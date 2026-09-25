@@ -82,6 +82,29 @@
   },
   "models": [
     {
+      "id": "claude-opus-5",
+      "provider": "anthropic",
+      "label": "Claude Opus 5",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": false,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "configured": true,
+      "modes": [
+        "agent",
+        "cli"
+      ],
+      "runtime": {
+        "model": "claude-opus-5"
+      }
+    },
+    {
       "id": "claude-fable-5-1",
       "provider": "anthropic",
       "label": "Claude Fable 5.1",
@@ -98,51 +121,11 @@
       "defaultEffort": "high",
       "configured": true,
       "modes": [
-        "api",
         "agent",
         "cli"
       ],
       "runtime": {
         "model": "claude-fable-5-1"
-      }
-    },
-    {
-      "id": "claude-opus-5",
-      "provider": "anthropic",
-      "label": "Claude Opus 5",
-      "capabilitiesKnown": true,
-      "reasoning": true,
-      "temperature": false,
-      "supportedEfforts": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-      ],
-      "configured": true,
-      "modes": [
-        "api",
-        "agent",
-        "cli"
-      ],
-      "runtime": {
-        "model": "claude-opus-5"
-      }
-    },
-    {
-      "id": "claude-haiku-4-5-20251001",
-      "provider": "anthropic",
-      "label": "Claude Haiku 4.5",
-      "capabilitiesKnown": true,
-      "reasoning": true,
-      "temperature": false,
-      "configured": true,
-      "modes": [
-        "api"
-      ],
-      "runtime": {
-        "model": "claude-haiku-4-5-20251001"
       }
     },
     {
@@ -159,80 +142,6 @@
       ],
       "runtime": {
         "model": "claude-haiku-4-5"
-      }
-    },
-    {
-      "id": "gpt-5.6-sol",
-      "provider": "openai",
-      "label": "GPT-5.6 Sol",
-      "capabilitiesKnown": true,
-      "reasoning": true,
-      "temperature": false,
-      "supportedEfforts": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max",
-        "ultra"
-      ],
-      "configured": true,
-      "modes": [
-        "api",
-        "agent",
-        "cli"
-      ],
-      "runtime": {
-        "model": "gpt-5.6-sol"
-      }
-    },
-    {
-      "id": "gpt-5.6-terra",
-      "provider": "openai",
-      "label": "GPT-5.6 Terra",
-      "capabilitiesKnown": true,
-      "reasoning": true,
-      "temperature": false,
-      "supportedEfforts": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max",
-        "ultra"
-      ],
-      "configured": true,
-      "modes": [
-        "api",
-        "agent",
-        "cli"
-      ],
-      "runtime": {
-        "model": "gpt-5.6-terra"
-      }
-    },
-    {
-      "id": "gpt-5.6-luna",
-      "provider": "openai",
-      "label": "GPT-5.6 Luna",
-      "capabilitiesKnown": true,
-      "reasoning": true,
-      "temperature": false,
-      "supportedEfforts": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-      ],
-      "configured": true,
-      "modes": [
-        "api",
-        "agent",
-        "cli"
-      ],
-      "runtime": {
-        "model": "gpt-5.6-luna"
       }
     },
     {
@@ -256,6 +165,77 @@
       ],
       "runtime": {
         "model": "gpt-6-astra"
+      }
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "provider": "openai",
+      "label": "GPT-5.6-Sol",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": false,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ],
+      "configured": true,
+      "modes": [
+        "agent",
+        "cli"
+      ],
+      "runtime": {
+        "model": "gpt-5.6-sol"
+      }
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "provider": "openai",
+      "label": "GPT-5.6-Terra",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": false,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ],
+      "configured": true,
+      "modes": [
+        "agent",
+        "cli"
+      ],
+      "runtime": {
+        "model": "gpt-5.6-terra"
+      }
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "provider": "openai",
+      "label": "GPT-5.6-Luna",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": false,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "configured": true,
+      "modes": [
+        "agent",
+        "cli"
+      ],
+      "runtime": {
+        "model": "gpt-5.6-luna"
       }
     },
     {
@@ -294,7 +274,6 @@
       ],
       "configured": true,
       "modes": [
-        "api",
         "cli"
       ],
       "runtime": {
@@ -315,131 +294,10 @@
       ],
       "configured": true,
       "modes": [
-        "api",
         "cli"
       ],
       "runtime": {
         "model": "gemini-3.5-flash"
-      }
-    },
-    {
-      "id": "veo-3.1-lite-generate-preview",
-      "provider": "google",
-      "label": "veo-3.1-lite-generate-preview",
-      "capabilitiesKnown": true,
-      "reasoning": false,
-      "temperature": false,
-      "configured": true,
-      "modes": [
-        "api"
-      ],
-      "runtime": {
-        "model": "veo-3.1-lite-generate-preview"
-      }
-    },
-    {
-      "id": "veo-3.1-generate-preview",
-      "provider": "google",
-      "label": "veo-3.1-generate-preview",
-      "capabilitiesKnown": true,
-      "reasoning": false,
-      "temperature": false,
-      "configured": true,
-      "modes": [
-        "api"
-      ],
-      "runtime": {
-        "model": "veo-3.1-generate-preview"
-      }
-    },
-    {
-      "id": "nano-banana-pro-preview",
-      "provider": "google",
-      "label": "nano-banana-pro-preview",
-      "capabilitiesKnown": true,
-      "reasoning": false,
-      "temperature": false,
-      "configured": true,
-      "modes": [
-        "api"
-      ],
-      "runtime": {
-        "model": "nano-banana-pro-preview"
-      }
-    },
-    {
-      "id": "lyria-3.5",
-      "provider": "google",
-      "label": "lyria-3.5",
-      "capabilitiesKnown": true,
-      "reasoning": false,
-      "temperature": false,
-      "configured": true,
-      "modes": [
-        "api"
-      ],
-      "runtime": {
-        "model": "lyria-3.5"
-      }
-    },
-    {
-      "id": "antigravity-preview-09-2026",
-      "provider": "google",
-      "label": "antigravity-preview-09-2026",
-      "capabilitiesKnown": true,
-      "reasoning": false,
-      "temperature": false,
-      "configured": true,
-      "modes": [
-        "api"
-      ],
-      "runtime": {
-        "model": "antigravity-preview-09-2026"
-      }
-    },
-    {
-      "id": "antigravity-preview-05-2026",
-      "provider": "google",
-      "label": "antigravity-preview-05-2026",
-      "capabilitiesKnown": true,
-      "reasoning": false,
-      "temperature": false,
-      "configured": true,
-      "modes": [
-        "api"
-      ],
-      "runtime": {
-        "model": "antigravity-preview-05-2026"
-      }
-    },
-    {
-      "id": "deepseek-v4-pro",
-      "provider": "deepseek",
-      "label": "DeepSeek V4 Pro",
-      "capabilitiesKnown": true,
-      "reasoning": true,
-      "temperature": true,
-      "configured": true,
-      "modes": [
-        "api"
-      ],
-      "runtime": {
-        "model": "deepseek-v4-pro"
-      }
-    },
-    {
-      "id": "deepseek-flash",
-      "provider": "deepseek",
-      "label": "deepseek-flash",
-      "capabilitiesKnown": true,
-      "reasoning": true,
-      "temperature": false,
-      "configured": true,
-      "modes": [
-        "api"
-      ],
-      "runtime": {
-        "model": "deepseek-flash"
       }
     }
   ],
@@ -691,57 +549,7 @@
       "authenticated": true,
       "kind": "api",
       "mode": "api",
-      "modelDetails": [
-        {
-          "id": "claude-fable-5-1",
-          "label": "Claude Fable 5.1",
-          "provider": "anthropic",
-          "mode": "api",
-          "releaseDate": "2026-09-01",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ],
-          "defaultEffort": "high"
-        },
-        {
-          "id": "claude-opus-5",
-          "label": "Claude Opus 5",
-          "provider": "anthropic",
-          "mode": "api",
-          "releaseDate": "2026-07-24",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ]
-        },
-        {
-          "id": "claude-haiku-4-5-20251001",
-          "label": "Claude Haiku 4.5",
-          "provider": "anthropic",
-          "mode": "api",
-          "releaseDate": "2025-10-15",
-          "capabilitiesKnown": true,
-          "temperature": false
-        }
-      ],
-      "models": [
-        "claude-fable-5-1",
-        "claude-opus-5",
-        "claude-haiku-4-5-20251001"
-      ],
+      "modelError": "anthropic: anthropic models: transport request failed",
       "permissions": {
         "modes": {
           "acceptEdits": {
@@ -910,6 +718,31 @@
       "mode": "agent",
       "modelDetails": [
         {
+          "id": "claude-opus-5",
+          "label": "Claude Opus 5",
+          "provider": "anthropic",
+          "mode": "agent",
+          "releaseDate": "2026-07-24",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "inputMediaTypes": [
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp",
+            "application/pdf"
+          ],
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "priority": 1
+        },
+        {
           "id": "claude-fable-5-1",
           "label": "Claude Fable 5.1",
           "provider": "anthropic",
@@ -935,30 +768,6 @@
           "defaultEffort": "high"
         },
         {
-          "id": "claude-opus-5",
-          "label": "Claude Opus 5",
-          "provider": "anthropic",
-          "mode": "agent",
-          "releaseDate": "2026-07-24",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "inputMediaTypes": [
-            "image/png",
-            "image/jpeg",
-            "image/gif",
-            "image/webp",
-            "application/pdf"
-          ],
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ]
-        },
-        {
           "id": "claude-haiku-4-5",
           "label": "Claude Haiku 4.5 (latest)",
           "provider": "anthropic",
@@ -977,8 +786,8 @@
         }
       ],
       "models": [
-        "claude-fable-5-1",
         "claude-opus-5",
+        "claude-fable-5-1",
         "claude-haiku-4-5"
       ],
       "permissions": {
@@ -1179,10 +988,28 @@
         "ANTHROPIC_API_KEY"
       ],
       "authenticated": true,
-      "binary": "/Users/moshe/.local/bin/claude",
+      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/E8504C34-EA28-4D2E-B73E-1247F22E71C7/claude",
       "kind": "cli",
       "mode": "cli",
       "modelDetails": [
+        {
+          "id": "claude-opus-5",
+          "label": "Claude Opus 5",
+          "provider": "anthropic",
+          "mode": "cli",
+          "releaseDate": "2026-07-24",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "priority": 1
+        },
         {
           "id": "claude-fable-5-1",
           "label": "Claude Fable 5.1",
@@ -1202,23 +1029,6 @@
           "defaultEffort": "high"
         },
         {
-          "id": "claude-opus-5",
-          "label": "Claude Opus 5",
-          "provider": "anthropic",
-          "mode": "cli",
-          "releaseDate": "2026-07-24",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ]
-        },
-        {
           "id": "claude-haiku-4-5",
           "label": "Claude Haiku 4.5 (latest)",
           "provider": "anthropic",
@@ -1230,8 +1040,8 @@
         }
       ],
       "models": [
-        "claude-fable-5-1",
         "claude-opus-5",
+        "claude-fable-5-1",
         "claude-haiku-4-5"
       ],
       "permissions": {
@@ -1430,69 +1240,7 @@
       "authenticated": true,
       "kind": "api",
       "mode": "api",
-      "modelDetails": [
-        {
-          "id": "gpt-5.6-sol",
-          "label": "GPT-5.6 Sol",
-          "provider": "openai",
-          "mode": "api",
-          "releaseDate": "2026-07-09",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max",
-            "ultra"
-          ],
-          "priority": 1
-        },
-        {
-          "id": "gpt-5.6-terra",
-          "label": "GPT-5.6 Terra",
-          "provider": "openai",
-          "mode": "api",
-          "releaseDate": "2026-07-09",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max",
-            "ultra"
-          ],
-          "priority": 2
-        },
-        {
-          "id": "gpt-5.6-luna",
-          "label": "GPT-5.6 Luna",
-          "provider": "openai",
-          "mode": "api",
-          "releaseDate": "2026-07-09",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ],
-          "priority": 3
-        }
-      ],
-      "models": [
-        "gpt-5.6-sol",
-        "gpt-5.6-terra",
-        "gpt-5.6-luna"
-      ],
+      "modelError": "openai: openai models: transport request failed",
       "permissions": {
         "modes": {
           "acceptEdits": {
@@ -1656,7 +1404,7 @@
         "OPENAI_API_KEY"
       ],
       "authenticated": true,
-      "binary": "/Users/moshe/Library/pnpm/bin/codex",
+      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/E8504C34-EA28-4D2E-B73E-1247F22E71C7/codex",
       "kind": "cli",
       "mode": "agent",
       "modelDetails": [
@@ -1695,7 +1443,7 @@
             "max",
             "ultra"
           ],
-          "priority": 1
+          "priority": 4
         },
         {
           "id": "gpt-5.6-terra",
@@ -1947,7 +1695,7 @@
         "OPENAI_API_KEY"
       ],
       "authenticated": true,
-      "binary": "/Users/moshe/Library/pnpm/bin/codex",
+      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/E8504C34-EA28-4D2E-B73E-1247F22E71C7/codex",
       "kind": "cli",
       "mode": "cli",
       "modelDetails": [
@@ -1986,7 +1734,7 @@
             "max",
             "ultra"
           ],
-          "priority": 1
+          "priority": 4
         },
         {
           "id": "gpt-5.6-terra",
@@ -2241,96 +1989,7 @@
       "authenticated": true,
       "kind": "api",
       "mode": "api",
-      "modelDetails": [
-        {
-          "id": "gemini-3.6-flash",
-          "label": "Gemini 3.6 Flash",
-          "provider": "google",
-          "mode": "api",
-          "releaseDate": "2026-07-21",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": true,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high"
-          ]
-        },
-        {
-          "id": "gemini-3.5-flash",
-          "label": "Gemini 3.5 Flash",
-          "provider": "google",
-          "mode": "api",
-          "releaseDate": "2026-05-19",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": true,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high"
-          ]
-        },
-        {
-          "id": "veo-3.1-lite-generate-preview",
-          "label": "veo-3.1-lite-generate-preview",
-          "provider": "google",
-          "mode": "api",
-          "capabilitiesKnown": true,
-          "temperature": false
-        },
-        {
-          "id": "veo-3.1-generate-preview",
-          "label": "veo-3.1-generate-preview",
-          "provider": "google",
-          "mode": "api",
-          "capabilitiesKnown": true,
-          "temperature": false
-        },
-        {
-          "id": "nano-banana-pro-preview",
-          "label": "nano-banana-pro-preview",
-          "provider": "google",
-          "mode": "api",
-          "capabilitiesKnown": true,
-          "temperature": false
-        },
-        {
-          "id": "lyria-3.5",
-          "label": "lyria-3.5",
-          "provider": "google",
-          "mode": "api",
-          "capabilitiesKnown": true,
-          "temperature": false
-        },
-        {
-          "id": "antigravity-preview-09-2026",
-          "label": "antigravity-preview-09-2026",
-          "provider": "google",
-          "mode": "api",
-          "capabilitiesKnown": true,
-          "temperature": false
-        },
-        {
-          "id": "antigravity-preview-05-2026",
-          "label": "antigravity-preview-05-2026",
-          "provider": "google",
-          "mode": "api",
-          "capabilitiesKnown": true,
-          "temperature": false
-        }
-      ],
-      "models": [
-        "gemini-3.6-flash",
-        "gemini-3.5-flash",
-        "veo-3.1-lite-generate-preview",
-        "veo-3.1-generate-preview",
-        "nano-banana-pro-preview",
-        "lyria-3.5",
-        "antigravity-preview-09-2026",
-        "antigravity-preview-05-2026"
-      ],
+      "modelError": "google: google models: transport request failed",
       "permissions": {
         "modes": {
           "acceptEdits": {
@@ -2711,30 +2370,7 @@
       "authenticated": true,
       "kind": "api",
       "mode": "api",
-      "modelDetails": [
-        {
-          "id": "deepseek-v4-pro",
-          "label": "DeepSeek V4 Pro",
-          "provider": "deepseek",
-          "mode": "api",
-          "releaseDate": "2026-04-24",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": true
-        },
-        {
-          "id": "deepseek-flash",
-          "label": "deepseek-flash",
-          "provider": "deepseek",
-          "mode": "api",
-          "capabilitiesKnown": true,
-          "temperature": false
-        }
-      ],
-      "models": [
-        "deepseek-v4-pro",
-        "deepseek-flash"
-      ],
+      "modelError": "deepseek: deepseek models: transport request failed",
       "permissions": {
         "modes": {
           "acceptEdits": {
@@ -2969,7 +2605,7 @@
           "mode": "api",
           "kind": "api",
           "keyless": false,
-          "defaultModel": "claude-fable-5-1",
+          "defaultModel": "claude-opus-5",
           "catalogProvider": "anthropic",
           "disabled": false,
           "availability": {
@@ -3289,7 +2925,7 @@
           "mode": "agent",
           "kind": "cli",
           "keyless": false,
-          "defaultModel": "claude-fable-5-1",
+          "defaultModel": "claude-opus-5",
           "catalogProvider": "anthropic",
           "disabled": false,
           "availability": {
@@ -4291,7 +3927,7 @@
           "mode": "cli",
           "kind": "cli",
           "keyless": false,
-          "defaultModel": "claude-fable-5-1",
+          "defaultModel": "claude-opus-5",
           "catalogProvider": "anthropic",
           "disabled": false,
           "availability": {
@@ -7750,7 +7386,7 @@
           "mode": "api",
           "kind": "api",
           "keyless": false,
-          "defaultModel": "deepseek-v4-flash",
+          "defaultModel": "deepseek-flash",
           "catalogProvider": "deepseek",
           "disabled": false,
           "availability": {
