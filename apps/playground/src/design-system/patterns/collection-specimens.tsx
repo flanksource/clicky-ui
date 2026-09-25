@@ -13,6 +13,8 @@ import {
   Tree,
   cn,
   type DataTableColumn,
+  type JsonSchemaObject,
+  type JsonSchemaProperty,
 } from "@flanksource/clicky-ui";
 import {
   UiActivity,
@@ -31,6 +33,7 @@ import {
   type ServiceNode,
   type ServiceRow,
 } from "./collection-data";
+import { ObjectArrayEditor } from "./ObjectArrayEditor";
 
 // One specimen per collection style. Each is deliberately small: the point of
 // comparison is the shape of the presentation, not how much data it can hold.
@@ -250,6 +253,57 @@ export function AccordionSpecimen() {
         )}
       />
     </div>
+  );
+}
+
+const cell = (title: string, type: "string" | "number" = "string"): JsonSchemaProperty => ({ type, title });
+
+// Two object arrays with no display hint: three columns fit a grid, seven open
+// as the inline item form. The ⋮ menu on each switches Grid / Stack form /
+// Inline form over the same value.
+const ARRAY_VIEWS_SCHEMA: JsonSchemaObject = {
+  type: "object",
+  properties: {
+    owners: {
+      type: "array",
+      title: "Owners",
+      items: {
+        type: "object",
+        properties: { service: cell("Service"), team: cell("Team"), oncall: cell("On-call") },
+      },
+    },
+    routes: {
+      type: "array",
+      title: "Routes",
+      items: {
+        type: "object",
+        properties: {
+          path: cell("Path"),
+          method: cell("Method"),
+          upstream: cell("Upstream"),
+          timeout: cell("Timeout", "number"),
+          retries: cell("Retries", "number"),
+          rewrite: cell("Rewrite"),
+          notes: cell("Notes"),
+        },
+      },
+    },
+  },
+};
+
+export function ArrayViewsSpecimen() {
+  return (
+    <ObjectArrayEditor
+      schema={ARRAY_VIEWS_SCHEMA}
+      idPrefix="design-system-array-views"
+      initial={{
+        owners: SERVICES.slice(0, 3).map((row) => ({ service: row.service, team: row.owner, oncall: row.owner })),
+        routes: [
+          { path: "/api/v1/users", method: "GET", upstream: "users-svc:8080", timeout: 30, retries: 2, rewrite: "/v1/users", notes: "" },
+          { path: "/healthz", method: "GET", upstream: "gateway:8081", timeout: 2, retries: 0, rewrite: "", notes: "Probe" },
+        ],
+      }}
+    />
   );
 }
 

@@ -64,10 +64,12 @@ const mode = {
 | Mode | Item schema | Behavior |
 | --- | --- | --- |
 | `filter-pills` | Enum-backed items | Toggle pills; an empty stored array represents all options. |
-| `accordion` | Objects | Default for object arrays; summary rows with one editor open at a time. |
+| `accordion` | Objects | Opens as summary rows with one editor open at a time, whatever the column count. |
 | `cards` | Objects | Titled cards with all item editors visible. |
 | `stacked` | Objects | Full sub-forms labelled by item number. |
 | `list` | Scalars | Compact editable list items. |
+
+With no `x-array-display` and no `x-layout: "table"`, an object array opens by its visible column count — the union across rows of the cells each row's own listeners show. Up to `x-table-max-columns` (array-level, default `4`) scalar columns open as a grid; wider items, or items holding a nested object or object list, open as summary rows with their fields labelled inline. A ⋮ menu on the array's summary line switches between **Grid**, **Stack form** and **Inline form** over the same value; it is hidden in read-only property previews.
 
 ### Array item descriptor
 

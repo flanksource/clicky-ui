@@ -133,7 +133,7 @@ Objects with fixed `properties` recurse into headed sub-forms. Required markers 
 
 ## Arrays of objects
 
-When `items` is an object schema, entries default to accordion rows with one item open at a time. Use `x-array-display: "cards"` to keep titled cards open, or `"stacked"` for full sub-forms. The `x-item` extension supplies item titles, summaries, and available actions.
+When `items` is an object schema, the array opens by its visible column count: up to `x-table-max-columns` (default 4) scalar columns render as a grid, and wider items — or items holding a nested object or object list — render as accordion rows with one item open at a time and its fields labelled inline. A ⋮ menu on the array's summary line switches between **Grid**, **Stack form** and **Inline form** over the same value. `x-layout: "table"` and `x-array-display: "accordion"` pick the opening view explicitly. Use `x-array-display: "cards"` to keep titled cards open, or `"stacked"` for full sub-forms. The `x-item` extension supplies item titles, summaries, and available actions.
 
 ```json
 {
