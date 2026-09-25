@@ -17,6 +17,7 @@ import type { StaticIconComponent } from "@flanksource/clicky-ui";
 import {
   AccordionSpecimen,
   AggregateSpecimen,
+  ArrayViewsSpecimen,
   CardsSpecimen,
   MasterDialogSpecimen,
   MasterRowDetailSpecimen,
@@ -192,6 +193,22 @@ export const COLLECTION_STYLES: readonly CollectionStyle[] = [
       "The collection is read-only and never needs inline editing",
     ],
     render: () => <ObjectArrayPattern />,
+  },
+  {
+    id: "object-array-views",
+    label: "Object array views",
+    icon: UiTable,
+    question: "Should these objects be edited as rows or as forms?",
+    useWhen: [
+      "An object array carries no display hint and its width depends on the schema",
+      "A few scalar columns fit a grid; wider items read better as one form per item",
+      "The author may want to flip between the grid and a per-item form while editing",
+    ],
+    avoidWhen: [
+      "The schema already knows the right shape — say `x-layout: table` or `x-array-display: accordion`",
+      "Items hold nested objects or object lists, which never fit a grid cell",
+    ],
+    render: () => <ArrayViewsSpecimen />,
   },
   {
     id: "infinite-feed",
