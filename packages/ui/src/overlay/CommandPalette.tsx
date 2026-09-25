@@ -45,6 +45,10 @@ export type CommandPaletteProps = {
   query?: string;
   /** Called with the next query on every keystroke. Required for server-side search. */
   onQueryChange?: (query: string) => void;
+  /** Replaces the built-in search field while preserving the palette and result list. */
+  customInput?: ReactNode;
+  /** Changing this value focuses the result list for keyboard selection. */
+  focusListKey?: number;
   /**
    * Global shortcut that opens (and, while open, closes) the palette, in
    * `useHotkey` syntax — `"mod+k"` by default, where `mod` is ⌘ on macOS and
@@ -100,6 +104,8 @@ export function CommandPalette({
   groups,
   query,
   onQueryChange,
+  customInput,
+  focusListKey,
   hotkey = "mod+k",
   placeholder = "Type a command or search…",
   loading,
@@ -126,6 +132,7 @@ export function CommandPalette({
 
   const isOpen = open ?? selfOpen;
   const currentQuery = query ?? selfQuery;
+  const usesCustomInput = customInput !== undefined;
 
   const setOpen = useCallback(
     (next: boolean) => {
@@ -171,7 +178,11 @@ export function CommandPalette({
     }
     restoreFocusRef.current = document.activeElement as HTMLElement | null;
     inputRef.current?.focus();
-  }, [isOpen, resetQueryOnClose, query]);
+  }, [isOpen, resetQueryOnClose, query, usesCustomInput]);
+
+  useEffect(() => {
+    if (isOpen && focusListKey !== undefined) listRef.current?.focus();
+  }, [isOpen, focusListKey]);
 
   // Keep the active row in view without stealing focus from the input.
   useEffect(() => {
@@ -198,7 +209,7 @@ export function CommandPalette({
     [currentQuery, onSelect, closeOnSelect, setOpen],
   );
 
-  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
@@ -253,14 +264,15 @@ export function CommandPalette({
         aria-modal="true"
         aria-label={ariaLabel}
         className={cn(
-          "flex h-fit w-full flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl",
+          "flex h-fit w-full flex-col rounded-lg border border-border bg-background shadow-xl",
+          usesCustomInput ? "overflow-visible" : "overflow-hidden",
           SIZE_CLASS[size],
           className,
         )}
         style={{ marginTop: topOffset }}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center gap-density-2 border-b border-border px-density-3">
+        {!usesCustomInput ? <div className="flex items-center gap-density-2 border-b border-border px-density-3">
           <Icon icon={UiSearch} className="shrink-0 text-muted-foreground" />
           <input
             ref={inputRef}
@@ -277,7 +289,7 @@ export function CommandPalette({
             onKeyDown={onKeyDown}
             className="h-12 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-placeholder"
           />
-        </div>
+        </div> : <div className="border-b border-border p-density-3">{customInput}</div>}
 
         <CommandPaletteList
           groups={visibleGroups}
@@ -287,6 +299,8 @@ export function CommandPalette({
           optionId={optionId}
           onActivate={activate}
           onHover={setActiveIndex}
+          onKeyDown={onKeyDown}
+          activeItemId={activeItem ? optionId(activeItem) : undefined}
           listRef={listRef}
           loading={loading}
           emptyState={emptyState}
