@@ -1,4 +1,4 @@
-import { Fragment, type RefObject } from "react";
+import { Fragment, type KeyboardEventHandler, type RefObject } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import type { CommandGroup, CommandItem } from "./CommandPalette.model";
@@ -12,6 +12,8 @@ export type CommandPaletteListProps = {
   optionId: (item: CommandItem) => string;
   onActivate: (item: CommandItem) => void;
   onHover: (index: number) => void;
+  onKeyDown: KeyboardEventHandler<HTMLDivElement>;
+  activeItemId?: string | undefined;
   listRef: RefObject<HTMLDivElement | null>;
   loading?: boolean | undefined;
   emptyState?: React.ReactNode;
@@ -31,6 +33,8 @@ export function CommandPaletteList({
   optionId,
   onActivate,
   onHover,
+  onKeyDown,
+  activeItemId,
   listRef,
   loading,
   emptyState,
@@ -46,6 +50,9 @@ export function CommandPaletteList({
       id={listId}
       role="listbox"
       aria-label="Commands"
+      aria-activedescendant={activeItemId}
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
       className="overflow-y-auto overscroll-contain py-density-1"
       style={{ maxHeight: listMaxHeight }}
     >

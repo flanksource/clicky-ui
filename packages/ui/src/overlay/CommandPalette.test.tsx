@@ -61,6 +61,24 @@ describe("CommandPalette", () => {
     expect(combobox()).toHaveFocus();
   });
 
+  it("renders a custom input and focuses keyboard-selectable results when requested", () => {
+    const onSelect = vi.fn();
+    const { rerender } = render(<CommandPalette open groups={groups()} customInput={<div role="textbox" aria-label="Expression" />} onSelect={onSelect} />);
+
+    expect(screen.getByRole("textbox", { name: "Expression" })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).toBeNull();
+
+    rerender(<CommandPalette open groups={groups()} customInput={<div role="textbox" aria-label="Expression" />} focusListKey={1} onSelect={onSelect} />);
+    const list = screen.getByRole("listbox", { name: "Commands" });
+    expect(list).toHaveFocus();
+    fireEvent.keyDown(list, { key: "ArrowDown" });
+    fireEvent.keyDown(list, { key: "Enter" });
+    expect(onSelect.mock.calls[0]?.[0]?.item?.id).toBe("orders");
+
+    rerender(<CommandPalette open groups={groups()} onSelect={onSelect} />);
+    expect(combobox()).toHaveFocus();
+  });
+
   it("opens on the hotkey when uncontrolled", () => {
     render(<CommandPalette groups={groups()} />);
     expect(screen.queryByRole("dialog")).toBeNull();
