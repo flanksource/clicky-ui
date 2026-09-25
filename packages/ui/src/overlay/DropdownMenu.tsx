@@ -200,6 +200,8 @@ function DropdownMenuRoot({
         ) : (
           <Button
             ref={refs.setReference as React.Ref<HTMLButtonElement>}
+            // Opening a menu never submits the form the trigger sits in.
+            type="button"
             variant={variant}
             size={size}
             title={title}
