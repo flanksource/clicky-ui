@@ -18,6 +18,18 @@ describe("DropdownMenu", () => {
     expect(screen.getByRole("menu")).toBeInTheDocument();
   });
 
+  it("opens without submitting the form its trigger sits in", () => {
+    const onSubmit = vi.fn((e: { preventDefault: () => void }) => e.preventDefault());
+    render(
+      <form onSubmit={onSubmit}>
+        <DropdownMenu label="Download" items={items()} />
+      </form>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /download/i }));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it("invokes onSelect and closes when an item is chosen", () => {
     const onSelect = vi.fn();
     render(<DropdownMenu label="Download" items={items(onSelect)} />);
