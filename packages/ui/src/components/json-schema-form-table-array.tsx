@@ -12,13 +12,14 @@ import {
 } from "./json-schema-form-size";
 import { resolveControl, schemaHelper } from "./json-schema-form-resolve";
 import { applyPostExtensions } from "./json-schema-form-extensions";
-import { effectiveProperties } from "./json-schema-form-conditionals";
 import { appendInstancePath } from "./json-schema-form-errors";
+import { applyChangeEffects } from "./json-schema-form-listeners";
+import { tableColumnOptions, tableLayout } from "./json-schema-form-array-view";
+import { itemCountLabel, noItemsLabel, resolveItemSpec } from "./json-schema-form-item-summary";
+import { labelSizeClass } from "./json-schema-form-size";
 import {
   canAddItem,
   canRemoveItem,
-  orderByClickyOrder,
-  orderByXOrder,
   seedFromSchema,
 } from "./json-schema-form-utils";
 import type {
@@ -30,15 +31,18 @@ import type {
 
 // TableArray renders an object-item array as a table: a header row of the item's
 // property names and one row per item with value-only controls, plus per-row
-// remove and an add button. Driven by `x-layout: table`.
+// remove and an add button. The grid view of an object array; see ObjectArrayView.
 export function TableArray({
   field,
   ctx,
   readOnly,
+  toolbar,
 }: {
   field: FieldControl;
   ctx: RenderContext;
   readOnly: boolean;
+  /** List-level actions, right-aligned on a slim line above the table beside the row count. */
+  toolbar?: ReactNode;
 }) {
   const items = Array.isArray(field.value) ? field.value : [];
   const itemSchema = field.itemSchema ?? { type: "object" };
@@ -49,27 +53,18 @@ export function TableArray({
   // text wherever it sits, and in a table the grid itself is the structure a
   // disabled control would otherwise keep visible. `x-disabled`, which only
   // reaches ctx.readOnly, keeps real controls, disabled.
-  const valueCells = ctx.viewOnly || field.readOnly === true;
-  // Columns are the item schema's effective properties — `allOf` members
-  // included, so a listener path that patches one cell (appended as an allOf
-  // member) reaches it — minus the columns no cell would render: `x-hidden`,
-  // a readOnly column under hideReadOnlyFields, and a writeOnly column in a
-  // read-only view. The item schema's explicit `x-order` is the authority for
-  // the keys it names: per-property `x-clicky-order` sorts first (so it still
-  // orders everything `x-order` leaves out, and composes across merged
-  // sources), then `x-order` pulls its listed columns to the front in its own
-  // sequence.
-  const columns = orderByXOrder(
-    orderByClickyOrder(
-      Object.entries(effectiveProperties(itemSchema as JsonSchemaObject, {}).properties).filter(
-        ([, prop]) =>
-          prop["x-hidden"] !== true &&
-          !(ctx.hideReadOnlyFields && prop.readOnly === true) &&
-          !(prop.writeOnly === true && (valueCells || prop.readOnly === true)),
-      ),
-    ),
-    itemSchema["x-order"],
-  );
+  const options = tableColumnOptions(field, ctx);
+  const valueCells = options.valueCells;
+  // Columns are the union across rows of each row's effective item properties
+  // under its own listener state — `allOf` members included, so a listener
+  // path that patches one cell (appended as an allOf member) reaches it —
+  // minus the cells no row would render: `x-hidden`, a readOnly cell under
+  // hideReadOnlyFields, and a writeOnly cell in a read-only view. A cell its
+  // own row hides renders as an empty placeholder in a column another row
+  // shows. The item schema's explicit `x-order` is the authority for the keys
+  // it names: per-property `x-clicky-order` sorts first, then `x-order` pulls
+  // its listed columns to the front in its own sequence.
+  const { columns, rows } = tableLayout(itemSchema, items, options);
   // hideReadOnlyFields already dropped the declared-readOnly columns; the
   // cells a read-only table marks readOnly itself must still render.
   const childCtx: RenderContext = {
@@ -83,28 +78,42 @@ export function TableArray({
   // gutter down the side.
   const removable = !readOnly && canRemoveItem(field, items.length);
 
-  function cell(
-    item: unknown,
-    rowIndex: number,
-    col: string,
-    prop: JsonSchemaProperty,
-  ): ReactNode {
+  // A cell renders its OWN row's property, so a listener's readOnly, enable or
+  // patch reaches that row alone, and commits through the row's value
+  // listeners exactly as an item of the list views does.
+  function cell(item: unknown, rowIndex: number, col: string): ReactNode {
     const obj = isPlainObject(item) ? item : {};
-    const nodes = ctx.render.renderFieldNodes(
-      {
-        key: `${field.key}[${rowIndex}].${col}`,
-        prop: valueCells ? { ...prop, readOnly: true } : prop,
-        required: false,
-        value: obj[col],
-        onChange: (next) =>
-          field.onChange(setIndex(items, rowIndex, { ...obj, [col]: next })),
-        instancePath: appendInstancePath(
-          appendInstancePath(ctx.instancePath, rowIndex),
-          col,
-        ),
-      },
-      childCtx,
-    );
+    const prop = rows[rowIndex]?.[col];
+    const nodes = prop
+      ? ctx.render.renderFieldNodes(
+          {
+            key: `${field.key}[${rowIndex}].${col}`,
+            prop: valueCells ? { ...prop, readOnly: true } : prop,
+            required: false,
+            value: obj[col],
+            onChange: (next) =>
+              field.onChange(
+                setIndex(
+                  items,
+                  rowIndex,
+                  applyChangeEffects(itemSchema as JsonSchemaObject, {
+                    root: options.rootValue ?? obj,
+                    ...(options.evaluate ? { evaluate: options.evaluate } : {}),
+                    value: obj,
+                    key: col,
+                    next,
+                  }),
+                ),
+              ),
+            instancePath: appendInstancePath(
+              appendInstancePath(ctx.instancePath, rowIndex),
+              col,
+            ),
+          },
+          childCtx,
+        )
+      : null;
+    if (!nodes) return <span data-jsf-cell-placeholder aria-hidden="true" className={cn("block", controlMinHeightClass[ctx.size])} />;
     return ctx.presentation ? (
       <div
         className={cn(
@@ -112,10 +121,10 @@ export function TableArray({
           controlMinHeightClass[ctx.size],
         )}
       >
-        {nodes?.value}
+        {nodes.value}
       </div>
     ) : (
-      (nodes?.value ?? null)
+      nodes.value
     );
   }
 
@@ -138,7 +147,7 @@ export function TableArray({
     return applyPostExtensions(column, { label: header, value: null }, ctx.post, roots).label;
   }
 
-  return (
+  const table = (
     <div
       className={cn(
         "overflow-x-auto",
@@ -177,9 +186,9 @@ export function TableArray({
                 ctx.presentation ? "border-border" : "border-input",
               )}
             >
-              {columns.map(([col, prop]) => (
+              {columns.map(([col]) => (
                 <td key={col} className={cn("px-2 py-1", !ctx.presentation && !readOnly && "min-w-40")}>
-                  {cell(item, i, col, prop)}
+                  {cell(item, i, col)}
                 </td>
               ))}
               {removable && (
@@ -216,6 +225,21 @@ export function TableArray({
           </Button>
         </div>
       )}
+    </div>
+  );
+  if (toolbar === undefined) return table;
+  // The same summary line the item list shows, so switching views keeps the
+  // count and the toolbar where they were.
+  const spec = field.itemSpec ?? resolveItemSpec(field.schema, itemSchema);
+  return (
+    <div className="flex flex-col gap-2">
+      <div data-jsf-array-summary className="flex items-center justify-between gap-2">
+        <p className={cn("text-muted-foreground", labelSizeClass[ctx.size])}>
+          {items.length === 0 ? noItemsLabel(spec) : itemCountLabel(spec, items.length)}
+        </p>
+        <div className="flex shrink-0 items-center">{toolbar}</div>
+      </div>
+      {table}
     </div>
   );
 }

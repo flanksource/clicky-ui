@@ -964,14 +964,18 @@ export const ArrayOfObjects: Story = {
     docs: {
       description: {
         story:
-          "When an array's items are objects, each item collapses to one summary row and opens on click — the accordion is the default, with no schema hint required. The row identifies its item from conventional keys (`title`, `name`, `label`, `id`, `key`), falling back to *Item N*; `x-item` says it explicitly (see **ObjectArrayAccordion**). Plain string arrays still use the compact tag input — see **ScalarArrayTags**, and **ArrayOfObjectsStacked** for the full-sub-form opt-out.",
+          "When an array's items are objects, it opens by its visible column count with no schema hint required: up to `x-table-max-columns` (default 4) scalar columns as a grid, wider items as the inline item form, where each item collapses to one summary row and opens on click. The ⋮ menu on the summary line switches between Grid, Stack form and Inline form. The row identifies its item from conventional keys (`title`, `name`, `label`, `id`, `key`), falling back to *Item N*; `x-item` says it explicitly (see **ObjectArrayAccordion**). Plain string arrays still use the compact tag input — see **ScalarArrayTags**, and **ArrayOfObjectsStacked** for the full-sub-form opt-out.",
       },
     },
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    // Collapsed by default: the item's own fields are not on screen.
-    await expect(canvas.getByText("api")).toBeInTheDocument();
+    // Three scalar columns fit, so the servers open as a grid.
+    await expect(canvas.getByRole("table")).toBeInTheDocument();
+    await expect(canvas.getByDisplayValue("api")).toBeInTheDocument();
+    // The view menu turns the grid into collapsed item rows.
+    await userEvent.click(canvas.getByRole("button", { name: "View options for Servers" }));
+    await userEvent.click(within(document.body).getByRole("menuitem", { name: "Inline form" }));
     await expect(canvas.queryByLabelText(/^Port/)).toBeNull();
     // `expanded` picks the disclosure out of the row's reorder/remove buttons,
     // which carry the same item title in their labels.

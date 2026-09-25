@@ -95,8 +95,9 @@ export interface JsonSchemaProperty {
   // compact toggle (an empty stored array means all options); "accordion" and
   // "cards" render object items as summary rows or titled cards, both reading
   // `x-item` for the summary; "list" renders scalar values as compact editable
-  // list items. Object items default to the accordion, so this is only needed to
-  // say "cards" or to opt out with "stacked".
+  // list items. Object items with no hint open as a grid or the inline item
+  // form by column count (see `x-table-max-columns`) behind a view menu, so
+  // "accordion" only pins the opening view; "cards" and "stacked" opt out.
   "x-array-display"?: ArrayDisplay;
   // Force how this field's description is presented, overriding the form-level
   // `FormLayout.help`. Defaults to "inline" (a paragraph under the control).
@@ -176,6 +177,9 @@ export interface JsonSchemaProperty {
   // Per-field layout override, winning over `x-label-position` and the form
   // layout. "table" renders an array of objects (or a map) as compact rows.
   "x-layout"?: "inline" | "stack" | "table";
+  // Array-level: the most visible columns an object array with no display hint
+  // opens as a grid; wider arrays open as the inline item form. Default 4.
+  "x-table-max-columns"?: number;
   // Async entity-reference picker; see LookupDescriptor.
   "x-clicky-lookup"?: LookupDescriptor;
   // Consumer extension keys pass through untouched.

@@ -104,15 +104,21 @@ export function toStringArray(value: unknown): string[] {
 }
 
 // rendersAsSection reports whether a field renders as a full-width section
-// (ObjectSection) rather than an inline label + value row: objects, and
-// table/accordion/cards arrays, outside the properties layout.
+// (ObjectSection) rather than an inline label + value row: objects, table
+// maps, and object arrays in every view but the stacked opt-out — the grid and
+// the item list the view menu switches between (see ObjectArrayView), and
+// cards — outside the properties layout. Keyed on the schema, not the chosen
+// view, so switching views never moves the array's heading.
 export function rendersAsSection(field: FieldControl, mode: FormLayout["mode"]): boolean {
   return (
     mode !== "properties" &&
     (field.kind === "object" ||
       field.layout === "table" ||
       field.arrayDisplay === "accordion" ||
-      field.arrayDisplay === "cards")
+      field.arrayDisplay === "cards" ||
+      (field.kind === "array" &&
+        field.arrayDisplay !== "stacked" &&
+        hasObjectItemProperties(field.itemSchema)))
   );
 }
 

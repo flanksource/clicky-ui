@@ -58,6 +58,9 @@ function patchNode(
   const [segment, ...rest] = segments;
   if (segment === undefined) return apply(node);
   if (isArraySchema(node)) {
+    // Column-level by design: one `items` schema serves every row, so a path
+    // into an array patches the column. Row-scoped state comes from the item
+    // schema's own x-on-load/x-on-change, evaluated per row by the renderers.
     if (!node.items) return undefined;
     const items = patchNode(node.items, {}, segments, apply);
     return items && { ...node, items };

@@ -3,6 +3,7 @@ import {
   scalarItemsType,
 } from "./json-schema-form-resolve";
 import { applyListenerState } from "./json-schema-form-listeners";
+import { defaultArrayView } from "./json-schema-form-array-view";
 import { isPlainObject } from "../lib/collections";
 import { hasObjectItemProperties, isEmptyValue } from "./json-schema-form-utils";
 import { matchesFieldFilter } from "./json-schema-form-filter";
@@ -239,7 +240,20 @@ function collectArrayPaths(
   }
 
   const itemSchema = field.itemSchema ?? { type: "string" };
-  const table = field.layout === "table" && hasObjectItemProperties(itemSchema);
+  // A grid has no row header to hang an item-level message on. The view is
+  // the one the array opens in; a later switch through its view menu is
+  // local UI state this pure walk cannot see.
+  const table =
+    field.arrayDisplay !== "stacked" &&
+    hasObjectItemProperties(itemSchema) &&
+    defaultArrayView(field, {
+      hideReadOnlyFields: options.hideReadOnlyFields,
+      valueCells: subtreeIsView(field, options),
+      // Only picks stack vs inline — both item lists — so any mode will do.
+      layoutMode: "stacked",
+      rootValue: options.rootValue,
+      ...(options.expressionEvaluator ? { evaluate: options.expressionEvaluator } : {}),
+    }) === "grid";
   for (const [index, item] of (Array.isArray(field.value)
     ? field.value
     : []

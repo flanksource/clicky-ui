@@ -156,6 +156,7 @@ describe("JsonSchemaForm authoritative errors", () => {
         properties: {
           lines: {
             type: "array",
+            "x-array-display": "accordion",
             items: {
               type: "object",
               properties: {
@@ -169,10 +170,10 @@ describe("JsonSchemaForm authoritative errors", () => {
       [{ instancePath: "/lines/0/account", message: "Select an account" }]
     );
 
-    // Object items collapse to summary rows by default, so the row reports the
+    // An accordion collapses its items to summary rows, so the row reports the
     // error it is hiding and the message itself waits inside.
     expect(screen.getByTitle("1 error")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { expanded: false }));
+    fireEvent.click(within(screen.getByTitle("1 error").closest<HTMLElement>("[data-accordion-row]")!).getByRole("button", { expanded: false }));
 
     const account = screen.getByRole("textbox", { name: "Account" });
     expect(account.nextElementSibling).toHaveTextContent("Select an account");
