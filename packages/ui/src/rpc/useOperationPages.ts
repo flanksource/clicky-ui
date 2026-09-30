@@ -31,6 +31,8 @@ export type OperationPagesOptions = {
   filters: ParameterValues;
   /** Omit to infer a cursor walk from the operation; hosts may force either presentation. */
   paginationMode?: "paged" | "infinite";
+  /** Poll the current server page while it can change, in milliseconds. */
+  refreshIntervalMs?: number;
 };
 
 export type OperationPages = {
@@ -73,6 +75,7 @@ export function useOperationPages({
   parameters,
   filters,
   paginationMode,
+  refreshIntervalMs,
 }: OperationPagesOptions): OperationPages {
   const queryClient = useQueryClient();
   const cursorParam = cursorParameterName(parameters);
@@ -84,6 +87,9 @@ export function useOperationPages({
     );
   }
   const walkMode = paginationMode === "infinite" || (paginationMode === undefined && !!cursorParam);
+  if (refreshIntervalMs !== undefined && (!Number.isFinite(refreshIntervalMs) || refreshIntervalMs <= 0 || walkMode)) {
+    throw new Error("Operation page refresh requires a positive interval and paged mode");
+  }
 
   // The walk's own view of the filters: everything that identifies the query,
   // with the position taken out. A cursor left over in the URL from a shared
@@ -116,6 +122,7 @@ export function useOperationPages({
     enabled: !!endpoint && !walkMode,
     placeholderData: keepPreviousData,
     staleTime: 30_000,
+    ...(refreshIntervalMs !== undefined ? { refetchInterval: refreshIntervalMs } : {}),
     retry: 0,
   });
 

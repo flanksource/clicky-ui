@@ -153,6 +153,8 @@ export type OperationCatalogProps = {
   urlState?: false | { prefix: string };
   /** Omit to infer cursor walking automatically; set when a host requires a specific paging presentation. */
   paginationMode?: "paged" | "infinite";
+  /** Poll the current server page while it can change, in milliseconds. */
+  refreshIntervalMs?: number;
   /** Column names retained in raw rows for detail rendering but omitted from the table. */
   hiddenColumns?: string[];
   /**
@@ -226,6 +228,7 @@ export function OperationCatalog({
   initialValues = EMPTY_INITIAL_VALUES,
   urlState,
   paginationMode,
+  refreshIntervalMs,
   hiddenColumns,
   rowDetail,
   cellRenderers,
@@ -336,6 +339,7 @@ export function OperationCatalog({
     parameters: listParameters,
     filters: effectiveFilters,
     ...(paginationMode ? { paginationMode } : {}),
+    ...(refreshIntervalMs !== undefined ? { refreshIntervalMs } : {}),
   });
 
   const { followEnabled, sessionOperation, followMissing, tail } =

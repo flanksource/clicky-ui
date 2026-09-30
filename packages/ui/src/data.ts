@@ -533,7 +533,7 @@ export {
   type ParsedErrorStackTrace,
 } from "./data/diagnostics/error-diagnostics";
 
-export { HarPanel, type HarPanelProps } from "./data/har/HarPanel";
+export { HarPanel, HarEntryDetails, type HarPanelProps, type HarPanelBodySource, type HarEntryDetailsProps } from "./data/har/HarPanel";
 export type {
   HAREntry,
   HARRequest,
