@@ -7,7 +7,41 @@ import {
   toneToBadgeTone,
 } from "./comment-utils";
 import { resolveCommentStage } from "../lib/comment-stage";
-import type { Comment, CommentConfig, CommentRating } from "./comment-types";
+import type {
+  Comment,
+  CommentConfig,
+  CommentRating,
+  CommentReviewDecision,
+} from "./comment-types";
+
+export function ReviewDecisionChip({
+  decision,
+}: {
+  decision: CommentReviewDecision | undefined;
+}) {
+  if (!decision) return null;
+  const label =
+    decision === "approved"
+      ? "Approved"
+      : decision === "rejected"
+        ? "Rejected"
+        : "Revision requested";
+  return (
+    <Badge
+      variant="soft"
+      tone={
+        decision === "approved"
+          ? "success"
+          : decision === "rejected"
+            ? "danger"
+            : "warning"
+      }
+      size="xs"
+    >
+      {label}
+    </Badge>
+  );
+}
 
 export function RatingChip({ rating }: { rating: CommentRating | undefined }) {
   if (!rating) return null;

@@ -71,7 +71,7 @@ const AUTHOR: JsonProperty = {
 const BODY: JsonProperty = {
   type: "string",
   description:
-    "Comment text. Markdown is rendered. May be empty only when a rating is supplied.",
+    "Comment text. Markdown is rendered. May be empty for a rating or approval.",
 };
 
 const ID: JsonProperty = {
@@ -184,6 +184,12 @@ export const COMMENT_TOOLS: CommentTool[] = [
         },
         body: BODY,
         rating: RATING,
+        reviewDecision: {
+          type: "string",
+          enum: ["approved", "rejected", "revision_requested"],
+          description:
+            "Human review decision for an element with data-review-id. Rejection and revision require body text.",
+        },
         author: AUTHOR,
         anchor: {
           type: "string",

@@ -53,6 +53,12 @@ Two complementary tools:
 
 **Comment pins** — select an element through react-grab and choose **Comment** or **Comment with screenshot**. Write one draft in the focused rail, then choose **Post comment** or **Post with screenshot**. Plain comments never request screen capture. Successful PNGs live under `.playground/screenshots/` (gitignored); cancellation or browser limitations are recorded when capture was requested. Use **Comment on page** for a whole-page note. Every new root persists source context and up to 4 KB of raw HTML.
 
+**Reviewable elements** — add a stable `data-review-id` to an element, or select it in react-grab and choose **Make reviewable**. The playground adds inline controls for **Approve**, **Reject with comment**, **Request revision**, and **Delete source and feedback**. Rejection and revision require a comment; a newer decision closes the older decision but preserves its rationale. Delete removes the selected JSX element or literal array row from its page source, along with feedback anchored inside it. The source editor must be saved first. Source edits are available only under `vite dev` and fail when the selected source is ambiguous or has changed since selection.
+
+```tsx
+<section data-review-id="review-summary-row">Summary row</section>
+```
+
 Comments move through **open → resolved → closed**. An agent or human resolves work after implementing it; only a human can close the resolved thread after review. **Review resolved** opens the global queue, stores the selected thread in `?review=resolved&comment=<id>`, navigates across artifact pages, and advances after **Close & next** or a feedback reply through **Comment & reopen**. The regular rail keeps Open, Resolved, and Closed as separate views.
 
 Comments can carry a positive or negative rating, with or without text. `BestPractice` and `ReviewVariant` in `src/review/ReviewComponents.tsx` build on that same store: each requires a stable fragment id, exposes a permalink, and renders aggregate rating controls. Variants additionally require an explicit discard handler.
@@ -85,16 +91,16 @@ The same comments are a REST API, so a coding agent can read feedback, act on it
 curl -s localhost:5274/__playground/comments/schema | jq '.tools[] | {name, description}'
 ```
 
-| Method   | Path                                  | Body                                               | Purpose                                                                         |
-| -------- | ------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `GET`    | `/__playground/comments`              | —                                                  | List; `?page=`, `?status=` (repeat or comma-separate), `?unresolved=true`       |
-| `POST`   | `/__playground/comments`              | `{page, author, body?, rating?, anchor?, element}` | Start an open thread with component and HTML context; screenshot is optional    |
-| `POST`   | `/__playground/comments/{id}/replies` | `{body, author}`                                   | Reply — page and anchor inherited from the root                                 |
-| `POST`   | `/__playground/comments/{id}/resolve` | `{}`                                               | Move an open or in-progress thread to resolved                                  |
-| `POST`   | `/__playground/comments/{id}/close`   | `{author:{name,kind:"user"}}`                      | Human approval: move resolved to closed and record attribution                  |
-| `POST`   | `/__playground/comments/{id}/reopen`  | `{author:{name,kind:"user"}, body?}`               | Human review: optionally reply, then return resolved or closed feedback to open |
-| `PATCH`  | `/__playground/comments/{id}`         | `{body?, status?, rating?}`                        | Edit text/rating or move between active work statuses                           |
-| `DELETE` | `/__playground/comments/{id}`         | —                                                  | Remove, cascading to replies                                                    |
+| Method   | Path                                  | Body                                                                | Purpose                                                                         |
+| -------- | ------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `GET`    | `/__playground/comments`              | —                                                                   | List; `?page=`, `?status=` (repeat or comma-separate), `?unresolved=true`       |
+| `POST`   | `/__playground/comments`              | `{page, author, body?, rating?, reviewDecision?, anchor?, element}` | Start a thread or a human review decision with component and HTML context       |
+| `POST`   | `/__playground/comments/{id}/replies` | `{body, author}`                                                    | Reply — page and anchor inherited from the root                                 |
+| `POST`   | `/__playground/comments/{id}/resolve` | `{}`                                                                | Move an open or in-progress thread to resolved                                  |
+| `POST`   | `/__playground/comments/{id}/close`   | `{author:{name,kind:"user"}}`                                       | Human approval: move resolved to closed and record attribution                  |
+| `POST`   | `/__playground/comments/{id}/reopen`  | `{author:{name,kind:"user"}, body?}`                                | Human review: optionally reply, then return resolved or closed feedback to open |
+| `PATCH`  | `/__playground/comments/{id}`         | `{body?, status?, rating?}`                                         | Edit text/rating or move between active work statuses                           |
+| `DELETE` | `/__playground/comments/{id}`         | —                                                                   | Remove, cascading to replies                                                    |
 
 Statuses are `open`, `in_progress`, `resolved`, `closed`; the first two are active work. Close and reopen reject non-user actors and invalid stage transitions. The machine-readable tool schema intentionally omits those human-only operations. Ratings are `positive` or `negative`. Every new root's `element` is `{componentName?, source, html, screenshot?}`; `html` is capped at 4 KB and optional `screenshot` is either `{status:"captured", dataUrl:"data:image/png;base64,…"}` or `{status:"unavailable", reason:"unsupported"|"cancelled"|"failed"}`. Invalid or missing context is a 400. A missing `author` also fails because identity is never inferred, so an agent's reply cannot show up as "You". Every comment is addressed by id alone; only `POST /__playground/comments` needs a page.
 

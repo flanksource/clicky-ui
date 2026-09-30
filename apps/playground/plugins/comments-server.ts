@@ -25,12 +25,16 @@ import {
   assertElementContext,
   assertPage,
   assertRating,
+  assertReviewDecision,
   patchComment,
+  readAll,
   removeComment,
+  writeAll,
   type CommentPatch,
   type StoredAuthor,
   type StoredComment,
 } from "./comments-store";
+import { recordReviewDecision } from "./review-decisions";
 
 export const COMMENTS_ROUTE = "/__playground/comments";
 
@@ -253,12 +257,14 @@ function handle(
           "page",
           "body",
           "rating",
+          "reviewDecision",
           "author",
           "anchor",
           "element",
         ]);
         const anchor = optionalText(body, "anchor");
         const rating = optionalText(body, "rating");
+        const reviewDecision = optionalText(body, "reviewDecision");
         const comment = draft(body, optionalText(body, "body") ?? "");
         const element = persistElementContext(dir, comment.id, body["element"]);
         const stored: StoredComment = {
@@ -267,10 +273,21 @@ function handle(
           parentId: null,
           anchor: anchor ?? null,
           ...(rating === undefined ? {} : { rating: assertRating(rating) }),
+          ...(reviewDecision === undefined
+            ? {}
+            : { reviewDecision: assertReviewDecision(reviewDecision) }),
           element,
         };
         try {
-          sendJson(res, 201, addComment(dir, assertPage(body["page"]), stored));
+          const page = assertPage(body["page"]);
+          if (stored.reviewDecision) {
+            const data = readAll(dir);
+            data[page] = recordReviewDecision(data[page] ?? [], stored);
+            writeAll(dir, data);
+            sendJson(res, 201, data[page].at(-1));
+          } else {
+            sendJson(res, 201, addComment(dir, page, stored));
+          }
         } catch (cause) {
           const removal = stageScreenshotRemoval(dir, [stored]);
           removal.commit();

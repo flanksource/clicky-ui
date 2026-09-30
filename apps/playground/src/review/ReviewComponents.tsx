@@ -168,6 +168,7 @@ function ReviewActions({
 export type BestPracticeProps = ReviewIdentity & {
   description: ReactNode;
   tone?: "do" | "avoid" | "rule";
+  "data-review-id"?: string;
   className?: string;
 };
 
@@ -176,6 +177,7 @@ export function BestPractice({
   title,
   description,
   tone = "rule",
+  "data-review-id": reviewId,
   className,
 }: BestPracticeProps) {
   const annotationsHidden = useAnnotationsHidden();
@@ -185,6 +187,7 @@ export function BestPractice({
     <article
       ref={elementRef}
       id={id}
+      data-review-id={reviewId}
       className={cn(
         "scroll-mt-density-4 rounded-xl border border-l-4 bg-card p-density-3",
         tone === "do"
@@ -210,7 +213,8 @@ export type ReviewVariantProps = ReviewIdentity & {
   verdict: ReactNode;
   children: ReactNode;
   selected?: boolean;
-  onDiscard: () => void;
+  onDiscard?: () => void;
+  "data-review-id"?: string;
   className?: string;
 };
 
@@ -221,13 +225,17 @@ export function ReviewVariant({
   children,
   selected = false,
   onDiscard,
+  "data-review-id": reviewId,
   className,
 }: ReviewVariantProps) {
   const annotationsHidden = useAnnotationsHidden();
   const { anchor, elementRef } = useReviewAnchor(id);
   if (annotationsHidden) {
     return (
-      <section className={cn("space-y-density-2", className)}>
+      <section
+        data-review-id={reviewId}
+        className={cn("space-y-density-2", className)}
+      >
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         <div className="overflow-x-auto rounded-lg border border-border bg-card p-density-4">
           {children}
@@ -239,6 +247,7 @@ export function ReviewVariant({
     <section
       ref={elementRef}
       id={id}
+      data-review-id={reviewId}
       className={cn("scroll-mt-density-4 space-y-density-2", className)}
     >
       <header className="flex flex-wrap items-start justify-between gap-density-2 pr-6">
@@ -248,7 +257,13 @@ export function ReviewVariant({
             {verdict}
           </div>
         </div>
-        <ReviewActions anchor={anchor} title={title} onDiscard={onDiscard} />
+        {!reviewId && (
+          <ReviewActions
+            anchor={anchor}
+            title={title}
+            {...(onDiscard ? { onDiscard } : {})}
+          />
+        )}
       </header>
       <div
         className={cn(

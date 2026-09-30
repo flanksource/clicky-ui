@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import {
   DEFAULT_COMMENT_STATUSES,
   DOCUMENT_ANCHOR,
@@ -242,6 +248,9 @@ export function useComments(
             author: PLAYGROUND_COMMENT_AUTHOR,
             anchor,
             ...(input.rating ? { rating: input.rating } : {}),
+            ...(input.reviewDecision
+              ? { reviewDecision: input.reviewDecision }
+              : {}),
             element,
           });
           if (preparedSelection.current === prepared) {

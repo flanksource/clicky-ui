@@ -31,6 +31,7 @@ import {
 } from "./PlaygroundShellParts";
 import { PlaygroundBodyHeader } from "./PlaygroundBodyHeader";
 import { PlaygroundShellActions } from "./PlaygroundShellActions";
+import { ReviewProvider } from "./review/ReviewProvider";
 
 // Monaco is several megabytes and only ever needed once someone opens the
 // editor, so it must not sit in the entry chunk.
@@ -40,7 +41,10 @@ const SourceEditor = lazy(() =>
   })),
 );
 import { useFeedbackCopy } from "./comments/useFeedbackCopy";
-import { type PageComment, type PlaygroundComments } from "./comments/useComments";
+import {
+  type PageComment,
+  type PlaygroundComments,
+} from "./comments/useComments";
 import { useDomAnchors } from "./comments/useDomAnchors";
 import {
   fallbackPageSlug,
@@ -163,7 +167,9 @@ export function PlaygroundShell({
     enabled: view === "preview" && Boolean(active),
     onSelect: ({ anchor, element, screenshot }) => {
       if (!(element instanceof HTMLElement)) {
-        throw new Error("React Grab comment selection requires an HTML element");
+        throw new Error(
+          "React Grab comment selection requires an HTML element",
+        );
       }
       onPrepareCommentSelection(anchor, element, screenshot);
       ctx.registerAnchor(anchor, null);
@@ -310,65 +316,75 @@ export function PlaygroundShell({
           ref={attachScrollRef}
           className="relative min-w-0 flex-1 overflow-auto"
         >
-          <div ref={contentRef} className="min-w-0 p-density-4">
-            {pageFolders.error && (
-              <Banner tone="danger">{pageFolders.error}</Banner>
-            )}
-            {pageMove.error && (
-              <Banner tone="danger">
-                The page was not moved — {pageMove.error}
-              </Banner>
-            )}
-            {commentsError && <Banner tone="danger">{commentsError}</Banner>}
-            {feedback.copyError && (
-              <Banner tone="danger">
-                Nothing was copied — {feedback.copyError}
-              </Banner>
-            )}
-            {pageGuidance.copyError && (
-              <Banner tone="danger">
-                Page Markdown was not copied — {pageGuidance.copyError}
-              </Banner>
-            )}
-            {view === "preview" && orphans.length > 0 && (
-              <Banner tone="warning">
-                {orphans.length} comment anchor
-                {orphans.length === 1
-                  ? " no longer matches"
-                  : "s no longer match"}{" "}
-                an element on this page. The notes are kept and listed as
-                “Unavailable” in the rail.
-              </Banner>
-            )}
-            {view === "markdown" ? (
-              <MarkdownPage
-                markdown={pageGuidance.markdown}
-                error={pageGuidance.loadError}
-              />
-            ) : PageComponent ? (
-              <Suspense
-                fallback={
-                  <p className="text-sm text-muted-foreground">Loading…</p>
-                }
-              >
-                <AnnotationVisibilityProvider value={annotations}>
-                  <PageComponent />
-                </AnnotationVisibilityProvider>
-              </Suspense>
-            ) : (
-              <EmptyPlayground />
-            )}
-          </div>
+          <ReviewProvider
+            page={active?.slug ?? ""}
+            active={
+              view === "preview" && annotations === "visible" && Boolean(active)
+            }
+            sourceDirty={source.dirty}
+            contentRef={contentRef}
+            scrollRef={ctx.contentRef}
+          >
+            <div ref={contentRef} className="min-w-0 p-density-4">
+              {pageFolders.error && (
+                <Banner tone="danger">{pageFolders.error}</Banner>
+              )}
+              {pageMove.error && (
+                <Banner tone="danger">
+                  The page was not moved — {pageMove.error}
+                </Banner>
+              )}
+              {commentsError && <Banner tone="danger">{commentsError}</Banner>}
+              {feedback.copyError && (
+                <Banner tone="danger">
+                  Nothing was copied — {feedback.copyError}
+                </Banner>
+              )}
+              {pageGuidance.copyError && (
+                <Banner tone="danger">
+                  Page Markdown was not copied — {pageGuidance.copyError}
+                </Banner>
+              )}
+              {view === "preview" && orphans.length > 0 && (
+                <Banner tone="warning">
+                  {orphans.length} comment anchor
+                  {orphans.length === 1
+                    ? " no longer matches"
+                    : "s no longer match"}{" "}
+                  an element on this page. The notes are kept and listed as
+                  “Unavailable” in the rail.
+                </Banner>
+              )}
+              {view === "markdown" ? (
+                <MarkdownPage
+                  markdown={pageGuidance.markdown}
+                  error={pageGuidance.loadError}
+                />
+              ) : PageComponent ? (
+                <Suspense
+                  fallback={
+                    <p className="text-sm text-muted-foreground">Loading…</p>
+                  }
+                >
+                  <AnnotationVisibilityProvider value={annotations}>
+                    <PageComponent />
+                  </AnnotationVisibilityProvider>
+                </Suspense>
+              ) : (
+                <EmptyPlayground />
+              )}
+            </div>
 
-          {view === "preview" && (
-            <CommentOverlay
-              pins={pins}
-              focusedAnchor={
-                ctx.railMode === "focused" ? ctx.focusedAnchor : null
-              }
-              onFocus={ctx.focusAnchor}
-            />
-          )}
+            {view === "preview" && (
+              <CommentOverlay
+                pins={pins}
+                focusedAnchor={
+                  ctx.railMode === "focused" ? ctx.focusedAnchor : null
+                }
+                onFocus={ctx.focusAnchor}
+              />
+            )}
+          </ReviewProvider>
         </div>
 
         {railVisible && (

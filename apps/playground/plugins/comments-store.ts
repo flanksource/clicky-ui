@@ -19,6 +19,12 @@ import {
 
 export const COMMENT_RATINGS = ["positive", "negative"] as const;
 export type CommentRating = (typeof COMMENT_RATINGS)[number];
+export const REVIEW_DECISIONS = [
+  "approved",
+  "rejected",
+  "revision_requested",
+] as const;
+export type ReviewDecision = (typeof REVIEW_DECISIONS)[number];
 
 /**
  * On-disk shape for playground feedback. Deliberately structural rather than an
@@ -41,6 +47,7 @@ export type StoredComment = {
   parentId?: string | null;
   anchor?: string | null;
   rating?: CommentRating;
+  reviewDecision?: ReviewDecision;
   closedAt?: string;
   closedBy?: StoredAuthor;
   element?: CommentElementContext;
@@ -157,6 +164,18 @@ export function assertRating(rating: unknown): CommentRating {
   return rating as CommentRating;
 }
 
+export function assertReviewDecision(value: unknown): ReviewDecision {
+  if (
+    typeof value !== "string" ||
+    !REVIEW_DECISIONS.includes(value as ReviewDecision)
+  ) {
+    throw new Error(
+      `review decision ${JSON.stringify(value)} is not one of ${REVIEW_DECISIONS.join(", ")}`,
+    );
+  }
+  return value as ReviewDecision;
+}
+
 export function assertElementContext(input: unknown): CommentElementContext {
   if (input === null || typeof input !== "object" || Array.isArray(input)) {
     throw new Error("comment element context must be an object");
@@ -223,7 +242,13 @@ export function assertComment(input: unknown): StoredComment {
     throw new Error('comment payload requires a string "body"');
   }
   if (candidate["rating"] !== undefined) assertRating(candidate["rating"]);
-  if (candidate["body"] === "" && candidate["rating"] === undefined) {
+  if (candidate["reviewDecision"] !== undefined)
+    assertReviewDecision(candidate["reviewDecision"]);
+  if (
+    candidate["body"] === "" &&
+    candidate["rating"] === undefined &&
+    candidate["reviewDecision"] !== "approved"
+  ) {
     throw new Error("comment payload requires body or rating");
   }
   if (
@@ -237,6 +262,9 @@ export function assertComment(input: unknown): StoredComment {
     assertElementContext(candidate["element"]);
   }
   const isReply = typeof candidate["parentId"] === "string";
+  if (isReply && candidate["reviewDecision"] !== undefined) {
+    throw new Error("review decisions belong on thread roots");
+  }
   const anchor = candidate["anchor"];
   const isAnchoredRoot =
     !isReply && typeof anchor === "string" && anchor !== "__document__";
