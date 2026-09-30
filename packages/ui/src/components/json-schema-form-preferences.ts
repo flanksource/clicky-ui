@@ -7,6 +7,9 @@ export interface FormPreferences {
   size?: FormSize;
   layoutMode?: LayoutMode;
   sortMode?: SortMode;
+  // debug renders every field the form would hide, marked with why, and a
+  // hover card per field telling where it comes from.
+  debug?: boolean;
 }
 
 export type LayoutMode = "stacked" | "inline" | "properties";
@@ -62,6 +65,7 @@ export function readPreferences(storageKey: string): FormPreferences {
   if (isFormSize(record.size)) prefs.size = record.size;
   if (isLayoutMode(record.layoutMode)) prefs.layoutMode = record.layoutMode;
   if (isSortMode(record.sortMode)) prefs.sortMode = record.sortMode;
+  if (typeof record.debug === "boolean") prefs.debug = record.debug;
   return prefs;
 }
 

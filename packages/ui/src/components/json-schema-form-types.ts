@@ -129,6 +129,10 @@ export interface JsonSchemaProperty {
   // declare the field `"x-hidden": true` at the base and re-declare it with
   // `"x-hidden": false` in the `then` that should reveal it.
   "x-hidden"?: boolean;
+  // The listener that hid this field (e.g. `x-on-change on "Option"`), stamped
+  // by the form when a `hide` applies and cleared by a `show`. Read only by the
+  // form's debug mode, to say why a field is missing.
+  "x-hidden-by"?: string;
   // Render the field's real control, disabled — unlike `readOnly`, which swaps
   // the input for plain value text. Flippable by an `allOf` branch the same way
   // as `x-hidden`, and set/cleared by an `x-on-change` enable/disable action.

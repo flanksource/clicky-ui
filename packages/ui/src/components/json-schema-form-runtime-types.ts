@@ -198,6 +198,9 @@ export interface RenderContext extends FormErrorContext {
   // level (depth 0) is filtered, so nested object subtrees stay intact. Unset or
   // blank shows every field.
   fieldFilter?: string;
+  // debug renders the fields the form would hide, marked with why, and gives
+  // every field a hover card saying where it comes from (the menu's Debug).
+  debug?: boolean;
   pre: PreExtension[];
   post: PostExtension[];
   // The form's top-level value, threaded unchanged through every depth so a

@@ -168,6 +168,7 @@ export function JsonSchemaForm({
     ...(expressionEvaluator ? { expressionEvaluator } : {}),
     ...(idPrefix ? { idPrefix } : {}),
     ...(fieldFilter.trim() ? { fieldFilter: fieldFilter.trim() } : {}),
+    ...(prefs.debug ? { debug: true } : {}),
   };
   // A schema may name a discriminator property whose value selects a "kind"; the
   // form then runs a two-phase pick-then-fill flow (see DiscriminatedForm).
@@ -193,6 +194,8 @@ export function JsonSchemaForm({
             onSelectSize={(next) => applyPrefs({ ...prefs, size: next })}
             onSelectLayout={(next) => applyPrefs({ ...prefs, layoutMode: next })}
             onSelectSort={(next) => applyPrefs({ ...prefs, sortMode: next })}
+            debug={prefs.debug === true}
+            onToggleDebug={() => applyPrefs({ ...prefs, debug: !prefs.debug })}
           />
         )}
         {title && <h3 className={cn("font-semibold", labelSizeClass[effectiveSize])}>{title}</h3>}
@@ -268,6 +271,8 @@ function PreferencesMenu({
   onSelectSize,
   onSelectLayout,
   onSelectSort,
+  debug,
+  onToggleDebug,
 }: {
   size: FormSize;
   layoutMode: LayoutMode;
@@ -278,8 +283,10 @@ function PreferencesMenu({
   onSelectSize: (size: FormSize) => void;
   onSelectLayout: (mode: LayoutMode) => void;
   onSelectSort: (mode: SortMode) => void;
+  debug: boolean;
+  onToggleDebug: () => void;
 }) {
-  const filterActive = fieldFilter.trim() !== "";
+  const filterActive = fieldFilter.trim() !== "" || debug;
   return (
     <DropdownMenu
       align="right"
@@ -340,6 +347,16 @@ function PreferencesMenu({
               }}
             />
           ))}
+          <PreferenceSection title="Debug" />
+          <PreferenceItem
+            role="menuitemcheckbox"
+            label="Show hidden fields & sources"
+            selected={debug}
+            onSelect={() => {
+              onToggleDebug();
+              closeMenu();
+            }}
+          />
         </>
       )}
     </DropdownMenu>
@@ -354,11 +371,21 @@ function PreferenceSection({ title }: { title: string }) {
   );
 }
 
-function PreferenceItem({ label, selected, onSelect }: { label: string; selected: boolean; onSelect: () => void }) {
+function PreferenceItem({
+  label,
+  selected,
+  onSelect,
+  role = "menuitemradio",
+}: {
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+  role?: "menuitemradio" | "menuitemcheckbox";
+}) {
   return (
     <button
       type="button"
-      role="menuitemradio"
+      role={role}
       aria-checked={selected}
       className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-popover-foreground hover:bg-accent hover:text-accent-foreground"
       onClick={onSelect}

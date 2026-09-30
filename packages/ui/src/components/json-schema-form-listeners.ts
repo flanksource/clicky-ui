@@ -99,7 +99,7 @@ export function applyListenerState(
     const actions = selectActions({ listener, source, self: value, known, options });
     for (const [name, keyword, flag] of STATE_FLAGS) {
       for (const target of list(actions, name)) {
-        patchTarget({ properties, value, target, apply: (leaf) => ({ ...leaf, [keyword]: flag }) });
+        patchTarget({ properties, value, target, apply: (leaf) => hiddenBy({ ...leaf, [keyword]: flag }, keyword, flag, source.label) });
       }
     }
     for (const target of list(actions, "require")) {
@@ -111,6 +111,15 @@ export function applyListenerState(
     }
   }
   return { properties, required: [...requiredSet] };
+}
+
+// hiddenBy records which listener hid a field (`x-hidden-by`), so the form's
+// debug mode can say why it is missing; a show clears it.
+function hiddenBy(leaf: JsonSchemaProperty, keyword: string, flag: boolean, label: string): JsonSchemaProperty {
+  if (keyword !== "x-hidden") return leaf;
+  if (flag) return { ...leaf, "x-hidden-by": label };
+  const { "x-hidden-by": _by, ...shown } = leaf;
+  return shown;
 }
 
 // loadListenersOf collects an object's `x-on-load` listeners in order: the
