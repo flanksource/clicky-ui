@@ -6,6 +6,7 @@ import { computeLineDiff } from "../code-diff";
 import { languageFromPath } from "../code-highlight";
 import { stripTrailingSlashes } from "../../lib/string";
 import { splitMcpTool, truncate } from "./SessionViewer.model";
+import type { ApprovalQuestion } from "./approval-request";
 
 /** Strip the event's working directory from an absolute file path. */
 export function relativizePath(path: string, cwd?: string): string {
@@ -250,6 +251,22 @@ export function summarizeToolInput(
     default:
       return "";
   }
+}
+
+/** Maps a typed approval's questions (captain `TerminalQuestion`) to the
+ *  viewer's question shape. Answers are keyed by `id`, or by the question text
+ *  when the provider gives none, which is how captain reads them back. */
+export function questionsFromApproval(questions: readonly ApprovalQuestion[]): SessionQuestion[] {
+  return questions.map((question) => ({
+    id: question.id || question.text,
+    text: question.text,
+    ...(question.context ? { context: question.context } : {}),
+    ...(question.multiSelect ? { multiSelect: true } : {}),
+    options: (question.options ?? []).map((option) => {
+      const description = question.optionDescriptions?.[option];
+      return { value: option, label: option, ...(description ? { description } : {}) };
+    }),
+  }));
 }
 
 export function questionsFromToolInput(input?: Record<string, unknown>): SessionQuestion[] {

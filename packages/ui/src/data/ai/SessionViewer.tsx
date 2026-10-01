@@ -2,9 +2,10 @@ import { useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../../lib/utils";
 import { Icon } from "../Icon";
+import { Button } from "../../components/button";
 import { useDensityValue, type Density } from "../../hooks/use-density";
 import { DensityValueProvider } from "../../hooks/density-provider";
-import { UiRobotAi } from "../../icons";
+import { UiArrowDown, UiRobotAi } from "../../icons";
 import {
   getSessionMetadata,
   normalizeSession,
@@ -20,6 +21,7 @@ import { SessionRow, WaitGroupRow } from "./SessionViewer.rows";
 import { SessionMetadataBadges } from "./SessionViewer.header";
 import {
   collectSessionFilters,
+  isEncryptedReasoning,
   isEventVisible,
   type SessionCategory,
 } from "./session-categories";
@@ -28,6 +30,11 @@ import {
   type SessionThemeOverride,
 } from "./SessionViewerMenu";
 import { useSessionScroll } from "./use-session-scroll";
+import type {
+  ApprovalDecisionFields,
+  ApprovalKind,
+  ApprovalRequest,
+} from "./approval-request";
 
 export type {
   SessionEntry,
@@ -43,13 +50,20 @@ export interface SessionPendingTool {
   toolCallId?: string;
   approvalId?: string;
   sessionId?: string;
+  /** What kind of approval this is. Absent means an untyped tool approval, which
+   *  renders as Allow / Reject. */
+  kind?: ApprovalKind;
+  /** The typed approval request; drives the per-kind controls. */
+  request?: ApprovalRequest;
 }
 
-export interface SessionToolDecision {
+/** A decision on one pending tool. `allow`/`message`/`answers` are the original
+ *  fields; `interrupt`, `scope`, `grants` and `content` are set only for a typed
+ *  request that offers them. */
+export interface SessionToolDecision extends ApprovalDecisionFields {
   event: SessionEvent;
   allow: boolean;
   message?: string;
-  answers?: Record<string, string | string[]>;
 }
 
 export interface SessionViewerProps {
@@ -89,6 +103,8 @@ export interface SessionViewerProps {
   windowSize?: number;
   /** Rows added each time older content loads in `scrollable` mode. Defaults to 40. */
   batchSize?: number;
+  /** Stable identity used to reset the transcript window when switching sessions. */
+  scrollResetKey?: string;
   /** Show per-row timestamp/source/model/turn/agent metadata. Defaults to false. */
   showRowMetadata?: boolean;
   /** Show a per-row raw JSON payload expander when available. Defaults to false. */
@@ -135,6 +151,7 @@ export function SessionViewer({
   scrollable = false,
   windowSize = 60,
   batchSize = 40,
+  scrollResetKey,
   showRowMetadata = false,
   showRaw = false,
   renderMessageBadge,
@@ -169,10 +186,15 @@ export function SessionViewer({
     boolean | undefined
   >(undefined);
   const effectiveShowThinking = showThinkingOverride ?? showThinking;
+  const [showEncryptedReasoning, setShowEncryptedReasoning] = useState(false);
 
   const filters = useMemo(() => collectSessionFilters(allEvents), [allEvents]);
   const hasThinking = useMemo(
     () => allEvents.some((e) => e.kind === "thinking"),
+    [allEvents],
+  );
+  const hasEncryptedReasoning = useMemo(
+    () => allEvents.some(isEncryptedReasoning),
     [allEvents],
   );
 
@@ -182,17 +204,16 @@ export function SessionViewer({
     hiddenSources,
     showThinking: effectiveShowThinking,
   };
-  const items = displayItems.filter((item) =>
-    isEventVisible(
-      isSessionEventGroup(item) ? item.representative : item,
-      visibility,
-    ),
-  );
+  const items = displayItems.filter((item) => {
+    const event = isSessionEventGroup(item) ? item.representative : item;
+    return (showEncryptedReasoning || !isEncryptedReasoning(event)) && isEventVisible(event, visibility);
+  });
+  const firstUserEventId = allEvents.find((event) => event.kind === "user")?.id;
 
   // Reset the window when the underlying session changes, not on filter toggles —
   // so hiding a category doesn't yank the reader back to the bottom.
-  const resetKey = `${allEvents.length}:${allEvents[0]?.id ?? ""}`;
-  const { scrollRef, contentRef, startIndex } = useSessionScroll({
+  const resetKey = scrollResetKey ?? allEvents[0]?.id ?? "";
+  const { scrollRef, contentRef, startIndex, following, resumeFollowing } = useSessionScroll({
     total: items.length,
     enabled: scrollable,
     windowSize,
@@ -241,6 +262,9 @@ export function SessionViewer({
       showThinking={effectiveShowThinking}
       onToggleThinking={() => setShowThinkingOverride(!effectiveShowThinking)}
       hasThinking={hasThinking}
+      hasEncryptedReasoning={hasEncryptedReasoning}
+      showEncryptedReasoning={showEncryptedReasoning}
+      onToggleEncryptedReasoning={() => setShowEncryptedReasoning((shown) => !shown)}
     />
   ) : null;
   // When a host supplies `menuContainer`, the menu is portaled into it (e.g. the
@@ -273,6 +297,7 @@ export function SessionViewer({
             <SessionRow
               key={item.id}
               event={item}
+              initialPrompt={item.id === firstUserEventId}
               last={last}
               defaultExpanded={defaultExpanded}
               showRowMetadata={showRowMetadata}
@@ -338,14 +363,28 @@ export function SessionViewer({
         )}
 
         {scrollable ? (
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-            <div
-              ref={contentRef}
-              data-session-viewer-content
-              className="p-density-3 @min-[48rem]/session-viewer:p-density-4"
-            >
-              {list}
+          <div className="relative min-h-0 flex-1">
+            <div ref={scrollRef} className="h-full overflow-y-auto">
+              <div
+                ref={contentRef}
+                data-session-viewer-content
+                className="p-density-3 @min-[48rem]/session-viewer:p-density-4"
+              >
+                {list}
+              </div>
             </div>
+            {!following && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={resumeFollowing}
+                className="absolute bottom-density-3 left-1/2 -translate-x-1/2 shadow-md"
+              >
+                <Icon icon={UiArrowDown} className="size-4" />
+                Scroll to bottom
+              </Button>
+            )}
           </div>
         ) : (
           list
@@ -378,6 +417,7 @@ function mergePendingTools(
         toolCallId: pending.toolCallId ?? match.toolCallId,
         approvalId: pending.approvalId ?? match.approvalId,
         sessionId: pending.sessionId ?? match.sessionId,
+        ...approvalFields(pending),
       });
     } else {
       merged.push({
@@ -390,9 +430,20 @@ function mergePendingTools(
         ...(pending.toolCallId ? { toolCallId: pending.toolCallId } : {}),
         ...(pending.approvalId ? { approvalId: pending.approvalId } : {}),
         ...(pending.sessionId ? { sessionId: pending.sessionId } : {}),
+        ...approvalFields(pending),
         pending: true,
       });
     }
   }
   return merged;
+}
+
+function approvalFields(
+  pending: SessionPendingTool,
+): Pick<SessionEvent, "approvalKind" | "approvalRequest"> {
+  const kind = pending.kind ?? pending.request?.kind;
+  return {
+    ...(kind ? { approvalKind: kind } : {}),
+    ...(pending.request ? { approvalRequest: pending.request } : {}),
+  };
 }

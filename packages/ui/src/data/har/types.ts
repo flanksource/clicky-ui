@@ -44,6 +44,18 @@ export interface HAREntry extends Record<string, unknown> {
   response: HARResponse;
   cache?: unknown;
   timings?: { send?: number; wait?: number; receive?: number };
+  /**
+   * HAR 1.2 custom field: a stable per-request id, identical on the pending and
+   * completed snapshots of one request.
+   */
+  _id?: string;
+  /**
+   * HAR 1.2 custom field: the request is still in flight. `response` is empty
+   * (status 0) and `time` is the elapsed ms when the snapshot was taken.
+   */
+  _pending?: boolean;
+  /** HAR 1.2 custom field: the transport error of a request that got no response (status 0). */
+  _error?: string;
 }
 
 export interface HARCreator {

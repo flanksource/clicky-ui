@@ -1,16 +1,15 @@
 import { useState } from "react";
-import { Button } from "../../components/button";
-import { UiCancel, UiCheck, UiChevronDown, UiComment } from "../../icons";
+import { UiChevronDown } from "../../icons";
 import { cn } from "../../lib/utils";
 import { CodeBlock } from "../CodeBlock";
 import { Icon } from "../Icon";
 import {
+  questionsFromApproval,
   questionsFromToolInput,
   shellCommand,
   summarizeToolInput,
   toolDiff,
   toolInputParams,
-  type SessionQuestion,
 } from "./SessionViewer.input";
 import type { SessionEvent } from "./SessionViewer.model";
 import { ApprovalBadge } from "./SessionViewer.row-metadata";
@@ -21,6 +20,12 @@ import {
   QuestionCard,
   ResponseBlock,
 } from "./SessionViewer.tool-details";
+import { hasApprovalBody } from "./approval-request";
+import { TypedApprovalBody } from "./SessionViewer.approval-body";
+import {
+  PendingDecisionControls,
+  QuestionDecisionControls,
+} from "./SessionViewer.decision-controls";
 import type { SessionToolDecision } from "./SessionViewer";
 
 export function ToolBody({
@@ -44,13 +49,31 @@ export function ToolBody({
   const command = shellCommand(event.tool ?? "", event.toolInput);
   const [open, setOpen] = useState(defaultExpanded);
 
-  if (event.tool === "AskUserQuestion") {
+  if (event.tool === "AskUserQuestion" || event.approvalKind === "question") {
     return (
       <QuestionToolBody
         event={event}
         visual={visual}
         onDecision={onPendingToolDecision}
       />
+    );
+  }
+
+  if (event.pending && hasApprovalBody(event.approvalRequest)) {
+    return (
+      <div className="not-prose">
+        <div className="flex items-center gap-1.5">
+          <span className="shrink-0 font-medium text-foreground">
+            {visual.label}
+          </span>
+          <ApprovalBadge event={event} />
+        </div>
+        <TypedApprovalBody
+          event={event}
+          request={event.approvalRequest}
+          onDecision={onPendingToolDecision}
+        />
+      </div>
     );
   }
 
@@ -88,6 +111,7 @@ export function ToolBody({
         {event.pending && onPendingToolDecision && (
           <PendingDecisionControls
             event={event}
+            request={event.approvalRequest}
             onDecision={onPendingToolDecision}
           />
         )}
@@ -171,6 +195,7 @@ export function ToolBody({
       {event.pending && onPendingToolDecision && (
         <PendingDecisionControls
           event={event}
+          request={event.approvalRequest}
           onDecision={onPendingToolDecision}
         />
       )}
@@ -189,7 +214,10 @@ function QuestionToolBody({
     | ((decision: SessionToolDecision) => Promise<void> | void)
     | undefined;
 }) {
-  const questions = questionsFromToolInput(event.toolInput);
+  const typedQuestions = event.approvalRequest?.questions;
+  const questions = typedQuestions?.length
+    ? questionsFromApproval(typedQuestions)
+    : questionsFromToolInput(event.toolInput);
   const summary = summarizeToolInput(
     event.tool ?? "",
     event.toolInput,
@@ -235,256 +263,12 @@ function QuestionToolBody({
         {event.pending && onDecision && (
           <QuestionDecisionControls
             event={event}
+            request={event.approvalRequest}
             questions={questions}
             onDecision={onDecision}
           />
         )}
       </div>
-    </div>
-  );
-}
-
-function PendingDecisionControls({
-  event,
-  onDecision,
-}: {
-  event: SessionEvent;
-  onDecision: (decision: SessionToolDecision) => Promise<void> | void;
-}) {
-  const [comment, setComment] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const decide = async (allow: boolean, message?: string) => {
-    setBusy(true);
-    setError("");
-    try {
-      await onDecision({ event, allow, ...(message ? { message } : {}) });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="mt-2 space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-density-3">
-      <textarea
-        aria-label="Decision comment"
-        value={comment}
-        onChange={(event) => setComment(event.target.value)}
-        placeholder="Optional rejection feedback"
-        className="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-      />
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" loading={busy} onClick={() => decide(true)}>
-          <Icon icon={UiCheck} />
-          Allow
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          onClick={() => decide(false)}
-        >
-          <Icon icon={UiCancel} />
-          Reject
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy || !comment.trim()}
-          onClick={() => decide(false, comment.trim())}
-        >
-          <Icon icon={UiComment} />
-          Reject with comment
-        </Button>
-      </div>
-      {error && (
-        <div role="alert" className="text-xs text-rose-600">
-          {error}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function QuestionDecisionControls({
-  event,
-  questions,
-  onDecision,
-}: {
-  event: SessionEvent;
-  questions: SessionQuestion[];
-  onDecision: (decision: SessionToolDecision) => Promise<void> | void;
-}) {
-  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
-  const [details, setDetails] = useState<Record<string, string>>({});
-  const [comment, setComment] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const answerFor = (question: SessionQuestion): string | string[] => {
-    const selected = answers[question.id];
-    const other = details[question.id]?.trim();
-    if (question.options.length && question.isOther && other) {
-      return question.multiSelect ? [...(Array.isArray(selected) ? selected : []), other] : other;
-    }
-    return selected ?? "";
-  };
-  const canSend = questions.length > 0 && questions.every((question) => {
-    const answer = answerFor(question);
-    return Array.isArray(answer)
-      ? answer.length > 0 && answer.every((value) => value.trim() !== "")
-      : answer.trim() !== "";
-  });
-  const decide = async (allow: boolean, message?: string) => {
-    setBusy(true);
-    setError("");
-    try {
-      await onDecision({
-        event,
-        allow,
-        ...(allow ? { answers: Object.fromEntries(questions.map((question) => [question.id, answerFor(question)])) } : {}),
-        ...(message ? { message } : {}),
-      });
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="space-y-3 rounded-md border border-sky-500/25 bg-sky-500/5 p-density-3">
-      {questions.map((question) => (
-        <fieldset key={question.id} className="space-y-1.5">
-          <legend className="text-sm font-medium text-foreground">
-            {question.text}
-          </legend>
-          {question.options.map((option) =>
-            question.multiSelect ? (
-              <label
-                key={option.value}
-                className="flex items-start gap-2 text-sm"
-              >
-                <input
-                  type="checkbox"
-                  checked={
-                    Array.isArray(answers[question.id]) &&
-                    (answers[question.id] as string[]).includes(option.value)
-                  }
-                  onChange={(event) =>
-                    setAnswers((current) => {
-                      const selected = Array.isArray(current[question.id])
-                        ? (current[question.id] as string[])
-                        : [];
-                      return {
-                        ...current,
-                        [question.id]: event.target.checked
-                          ? [...selected, option.value]
-                          : selected.filter((value) => value !== option.value),
-                      };
-                    })
-                  }
-                />
-                <span>
-                  {option.label}
-                  {option.description && (
-                    <span className="ml-1 text-muted-foreground">
-                      {option.description}
-                    </span>
-                  )}
-                </span>
-              </label>
-            ) : (
-              <label
-                key={option.value}
-                className="flex items-start gap-2 text-sm"
-              >
-                <input
-                  type="radio"
-                  name={`question-${event.id}-${question.id}`}
-                  value={option.value}
-                  checked={answers[question.id] === option.value && !details[question.id]?.trim()}
-                  onChange={() => {
-                    setDetails((current) => ({ ...current, [question.id]: "" }));
-                    setAnswers((current) => ({
-                      ...current,
-                      [question.id]: option.value,
-                    }));
-                  }}
-                />
-                <span>
-                  {option.label}
-                  {option.description && (
-                    <span className="ml-1 text-muted-foreground">
-                      {option.description}
-                    </span>
-                  )}
-                </span>
-              </label>
-            ),
-          )}
-          {(!question.options.length || question.isOther) && <textarea
-            aria-label={`${question.text} ${question.options.length ? "other answer" : "answer"}`}
-            value={
-              question.options.length
-                ? (details[question.id] ?? "")
-                : typeof answers[question.id] === "string"
-                  ? (answers[question.id] as string)
-                  : ""
-            }
-            onChange={(event) =>
-              question.options.length
-                ? setDetails((current) => ({
-                    ...current,
-                    [question.id]: event.target.value,
-                  }))
-                : setAnswers((current) => ({
-                    ...current,
-                    [question.id]: event.target.value,
-                  }))
-            }
-            placeholder={
-              question.options.length ? "Other answer" : "Your answer"
-            }
-            className="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-          />}
-        </fieldset>
-      ))}
-      <textarea
-        aria-label="Rejection comment"
-        value={comment}
-        onChange={(event) => setComment(event.target.value)}
-        placeholder="Optional rejection feedback"
-        className="min-h-16 w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-      />
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" loading={busy} disabled={!canSend} onClick={() => decide(true)}>
-          <Icon icon={UiCheck} />
-          Send answer
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          onClick={() => decide(false)}
-        >
-          <Icon icon={UiCancel} />
-          Reject
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy || !comment.trim()}
-          onClick={() => decide(false, comment.trim())}
-        >
-          <Icon icon={UiComment} />
-          Reject with comment
-        </Button>
-      </div>
-      {error && (
-        <div role="alert" className="text-xs text-rose-600">
-          {error}
-        </div>
-      )}
     </div>
   );
 }

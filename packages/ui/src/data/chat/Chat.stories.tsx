@@ -76,9 +76,14 @@ export const WithRuntimeBar: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const runtime = canvas.getByRole("button", {
-      name: "Runtime: Claude, API, Claude Sonnet 4.5, effort Medium",
-    });
+    const runtime = within(canvas.getByRole("group", { name: "Runtime" }));
+    const mode = runtime.getByTitle("Runtime mode — API");
+    await expect(runtime.getByRole("combobox", { name: "Model" })).toHaveTextContent(
+      "Claude Sonnet 4.5",
+    );
+    await expect(runtime.getByTitle("Reasoning effort")).toHaveTextContent(
+      "Medium",
+    );
     const meter = canvas.getByLabelText("Context 0% used");
     await userEvent.hover(meter);
     const body = within(document.body);
@@ -86,14 +91,12 @@ export const WithRuntimeBar: Story = {
     await expect(
       within(body.getByRole("tooltip")).queryByText("Claude Sonnet 4.5"),
     ).not.toBeInTheDocument();
-    await userEvent.click(runtime);
-    await expect(body.getByRole("menu")).toHaveAttribute(
-      "aria-label",
-      "Runtime controls",
-    );
+    await userEvent.click(mode);
+    const menu = await body.findByRole("menu", { name: "Runtime mode" });
     await expect(
-      body.getByRole("radiogroup", { name: "Runtime mode" }),
+      within(menu).getByRole("menuitem", { name: "API" }),
     ).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
   },
 };
 

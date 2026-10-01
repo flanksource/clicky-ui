@@ -3,6 +3,7 @@ import { dirname, isAbsolute, relative, sep } from "node:path";
 import type { Plugin } from "vite";
 
 import { deleteFolder, deletePage, movePage } from "./page-management-store";
+import { deleteReviewable, markReviewable } from "./reviewable-store";
 import {
   PageStoreError,
   assertSlug,
@@ -24,6 +25,8 @@ export type SourceRoute =
   | "create-page"
   | "create-folder"
   | "delete-folder"
+  | "mark-reviewable"
+  | "delete-reviewable"
   | "write"
   | "move"
   | "delete";
@@ -40,6 +43,11 @@ export function matchSourceRoute(
   if (pathname === "/folders") {
     if (method === "POST") return "create-folder";
     return method === "DELETE" && hasTarget ? "delete-folder" : undefined;
+  }
+  if (pathname === "/reviewables") {
+    if (method === "POST") return "mark-reviewable";
+    if (method === "DELETE") return "delete-reviewable";
+    return undefined;
   }
   if (pathname !== "/") return undefined;
 
@@ -68,17 +76,22 @@ export function filterDeletedPageModules<T extends { file: string | null }>(
   return modules.filter((module) => module.file !== file);
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function readJsonBody(
+  req: IncomingMessage,
+): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
   const raw = Buffer.concat(chunks).toString("utf8");
-  if (raw === "") throw new Error(`${req.method} ${SOURCES_ROUTE} expects a JSON body`);
+  if (raw === "")
+    throw new Error(`${req.method} ${SOURCES_ROUTE} expects a JSON body`);
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    throw new Error(`request body is not valid JSON (${(error as Error).message})`);
+    throw new Error(
+      `request body is not valid JSON (${(error as Error).message})`,
+    );
   }
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("request body must be a JSON object");
@@ -95,8 +108,29 @@ function sendJson(res: ServerResponse, status: number, payload: unknown): void {
 
 function requireSource(body: Record<string, unknown>): string {
   const source = body["source"];
-  if (typeof source !== "string") throw new Error('request requires a string "source"');
+  if (typeof source !== "string")
+    throw new Error('request requires a string "source"');
   return source;
+}
+
+function requireString(body: Record<string, unknown>, key: string): string {
+  const value = body[key];
+  if (typeof value !== "string" || value === "") {
+    throw new PageStoreError(`${key} must be a non-empty string`, 400);
+  }
+  return value;
+}
+
+function optionalString(
+  body: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = body[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || value === "") {
+    throw new PageStoreError(`${key} must be a non-empty string`, 400);
+  }
+  return value;
 }
 
 function optionalTitle(body: Record<string, unknown>): string | undefined {
@@ -106,6 +140,18 @@ function optionalTitle(body: Record<string, unknown>): string | undefined {
     throw new Error('"title" must be a non-empty string');
   }
   return title;
+}
+
+function optionalPositiveInteger(
+  body: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  const value = body[key];
+  if (value === undefined) return undefined;
+  if (!Number.isInteger(value) || (value as number) <= 0) {
+    throw new PageStoreError(`${key} must be a positive integer`, 400);
+  }
+  return value as number;
 }
 
 type SourceEvents = {
@@ -153,6 +199,52 @@ function handle(
   }
 
   switch (route) {
+    case "mark-reviewable":
+      return readJsonBody(req).then((body) => {
+        const slug = assertSlug(body["slug"]);
+        const line = optionalPositiveInteger(body, "line");
+        const column = optionalPositiveInteger(body, "column");
+        const domId = optionalString(body, "domId");
+        const sourcePath = optionalString(body, "sourcePath");
+        const result = markReviewable({
+          pagesDir,
+          commentsDir,
+          slug,
+          expectedSource: requireString(body, "expectedSource"),
+          ...(domId ? { domId } : {}),
+          ...(sourcePath ? { sourcePath } : {}),
+          ...(line ? { line } : {}),
+          ...(column ? { column } : {}),
+        });
+        events.changed(pagePath(pagesDir, slug));
+        sendJson(res, 200, { reviewId: result.reviewId });
+      });
+
+    case "delete-reviewable":
+      return readJsonBody(req).then((body) => {
+        const slug = assertSlug(body["slug"]);
+        const associated = body["associatedCommentIds"];
+        if (
+          !Array.isArray(associated) ||
+          associated.some((id) => typeof id !== "string")
+        ) {
+          throw new PageStoreError(
+            "associatedCommentIds must be an array of comment ids",
+            400,
+          );
+        }
+        const result = deleteReviewable({
+          pagesDir,
+          commentsDir,
+          slug,
+          expectedSource: requireString(body, "expectedSource"),
+          reviewId: requireString(body, "reviewId"),
+          associatedCommentIds: associated,
+        });
+        events.changed(pagePath(pagesDir, slug));
+        sendJson(res, 200, { removedComments: result.removedComments });
+      });
+
     case "folders":
       return sendJson(res, 200, { folders: listFolders(pagesDir) });
 
@@ -165,7 +257,10 @@ function handle(
       return readJsonBody(req).then((body) => {
         const slug = assertSlug(body["slug"] ?? slugParam);
         if (!sourceExists(pagesDir, slug)) {
-          throw new PageStoreError(`page "${slug}" does not exist — create it first`, 404);
+          throw new PageStoreError(
+            `page "${slug}" does not exist — create it first`,
+            404,
+          );
         }
         writeSource(pagesDir, slug, requireSource(body));
         sendJson(res, 200, { slug });
@@ -230,7 +325,10 @@ function handle(
  * `src/pages/`. Dev-server only: `vite build` output has no file backend, and
  * writes are confined to validated slugs inside the pages directory.
  */
-export function playgroundSources(options: { pagesDir: string; commentsDir: string }): Plugin {
+export function playgroundSources(options: {
+  pagesDir: string;
+  commentsDir: string;
+}): Plugin {
   return {
     name: "playground-sources",
     apply: "serve",
@@ -257,17 +355,30 @@ export function playgroundSources(options: { pagesDir: string; commentsDir: stri
       server.middlewares.use(SOURCES_ROUTE, (req, res, next) => {
         void (async () => {
           try {
-            await handle(options.pagesDir, options.commentsDir, events, req, res);
+            await handle(
+              options.pagesDir,
+              options.commentsDir,
+              events,
+              req,
+              res,
+            );
           } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            server.config.logger.error(`[playground-sources] ${req.method} failed: ${message}`);
+            const message =
+              error instanceof Error ? error.message : String(error);
+            server.config.logger.error(
+              `[playground-sources] ${req.method} failed: ${message}`,
+            );
             if (res.headersSent) {
               next(error);
               return;
             }
-            sendJson(res, error instanceof PageStoreError ? error.statusCode : 400, {
-              error: message,
-            });
+            sendJson(
+              res,
+              error instanceof PageStoreError ? error.statusCode : 400,
+              {
+                error: message,
+              },
+            );
           }
         })();
       });

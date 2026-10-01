@@ -340,4 +340,17 @@ describe("DropdownMenu", () => {
     expect(onAccounts).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
+
+  it("keeps a portaled submenu open through the pointer press so its choice can apply", () => {
+    const onAccounts = vi.fn();
+    render(<DropdownMenu label="Add" items={nestedItems(onAccounts)} />);
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Xero" }));
+    const choice = screen.getByRole("menuitem", { name: "Accounts" });
+    fireEvent.pointerDown(choice);
+    expect(choice).toBeInTheDocument();
+    fireEvent.click(choice);
+    expect(onAccounts).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
 });

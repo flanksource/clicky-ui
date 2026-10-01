@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import type { AISpecRuntimeValue } from "../SpecRuntimeEditor.model";
 import {
   checkoutMode,
+  commitPhase,
+  commitPhaseFromEntry,
   parseOptionalNumber,
   stashMode,
   withBudgetValue,
   withCheckoutMode,
+  withCommitPhase,
   withOptionalRoot,
   withPermissionMode,
   withSandboxMode,
@@ -92,6 +95,56 @@ describe("update helpers", () => {
     });
   });
 
+  it.each([
+    { mode: "new" as const, worktree: { mode: "new" } },
+    {
+      mode: "existing" as const,
+      worktree: { mode: "existing", prefix: "", base: "", keep: false },
+    },
+  ])(
+    "defaults $mode worktrees to committing after each turn",
+    ({ mode, worktree }) => {
+      expect(
+        withWorktreeMode({ mode: "cli", budget: { timeout: "30m" } }, mode),
+      ).toEqual({
+        mode: "cli",
+        budget: { timeout: "30m" },
+        setup: { checkout: { worktree } },
+        workflow: { commits: [{ on: "turn" }] },
+      });
+    },
+  );
+
+  it.each(["new", "existing"] as const)(
+    "preserves explicit commit choices when selecting a %s worktree",
+    (mode) => {
+      for (const commits of [
+        [],
+        [{ on: "run" as const, message: "Update configuration" }],
+      ]) {
+        const value: AISpecRuntimeValue = { workflow: { commits } };
+        expect(withWorktreeMode(value, mode).workflow).toEqual({ commits });
+        expect(value).toEqual({ workflow: { commits } });
+      }
+    },
+  );
+
+  it("leaves commit policy unset when selecting HEAD", () => {
+    expect(withWorktreeMode({}, "none")).toEqual({
+      setup: {
+        checkout: {
+          worktree: {
+            mode: "none",
+            prefix: "",
+            base: "",
+            path: "",
+            keep: false,
+          },
+        },
+      },
+    });
+  });
+
   it("derives segmented modes from partially-set specs", () => {
     expect(checkoutMode({})).toBe("none");
     expect(checkoutMode({ setup: { checkout: { path: "/repo" } } })).toBe(
@@ -159,5 +212,37 @@ describe("update helpers", () => {
     expect(withSandboxMode(value, "docker").sandbox).toEqual({
       mode: "docker",
     });
+  });
+
+  it("derives a commit stanza's phase, defaulting an untagged entry to end of run", () => {
+    expect(commitPhaseFromEntry(undefined)).toBe("run");
+    expect(commitPhaseFromEntry({})).toBe("run");
+    expect(commitPhaseFromEntry({ on: "turn" })).toBe("turn");
+    expect(commitPhaseFromEntry({ on: "agent" })).toBe("agent");
+    expect(commitPhaseFromEntry({ on: "run" })).toBe("run");
+  });
+
+  it("reads commitPhase as none only when no stanza is present", () => {
+    expect(commitPhase({})).toBe("none");
+    expect(commitPhase({ workflow: { commits: [] } })).toBe("none");
+    expect(commitPhase({ workflow: { commits: [{ on: "turn" }] } })).toBe(
+      "turn",
+    );
+    expect(commitPhase({ workflow: { commits: [{}] } })).toBe("run");
+  });
+
+  it("keeps withCommitPhase delta-only: never carries stage/gates into the value", () => {
+    expect(withCommitPhase({}, "run")).toEqual({
+      workflow: { commits: [{ on: "run" }] },
+    });
+    expect(withCommitPhase({}, "none")).toEqual({
+      workflow: { commits: [] },
+    });
+    expect(
+      withCommitPhase(
+        { workflow: { commits: [{ on: "turn", message: "x" }] } },
+        "run",
+      ),
+    ).toEqual({ workflow: { commits: [{ on: "run", message: "x" }] } });
   });
 });

@@ -75,6 +75,11 @@
       "type": "boolean",
       "examples": [true]
     },
+    "x-hidden-by": {
+      "description": "Which listener hid this field, e.g. `x-on-change on \"Option\"`. Stamped by the form when an `x-on-change`/`x-on-load` `hide` applies and cleared by a `show`; read only by the form's debug mode to say why a field is missing. Not meant to be authored.",
+      "type": "string",
+      "examples": ["x-on-change on \"MemberClassOption\""]
+    },
     "x-disabled": {
       "description": "Render the field's real control, disabled (containers disable their whole subtree). Unlike `readOnly`, which swaps the input for plain value text. Flippable by an `allOf` branch like `x-hidden`, and set/cleared by an `x-on-change` `enable`/`disable` action or `patch`.",
       "type": "boolean",

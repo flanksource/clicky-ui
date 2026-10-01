@@ -57,6 +57,37 @@ export const Default: Story = {
   args: { session: INSPECTOR_SESSION },
 };
 
+export const LongTranscript: Story = {
+  args: {
+    session: {
+      id: "long-transcript",
+      messages: Array.from({ length: 30 }, (_, index) => ({
+        id: `message-${index}`,
+        role: "assistant" as const,
+        parts: [{
+          type: "text" as const,
+          text: `Transcript message ${index + 1}\n\nThis message contains enough detail to make the transcript scrollable while keeping each entry easy to identify.`,
+        }],
+      })),
+    },
+  },
+};
+
+export const PromptAndReasoning: Story = {
+  args: {
+    session: {
+      id: "prompt-and-reasoning",
+      initialPrompt: "# Review the parser\n\n- Inspect the source\n- Run focused tests",
+      messages: [
+        { id: "prompt", role: "user", parts: [{ type: "text", text: "# Review the parser\n\n- Inspect the source\n- Run focused tests" }] },
+        { id: "encrypted", role: "assistant", parts: [{ type: "reasoning", text: "81 encrypted reasoning records over 17m54s (2026-07-16T11:15:04Z → 2026-07-16T11:32:58Z)" }] },
+        { id: "reasoning", role: "assistant", parts: [{ type: "reasoning", text: "I will inspect the parser first." }] },
+        { id: "answer", role: "assistant", parts: [{ type: "text", text: "The parser has been reviewed." }] },
+      ],
+    },
+  },
+};
+
 export const RecentCodex: Story = {
   args: { session: CODEX_SESSION_EXAMPLE },
 };

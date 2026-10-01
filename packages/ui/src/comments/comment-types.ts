@@ -106,6 +106,10 @@ export type CommentAnchor = string;
 
 /** Binary review signal attached to a root comment. */
 export type CommentRating = "positive" | "negative";
+export type CommentReviewDecision =
+  | "approved"
+  | "rejected"
+  | "revision_requested";
 
 /** Anchor key reserved for document-level (un-anchored) comments. */
 export const DOCUMENT_ANCHOR = "__document__";
@@ -127,6 +131,8 @@ export type Comment = {
   anchor?: CommentAnchor | null;
   /** Optional positive/negative review signal; roots only. */
   rating?: CommentRating;
+  /** Human decision on an opted-in playground review element; roots only. */
+  reviewDecision?: CommentReviewDecision;
   /** ISO-8601 time when a human closed the resolved comment. */
   closedAt?: string;
   /** Human who closed the comment. */
@@ -142,6 +148,7 @@ export type CommentCreateInput = {
   body: string;
   anchor?: CommentAnchor | null;
   rating?: CommentRating;
+  reviewDecision?: CommentReviewDecision;
   facets?: Record<string, string>;
   mentions?: CommentMention[];
 };
@@ -161,7 +168,10 @@ export type CommentReplyInput = {
  * performs the mutation and feeds the updated `comments` back in.
  */
 export type CommentCallbacks = {
-  onCreate?: (input: CommentCreateInput, actionId?: string) => void | Promise<void>;
+  onCreate?: (
+    input: CommentCreateInput,
+    actionId?: string,
+  ) => void | Promise<void>;
   onReply?: (input: CommentReplyInput) => void | Promise<void>;
   onUpdateStatus?: (id: string, status: string) => void | Promise<void>;
   /** Human-only transition from resolved to closed. */

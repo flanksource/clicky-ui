@@ -7,6 +7,7 @@ import { durationLabel, runtimeDescriptor } from "./SessionInspector.model";
 import { SessionContextMeter } from "./SessionViewer.header";
 import { getSessionMetadata } from "./SessionViewer.model";
 import type { UnifiedSessionInput } from "./SessionViewer.unified";
+import { Markdown } from "../Markdown";
 
 export function SessionInspectorHeader({
   session,
@@ -19,9 +20,10 @@ export function SessionInspectorHeader({
   const providerColor = providerIconColor(providerId);
   const effortValue = session.reasoningEffort?.trim();
   const effort = effortValue ? effortIcon(effortValue) : undefined;
+  const initialPrompt = session.initialPrompt?.trim();
   const title =
     session.title?.trim() ||
-    session.initialPrompt?.trim() ||
+    initialPrompt?.split(/\r?\n/, 1)[0]?.replace(/^#{1,6}\s+/, "").trim() ||
     session.model ||
     provider?.family ||
     session.provider ||
@@ -65,6 +67,14 @@ export function SessionInspectorHeader({
               </span>
             ) : null}
           </div>
+          {initialPrompt && (
+            <details className="mt-density-2 text-sm">
+              <summary className="w-fit cursor-pointer text-muted-foreground hover:text-foreground">Initial prompt</summary>
+              <div className="mt-density-2 max-h-64 overflow-y-auto rounded-lg border border-border bg-background px-density-3 py-density-2 text-foreground">
+                <Markdown text={initialPrompt} />
+              </div>
+            </details>
+          )}
         </div>
       </div>
     </header>

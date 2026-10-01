@@ -345,6 +345,8 @@ export { ExecutionTree, type ExecutionNode, type ExecutionTreeProps } from "./da
 export {
   GraphDiagram,
   type GraphDiagramEdge,
+  type GraphDiagramEdgeFocus,
+  type GraphDiagramGroup,
   type GraphDiagramLayout,
   type GraphDiagramNode,
   type GraphDiagramProps,
@@ -359,7 +361,15 @@ export {
   type GraphLayoutResult,
   type RingLayoutOptions,
   type RouteEdgesDimensions,
+  type RouteEdgesOptions,
 } from "./data/graph-layout";
+export {
+  columnsLayout,
+  type ColumnsLayoutNode,
+  type ColumnsLayoutOptions,
+  type ColumnsLayoutResult,
+  type GraphLayoutGroupBox,
+} from "./data/graph-columns-layout";
 export { TreeNode, type TreeNodeProps, type TreeRowContext } from "./data/TreeNode";
 export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHeader";
 export { Timeline, type TimelineItem, type TimelineProps } from "./data/Timeline";
@@ -533,7 +543,7 @@ export {
   type ParsedErrorStackTrace,
 } from "./data/diagnostics/error-diagnostics";
 
-export { HarPanel, type HarPanelProps } from "./data/har/HarPanel";
+export { HarPanel, HarEntryDetails, type HarPanelProps, type HarPanelBodySource, type HarEntryDetailsProps } from "./data/har/HarPanel";
 export type {
   HAREntry,
   HARRequest,

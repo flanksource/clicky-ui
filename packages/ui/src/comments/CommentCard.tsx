@@ -20,6 +20,7 @@ import {
   ChecklistChips,
   FacetBadges,
   RatingChip,
+  ReviewDecisionChip,
   RefChips,
   StatusChip,
 } from "./CommentCardParts";
@@ -195,6 +196,7 @@ function CommentBody({
             <div className="mt-1 flex flex-wrap gap-1">
               <StatusChip comment={comment} config={config} />
               <RatingChip rating={comment.rating} />
+              <ReviewDecisionChip decision={comment.reviewDecision} />
               <FacetBadges comment={comment} config={config} />
             </div>
           )}
@@ -329,6 +331,7 @@ export function CommentCard(props: CommentCardProps) {
             <>
               <StatusChip comment={comment} config={config} />
               <RatingChip rating={comment.rating} />
+              <ReviewDecisionChip decision={comment.reviewDecision} />
               <FacetBadges comment={comment} config={config} compact />
             </>
           )}
@@ -339,7 +342,9 @@ export function CommentCard(props: CommentCardProps) {
                 ? "Positive rating"
                 : comment.rating === "negative"
                   ? "Negative rating"
-                  : "Empty comment"}
+                  : comment.reviewDecision === "approved"
+                    ? "Approved"
+                    : "Empty comment"}
           </span>
           <span
             role="presentation"

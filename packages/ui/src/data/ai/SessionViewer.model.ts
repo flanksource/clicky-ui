@@ -1,5 +1,6 @@
 import type { StaticIconComponent } from "../Icon";
 import { WORKFLOW_PHASES } from "./agent-action-icons";
+import type { ApprovalKind, ApprovalRequest } from "./approval-request";
 import type {
   SessionBudget,
   SessionCapabilities,
@@ -185,6 +186,9 @@ export interface SessionEvent {
   toolState?: string;
   approval?: SessionUIPart["approval"];
   pending?: boolean;
+  /** Typed approval for a pending tool row (see `SessionPendingTool.kind`). */
+  approvalKind?: ApprovalKind;
+  approvalRequest?: ApprovalRequest;
   toolCallId?: string;
   approvalId?: string;
   sessionId?: string;

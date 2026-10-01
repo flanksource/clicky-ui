@@ -69,12 +69,15 @@ describe("applyListenerState path targets", () => {
     const schema = stepSchema([{ hide: ["mf/G1"] }]);
     const groups = groupsOf(stateOf(schema));
     const original = groupsOf(schema.properties!);
-    expect(groups).toEqual({ ...original, G1: { ...original.G1, "x-hidden": true } });
+    expect(groups).toEqual({ ...original, G1: { ...original.G1, "x-hidden": true, "x-hidden-by": 'x-on-change on "input"' } });
   });
 
   it("descends an array into its items to hide one cell", () => {
     const groups = groupsOf(stateOf(stepSchema([{ hide: ["mf/G1/cell"] }])));
-    expect(cellsOf(groups.G1)).toEqual({ cell: { type: "number", "x-hidden": true }, other: { type: "string" } });
+    expect(cellsOf(groups.G1)).toEqual({
+      cell: { type: "number", "x-hidden": true, "x-hidden-by": 'x-on-change on "input"' },
+      other: { type: "string" },
+    });
     expect(groups.G1?.["x-hidden"]).toBeUndefined();
   });
 
@@ -92,6 +95,7 @@ describe("applyListenerState path targets", () => {
   it("lets a later listener show a path an earlier one hid", () => {
     const groups = groupsOf(stateOf(stepSchema([{ hide: ["mf/G1"] }, { show: ["mf/G1"] }])));
     expect(groups.G1?.["x-hidden"]).toBe(false);
+    expect(groups.G1).not.toHaveProperty("x-hidden-by");
   });
 
   it("keeps both listeners when they target different groups under the same sibling", () => {

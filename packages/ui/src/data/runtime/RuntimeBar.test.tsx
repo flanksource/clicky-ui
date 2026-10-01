@@ -56,19 +56,10 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: /Model and mode are locked for this conversation/,
-      }),
-    );
-    expect(
-      screen.getByText(/Fork this conversation to change them/),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Claude" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "GPT-5" })).toBeDisabled();
-    const effort = screen.getByRole("slider", { name: "Reasoning effort" });
-    expect(effort).not.toBeDisabled();
-    fireEvent.change(effort, { target: { value: "1" } });
+    expect(screen.getByTitle("Runtime mode — CLI")).toBeDisabled();
+    expect(screen.getByTitle("Model — gpt-5")).toBeDisabled();
+    openSegment("Reasoning effort");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Low" }));
     expect(onChange).toHaveBeenCalledWith({
       mode: "cli",
       model: "gpt-5",
@@ -76,7 +67,7 @@ describe("RuntimeBar", () => {
     });
   });
 
-  it("renders the combo summary and direct runtime controls", () => {
+  it("renders separate mode and combined model controls in the combo layout", () => {
     render(
       <RuntimeBar
         variant="combo"
@@ -90,33 +81,24 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    const trigger = screen.getByRole("button", {
-      name: "Runtime: Codex, CLI, GPT-5, effort High",
-    });
+    const trigger = screen.getByTitle("Model — gpt-5");
     expect(trigger).toHaveTextContent("GPT-5");
 
     fireEvent.click(trigger);
-    const menu = screen.getByRole("menu");
-    expect(menu).toHaveAttribute("aria-label", "Runtime controls");
-    expect(
-      within(menu).getByRole("radiogroup", { name: "Family" }),
-    ).toBeInTheDocument();
-    expect(
-      within(menu).getByRole("radiogroup", { name: "Runtime mode" }),
-    ).toBeInTheDocument();
-    expect(within(menu).getByLabelText("Model id")).toBeInTheDocument();
-    const modelChoice = within(menu).getByRole("button", {
-      name: "GPT-5",
+    const menu = screen.getByRole("listbox");
+    expect(menu).toHaveAttribute("aria-label", "Model");
+    expect(within(menu).getByText("Claude")).toBeInTheDocument();
+    expect(within(menu).getByText("Codex")).toBeInTheDocument();
+    expect(screen.getByLabelText("Search Model")).toBeInTheDocument();
+    const modelChoice = within(menu).getByRole("option", {
+      name: /^GPT-5/,
     });
     expect(modelChoice).toBeInTheDocument();
-    expect(modelChoice).toHaveAttribute("title", "openai/gpt-5");
-    expect(modelChoice).not.toHaveTextContent("openai/gpt-5");
-    expect(
-      within(menu).getByRole("slider", { name: "Reasoning effort" }),
-    ).toHaveAttribute("aria-valuetext", "High");
+    expect(modelChoice).toHaveTextContent(/^GPT-5$/);
+    expect(screen.getByTitle("Reasoning effort")).toHaveTextContent("High");
   });
 
-  it("uses a wider panel for combo controls", () => {
+  it("bounds the combo model picker to the viewport", () => {
     render(
       <RuntimeBar
         variant="combo"
@@ -126,9 +108,12 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /^Runtime:/ }));
+    openSegment("Model — unspecified");
 
-    expect(screen.getByRole("menu")).toHaveClass("w-[28rem]");
+    expect(screen.getByRole("listbox").parentElement).toHaveStyle({
+      maxWidth: "400px",
+      maxHeight: "256px",
+    });
   });
 
   it("accepts an uncatalogued model id in the combo menu", () => {
@@ -142,10 +127,13 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /^Runtime:/ }));
-    fireEvent.change(screen.getByLabelText("Model id"), {
+    openSegment("Model — unspecified");
+    fireEvent.change(screen.getByLabelText("Search Model"), {
       target: { value: "gemini-3-pro" },
     });
+    fireEvent.click(
+      screen.getByRole("option", { name: "Use custom: gemini-3-pro" }),
+    );
 
     expect(onChange).toHaveBeenLastCalledWith({
       mode: "api",
@@ -166,19 +154,13 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Runtime: Codex, CLI, Unspecified, effort High",
-      }),
-    );
-    expect(screen.getByRole("radio", { name: "Codex" })).toBeChecked();
-    fireEvent.change(screen.getByRole("slider", { name: "Reasoning effort" }), {
-      target: { value: "1" },
-    });
+    expect(screen.getByTitle("Runtime mode — CLI")).toBeInTheDocument();
+    openSegment("Reasoning effort");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Low" }));
     expect(onChange).toHaveBeenCalledWith({ effort: "low" });
   });
 
-  it("updates combo fields without closing the runtime menu", () => {
+  it("keeps the combo model picker open while typing a custom model", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
@@ -193,38 +175,13 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Runtime: Codex, CLI, GPT-5, effort High",
-      }),
-    );
-    const menu = screen.getByRole("menu");
-    expect(menu).toHaveAttribute("aria-label", "Runtime controls");
-
-    fireEvent.click(within(menu).getByRole("radio", { name: "Claude" }));
-    expect(onChange).toHaveBeenCalledWith({
-      mode: "cli",
-      effort: "high",
+    openSegment("Model — gpt-5");
+    const menu = screen.getByRole("listbox");
+    expect(menu).toHaveAttribute("aria-label", "Model");
+    fireEvent.change(screen.getByLabelText("Search Model"), {
+      target: { value: "gpt-next" },
     });
-    expect(menu).toBeInTheDocument();
-
-    fireEvent.click(within(menu).getByRole("radio", { name: "cmux" }));
-    expect(onChange).toHaveBeenCalledWith({
-      mode: "cmux",
-      model: "gpt-5",
-      effort: "high",
-    });
-    expect(menu).toBeInTheDocument();
-
-    fireEvent.change(
-      within(menu).getByRole("slider", { name: "Reasoning effort" }),
-      { target: { value: "1" } },
-    );
-    expect(onChange).toHaveBeenCalledWith({
-      mode: "cli",
-      model: "gpt-5",
-      effort: "low",
-    });
+    expect(onChange).not.toHaveBeenCalled();
     expect(menu).toBeInTheDocument();
   });
 
@@ -238,11 +195,12 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    openSegment("Family — Claude");
-    fireEvent.click(screen.getByRole("menuitem", { name: /^Codex/ }));
+    openSegment("Model — sonnet");
+    fireEvent.mouseDown(screen.getByRole("option", { name: /^GPT-5/ }));
 
     expect(onChange).toHaveBeenCalledWith({
       mode: "cli",
+      model: "gpt-5",
     });
   });
 
@@ -256,11 +214,12 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    openSegment("Family — Claude");
-    fireEvent.click(screen.getByRole("menuitem", { name: /^Codex/ }));
+    openSegment("Model — sonnet");
+    fireEvent.mouseDown(screen.getByRole("option", { name: /^GPT-5/ }));
 
     expect(onChange).toHaveBeenCalledWith({
       mode: "agent",
+      model: "gpt-5",
     });
   });
 
@@ -278,11 +237,12 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    openSegment("Family — Claude");
-    fireEvent.click(screen.getByRole("menuitem", { name: /^Codex/ }));
+    openSegment("Model — sonnet");
+    fireEvent.mouseDown(screen.getByRole("option", { name: /^GPT-5/ }));
 
     expect(onChange).toHaveBeenCalledWith({
       mode: "agent",
+      model: "gpt-5",
     });
   });
 
@@ -301,9 +261,12 @@ describe("RuntimeBar", () => {
     );
 
     openSegment("Model — gpt-5");
-    fireEvent.change(screen.getByLabelText("Model id"), {
+    fireEvent.change(screen.getByLabelText("Search Model"), {
       target: { value: "gpt-5.1" },
     });
+    fireEvent.click(
+      screen.getByRole("option", { name: "Use custom: gpt-5.1" }),
+    );
 
     expect(onChange).toHaveBeenCalledWith({
       mode: "cli",
@@ -321,7 +284,7 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    openSegment("Codex CLI");
+    openSegment("Runtime mode — CLI");
     fireEvent.click(screen.getByRole("menuitem", { name: /^cmux/ }));
 
     expect(onChange).toHaveBeenCalledWith({
@@ -351,7 +314,7 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    openSegment("Runtime mode");
+    openSegment("Runtime mode — Agent");
     expect(
       screen.queryByRole("menuitem", { name: /^API/ }),
     ).not.toBeInTheDocument();
@@ -378,19 +341,22 @@ describe("RuntimeBar", () => {
 
     openSegment("Model — gemini-3-pro");
     expect(
-      screen.getAllByRole("menuitem").map((item) => item.textContent),
-    ).toEqual(["-not sent — configuration decides"]);
+      screen.getAllByRole("option").map((item) => item.textContent),
+    ).toEqual(["-not sent — configuration decides", "Custom model…"]);
 
-    fireEvent.change(screen.getByLabelText("Model id"), {
+    fireEvent.change(screen.getByLabelText("Search Model"), {
       target: { value: "gemini-3-pro-preview" },
     });
+    fireEvent.click(
+      screen.getByRole("option", { name: "Use custom: gemini-3-pro-preview" }),
+    );
     expect(onChange).toHaveBeenCalledWith({
       mode: "api",
       model: "gemini-3-pro-preview",
     });
   });
 
-  it("lists only selectable models for the selected family", () => {
+  it("lists selectable models across eligible families with the inherited model hint", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
@@ -402,14 +368,13 @@ describe("RuntimeBar", () => {
     );
 
     openSegment("Model — unspecified");
-    const items = screen.getAllByRole("menuitem");
-    expect(items.map((item) => item.textContent)).toEqual([
-      "-not sent — inherits GPT-5",
-      "GPT-5openai/gpt-5",
-    ]);
+    expect(
+      screen.getByRole("option", { name: /not sent — inherits GPT-5/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /^Sonnet/ })).toBeInTheDocument();
     expect(screen.queryByText("GPT-5 mini")).not.toBeInTheDocument();
 
-    fireEvent.click(items[1]!);
+    fireEvent.mouseDown(screen.getByRole("option", { name: /^GPT-5/ }));
     // Picking a model never invents a reasoning effort the user didn't choose.
     expect(onChange).toHaveBeenCalledWith({
       mode: "cli",
@@ -446,7 +411,7 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    openSegment("Runtime mode");
+    openSegment("Runtime mode — Agent");
     expect(
       screen.queryByRole("menuitem", { name: /cmux/ }),
     ).not.toBeInTheDocument();
@@ -471,7 +436,7 @@ describe("RuntimeBar", () => {
     expect(within(bar).queryByText("GPT-5 mini")).not.toBeInTheDocument();
 
     openSegment("Model — unavailable selection");
-    expect(screen.getByLabelText("Model id")).toHaveValue("");
+    expect(screen.getByLabelText("Search Model")).toHaveValue("");
     expect(screen.queryByText("GPT-5 mini")).not.toBeInTheDocument();
   });
 
@@ -514,7 +479,9 @@ describe("RuntimeBar", () => {
 
     const bar = screen.getByRole("group", { name: "Runtime" });
     expect(within(bar).getByText("Gemini 3.6 Flash")).toBeInTheDocument();
-    expect(within(bar).queryByText("Unavailable selection")).not.toBeInTheDocument();
+    expect(
+      within(bar).queryByText("Unavailable selection"),
+    ).not.toBeInTheDocument();
   });
 
   it("omits unavailable models from the combo picker", () => {
@@ -528,15 +495,11 @@ describe("RuntimeBar", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Runtime: Codex, CLI, Unspecified, effort Unspecified",
-      }),
-    );
+    openSegment("Model — unspecified");
 
-    expect(screen.getByRole("button", { name: "GPT-5" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /^GPT-5/ })).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "GPT-5 mini" }),
+      screen.queryByRole("option", { name: /^GPT-5 mini/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -564,7 +527,7 @@ describe("RuntimeBar", () => {
     );
 
     openSegment("Model — unspecified");
-    fireEvent.click(screen.getByRole("menuitem", { name: /^Sonnet 4.6/ }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: /^Sonnet 4.6/ }));
 
     expect(onChange).toHaveBeenCalledWith({
       model: "claude-sonnet-4-6",
@@ -614,7 +577,7 @@ describe("RuntimeBar", () => {
     );
 
     openSegment("Model — unspecified");
-    fireEvent.click(screen.getByRole("menuitem", { name: /^Opus 5/ }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: /^Opus 5/ }));
 
     expect(onChange).toHaveBeenCalledWith({
       model: "claude-opus-5",
@@ -633,7 +596,7 @@ describe("RuntimeBar", () => {
     );
 
     openSegment("Model — gpt-5");
-    fireEvent.click(screen.getByRole("menuitem", { name: /^-\s*not sent/ }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: /^-\s*not sent/ }));
 
     expect(onChange).toHaveBeenCalledWith({ mode: "cli" });
   });

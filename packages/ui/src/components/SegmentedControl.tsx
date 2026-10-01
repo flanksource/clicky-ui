@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
 
@@ -19,6 +19,17 @@ export type SegmentedOption<T extends string = string> = {
   description?: ReactNode;
   /** Native title attribute. */
   title?: string;
+  /**
+   * Short muted tag rendered after the label (e.g. "default"). It is exposed to
+   * assistive tech as the segment's accessible description, not its name.
+   */
+  marker?: string;
+  /**
+   * Render this segment as the implied choice while no option is selected (e.g.
+   * a schema default the value has not been set to). It is outlined, not
+   * filled, and stays `aria-checked=false` because nothing is selected.
+   */
+  implied?: boolean;
   /** Disable this segment. */
   disabled?: boolean;
 };
@@ -63,6 +74,8 @@ export function SegmentedControl<T extends string = string>({
   "aria-label": ariaLabel,
 }: SegmentedControlProps<T>) {
   const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const markerIdBase = useId();
+  const hasSelection = options.some((option) => option.id === value);
 
   const move = (from: number, dir: 1 | -1) => {
     const n = options.length;
@@ -92,6 +105,8 @@ export function SegmentedControl<T extends string = string>({
     >
       {options.map((option, index) => {
         const active = option.id === value;
+        const implied = !hasSelection && option.implied === true;
+        const markerId = option.marker ? `${markerIdBase}-marker-${index}` : undefined;
         return (
           <button
             key={option.id}
@@ -101,9 +116,11 @@ export function SegmentedControl<T extends string = string>({
             type="button"
             role="radio"
             aria-checked={active}
+            aria-describedby={markerId}
+            data-implied={implied ? "true" : undefined}
             title={option.title}
             disabled={option.disabled}
-            tabIndex={active ? 0 : -1}
+            tabIndex={active || implied ? 0 : -1}
             onClick={() => !option.disabled && onChange(option.id)}
             onKeyDown={(e) => {
               if (e.key === "ArrowRight" || e.key === "ArrowDown") {
@@ -125,9 +142,13 @@ export function SegmentedControl<T extends string = string>({
                 ? size === "lg"
                   ? "border-primary/70 bg-primary/10 text-foreground shadow-sm ring-1 ring-primary/25"
                   : "border-border bg-card text-foreground shadow-sm"
-                : size === "lg"
-                  ? "border-border bg-card text-muted-foreground hover:border-muted-foreground/40 hover:bg-card hover:text-foreground hover:shadow-sm"
-                  : "text-muted-foreground hover:border-border hover:bg-background/60 hover:text-foreground",
+                : implied
+                  ? size === "lg"
+                    ? "border-dashed border-primary/60 bg-card text-foreground hover:shadow-sm"
+                    : "border-dashed border-primary/60 text-foreground hover:bg-background/60"
+                  : size === "lg"
+                    ? "border-border bg-card text-muted-foreground hover:border-muted-foreground/40 hover:bg-card hover:text-foreground hover:shadow-sm"
+                    : "text-muted-foreground hover:border-border hover:bg-background/60 hover:text-foreground",
               active && option.activeClassName,
             )}
           >
@@ -151,7 +172,20 @@ export function SegmentedControl<T extends string = string>({
                   "flex flex-col items-start text-left leading-tight",
               )}
             >
-              <span className="min-w-0 truncate">{option.label}</span>
+              {option.marker ? (
+                <span className="inline-flex min-w-0 max-w-full items-baseline gap-1">
+                  <span className="min-w-0 truncate">{option.label}</span>
+                  <span
+                    id={markerId}
+                    aria-hidden="true"
+                    className="shrink-0 text-[11px] font-normal opacity-70"
+                  >
+                    {option.marker}
+                  </span>
+                </span>
+              ) : (
+                <span className="min-w-0 truncate">{option.label}</span>
+              )}
               {option.description && (
                 <span
                   className={cn(

@@ -11,10 +11,7 @@ import type {
   AttachmentUploadAdapter,
 } from "../../chat/attachment-upload";
 import type { ChatModel, ToolMeta } from "../../chat/types";
-import type {
-  RuntimeBarAction,
-  RuntimeBarActionsProps,
-} from "../../runtime/RuntimeBarActions";
+import type { RuntimeBarActionsProps } from "../../runtime/RuntimeBarActions";
 import {
   SPEC_RUNTIME_FAMILIES,
   type SpecRuntimeFamily,
@@ -42,9 +39,13 @@ import type {
   RuntimeProfileResolveRequest,
 } from "../runtime-profile";
 import { authoredRuntimeSpec } from "../../../lib/runtime-profile-model";
-import { OrderedPresetSelect } from "../runtime-profiles/OrderedPresetSelect";
+import { runtimeSpecFields } from "../runtime-spec-fields";
+import { useRuntimePresetMenu } from "../runtime-preset-menu";
 import {
   modelModeOf,
+  runtimeModelFromSpec,
+  runtimeRows,
+  withRuntimeRows,
   withModelMode,
   withRecentRuntime,
   type AIPromptRunValue,
@@ -53,7 +54,6 @@ import {
 } from "./model";
 import { Block, PromptBlocks } from "./PromptBlocks";
 import { RecentRuntimes } from "./RecentRuntimes";
-import { permissionField, presetsField } from "./runtimeActions";
 import { RuntimeRows } from "./RuntimeRows";
 
 export type PromptRunEditorProps = {
@@ -113,6 +113,10 @@ export type PromptRunEditorProps = {
   profiles?: RuntimeProfile[] | undefined;
   /** Available presets for direct ordered run selection. */
   presets?: RuntimePreset[] | undefined;
+  /** Persist a preset captured from the runtime bar. */
+  onCreatePreset?:
+    | ((draft: RuntimePreset) => Promise<RuntimePreset>)
+    | undefined;
   onSaveProfile?:
     | ((profile: RuntimeProfile) => Promise<RuntimeProfile>)
     | undefined;
@@ -176,6 +180,7 @@ export function PromptRunEditor({
   specSections,
   specTabs,
   presets,
+  onCreatePreset,
   resolution,
 }: PromptRunEditorProps) {
   if (specTabs && specSections) {
@@ -184,7 +189,6 @@ export function PromptRunEditor({
     );
   }
   const [specOpen, setSpecOpen] = useState(false);
-  const [presetsOpen, setPresetsOpen] = useState(false);
   const spec = value.spec ?? {};
   const modelMode = modelModeOf(value);
   const presetCatalog = presets ?? [];
@@ -200,41 +204,53 @@ export function PromptRunEditor({
       presetCatalog,
     );
 
-  // Spec-level run settings shown on the runtime bar. The permission field is
-  // dropped under `specTabs` because the inline Permissions tab already owns it,
-  // and a value with two editors in one layout is a value that drifts.
+  const presetMenu = useRuntimePresetMenu({
+    value: { spec, presets: value.presets ?? [] },
+    presets: presetCatalog,
+    onCreatePreset,
+    onChange: (next) => {
+      const updated = { ...value, spec: next.spec, presets: next.presets };
+      onChange(
+        value.runtimes?.length && next.spec !== spec
+          ? withRuntimeRows(updated, [
+              runtimeModelFromSpec(next.spec),
+              ...runtimeRows(value).slice(1),
+            ])
+          : updated,
+      );
+    },
+  });
   const barActions: RuntimeBarActionsProps = {
-    fields: [
+    fields: specTabs
+      ? []
+      : runtimeSpecFields({
+          value: spec,
+          families,
+          models,
+          effectiveMode: runRuntime.mode,
+          effectiveModel: runRuntime.model,
+          onChange: (next) => onChange({ ...value, spec: next }),
+        }).filter((field) => {
+          const section =
+            field.id === "permissions.mode"
+              ? "permissions"
+              : field.id === "workflow.commits"
+              ? "commit"
+              : "workspace";
+          return !specSections || specSections.includes(section);
+        }),
+    menu: [
+      ...(presets !== undefined || onCreatePreset ? presetMenu.menu : []),
       ...(specTabs
         ? []
         : [
-            permissionField({
-              spec,
-              families,
-              effectiveMode: runRuntime.mode,
-              onChange: (next) => onChange({ ...value, spec: next }),
-            }),
+            {
+              label: advancedLabel,
+              icon: UiGearSix,
+              onSelect: () => setSpecOpen(true),
+            },
           ]),
-      ...(presets === undefined
-        ? []
-        : [
-            presetsField({
-              presets: presetCatalog,
-              value: value.presets ?? [],
-              onChange: (next) => onChange({ ...value, presets: next }),
-              onReorder: () => setPresetsOpen(true),
-            }),
-          ]),
-    ].filter((field): field is RuntimeBarAction => field !== undefined),
-    menu: specTabs
-      ? []
-      : [
-          {
-            label: advancedLabel,
-            icon: UiGearSix,
-            onSelect: () => setSpecOpen(true),
-          },
-        ],
+    ],
   };
 
   const specEditorProps: SpecRuntimeEditorProps = {
@@ -324,21 +340,7 @@ export function PromptRunEditor({
 
       {footer}
 
-      {presets !== undefined && (
-        <Modal
-          open={presetsOpen}
-          onClose={() => setPresetsOpen(false)}
-          title="Presets"
-          size="lg"
-          closeOnEsc
-        >
-          <OrderedPresetSelect
-            presets={presetCatalog}
-            value={value.presets ?? []}
-            onChange={(next) => onChange({ ...value, presets: next })}
-          />
-        </Modal>
-      )}
+      {presetMenu.dialogs}
 
       {!specTabs && (
         <Modal

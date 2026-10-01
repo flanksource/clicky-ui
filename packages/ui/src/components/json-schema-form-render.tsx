@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { LabelIcon } from "../data/Icon";
+import { withFieldDebug } from "./json-schema-form-debug";
 import {
   BooleanControl,
   DateControl,
@@ -161,11 +162,22 @@ function buildField(
   // extension can set or clear it — checked before anything is resolved. A
   // matching `allOf` branch that re-declares the property without the flag is
   // what reveals it; see effectiveProperties.
-  if (args.prop["x-hidden"]) return null;
+  // hide says whether to drop the field; in debug mode it keeps it and records
+  // the first reason it would have gone.
+  let hiddenReason: string | undefined;
+  const hide = (reason: string) => {
+    if (!ctx.debug) return true;
+    hiddenReason ??= reason;
+    return false;
+  };
+  const hiddenBy = args.prop["x-hidden-by"];
+  if (args.prop["x-hidden"] && hide(hiddenBy ? `hidden by ${hiddenBy}` : "hidden by the schema (x-hidden)")) return null;
   const base = resolveControl(args);
   let field: FieldControl | null = base;
+  let beforeDrop: FieldControl = base;
   for (const ext of ctx.pre) {
     if (!field) break;
+    beforeDrop = field;
     field = ext(field, {
       key: args.key,
       prop: args.prop,
@@ -174,15 +186,18 @@ function buildField(
       ...(ctx.onRootChange ? { onRootChange: ctx.onRootChange } : {}),
     });
   }
-  if (!field) return null;
+  if (!field) {
+    if (hide("dropped by a form extension")) return null;
+    field = beforeDrop;
+  }
   // Drop read-only fields entirely when the form opts out of displaying them.
   // Checked after pre-extensions so an extension that sets/clears readOnly wins.
-  if (ctx.hideReadOnlyFields && field.readOnly) return null;
+  if (ctx.hideReadOnlyFields && field.readOnly && hide("hidden: read-only")) return null;
   // A writeOnly value is never read back, so a view has nothing to show for it.
-  if (field.writeOnly && (ctx.viewOnly || field.readOnly)) return null;
+  if (field.writeOnly && (ctx.viewOnly || field.readOnly) && hide("hidden: write-only")) return null;
   // Same placement, same reason: an extension that supplies a value decides
   // whether the field has one.
-  if (ctx.hideEmpty && isEmptyValue(field.value)) return null;
+  if (ctx.hideEmpty && isEmptyValue(field.value) && hide("hidden: empty")) return null;
   // A readOnly field's subtree is a view, like a read-only form's. Read before
   // the presentation override, which marks fields readOnly only to show text.
   const view = field.readOnly === true;
@@ -257,6 +272,9 @@ function buildField(
         draftCtx.post,
         { ...postCtx, ...(draftCtx.rootValue ? { rootValue: draftCtx.rootValue } : {}), ...(draftCtx.onRootChange ? { onRootChange: draftCtx.onRootChange } : {}) },
       ).value} />;
+  }
+  if (ctx.debug && field.kind !== "display") {
+    ({ label, value } = withFieldDebug({ label, value }, { fieldKey: args.key, instancePath, field, prop: args.prop, hiddenReason }));
   }
   return { field, fieldId, label, value, messages, help };
 }

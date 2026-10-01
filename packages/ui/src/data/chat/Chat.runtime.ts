@@ -33,8 +33,7 @@ export function resolveChatRuntime({
     const preservesExecutionSelection = Boolean(
       selected === currentModel &&
       current.mode !== undefined &&
-      selected.runtime?.mode !== undefined &&
-      selected.runtime.mode !== current.mode,
+      selected.runtime?.mode !== current.mode,
     );
     next = reconcileModelCapabilities(current, selected, reasoningEfforts, {
       defaultEffort: true,

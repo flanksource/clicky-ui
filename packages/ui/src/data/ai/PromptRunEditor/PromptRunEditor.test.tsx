@@ -43,18 +43,18 @@ function currentValue(): AIPromptRunValue {
 
 /** The runtime bar's ⋮ segment, which carries its tooltip as its title. */
 function kebabItems(): string[] {
-  fireEvent.click(screen.getByTitle("Runtime options"));
+  fireEvent.click(screen.getAllByTitle("Runtime options").at(-1)!);
   return within(screen.getAllByRole("menu")[0]!)
     .getAllByRole("menuitem")
     .map((item) => item.textContent ?? "");
 }
 
 function openAdvanced(): void {
-  fireEvent.click(screen.getByTitle("Runtime options"));
+  fireEvent.click(screen.getAllByTitle("Runtime options").at(-1)!);
   fireEvent.click(screen.getByRole("menuitem", { name: "Advanced" }));
 }
 
-/** Forces the bar below RUNTIME_ACTIONS_INLINE_MIN_PX so fields collapse. */
+/** Leaves insufficient measured space for the optional fields. */
 function measureNarrow(width: number): () => void {
   const spy = vi
     .spyOn(HTMLElement.prototype, "getBoundingClientRect")
@@ -129,7 +129,7 @@ describe("PromptRunEditor", () => {
       const runtime = within(
         screen.getByRole("group", { name: "Runtime 1 controls" }),
       );
-      expect(runtime.getByTitle(`Family — ${family}`)).toBeInTheDocument();
+      expect(runtime.getByTitle(/^Model —/)).toHaveTextContent(family);
       expect(runtime.getByText(mode)).toBeInTheDocument();
       expect(currentValue()).toEqual(initial);
     },
@@ -198,8 +198,9 @@ describe("PromptRunEditor", () => {
     fireEvent.click(
       within(
         screen.getByRole("group", { name: "Runtime 1 controls" }),
-      ).getByTitle("Timeout — no limit"),
+      ).getByTitle("Runtime options"),
     );
+    fireEvent.click(screen.getByRole("menuitem", { name: "Timeout" }));
     fireEvent.click(screen.getByRole("menuitem", { name: /^1h/ }));
 
     expect(currentValue()).toEqual({
@@ -334,20 +335,32 @@ describe("PromptRunEditor", () => {
   it("selects presets on the runtime bar and orders them in the presets modal", () => {
     render(<Harness initial={VALUE} presets={PRESETS} />);
 
-    fireEvent.click(screen.getByTitle(/^Presets/));
+    fireEvent.click(screen.getByTitle("Runtime options"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Presets" }));
     fireEvent.click(screen.getByRole("menuitem", { name: /Defaults/ }));
-    fireEvent.click(screen.getByTitle(/^Presets/));
+    fireEvent.click(screen.getByTitle("Runtime options"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Presets" }));
     fireEvent.click(screen.getByRole("menuitem", { name: /Guardrails/ }));
+    const appliedSpec = {
+      mode: "cli",
+      model: "anthropic/claude-sonnet-5",
+      prompt: VALUE.spec?.prompt,
+      messages: VALUE.spec?.messages,
+      permissions: { mode: "plan" },
+    };
     expect(currentValue()).toEqual({
       ...VALUE,
+      spec: appliedSpec,
       presets: ["defaults", "guardrails"],
     });
 
-    fireEvent.click(screen.getByTitle(/^Presets/));
+    fireEvent.click(screen.getByTitle("Runtime options"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Presets" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Reorder presets…" }));
     fireEvent.click(screen.getByRole("button", { name: "Move Guardrails up" }));
     expect(currentValue()).toEqual({
       ...VALUE,
+      spec: appliedSpec,
       presets: ["guardrails", "defaults"],
     });
     expect(screen.queryByText(/profile/i)).not.toBeInTheDocument();
@@ -356,7 +369,8 @@ describe("PromptRunEditor", () => {
   it("sets the permission posture from the runtime bar without opening the spec", () => {
     render(<Harness initial={VALUE} />);
 
-    fireEvent.click(screen.getByTitle("Permission posture — Unspecified"));
+    fireEvent.click(screen.getByTitle("Runtime options"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Permission mode" }));
     fireEvent.click(screen.getByRole("menuitem", { name: /^Plan/ }));
 
     expect(currentValue()).toEqual({
@@ -372,7 +386,12 @@ describe("PromptRunEditor", () => {
 
       expect(screen.queryByTitle(/^Presets/)).not.toBeInTheDocument();
       expect(kebabItems()).toEqual([
-        "Permission posture",
+        "Effort",
+        "Permission mode",
+        "Source",
+        "Commit",
+        "Budget",
+        "Timeout",
         "Presets",
         "Advanced",
       ]);
@@ -387,7 +406,21 @@ describe("PromptRunEditor", () => {
     expect(screen.getAllByRole("group", { name: /^Runtime \d$/ })).toHaveLength(
       2,
     );
-    expect(screen.getAllByTitle("Runtime options")).toHaveLength(1);
+    const specOptions = screen.getAllByTitle("Runtime options").at(-1)!;
+    fireEvent.click(specOptions);
+    expect(screen.getAllByRole("menuitem", { name: "Advanced" })).toHaveLength(
+      1,
+    );
+    fireEvent.keyDown(document, { key: "Escape" });
+    for (const runtime of screen.getAllByRole("group", {
+      name: /^Runtime \d controls$/,
+    })) {
+      fireEvent.click(within(runtime).getByTitle("Runtime options"));
+      expect(
+        screen.queryByRole("menuitem", { name: "Advanced" }),
+      ).not.toBeInTheDocument();
+      fireEvent.keyDown(document, { key: "Escape" });
+    }
   });
 
   describe("with spec tabs", () => {
@@ -406,9 +439,8 @@ describe("PromptRunEditor", () => {
       expect(screen.getByRole("textbox", { name: "User prompt" })).toHaveValue(
         "Review {{company}}",
       );
-      // Both the Advanced entry and the permission field would duplicate what
-      // the inline tabs already own, so the bar drops the whole ⋮ section.
-      expect(screen.queryByTitle("Runtime options")).not.toBeInTheDocument();
+      expect(kebabItems()).toEqual(["Effort", "Budget", "Timeout"]);
+      fireEvent.keyDown(document, { key: "Escape" });
       expect(
         screen.queryByTitle(/^Permission posture/),
       ).not.toBeInTheDocument();

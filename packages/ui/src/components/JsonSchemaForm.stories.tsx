@@ -473,6 +473,72 @@ export const PreferencesMenu: Story = {
   },
 };
 
+const debugSchema: JsonSchemaObject = {
+  type: "object",
+  properties: {
+    action: {
+      type: "string",
+      title: "Member class action",
+      enum: ["00", "01", "02"],
+      "x-icon": "sliders",
+      "x-enum-labels": { "00": "-- Please select --", "01": "Add", "02": "Update" },
+      "x-enum-tones": { "01": "emerald", "02": "sky" },
+      "x-enum-display": "radio",
+      "x-on-change": [
+        { when: { const: "00" }, hide: ["currentClass"], else: { require: ["currentClass"] } },
+        { when: { const: "01" }, set: { classGroup: "Plan:SchemeName" } },
+        { when: { enum: ["01", "02"] }, patch: { classGroup: { title: "Target class group" } }, else: { disable: ["connection"] } },
+      ],
+    },
+    connection: {
+      type: "string",
+      title: "Connection",
+      "x-clicky-lookup": { url: "/api/v1/connection", filter: "name", scope: { param: "types", from: "provider.type" } },
+    },
+    classGroup: {
+      type: "string",
+      title: "Current class group",
+      default: "Plan:SchemeName",
+      description: "Options come from the screen's rule SQL.",
+      "x-query": { type: "SQL", sql: "Select ClassGroupGUID, ClassGroupName From AsClassGroup" },
+    },
+    currentClass: { type: "string", title: "Current class" },
+    filler: { type: "string", title: "Filler", "x-hidden": true },
+  },
+};
+
+export const DebugMode: Story = {
+  args: {
+    schema: debugSchema,
+    value: { action: "00" },
+    preferencesStorageKey: "storybook-json-schema-form-debug",
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "The three-dot menu's **Debug → Show hidden fields & sources** renders every field the form would hide — `x-hidden`, an `x-on-change` hide, `hideReadOnlyFields`, `hideEmpty`, write-only in a view, or a pre-extension dropping it — dimmed and outlined, with an eye-slash badge whose hover card says why (a listener hide names its listener: `x-on-change on \"action\"`). Every other field gets a bug badge whose card lists its instance path, resolved control and the schema keywords that source it, grouped as Behaviour, Presentation, Opt-in extensions, Consumer extensions (x-* keys the form does not read, e.g. a query) and Schema. Each clicky extension is spelled out in its own terms: listeners as `when → actions`, the `x-enum-*` maps as one option table, `x-clicky-lookup` as the request it makes, `x-item` as its row recipe, icon keys with their glyph. `hiddenKeys` stay hidden: they are the host's layout, not the field's state. Like the other menu choices, Debug persists under `preferencesStorageKey`.",
+      },
+    },
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+    await step("Hidden fields are absent until Debug is on", async () => {
+      expect(canvas.queryByText("Filler")).not.toBeInTheDocument();
+    });
+    await step("Turn on Debug: the hidden fields show with their reason", async () => {
+      await userEvent.click(canvas.getByRole("button", { name: "Form display options" }));
+      await userEvent.click(await body.findByRole("menuitemcheckbox", { name: /Show hidden fields/ }));
+      await waitFor(() => expect(canvas.getByText("Filler")).toBeInTheDocument());
+      expect(canvasElement.querySelector('[data-debug-field="currentClass"]')).toHaveAttribute(
+        "data-debug-hidden",
+        'hidden by x-on-change on "action"',
+      );
+    });
+  },
+};
+
 const markdownSchema: JsonSchemaObject = {
   type: "object",
   properties: {

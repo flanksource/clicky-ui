@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { SessionViewer } from "./SessionViewer";
 import { SAMPLE_SESSION } from "./SessionViewer.fixtures";
@@ -374,6 +374,25 @@ describe("SessionViewer", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("hides encrypted reasoning summaries while keeping readable reasoning available", () => {
+    render(
+      <SessionViewer
+        session={{
+          messages: [
+            { id: "encrypted", role: "assistant", parts: [{ type: "reasoning", text: "81 encrypted reasoning records over 17m54s (2026-07-16T11:15:04Z → 2026-07-16T11:32:58Z)" }] },
+            { id: "readable", role: "assistant", parts: [{ type: "reasoning", text: "I will inspect the parser first." }] },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("I will inspect the parser first.")).toBeInTheDocument();
+    expect(screen.queryByText(/81 encrypted reasoning records/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Session options" }));
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Encrypted reasoning" }));
+    expect(screen.getByText(/81 encrypted reasoning records/)).toBeInTheDocument();
+  });
+
   it("expands a shell call's response behind the chevron", () => {
     render(<SessionViewer session={SAMPLE_SESSION} />);
     expect(screen.queryByText(/Tests: 8 passed/)).not.toBeInTheDocument();
@@ -451,15 +470,72 @@ describe("SessionViewer", () => {
     );
     const scroller = container.querySelector("div.overflow-y-auto") as HTMLElement;
     expect(container.querySelectorAll("[data-event-kind]")).toHaveLength(20);
-    // Reaching the top loads the next-older batch, keeping the total bounded.
-    act(() => {
-      scroller.scrollTop = 0;
-      fireEvent.scroll(scroller);
-    });
+    // An upward gesture at the top loads the next-older batch, keeping the total bounded.
+    fireEvent.wheel(scroller, { deltaY: -100 });
     expect(container.querySelectorAll("[data-event-kind]")).toHaveLength(40);
     // The newest entries stay mounted; only older ones were prepended.
     expect(within(container).getByText("message 299")).toBeInTheDocument();
     expect(within(container).getByText("message 260")).toBeInTheDocument();
     expect(within(container).queryByText("message 259")).not.toBeInTheDocument();
+  });
+
+  it("does not page older messages during the initial scroll to bottom", () => {
+    const { container } = render(
+      <SessionViewer session={assistantLog(30)} scrollable windowSize={10} batchSize={10} showHeader={false} showMenu={false} />,
+    );
+    const scroller = container.querySelector("div.overflow-y-auto") as HTMLElement;
+    Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 700 });
+    Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 200 });
+
+    scroller.scrollTop = 500;
+    fireEvent.scroll(scroller);
+
+    expect(container.querySelectorAll("[data-event-kind]")).toHaveLength(10);
+    expect(screen.queryByRole("button", { name: "Scroll to bottom" })).not.toBeInTheDocument();
+  });
+
+  it("pauses following after scrolling up until Scroll to bottom is clicked", () => {
+    const { container, rerender } = render(
+      <SessionViewer session={assistantLog(30)} scrollable windowSize={10} batchSize={10} showHeader={false} showMenu={false} />,
+    );
+    const scroller = container.querySelector("div.overflow-y-auto") as HTMLElement;
+    Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 1000 });
+    Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 200 });
+    expect(container.querySelectorAll("[data-event-kind]")).toHaveLength(10);
+
+    scroller.scrollTop = 800;
+    fireEvent.scroll(scroller);
+    scroller.scrollTop = 700;
+    fireEvent.scroll(scroller);
+    expect(screen.getByRole("button", { name: "Scroll to bottom" })).toBeInTheDocument();
+
+    scroller.scrollTop = 800;
+    fireEvent.scroll(scroller);
+    expect(screen.getByRole("button", { name: "Scroll to bottom" })).toBeInTheDocument();
+
+    rerender(
+      <SessionViewer session={assistantLog(31)} scrollable windowSize={10} batchSize={10} showHeader={false} showMenu={false} />,
+    );
+    expect(scroller.scrollTop).toBe(800);
+    expect(within(container).getByText("message 30")).toBeInTheDocument();
+    expect(within(container).getByText("message 20")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Scroll to bottom" }));
+    expect(scroller.scrollTop).toBe(1000);
+    expect(screen.queryByRole("button", { name: "Scroll to bottom" })).not.toBeInTheDocument();
+  });
+
+  it("loads older messages on an upward wheel gesture when ten rows fit without scrolling", () => {
+    const { container } = render(
+      <SessionViewer session={assistantLog(30)} scrollable windowSize={10} batchSize={10} showHeader={false} showMenu={false} />,
+    );
+    const scroller = container.querySelector("div.overflow-y-auto") as HTMLElement;
+    expect(container.querySelectorAll("[data-event-kind]")).toHaveLength(10);
+
+    fireEvent.wheel(scroller, { deltaY: -100 });
+
+    expect(container.querySelectorAll("[data-event-kind]")).toHaveLength(20);
+    expect(within(container).getByText("message 10")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Scroll to bottom" })).toBeInTheDocument();
   });
 });

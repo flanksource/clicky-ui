@@ -30,7 +30,7 @@ beforeEach(() => {
   window.history.replaceState({}, "", "/");
 });
 
-function renderWidgets() {
+function renderWidgets(refreshIntervalMs?: number) {
   const executeSpy = vi.fn(FAKE_CLIENT.executeCommand);
   const client: OperationsApiClient = {
     ...FAKE_CLIENT,
@@ -52,6 +52,7 @@ function renderWidgets() {
         surfaceKey="widgets"
         client={client}
         renderLink={anchorLink}
+        {...(refreshIntervalMs !== undefined ? { refreshIntervalMs, paginationMode: "paged" as const } : {})}
       />
     </QueryClientProvider>,
   );
@@ -72,6 +73,18 @@ function lastListParams(
 }
 
 describe("OperationCatalog — remote pagination", () => {
+  it("refreshes only the current server page when requested", async () => {
+    const { executeSpy } = renderWidgets(25);
+    await waitFor(() => {
+      expect(executeSpy.mock.calls.filter(([path]) => path === "/api/v1/widgets").length).toBeGreaterThanOrEqual(2);
+    });
+    const pages = executeSpy.mock.calls.filter(([path]) => path === "/api/v1/widgets");
+    const first = pages[0];
+    if (!first) throw new Error("No first server page was fetched");
+    const firstOffset = (first[2] as Record<string, string>).offset;
+    expect(pages.every(([, , params]) => (params as Record<string, string>).offset === firstOffset)).toBe(true);
+  });
+
   it("renders a pagination footer reporting the backend's total", async () => {
     renderWidgets();
 

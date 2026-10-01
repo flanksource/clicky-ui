@@ -60,6 +60,7 @@ export function SessionTranscript({
     [turnBadges],
   );
   const viewerClassName = cn("min-h-0 flex-1", viewerProps?.className);
+  const scrollResetKey = session.id ?? viewerProps?.scrollResetKey;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -67,6 +68,11 @@ export function SessionTranscript({
         session={session}
         scrollable
         {...viewerProps}
+        windowSize={viewerProps?.windowSize ?? 10}
+        batchSize={viewerProps?.batchSize ?? 10}
+        {...(scrollResetKey !== undefined
+          ? { scrollResetKey }
+          : {})}
         className={viewerClassName}
         showHeader={false}
         showContextMeter={false}

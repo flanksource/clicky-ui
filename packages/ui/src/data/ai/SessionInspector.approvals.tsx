@@ -9,8 +9,11 @@ import { EmptyState, SimpleList } from "./SessionInspector.panel-parts";
 import { kv } from "./SessionInspector.panel-values";
 import {
   type ApprovalResolveHandler,
+  decisionFields,
   pendingApprovalRequests,
 } from "./SessionInspector.approvals-model";
+import { TypedApprovalBody } from "./SessionViewer.approval-body";
+import type { DecisionHandler } from "./SessionViewer.decision";
 import type {
   SessionApprovalRequest,
   SessionApprovalStats,
@@ -138,6 +141,16 @@ function PendingApprovalRow({
     approval: { id: request.id },
   };
 
+  const typed = request.request;
+  const decideTyped: DecisionHandler | undefined = onResolve
+    ? async (decision) => {
+        const fields = decisionFields(decision);
+        await (fields
+          ? onResolve(request.id, decision.allow ? "approve" : "deny", decision.message, fields)
+          : onResolve(request.id, decision.allow ? "approve" : "deny", decision.message));
+      }
+    : undefined;
+
   const handleApprove = (
     approvalId: string,
     approved: boolean,
@@ -174,11 +187,30 @@ function PendingApprovalRow({
           ) : null}
         </span>
       </div>
-      <ToolCall
-        part={part}
-        defaultOpen
-        onApprove={busy ? undefined : handleApprove}
-      />
+      {typed ? (
+        <div className="not-prose">
+          <div className="font-medium text-foreground">{request.tool}</div>
+          <TypedApprovalBody
+            event={{
+              id: request.id,
+              kind: "tool",
+              tool: request.tool,
+              pending: true,
+              approvalId: request.id,
+              approvalKind: typed.kind,
+              approvalRequest: typed,
+            }}
+            request={typed}
+            onDecision={decideTyped}
+          />
+        </div>
+      ) : (
+        <ToolCall
+          part={part}
+          defaultOpen
+          onApprove={busy ? undefined : handleApprove}
+        />
+      )}
       {busy ? (
         <p className="mt-1.5 pl-4 text-xs text-muted-foreground">
           Submitting…

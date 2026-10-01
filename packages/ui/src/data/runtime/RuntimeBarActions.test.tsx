@@ -1,15 +1,13 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { UiGearSix } from "../../icons";
-import {
-  RuntimeBarActions,
-  type RuntimeBarAction,
-} from "./RuntimeBarActions";
+import { RuntimeBarActions, type RuntimeBarAction } from "./RuntimeBarActions";
 
 function fields(onSelect: () => void): RuntimeBarAction[] {
   return [
     {
       id: "permissions",
+      isSet: true,
       label: "Permission posture",
       title: "Permission posture — Plan",
       caption: <span>Plan</span>,
@@ -20,6 +18,7 @@ function fields(onSelect: () => void): RuntimeBarAction[] {
     },
     {
       id: "presets",
+      isSet: true,
       label: "Presets",
       title: "Presets — Defaults",
       caption: <span>Presets · 1</span>,
@@ -41,15 +40,17 @@ const rootItems = () =>
     .map((item) => item.textContent);
 
 describe("RuntimeBarActions", () => {
-  it("renders one segment per field inline, leaving the kebab holding only the always-collapsed entries", () => {
-    render(<RuntimeBarActions fields={fields(vi.fn())} menu={[ADVANCED]} inline />);
+  it("renders supplied fields inline and keeps the same choices in the kebab", () => {
+    render(
+      <RuntimeBarActions fields={fields(vi.fn())} menu={[ADVANCED]} inline />,
+    );
 
     expect(screen.getByTitle("Permission posture — Plan")).toBeInTheDocument();
     expect(screen.getByTitle("Presets — Defaults")).toBeInTheDocument();
 
     fireEvent.click(kebab());
 
-    expect(rootItems()).toEqual(["Advanced"]);
+    expect(rootItems()).toEqual(["Permission posture", "Presets", "Advanced"]);
   });
 
   it("collapses every field into a flyout carrying the same items when there is no room", () => {
@@ -67,20 +68,17 @@ describe("RuntimeBarActions", () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(kebab());
-    expect(rootItems()).toEqual([
-      "Permission posture",
-      "Presets",
-      "Advanced",
-    ]);
+    expect(rootItems()).toEqual(["Permission posture", "Presets", "Advanced"]);
 
-    fireEvent.click(screen.getByRole("menuitem", { name: "Permission posture" }));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "Permission posture" }),
+    );
     const flyout = within(
       screen.getByRole("menu", { name: "Permission posture" }),
     );
-    expect(flyout.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
-      "Unspecified",
-      "Plan",
-    ]);
+    expect(
+      flyout.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Unspecified", "Plan"]);
 
     fireEvent.click(flyout.getByRole("menuitem", { name: "Plan" }));
     expect(onSelect).toHaveBeenCalledTimes(1);
@@ -96,7 +94,7 @@ describe("RuntimeBarActions", () => {
     {
       mode: "fused onto the bar",
       standalone: false,
-      classes: ["-ml-px", "-mt-px", "border-l", "border-t"],
+      classes: ["border-l"],
       absent: "rounded-md",
     },
     {

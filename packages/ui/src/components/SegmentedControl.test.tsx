@@ -143,6 +143,56 @@ describe("SegmentedControl", () => {
     ).toHaveClass("flex-wrap");
   });
 
+  it("renders an option marker as a muted suffix that becomes the segment's accessible description", () => {
+    render(
+      <SegmentedControl
+        aria-label="Scope"
+        value="all"
+        onChange={() => {}}
+        options={[{ id: "me", label: "Mine", marker: "default" }, ...OPTIONS.slice(1)]}
+      />,
+    );
+    const mine = screen.getByRole("radio", { name: "Mine" });
+    expect(mine).toHaveAccessibleDescription("default");
+    expect(mine).toHaveTextContent("Minedefault");
+    expect(screen.getByRole("radio", { name: "All" })).not.toHaveAccessibleDescription();
+  });
+
+  it("styles an implied option distinctly while leaving it unchecked and keyboard-reachable", () => {
+    render(
+      <SegmentedControl
+        aria-label="Scope"
+        value=""
+        onChange={() => {}}
+        options={OPTIONS.map((option) => (option.id === "bots" ? { ...option, implied: true } : option))}
+      />,
+    );
+    const bots = screen.getByRole("radio", { name: "Bots" });
+    expect({
+      checked: bots.getAttribute("aria-checked"),
+      implied: bots.getAttribute("data-implied"),
+      tabIndex: bots.tabIndex,
+      dashed: bots.classList.contains("border-dashed"),
+      card: bots.classList.contains("bg-card"),
+    }).toEqual({ checked: "false", implied: "true", tabIndex: 0, dashed: true, card: false });
+  });
+
+  it("ignores implied while another option is selected", () => {
+    render(
+      <SegmentedControl
+        aria-label="Scope"
+        value="all"
+        onChange={() => {}}
+        options={OPTIONS.map((option) => (option.id === "bots" ? { ...option, implied: true } : option))}
+      />,
+    );
+    const bots = screen.getByRole("radio", { name: "Bots" });
+    expect({ implied: bots.hasAttribute("data-implied"), tabIndex: bots.tabIndex }).toEqual({
+      implied: false,
+      tabIndex: -1,
+    });
+  });
+
   it("applies option icon and active styling without coloring inactive segments", () => {
     render(
       <SegmentedControl

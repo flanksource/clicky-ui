@@ -14,6 +14,7 @@ import { SpecRuntimeEditor } from "./SpecRuntimeEditor";
 import { ModelSection } from "./SpecRuntimeEditor/ModelSection";
 import {
   buildAISpecRuntimePayload,
+  type AISpecRuntimeCommit,
   type AISpecRuntimeEnvVar,
   type AISpecRuntimePermissionCatalog,
   type AISpecRuntimeValue,
@@ -330,11 +331,13 @@ function SpecRuntimeEditorStory({
   withFooter = false,
   withCLIOptions = false,
   showPayload = true,
+  inheritedCommits,
 }: {
   initial?: AISpecRuntimeValue;
   withFooter?: boolean;
   withCLIOptions?: boolean;
   showPayload?: boolean;
+  inheritedCommits?: AISpecRuntimeCommit[];
 }) {
   const [value, setValue] = useState<AISpecRuntimeValue>(initial);
   const payload = useMemo(() => buildAISpecRuntimePayload(value), [value]);
@@ -347,6 +350,7 @@ function SpecRuntimeEditorStory({
       permissionCatalog={PERMISSION_CATALOG}
       secretSelector={{ loadResources, loadKeyPreview, strict: true }}
       {...(withCLIOptions ? { cliOptions: { schema: CODEX_CMUX_SCHEMA } } : {})}
+      {...(inheritedCommits ? { inheritedCommits } : {})}
       {...(withFooter
         ? {
             onSave: () => {},
@@ -400,6 +404,22 @@ export const WithFooterActions: Story = {
 
 export const Empty: Story = {
   render: () => <SpecRuntimeEditorStory initial={{}} showPayload={false} />,
+};
+
+// Gavel's run dialog opens the editor with an empty value on purpose — only
+// what the operator explicitly changes is sent as the request layer, and the
+// server layers that request over the lifecycle step's own spec. Without
+// telling the editor what that step's spec already declares, the Commit
+// section reads "Never" even though the run will in fact commit. This story
+// is that exact scenario: an empty value plus the step's inherited policy.
+export const EmptyWithInheritedCommit: Story = {
+  render: () => (
+    <SpecRuntimeEditorStory
+      initial={{}}
+      showPayload={false}
+      inheritedCommits={[{ on: "run", stage: "worktree", gates: "full" }]}
+    />
+  ),
 };
 
 // Match the SpecField label chrome (text-xs, normal weight, muted) — JsonSchemaForm

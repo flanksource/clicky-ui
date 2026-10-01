@@ -313,6 +313,12 @@ export {
   type RuntimeBarProps,
   type RuntimeBarValue,
 } from "../runtime/RuntimeBar";
+export { runtimeSpecFields } from "./runtime-spec-fields";
+export {
+  useRuntimePresetMenu,
+  type RuntimePresetMenuOptions,
+  type RuntimePresetMenuValue,
+} from "./runtime-preset-menu";
 export {
   RuntimeBarActions,
   type RuntimeBarAction,
@@ -390,6 +396,29 @@ export {
   type SessionInput,
   type SessionThemeOverride,
 } from "./SessionViewer";
+export type {
+  ApprovalDecisionFields,
+  ApprovalKind,
+  ApprovalQuestion,
+  ApprovalRequest,
+  ApprovalScope,
+  CommandApproval,
+  ElicitationApproval,
+  ElicitationMode,
+  FileChange,
+  FilesystemApproval,
+  FilesystemOperation,
+  NativeSandboxPolicy,
+  NetworkApproval,
+  SandboxCommandPolicy,
+  SandboxCredentialsPolicy,
+  SandboxFilesystemAccess,
+  SandboxFilesystemPolicy,
+  SandboxNetworkAccess,
+  SandboxNetworkPolicy,
+  SandboxPlatformPolicy,
+  StdinWrite,
+} from "./approval-request";
 export {
   SessionInspector,
   type SessionInspectorOptions,

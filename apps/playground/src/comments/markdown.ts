@@ -91,6 +91,8 @@ function renderSection(
     if (!isDocument) out.push(`- anchor: \`${anchor}\``);
     out.push(`- status: ${root.status ?? "open"}`);
     if (root.rating) out.push(`- rating: ${root.rating}`);
+    if (root.reviewDecision)
+      out.push(`- review decision: ${root.reviewDecision}`);
     const actionUrls = commentActionUrls?.(root.id);
     if (actionUrls) {
       out.push(

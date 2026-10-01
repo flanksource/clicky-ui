@@ -3,6 +3,7 @@ import {
   classifyCommand,
   classifyToolCategory,
   collectSessionFilters,
+  isEncryptedReasoning,
   isEventVisible,
   type SessionVisibility,
 } from "./session-categories";
@@ -99,5 +100,19 @@ describe("isEventVisible", () => {
     const user: SessionEvent = { id: "u", kind: "user", text: "hi" };
     expect(isEventVisible(thinking, { ...base, showThinking: false })).toBe(false);
     expect(isEventVisible(user, { ...base, hiddenCategories: new Set(["explore"]) })).toBe(true);
+  });
+});
+
+describe("isEncryptedReasoning", () => {
+  it.each([
+    ["1 encrypted reasoning record at 2026-07-16T11:15:04Z", true],
+    ["81 encrypted reasoning records over 17m54s", true],
+    ["The provider returned encrypted reasoning records", false],
+  ])("classifies %s", (text, expected) => {
+    expect(isEncryptedReasoning({ id: "reasoning", kind: "thinking", text })).toBe(expected);
+  });
+
+  it("does not classify assistant prose as encrypted reasoning", () => {
+    expect(isEncryptedReasoning({ id: "reply", kind: "assistant", text: "1 encrypted reasoning record at 2026-07-16T11:15:04Z" })).toBe(false);
   });
 });

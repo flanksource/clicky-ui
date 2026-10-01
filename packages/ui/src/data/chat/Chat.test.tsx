@@ -80,7 +80,6 @@ describe("Chat runtime controls", () => {
       capabilitiesKnown: true,
       runtime: {
         model: "gpt-5.6-luna",
-        mode: "agent",
       },
     };
     const onRuntimeChange = vi.fn();
@@ -91,6 +90,7 @@ describe("Chat runtime controls", () => {
         models={[apiModel, agentModel]}
         modelsApi={null}
         defaultModel={agentModel.id}
+        defaultRuntime={{ model: "gpt-5.6-luna", mode: "agent" }}
         runtimeFamilies={[
           {
             id: "codex",
@@ -116,12 +116,8 @@ describe("Chat runtime controls", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Runtime: Codex, Agent, GPT-5.6 Luna, effort Unspecified",
-      }),
-    );
-    fireEvent.click(screen.getByRole("radio", { name: "CLI" }));
+    fireEvent.click(screen.getByTitle("Runtime mode — Agent"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "CLI" }));
 
     expect(onRuntimeChange).toHaveBeenCalledWith({
       model: "gpt-5.6-luna",
@@ -130,7 +126,7 @@ describe("Chat runtime controls", () => {
     expect(onModelChange).not.toHaveBeenCalled();
   });
 
-  it("renders the RuntimeBar combo instead of separate model and effort selectors", () => {
+  it("renders the shared RuntimeBar mode, model and effort controls", () => {
     render(
       <Chat
         models={[RUNTIME_MODEL]}
@@ -140,14 +136,12 @@ describe("Chat runtime controls", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("button", {
-        name: "Runtime: Claude, API, Claude Sonnet 4.5, effort Medium",
-      }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("combobox", { name: "Model" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTitle("Runtime mode — API")).toBeInTheDocument();
+    expect(screen.getByTitle("Model — claude-sonnet-4-5")).toHaveTextContent("Claude Sonnet 4.5");
+    expect(screen.getByTitle("Reasoning effort")).toHaveTextContent("Medium");
+    expect(screen.getByRole("combobox", { name: "Model" })).toBe(
+      screen.getByTitle("Model — claude-sonnet-4-5"),
+    );
     expect(
       screen.queryByRole("combobox", { name: "Reasoning effort" }),
     ).not.toBeInTheDocument();
@@ -162,25 +156,22 @@ describe("Chat runtime controls", () => {
         defaultModel={RUNTIME_MODEL.id}
         transport={recordingTransport()}
         onRuntimeChange={onRuntimeChange}
+        runtimeFamilies={[
+          { id: "claude", label: "Claude", provider: "anthropic", modes: [{ id: "api", label: "API" }] },
+          { id: "codex", label: "Codex", provider: "openai", modes: [{ id: "api", label: "API" }] },
+        ]}
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Runtime: Claude, API, Claude Sonnet 4.5, effort Medium",
-      }),
-    );
-    fireEvent.click(screen.getByRole("radio", { name: "Codex" }));
+    fireEvent.click(screen.getByTitle("Model — claude-sonnet-4-5"));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Custom model…" }));
 
     expect(onRuntimeChange).toHaveBeenCalledWith({
       mode: "api",
       effort: "medium",
     });
-    expect(
-      screen.getByRole("button", {
-        name: "Runtime: Codex, API, Unspecified, effort Medium",
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByTitle("Model — unspecified")).toHaveTextContent("Codex");
+    expect(screen.getByTitle("Runtime mode — API")).toBeInTheDocument();
   });
 });
 
