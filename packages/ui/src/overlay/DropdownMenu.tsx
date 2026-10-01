@@ -35,6 +35,8 @@ export type DropdownMenuItem = {
   icon?: string | StaticIconComponent;
   /** CSS colour applied to this item's icon (the glyph fills `currentColor`). */
   iconColor?: string;
+  /** Theme-aware classes applied to this item's icon. */
+  iconClassName?: string | undefined;
   /**
    * Section header. A non-interactive header renders above the first item of
    * each contiguous group — provide items pre-sorted by `group`. Items without
@@ -51,6 +53,8 @@ export type DropdownMenuItem = {
    * instead of firing `onSelect`.
    */
   children?: DropdownMenuItem[];
+  /** Editor or explanatory content above a submenu's choices. */
+  header?: ReactNode;
 };
 
 export type DropdownMenuProps = {
@@ -230,6 +234,7 @@ function DropdownMenuRoot({
                 {...getFloatingProps()}
                 role="menu"
                 aria-label={menuLabel}
+                {...(menuLabel ? { "aria-labelledby": undefined } : {})}
                 style={{ ...floatingStyles, zIndex: floatingZ }}
                 className={cn(MENU_POPOVER_CLASS, menuClassName)}
               >

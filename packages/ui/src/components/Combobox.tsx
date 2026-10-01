@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -10,6 +11,7 @@ import { cn } from "../lib/utils";
 import { LabelIcon } from "../data/Icon";
 import { useFloatingZIndex } from "../overlay/modalStack";
 import { ComboboxControl } from "./ComboboxControl";
+import { ComboboxMenuSearch, ComboboxMenuTrigger } from "./ComboboxMenuTrigger";
 import {
   useComboboxLabelWidth,
   useComboboxMenuPosition,
@@ -61,6 +63,9 @@ export function Combobox(props: ComboboxProps) {
     footer,
   } = props;
   const multiple = props.multiple === true;
+  const menuSearch = !multiple && props.searchPlacement === "menu";
+  const generatedId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const tristate = props.multiple === true && props.tristate === true;
   const tags = props.multiple === true && props.variant === "tags";
   const separators =
@@ -134,6 +139,7 @@ export function Combobox(props: ComboboxProps) {
       (o) =>
         o.label.toLowerCase().includes(q) ||
         o.description?.toLowerCase().includes(q) ||
+        o.group?.toLowerCase().includes(q) ||
         o.value.toLowerCase().includes(q),
     );
   }, [onSearch, options, query, selectedValues]);
@@ -147,17 +153,21 @@ export function Combobox(props: ComboboxProps) {
   const trimmedQuery = query.trim();
   const customEntry = useMemo<ComboboxOption | null>(
     () =>
-      createComboboxCustomEntry({
-        allowCustomValue,
-        query: trimmedQuery,
-        multiple,
-        tristate,
-        onNew,
-        choices: options,
-        selectedValues,
-      }),
+      menuSearch && filtered.length > 0
+        ? null
+        : createComboboxCustomEntry({
+            allowCustomValue,
+            query: trimmedQuery,
+            multiple,
+            tristate,
+            onNew,
+            choices: options,
+            selectedValues,
+          }),
     [
       allowCustomValue,
+      menuSearch,
+      filtered.length,
       multiple,
       onNew,
       options,
@@ -286,6 +296,12 @@ export function Combobox(props: ComboboxProps) {
   }
 
   function commitAndClose() {
+    if (menuSearch) {
+      setQuery("");
+      setOpen(false);
+      setHighlighted(-1);
+      return;
+    }
     const trimmed = query.trim();
     if (customEntry) {
       const created = createOptionValue(customEntry);
@@ -326,7 +342,7 @@ export function Combobox(props: ComboboxProps) {
       if (!multiple) {
         setOpen(false);
       }
-      inputRef.current?.focus();
+      (menuSearch ? triggerRef : inputRef).current?.focus();
       return;
     }
     if (tristate) {
@@ -347,7 +363,7 @@ export function Combobox(props: ComboboxProps) {
     setQuery("");
     setOpen(false);
     setHighlighted(-1);
-    inputRef.current?.focus();
+    (menuSearch ? triggerRef : inputRef).current?.focus();
   }
 
   function clear() {
@@ -411,6 +427,7 @@ export function Combobox(props: ComboboxProps) {
       setHighlighted(next);
       scrollToHighlighted(next);
     } else if (e.key === "Enter") {
+      if (menuSearch) e.preventDefault();
       if (
         open &&
         highlighted >= 0 &&
@@ -421,7 +438,7 @@ export function Combobox(props: ComboboxProps) {
         selectOption(navOptions[highlighted]);
         return;
       }
-      if (open && multiple && customEntry) {
+      if (open && (multiple || menuSearch) && customEntry) {
         e.preventDefault();
         selectOption(customEntry);
         return;
@@ -431,16 +448,18 @@ export function Combobox(props: ComboboxProps) {
     } else if (e.key === "Escape") {
       if (open) {
         e.preventDefault();
+        if (menuSearch) e.stopPropagation();
         setQuery("");
         setOpen(false);
         setHighlighted(-1);
+        if (menuSearch) triggerRef.current?.focus();
       }
     } else {
       onKeyDownProp?.(e);
     }
   }
 
-  const listId = id ? `${id}-listbox` : undefined;
+  const listId = `${id ?? generatedId}-listbox`;
   const ariaLabel =
     ariaLabelProp ?? (typeof label === "string" ? label : undefined);
   const showClear =
@@ -448,58 +467,96 @@ export function Combobox(props: ComboboxProps) {
 
   return (
     <div ref={rootRef} className={cn("relative", className)}>
-      <ComboboxControl
-        anchorRef={anchorRef}
-        ariaLabel={ariaLabel}
-        ariaRequired={ariaRequired}
-        closedLabel={closedLabel}
-        describedBy={describedBy}
-        disabled={disabled}
-        displayValue={displayValue}
-        effectivePrefix={effectivePrefix}
-        highlighted={highlighted}
-        id={id}
-        inputRef={inputRef}
-        invalid={invalid}
-        label={label}
-        labelRef={labelRef}
-        labelWidth={labelWidth}
-        listId={listId}
-        loading={loading}
-        onClear={clear}
-        onInput={(value) => {
-          setQuery(value);
-          if (!open) setOpen(true);
-        }}
-        onKeyDown={onKeyDown}
-        onOpen={openMenu}
-        onPaste={onPaste}
-        onRemoveTag={removeTag}
-        onToggle={() => {
-          if (open) {
-            commitAndClose();
-          } else {
-            openMenu();
-            inputRef.current?.focus();
+      {menuSearch ? (
+        <ComboboxMenuTrigger
+          anchorRef={anchorRef}
+          triggerRef={triggerRef}
+          content={
+            props.triggerContent ?? (
+              <>
+                {effectivePrefix}
+                <span className="min-w-0 truncate">
+                  {closedLabel || placeholder}
+                </span>
+              </>
+            )
           }
-        }}
-        open={open}
-        options={options}
-        placeholder={placeholder}
-        showClear={showClear}
-        size={size}
-        suffix={suffix}
-        tagModes={tristate ? modes : undefined}
-        onSetTagMode={setMode}
-        tagValues={selectedValues}
-        tags={tags}
-      />
+          className={props.triggerClassName}
+          disabled={disabled}
+          open={open}
+          listId={listId}
+          ariaLabel={ariaLabel}
+          title={props.title}
+          onToggle={() => (open ? commitAndClose() : openMenu())}
+        />
+      ) : (
+        <ComboboxControl
+          anchorRef={anchorRef}
+          ariaLabel={ariaLabel}
+          ariaRequired={ariaRequired}
+          closedLabel={closedLabel}
+          describedBy={describedBy}
+          disabled={disabled}
+          displayValue={displayValue}
+          effectivePrefix={effectivePrefix}
+          highlighted={highlighted}
+          id={id}
+          inputRef={inputRef}
+          invalid={invalid}
+          label={label}
+          labelRef={labelRef}
+          labelWidth={labelWidth}
+          listId={listId}
+          loading={loading}
+          onClear={clear}
+          onInput={(value) => {
+            setQuery(value);
+            if (!open) setOpen(true);
+          }}
+          onKeyDown={onKeyDown}
+          onOpen={openMenu}
+          onPaste={onPaste}
+          onRemoveTag={removeTag}
+          onToggle={() => {
+            if (open) {
+              commitAndClose();
+            } else {
+              openMenu();
+              inputRef.current?.focus();
+            }
+          }}
+          open={open}
+          options={options}
+          placeholder={placeholder}
+          showClear={showClear}
+          size={size}
+          suffix={suffix}
+          tagModes={tristate ? modes : undefined}
+          onSetTagMode={setMode}
+          tagValues={selectedValues}
+          tags={tags}
+        />
+      )}
       {open && menuPos && typeof document !== "undefined" && (
         <ComboboxMenu
           customEntry={customEntry}
           filtered={filtered}
           floatingZ={floatingZ}
           footer={footer}
+          ariaLabel={ariaLabel}
+          header={
+            menuSearch ? (
+              <ComboboxMenuSearch
+                inputRef={inputRef}
+                value={query}
+                ariaLabel={ariaLabel}
+                listId={listId}
+                highlighted={highlighted}
+                onChange={setQuery}
+                onKeyDown={onKeyDown}
+              />
+            ) : undefined
+          }
           hasOptions={options.length > 0}
           highlighted={highlighted}
           isSelected={isSelected}

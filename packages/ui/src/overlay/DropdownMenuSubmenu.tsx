@@ -28,6 +28,7 @@ import { UiChevronRight } from "../icons";
 import { MENU_POPOVER_CLASS, MenuContext } from "./dropdownMenuContext";
 import { useEscapeLayer, useFloatingZIndex } from "./modalStack";
 import type { DropdownMenuItem } from "./DropdownMenu";
+import { cn } from "../lib/utils";
 
 // Shared item surfaces so a leaf renders identically in the root menu or a
 // flyout submenu.
@@ -39,9 +40,11 @@ const MENU_HEADER_CLASS =
 function MenuItemIcon({
   icon,
   iconColor,
+  iconClassName,
 }: {
   icon: string | StaticIconComponent | undefined;
   iconColor: string | undefined;
+  iconClassName: string | undefined;
 }) {
   if (!icon) return null;
   return (
@@ -50,7 +53,7 @@ function MenuItemIcon({
     // puts in the label beside it, and too small to identify at a glance. The
     // row's content box is already 16px tall, so this does not change its height.
     <span
-      className="inline-flex shrink-0 text-base"
+      className={cn("inline-flex shrink-0 text-base", iconClassName)}
       style={iconColor ? { color: iconColor } : undefined}
     >
       <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} />
@@ -91,7 +94,11 @@ function MenuLeaf({ item }: { item: DropdownMenuItem }) {
         },
       })}
     >
-      <MenuItemIcon icon={item.icon} iconColor={item.iconColor} />
+      <MenuItemIcon
+        icon={item.icon}
+        iconColor={item.iconColor}
+        iconClassName={item.iconClassName}
+      />
       {item.label}
     </button>
   );
@@ -119,7 +126,7 @@ function MenuSubmenu({ item }: { item: DropdownMenuItem }) {
     middleware: [
       offset({ mainAxis: 0, alignmentAxis: -4 }),
       flip({ padding: 8 }),
-      shift({ padding: 8 }),
+      shift({ padding: 8, crossAxis: true }),
     ],
     whileElementsMounted: autoUpdate,
   });
@@ -143,13 +150,9 @@ function MenuSubmenu({ item }: { item: DropdownMenuItem }) {
     onNavigate: setActiveIndex,
     loop: true,
   });
-  const { getReferenceProps, getFloatingProps, getItemProps } = useInteractions([
-    hover,
-    click,
-    role,
-    dismiss,
-    listNav,
-  ]);
+  const { getReferenceProps, getFloatingProps, getItemProps } = useInteractions(
+    [hover, click, role, dismiss, listNav],
+  );
 
   useEscapeLayer(isOpen, () => setIsOpen(false));
 
@@ -206,7 +209,11 @@ function MenuSubmenu({ item }: { item: DropdownMenuItem }) {
           }) as unknown as Parameters<UseInteractionsReturn["getItemProps"]>[0],
         )}
       >
-        <MenuItemIcon icon={item.icon} iconColor={item.iconColor} />
+        <MenuItemIcon
+          icon={item.icon}
+          iconColor={item.iconColor}
+          iconClassName={item.iconClassName}
+        />
         <span className="min-w-0 flex-1 truncate">{item.label}</span>
         <Icon icon={UiChevronRight} className="ml-auto shrink-0 opacity-60" />
       </button>
@@ -231,11 +238,17 @@ function MenuSubmenu({ item }: { item: DropdownMenuItem }) {
                 <div
                   ref={refs.setFloating}
                   role="menu"
-                  aria-label={ariaLabel}
                   style={{ ...floatingStyles, zIndex: floatingZ }}
                   className={MENU_POPOVER_CLASS}
                   {...getFloatingProps()}
+                  aria-label={ariaLabel}
+                  {...(ariaLabel ? { "aria-labelledby": undefined } : {})}
                 >
+                  {item.header != null && (
+                    <div className="border-b border-border px-3 py-1.5">
+                      {item.header}
+                    </div>
+                  )}
                   <MenuItemList items={item.children ?? []} />
                 </div>
               </FloatingFocusManager>

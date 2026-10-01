@@ -115,6 +115,14 @@ type ComboboxBaseProps = {
 };
 
 export type ComboboxSingleProps = ComboboxBaseProps & {
+  /** Places the filter in the popup and uses a button for the closed control. Custom entries appear only when no options match; dismissal discards the search. */
+  searchPlacement?: "control" | "menu";
+  /** Replaces the closed caption when searchPlacement is menu. */
+  triggerContent?: ReactNode;
+  /** Button classes for the menu filter layout. */
+  triggerClassName?: string;
+  /** Tooltip for the menu filter button. */
+  title?: string;
   multiple?: false;
   tristate?: false;
   value: string;
