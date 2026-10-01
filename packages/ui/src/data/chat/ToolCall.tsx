@@ -37,6 +37,9 @@ export type ToolCallProps = {
   tool?: ToolMeta | undefined;
   /** Renderer registry override. Defaults to the provided context registry. */
   registry?: ToolRenderRegistry | undefined;
+  /** Calls made by the subagent this call spawned (an Agent/Task call), nested
+   *  beneath it. A background subagent keeps calling after its parent returns. */
+  subcalls?: AnyToolPart[] | undefined;
   className?: string;
 };
 
@@ -84,10 +87,14 @@ export function ToolCall({
   renderToolResult,
   tool,
   registry: registryProp,
+  subcalls = [],
   className,
 }: ToolCallProps) {
   const needsApproval = part.state === "approval-requested";
-  const [open, setOpen] = useState(defaultOpen || needsApproval);
+  const [userOpen, setOpen] = useState(defaultOpen || needsApproval);
+  // A nested approval must stay reachable, so it holds its parent open.
+  const open =
+    userOpen || subcalls.some((call) => call.state === "approval-requested");
   const contextRegistry = useToolRenderRegistry();
   const registry = registryProp ?? contextRegistry;
   const status = STATUS_ICON[part.state];
@@ -131,6 +138,9 @@ export function ToolCall({
             title={STATUS_LABEL[part.state]}
             className={cn("size-3 shrink-0", status.className)}
           />
+          {subcalls.length > 0 ? (
+            <span className="shrink-0 text-xs">{subcallsLabel(subcalls)}</span>
+          ) : null}
           {!open && summary ? (
             <span className="min-w-0 flex-1 truncate text-xs">{summary}</span>
           ) : null}
@@ -157,12 +167,36 @@ export function ToolCall({
             output={normalized.value}
             {...(renderToolResult ? { renderToolResult } : {})}
           />
+          {subcalls.length > 0 && (
+            <div
+              data-slot="tool-call-subcalls"
+              className="border-l border-border pl-2"
+            >
+              {subcalls.map((call) => (
+                <ToolCall
+                  key={call.toolCallId}
+                  part={call}
+                  onApprove={onApprove}
+                  registry={registry}
+                  {...(renderToolResult ? { renderToolResult } : {})}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {needsApproval && <ApprovalControls part={part} onApprove={onApprove} />}
     </div>
   );
+}
+
+function subcallsLabel(subcalls: AnyToolPart[]): string {
+  const running = subcalls.filter(
+    (call) => call.state === "input-streaming" || call.state === "input-available",
+  ).length;
+  const count = `${subcalls.length} ${subcalls.length === 1 ? "call" : "calls"}`;
+  return running > 0 ? `${count} · ${running} running` : count;
 }
 
 /** Approve/Deny controls shown while a tool call awaits human approval. The
