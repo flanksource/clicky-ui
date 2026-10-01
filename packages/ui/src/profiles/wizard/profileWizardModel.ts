@@ -287,6 +287,7 @@ export function applyVisibleFieldSelection(
  *  profile schema carries for them. */
 export const PROFILE_FILTER_KIND_OPTIONS = [
   { value: "terms", label: "Value list" },
+  { value: "match", label: "Pattern list" },
   { value: "exact", label: "Exact match" },
   { value: "text", label: "Text search" },
   { value: "range", label: "Numeric range" },
