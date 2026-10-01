@@ -112,6 +112,32 @@ describe("frameActions slot", () => {
     expect(screen.getByText("decompiled source")).toBeInTheDocument();
   });
 
+  it("nests frame detail under the frame's content column, not the gutter", () => {
+    render(
+      <StackTrace
+        input={{ causedBy: [], language: "java", frames: [frame()] }}
+        renderFrameDetail={() => <div>decompiled source</div>}
+      />,
+    );
+    const cell = screen.getByText("decompiled source").parentElement;
+    expect(cell).toHaveClass("col-start-2");
+    expect(cell).not.toHaveClass("col-span-3");
+  });
+
+  it("numbers frames unless the caller turns the ordinal off", () => {
+    const frames = [frame({ method: "one" }), frame({ method: "two" })];
+    const { container, rerender } = render(
+      <StackTrace input={{ causedBy: [], language: "java", frames }} />,
+    );
+    const ordinals = () =>
+      [...container.querySelectorAll("[data-frame-index]")].map((el) => el.textContent);
+    expect(ordinals()).toEqual(["1", "2"]);
+    rerender(
+      <StackTrace input={{ causedBy: [], language: "java", frames }} showFrameIndex={false} />,
+    );
+    expect(ordinals()).toEqual([]);
+  });
+
   it("keeps actions visible when requested", () => {
     const { container } = render(
       <StackTrace
