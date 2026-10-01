@@ -6,7 +6,8 @@ import { cn } from "../../lib/utils";
 import type { ChatModel } from "../chat/types";
 import type { AISpecRuntimeValue } from "../ai/SpecRuntimeEditor.model";
 import { RuntimeBar, type RuntimeBarProps } from "./RuntimeBar";
-import { RuntimeBarActions } from "./RuntimeBarActions";
+import { runtimeSpecFields } from "../ai/runtime-spec-fields";
+import { SPEC_RUNTIME_FAMILIES } from "./runtime-mode";
 
 // A catalog wide enough for every segment to have somewhere to go: agent/CLI
 // families that carry their own models, plus a hosted-API family that does not.
@@ -95,7 +96,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The runtime as one self-describing control. The default segmented variant gives family, mode, model and reasoning effort their own menu triggers. The combo variant condenses the same values into one summary trigger and exposes direct controls in a single dropdown. Switching family keeps the current mode when the new family has it and drops a model the new provider cannot run. Unsupported modes and efforts stay visible but disabled, and the model can always be entered directly when the catalog does not describe it.",
+          "Mode comes first and filters the combined provider/model picker. Both layouts show supplied settings inline when space permits and move them into the three-dot menu on narrower containers. Unset settings are menu-only. Use showTimeout/showCost for run limits and actions.fields with runtimeSpecFields for permission mode, Source and Commit timing. Host fields provide isSet, caption and menu items; actions.menu adds entries such as Advanced. Custom model IDs and limits remain editable in their dropdowns.",
       },
     },
   },
@@ -143,28 +144,26 @@ function NarrowRuntimeBarStory() {
   );
 }
 
-// Too narrow for one strip: the run settings (effort, timeout, max cost) wrap
-// onto their own row instead of being clipped. On a phone viewport the bar
-// also spans the full width and the family collapses to its brand icon.
 export const NarrowContainer: Story = {
   args: { variant: "segmented" },
   render: () => <NarrowRuntimeBarStory />,
   play: async ({ canvasElement }) => {
-    const bar = within(canvasElement).getByRole("group", { name: "Narrow runtime" });
-    const identity = bar.querySelector("[data-runtime-bar-section=identity]");
-    const settings = bar.querySelector("[data-runtime-bar-section=settings]");
-
-    await expect(settings!.getBoundingClientRect().top).toBeGreaterThan(
-      identity!.getBoundingClientRect().top,
+    const bar = within(canvasElement).getByRole("group", {
+      name: "Narrow runtime",
+    });
+    const identity = bar.querySelector("[data-runtime-bar-section=identity]")!;
+    const actions = bar.querySelector("[data-runtime-bar-section=actions]")!;
+    await expect(actions.getBoundingClientRect().top).toBe(
+      identity.getBoundingClientRect().top,
     );
     await expect(bar.scrollWidth).toBe(bar.clientWidth);
-    await expect(settings!.scrollWidth).toBe(settings!.clientWidth);
-    // A narrow bar must keep its limit values legible: the run settings give up
-    // the static "Effort" key label rather than ellipsing "30m" or "$2.00".
-    for (const caption of ["Medium", "30m", "$2.00"]) {
-      const span = within(settings!).getByText(caption);
-      await expect(span.scrollWidth).toBeLessThanOrEqual(span.clientWidth);
-    }
+    await userEvent.click(within(bar).getByTitle("Runtime options"));
+    await expect(
+      within(document.body)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent),
+    ).toEqual(["Timeout", "Budget", "Effort"]);
+    await userEvent.keyboard("{Escape}");
   },
 };
 
@@ -181,29 +180,24 @@ function HostActionsStory({ inline }: { inline: boolean }) {
         onChange={setValue}
         models={MODELS}
         ariaLabel={inline ? "Wide runtime" : "Narrow runtime"}
-        actions={
-          <RuntimeBarActions
-            inline={inline}
-            fields={[
-              {
-                id: "presets",
-                label: "Presets",
-                title: "Presets — Guardrails",
-                caption: <span className="text-xs">Presets 1</span>,
-                items: [{ label: "Guardrails", onSelect: () => {} }],
-              },
-            ]}
-            menu={[{ label: "Advanced", icon: UiGearSix, onSelect: () => {} }]}
-          />
-        }
+        actions={{
+          fields: [
+            {
+              id: "presets",
+              isSet: true,
+              label: "Presets",
+              title: "Presets — Guardrails",
+              caption: <span className="text-xs">Presets 1</span>,
+              items: [{ label: "Guardrails", onSelect: () => {} }],
+            },
+          ],
+          menu: [{ label: "Advanced", icon: UiGearSix, onSelect: () => {} }],
+        }}
       />
     </div>
   );
 }
 
-// Spec-level settings the host fuses onto the bar. Wide enough, they are their
-// own segments; in a narrow column the host flips `inline` off and the same
-// items become submenus of the ⋮ segment that always carries Advanced.
 export const HostActions: Story = {
   args: { variant: "segmented" },
   render: () => (
@@ -217,14 +211,21 @@ export const HostActions: Story = {
     const wide = canvas.getByRole("group", { name: "Wide runtime" });
     const narrow = canvas.getByRole("group", { name: "Narrow runtime" });
 
-    await expect(within(wide).getByTitle("Presets — Guardrails")).toBeInTheDocument();
-    await expect(within(narrow).queryByTitle("Presets — Guardrails")).not.toBeInTheDocument();
+    await expect(
+      within(wide).getByTitle("Presets — Guardrails"),
+    ).toBeInTheDocument();
+    await expect(
+      within(narrow).queryByTitle("Presets — Guardrails"),
+    ).not.toBeInTheDocument();
 
     await userEvent.click(within(narrow).getByTitle("Runtime options"));
     const menu = within(document.body).getAllByRole("menu")[0]!;
     await expect(
-      within(menu).getAllByRole("menuitem").map((item) => item.textContent),
-    ).toEqual(["Presets", "Advanced"]);
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent),
+    ).toEqual(["Effort", "Presets", "Advanced"]);
+    await userEvent.keyboard("{Escape}");
   },
 };
 
@@ -248,44 +249,21 @@ export const Combo: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const body = within(document.body);
-    const trigger = canvas.getByRole("button", {
-      name: "Runtime: Codex, CLI, GPT-5 Codex, effort High, timeout 30m, max cost $2.00",
-    });
-
-    await userEvent.click(trigger);
-
-    const menu = await body.findByRole("menu");
-    await expect(
-      within(menu).getByRole("radiogroup", { name: "Family" }),
-    ).toBeInTheDocument();
-    await expect(
-      within(menu).getByRole("radiogroup", { name: "Runtime mode" }),
-    ).toBeInTheDocument();
-    await expect(
-      within(menu).getByRole("slider", { name: "Reasoning effort" }),
-    ).toHaveAttribute("aria-valuetext", "High");
+    await expect(canvas.getByTitle("Runtime mode — CLI")).toBeInTheDocument();
+    await userEvent.click(canvas.getByTitle("Model — openai/gpt-5-codex"));
+    const menu = await body.findByRole("menu", { name: "Model" });
     await expect(within(menu).getByLabelText("Model id")).toBeInTheDocument();
-    await expect(within(menu).getByLabelText("Timeout duration")).toHaveValue("30m");
-    await expect(within(menu).getByLabelText("Max cost (USD)")).toHaveValue("2");
-    const modelChoice = within(menu).getByRole("button", {
-      name: "GPT-5 Codex",
-    });
-    await expect(modelChoice).toHaveAttribute("title", "openai/gpt-5-codex");
-    await expect(modelChoice).not.toHaveTextContent("openai/gpt-5-codex");
-
-    await userEvent.click(within(menu).getByRole("radio", { name: "Claude" }));
+    await userEvent.click(
+      within(menu).getByRole("menuitem", { name: /^Claude Sonnet/ }),
+    );
+    await expect(canvas.getByTitle("Runtime mode — CLI")).toBeInTheDocument();
     await expect(
-      canvas.getByRole("button", {
-        name: "Runtime: Claude, CLI, Unspecified, effort High, timeout 30m, max cost $2.00",
-      }),
+      canvas.getByTitle("Model — anthropic/claude-sonnet-4-6"),
     ).toBeInTheDocument();
-    await expect(body.getByRole("menu")).toBeInTheDocument();
-
-    // The canonical Claude family includes its hosted API runtime.
-    await expect(
-      within(menu).getByRole("radio", { name: "API" }),
-    ).toBeInTheDocument();
-
+    await userEvent.click(canvas.getByTitle("Runtime options"));
+    await userEvent.click(body.getByRole("menuitem", { name: "Budget" }));
+    await expect(body.getByLabelText("Budget (USD)")).toHaveValue("2");
+    await userEvent.keyboard("{Escape}");
     await userEvent.keyboard("{Escape}");
     await expect(body.queryByRole("menu")).not.toBeInTheDocument();
   },
@@ -294,11 +272,20 @@ export const Combo: Story = {
 /** A hosted-API family the catalog does not describe keeps model entry available
  *  as free text even when there are no catalog rows. */
 export const NoModelsForFamily: Story = {
-  // Pinned to exercise the standalone Model segment; Combo covers its equivalent
-  // free-text field inside the main menu.
   args: { variant: "segmented" },
   render: ({ variant }) => (
-    <RuntimeBarStory initial={{ mode: "api" }} variant={variant} />
+    <RuntimeBarStory
+      initial={{ mode: "api" }}
+      variant={variant}
+      families={[
+        {
+          id: "gemini",
+          label: "Gemini",
+          provider: "googleai",
+          modes: [{ id: "api", label: "API" }],
+        },
+      ]}
+    />
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -314,8 +301,6 @@ export const NoModelsForFamily: Story = {
 };
 
 export const SwitchingFamilyKeepsTheMode: Story = {
-  // Pinned: the segment menus these interactions drive exist only in the
-  // segmented variant; the combo variant exposes radios behind one trigger.
   args: { variant: "segmented" },
   render: ({ variant }) => (
     <RuntimeBarStory
@@ -327,15 +312,18 @@ export const SwitchingFamilyKeepsTheMode: Story = {
     const canvas = within(canvasElement);
     const body = within(document.body);
 
-    await userEvent.click(canvas.getByTitle("Family — Claude"));
     await userEvent.click(
-      await body.findByRole("menuitem", { name: /^Codex/ }),
+      canvas.getByTitle("Model — anthropic/claude-opus-4-1"),
+    );
+    await userEvent.click(
+      await body.findByRole("menuitem", { name: /^GPT-5 Codex/ }),
     );
 
-    // CLI survives the family switch; the Claude-only model does not.
-    await expect(canvas.getByTitle("Codex CLI")).toHaveTextContent("CLI");
+    await expect(canvas.getByTitle("Runtime mode — CLI")).toHaveTextContent(
+      "CLI",
+    );
     await expect(
-      canvas.getByTitle("Model — unspecified"),
+      canvas.getByTitle("Model — openai/gpt-5-codex"),
     ).toBeInTheDocument();
   },
 };
@@ -373,9 +361,46 @@ export const UnavailableModesAreOmitted: Story = {
     const canvas = within(canvasElement);
     const body = within(document.body);
 
-    await userEvent.click(canvas.getByTitle("Claude Agent SDK"));
+    await userEvent.click(canvas.getByTitle("Runtime mode — Agent"));
     await expect(
       body.queryByRole("menuitem", { name: /^API/ }),
     ).not.toBeInTheDocument();
   },
+};
+
+function SpecSettingsStory({ variant }: Pick<RuntimeBarProps, "variant">) {
+  const [value, setValue] = useState<AISpecRuntimeValue>({
+    mode: "cli",
+    model: "anthropic/claude-sonnet-4-6",
+    effort: "medium",
+    budget: { timeout: "30m", cost: 2 },
+    permissions: { mode: "plan" },
+    setup: { checkout: { worktree: { mode: "none" } } },
+    workflow: { commits: [{ on: "run" }] },
+  });
+  return (
+    <div className="grid gap-4 p-6">
+      <RuntimeBar
+        variant={variant}
+        value={value}
+        onChange={setValue}
+        models={MODELS}
+        showTimeout
+        showCost
+        actions={{
+          fields: runtimeSpecFields({
+            value,
+            onChange: setValue,
+            models: MODELS,
+            families: SPEC_RUNTIME_FAMILIES,
+          }),
+        }}
+      />
+      <pre className="text-xs">{JSON.stringify(value, null, 2)}</pre>
+    </div>
+  );
+}
+
+export const WithSpecSettings: Story = {
+  render: ({ variant }) => <SpecSettingsStory variant={variant} />,
 };

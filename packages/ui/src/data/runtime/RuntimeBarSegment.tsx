@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
 import { UiCheck, UiChevronDown } from "../../icons";
 import { cn } from "../../lib/utils";
 import {
@@ -6,8 +6,10 @@ import {
   type DropdownMenuItem,
 } from "../../overlay/DropdownMenu";
 import { Icon } from "../Icon";
+import { RuntimeBarVariantContext } from "./RuntimeBar.context";
 
-export const SEGMENT_CAPTION_CLASS = "truncate text-xs font-semibold text-foreground";
+export const SEGMENT_CAPTION_CLASS =
+  "truncate text-xs font-semibold text-foreground";
 export const SEGMENT_KEY_CLASS =
   "text-[11px] font-semibold uppercase leading-none tracking-wide text-muted-foreground";
 
@@ -36,15 +38,19 @@ export function RuntimeSegment({
   className?: string | undefined;
   children: ReactNode;
 }) {
+  const variant = useContext(RuntimeBarVariantContext);
   return (
     <DropdownMenu
       align="left"
       menuLabel={menuLabel}
       items={items}
       {...(header ? { header } : {})}
-      menuClassName="min-w-56 max-w-80"
+      menuClassName="max-h-[70vh] min-w-56 max-w-80 overflow-y-auto"
       className={cn(
-        "min-w-0 border-l border-border first:border-l-0 [&>span]:min-w-0 [&>span]:w-full",
+        "h-control-h min-w-0 [&>span]:min-w-0 [&>span]:w-full",
+        variant === "combo"
+          ? "rounded-md border border-input bg-background"
+          : "border-l border-border first:border-l-0",
         className,
       )}
       trigger={
@@ -54,16 +60,32 @@ export function RuntimeSegment({
           title={title}
           className="inline-flex h-full w-full min-w-0 items-center gap-1.5 px-density-2 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring [[aria-expanded=true]_&]:bg-muted"
         >
-          {children}
-          {!hideChevron && (
-            <Icon
-              icon={UiChevronDown}
-              className="size-3 shrink-0 text-muted-foreground/70"
-            />
-          )}
+          <RuntimeSegmentCaption hideChevron={hideChevron}>
+            {children}
+          </RuntimeSegmentCaption>
         </button>
       }
     />
+  );
+}
+
+export function RuntimeSegmentCaption({
+  children,
+  hideChevron = false,
+}: {
+  children: ReactNode;
+  hideChevron?: boolean;
+}) {
+  return (
+    <>
+      {children}
+      {!hideChevron && (
+        <Icon
+          icon={UiChevronDown}
+          className="size-3 shrink-0 text-muted-foreground/70"
+        />
+      )}
+    </>
   );
 }
 

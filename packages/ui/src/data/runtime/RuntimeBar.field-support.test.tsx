@@ -27,20 +27,13 @@ describe("RuntimeBar field support", () => {
       />,
     );
 
-    const trigger = screen.getByRole("button", {
-      name: "Runtime: Gemini, CLI",
-    });
-    expect(trigger).toHaveTextContent("Gemini CLI");
-    fireEvent.click(trigger);
-    expect(screen.getByRole("radiogroup", { name: "Family" })).toBeInTheDocument();
+    expect(screen.getByTitle("Runtime mode — CLI")).toHaveTextContent("CLI");
+    fireEvent.click(screen.getByTitle("Family — Gemini"));
+    expect(screen.getByRole("menu", { name: "Family" })).toBeInTheDocument();
     expect(
-      screen.getByRole("radiogroup", { name: "Runtime mode" }),
+      screen.getByRole("menuitem", { name: "Gemini" }),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("slider", { name: "Reasoning effort" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Unspecified" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Model id")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("Reasoning effort")).not.toBeInTheDocument();
   });
 });

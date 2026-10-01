@@ -18,10 +18,15 @@ export type RuntimeBarAction = {
   /** Menu entry label when collapsed; also the inline segment's menu label. */
   label: string;
   icon?: StaticIconComponent | undefined;
+  iconClassName?: string | undefined;
   /** Tooltip on the inline segment, e.g. "Permission posture — Plan". */
   title: string;
   /** Inline segment caption: key + glyph + current value. */
   caption: ReactNode;
+  /** Only supplied settings are candidates for inline display. */
+  isSet: boolean;
+  /** Custom editor shared by the inline dropdown and overflow submenu. */
+  header?: ReactNode;
   /** Choices, identical inline and collapsed. */
   items: DropdownMenuItem[];
 };
@@ -36,6 +41,8 @@ export type RuntimeBarActionsProps = {
   /** Renders its own bar chrome instead of fusing onto the bar's border. */
   standalone?: boolean | undefined;
   className?: string | undefined;
+  /** Number of supplied fields that fit beside the runtime identity. */
+  visibleCount?: number | undefined;
 };
 
 /**
@@ -49,17 +56,22 @@ export function RuntimeBarActions({
   menuLabel = "Runtime options",
   standalone = false,
   className,
+  visibleCount = fields.length,
 }: RuntimeBarActionsProps) {
   const variant = useContext(RuntimeBarVariantContext);
   const useStandalone = standalone || variant === "combo";
-  const inlineFields = inline ? fields : [];
+  const inlineFields = inline
+    ? fields.filter((field) => field.isSet).slice(0, visibleCount)
+    : [];
   const menuItems: DropdownMenuItem[] = [
-    ...(inline ? [] : fields).map((field) => ({
+    ...fields.map((field) => ({
       label: field.label,
       ...(field.icon ? { icon: field.icon } : {}),
+      ...(field.iconClassName ? { iconClassName: field.iconClassName } : {}),
       // Ignored: an item with `children` is a submenu trigger, not a leaf.
       onSelect: () => {},
       children: field.items,
+      ...(field.header ? { header: field.header } : {}),
     })),
     ...menu,
   ];
@@ -69,10 +81,12 @@ export function RuntimeBarActions({
     <div
       data-runtime-bar-section="actions"
       className={cn(
-        "flex h-control-h min-w-0 items-stretch",
+        "flex h-control-h shrink-0 items-stretch",
         useStandalone
-          ? "w-fit overflow-hidden rounded-md border border-input bg-background"
-          : "-ml-px -mt-px border-l border-t border-border",
+          ? variant === "combo"
+            ? "gap-1"
+            : "w-fit overflow-hidden rounded-md border border-input bg-background"
+          : "border-l border-border",
         className,
       )}
     >
@@ -82,6 +96,7 @@ export function RuntimeBarActions({
           menuLabel={field.label}
           title={field.title}
           items={field.items}
+          {...(field.header ? { header: field.header } : {})}
         >
           {field.caption}
         </RuntimeSegment>

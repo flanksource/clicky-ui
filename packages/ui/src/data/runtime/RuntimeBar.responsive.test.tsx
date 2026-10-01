@@ -1,7 +1,6 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { RuntimeBar, type RuntimeBarValue } from "./RuntimeBar";
-import { RuntimeBarActions } from "./RuntimeBarActions";
 
 const VALUE: RuntimeBarValue = {
   mode: "agent",
@@ -10,74 +9,129 @@ const VALUE: RuntimeBarValue = {
   budget: { timeout: "30m", cost: 2 },
 };
 
-const titles = (element: HTMLElement) =>
-  [...element.querySelectorAll("button[title]")].map((button) => button.getAttribute("title"));
+afterEach(() => vi.restoreAllMocks());
 
-function section(
-  bar: HTMLElement,
-  name: "identity" | "settings" | "actions",
-): HTMLElement {
-  const element = bar.querySelector<HTMLElement>(`[data-runtime-bar-section=${name}]`);
-  if (!element) throw new Error(`runtime bar has no ${name} section`);
-  return element;
-}
+describe.each(["segmented", "combo"] as const)(
+  "RuntimeBar %s responsive layout",
+  (variant) => {
+    it("moves supplied settings into the menu on resize and restores them when space returns", () => {
+      let width = 1000;
+      vi.spyOn(
+        HTMLElement.prototype,
+        "getBoundingClientRect",
+      ).mockImplementation(function () {
+        const node = this as HTMLElement;
+        const isContainer =
+          node.classList.contains("relative") &&
+          node.classList.contains("w-full");
+        return {
+          x: 0,
+          y: 0,
+          top: 0,
+          left: 0,
+          bottom: 36,
+          right: isContainer ? width : 80,
+          height: 36,
+          width: isContainer ? width : 80,
+          toJSON: () => ({}),
+        };
+      });
+      render(
+        <RuntimeBar
+          variant={variant}
+          value={VALUE}
+          onChange={vi.fn()}
+          showTimeout
+          showCost
+          actions={{
+            fields: ["Perms", "Source", "Commit"].map((label) => ({
+              id: label,
+              label,
+              title: label,
+              caption: label,
+              isSet: true,
+              items: [],
+            })),
+          }}
+        />,
+      );
+      const bar = screen.getByRole("group", { name: "Runtime" });
+      expect(within(bar).getByTitle("Timeout — 30m")).toBeInTheDocument();
+      expect(within(bar).getByTitle("Budget — $2.00")).toBeInTheDocument();
+      expect(
+        Array.from(bar.querySelectorAll<HTMLButtonElement>("button")).map(
+          (button) => button.title,
+        ),
+      ).toEqual([
+        "Runtime mode — Agent",
+        "Model — anthropic/claude-sonnet-5",
+        "Reasoning effort",
+        "Perms",
+        "Source",
+        "Commit",
+        "Budget — $2.00",
+        "Timeout — 30m",
+        "Runtime options",
+      ]);
+      width = 180;
+      fireEvent(window, new Event("resize"));
+      expect(within(bar).queryByTitle("Timeout — 30m")).not.toBeInTheDocument();
+      expect(
+        within(bar).queryByTitle("Reasoning effort"),
+      ).not.toBeInTheDocument();
+      fireEvent.click(within(bar).getByTitle("Runtime options"));
+      expect(
+        within(screen.getByRole("menu", { name: "Runtime options" }))
+          .getAllByRole("menuitem")
+          .map((item) => item.textContent),
+      ).toEqual(["Effort", "Perms", "Source", "Commit", "Budget", "Timeout"]);
+      width = 1000;
+      fireEvent(window, new Event("resize"));
+      expect(within(bar).getByTitle("Timeout — 30m")).toBeInTheDocument();
+      expect(within(bar).getByTitle("Budget — $2.00")).toBeInTheDocument();
+      expect(within(bar).getByTitle("Reasoning effort")).toBeInTheDocument();
+      expect(bar).toHaveClass("h-control-h");
+      expect(bar).not.toHaveClass("flex-wrap");
+    });
 
-describe("RuntimeBar responsive layout", () => {
-  it("groups runtime identity apart from run settings so settings wrap as one row instead of being clipped", () => {
-    render(<RuntimeBar value={VALUE} onChange={vi.fn()} showTimeout showCost />);
+    it("retains the provider family name in the merged model caption for assistive technology", () => {
+      render(<RuntimeBar variant={variant} value={VALUE} onChange={vi.fn()} />);
+      expect(
+        within(
+          screen.getByTitle("Model — anthropic/claude-sonnet-5"),
+        ).getByText("Claude"),
+      ).toHaveClass("sr-only");
+    });
 
-    const bar = screen.getByRole("group", { name: "Runtime" });
-    const identity = section(bar, "identity");
-    const settings = section(bar, "settings");
+    it("offers native settings and host actions through the same menu", () => {
+      render(
+        <RuntimeBar
+          variant={variant}
+          value={VALUE}
+          onChange={vi.fn()}
+          showTimeout
+          showCost
+          actions={{ menu: [{ label: "Advanced", onSelect: vi.fn() }] }}
+        />,
+      );
+      fireEvent.click(screen.getByTitle("Runtime options"));
+      expect(
+        within(screen.getByRole("menu", { name: "Runtime options" }))
+          .getAllByRole("menuitem")
+          .map((item) => item.textContent),
+      ).toEqual(["Effort", "Budget", "Timeout", "Advanced"]);
+    });
 
-    expect(bar).toHaveClass("flex-wrap", "max-sm:w-full");
-    expect(bar).not.toHaveClass("h-control-h");
-    expect(titles(identity)).toEqual(["Family — Claude", "Claude Agent SDK", "Model — anthropic/claude-sonnet-5"]);
-    expect(titles(settings)).toEqual(["Reasoning effort", "Timeout — 30m", "Max cost — $2.00"]);
-    expect(settings).toHaveClass("-ml-px", "-mt-px", "border-l", "border-t", "max-sm:w-full", "max-sm:[&>div]:flex-1");
-  });
-
-  it("keeps the family name for assistive tech while phones show only its brand icon", () => {
-    render(<RuntimeBar value={VALUE} onChange={vi.fn()} />);
-
-    const family = screen.getByRole("button", { name: "Claude" });
-
-    expect(within(family).getByText("Claude")).toHaveClass("max-sm:sr-only");
-  });
-
-  it("fuses host actions onto the bar as a third section without touching the runtime's own sections", () => {
-    render(
-      <RuntimeBar
-        value={VALUE}
-        onChange={vi.fn()}
-        showTimeout
-        showCost
-        actions={
-          <RuntimeBarActions
-            menu={[{ label: "Advanced", onSelect: vi.fn() }]}
-          />
-        }
-      />,
-    );
-
-    const bar = screen.getByRole("group", { name: "Runtime" });
-
-    expect(titles(section(bar, "identity"))).toEqual(["Family — Claude", "Claude Agent SDK", "Model — anthropic/claude-sonnet-5"]);
-    expect(titles(section(bar, "settings"))).toEqual(["Reasoning effort", "Timeout — 30m", "Max cost — $2.00"]);
-    expect(titles(section(bar, "actions"))).toEqual(["Runtime options"]);
-  });
-
-  it("renders no actions section unless the host passes one", () => {
-    render(<RuntimeBar value={VALUE} onChange={vi.fn()} showTimeout showCost />);
-
-    expect(
-      screen.getByRole("group", { name: "Runtime" }).querySelector("[data-runtime-bar-section=actions]"),
-    ).toBeNull();
-  });
-
-  it("renders no settings group when the runtime exposes no effort or limits", () => {
-    render(<RuntimeBar value={{ mode: "api" }} onChange={vi.fn()} showEffort={false} />);
-
-    expect(screen.getByRole("group", { name: "Runtime" }).querySelector("[data-runtime-bar-section=settings]")).toBeNull();
-  });
-});
+    it("omits the settings menu when neither native settings nor host actions are exposed", () => {
+      render(
+        <RuntimeBar
+          variant={variant}
+          value={{ mode: "api" }}
+          onChange={vi.fn()}
+          showEffort={false}
+        />,
+      );
+      expect(screen.queryByTitle("Runtime options")).not.toBeInTheDocument();
+    });
+  },
+);

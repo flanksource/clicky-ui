@@ -1,11 +1,16 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { DEFAULT_REASONING_EFFORTS } from "../chat/effort-icons";
-import { cn } from "../../lib/utils";
 import type { ChatModel, ChatModelRuntime } from "../chat/types";
 import { withBudgetLimit, type RuntimeBarBudget } from "./RuntimeBar.limits";
-import { applyRuntimeMode, runtimeModelForValue } from "./RuntimeBar.model";
-import { RuntimeBarCombo } from "./RuntimeBarCombo";
-import { RuntimeBarSegments } from "./RuntimeBarSegments";
+import { runtimeModelForValue } from "./RuntimeBar.model";
+import { RuntimeBarLayout } from "./RuntimeBarLayout";
+import type { RuntimeBarActionsProps } from "./RuntimeBarActions";
+import { timeoutField, budgetField, effortField } from "./RuntimeBar.fields";
+import {
+  modelGroupsForMode,
+  runtimeModes,
+  withRuntimeMode,
+} from "./RuntimeBar.selection";
 import { RuntimeBarVariantContext } from "./RuntimeBar.context";
 import { isSelectableModel } from "./availability";
 import {
@@ -15,8 +20,6 @@ import {
 import {
   SPEC_RUNTIME_FAMILIES,
   familyById,
-  firstMode,
-  modelsForFamily,
   selectionForRuntime,
   runtimeModeFromModel,
   type SpecRuntimeFamily,
@@ -31,10 +34,9 @@ export type RuntimeBarValue = ChatModelRuntime & {
 export type RuntimeBarProps<T extends RuntimeBarValue = RuntimeBarValue> = {
   value: T;
   onChange: (value: T) => void;
-  /** `segmented` uses field triggers; `combo` uses one direct-edit menu. */
+  /** Fused field triggers or individually bordered controls. */
   variant?: "combo" | "segmented";
-  /** Model catalog. Only the selected family's models are listed; a family the
-   *  catalog does not describe is served by the segment's free-text entry. */
+  /** Model catalog grouped by family and filtered by the selected mode. */
   models?: ChatModel[] | undefined;
   families?: SpecRuntimeFamily[] | undefined;
   /** Resolved mode shown when the editable value inherits it from another layer. */
@@ -54,7 +56,9 @@ export type RuntimeBarProps<T extends RuntimeBarValue = RuntimeBarValue> = {
   /** Opt-in control for `budget.cost`. */
   showCost?: boolean | undefined;
   /** Host-level settings belonging to the surrounding spec rather than this runtime row. */
-  actions?: ReactNode | undefined;
+  actions?:
+    | Pick<RuntimeBarActionsProps, "fields" | "menu" | "menuLabel">
+    | undefined;
   ariaLabel?: string | undefined;
   className?: string | undefined;
 };
@@ -85,24 +89,31 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   if (preference.model !== effectiveModel) {
     setPreference({ model: effectiveModel, family: undefined });
   }
-  const preferredFamily = preference.model === effectiveModel ? preference.family : undefined;
+  const preferredFamily =
+    preference.model === effectiveModel ? preference.family : undefined;
   const specMode =
-    runtimeModeFromModel(value.model) ||
     value.mode?.trim() ||
+    runtimeModeFromModel(value.model) ||
     effectiveMode?.trim();
   const selection = selectionForRuntime(
     families,
     specMode,
-    value.model || (preferredFamily ? undefined : effectiveModel),
+    value.id || value.model || (preferredFamily ? undefined : effectiveModel),
     models,
     preferredFamily,
   );
   const family = familyById(families, selection.family);
-  const mode =
-    family.modes.find((entry) => entry.id === selection.mode) ??
-    firstMode(family);
-  const modelOptions = modelsForFamily(models, family, specMode);
-  const resolvedModel = runtimeModelForValue(models, value, isSelectableModel);
+  const modes = runtimeModes(families);
+  const mode = modes.find((entry) => entry.id === selection.mode);
+  if (!mode)
+    throw new Error(
+      `No available runtime mode for ${JSON.stringify(selection.mode)}`,
+    );
+  const groups = modelGroupsForMode({ models, families, mode: mode.id });
+  const resolvedModel = runtimeModelForValue(
+    groups.flatMap((group) => group.models),
+    value,
+  );
   const selectedModelUnavailable = Boolean(
     !resolvedModel &&
     (value.id || value.model) &&
@@ -125,14 +136,13 @@ export function RuntimeBar<T extends RuntimeBarValue>({
 
   const applyMode = (familyId: string, modeId: string) => {
     setPreference({ model: effectiveModel, family: familyId });
-    const next = applyRuntimeMode(
+    const next = withRuntimeMode({
       value,
       models,
       families,
-      familyId,
-      modeId,
+      mode: modeId,
       reasoningEfforts,
-    );
+    });
     if (next !== value) onChange(next);
   };
 
@@ -158,78 +168,63 @@ export function RuntimeBar<T extends RuntimeBarValue>({
   const applyEffort = (effort: string) =>
     onChange(withOptionalRuntimeValue(value, "effort", effort));
 
-  if (variant === "combo") {
-    return (
-      <RuntimeBarVariantContext.Provider value="combo">
-        <div
-          role="group"
-          aria-label={ariaLabel}
-          data-runtime-bar-variant="combo"
-          className={cn("inline-flex max-w-full flex-wrap items-stretch gap-1", className)}
-        >
-          <RuntimeBarCombo
-            value={value}
-            families={families}
-            family={family}
-            mode={mode}
-            selectedMode={selection.mode}
-            models={modelOptions}
-            selectedModel={resolvedModel}
-            selectedModelUnavailable={selectedModelUnavailable}
-            inheritedModelLabel={inheritedModelLabel}
-            supportedEfforts={supportedEfforts}
-            locked={locked}
-            showModel={showModel}
-            showEffort={showEffort}
-            showTimeout={showTimeout}
-            showCost={showCost}
-            ariaLabel={ariaLabel}
-            className="max-w-full"
-            onFamilyChange={(familyId) => applyMode(familyId, selection.mode)}
-            onModeChange={(modeId) => applyMode(family.id, modeId)}
-            onModelSelect={applyModel}
-            onModelClear={clearModel}
-            onCustomModel={applyCustomModel}
-            onEffortChange={applyEffort}
-            onTimeoutChange={(timeout) => onChange(withBudgetLimit(value, "timeout", timeout))}
-            onCostChange={(cost) => onChange(withBudgetLimit(value, "cost", cost))}
-          />
-          {actions}
-        </div>
-      </RuntimeBarVariantContext.Provider>
-    );
-  }
-
+  const fields = [
+    ...(showEffort && supportedEfforts.length > 0
+      ? [
+          effortField({
+            value: value.effort,
+            offered: reasoningEfforts,
+            supported: supportedEfforts,
+            onChange: applyEffort,
+          }),
+        ]
+      : []),
+    ...(actions?.fields ?? []),
+    ...(showCost
+      ? [
+          budgetField({
+            value: value.budget?.cost,
+            onChange: (cost) => onChange(withBudgetLimit(value, "cost", cost)),
+          }),
+        ]
+      : []),
+    ...(showTimeout
+      ? [
+          timeoutField({
+            value: value.budget?.timeout,
+            onChange: (timeout) =>
+              onChange(withBudgetLimit(value, "timeout", timeout)),
+          }),
+        ]
+      : []),
+  ];
   return (
-    <RuntimeBarVariantContext.Provider value="segmented">
-      <RuntimeBarSegments
-        value={value}
-        models={models}
-        modelOptions={modelOptions}
-        resolvedModel={resolvedModel}
-        selectedModelUnavailable={selectedModelUnavailable}
-        inheritedModelLabel={inheritedModelLabel}
-        families={families}
-        family={family}
-        mode={mode}
-        selectedMode={selection.mode}
-        reasoningEfforts={reasoningEfforts}
-        supportedEfforts={supportedEfforts}
-        locked={locked}
-        showModel={showModel}
-        showEffort={showEffort}
-        showTimeout={showTimeout}
-        showCost={showCost}
-        actions={actions}
+    <RuntimeBarVariantContext.Provider value={variant}>
+      <RuntimeBarLayout
         ariaLabel={ariaLabel}
         className={className}
-        onModeChange={applyMode}
-        onCustomModel={applyCustomModel}
-        onModelSelect={applyModel}
-        onModelClear={clearModel}
-        onEffortChange={applyEffort}
-        onTimeoutChange={(timeout) => onChange(withBudgetLimit(value, "timeout", timeout))}
-        onCostChange={(cost) => onChange(withBudgetLimit(value, "cost", cost))}
+        actions={{ ...actions, fields }}
+        identity={{
+          family,
+          mode,
+          modes,
+          groups,
+          selectedModel: resolvedModel,
+          model: value.model,
+          unavailable: selectedModelUnavailable,
+          inheritedModelLabel,
+          locked,
+          showModel,
+          variant,
+          onModeChange: (modeId) => applyMode(family.id, modeId),
+          onCustomModel: applyCustomModel,
+          onModelSelect: applyModel,
+          onModelClear: clearModel,
+          onFamilySelect: (familyId) => {
+            setPreference({ model: effectiveModel, family: familyId });
+            onChange(withoutCatalogModel(value));
+          },
+        }}
       />
     </RuntimeBarVariantContext.Provider>
   );
