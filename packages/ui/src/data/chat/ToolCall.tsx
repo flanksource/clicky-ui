@@ -30,7 +30,7 @@ export type ToolCallProps = {
    *  `approval-requested`). Receives the approval id, the decision, and an
    *  optional reason. */
   onApprove?:
-    | ((approvalId: string, approved: boolean, reason?: string) => void)
+    | ((approvalId: string, approved: boolean, reason?: string) => void | Promise<unknown>)
     | undefined;
   renderToolResult?: ToolResultRenderer;
   /** Catalog entry for this tool. Defaults to the registry's catalog lookup. */
@@ -166,7 +166,9 @@ export function ToolCall({
 }
 
 /** Approve/Deny controls shown while a tool call awaits human approval. The
- *  approval id comes from the part's `approval` envelope (AI SDK v6). */
+ *  approval id comes from the part's `approval` envelope (AI SDK v6). While a
+ *  returned decision promise is in flight the clicked button shows progress
+ *  and both are disabled. */
 function ApprovalControls({
   part,
   onApprove,
@@ -174,14 +176,23 @@ function ApprovalControls({
   part: AnyToolPart;
   onApprove: ToolCallProps["onApprove"];
 }) {
+  const [pending, setPending] = useState<"approve" | "deny">();
   const approval = "approval" in part ? part.approval : undefined;
   if (!approval || !onApprove) return null;
+  const decide = (approved: boolean) => {
+    setPending(approved ? "approve" : "deny");
+    void Promise.resolve(onApprove(approval.id, approved)).finally(() =>
+      setPending(undefined),
+    );
+  };
   return (
     <div className="mt-1.5 flex items-center gap-2 pl-4">
       <Button
         type="button"
         size="sm"
-        onClick={() => onApprove(approval.id, true)}
+        loading={pending === "approve"}
+        disabled={pending !== undefined}
+        onClick={() => decide(true)}
       >
         Approve
       </Button>
@@ -189,7 +200,9 @@ function ApprovalControls({
         type="button"
         size="sm"
         variant="outline"
-        onClick={() => onApprove(approval.id, false)}
+        loading={pending === "deny"}
+        disabled={pending !== undefined}
+        onClick={() => decide(false)}
       >
         Deny
       </Button>

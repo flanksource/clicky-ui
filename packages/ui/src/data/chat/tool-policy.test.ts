@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ToolMeta } from "./types";
 import {
   appendToolPolicy,
+  consolidateRules,
   matchItems,
   matchesTool,
   normalizeToolPolicyRules,
@@ -76,7 +77,9 @@ describe("matchesTool", () => {
   });
 
   it("does not select a tool that carries none of the facet's data", () => {
-    expect(matchesTool({ verb: "list" }, tool({ verb: undefined }))).toBe(false);
+    expect(matchesTool({ verb: "list" }, tool({ verb: undefined }))).toBe(
+      false,
+    );
   });
 
   it("requires a declared hint to be declared on the tool too", () => {
@@ -190,6 +193,72 @@ describe("withUserRule", () => {
     const twice = withUserRule(once, { group: "admin.*", policy: "ask" });
 
     expect(twice).toEqual([{ group: "admin.*", policy: "ask" }]);
+  });
+
+  it("groups per-tool toggles with the same action into one in-clause", () => {
+    const rules = [
+      { name: "accounts_get", policy: "deny" as const },
+      { name: "contacts_list", policy: "deny" as const },
+      { name: "sync", policy: "ask" as const },
+    ].reduce(withUserRule, [] as ReturnType<typeof withUserRule>);
+
+    expect(rules).toEqual([
+      { name: ["accounts_get", "contacts_list"], policy: "deny" },
+      { name: "sync", policy: "ask" },
+    ]);
+  });
+
+  it("moves a re-toggled tool out of its old in-clause", () => {
+    const rules = withUserRule(
+      [{ name: ["accounts_get", "contacts_list"], policy: "deny" }],
+      { name: "accounts_get", policy: "allow" },
+    );
+
+    expect(rules).toEqual([
+      { name: "contacts_list", policy: "deny" },
+      { name: "accounts_get", policy: "allow" },
+    ]);
+  });
+});
+
+describe("consolidateRules", () => {
+  it("merges a run of exact names or groups per action, never across a rule that could overlap", () => {
+    expect(
+      consolidateRules([
+        { group: "xero.read", policy: "deny" },
+        { group: "xero.audit", policy: "ask" },
+        { group: "xero.write", policy: "deny" },
+        // A wildcard may cover xero.files, so moving it earlier could flip it.
+        { group: "xero.*", policy: "allow" },
+        { group: "xero.files", policy: "deny" },
+        { group: "xero.read", parent: "Contacts", policy: "deny" },
+        { name: "a", policy: "ask" },
+        { name: "b", policy: "ask" },
+        { name: "*", policy: "ask" },
+        { name: "c", policy: "ask" },
+      ]),
+    ).toEqual([
+      { group: ["xero.read", "xero.write"], policy: "deny" },
+      { group: "xero.audit", policy: "ask" },
+      { group: "xero.*", policy: "allow" },
+      { group: "xero.files", policy: "deny" },
+      { group: "xero.read", parent: "Contacts", policy: "deny" },
+      { name: ["a", "b"], policy: "ask" },
+      { name: "*", policy: "ask" },
+      { name: "c", policy: "ask" },
+    ]);
+  });
+
+  it("keeps the later rule's action when an exact value repeats", () => {
+    expect(
+      consolidateRules([
+        { name: ["a", "b"], policy: "deny" },
+        { name: "a", policy: "allow" },
+      ]),
+    ).toEqual([
+      { name: "b", policy: "deny" },
+      { name: "a", policy: "allow" },
+    ]);
   });
 });
 

@@ -171,6 +171,33 @@ describe("ToolCall tool-render registry", () => {
     expect(details).toHaveTextContent("force");
   });
 
+  it.each([
+    { clicked: "Approve", other: "Deny", approved: true },
+    { clicked: "Deny", other: "Approve", approved: false },
+  ])("shows $clicked progress on the button until the decision settles", async ({ clicked, other, approved }) => {
+    let settle!: () => void;
+    const onApprove = vi.fn(() => new Promise<void>((resolve) => { settle = resolve; }));
+    const part = dynamicPart({
+      state: "approval-requested",
+      toolName: "deletePod",
+      output: undefined,
+      approval: { id: "approval-1" },
+    } as Partial<DynamicToolUIPart>);
+    render(<ToolCall part={part} onApprove={onApprove} />);
+
+    fireEvent.click(screen.getByRole("button", { name: clicked }));
+
+    expect(onApprove).toHaveBeenCalledWith("approval-1", approved);
+    const busy = screen.getByRole("button", { name: clicked });
+    expect(busy).toHaveAttribute("aria-busy", "true");
+    expect(busy).toBeDisabled();
+    expect(screen.getByRole("button", { name: other })).toBeDisabled();
+
+    settle();
+    await vi.waitFor(() => expect(screen.getByRole("button", { name: clicked })).toBeEnabled());
+    expect(screen.getByRole("button", { name: other })).toBeEnabled();
+  });
+
   it("labels params from the catalog's input schema", () => {
     const tool: ToolMeta = {
       name: "listPods",

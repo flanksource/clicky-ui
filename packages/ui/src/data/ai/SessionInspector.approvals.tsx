@@ -130,7 +130,6 @@ function PendingApprovalRow({
   onResolve?: ApprovalResolveHandler;
 }) {
   const [error, setError] = useState<string | undefined>(undefined);
-  const [busy, setBusy] = useState(false);
 
   const part: AnyToolPart = {
     type: "dynamic-tool",
@@ -158,12 +157,10 @@ function PendingApprovalRow({
   ) => {
     if (!onResolve) return;
     setError(undefined);
-    setBusy(true);
-    void Promise.resolve(onResolve(approvalId, approved ? "approve" : "deny", reason))
+    return Promise.resolve(onResolve(approvalId, approved ? "approve" : "deny", reason))
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => setBusy(false));
+      });
   };
 
   return (
@@ -208,14 +205,9 @@ function PendingApprovalRow({
         <ToolCall
           part={part}
           defaultOpen
-          onApprove={busy ? undefined : handleApprove}
+          onApprove={handleApprove}
         />
       )}
-      {busy ? (
-        <p className="mt-1.5 pl-4 text-xs text-muted-foreground">
-          Submitting…
-        </p>
-      ) : null}
       {error ? (
         <p role="alert" className="mt-1.5 pl-4 text-xs text-destructive">
           {error}

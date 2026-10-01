@@ -674,6 +674,7 @@ describe("Chat Captain session projection", () => {
 
   it("replaces local messages with the session returned by approval", async () => {
     const sendMessages = vi.fn();
+    let respondToApproval!: (response: Response) => void;
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(
@@ -686,7 +687,12 @@ describe("Chat Captain session projection", () => {
           { status: 200, headers: { "Content-Type": "application/json" } },
         ),
       )
-      .mockResolvedValueOnce(
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          respondToApproval = resolve;
+        }),
+      );
+    const approvalResponse = () =>
         new Response(
           JSON.stringify({
             id: "session-1",
@@ -711,8 +717,7 @@ describe("Chat Captain session projection", () => {
             ],
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
-        ),
-      );
+        );
 
     render(
       <Chat
@@ -726,6 +731,15 @@ describe("Chat Captain session projection", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Approve" })).toHaveAttribute(
+        "aria-busy",
+        "true",
+      ),
+    );
+    expect(screen.getByRole("button", { name: "Deny" })).toBeDisabled();
+    respondToApproval(approvalResponse());
 
     await waitFor(() =>
       expect(screen.getByText("Updated from Captain.")).toBeInTheDocument(),

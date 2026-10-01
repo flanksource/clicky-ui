@@ -132,63 +132,43 @@ describe("ToolSchemaBrowser", () => {
     expect(screen.queryByLabelText("Read only tool")).not.toBeInTheDocument();
   });
 
-  it("bulk-selects visible descendants and emits one ordered exact-name rule", () => {
+  it("toggles a tool from its badge while a row click only selects it", () => {
     const onRule = vi.fn();
-    const { rerender } = render(
+    render(
       <ToolSchemaBrowser
         tools={TOOLS}
-        value={{
-          xero_accounts_list: "allow",
-          xero_contacts_list: "ask",
-          xero_contacts_get: "ask",
-          xero_transactions_split: "deny",
-        }}
+        value={{ xero_contacts_get: "ask" }}
         onRule={onRule}
       />,
     );
 
-    fireEvent.change(screen.getByPlaceholderText("Search tools"), {
-      target: { value: "contacts" },
-    });
-    fireEvent.click(
-      screen.getByRole("checkbox", {
-        name: "Select all visible tools in Xero Read",
-      }),
-    );
-    expect(screen.getByText("2 selected")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("radio", { name: "On" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save strategy" }));
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Get" }));
+    expect(onRule).not.toHaveBeenCalled();
+    expect(screen.getAllByText("xero_contacts_get").length).toBeGreaterThan(0);
 
+    fireEvent.click(screen.getByRole("button", { name: "Toggle Get" }));
     expect(onRule).toHaveBeenCalledWith({
-      name: ["xero_contacts_get", "xero_contacts_list"],
-      policy: "allow",
+      name: "xero_contacts_get",
+      policy: "deny",
     });
-    expect(screen.queryByText("2 selected")).not.toBeInTheDocument();
-
-    rerender(
-      <ToolSchemaBrowser
-        tools={TOOLS}
-        value={{
-          xero_contacts_list: "allow",
-          xero_contacts_get: "allow",
-        }}
-        onRule={onRule}
-      />,
-    );
-    expect(screen.getAllByText("On")).toHaveLength(2);
   });
 
-  it("adds metadata strategies by clicking directory row headers", () => {
+  it("cycles a directory's metadata rule one step past its most restrictive member", () => {
     const onRule = vi.fn();
     render(<ToolSchemaBrowser tools={TOOLS} onRule={onRule} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /^Xero Read/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Toggle Xero Read group" }),
+    );
     expect(onRule).toHaveBeenLastCalledWith({
       group: "Xero Read",
       policy: "ask",
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /^Xero Accounts/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Toggle Xero Accounts group" }),
+    );
     expect(onRule).toHaveBeenLastCalledWith({
       group: "Xero Read",
       parent: "Xero Accounts",
@@ -196,11 +176,41 @@ describe("ToolSchemaBrowser", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Tree" }));
-    fireEvent.click(screen.getByRole("button", { name: /^Xero Accounts/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Toggle Xero Accounts group" }),
+    );
     expect(onRule).toHaveBeenLastCalledWith({
       parent: "Xero Accounts",
       policy: "ask",
     });
+  });
+
+  it("keeps the strategy editor collapsed to a saved-rule count until opened", () => {
+    const onRulesChange = vi.fn();
+    render(
+      <ToolSchemaBrowser
+        tools={TOOLS}
+        rules={[
+          { group: "Xero Read", policy: "deny" },
+          { name: "xero_transactions_split", policy: "ask" },
+        ]}
+        onRulesChange={onRulesChange}
+      />,
+    );
+
+    const toggle = screen.getByRole("button", {
+      name: /Permission strategies/,
+    });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByLabelText("2 saved strategies")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Permission strategies" }),
+    ).toBeNull();
+
+    fireEvent.click(toggle);
+    expect(
+      screen.getByRole("heading", { name: "Permission strategies" }),
+    ).toBeInTheDocument();
   });
 
   it("keeps duplicate 'List' labels distinct by nesting them under their parent surface", () => {
