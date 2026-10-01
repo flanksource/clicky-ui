@@ -14,6 +14,7 @@ export {
 } from "./data/Badge";
 export { CodeBlock, type CodeBlockProps } from "./data/CodeBlock";
 export { CodeDiff, type CodeDiffProps, type CodeDiffView } from "./data/CodeDiff";
+export { CodeLine, type CodeLineProps } from "./data/CodeLine";
 export {
   computeLineDiff,
   parseUnifiedDiff,

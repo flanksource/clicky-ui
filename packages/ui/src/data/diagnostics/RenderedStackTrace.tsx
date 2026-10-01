@@ -54,6 +54,8 @@ export interface StackTraceProps {
   renderFrameDetail?: StackFrameDetailRenderer;
   /** Control whether per-frame actions are hover-only or always visible. */
   frameActionsVisibility?: StackFrameActionsVisibility;
+  /** Show each frame's 1-based ordinal in the gutter. Defaults to true. */
+  showFrameIndex?: boolean;
   /** Additional application-owned frame predicate. */
   frameFilter?: (frame: ParsedStackFrame) => boolean;
   /** Render application-owned detail below a parsed cause. */
@@ -78,6 +80,7 @@ export function StackTrace({
   renderFramePart,
   renderFrameDetail,
   frameActionsVisibility = "hover",
+  showFrameIndex = true,
   frameFilter,
   renderCauseDetail,
   className,
@@ -172,7 +175,7 @@ export function StackTrace({
             key={`${frame.functionName}-${idx}`}
             frame={frame}
             index={idx}
-            showIndex
+            showIndex={showFrameIndex}
             {...(frameActions ? { frameActions } : {})}
             {...(renderFramePart ? { renderFramePart } : {})}
             {...(renderFrameDetail ? { renderFrameDetail } : {})}
