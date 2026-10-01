@@ -96,7 +96,6 @@ export function ChatWindow({
   const [permissionMode, setPermissionMode] = useState<ClaudePermissionMode>(
     chat?.permissionMode ?? storedPrefs.permissionMode ?? "default",
   );
-  const [usage, setUsage] = useState<ChatUsageSummary | null>(null);
   const [titleRefresh, setTitleRefresh] = useState(0);
   // Only the rules the user actually toggled are stored. Everything else is
   // derived, so a surface's rules still reach tools the user never touched, and
@@ -126,12 +125,10 @@ export function ChatWindow({
   });
   const {
     runtime,
-    temperature,
     reasoningEfforts,
     handleRuntimeChange,
     handleModelChange,
     handleReasoningEffortChange,
-    handleTemperatureChange,
     replaceRuntimeIdentity,
     replaceRuntime,
   } = useChatWindowRuntime({
@@ -155,7 +152,6 @@ export function ChatWindow({
   useEffect(() => {
     setMessageCount(0);
     setRuntimeBound(false);
-    setUsage(null);
     replaceRuntime(preferredRuntimeRef.current);
   }, [panel.threadId, replaceRuntime]);
 
@@ -282,7 +278,6 @@ export function ChatWindow({
   }, [chat, panel.id, panel.proposedPrompts, updatePanel]);
   const handleUsage = useCallback(
     (snapshot: ChatUsageSummary) => {
-      setUsage(snapshot);
       // A settled turn is also when the backend has named the conversation, so
       // this is what refreshes the picker's label.
       setTitleRefresh((value) => value + 1);
@@ -358,6 +353,8 @@ export function ChatWindow({
         tools={resolvedTools}
         value={toolPrefs}
         onRule={handleToolRule}
+        rules={userToolRules}
+        onRulesChange={setUserToolRules}
         models={resolvedModels}
         runtime={runtime}
         onRuntimeChange={handleRuntimeChange}
@@ -365,11 +362,8 @@ export function ChatWindow({
         reasoningEfforts={reasoningEfforts}
         permissionMode={permissionMode}
         onPermissionModeChange={handlePermissionModeChange}
-        temperature={temperature}
-        onTemperatureChange={handleTemperatureChange}
         budget={budget}
         onBudgetChange={setBudget}
-        usage={usage}
         runtimeLocked={runtimeLocked}
         {...(sessionsApi ? { costsApi: sessionsApi } : {})}
         {...(panel.threadId ? { threadId: panel.threadId } : {})}

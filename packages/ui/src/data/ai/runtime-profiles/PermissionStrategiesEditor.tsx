@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { AccordionList } from "../../../components/AccordionList";
 import { Combobox } from "../../../components/Combobox";
-import { Select } from "../../../components/select";
 import {
   SegmentedControl,
   type SegmentedOption,
@@ -28,9 +27,9 @@ import {
   activeMatchFields,
   addCondition,
   applyStrategyPreset,
-  conditionText,
   matchingTools,
   strategyPreset,
+  strategySummary,
   type MatchField,
   type StrategyPreset,
 } from "../../../lib/permission-strategies";
@@ -65,7 +64,7 @@ export function PermissionStrategiesEditor({
         addLabel="Add permission strategy"
         addDescription="Start with a common match preset or define custom conditions."
         itemLabel={({ item, index }) =>
-          `Permission strategy ${index + 1}: ${strategyLabel(item)}`
+          `Permission strategy ${index + 1}: ${strategySummary(item)}`
         }
         idPrefix="permission-strategy"
         renderHeader={({ item }) => <StrategyHeader rule={item} />}
@@ -94,8 +93,8 @@ function StrategyHeader({ rule }: { rule: PermissionRule }) {
       >
         <StrategyIcon preset={preset} className="size-4" />
       </span>
-      <span className="min-w-0 flex-1 truncate text-sm font-medium">
-        {strategyLabel(rule)}
+      <span className="min-w-0 flex-1 text-sm font-medium [overflow-wrap:anywhere]">
+        {strategySummary(rule)}
       </span>
       <PolicyBadge policy={rule.policy} />
     </div>
@@ -176,18 +175,17 @@ function PermissionStrategyFields({
           {available.length > 0 && (
             <label className="grid gap-1 text-xs font-medium sm:max-w-xs">
               Add condition
-              <Select
+              <Combobox
+                ariaLabel="Add condition"
                 value=""
                 placeholder="Choose metadata…"
-                onChange={(event) =>
-                  onChange(
-                    addCondition(value, event.target.value as MatchField),
-                  )
-                }
+                onChange={(field) => {
+                  if (field) onChange(addCondition(value, field as MatchField));
+                }}
                 options={MATCH_FIELD_OPTIONS.filter((option) =>
                   available.includes(option.value),
                 )}
-                className="border-dashed text-muted-foreground"
+                allowCustomValue={false}
               />
             </label>
           )}
@@ -319,32 +317,6 @@ function PolicyIcon({
   if (policy === "deny") return <UiShieldSlash className={className} />;
   if (policy === "ask") return <UiQuestion className={className} />;
   return <UiSparkles className={className} />;
-}
-
-function strategyLabel(rule: PermissionRule): string {
-  const preset = strategyPreset(rule);
-  if (preset !== "custom") {
-    return (
-      STRATEGY_PRESETS.find((option) => option.value === preset)?.label ??
-      "All tools"
-    );
-  }
-  const fields = activeMatchFields(rule);
-  if (fields.length !== 1) {
-    return `Custom conditions · ${fields.length} conditions`;
-  }
-  const field = fields[0];
-  if (!field) return "Custom conditions";
-  const label =
-    MATCH_FIELD_OPTIONS.find((option) => option.value === field)?.label ??
-    field;
-  const value = conditionText(rule, field);
-  if (Array.isArray(rule[field])) {
-    return `Custom conditions · ${label} in ${rule[field].length} values`;
-  }
-  const displayValue =
-    value === "true" ? "Yes" : value === "false" ? "No" : value;
-  return `Custom conditions · ${label} ${displayValue}`;
 }
 
 function policyLabel(policy: ToolPolicy): string {

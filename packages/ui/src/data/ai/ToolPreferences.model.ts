@@ -1,6 +1,7 @@
 import type { ToolMeta, ToolPolicy } from "../chat/types";
 import { normalizeToolPolicy } from "../chat/types";
 import {
+  consolidateRules,
   resolveToolPolicy,
   type PermissionPolicy,
   type PermissionRule,
@@ -93,7 +94,7 @@ export function withUserRule(
     sameSubject(existing, rule) ? rule : existing,
   );
   const next = replaced.includes(rule) ? replaced : [...replaced, rule];
-  return [...next].sort((a, b) => ruleRank(a) - ruleRank(b));
+  return consolidateRules([...next].sort((a, b) => ruleRank(a) - ruleRank(b)));
 }
 
 /** The mode to show for each tool: the user's own rules over the surface's, then
@@ -128,18 +129,21 @@ export type ToolGroup = {
   subGroups: ToolSubGroup[];
 };
 
+export function toolEntry(tool: ToolMeta): ToolPreferenceEntry {
+  return {
+    key: tool.name,
+    label: tool.label || tool.name,
+    group: tool.group ?? "Tools",
+    tool,
+    defaultPermission: tool.defaultPermission ?? "auto",
+  };
+}
+
 export function groupedToolEntries(tools: ToolMeta[]): ToolGroup[] {
   const groups: Record<string, ToolPreferenceEntry[]> = {};
   for (const tool of tools) {
-    const group = tool.group ?? "Tools";
-    const entry: ToolPreferenceEntry = {
-      key: tool.name,
-      label: tool.label || tool.name,
-      group,
-      tool,
-      defaultPermission: tool.defaultPermission ?? "auto",
-    };
-    (groups[group] ??= []).push(entry);
+    const entry = toolEntry(tool);
+    (groups[entry.group] ??= []).push(entry);
   }
   return Object.entries(groups)
     .map(([group, entries]) => buildToolGroup(group, entries))

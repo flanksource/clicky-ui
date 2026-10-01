@@ -34,8 +34,13 @@ export {
 } from "./ContextBadges";
 export {
   ToolPreferences,
+  ToolPreferencesMenu,
+  AdvancedChatSettings,
   CompactToolPreferencesList,
+  type AdvancedChatSettingsProps,
+  type AdvancedTab,
   type CompactToolPreferencesListProps,
+  type ToolPreferencesMenuProps,
   type ToolPreferencesProps,
   type ClaudePermissionMode,
   type ToolAnnotations,

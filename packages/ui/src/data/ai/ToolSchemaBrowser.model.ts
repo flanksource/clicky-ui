@@ -1,5 +1,12 @@
 import type { PermissionRule } from "../chat/tool-policy";
-import type { ToolMeta } from "../chat/types";
+import type { ToolMeta, ToolPolicy } from "../chat/types";
+import {
+  commonMode,
+  groupToolPolicy,
+  nextMode,
+  toolEntry,
+  type BadgePolicy,
+} from "./ToolPreferences.model";
 
 export type ToolSchemaViewMode = "group" | "tree";
 export type ToolSchemaBrowserTab = "schema" | "json";
@@ -145,27 +152,31 @@ export function directoryPermissionRule({
   tools,
   view,
   depth,
+  policy,
 }: {
   tools: ToolMeta[];
   view: ToolSchemaViewMode;
   depth: "section" | "child";
+  policy: ToolPolicy;
 }): PermissionRule {
   const group = singleDirectoryValue(tools, "group");
   const parent = singleDirectoryValue(tools, "parent");
-  const outer = view === "group" ? group : parent;
-  const inner = view === "group" ? parent : group;
-  if (!outer || (depth === "child" && !inner)) {
-    return { name: tools.map((tool) => tool.name).sort(), policy: "ask" };
+  const facets =
+    depth === "section"
+      ? view === "group"
+        ? { group }
+        : { parent }
+      : { group, parent };
+  // Metadata facets keep applying as the catalog grows; only a directory with
+  // no metadata at all falls back to the names it holds today.
+  if (!facets.group && !facets.parent) {
+    return { name: tools.map((tool) => tool.name).sort(), policy };
   }
-  if (depth === "child") {
-    if (!inner) throw new Error("Child tool directory has no metadata value");
-    return view === "group"
-      ? { group: outer, parent: inner, policy: "ask" }
-      : { parent: outer, group: inner, policy: "ask" };
-  }
-  return view === "group"
-    ? { group: outer, policy: "ask" }
-    : { parent: outer, policy: "ask" };
+  return {
+    ...(facets.group ? { group: facets.group } : {}),
+    ...(facets.parent ? { parent: facets.parent } : {}),
+    policy,
+  };
 }
 
 function singleDirectoryValue(
@@ -176,26 +187,15 @@ function singleDirectoryValue(
   return values.size === 1 ? [...values][0] : undefined;
 }
 
-export function updateSelectedTools(
-  selected: readonly string[],
-  visible: readonly string[],
-): string[] {
-  const next = new Set(selected);
-  const allVisibleSelected = visible.length > 0 && visible.every((name) => next.has(name));
-  for (const name of visible) {
-    if (allVisibleSelected) next.delete(name);
-    else next.add(name);
-  }
-  return [...next];
-}
-
-export function selectedToolState(
-  selected: ReadonlySet<string>,
-  visible: readonly string[],
-): { checked: boolean; mixed: boolean } {
-  const count = visible.filter((name) => selected.has(name)).length;
+/** The badge a directory shows and the rule a click on it emits: one cycle step
+ *  past its most restrictive member, matching the quick menu's group toggle. */
+export function directoryPolicyToggle(
+  tools: ToolMeta[],
+  value: Record<string, ToolPolicy>,
+): { badge: BadgePolicy; next: ToolPolicy } {
+  const entries = tools.map(toolEntry);
   return {
-    checked: visible.length > 0 && count === visible.length,
-    mixed: count > 0 && count < visible.length,
+    badge: commonMode(entries, value),
+    next: nextMode(groupToolPolicy(entries, value)),
   };
 }

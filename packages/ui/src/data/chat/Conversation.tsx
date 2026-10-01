@@ -17,6 +17,9 @@ export type ConversationProps = MessageActionHandlers & {
   sessionId?: string | undefined;
   /** Selected model id, surfaced in the copyable error report. */
   model?: string | undefined;
+  /** Hide the waiting indicator because another control (e.g. an approval
+   *  button) is already showing progress. */
+  suppressWaiting?: boolean | undefined;
   /** Shown when there are no messages yet. */
   emptyState?: React.ReactNode;
   className?: string;
@@ -32,13 +35,16 @@ export function Conversation({
   onClearError,
   sessionId,
   model,
+  suppressWaiting,
   emptyState,
   className,
   ...actions
 }: ConversationProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pinned, setPinned] = useState(true);
-  const isWaiting = status === "submitted" || (status === "streaming" && !hasVisibleAssistantResponse(messages));
+  const isWaiting =
+    !suppressWaiting &&
+    (status === "submitted" || (status === "streaming" && !hasVisibleAssistantResponse(messages)));
   const errorText = error?.message || (status === "error" ? "The assistant request failed." : undefined);
 
   const onScroll = () => {
