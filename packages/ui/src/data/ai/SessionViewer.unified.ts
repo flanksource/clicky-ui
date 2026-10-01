@@ -5,6 +5,8 @@
 // pkg/session {Message, Part, Provenance}. The viewer normalizes these into the
 // same SessionEvent rows as the legacy SessionEntry log (see SessionViewer.model).
 
+import type { ApprovalRequest } from "./approval-request";
+
 /** Transcript fields the AI SDK part shape lacks; rides on a message. */
 export interface SessionProvenance {
   timestamp?: string;
@@ -193,6 +195,9 @@ export interface SessionApprovalRequest {
   state: "pending" | "approved" | "denied" | "cancelled" | "expired";
   tool: string;
   input?: unknown;
+  /** The typed approval request (captain `api.ApprovalRequest`) when the broker
+   *  stored one; absent on rows that predate typed approvals. */
+  request?: ApprovalRequest;
   requestedBy?: string;
   createdAt?: string;
   expiresAt?: string;

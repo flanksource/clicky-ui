@@ -1,3 +1,4 @@
+import type { ApprovalDecisionFields } from "./approval-request";
 import type { SessionApprovalRequest } from "./SessionViewer.unified";
 
 /** Approve or deny one pending approval. */
@@ -5,11 +6,17 @@ export type ApprovalResolveAction = "approve" | "deny";
 
 /** Resolves one `session.requests[]` row. Rejecting surfaces the server's
  *  refusal text inline on that row (e.g. the prompt run is no longer
- *  `waiting`) instead of leaving the Approve/Deny buttons silently inert. */
+ *  `waiting`) instead of leaving the Approve/Deny buttons silently inert.
+ *
+ *  `decision` is passed only for a typed approval that sent more than
+ *  approve/deny + message: answers, form content, grants, scope, or interrupt
+ *  (Cancel is `deny` with `interrupt`). A plain approval calls it with three
+ *  arguments, exactly as before typed approvals existed. */
 export type ApprovalResolveHandler = (
   approvalId: string,
   action: ApprovalResolveAction,
   message?: string,
+  decision?: ApprovalDecisionFields,
 ) => void | Promise<void>;
 
 /** The subset of `session.requests[]` the approvals panel surfaces: outstanding
@@ -26,4 +33,20 @@ export function pendingApprovalRequests(
   return (requests ?? []).filter(
     (request) => request.state === "pending" && request.kind === "tool_approval",
   );
+}
+
+/** The typed-decision fields a decision actually set, or undefined when it is a
+ *  plain approve/deny. */
+export function decisionFields(
+  decision: ApprovalDecisionFields,
+): ApprovalDecisionFields | undefined {
+  const { answers, interrupt, scope, grants, content } = decision;
+  const fields: ApprovalDecisionFields = {
+    ...(answers ? { answers } : {}),
+    ...(interrupt ? { interrupt } : {}),
+    ...(scope ? { scope } : {}),
+    ...(grants ? { grants } : {}),
+    ...(content ? { content } : {}),
+  };
+  return Object.keys(fields).length > 0 ? fields : undefined;
 }

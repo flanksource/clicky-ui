@@ -62,15 +62,9 @@ export interface SessionScrollState {
   contentRef: RefObject<HTMLDivElement | null>;
   startIndex: number;
   hasMore: boolean;
+  following: boolean;
+  resumeFollowing: () => void;
 }
-
-const idleWindow = () =>
-  (typeof window === "undefined" ? undefined : window) as
-    | (Window & {
-        requestIdleCallback?: (cb: () => void) => number;
-        cancelIdleCallback?: (handle: number) => void;
-      })
-    | undefined;
 
 export function useSessionScroll(options: SessionScrollOptions): SessionScrollState {
   const { total, enabled, windowSize, batchSize, resetKey } = options;
@@ -79,12 +73,15 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const pinnedRef = useRef(true);
+  const followingRef = useRef(true);
+  const lastScrollTopRef = useRef(0);
   const anchorHeightRef = useRef<number | null>(null);
   const scrollBottomPendingRef = useRef(true);
   const loadingOlderRef = useRef(false);
+  const previousTotalRef = useRef({ resetKey, total });
 
-  const [visibleCount, setVisibleCount] = useState(() => Math.min(windowSize, total));
+  const [visibleCount, setVisibleCount] = useState(windowSize);
+  const [following, setFollowing] = useState(true);
   const effectiveCount = enabled ? visibleCount : total;
   const startIndex = Math.max(0, total - effectiveCount);
   const hasMore = enabled && startIndex > 0;
@@ -93,8 +90,17 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
 
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+      lastScrollTopRef.current = el.scrollTop;
+    }
   }, []);
+
+  const resumeFollowing = useCallback(() => {
+    followingRef.current = true;
+    setFollowing(true);
+    scrollToBottom();
+  }, [scrollToBottom]);
 
   // Prepend an older batch, latching until the layout effect settles the prepend so
   // rapid scroll events don't stack multiple batches at once.
@@ -112,11 +118,20 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
   // A new session (resetKey change) snaps back to the newest screenful and re-pins.
   useLayoutEffect(() => {
     if (!enabled) return;
-    setVisibleCount(Math.min(windowSize, total));
-    pinnedRef.current = true;
+    setVisibleCount(windowSize);
+    followingRef.current = true;
+    setFollowing(true);
     loadingOlderRef.current = false;
     scrollBottomPendingRef.current = true;
-  }, [enabled, resetKey, windowSize, total]);
+  }, [enabled, resetKey, windowSize]);
+
+  useLayoutEffect(() => {
+    const previous = previousTotalRef.current;
+    previousTotalRef.current = { resetKey, total };
+    if (enabled && previous.resetKey === resetKey && !followingRef.current && total > previous.total) {
+      setVisibleCount((count) => count + total - previous.total);
+    }
+  }, [enabled, resetKey, total]);
 
   // After each commit, either snap to bottom (pending pin) or preserve the reader's
   // position when older rows were prepended (anchor), then release the load latch.
@@ -126,24 +141,42 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
     if (scrollBottomPendingRef.current) {
       scrollBottomPendingRef.current = false;
       anchorHeightRef.current = null;
-      el.scrollTop = el.scrollHeight;
+      scrollToBottom();
     } else if (anchorHeightRef.current != null) {
       el.scrollTop += el.scrollHeight - anchorHeightRef.current;
       anchorHeightRef.current = null;
+      lastScrollTopRef.current = el.scrollTop;
+    } else if (followingRef.current) {
+      scrollToBottom();
     }
     loadingOlderRef.current = false;
-  }, [enabled, visibleCount]);
+  }, [enabled, visibleCount, total, scrollToBottom]);
 
   // Track pinned-to-bottom, and load older rows as the reader nears the top.
   useEffect(() => {
     const el = scrollRef.current;
     if (!enabled || !el) return;
     const onScroll = () => {
-      pinnedRef.current = isPinnedToBottom(el, bottomThreshold);
+      const movedUp = el.scrollTop < lastScrollTopRef.current;
+      if (movedUp || !isPinnedToBottom(el, bottomThreshold)) {
+        followingRef.current = false;
+        setFollowing(false);
+      }
+      lastScrollTopRef.current = el.scrollTop;
+      if (hasMoreRef.current && movedUp && isNearTop(el.scrollTop, topThreshold)) growOlderRef.current();
+    };
+    const onWheel = (event: WheelEvent) => {
+      if (event.deltaY >= 0) return;
+      followingRef.current = false;
+      setFollowing(false);
       if (hasMoreRef.current && isNearTop(el.scrollTop, topThreshold)) growOlderRef.current();
     };
     el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
+    el.addEventListener("wheel", onWheel, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      el.removeEventListener("wheel", onWheel);
+    };
   }, [enabled, bottomThreshold, topThreshold]);
 
   // Keep the newest row in view as rows grow (shiki highlighting settles after paint).
@@ -151,21 +184,11 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
     const content = contentRef.current;
     if (!enabled || !content || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => {
-      if (pinnedRef.current) scrollToBottom();
+      if (followingRef.current) scrollToBottom();
     });
     observer.observe(content);
     return () => observer.disconnect();
   }, [enabled, scrollToBottom]);
 
-  // Prefetch one batch while idle so the first scroll up is instant.
-  useEffect(() => {
-    if (!enabled || !hasMore) return;
-    const win = idleWindow();
-    const request = win?.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 200));
-    const cancel = win?.cancelIdleCallback ?? window.clearTimeout;
-    const handle = request(() => growOlderRef.current());
-    return () => cancel(handle);
-  }, [enabled, resetKey, hasMore]);
-
-  return { scrollRef, contentRef, startIndex, hasMore };
+  return { scrollRef, contentRef, startIndex, hasMore, following, resumeFollowing };
 }

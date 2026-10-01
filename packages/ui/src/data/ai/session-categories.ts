@@ -292,6 +292,10 @@ export interface SessionVisibility {
   showThinking: boolean;
 }
 
+export function isEncryptedReasoning(event: SessionEvent): boolean {
+  return event.kind === "thinking" && /^\d+ encrypted reasoning records? (?:at|over) \S/.test(event.text ?? "");
+}
+
 /** Whether an event survives the active filters. Tool events are gated by their
  *  tool, category and source; reasoning by `showThinking`; everything else
  *  (user/assistant/error) is always shown. */

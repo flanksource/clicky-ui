@@ -4,6 +4,47 @@ import { SessionInspector } from "./SessionInspector";
 import { INSPECTOR_SESSION } from "./SessionViewer.fixtures";
 
 describe("SessionInspector", () => {
+  it("starts a long transcript at the newest ten messages", () => {
+    const messages = Array.from({ length: 25 }, (_, index) => ({
+      id: `message-${index}`,
+      role: "assistant" as const,
+      parts: [{ type: "text" as const, text: `Entry ${index}` }],
+    }));
+    const { container } = render(
+      <div className="h-[720px]">
+        <SessionInspector session={{ id: "long-session", messages }} />
+      </div>,
+    );
+
+    expect(container.querySelectorAll("[data-event-kind]")).toHaveLength(10);
+    expect(screen.getByText("Entry 24")).toBeInTheDocument();
+    expect(screen.queryByText("Entry 14")).not.toBeInTheDocument();
+  });
+
+  it("renders the initial prompt as readable markdown inside the user bubble", async () => {
+    const { container } = render(
+      <div className="h-[720px]">
+        <SessionInspector session={{
+          id: "prompt-session",
+          title: "Parser session",
+          initialPrompt: "# Review parser\n\n- inspect the source\n- run focused tests",
+          messages: [
+            { id: "first", role: "user", parts: [{ type: "text", text: "# Review parser\n\n- inspect the source\n- run focused tests" }] },
+            { id: "reply", role: "assistant", parts: [{ type: "text", text: "On it." }] },
+            { id: "followup", role: "user", parts: [{ type: "text", text: "Thanks" }] },
+          ],
+        }} />
+      </div>,
+    );
+    const userRows = container.querySelectorAll('[data-event-kind="user"]');
+    const initialPrompt = userRows[0] as HTMLElement;
+
+    expect(within(initialPrompt).getByText("Initial prompt")).toBeInTheDocument();
+    expect(await within(initialPrompt).findByRole("heading", { name: "Review parser" })).toBeInTheDocument();
+    expect(within(initialPrompt).getByRole("list")).toHaveTextContent("inspect the source");
+    expect(userRows[1]).toHaveTextContent("You");
+  });
+
   it("keeps the composer mounted across detail tabs", () => {
     render(
       <div className="h-[720px]">
@@ -96,6 +137,23 @@ describe("SessionInspector", () => {
         name: "Investigate the effort discrepancy",
       }),
     ).toBeInTheDocument();
+  });
+
+  it("shows the full initial prompt as expandable markdown below a concise heading", async () => {
+    render(
+      <div className="h-[720px]">
+        <SessionInspector session={{
+          id: "header-prompt",
+          initialPrompt: "# Review parser\n\n- inspect the source\n- run focused tests",
+          messages: [],
+        }} />
+      </div>,
+    );
+
+    const banner = within(screen.getByRole("banner"));
+    expect(banner.getByRole("heading", { name: "Review parser" })).toBeInTheDocument();
+    fireEvent.click(banner.getByText("Initial prompt"));
+    expect(await banner.findByRole("list")).toHaveTextContent("run focused tests");
   });
 
   it("renders unknown effort values as neutral metadata", () => {

@@ -24,6 +24,7 @@ import { MessageFilePart } from "../chat/MessageFilePart";
 
 export function SessionRow({
   event,
+  initialPrompt = false,
   last,
   defaultExpanded,
   showRowMetadata = false,
@@ -32,6 +33,7 @@ export function SessionRow({
   onPendingToolDecision,
 }: {
   event: SessionEvent;
+  initialPrompt?: boolean;
   last: boolean;
   defaultExpanded: boolean;
   showRowMetadata?: boolean;
@@ -45,6 +47,7 @@ export function SessionRow({
     return (
       <UserRow
         event={event}
+        initialPrompt={initialPrompt}
         showRowMetadata={showRowMetadata}
         showRaw={showRaw}
       />
@@ -187,10 +190,12 @@ export function WaitGroupRow({
 
 function UserRow({
   event,
+  initialPrompt,
   showRowMetadata,
   showRaw,
 }: {
   event: SessionEvent;
+  initialPrompt: boolean;
   showRowMetadata: boolean;
   showRaw: boolean;
 }) {
@@ -199,13 +204,13 @@ function UserRow({
       data-event-kind="user"
       className="relative flex justify-end pb-density-4 last:pb-0"
     >
-      <div className="flex max-w-full items-start gap-density-2 @min-[48rem]/session-viewer:max-w-[85%] @min-[48rem]/session-viewer:gap-density-3">
+      <div className={cn("flex max-w-full items-start gap-density-2 @min-[48rem]/session-viewer:gap-density-3", !initialPrompt && "@min-[48rem]/session-viewer:max-w-[85%]")}>
         <div className="min-w-0">
           <div className="mb-0.5 text-right text-xs font-medium text-muted-foreground">
-            You
+            {initialPrompt ? "Initial prompt" : "You"}
           </div>
-          <div className="whitespace-pre-wrap break-words rounded-lg bg-accent px-density-3 py-density-2 text-right text-base font-medium leading-relaxed text-accent-foreground">
-            {event.file ? <MessageFilePart part={event.file} /> : event.text}
+          <div className="min-w-0 break-words rounded-lg bg-accent px-density-3 py-density-2 text-left text-sm leading-relaxed text-accent-foreground">
+            {event.file ? <MessageFilePart part={event.file} /> : event.text && <Markdown text={event.text} />}
           </div>
           {showRowMetadata && <EventMetadata event={event} align="right" />}
           {showRaw && event.raw !== undefined && (

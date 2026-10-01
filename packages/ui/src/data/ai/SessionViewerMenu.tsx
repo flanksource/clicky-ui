@@ -59,6 +59,9 @@ export interface SessionViewerMenuProps {
   showThinking: boolean;
   onToggleThinking: () => void;
   hasThinking: boolean;
+  hasEncryptedReasoning: boolean;
+  showEncryptedReasoning: boolean;
+  onToggleEncryptedReasoning: () => void;
 }
 
 /** The SessionViewer's "3-dot" menu: density and theme overrides as one-line
@@ -80,6 +83,9 @@ export function SessionViewerMenu({
   showThinking,
   onToggleThinking,
   hasThinking,
+  hasEncryptedReasoning,
+  showEncryptedReasoning,
+  onToggleEncryptedReasoning,
 }: SessionViewerMenuProps) {
   return (
     <DropdownMenu
@@ -152,6 +158,9 @@ export function SessionViewerMenu({
           {hasThinking && (
             <Section>
               <CheckRow label="Reasoning" checked={showThinking} onToggle={onToggleThinking} />
+              {hasEncryptedReasoning && (
+                <CheckRow label="Encrypted reasoning" checked={showEncryptedReasoning} onToggle={onToggleEncryptedReasoning} />
+              )}
             </Section>
           )}
         </div>
