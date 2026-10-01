@@ -176,7 +176,7 @@ describe("ChatWindow model fetching", () => {
     fireEvent.click(screen.getByTestId("tool-preferences-btn"));
     fireEvent.click(await screen.findByText("Advanced"));
     const dialog = await screen.findByRole("dialog", { name: "Advanced Chat Settings" });
-    expect(within(dialog).getByRole("button", { name: "Captain Codex" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("combobox", { name: "Model" })).toHaveTextContent("Captain Codex");
     expect(within(dialog).getByRole("button", { name: "CLI" })).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -212,12 +212,11 @@ describe("ChatWindow model fetching", () => {
 // "Anthropic", was a family that catalog has not carried for some time.
 async function expectRuntimeModel(label: string): Promise<void> {
   await waitFor(() =>
-    expect(
-      screen.getByRole("button", {
-        name: new RegExp(`^Runtime: Claude, API, ${label}, effort Unspecified$`),
-      }),
-    ).toBeInTheDocument(),
+    expect(screen.getByRole("combobox", { name: "Model" })).toHaveTextContent(
+      `Claude ${label}`,
+    ),
   );
+  expect(screen.getByTitle("Runtime mode — API")).toBeInTheDocument();
 }
 
 async function expectStoredRuntime(modelId: string): Promise<void> {

@@ -347,11 +347,8 @@ describe("ChatWindow", () => {
     await waitFor(() =>
       expect(screen.getByText("Source question")).toBeInTheDocument(),
     );
-    expect(
-      screen.getByRole("button", {
-        name: /Model and mode are locked for this conversation/,
-      }),
-    ).toBeInTheDocument();
+    expect(screen.getByTitle(/^Runtime mode — /)).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Model" })).toBeDisabled();
     fireEvent.click(
       screen.getByRole("button", {
         name: "Fork conversation into a new window",

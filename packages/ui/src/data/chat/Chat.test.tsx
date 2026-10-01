@@ -139,9 +139,9 @@ describe("Chat runtime controls", () => {
     expect(screen.getByTitle("Runtime mode — API")).toBeInTheDocument();
     expect(screen.getByTitle("Model — claude-sonnet-4-5")).toHaveTextContent("Claude Sonnet 4.5");
     expect(screen.getByTitle("Reasoning effort")).toHaveTextContent("Medium");
-    expect(
-      screen.queryByRole("combobox", { name: "Model" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Model" })).toBe(
+      screen.getByTitle("Model — claude-sonnet-4-5"),
+    );
     expect(
       screen.queryByRole("combobox", { name: "Reasoning effort" }),
     ).not.toBeInTheDocument();
@@ -164,7 +164,7 @@ describe("Chat runtime controls", () => {
     );
 
     fireEvent.click(screen.getByTitle("Model — claude-sonnet-4-5"));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Custom model…" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Custom model…" }));
 
     expect(onRuntimeChange).toHaveBeenCalledWith({
       mode: "api",

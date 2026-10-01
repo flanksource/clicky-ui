@@ -326,12 +326,14 @@ describe("ChatWindow tool approval default", () => {
     });
 
     fireEvent.click(within(dialog).getByTitle("Model — unspecified"));
+    expect(screen.getByRole("listbox", { name: "Model" })).toBeInTheDocument();
     expect(
-      screen.queryByRole("menuitem", { name: /Claude Opus/ })
+      screen.queryByRole("option", { name: /Claude Opus/ })
     ).not.toBeInTheDocument();
     fireEvent.click(within(dialog).getByTitle("Model — unspecified"));
 
-    fireEvent.click(within(dialog).getByTitle("Claude Agent"));
+    fireEvent.click(within(dialog).getByTitle("Runtime mode — Agent"));
+    expect(screen.getByRole("menuitem", { name: "Agent" })).toBeInTheDocument();
     expect(
       screen.queryByRole("menuitem", { name: /cmux/ })
     ).not.toBeInTheDocument();
