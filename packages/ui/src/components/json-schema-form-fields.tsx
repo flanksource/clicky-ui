@@ -3,7 +3,7 @@ import { cn } from "../lib/utils";
 import { formatDateTimeRelative } from "../data/cells/timestamp-format";
 import { Combobox } from "./Combobox";
 import { DateField } from "./DateField";
-import { SegmentedControl, type SegmentedSize } from "./SegmentedControl";
+import { RadioGroupControl, SegmentedEnumControl } from "./json-schema-form-enum-choice";
 import { GridControl } from "./json-schema-form-grid";
 import { LookupTreeControl } from "./json-schema-form-lookup-tree";
 import { TagsComboboxControl } from "./json-schema-form-tags-combobox";
@@ -357,59 +357,6 @@ export function EnumControl({
   );
 }
 
-// The FormSize scale is wider than SegmentedControl's; map the extremes down.
-const SEGMENTED_SIZE: Record<FormSize, SegmentedSize> = {
-  xs: "sm",
-  sm: "sm",
-  md: "md",
-  lg: "lg",
-  xl: "lg",
-};
-
-// SegmentedEnumControl renders an enum (x-enum-display: "segmented") with the
-// shared SegmentedControl. Icons come from x-enum-icons, descriptions from
-// x-enum-descriptions (which promote it to the large card layout). The wrapper
-// carries the field id + data-jsf-input so the JSF field contract holds.
-function SegmentedEnumControl({
-  field,
-  fieldId,
-  readOnly,
-  options,
-  value,
-  size,
-}: {
-  field: FieldControl;
-  fieldId: string;
-  readOnly: boolean;
-  options: FieldOption[];
-  value: string;
-  size: FormSize;
-}) {
-  const hasDescription = options.some((opt) => opt.description);
-  const segSize: SegmentedSize = hasDescription ? "lg" : SEGMENTED_SIZE[size];
-  return (
-    <div id={fieldId} data-jsf-input className={cn(field.inputClassName)}>
-      <SegmentedControl
-        aria-label={field.label}
-        value={value}
-        onChange={(next) => field.onChange(next)}
-        size={segSize}
-        wrap
-        options={options.map((opt) => ({
-          id: opt.value,
-          label: opt.label,
-          // x-enum-icons resolves to a runtime name string; SegmentedControl
-          // renders that via <Icon name>. Non-string (pre-extension) icons are
-          // dropped here since the segmented option type only takes name/component.
-          ...(typeof opt.icon === "string" ? { icon: opt.icon } : {}),
-          ...(opt.description ? { description: opt.description } : {}),
-          ...(readOnly ? { disabled: true } : {}),
-        }))}
-      />
-    </div>
-  );
-}
-
 // LookupControl is the async entity-reference picker for an `x-clicky-lookup`
 // field. It wraps Combobox and fetches options lazily through the form's
 // LookupFetcher (from context): the head set loads when the menu opens and the
@@ -528,67 +475,6 @@ export function LookupControl({
       {...comboboxAriaProps(field, fieldId)}
       {...(defaultPlaceholder(field.schema) ? { placeholder: defaultPlaceholder(field.schema) } : {})}
     />
-  );
-}
-
-// RadioGroupControl renders a small fixed enum as a segmented radio-button group
-// instead of a dropdown. It shares EnumControl's option list (any out-of-enum
-// value is already prepended, so a token still shows). One `radiogroup` role +
-// native radios keep it keyboard-navigable; the visible chip is a styled label.
-function RadioGroupControl({
-  field,
-  fieldId,
-  readOnly,
-  options,
-  value,
-  size,
-}: {
-  field: FieldControl;
-  fieldId: string;
-  readOnly: boolean;
-  options: FieldOption[];
-  value: string;
-  size: FormSize;
-}) {
-  return (
-    <div
-      role="radiogroup"
-      aria-label={field.label}
-      id={fieldId}
-      data-jsf-input
-      className={cn(
-        "inline-flex flex-wrap items-center gap-1 rounded-md border border-input bg-background p-0.5",
-        field.inputClassName,
-      )}
-    >
-      {options.map((opt) => {
-        const checked = opt.value === value;
-        return (
-          <label
-            key={opt.value}
-            className={cn(
-              "inline-flex cursor-pointer select-none items-center rounded px-2.5 py-1",
-              labelSizeClass[size],
-              checked
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-accent hover:text-foreground",
-              readOnly && "cursor-not-allowed opacity-60",
-            )}
-          >
-            <input
-              type="radio"
-              name={fieldId}
-              className="sr-only"
-              value={opt.value}
-              checked={checked}
-              disabled={readOnly}
-              onChange={() => field.onChange(opt.value)}
-            />
-            {opt.label}
-          </label>
-        );
-      })}
-    </div>
   );
 }
 
