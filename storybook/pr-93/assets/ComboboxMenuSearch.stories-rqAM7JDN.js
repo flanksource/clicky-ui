@@ -1,0 +1,8 @@
+import{r as m,j as a}from"./iframe-CLXtWVmt.js";import{C as s}from"./Combobox-BjmBMG3b.js";import"./preload-helper-DmsBQNJi.js";import"./utils-DW-IJACk.js";import"./Icon-CpZ1luCu.js";import"./modalStack-gt8ROY-G.js";import"./zIndex-BGbNBNA8.js";import"./json-schema-form-size-E77C3uZS.js";import"./FilterPill-CM5YOpR7.js";import"./index-cL1Er3Pi.js";import"./index-99h8sS2h.js";const p=[{value:"primary",label:"Primary database",group:"Live"},{value:"reporting",label:"Reporting database",group:"Live"},{value:"archive",label:"Archive database",group:"Historical"}],w={title:"Components/Combobox/Menu filter",component:s,parameters:{docs:{description:{component:"Set searchPlacement to menu to show a compact selection button with filtering inside its grouped popup. Typing leaves the selection unchanged; choose an option to commit, or dismiss to discard the search."}}}},e={render:()=>{const[n,i]=m.useState("primary");return a.jsx("div",{className:"w-64",children:a.jsx(s,{ariaLabel:"Database",searchPlacement:"menu",options:p,value:n,onChange:i,allowCustomValue:!1})})}};var o,t,r;e.parameters={...e.parameters,docs:{...(o=e.parameters)==null?void 0:o.docs,source:{originalSource:`{
+  render: () => {
+    const [value, setValue] = useState("primary");
+    return <div className="w-64">
+        <Combobox ariaLabel="Database" searchPlacement="menu" options={OPTIONS} value={value} onChange={setValue} allowCustomValue={false} />
+      </div>;
+  }
+}`,...(r=(t=e.parameters)==null?void 0:t.docs)==null?void 0:r.source}}};const P=["Grouped"];export{e as Grouped,P as __namedExportsOrder,w as default};
