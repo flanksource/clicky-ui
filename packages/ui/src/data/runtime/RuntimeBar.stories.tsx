@@ -162,7 +162,7 @@ export const NarrowContainer: Story = {
       within(document.body)
         .getAllByRole("menuitem")
         .map((item) => item.textContent),
-    ).toEqual(["Timeout", "Budget", "Effort"]);
+    ).toEqual(["Effort", "Budget", "Timeout"]);
     await userEvent.keyboard("{Escape}");
   },
 };
@@ -251,10 +251,10 @@ export const Combo: Story = {
     const body = within(document.body);
     await expect(canvas.getByTitle("Runtime mode — CLI")).toBeInTheDocument();
     await userEvent.click(canvas.getByTitle("Model — openai/gpt-5-codex"));
-    const menu = await body.findByRole("menu", { name: "Model" });
-    await expect(within(menu).getByLabelText("Model id")).toBeInTheDocument();
+    const listbox = await body.findByRole("listbox", { name: "Model" });
+    await expect(body.getByLabelText("Search Model")).toBeInTheDocument();
     await userEvent.click(
-      within(menu).getByRole("menuitem", { name: /^Claude Sonnet/ }),
+      within(listbox).getByRole("option", { name: /^Claude Sonnet/ }),
     );
     await expect(canvas.getByTitle("Runtime mode — CLI")).toBeInTheDocument();
     await expect(
@@ -290,10 +290,15 @@ export const NoModelsForFamily: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
+    const body = within(document.body);
+
     await userEvent.click(canvas.getByTitle("Model — unspecified"));
     await userEvent.type(
-      await within(document.body).findByLabelText("Model id"),
+      await body.findByLabelText("Search Model"),
       "gemini-3-pro",
+    );
+    await userEvent.click(
+      await body.findByRole("option", { name: "Use custom: gemini-3-pro" }),
     );
 
     await expect(canvas.getByTitle("Model — gemini-3-pro")).toBeInTheDocument();
@@ -316,7 +321,7 @@ export const SwitchingFamilyKeepsTheMode: Story = {
       canvas.getByTitle("Model — anthropic/claude-opus-4-1"),
     );
     await userEvent.click(
-      await body.findByRole("menuitem", { name: /^GPT-5 Codex/ }),
+      await body.findByRole("option", { name: /^GPT-5 Codex/ }),
     );
 
     await expect(canvas.getByTitle("Runtime mode — CLI")).toHaveTextContent(

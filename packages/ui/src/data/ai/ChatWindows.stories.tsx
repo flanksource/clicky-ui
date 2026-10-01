@@ -129,10 +129,8 @@ export const MultiWindow: Story = {
     const canvas = within(canvasElement);
     await waitFor(() =>
       expect(
-        canvas.getByRole("button", {
-          name: "Runtime: Claude, API, Claude Sonnet 4.5, effort Medium",
-        }),
-      ).toBeInTheDocument(),
+        canvas.getByRole("combobox", { name: "Model" }),
+      ).toHaveTextContent("Claude Sonnet 4.5"),
     );
   },
 };
