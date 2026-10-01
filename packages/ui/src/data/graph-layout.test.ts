@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ringLayout, routeEdges, type GraphLayoutPosition } from "./graph-layout";
+import { ringLayout, routeEdges, spreadLabels, type GraphLayoutPosition } from "./graph-layout";
 
 function distance(a: GraphLayoutPosition, b: GraphLayoutPosition): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -162,5 +162,31 @@ describe("routeEdges", () => {
     expect(() => routeEdges([{ id: "bad-edge", from: "a", to: "missing" }], positions, dims)).toThrow(
       /bad-edge/,
     );
+  });
+});
+
+describe("spreadLabels", () => {
+  const size = { width: 80, height: 18 };
+
+  it("pushes a label down until it clears every label it would cover, leaving the rest in place", () => {
+    const ys = spreadLabels([
+      { id: "first", x: 100, y: 100, ...size },
+      // Covers `first` (60–140 against 80–160), so it drops one row: 100 + 18 + 2.
+      { id: "covering", x: 120, y: 105, ...size },
+      { id: "elsewhere", x: 400, y: 102, ...size },
+      // Starts at 150, clear of `first` but under the moved `covering`, so it drops below that.
+      { id: "chained", x: 150, y: 110, anchor: "start", ...size },
+    ]);
+
+    expect(ys).toEqual({ first: 100, covering: 120, elsewhere: 102, chained: 140 });
+  });
+
+  it("leaves labels that only touch horizontally where they are", () => {
+    const ys = spreadLabels([
+      { id: "left", x: 100, y: 50, ...size },
+      { id: "right", x: 180, y: 50, ...size },
+    ]);
+
+    expect(ys).toEqual({ left: 50, right: 50 });
   });
 });
