@@ -1,21 +1,26 @@
 import { UiChevronDown, UiChevronRight } from "../../icons";
 import { cn } from "../../lib/utils";
 import { Icon } from "../Icon";
+import type { BadgePolicy } from "./ToolPreferences.model";
+import { ModeBadge } from "./ToolPreferencesList";
 
 export function ToolDirectoryHeader({
   label,
   count,
   open,
   variant,
+  mode,
   onToggle,
-  onAdd,
+  onCycle,
 }: {
   label: string;
   count: number;
   open: boolean;
   variant: "section" | "child";
+  mode?: BadgePolicy | undefined;
   onToggle: () => void;
-  onAdd?: (() => void) | undefined;
+  /** Click-to-toggle policy for every tool under this directory. */
+  onCycle?: (() => void) | undefined;
 }) {
   return (
     <div className="flex min-w-0 flex-1 items-stretch">
@@ -28,16 +33,13 @@ export function ToolDirectoryHeader({
           variant === "child" && "text-foreground/80 hover:bg-accent/50",
         )}
       >
-        <Icon
-          icon={open ? UiChevronDown : UiChevronRight}
-          className="size-3"
-        />
+        <Icon icon={open ? UiChevronDown : UiChevronRight} className="size-3" />
       </button>
       <button
         type="button"
-        aria-label={`${label} ${count}${onAdd ? " · Add strategy" : ""}`}
-        title={onAdd ? `Add an Ask strategy for ${label}` : undefined}
-        onClick={onAdd ?? onToggle}
+        aria-label={onCycle ? `Toggle ${label} group` : `${label} ${count}`}
+        title={onCycle ? `Cycle all ${count} tools in ${label}` : undefined}
+        onClick={onCycle ?? onToggle}
         className={cn(
           "flex min-w-0 flex-1 items-center gap-1 pr-2 text-left text-muted-foreground hover:bg-muted",
           variant === "section"
@@ -46,14 +48,10 @@ export function ToolDirectoryHeader({
         )}
       >
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        {onAdd && (
-          <span className="text-[9px] font-semibold normal-case tracking-normal text-muted-foreground/70">
-            Add
-          </span>
-        )}
         <span className="tabular-nums text-[10px] text-muted-foreground/70">
           {count}
         </span>
+        {mode && <ModeBadge mode={mode} />}
       </button>
     </div>
   );

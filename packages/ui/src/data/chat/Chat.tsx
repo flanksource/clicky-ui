@@ -222,6 +222,7 @@ export function Chat({
   );
   const [usage, setUsage] = useState<ChatUsageSummary | null>(null);
   const [approvalError, setApprovalError] = useState<Error | undefined>();
+  const [approvalsInFlight, setApprovalsInFlight] = useState(0);
   const lastDefaultModel = useRef(defaultModel);
   const [draft, setDraft] = useState<{ id: number; text: string } | null>(null);
   const seededInitialPromptId = useRef<number | null>(null);
@@ -456,6 +457,7 @@ export function Chat({
   ) => {
     const approvalThreadId = threadId;
     setApprovalError(undefined);
+    setApprovalsInFlight((count) => count + 1);
     try {
       if (!sessionsApi) {
         throw new Error(
@@ -481,6 +483,8 @@ export function Chat({
       setApprovalError(
         cause instanceof Error ? cause : new Error(String(cause)),
       );
+    } finally {
+      setApprovalsInFlight((count) => count - 1);
     }
   };
 
@@ -537,11 +541,10 @@ export function Chat({
             : runtime.model
               ? { model: runtime.model }
               : {})}
+          suppressWaiting={approvalsInFlight > 0}
           emptyState={empty}
           onRegenerate={(messageId) => void regenerate({ messageId })}
-          onApprove={(id, approved, reason) =>
-            void resolveToolApproval(id, approved, reason)
-          }
+          onApprove={resolveToolApproval}
           {...(renderToolResult ? { renderToolResult } : {})}
         />
         <div className="flex flex-col gap-2 p-4 pt-0">

@@ -6,6 +6,7 @@ import { runtimeModelForValue } from "./RuntimeBar.model";
 import {
   modelsForFamily,
   runtimeModeFromModel,
+  runtimeModeIcon,
   type SpecRuntimeFamily,
 } from "./runtime-mode";
 
@@ -15,7 +16,10 @@ export function runtimeModes(families: SpecRuntimeFamily[]) {
       families
         .flatMap((family) => family.modes)
         .filter((mode) => !isUnavailable(mode.availability))
-        .map((mode) => [mode.id, mode]),
+        .map((mode) => {
+          const icon = mode.icon ?? runtimeModeIcon(mode.id);
+          return [mode.id, icon ? { ...mode, icon } : mode] as const;
+        }),
     ).values(),
   ];
 }

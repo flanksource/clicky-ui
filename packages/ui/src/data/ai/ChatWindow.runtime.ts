@@ -123,9 +123,6 @@ export function useChatWindowRuntime({
     },
     [chat],
   );
-  const handleTemperatureChange = useCallback((next: number | undefined) => {
-    setRuntime((current) => withRuntimeField(current, "temperature", next));
-  }, []);
   const replaceRuntimeIdentity = useCallback((identity: ChatModelRuntime) => {
     setRuntime((current) => {
       const next: ChatModelRuntime = { ...current };
@@ -145,12 +142,10 @@ export function useChatWindowRuntime({
     runtime,
     model,
     reasoningEffort,
-    temperature: runtime.temperature,
     reasoningEfforts,
     handleRuntimeChange,
     handleModelChange,
     handleReasoningEffortChange,
-    handleTemperatureChange,
     replaceRuntimeIdentity,
     replaceRuntime,
   };

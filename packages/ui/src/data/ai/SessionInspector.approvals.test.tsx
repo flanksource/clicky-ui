@@ -121,6 +121,26 @@ describe("SessionApprovalsPanel", () => {
     expect(onResolve).toHaveBeenCalledWith("approval-1", "deny", undefined);
   });
 
+  it("shows submission progress on the clicked button instead of a separate line", async () => {
+    let settle!: () => void;
+    const onResolve = vi.fn(() => new Promise<void>((resolve) => { settle = resolve; }));
+    render(
+      <SessionApprovalsPanel
+        approvals={undefined}
+        requests={[pendingRequest()]}
+        onResolve={onResolve}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+
+    expect(screen.getByRole("button", { name: "Approve" })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "Deny" })).toBeDisabled();
+    expect(screen.queryByText("Submitting…")).not.toBeInTheDocument();
+    settle();
+    await vi.waitFor(() => expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled());
+  });
+
   it("surfaces a rejected onResolve as a visible refusal message", async () => {
     const onResolve = vi
       .fn()

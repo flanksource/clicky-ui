@@ -188,10 +188,95 @@ export function toolPolicyFromPreferences(
     if (policy) policies.set(key, policy);
   }
   const ordered = [...policies.keys()];
-  return [
+  return consolidateRules([
     ...ordered.map((key) => ({ group: key, policy: policies.get(key)! })),
     ...ordered.map((key) => ({ name: key, policy: policies.get(key)! })),
-  ];
+  ]);
+}
+
+type ExactFacet = "name" | "group";
+
+/** The exact names or groups a rule selects by, when it selects by nothing
+ *  else. Wildcards are excluded: they can overlap anything. */
+function exactSelection(
+  rule: PermissionRule,
+): { facet: ExactFacet; values: string[] } | undefined {
+  const facets = Object.keys(rule).filter(
+    (key) =>
+      key !== "policy" && rule[key as keyof PermissionRule] !== undefined,
+  );
+  if (facets.length !== 1) return undefined;
+  const facet = facets[0];
+  if (facet !== "name" && facet !== "group") return undefined;
+  const patterns = rule[facet]!;
+  const values = typeof patterns === "string" ? [patterns] : [...patterns];
+  if (values.length === 0 || values.some((value) => value.includes("*"))) {
+    return undefined;
+  }
+  return { facet, values };
+}
+
+/** Folds exact-name and exact-group rules that share an action into one
+ *  in-clause, so a list of per-tool toggles reads as a few strategies.
+ *
+ *  Evaluation is last-match-wins, so this keeps behaviour identical: an exact
+ *  value's earlier occurrences are dropped (the later one already wins), and
+ *  values merge only within a contiguous run of exact rules on the same facet,
+ *  which are disjoint by construction. Any other rule ends the run, because
+ *  moving a value past it could change which rule matches last. */
+export function consolidateRules(rules: PermissionPolicy): PermissionPolicy {
+  const seen = new Set<string>();
+  const live = [...rules]
+    .reverse()
+    .flatMap((rule): PermissionPolicy => {
+      const exact = exactSelection(rule);
+      if (!exact) return [rule];
+      const values = exact.values.filter((value) => {
+        const key = `${exact.facet}\u0000${value.toLowerCase()}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      return values.length > 0
+        ? [{ [exact.facet]: values, policy: rule.policy }]
+        : [];
+    })
+    .reverse();
+
+  const merged: Array<{
+    facet?: ExactFacet;
+    values: string[];
+    rule: PermissionRule;
+  }> = [];
+  let run = new Map<ToolPolicy, (typeof merged)[number]>();
+  let runFacet: ExactFacet | undefined;
+  for (const rule of live) {
+    const exact = exactSelection(rule);
+    if (exact?.facet !== runFacet || !exact) {
+      run = new Map();
+      runFacet = exact?.facet;
+    }
+    if (!exact) {
+      merged.push({ values: [], rule });
+      continue;
+    }
+    const bucket = run.get(rule.policy);
+    if (bucket) {
+      bucket.values.push(...exact.values);
+      continue;
+    }
+    const entry = { facet: exact.facet, values: [...exact.values], rule };
+    run.set(rule.policy, entry);
+    merged.push(entry);
+  }
+  return merged.map(({ facet, values, rule }) =>
+    facet
+      ? {
+          [facet]: values.length === 1 ? values[0] : values,
+          policy: rule.policy,
+        }
+      : rule,
+  );
 }
 
 /** Appends `later` onto `earlier`, the later winning. Composition rather than
