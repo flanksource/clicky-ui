@@ -11,6 +11,7 @@ import {
   isTypedToolPart,
   isReasoningPart,
   isFilePart,
+  toolPartParentId,
   type AnyToolPart,
   type ToolResultRenderer,
 } from "./types";
@@ -52,6 +53,7 @@ export function Message({
     .filter((p) => p.type === "text")
     .map((p) => (p as { text: string }).text)
     .join("");
+  const { subcalls, nested } = groupSubagentCalls(message.parts);
 
   return (
     <div
@@ -68,15 +70,18 @@ export function Message({
             "rounded-lg bg-secondary px-4 py-3 text-secondary-foreground",
         )}
       >
-        {message.parts.map((part, i) => (
-          <MessagePart
-            key={`${message.id}-${i}`}
-            part={part}
-            isUser={isUser}
-            onApprove={onApprove}
-            renderToolResult={renderToolResult}
-          />
-        ))}
+        {message.parts.map((part, i) =>
+          nested.has(part) ? null : (
+            <MessagePart
+              key={`${message.id}-${i}`}
+              part={part}
+              isUser={isUser}
+              onApprove={onApprove}
+              renderToolResult={renderToolResult}
+              subcalls={isToolPart(part) ? subcalls.get(part.toolCallId) : undefined}
+            />
+          ),
+        )}
       </div>
 
       {!isUser && text && (
@@ -89,6 +94,30 @@ export function Message({
       )}
     </div>
   );
+}
+
+type MessagePartValue = UIMessage["parts"][number];
+
+function isToolPart(part: MessagePartValue): part is AnyToolPart {
+  return isDynamicToolPart(part) || isTypedToolPart(part);
+}
+
+/** Groups a subagent's tool calls under the call that spawned it. A call whose
+ *  parent is not in this message (e.g. a resumed turn) stays top-level. */
+function groupSubagentCalls(parts: UIMessage["parts"]) {
+  const callIds = new Set(
+    parts.filter(isToolPart).map((part) => part.toolCallId),
+  );
+  const subcalls = new Map<string, AnyToolPart[]>();
+  const nested = new Set<MessagePartValue>();
+  for (const part of parts) {
+    if (!isToolPart(part)) continue;
+    const parent = toolPartParentId(part);
+    if (!parent || !callIds.has(parent)) continue;
+    subcalls.set(parent, [...(subcalls.get(parent) ?? []), part]);
+    nested.add(part);
+  }
+  return { subcalls, nested };
 }
 
 function ForkSeedMessage({
@@ -131,11 +160,13 @@ function MessagePart({
   isUser,
   onApprove,
   renderToolResult,
+  subcalls,
 }: {
-  part: UIMessage["parts"][number];
+  part: MessagePartValue;
   isUser: boolean;
   onApprove: MessageActionHandlers["onApprove"];
   renderToolResult: MessageActionHandlers["renderToolResult"];
+  subcalls: AnyToolPart[] | undefined;
 }) {
   if (part.type === "text") {
     if (isUser) {
@@ -151,11 +182,12 @@ function MessagePart({
   if (isFilePart(part)) {
     return <MessageFilePart part={part} />;
   }
-  if (isDynamicToolPart(part) || isTypedToolPart(part)) {
+  if (isToolPart(part)) {
     return (
       <ToolCall
-        part={part as AnyToolPart}
+        part={part}
         onApprove={onApprove}
+        subcalls={subcalls}
         {...(renderToolResult ? { renderToolResult } : {})}
       />
     );

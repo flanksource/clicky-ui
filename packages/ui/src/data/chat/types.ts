@@ -360,6 +360,14 @@ export function toolPartName(part: AnyToolPart): string {
   return part.type.slice("tool-".length);
 }
 
+/** The tool call that spawned the subagent which made this call, from the
+ *  part's `toolMetadata.parentToolCallId`; undefined for the main thread's own
+ *  calls. */
+export function toolPartParentId(part: AnyToolPart): string | undefined {
+  const parent = part.toolMetadata?.["parentToolCallId"];
+  return typeof parent === "string" && parent !== "" ? parent : undefined;
+}
+
 export interface ToolResultRenderArgs {
   part: AnyToolPart;
   toolName: string;
