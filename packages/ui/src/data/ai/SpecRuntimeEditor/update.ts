@@ -108,7 +108,9 @@ export function withSandbox(
 ): AISpecRuntimeValue {
   const next: AISpecRuntimeSandbox = { ...sandboxRef(value), ...patch };
   if (!next.mode) {
-    throw new Error("sandbox.mode is required before configuring sandbox settings");
+    throw new Error(
+      "sandbox.mode is required before configuring sandbox settings",
+    );
   }
   return withRoot(value, { sandbox: next });
 }
@@ -267,14 +269,21 @@ export function withCommitPhase(
 }
 
 // A stanza with no explicit phase commits at the end of the run, matching
-// api.Commit.Phase()'s default.
+// api.Commit.Phase()'s default. Shared between a value's own first commit
+// stanza and an inherited stanza the section displays in its place.
+export function commitPhaseFromEntry(
+  commit: SpecCommit | undefined,
+): SpecCommitPhase {
+  const on = commit?.on;
+  return on === "turn" || on === "agent" ? on : "run";
+}
+
 export function commitPhase(
   value: AISpecRuntimeValue,
 ): SpecCommitPhase | "none" {
   const commits = value.workflow?.commits;
   if (!commits?.length) return "none";
-  const on = commits[0]?.on;
-  return on === "turn" || on === "agent" ? on : "run";
+  return commitPhaseFromEntry(commits[0]);
 }
 
 // Mode switches clear the fields that no longer apply, so stale values from a
@@ -311,10 +320,14 @@ export function withWorktreeMode(
       keep: false,
     });
   }
+  const next =
+    value.workflow?.commits === undefined
+      ? withCommitPhase(value, "turn")
+      : value;
   if (mode === "existing") {
-    return withWorktree(value, { mode, prefix: "", base: "", keep: false });
+    return withWorktree(next, { mode, prefix: "", base: "", keep: false });
   }
-  return withWorktree(value, { mode });
+  return withWorktree(next, { mode });
 }
 
 export function withStashMode(

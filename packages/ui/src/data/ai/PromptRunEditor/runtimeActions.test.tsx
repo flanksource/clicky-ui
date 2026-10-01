@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { UiShield } from "../../../icons";
 import type { DropdownMenuItem } from "../../../overlay/DropdownMenu";
 import { UNSPECIFIED_HINT, UNSPECIFIED_LABEL } from "../../runtime/unspecified";
 import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
@@ -52,6 +53,17 @@ function labels(items: DropdownMenuItem[]): string[] {
 }
 
 describe("permissionField", () => {
+  it("shows the permissions shield when no posture is supplied", () => {
+    const field = permissionField({
+      spec: { mode: "cli" },
+      families: families(PLAN_AND_DEFAULT),
+      onChange: vi.fn(),
+    });
+
+    expect(field?.icon).toBe(UiShield);
+    expect(field?.isSet).toBe(false);
+  });
+
   it("offers only the postures the runtime's schema publishes, led by Unspecified", () => {
     const field = permissionField({
       spec: { mode: "cli" },

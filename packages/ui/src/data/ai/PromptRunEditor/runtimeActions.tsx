@@ -1,9 +1,10 @@
-import { UiSliders } from "../../../icons";
+import { UiShield, UiSliders } from "../../../icons";
 import { cn } from "../../../lib/utils";
 import type { DropdownMenuItem } from "../../../overlay/DropdownMenu";
 import { presetForRef } from "../../../lib/runtime-profile-model";
 import { Icon } from "../../Icon";
 import type { RuntimeBarAction } from "../../runtime/RuntimeBarActions";
+import type { ChatModel } from "../../chat/types";
 import {
   SEGMENT_CAPTION_CLASS,
   SEGMENT_KEY_CLASS,
@@ -11,6 +12,7 @@ import {
 } from "../../runtime/RuntimeBarSegment";
 import {
   familyForMode,
+  familyForModel,
   modeOptionFor,
   type SpecRuntimeFamily,
 } from "../../runtime/runtime-mode";
@@ -48,16 +50,24 @@ export function permissionField({
   spec,
   families,
   effectiveMode,
+  effectiveModel,
   onChange,
+  models = [],
 }: {
   spec: AISpecRuntimeValue;
   families: SpecRuntimeFamily[];
   effectiveMode?: string | undefined;
+  effectiveModel?: string | undefined;
   onChange: (spec: AISpecRuntimeValue) => void;
+  models?: ChatModel[];
 }): RuntimeBarAction | undefined {
   const specMode = spec.mode?.trim() || effectiveMode?.trim();
-  const runtime = specMode ? modeOptionFor(families, specMode) : undefined;
-  const family = specMode ? familyForMode(families, specMode) : undefined;
+  const family =
+    familyForModel(families, models, spec.model ?? spec.id ?? effectiveModel) ??
+    (specMode ? familyForMode(families, specMode) : undefined);
+  const runtime = specMode
+    ? modeOptionFor(families, specMode, family?.id)
+    : undefined;
   const available = publishedPermissionModes(runtime?.schema);
   const published = SPEC_PERMISSION_MODES.filter((mode) =>
     available.includes(mode),
@@ -82,7 +92,7 @@ export function permissionField({
 
   const runtimeLabel = runtime
     ? `${family?.label ?? specMode} ${runtime.label}`
-    : (specMode ?? "the current runtime");
+    : specMode ?? "the current runtime";
   const currentVisual = current
     ? permissionModeVisual(family?.id, current)
     : undefined;
@@ -91,8 +101,10 @@ export function permissionField({
 
   return {
     id: "permissions.mode",
+    isSet: current !== undefined,
     label: PERMISSION_GROUP,
-    ...(currentVisual?.icon ? { icon: currentVisual.icon } : {}),
+    icon: UiShield,
+    iconClassName: "text-muted-foreground",
     title: unpublished
       ? `${PERMISSION_GROUP} — ${currentVisual?.label} is not available for ${runtimeLabel}`
       : `${PERMISSION_GROUP} — ${currentVisual?.label ?? UNSPECIFIED_NAME}`,
@@ -147,6 +159,7 @@ export function permissionField({
             />
           ),
           icon: visual.icon,
+          iconClassName: sessionTone(visual.tone).text,
           onSelect: () => select(mode),
         };
       }),
@@ -163,6 +176,7 @@ export function permissionField({
                 />
               ),
               icon: permissionModeVisual(family?.id, current).icon,
+              iconClassName: "text-destructive",
               disabled: true,
               onSelect: () => {},
             },
@@ -188,7 +202,10 @@ export function presetsField({
   onChange: (next: string[]) => void;
   onReorder: () => void;
 }): RuntimeBarAction {
-  const rows = value.map((ref) => ({ ref, preset: presetForRef(ref, presets) }));
+  const rows = value.map((ref) => ({
+    ref,
+    preset: presetForRef(ref, presets),
+  }));
   const names = rows.map(({ ref, preset }) => preset?.name ?? ref);
   const missing = rows.some(({ preset }) => !preset);
 
@@ -205,8 +222,10 @@ export function presetsField({
 
   return {
     id: "presets",
+    isSet: value.length > 0,
     label: PRESETS_GROUP,
-    title: names.length > 0 ? `Presets — ${names.join(", ")}` : "Presets — none",
+    title:
+      names.length > 0 ? `Presets — ${names.join(", ")}` : "Presets — none",
     caption: (
       <>
         <span className={cn(SEGMENT_KEY_CLASS, "min-w-0 truncate")}>

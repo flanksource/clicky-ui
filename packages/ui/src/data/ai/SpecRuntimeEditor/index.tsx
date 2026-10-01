@@ -3,6 +3,7 @@ import { cn } from "../../../lib/utils";
 import type { ChatModel, ToolMeta } from "../../chat/types";
 import type { FixtureFenceSchemas } from "../../FixtureEditor/types";
 import type {
+  AISpecRuntimeCommit,
   AISpecRuntimePermissionCatalog,
   AISpecRuntimeValue,
 } from "../SpecRuntimeEditor.model";
@@ -118,6 +119,13 @@ export type SpecRuntimeEditorProps = {
   beforeSections?: ReactNode | undefined;
   /** Sections that should start collapsed in embedded contexts. */
   defaultCollapsedSections?: readonly SpecSectionId[] | undefined;
+  /**
+   * Commit stanza(s) inherited from a lower spec layer (e.g. the lifecycle
+   * step's own workflow), shown in the Commit section as the current
+   * selection — clearly marked inherited — only while the operator has not
+   * set `value.workflow.commits` at all.
+   */
+  inheritedCommits?: AISpecRuntimeCommit[] | undefined;
   /** Restrict task-owned fields when editing a reusable preset fragment. */
   variant?: "run" | "preset" | undefined;
   /** Renders the sticky footer's save action when set. */
@@ -170,6 +178,7 @@ export function SpecRuntimeEditor({
   showHeader = true,
   beforeSections,
   defaultCollapsedSections,
+  inheritedCommits,
   variant = "run",
   onSave,
   onCancel,
@@ -355,7 +364,13 @@ export function SpecRuntimeEditor({
           />
         );
       case "commit":
-        return <CommitSection value={value} onChange={commitChange} />;
+        return (
+          <CommitSection
+            value={value}
+            onChange={commitChange}
+            {...(inheritedCommits ? { inheritedCommits } : {})}
+          />
+        );
       case "cli":
         return cliOptions ? (
           <CLIArgsSection

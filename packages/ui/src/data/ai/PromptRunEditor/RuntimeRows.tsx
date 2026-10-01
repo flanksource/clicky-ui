@@ -69,9 +69,7 @@ export function RuntimeRows({
           showTimeout
           showCost
           ariaLabel="Runtime 1 controls"
-          {...(actions
-            ? { actions: <RuntimeBarActions {...actions} inline={wider} /> }
-            : {})}
+          {...(actions ? { actions } : {})}
         />
       </div>
     );
@@ -94,7 +92,9 @@ export function RuntimeRows({
               onChange(
                 withRuntimeRows(
                   value,
-                  rows.map((item, itemIndex) => (itemIndex === index ? next : item)),
+                  rows.map((item, itemIndex) =>
+                    itemIndex === index ? next : item,
+                  ),
                 ),
               )
             }
@@ -128,7 +128,10 @@ export function RuntimeRows({
         aria-label="Add runtime"
         onClick={() =>
           onChange(
-            withRuntimeRows(value, [...rows, rows[0]?.mode ? { mode: rows[0].mode } : {}]),
+            withRuntimeRows(value, [
+              ...rows,
+              rows[0]?.mode ? { mode: rows[0].mode } : {},
+            ]),
           )
         }
       >

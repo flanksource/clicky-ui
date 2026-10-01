@@ -1,7 +1,15 @@
 import type { ChatModel } from "../../chat/types";
-import type { AISpecRuntimeValue } from "../SpecRuntimeEditor.model";
+import type {
+  AISpecRuntimeCommit,
+  AISpecRuntimeValue,
+} from "../SpecRuntimeEditor.model";
 import { UNSPECIFIED_LABEL } from "../../runtime/unspecified";
-import { checkoutMode, commitPhase, worktreeMode } from "./update";
+import {
+  checkoutMode,
+  commitPhase,
+  commitPhaseFromEntry,
+  worktreeMode,
+} from "./update";
 import { isDenyMode, type PermissionListEntry } from "./permissions-model";
 
 export function summarizeModel(
@@ -97,7 +105,36 @@ const COMMIT_PHASE_SUMMARIES = {
   run: "Commit changes",
 } as const;
 
-export function summarizeCommit(value: AISpecRuntimeValue): string {
+// Matches the CommitSection phase select's own option labels, since this is
+// the vocabulary the section reads back to the operator as "what's selected"
+// rather than the free-standing summary line's own copy.
+const COMMIT_PHASE_SELECT_LABELS = {
+  turn: "Every turn",
+  agent: "After the loop",
+  run: "End of run",
+} as const;
+
+/**
+ * Reads back the effective commit intent: the operator's own policy, or —
+ * only while `workflow.commits` is entirely unset and `inheritedCommits` is
+ * non-empty — the inherited stanza from a lower spec layer, clearly marked so
+ * it never reads as "the operator chose this".
+ */
+export function summarizeCommit(
+  value: AISpecRuntimeValue,
+  inheritedCommits?: AISpecRuntimeCommit[] | undefined,
+): string {
+  const operatorSet = value.workflow?.commits !== undefined;
+  const inherited = operatorSet ? undefined : inheritedCommits?.[0];
+  if (inherited) {
+    const parts = [
+      COMMIT_PHASE_SELECT_LABELS[commitPhaseFromEntry(inherited)],
+      "inherited",
+    ];
+    if (inherited.stage) parts.push(inherited.stage);
+    if (inherited.gates) parts.push(`${inherited.gates} gates`);
+    return parts.join(" · ");
+  }
   const phase = commitPhase(value);
   const summary = COMMIT_PHASE_SUMMARIES[phase];
   return value.workflow?.commits?.[0]?.dryRun

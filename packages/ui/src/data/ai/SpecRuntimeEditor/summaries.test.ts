@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { AISpecRuntimeValue } from "../SpecRuntimeEditor.model";
+import type {
+  AISpecRuntimeCommit,
+  AISpecRuntimeValue,
+} from "../SpecRuntimeEditor.model";
 import {
   buildPermissionCatalog,
   specPermissionEntries,
@@ -147,6 +150,28 @@ describe("summaries", () => {
     expect(summarizeCommit({ workflow: { commits: [{ on: "turn" }] } })).toBe(
       "Commit every turn",
     );
+  });
+
+  it("summarizes an inherited commit policy until the operator sets one explicitly", () => {
+    const inherited: AISpecRuntimeCommit[] = [
+      { on: "run", stage: "worktree", gates: "full" },
+    ];
+    // Empty operator value + a non-empty inherited policy: the summary names
+    // the inherited phase, marks it inherited, and surfaces stage/gates.
+    expect(summarizeCommit({}, inherited)).toBe(
+      "End of run · inherited · worktree · full gates",
+    );
+    // An empty inherited list is not "non-empty", so it never overrides the
+    // operator's own (unset) reading.
+    expect(summarizeCommit({}, [])).toBe("Leave uncommitted");
+    // Once the operator has set workflow.commits (even to an empty list),
+    // their value wins over anything inherited.
+    expect(summarizeCommit({ workflow: { commits: [] } }, inherited)).toBe(
+      "Leave uncommitted",
+    );
+    expect(
+      summarizeCommit({ workflow: { commits: [{ on: "turn" }] } }, inherited),
+    ).toBe("Commit every turn");
   });
 
   it("summarizes cli args by set-flag count", () => {
