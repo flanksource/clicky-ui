@@ -223,6 +223,7 @@ describe("ProfileFieldEditorForm filter segments", () => {
       "Auto",
       "Off",
       "Value list",
+      "Pattern list",
       "Exact match",
       "Text search",
       "Numeric range",
@@ -253,6 +254,26 @@ describe("ProfileFieldEditorForm filter segments", () => {
     expect(
       screen.queryByRole("spinbutton", { name: "Values offered" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps a value list's values, lookup and multi when it becomes a pattern list", () => {
+    const { onChange, rerender } = renderSegments({
+      name: "db",
+      type: "string",
+      filter: { kind: "terms", options: ["api*"], limit: 12, multi: true },
+    });
+
+    fireEvent.click(screen.getByRole("radio", { name: "Pattern list" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      filter: { kind: "match", options: ["api*"], limit: 12, multi: true },
+    });
+    rerender({ name: "db", type: "string", filter: { kind: "match" } });
+    expect(
+      screen.getByRole("spinbutton", { name: "Values offered" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("checkbox", { name: "Allow several values at once" }),
+    ).toBeInTheDocument();
   });
 
   it("disables in one click while retaining the prior filter configuration", () => {

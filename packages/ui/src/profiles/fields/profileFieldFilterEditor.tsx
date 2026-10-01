@@ -46,7 +46,7 @@ export function ProfileFieldFilterEditor({
     filter.disabled || filter.kind === "none" ? "off" : filter.kind || "auto";
   const effectiveKind = state === "auto" ? inferredFilterKind(field) : state;
   const enabled = state !== "off" && effectiveKind !== "none";
-  const picksFromAList = effectiveKind === "terms";
+  const picksFromAList = selectsValues(effectiveKind);
   const supportsMultiple = picksFromAList || effectiveKind === "exact";
   const enumerated = (filter.options?.length ?? 0) > 0;
   const looksUp = picksFromAList && !enumerated && (filter.lookup ?? true);
@@ -204,11 +204,18 @@ export function ProfileFieldFilterEditor({
   );
 }
 
+/** Whether kind picks values from a list — values, or the patterns a value
+ *  matches — and so takes options, a lookup and several values at once.
+ *  Mirrors query.ColumnFilterKind.selectsValues. */
+function selectsValues(kind: string): boolean {
+  return kind === "terms" || kind === "match";
+}
+
 function filterForKind(
   filter: ProfileColumnFilter | undefined,
   kind: string,
 ): ProfileColumnFilter | undefined {
-  if (kind === "terms") return filter;
+  if (selectsValues(kind)) return filter;
   if (kind === "exact") {
     return patchColumnFilter(filter, {
       options: undefined,

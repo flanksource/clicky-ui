@@ -13,6 +13,7 @@ import type { ComboboxOption } from "../../components/combobox-types";
 // carry hardcoded IDE colours, which read as stray dots beside a form label.
 import {
   UiActivity,
+  UiAsterisk,
   UiBraces,
   UiCalendar,
   UiChartPie,
@@ -60,6 +61,7 @@ const TYPE_ICONS: Record<string, ReactNode> = {
 // time split legible at a glance.
 const FILTER_KIND_ICONS: Record<string, ReactNode> = {
   terms: <UiListChecks />,
+  match: <UiAsterisk />,
   exact: <UiFingerprint />,
   range: <UiSliders />,
   duration: <UiTimer />,
