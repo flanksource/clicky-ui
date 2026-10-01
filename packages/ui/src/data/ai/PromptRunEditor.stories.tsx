@@ -112,8 +112,16 @@ export const CanonicalRequest: Story = {
     ).not.toBeInTheDocument();
 
     // Permissions and Advanced belong to the spec, so comparison rows share one
-    // actions section rather than repeating it per row.
-    await expect(canvas.getAllByTitle("Runtime options")).toHaveLength(1);
+    // actions section rather than repeating it per row. Each row keeps its own
+    // ⋮ menu for runtime settings such as effort.
+    await expect(
+      canvas
+        .getAllByTitle("Runtime options")
+        .filter(
+          (trigger) =>
+            !trigger.closest('[role="group"][aria-label$=" controls"]'),
+        ),
+    ).toHaveLength(1);
 
     await userEvent.click(canvas.getByRole("radio", { name: "Single model" }));
     await expect(
@@ -129,9 +137,15 @@ export const TabbedSpec: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
+    const controls = canvas.getByRole("group", { name: "Runtime 1 controls" });
+    await userEvent.click(within(controls).getByTitle("Runtime options"));
+    const options = await within(document.body).findByRole("menu", {
+      name: "Runtime options",
+    });
     await expect(
-      canvas.queryByTitle("Runtime options"),
+      within(options).queryByRole("menuitem", { name: "Advanced" }),
     ).not.toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
     await userEvent.click(
       within(canvas.getByRole("list", { name: "Recently used runtimes" })).getByRole("button"),
     );
