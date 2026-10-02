@@ -23,7 +23,7 @@ export type MessageActionHandlers = {
   onRegenerate?: ((messageId: string) => void) | undefined;
   /** Respond to a tool approval request. */
   onApprove?:
-    | ((approvalId: string, approved: boolean, reason?: string) => void)
+    | ((approvalId: string, approved: boolean, reason?: string) => void | Promise<unknown>)
     | undefined;
   /** Optional host renderer for recognized completed tool outputs. */
   renderToolResult?: ToolResultRenderer;

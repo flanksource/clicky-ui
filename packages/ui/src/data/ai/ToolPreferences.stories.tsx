@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
 import { MOCK_MODELS } from "../chat/Chat.fixtures";
-import type { ChatBudgetConfig, ChatUsageSummary } from "../chat/types";
+import type { ChatBudgetConfig } from "../chat/types";
 import {
   ToolPreferences,
   type ClaudePermissionMode,
@@ -175,34 +175,11 @@ const INITIAL_PREFS: Record<string, ToolPolicy> = {
   sync_finance: "ask",
 };
 
+const INITIAL_RULE_COUNT = toolPolicyFromPreferences(INITIAL_PREFS).length;
+
 const INITIAL_BUDGET: ChatBudgetConfig = {
   cost: 0.25,
   maxTokens: 8000,
-};
-
-const SAMPLE_USAGE: ChatUsageSummary = {
-  usedTokens: 14320,
-  maxTokens: 200000,
-  messageCount: 8,
-  modelLabel: "Claude Sonnet 4.5",
-  cost: 0.0382,
-  usage: {
-    inputTokens: 12180,
-    outputTokens: 1440,
-    reasoningTokens: 520,
-    cacheReadTokens: 9400,
-    cacheWriteTokens: 320,
-    totalTokens: 14320,
-  },
-  costBreakdown: {
-    model: "anthropic/claude-sonnet-4-5",
-    inputUsd: 0.01218,
-    outputUsd: 0.0216,
-    reasoningUsd: 0.0021,
-    cacheReadUsd: 0.00188,
-    cacheWriteUsd: 0.00044,
-    totalUsd: 0.0382,
-  },
 };
 
 type ToolPreferencesStoryProps = {
@@ -226,7 +203,6 @@ function ToolPreferencesStory({
   const [reasoningEffort, setReasoningEffort] = useState("medium");
   const [permissionMode, setPermissionMode] =
     useState<ClaudePermissionMode>("default");
-  const [temperature, setTemperature] = useState<number | undefined>(0.4);
   const [budget, setBudget] = useState<ChatBudgetConfig>(INITIAL_BUDGET);
 
   return (
@@ -242,6 +218,8 @@ function ToolPreferencesStory({
           tools={SAMPLE_TOOLS}
           value={prefs}
           onRule={handleRule}
+          rules={rules}
+          onRulesChange={setRules}
           models={MOCK_MODELS}
           model={model}
           onModelChange={setModel}
@@ -250,11 +228,8 @@ function ToolPreferencesStory({
           onReasoningEffortChange={setReasoningEffort}
           permissionMode={permissionMode}
           onPermissionModeChange={setPermissionMode}
-          temperature={temperature}
-          onTemperatureChange={setTemperature}
           budget={budget}
           onBudgetChange={setBudget}
-          usage={SAMPLE_USAGE}
         />
       </div>
       <div className="grid gap-3 pt-4 sm:grid-cols-2">
@@ -271,7 +246,7 @@ function ToolPreferencesStory({
             Budget
           </div>
           <pre className="overflow-auto text-xs">
-            {JSON.stringify({ budget, permissionMode, temperature }, null, 2)}
+            {JSON.stringify({ budget, permissionMode }, null, 2)}
           </pre>
         </div>
       </div>
@@ -308,7 +283,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "AI chat tool-preferences control with a compact grouped dropdown and an Advanced dialog for model settings, group permissions, and tool schemas.",
+          "AI chat tool-preferences control with a click-to-toggle tool tree and an Advanced dialog for runtime settings, costs, and a permissions browser with saved strategies.",
       },
     },
   },
@@ -322,11 +297,9 @@ const meta = {
     reasoningEfforts: { control: false, table: { category: "Model" } },
     reasoningEffort: { control: false, table: { category: "Model" } },
     onReasoningEffortChange: { control: false, table: { category: "Events" } },
-    temperature: { control: false, table: { category: "Generation" } },
-    onTemperatureChange: { control: false, table: { category: "Events" } },
     budget: { control: false, table: { category: "Budget" } },
     onBudgetChange: { control: false, table: { category: "Events" } },
-    usage: { control: false, table: { category: "Usage" } },
+    rules: { control: false, table: { category: "State" } },
     toolsLoading: { control: "boolean", table: { category: "State" } },
     toolsError: { control: "text", table: { category: "State" } },
     className: { control: false, table: { category: "Layout" } },
@@ -339,18 +312,15 @@ type Story = StoryObj<typeof meta>;
 export const Dropdown: Story = {
   render: () => <ToolPreferencesStory />,
   play: async ({ canvasElement, step }) => {
-    await step("opens the grouped dropdown collapsed by default", async () => {
+    await step("opens the tool tree expanded", async () => {
       const { menu } = await openPreferencesMenu(canvasElement);
       const menuView = within(menu);
 
       await expect(menuView.getByText("Tool Preferences")).toBeInTheDocument();
+      // The tree nests groups under their parent surface; ungrouped parents
+      // collect under General, and every level starts open.
       await expect(menuView.getByText("Admin Write")).toBeInTheDocument();
       await expect(menuView.getByText("Xero")).toBeInTheDocument();
-      // Groups start collapsed — tool rows are hidden until the group is expanded.
-      await expect(menuView.queryByText("List Xero accounts")).toBeNull();
-      await userEvent.click(
-        menuView.getByRole("button", { name: "Expand Xero" }),
-      );
       await expect(
         menuView.getByText("List Xero accounts"),
       ).toBeInTheDocument();
@@ -369,26 +339,16 @@ export const AdvancedConfig: Story = {
       const { dialogView } = await openAdvancedDialog(canvasElement);
 
       await expect(dialogView.getByText("Runtime")).toBeInTheDocument();
-      await expect(dialogView.getByText("Generation")).toBeInTheDocument();
-      await expect(dialogView.getByText("Budget")).toBeInTheDocument();
+      // Permission mode and the cost cap live in the integrated runtime bar;
+      // the usage/cost panel and the Generation section are gone from Config.
+      await expect(dialogView.queryByText("Generation")).toBeNull();
       await expect(
-        dialogView.getByText("Usage (last turn)"),
+        dialogView.getByRole("group", { name: "Advanced runtime" }),
       ).toBeInTheDocument();
+      await expect(dialogView.queryByText("Usage (last turn)")).toBeNull();
       await expect(
-        dialogView.getByText("Conversation total"),
-      ).toBeInTheDocument();
-      const select = dialogView.getByRole("combobox", {
-        name: "Permission mode",
-      });
-      await expect(
-        within(select).getByRole("option", { name: "Default" }),
-      ).toBeInTheDocument();
-      await expect(
-        within(select).getByRole("option", { name: "Accept edits" }),
-      ).toBeInTheDocument();
-      await expect(
-        within(select).getByRole("option", { name: "Bypass" }),
-      ).toBeInTheDocument();
+        dialogView.queryByRole("combobox", { name: "Permission mode" }),
+      ).toBeNull();
     });
   },
 };
@@ -396,28 +356,36 @@ export const AdvancedConfig: Story = {
 export const AdvancedPermissions: Story = {
   render: () => <ToolPreferencesStory />,
   play: async ({ canvasElement, step }) => {
-    await step("opens grouped permissions, collapsed by default", async () => {
-      const { dialogView } = await openAdvancedDialog(canvasElement);
+    await step(
+      "shows the tool browser with a collapsed strategy editor",
+      async () => {
+        const { dialogView } = await openAdvancedDialog(canvasElement);
 
+        await userEvent.click(
+          dialogView.getByRole("button", { name: /permissions/i }),
+        );
+        await expect(
+          dialogView.getByPlaceholderText("Search tools"),
+        ).toBeInTheDocument();
+        await expect(dialogView.queryByRole("checkbox")).toBeNull();
+        const strategies = dialogView.getByRole("button", {
+          name: /Permission strategies/,
+        });
+        await expect(strategies).toHaveAttribute("aria-expanded", "false");
+        await expect(
+          dialogView.getByLabelText(`${INITIAL_RULE_COUNT} saved strategies`),
+        ).toBeInTheDocument();
+      },
+    );
+
+    await step("a directory toggle saves one new strategy", async () => {
+      const dialogView = within(await dialog());
       await userEvent.click(
-        dialogView.getByRole("button", { name: /permissions/i }),
-      );
-      await expect(dialogView.getByText("Admin Write")).toBeInTheDocument();
-      await expect(dialogView.getByText("Xero")).toBeInTheDocument();
-      await expect(dialogView.queryByText("List Xero accounts")).toBeNull();
-      await userEvent.click(
-        dialogView.getByRole("button", { name: "Expand Xero" }),
+        dialogView.getByRole("button", { name: "Toggle Knowledge group" }),
       );
       await expect(
-        dialogView.getByText("List Xero accounts"),
+        dialogView.getByLabelText(`${INITIAL_RULE_COUNT + 1} saved strategies`),
       ).toBeInTheDocument();
-      await expect(
-        dialogView.getByText("List Xero contacts"),
-      ).toBeInTheDocument();
-      await userEvent.click(
-        dialogView.getByRole("button", { name: "Collapse Xero" }),
-      );
-      await expect(dialogView.queryByText("List Xero accounts")).toBeNull();
     });
   },
 };
@@ -520,51 +488,42 @@ export const NestedPermissions: Story = {
   render: () => <NestedToolsStory />,
   play: async ({ canvasElement, step }) => {
     await step(
-      "starts collapsed; expanding reveals entity sub-headers",
+      "nests colliding verbs under their entity sub-headers",
       async () => {
         const { dialogView } = await openAdvancedDialog(canvasElement);
         await userEvent.click(
           dialogView.getByRole("button", { name: /permissions/i }),
         );
 
-        // Group headers show, but entity sub-headers and rows stay hidden.
         await expect(
-          dialogView.getByText("Accounting Read"),
+          dialogView.getByRole("button", {
+            name: "Toggle Accounting Read group",
+          }),
         ).toBeInTheDocument();
-        await expect(dialogView.queryByText("Accounts")).toBeNull();
-
-        await userEvent.click(
-          dialogView.getByRole("button", { name: "Expand Accounting Read" }),
-        );
-        // Entity sub-headers appear; their colliding verbs are still collapsed.
-        await expect(dialogView.getByText("Accounts")).toBeInTheDocument();
-        await expect(dialogView.getByText("Contacts")).toBeInTheDocument();
-        await expect(dialogView.queryByText("Get")).toBeNull();
-      },
-    );
-
-    await step(
-      "expanding an entity disambiguates its colliding verbs",
-      async () => {
-        const dialogView = within(await dialog());
-        await userEvent.click(
-          dialogView.getByRole("button", { name: "Expand Accounts" }),
-        );
-        // Only Accounts' verbs so far — Contacts stays collapsed.
-        await expect(dialogView.getAllByText("Get")).toHaveLength(1);
-        await userEvent.click(
-          dialogView.getByRole("button", { name: "Expand Contacts" }),
-        );
-        // The two "Get"/"List" verbs now coexist, each under its own entity.
-        await expect(dialogView.getAllByText("Get")).toHaveLength(2);
-        await expect(dialogView.getAllByText("List")).toHaveLength(2);
+        await expect(
+          dialogView.getByRole("button", { name: "Toggle Accounts group" }),
+        ).toBeInTheDocument();
+        await expect(
+          dialogView.getByRole("button", { name: "Toggle Contacts group" }),
+        ).toBeInTheDocument();
+        // The two "Get"/"List" verbs coexist, each under its own entity.
+        await expect(
+          dialogView.getAllByRole("button", { name: "Get" }),
+        ).toHaveLength(2);
+        await expect(
+          dialogView.getAllByRole("button", { name: "List" }),
+        ).toHaveLength(2);
       },
     );
 
     await step("differing member modes surface as Mixed", async () => {
       const dialogView = within(await dialog());
       // Flip a single Accounts tool so Accounts (and thus the group) disagree.
-      await userEvent.click(dialogView.getByTitle("accounts_get"));
+      await userEvent.click(
+        within(dialogView.getByTitle("accounts_get")).getByRole("button", {
+          name: "Toggle Get",
+        }),
+      );
       expect(readNestedRules(canvasElement)).toEqual([
         { name: "accounts_get", policy: "auto" },
       ]);
@@ -606,7 +565,7 @@ export const AdvancedSchemaBrowser: Story = {
         const { dialogView } = await openAdvancedDialog(canvasElement);
 
         await userEvent.click(
-          dialogView.getByRole("button", { name: /browser/i }),
+          dialogView.getByRole("button", { name: /permissions/i }),
         );
         await expect(
           dialogView.getByPlaceholderText("Search tools"),

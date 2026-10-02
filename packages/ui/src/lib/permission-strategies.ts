@@ -58,20 +58,87 @@ export const STRATEGY_PRESETS: Array<{
   },
 ];
 
-export const MATCH_FIELD_OPTIONS: Array<{ value: MatchField; label: string }> =
-  [
-    { value: "name", label: "Tool name" },
-    { value: "group", label: "Group" },
-    { value: "parent", label: "Parent" },
-    { value: "entity", label: "Entity" },
-    { value: "action", label: "Action" },
-    { value: "verb", label: "Verb" },
-    { value: "method", label: "HTTP method" },
-    { value: "scope", label: "Scope" },
-    { value: "readOnly", label: "Read only" },
-    { value: "destructive", label: "Destructive" },
-    { value: "idempotent", label: "Idempotent" },
-  ];
+export const MATCH_FIELD_OPTIONS: Array<{
+  value: MatchField;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "name",
+    label: "Tool name",
+    description: "The operation's unique id, e.g. todo_create.",
+  },
+  {
+    value: "group",
+    label: "Group",
+    description: "The permission category a tool is filed under.",
+  },
+  {
+    value: "parent",
+    label: "Parent",
+    description: "The surface a tool belongs to, e.g. Contacts.",
+  },
+  {
+    value: "entity",
+    label: "Entity",
+    description: "The resource type the operation acts on.",
+  },
+  {
+    value: "action",
+    label: "Action",
+    description: "The operation's action name within its entity.",
+  },
+  {
+    value: "verb",
+    label: "Verb",
+    description: "What the operation does: get, list, create, delete…",
+  },
+  {
+    value: "method",
+    label: "HTTP method",
+    description: "GET, POST, PATCH or DELETE for HTTP-backed tools.",
+  },
+  {
+    value: "scope",
+    label: "Scope",
+    description: "Whether it acts on one item or a whole collection.",
+  },
+  {
+    value: "readOnly",
+    label: "Read only",
+    description: "Tools that declare they never change anything.",
+  },
+  {
+    value: "destructive",
+    label: "Destructive",
+    description: "Tools that declare they may delete or overwrite data.",
+  },
+  {
+    value: "idempotent",
+    label: "Idempotent",
+    description: "Tools that declare repeating a call is safe.",
+  },
+];
+
+/** A strategy's actual match, e.g. "Tool name in a, b · Destructive is No". */
+export function strategySummary(rule: PermissionRule): string {
+  const preset = strategyPreset(rule);
+  if (preset !== "custom") {
+    return STRATEGY_PRESETS.find((option) => option.value === preset)!.label;
+  }
+  return activeMatchFields(rule)
+    .map((field) => {
+      const label =
+        MATCH_FIELD_OPTIONS.find((option) => option.value === field)?.label ??
+        field;
+      if (isHintField(field)) {
+        return `${label} is ${rule[field] ? "Yes" : "No"}`;
+      }
+      const values = patternValues(rule[field]);
+      return `${label} ${values.length > 1 ? "in" : "is"} ${values.join(", ")}`;
+    })
+    .join(" · ");
+}
 
 export function strategyPreset(rule: PermissionRule): StrategyPreset {
   const fields = activeMatchFields(rule);

@@ -36,7 +36,7 @@ export type CompactToolPreferencesListProps = {
   className?: string | undefined;
 };
 
-function ModeBadge({ mode }: { mode: BadgePolicy }) {
+export function ModeBadge({ mode }: { mode: BadgePolicy }) {
   return (
     <span
       className={cn(
