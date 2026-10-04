@@ -1,4 +1,4 @@
-import { useContext, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { UiCheck, UiChevronDown } from "../../icons";
 import { cn } from "../../lib/utils";
 import {
@@ -6,7 +6,6 @@ import {
   type DropdownMenuItem,
 } from "../../overlay/DropdownMenu";
 import { Icon } from "../Icon";
-import { RuntimeBarVariantContext } from "./RuntimeBar.context";
 
 export const SEGMENT_CAPTION_CLASS =
   "truncate text-xs font-semibold text-foreground";
@@ -38,7 +37,6 @@ export function RuntimeSegment({
   className?: string | undefined;
   children: ReactNode;
 }) {
-  const variant = useContext(RuntimeBarVariantContext);
   return (
     <DropdownMenu
       align="left"
@@ -47,10 +45,7 @@ export function RuntimeSegment({
       {...(header ? { header } : {})}
       menuClassName="max-h-[70vh] min-w-56 max-w-80 overflow-y-auto"
       className={cn(
-        "h-control-h min-w-0 [&>span]:min-w-0 [&>span]:w-full",
-        variant === "combo"
-          ? "rounded-md border border-input bg-background"
-          : "border-l border-border first:border-l-0",
+        "h-control-h min-w-0 border-l border-border first:border-l-0 [&>span]:min-w-0 [&>span]:w-full",
         className,
       )}
       trigger={
