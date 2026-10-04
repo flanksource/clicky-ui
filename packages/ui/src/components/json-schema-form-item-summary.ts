@@ -105,7 +105,12 @@ export function itemSummaryFor({
   const props = itemProperties(itemSchema, obj);
 
   const title =
-    firstNonEmpty((spec.title ?? DEFAULT_TITLE_KEYS).map((key) => text(obj[key]))) ??
+    firstNonEmpty(
+      (spec.title ?? DEFAULT_TITLE_KEYS).map((key) => {
+        const value = text(obj[key]);
+        return value && enumLabel(props[key], value);
+      }),
+    ) ??
     spec.fallback ??
     `Item ${index + 1}`;
 
