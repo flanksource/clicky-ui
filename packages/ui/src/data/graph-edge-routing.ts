@@ -32,6 +32,12 @@ export interface EdgeRoute {
 export interface RouteEdgesDimensions {
   nodeWidth: number;
   nodeHeight: number;
+  /** Heights of the nodes not drawn at `nodeHeight`, by id. */
+  nodeHeights?: Readonly<Record<string, number>>;
+}
+
+function heightOf(dimensions: RouteEdgesDimensions, id: string): number {
+  return dimensions.nodeHeights?.[id] ?? dimensions.nodeHeight;
 }
 
 export interface RouteEdgesOptions {
@@ -240,11 +246,11 @@ function planLoops(
 function loopRoute(
   from: GraphLayoutPosition,
   to: GraphLayoutPosition,
-  options: { self: boolean; index: number; dimensions: RouteEdgesDimensions; plan: LoopPlan },
+  options: { self: boolean; index: number; dimensions: RouteEdgesDimensions; plan: LoopPlan; loopHeight: number },
 ): EdgeRoute {
   const { side, maxReach } = options.plan;
   const halfW = options.dimensions.nodeWidth / 2;
-  const spread = options.self ? options.dimensions.nodeHeight / 4 : 0;
+  const spread = options.self ? options.loopHeight / 4 : 0;
   const startY = from.y - spread;
   const endY = to.y + spread;
   const reach =
@@ -271,10 +277,9 @@ function routeSideGroup(
   routes: Record<string, EdgeRoute>,
 ): void {
   const halfW = dimensions.nodeWidth / 2;
-  const step =
-    group.length > 1
-      ? Math.min(CURVE_OFFSET, (dimensions.nodeHeight - PORT_INSET) / (group.length - 1))
-      : 0;
+  const first = requireEdge(group, 0);
+  const shorter = Math.min(heightOf(dimensions, first.from), heightOf(dimensions, first.to));
+  const step = group.length > 1 ? Math.min(CURVE_OFFSET, Math.max(0, shorter - PORT_INSET) / (group.length - 1)) : 0;
 
   group.forEach((edge, index) => {
     const from = requirePosition(positions, edge.from);
@@ -282,7 +287,7 @@ function routeSideGroup(
     if (isLoop(from, to, dimensions.nodeWidth)) {
       const plan = loops.get(from.x);
       if (!plan) throw new Error(`routeEdges: no loop plan for the column of "${edge.from}"`);
-      routes[edge.id] = loopRoute(from, to, { self: edge.from === edge.to, index, dimensions, plan });
+      routes[edge.id] = loopRoute(from, to, { self: edge.from === edge.to, index, dimensions, plan, loopHeight: heightOf(dimensions, edge.from) });
       return;
     }
     const direction = to.x > from.x ? 1 : -1;

@@ -19,6 +19,11 @@ export interface GraphDiagramNode {
   level?: number;
   /** "columns" layout: nodes sharing a group are stacked together and boxed. */
   group?: string;
+  /**
+   * "columns" layout: "compact" draws the node on one short line at `compactNodeHeight`, its icon and
+   * label only, for a member its group box already names the owner of. Defaults to "regular".
+   */
+  size?: "regular" | "compact";
   /** Dimmed styling, for a node that leads nowhere further: external, unresolved, not expandable. */
   muted?: boolean;
   /** Neighbours not drawn yet. Renders a `+N` control on the node's outer side. */

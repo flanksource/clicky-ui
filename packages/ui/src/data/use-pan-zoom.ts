@@ -26,7 +26,14 @@ export interface PanZoomLimits {
 
 const DEFAULT_LIMITS: PanZoomLimits = { minScale: 0.2, maxScale: 4 };
 const BUTTON_ZOOM_FACTOR = 1.25;
-const WHEEL_ZOOM_RATE = 0.01;
+/** A pinch sends small ctrl-wheel deltas: this rate keeps it tracking the fingers. */
+const PINCH_ZOOM_RATE = 0.01;
+/** A mouse wheel notch is about 100px of delta; this rate makes one notch a button step. */
+const WHEEL_NOTCH_PX = 100;
+const WHEEL_ZOOM_RATE = Math.log(BUTTON_ZOOM_FACTOR) / WHEEL_NOTCH_PX;
+const LINE_PX = 16;
+const DOM_DELTA_LINE = 1;
+const DOM_DELTA_PAGE = 2;
 /** Air kept between overflowing content and the viewport edge when fitting, in content px. */
 const OVERFLOW_MARGIN = 8;
 /** Pointer travel in px before a press becomes a pan rather than a click. */
@@ -95,6 +102,8 @@ export interface UsePanZoomOptions {
   contentHeight: number;
   /** How the content opens, and what `reset()` returns to. `fit()` ignores it and shows everything. */
   opening?: FitOptions;
+  /** What a plain wheel does; defaults to "modifier". See `WheelMode`. */
+  wheel?: WheelMode;
 }
 
 export interface PanZoomViewportHandlers {
@@ -155,27 +164,48 @@ function useViewportResize(viewportRef: ViewportRef, enabled: boolean, refit: ()
   }, [viewportRef, enabled, refit]);
 }
 
+/**
+ * What a plain (unmodified) wheel does over the viewport: "modifier" leaves it to scroll the page
+ * and zooms only on ctrl/meta + wheel or a pinch; "zoom" zooms on every wheel.
+ */
+export type WheelMode = "modifier" | "zoom";
+
+type WheelInput = Pick<WheelEvent, "deltaY" | "deltaMode" | "ctrlKey" | "metaKey">;
+
+/**
+ * The scale factor a wheel event zooms by, or undefined when `mode` leaves it to the page. The
+ * delta is read in pixels whatever its unit, and a plain wheel notch is capped at one button step.
+ */
+export function wheelZoomFactor(event: WheelInput, mode: WheelMode, viewportHeight: number): number | undefined {
+  const modified = event.ctrlKey || event.metaKey;
+  if (!modified && mode === "modifier") return undefined;
+  const unit = event.deltaMode === DOM_DELTA_LINE ? LINE_PX : event.deltaMode === DOM_DELTA_PAGE ? viewportHeight : 1;
+  const pixels = -event.deltaY * unit;
+  if (modified) return Math.exp(pixels * PINCH_ZOOM_RATE);
+  const step = Math.log(BUTTON_ZOOM_FACTOR);
+  return Math.exp(Math.min(step, Math.max(-step, pixels * WHEEL_ZOOM_RATE)));
+}
+
 function useWheelZoom(
   viewportRef: ViewportRef,
   enabled: boolean,
+  mode: WheelMode,
   zoomAt: (point: { x: number; y: number }, factor: number) => void,
 ): void {
   useEffect(() => {
     const viewport = viewportRef.current;
     if (!enabled || !viewport) return;
     const onWheel = (event: WheelEvent) => {
-      if (!event.ctrlKey && !event.metaKey) return;
+      const factor = wheelZoomFactor(event, mode, viewport.clientHeight);
+      if (factor === undefined) return;
       event.preventDefault();
       const rect = viewport.getBoundingClientRect();
-      zoomAt(
-        { x: event.clientX - rect.left, y: event.clientY - rect.top },
-        Math.exp(-event.deltaY * WHEEL_ZOOM_RATE),
-      );
+      zoomAt({ x: event.clientX - rect.left, y: event.clientY - rect.top }, factor);
     };
-    // React registers wheel listeners as passive, which cannot preventDefault the page zoom.
+    // React registers wheel listeners as passive, which cannot preventDefault the page zoom or scroll.
     viewport.addEventListener("wheel", onWheel, { passive: false });
     return () => viewport.removeEventListener("wheel", onWheel);
-  }, [viewportRef, enabled, zoomAt]);
+  }, [viewportRef, enabled, mode, zoomAt]);
 }
 
 function useDragPan(panBy: (dx: number, dy: number) => void): {
@@ -219,13 +249,13 @@ function useDragPan(panBy: (dx: number, dy: number) => void): {
 
 /**
  * Pan and zoom for a fixed-size content box inside a clipping viewport:
- * ctrl/meta + wheel (which is also what a trackpad pinch sends) zooms around
+ * ctrl/meta + wheel (which is also what a trackpad pinch sends) — or any wheel, with `wheel: "zoom"` — zooms around
  * the pointer, dragging pans, and `zoomIn`/`zoomOut`/`fit` back a control
  * cluster. The content stays fitted to the viewport — across content and
  * viewport size changes — until the user pans or zooms, and again after
  * `fit()` or `reset()`.
  */
-export function usePanZoom({ enabled, contentWidth, contentHeight, opening }: UsePanZoomOptions): PanZoom {
+export function usePanZoom({ enabled, contentWidth, contentHeight, opening, wheel = "modifier" }: UsePanZoomOptions): PanZoom {
   const viewportRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState<PanZoomTransform>({ x: 0, y: 0, scale: 1 });
@@ -262,7 +292,7 @@ export function usePanZoom({ enabled, contentWidth, contentHeight, opening }: Us
     setTransform((current) => ({ ...current, x: current.x + dx, y: current.y + dy }));
   });
   useViewportResize(viewportRef, enabled, refit);
-  useWheelZoom(viewportRef, enabled, zoomAt);
+  useWheelZoom(viewportRef, enabled, wheel, zoomAt);
   const hold = (fit: "opening" | "everything") => () => {
     fitted.current = fit;
     refit();

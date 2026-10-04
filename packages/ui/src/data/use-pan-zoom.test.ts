@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitTransform, zoomAround } from "./use-pan-zoom";
+import { fitTransform, wheelZoomFactor, zoomAround } from "./use-pan-zoom";
 
 describe("zoomAround", () => {
   it("keeps the content point under the pointer fixed while scaling", () => {
@@ -88,5 +88,45 @@ describe("fitTransform", () => {
 
   it("returns the identity transform for a viewport that has not been measured", () => {
     expect(fitTransform({ width: 800, height: 400 }, { width: 0, height: 0 })).toEqual({ x: 0, y: 0, scale: 1 });
+  });
+});
+
+describe("wheelZoomFactor", () => {
+  const PIXEL = 0;
+  const LINE = 1;
+  const PAGE = 2;
+  const VIEWPORT_HEIGHT = 600;
+  const BUTTON_STEP = 1.25;
+  const MOUSE_NOTCH = 100;
+  const wheel = (deltaY: number, deltaMode = PIXEL, modifier = false) => ({ deltaY, deltaMode, ctrlKey: modifier, metaKey: false });
+
+  it("leaves a plain wheel to the page in modifier mode", () => {
+    expect(wheelZoomFactor(wheel(MOUSE_NOTCH), "modifier", VIEWPORT_HEIGHT)).toBeUndefined();
+  });
+
+  it("zooms on a pinch (a ctrl wheel) in either mode", () => {
+    expect(wheelZoomFactor(wheel(-4, PIXEL, true), "modifier", VIEWPORT_HEIGHT)).toBeGreaterThan(1);
+    expect(wheelZoomFactor(wheel(-4, PIXEL, true), "zoom", VIEWPORT_HEIGHT)).toBeGreaterThan(1);
+  });
+
+  it("zooms out on a plain wheel down and in on a wheel up in zoom mode", () => {
+    expect(wheelZoomFactor(wheel(MOUSE_NOTCH), "zoom", VIEWPORT_HEIGHT)).toBeLessThan(1);
+    expect(wheelZoomFactor(wheel(-MOUSE_NOTCH), "zoom", VIEWPORT_HEIGHT)).toBeGreaterThan(1);
+  });
+
+  it("steps one mouse notch no further than a zoom button does", () => {
+    expect(wheelZoomFactor(wheel(-MOUSE_NOTCH), "zoom", VIEWPORT_HEIGHT)).toBeCloseTo(BUTTON_STEP);
+    expect(wheelZoomFactor(wheel(MOUSE_NOTCH), "zoom", VIEWPORT_HEIGHT)).toBeCloseTo(1 / BUTTON_STEP);
+  });
+
+  it("reads a line or page delta in pixels, so a line-mode notch zooms like a pixel one", () => {
+    expect(wheelZoomFactor(wheel(-3, LINE), "zoom", VIEWPORT_HEIGHT)).toBeCloseTo(wheelZoomFactor(wheel(-48), "zoom", VIEWPORT_HEIGHT)!);
+    expect(wheelZoomFactor(wheel(1, PAGE), "zoom", VIEWPORT_HEIGHT)).toBeCloseTo(1 / BUTTON_STEP);
+  });
+
+  it("zooms a small trackpad delta by less than a notch", () => {
+    const factor = wheelZoomFactor(wheel(-4), "zoom", VIEWPORT_HEIGHT)!;
+    expect(factor).toBeGreaterThan(1);
+    expect(factor).toBeLessThan(BUTTON_STEP);
   });
 });
