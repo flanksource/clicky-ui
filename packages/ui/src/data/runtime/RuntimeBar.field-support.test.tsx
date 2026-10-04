@@ -10,7 +10,6 @@ describe("RuntimeBar field support", () => {
     // the runtime rework removed.
     render(
       <RuntimeBar
-        variant="combo"
         value={{ mode: "cli", model: "gemini-3.5-flash" }}
         onChange={vi.fn()}
         models={[

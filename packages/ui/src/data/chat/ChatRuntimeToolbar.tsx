@@ -45,7 +45,6 @@ export function ChatRuntimeToolbar({
     <div className="flex flex-1 items-center gap-2">
       {showRuntimeBar && (
         <RuntimeBar
-          variant="combo"
           value={runtime}
           onChange={onRuntimeChange}
           models={models}

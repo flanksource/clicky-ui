@@ -24,7 +24,6 @@ export type RuntimeBarIdentityProps = {
   inheritedModelLabel: string | undefined;
   locked: boolean;
   showModel: boolean;
-  variant: "segmented" | "combo";
   onModeChange: (mode: string) => void;
   onModelSelect: (model: ChatModel) => void;
   onModelClear: () => void;
@@ -50,13 +49,10 @@ export function RuntimeBarIdentity({
   return (
     <div
       data-runtime-bar-section={measure ? undefined : "identity"}
-      className={cn(
-        "flex h-control-h min-w-0 items-stretch",
-        props.variant === "combo" && "gap-1",
-      )}
+      className="flex h-control-h min-w-0 items-stretch"
     >
       {measure ? (
-        <IdentityMeasure variant={props.variant}>{modeCaption}</IdentityMeasure>
+        <IdentityMeasure>{modeCaption}</IdentityMeasure>
       ) : (
         <RuntimeSegment
           menuLabel="Runtime mode"
@@ -73,7 +69,7 @@ export function RuntimeBarIdentity({
         </RuntimeSegment>
       )}
       {measure ? (
-        <IdentityMeasure variant={props.variant} model>
+        <IdentityMeasure model>
           <ModelCaption {...props} />
         </IdentityMeasure>
       ) : (
@@ -84,22 +80,17 @@ export function RuntimeBarIdentity({
 }
 
 function IdentityMeasure({
-  variant,
   model = false,
   children,
 }: {
-  variant: "segmented" | "combo";
   model?: boolean;
   children: ReactNode;
 }) {
   return (
     <div
       className={cn(
-        "flex h-control-h items-center gap-1.5 px-density-2",
+        "flex h-control-h items-center gap-1.5 border-l border-border px-density-2 first:border-l-0",
         model && "max-w-56 min-w-0",
-        variant === "combo"
-          ? "rounded-md border border-input"
-          : "border-l border-border first:border-l-0",
       )}
     >
       <RuntimeSegmentCaption>{children}</RuntimeSegmentCaption>
@@ -193,12 +184,7 @@ function RuntimeModelPicker(props: RuntimeBarIdentityProps) {
         props.unavailable ? "" : (props.selectedModel?.id ?? props.model ?? "")
       }
       options={options}
-      className={cn(
-        "h-control-h min-w-0 max-w-56 flex-1",
-        props.variant === "combo"
-          ? "rounded-md border border-input bg-background"
-          : "border-l border-border first:border-l-0",
-      )}
+      className="h-control-h min-w-0 max-w-56 flex-1 border-l border-border first:border-l-0"
       triggerClassName="h-full rounded-none border-0 px-density-2 focus-visible:ring-inset aria-expanded:bg-muted"
       triggerContent={<ModelCaption {...props} />}
       onNew={(value) => ({ value, label: `Use custom: ${value}` })}

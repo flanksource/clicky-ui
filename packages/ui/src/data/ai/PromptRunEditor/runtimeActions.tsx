@@ -103,8 +103,12 @@ export function permissionField({
     id: "permissions.mode",
     isSet: current !== undefined,
     label: PERMISSION_GROUP,
-    icon: UiShield,
-    iconClassName: "text-muted-foreground",
+    icon: currentVisual?.icon ?? UiShield,
+    iconClassName: unpublished
+      ? "text-destructive"
+      : currentVisual
+        ? sessionTone(currentVisual.tone).text
+        : "text-muted-foreground",
     title: unpublished
       ? `${PERMISSION_GROUP} — ${currentVisual?.label} is not available for ${runtimeLabel}`
       : `${PERMISSION_GROUP} — ${currentVisual?.label ?? UNSPECIFIED_NAME}`,
