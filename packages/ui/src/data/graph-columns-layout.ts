@@ -9,6 +9,8 @@ export interface ColumnsLayoutNode extends GraphLayoutNode {
   level: number;
   /** Nodes sharing a group stay contiguous within their column and are boxed together. */
   group?: string;
+  /** Drawn at `compactNodeHeight`; a group of only compact nodes stacks them at the compact gap and padding. */
+  compact?: boolean;
 }
 
 export interface ColumnsLayoutOptions {
@@ -22,6 +24,12 @@ export interface ColumnsLayoutOptions {
   rowGap?: number;
   /** Space between a group's nodes and its rectangle in px. Defaults to 12. */
   groupPadding?: number;
+  /** Height of a compact node in px. Defaults to 24. */
+  compactNodeHeight?: number;
+  /** Vertical gap between the nodes of a group of only compact nodes in px. Defaults to 4. */
+  compactRowGap?: number;
+  /** Space between a group of only compact nodes and its rectangle in px. Defaults to 8. */
+  compactGroupPadding?: number;
   /** Space reserved around the columns before the viewport edge. Defaults to 24. */
   padding?: number;
   /**
@@ -78,6 +86,9 @@ const DEFAULT_NODE_HEIGHT = 60;
 const DEFAULT_COLUMN_GAP = 96;
 const DEFAULT_ROW_GAP = 20;
 const DEFAULT_GROUP_PADDING = 12;
+const DEFAULT_COMPACT_NODE_HEIGHT = 24;
+const DEFAULT_COMPACT_ROW_GAP = 4;
+const DEFAULT_COMPACT_GROUP_PADDING = 8;
 const DEFAULT_PADDING = 24;
 const DEFAULT_SWEEPS = 4;
 
@@ -96,6 +107,9 @@ function columnMetrics(options: ColumnsLayoutOptions): ColumnMetrics {
     columnGap: options.columnGap ?? DEFAULT_COLUMN_GAP,
     rowGap: options.rowGap ?? DEFAULT_ROW_GAP,
     groupPadding: options.groupPadding ?? DEFAULT_GROUP_PADDING,
+    compactNodeHeight: options.compactNodeHeight ?? DEFAULT_COMPACT_NODE_HEIGHT,
+    compactRowGap: options.compactRowGap ?? DEFAULT_COMPACT_ROW_GAP,
+    compactGroupPadding: options.compactGroupPadding ?? DEFAULT_COMPACT_GROUP_PADDING,
     padding: options.padding ?? DEFAULT_PADDING,
     sweeps: options.sweeps ?? DEFAULT_SWEEPS,
   };
@@ -137,10 +151,25 @@ function indexNeighbours(
   return neighbours;
 }
 
+/**
+ * How a run of nodes stacks: each node's height, the gap between them and the padding inside the run's
+ * rectangle. A grouped run of only compact nodes takes the compact gap and padding; any other run the
+ * regular ones, whatever its order, so a column's height does not depend on how it is ordered.
+ */
+function runMetrics(group: string | undefined, nodes: readonly ColumnsLayoutNode[], m: ColumnMetrics) {
+  const compact = group !== undefined && nodes.every((node) => node.compact === true);
+  const pad = group === undefined ? 0 : compact ? m.compactGroupPadding : m.groupPadding;
+  const gap = compact ? m.compactRowGap : m.rowGap;
+  const heightOf = (node: ColumnsLayoutNode) => (node.compact ? m.compactNodeHeight : m.nodeHeight);
+  const height = nodes.reduce((sum, node) => sum + heightOf(node), 0) + (nodes.length - 1) * gap + 2 * pad;
+  return { pad, gap, heightOf, height };
+}
+
 function columnHeight(column: readonly ColumnsLayoutNode[], m: ColumnMetrics): number {
-  const groups = new Set(column.map((node) => node.group));
-  groups.delete(undefined);
-  return column.length * m.nodeHeight + (column.length - 1) * m.rowGap + 2 * m.groupPadding * groups.size;
+  const runs = new Map<string | undefined, ColumnsLayoutNode[]>();
+  for (const node of column) runs.set(node.group, [...(runs.get(node.group) ?? []), node]);
+  const stacked = [...runs].reduce((sum, [group, nodes]) => sum + runMetrics(group, nodes, m).height, 0);
+  return stacked + (runs.size - 1) * m.rowGap;
 }
 
 /** Groups in order of first appearance; within a group by ascending weight, the column's order on ties. */
@@ -178,12 +207,12 @@ function stackColumn(
   const boxes: GraphLayoutGroupBox[] = [];
   let cursor = origin.top;
   for (const { group, nodes } of runs) {
-    const pad = group === undefined ? 0 : m.groupPadding;
-    const height = nodes.length * m.nodeHeight + (nodes.length - 1) * m.rowGap + 2 * pad;
-    nodes.forEach((node, index) => {
-      const top = cursor + pad + index * (m.nodeHeight + m.rowGap);
-      placed.set(node.id, { x: origin.x, y: top + m.nodeHeight / 2 });
-    });
+    const { pad, gap, heightOf, height } = runMetrics(group, nodes, m);
+    let top = cursor + pad;
+    for (const node of nodes) {
+      placed.set(node.id, { x: origin.x, y: top + heightOf(node) / 2 });
+      top += heightOf(node) + gap;
+    }
     if (group !== undefined) {
       boxes.push({
         id: `${origin.level}:${group}`,
@@ -338,7 +367,8 @@ export function columnsLayout(
     }),
   });
 
-  const room = loopOverhang(edges, Object.fromEntries(placed), m);
+  const nodeHeights = Object.fromEntries(nodes.filter((node) => node.compact).map((node) => [node.id, m.compactNodeHeight]));
+  const room = loopOverhang(edges, Object.fromEntries(placed), { ...m, nodeHeights });
   const span = (Math.max(...levels) - minLevel) * (m.nodeWidth + m.columnGap) + m.nodeWidth;
   return {
     width: room.left + 2 * inset + span + room.right,

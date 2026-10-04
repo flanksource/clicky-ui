@@ -62,6 +62,24 @@ describe("routeEdges with side anchors", () => {
     ]);
   });
 
+  it("fans parallel edges no wider than the shorter of the two nodes allows", () => {
+    // b is 20px tall: the fan step is its height less the 12px port inset.
+    const routes = routeEdges(
+      [
+        { id: "read", from: "a", to: "b" },
+        { id: "write", from: "a", to: "b" },
+      ],
+      positions,
+      { ...dims, nodeHeights: { b: 20 } },
+      side,
+    );
+
+    expect([routes.read?.path, routes.write?.path]).toEqual([
+      "M 150 96 C 250 96 250 196 350 196",
+      "M 150 104 C 250 104 250 204 350 204",
+    ]);
+  });
+
   it("fans a reciprocal pair so the forward and backward edges do not overlap", () => {
     const routes = routeEdges(
       [
