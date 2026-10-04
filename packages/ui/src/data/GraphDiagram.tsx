@@ -16,7 +16,7 @@ import {
   type GraphPlacer,
 } from "./graph-diagram-model";
 import { useEdgeFocus } from "./use-edge-focus";
-import { usePanZoom, type FitOptions, type PanZoom } from "./use-pan-zoom";
+import { usePanZoom, type FitOptions, type PanZoom, type WheelMode } from "./use-pan-zoom";
 
 export type {
   GraphDiagramEdge,
@@ -62,12 +62,19 @@ export interface GraphDiagramProps {
   groups?: GraphDiagramGroup[];
   nodeWidth?: number;
   nodeHeight?: number;
+  /**
+   * "columns" layout: the height of a node with `size: "compact"`, drawn on one line. A group of only
+   * compact nodes stacks them closer and pads them tighter. Defaults to 24.
+   */
+  compactNodeHeight?: number;
   /** "columns" layout: horizontal gap between columns in px. Leave room for edge label pills. */
   columnGap?: number;
   /** "columns" layout: vertical gap between stacked nodes in px. */
   rowGap?: number;
   /** Ctrl/meta + wheel (or pinch) zooms, dragging the background pans, and zoom controls appear. */
   zoomable?: boolean;
+  /** Zoomable: "zoom" makes a plain mouse wheel zoom too, for a diagram that fills its pane. Defaults to "modifier". */
+  wheelZoom?: WheelMode;
   /**
    * Zoomable: the smallest scale the diagram opens at, so its text stays readable. A diagram too
    * large for it opens overflowing, centred on `focusId`, and is panned to reach the rest. `Fit to
@@ -83,13 +90,21 @@ export interface GraphDiagramProps {
 
 const DEFAULT_NODE_WIDTH = 168;
 const DEFAULT_NODE_HEIGHT = 60;
+const DEFAULT_COMPACT_NODE_HEIGHT = 24;
 
 interface LayoutOptions {
   layout: GraphDiagramLayout;
   nodeWidth: number;
   nodeHeight: number;
+  compactNodeHeight: number;
   columnGap: number | undefined;
   rowGap: number | undefined;
+}
+
+/** The heights of the nodes not drawn at the node height: the compact ones, in the "columns" layout. */
+function compactHeights(nodes: GraphDiagramNode[], layout: GraphDiagramLayout, compactNodeHeight: number): Record<string, number> {
+  if (layout !== "columns") return {};
+  return Object.fromEntries(nodes.filter((node) => node.size === "compact").map((node) => [node.id, compactNodeHeight]));
 }
 
 function assertEdgesReferenceKnownNodes(nodes: GraphDiagramNode[], edges: GraphDiagramEdge[]): void {
@@ -114,7 +129,7 @@ function requireLevel(node: GraphDiagramNode): number {
 function layoutNodes(
   nodes: GraphDiagramNode[],
   edges: GraphDiagramEdge[],
-  { layout, nodeWidth, nodeHeight, columnGap, rowGap }: LayoutOptions,
+  { layout, nodeWidth, nodeHeight, compactNodeHeight, columnGap, rowGap }: LayoutOptions,
 ): ColumnsLayoutResult {
   switch (layout) {
     case "ring":
@@ -125,11 +140,13 @@ function layoutNodes(
           id: node.id,
           level: requireLevel(node),
           ...(node.group !== undefined ? { group: node.group } : {}),
+          ...(node.size === "compact" ? { compact: true } : {}),
         })),
         edges,
         {
           nodeWidth,
           nodeHeight,
+          compactNodeHeight,
           ...(columnGap !== undefined ? { columnGap } : {}),
           ...(rowGap !== undefined ? { rowGap } : {}),
         },
@@ -187,9 +204,11 @@ export function GraphDiagram({
   groups,
   nodeWidth = DEFAULT_NODE_WIDTH,
   nodeHeight = DEFAULT_NODE_HEIGHT,
+  compactNodeHeight = DEFAULT_COMPACT_NODE_HEIGHT,
   columnGap,
   rowGap,
   zoomable = false,
+  wheelZoom = "modifier",
   fitMinScale,
   focusId,
   maxHeight,
@@ -200,17 +219,19 @@ export function GraphDiagram({
   const markerPrefix = `graph-diagram-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
   const { width, height, positions, groups: groupBoxes } = useMemo(
-    () => layoutNodes(nodes, edges, { layout, nodeWidth, nodeHeight, columnGap, rowGap }),
-    [layout, nodes, edges, nodeWidth, nodeHeight, columnGap, rowGap],
+    () => layoutNodes(nodes, edges, { layout, nodeWidth, nodeHeight, compactNodeHeight, columnGap, rowGap }),
+    [layout, nodes, edges, nodeWidth, nodeHeight, compactNodeHeight, columnGap, rowGap],
   );
+  const nodeHeights = useMemo(() => compactHeights(nodes, layout, compactNodeHeight), [nodes, layout, compactNodeHeight]);
   const routes = useMemo(
     () =>
-      routeEdges(edges, positions, { nodeWidth, nodeHeight }, { anchor: layout === "columns" ? "side" : "center" }),
-    [edges, positions, nodeWidth, nodeHeight, layout],
+      routeEdges(edges, positions, { nodeWidth, nodeHeight, nodeHeights }, { anchor: layout === "columns" ? "side" : "center" }),
+    [edges, positions, nodeWidth, nodeHeight, nodeHeights, layout],
   );
 
   const panZoom = usePanZoom({
     enabled: zoomable,
+    wheel: wheelZoom,
     contentWidth: width,
     contentHeight: height,
     opening: openingFit(positions, fitMinScale, focusId),
@@ -260,6 +281,7 @@ export function GraphDiagram({
             place={place}
             nodeWidth={nodeWidth}
             nodeHeight={nodeHeight}
+            nodeHeights={nodeHeights}
             selectedId={selectedId}
             onNodeSelect={onNodeSelect}
             onNodeExpand={onNodeExpand}
