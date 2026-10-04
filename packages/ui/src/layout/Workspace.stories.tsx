@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   UiFileCode,
@@ -116,4 +117,35 @@ export const FixedExplorer: Story = {
       />
     </div>
   ),
+};
+
+function FocusedCenter() {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div className="h-[520px]">
+      <Workspace
+        panes={panes.map((pane) =>
+          pane.id === "editor"
+            ? {
+                ...pane,
+                content: (
+                  <div className="space-y-2 p-3 text-sm">
+                    <button type="button" className="rounded border px-2 py-1" aria-pressed={focused} onClick={() => setFocused(!focused)}>
+                      {focused ? "Show the sides" : "Give the editor the full width"}
+                    </button>
+                    <p>Held collapsed, the sides lose their toggles; their layout comes back as it was.</p>
+                  </div>
+                ),
+              }
+            : pane,
+        )}
+        collapsedSides={focused ? ["left", "right"] : []}
+      />
+    </div>
+  );
+}
+
+/** A host holding both sides collapsed while its center needs the full width. */
+export const HeldCollapsedSides: Story = {
+  render: () => <FocusedCenter />,
 };
