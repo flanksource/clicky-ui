@@ -379,6 +379,7 @@ export * from "./data/test-runner";
 export * from "./data/verification";
 export * from "./data/cache-browser";
 export * from "./data/query-browser";
+export * from "./data/call-graph";
 export {
   debugCaptureHeaders,
   debugConsoleAvailable,

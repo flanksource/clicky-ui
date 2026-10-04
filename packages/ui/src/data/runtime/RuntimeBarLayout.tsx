@@ -35,13 +35,7 @@ export function RuntimeBarLayout({
       <div
         role="group"
         aria-label={ariaLabel}
-        data-runtime-bar-variant={identity.variant}
-        className={cn(
-          "inline-flex h-control-h max-w-full items-stretch",
-          identity.variant === "combo"
-            ? "gap-1"
-            : "overflow-hidden rounded-md border border-input bg-background",
-        )}
+        className="inline-flex h-control-h max-w-full items-stretch overflow-hidden rounded-md border border-input bg-background"
       >
         <RuntimeBarIdentity {...identity} />
         <RuntimeBarActions {...actions} visibleCount={visibleCount} />
@@ -53,33 +47,18 @@ export function RuntimeBarLayout({
         >
           <div
             ref={measurementRef}
-            className={cn(
-              "pointer-events-none invisible absolute left-0 top-0 flex w-max items-stretch",
-              identity.variant === "combo" && "gap-1",
-            )}
+            className="pointer-events-none invisible absolute left-0 top-0 flex w-max items-stretch"
           >
             <RuntimeBarIdentity {...identity} measure />
             {supplied.map((field) => (
               <div
                 key={field.id}
-                className={cn(
-                  "flex h-control-h items-center gap-1.5 px-density-2",
-                  identity.variant === "combo"
-                    ? "rounded-md border border-input"
-                    : "border-l border-border",
-                )}
+                className="flex h-control-h items-center gap-1.5 border-l border-border px-density-2"
               >
                 <RuntimeSegmentCaption>{field.caption}</RuntimeSegmentCaption>
               </div>
             ))}
-            <div
-              className={cn(
-                "flex h-control-h items-center px-density-2",
-                identity.variant === "combo"
-                  ? "rounded-md border border-input"
-                  : "border-l border-border",
-              )}
-            >
+            <div className="flex h-control-h items-center border-l border-border px-density-2">
               <Icon
                 icon={UiDotsVertical}
                 className="size-4 shrink-0 text-muted-foreground"

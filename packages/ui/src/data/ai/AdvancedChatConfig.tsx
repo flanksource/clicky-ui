@@ -102,7 +102,6 @@ export function AdvancedChatConfig({
           </div>
         )}
         <RuntimeBar
-          variant="combo"
           ariaLabel="Advanced runtime"
           value={barValue}
           onChange={handleBarChange}

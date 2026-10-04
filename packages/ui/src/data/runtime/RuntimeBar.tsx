@@ -11,7 +11,6 @@ import {
   runtimeModes,
   withRuntimeMode,
 } from "./RuntimeBar.selection";
-import { RuntimeBarVariantContext } from "./RuntimeBar.context";
 import { isSelectableModel } from "./availability";
 import {
   effortOptionsForModel,
@@ -34,8 +33,6 @@ export type RuntimeBarValue = ChatModelRuntime & {
 export type RuntimeBarProps<T extends RuntimeBarValue = RuntimeBarValue> = {
   value: T;
   onChange: (value: T) => void;
-  /** Fused field triggers or individually bordered controls. */
-  variant?: "combo" | "segmented";
   /** Model catalog grouped by family and filtered by the selected mode. */
   models?: ChatModel[] | undefined;
   families?: SpecRuntimeFamily[] | undefined;
@@ -63,11 +60,10 @@ export type RuntimeBarProps<T extends RuntimeBarValue = RuntimeBarValue> = {
   className?: string | undefined;
 };
 
-/** Self-describing runtime controls with segmented and combo presentations. */
+/** Mode-first runtime controls with settings that adapt to the container width. */
 export function RuntimeBar<T extends RuntimeBarValue>({
   value,
   onChange,
-  variant = "segmented",
   models = [],
   families = SPEC_RUNTIME_FAMILIES,
   effectiveMode,
@@ -199,34 +195,31 @@ export function RuntimeBar<T extends RuntimeBarValue>({
       : []),
   ];
   return (
-    <RuntimeBarVariantContext.Provider value={variant}>
-      <RuntimeBarLayout
-        ariaLabel={ariaLabel}
-        className={className}
-        actions={{ ...actions, fields }}
-        identity={{
-          family,
-          mode,
-          modes,
-          groups,
-          selectedModel: resolvedModel,
-          model: value.model,
-          unavailable: selectedModelUnavailable,
-          inheritedModelLabel,
-          locked,
-          showModel,
-          variant,
-          onModeChange: (modeId) => applyMode(family.id, modeId),
-          onCustomModel: applyCustomModel,
-          onModelSelect: applyModel,
-          onModelClear: clearModel,
-          onFamilySelect: (familyId) => {
-            setPreference({ model: effectiveModel, family: familyId });
-            onChange(withoutCatalogModel(value));
-          },
-        }}
-      />
-    </RuntimeBarVariantContext.Provider>
+    <RuntimeBarLayout
+      ariaLabel={ariaLabel}
+      className={className}
+      actions={{ ...actions, fields }}
+      identity={{
+        family,
+        mode,
+        modes,
+        groups,
+        selectedModel: resolvedModel,
+        model: value.model,
+        unavailable: selectedModelUnavailable,
+        inheritedModelLabel,
+        locked,
+        showModel,
+        onModeChange: (modeId) => applyMode(family.id, modeId),
+        onCustomModel: applyCustomModel,
+        onModelSelect: applyModel,
+        onModelClear: clearModel,
+        onFamilySelect: (familyId) => {
+          setPreference({ model: effectiveModel, family: familyId });
+          onChange(withoutCatalogModel(value));
+        },
+      }}
+    />
   );
 }
 

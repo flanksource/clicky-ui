@@ -7,11 +7,7 @@ import type { RuntimePreset } from "../runtime-profile";
 import type { RuntimePresetMenuValue } from "./model";
 import { useRuntimePresetMenu } from "./use-runtime-preset-menu";
 
-function PresetMenuExample({
-  variant = "segmented",
-}: {
-  variant?: "segmented" | "combo";
-}) {
+function PresetMenuExample() {
   const [value, setValue] = useState<RuntimePresetMenuValue>({
     spec: {
       mode: "cli",
@@ -47,7 +43,6 @@ function PresetMenuExample({
     <div className="grid w-full max-w-5xl gap-density-4 p-density-4">
       <RuntimeBar
         value={value.spec}
-        variant={variant}
         showTimeout
         showCost
         onChange={(spec) => setValue({ ...value, spec })}
@@ -77,5 +72,4 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
-export const Segmented: Story = {};
-export const Combo: Story = { args: { variant: "combo" } };
+export const Default: Story = {};

@@ -106,7 +106,7 @@ const meta: Meta = {
     docs: {
       description: {
         component:
-          "Multi-window chat shell: draggable/resizable floating windows (react-rnd, lazy-loaded), a launch FAB, a conversation thread switcher, a context-badge row, and per-tool preferences. The shared <Chat> footer carries the same RuntimeBar combo used by inline chat, plus its context gauge. Drives a mock transport. Drag the header, resize from the edges, maximize, switch threads, or open more windows with the + button / FAB.",
+          "Multi-window chat shell: draggable/resizable floating windows (react-rnd, lazy-loaded), a launch FAB, a conversation thread switcher, a context-badge row, and per-tool preferences. The shared <Chat> footer carries the same RuntimeBar used by inline chat, plus its context gauge. Drives a mock transport. Drag the header, resize from the edges, maximize, switch threads, or open more windows with the + button / FAB.",
       },
     },
   },

@@ -44,7 +44,6 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        variant="combo"
         value={{
           mode: "cli",
           model: "gpt-5",
@@ -67,10 +66,9 @@ describe("RuntimeBar", () => {
     });
   });
 
-  it("renders separate mode and combined model controls in the combo layout", () => {
+  it("fuses mode, model and settings into one bordered bar", () => {
     render(
       <RuntimeBar
-        variant="combo"
         value={{
           mode: "cli",
           model: "gpt-5",
@@ -82,6 +80,12 @@ describe("RuntimeBar", () => {
     );
 
     const trigger = screen.getByTitle("Model — gpt-5");
+    expect(screen.getByRole("group", { name: "Runtime" })).toHaveClass(
+      "overflow-hidden",
+      "rounded-md",
+      "border",
+      "border-input",
+    );
     expect(trigger).toHaveTextContent("GPT-5");
 
     fireEvent.click(trigger);
@@ -98,14 +102,9 @@ describe("RuntimeBar", () => {
     expect(screen.getByTitle("Reasoning effort")).toHaveTextContent("High");
   });
 
-  it("bounds the combo model picker to the viewport", () => {
+  it("bounds the model picker to the viewport", () => {
     render(
-      <RuntimeBar
-        variant="combo"
-        value={{ mode: "cli" }}
-        onChange={vi.fn()}
-        models={MODELS}
-      />,
+      <RuntimeBar value={{ mode: "cli" }} onChange={vi.fn()} models={MODELS} />,
     );
 
     openSegment("Model — unspecified");
@@ -116,11 +115,10 @@ describe("RuntimeBar", () => {
     });
   });
 
-  it("accepts an uncatalogued model id in the combo menu", () => {
+  it("accepts an uncatalogued model id in the model menu", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        variant="combo"
         value={{ mode: "api" }}
         onChange={onChange}
         models={MODELS}
@@ -145,7 +143,6 @@ describe("RuntimeBar", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        variant="combo"
         value={{ effort: "high" }}
         effectiveMode="cli"
         effectiveModel="gpt-5"
@@ -160,11 +157,10 @@ describe("RuntimeBar", () => {
     expect(onChange).toHaveBeenCalledWith({ effort: "low" });
   });
 
-  it("keeps the combo model picker open while typing a custom model", () => {
+  it("keeps the model picker open while typing a custom model", () => {
     const onChange = vi.fn();
     render(
       <RuntimeBar
-        variant="combo"
         value={{
           mode: "cli",
           model: "gpt-5",
@@ -484,10 +480,9 @@ describe("RuntimeBar", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("omits unavailable models from the combo picker", () => {
+  it("omits unavailable models from the model picker", () => {
     render(
       <RuntimeBar
-        variant="combo"
         value={{ mode: "cli" }}
         effectiveModel="gpt-5"
         onChange={vi.fn()}
