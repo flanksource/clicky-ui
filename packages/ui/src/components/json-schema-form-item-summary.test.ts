@@ -146,6 +146,14 @@ describe("itemSummaryFor", () => {
     expect(summarize({ ...SERVICE, label: "  " }).title).toBe("service");
   });
 
+  it.each([
+    { role: "filter", title: "filters" },
+    { role: "limit", title: "limit" },
+  ])("titles a row from an enum code with its x-enum-labels label ($role → $title)", ({ role, title }) => {
+    const array: JsonSchemaProperty = { ...PARAMS_ARRAY, "x-item": { title: ["role"] } };
+    expect(summarize({ role }, 0, array).title).toBe(title);
+  });
+
   it("falls back to the item's position when nothing identifies it", () => {
     expect(summarize({}, 2).title).toBe("Item 3");
   });
