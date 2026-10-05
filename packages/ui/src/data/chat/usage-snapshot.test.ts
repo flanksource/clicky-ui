@@ -6,7 +6,6 @@ import {
 } from "./usage-snapshot";
 
 const options = {
-  contextWindow: 1_000_000,
   modelLabel: "Claude Opus 5",
   messageCount: 4,
 };
@@ -38,16 +37,30 @@ describe("usageSnapshotFromMetadata", () => {
     expect(usageSnapshotFromMetadata(metadata, options).cost).toBe(0);
   });
 
-  it("keeps context occupancy from contextTokens", () => {
+  it("preserves the provider context snapshot independently of cumulative billing", () => {
     const metadata: ChatMessageMetadata = {
-      contextTokens: 128138,
-      usage: { totalTokens: 131806 },
+      context: { usedTokens: 89_595, windowTokens: 258_400, freePercent: 69 },
+      usage: { inputTokens: 660_747, totalTokens: 663_270 },
     };
 
     const snapshot = usageSnapshotFromMetadata(metadata, options);
 
-    expect(snapshot.usedTokens).toBe(128138);
-    expect(snapshot.maxTokens).toBe(1_000_000);
+    expect(snapshot.usedTokens).toBe(89_595);
+    expect(snapshot.maxTokens).toBe(258_400);
+    expect(snapshot.freePercent).toBe(69);
+  });
+
+  it("leaves missing provider context unavailable despite billing usage and catalog capacity", () => {
+    const snapshot = usageSnapshotFromMetadata({ usage: { totalTokens: 663_270 } }, options);
+    expect(snapshot.usedTokens).toBeUndefined();
+    expect(snapshot.maxTokens).toBeUndefined();
+    expect(snapshot.freePercent).toBeUndefined();
+  });
+
+  it("preserves explicit zero occupancy", () => {
+    const snapshot = usageSnapshotFromMetadata({ context: { usedTokens: 0, windowTokens: 258_400, freePercent: 100 } }, options);
+    expect(snapshot.usedTokens).toBe(0);
+    expect(snapshot.freePercent).toBe(100);
   });
 
   it("carries the per-turn breakdown through for the last-turn tables", () => {
@@ -107,6 +120,7 @@ describe("usageSnapshotFromSession", () => {
     expect(snapshot).toEqual({
       usedTokens: 128_138,
       maxTokens: 1_000_000,
+      freePercent: 87,
       messageCount: 1,
       cost: 7.35,
       usage: {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { UiChevronDown } from "../../icons";
 import { cn } from "../../lib/utils";
 import { CodeBlock } from "../CodeBlock";
@@ -27,16 +27,19 @@ import {
   QuestionDecisionControls,
 } from "./SessionViewer.decision-controls";
 import type { SessionToolDecision } from "./SessionViewer";
+import { EstimatedToolCost } from "./SessionViewer.tool-cost";
 
 export function ToolBody({
   event,
   visual,
   defaultExpanded,
+  showEstimatedToolCost = false,
   onPendingToolDecision,
 }: {
   event: SessionEvent;
   visual: { label: string; summaryOnly: boolean };
   defaultExpanded: boolean;
+  showEstimatedToolCost?: boolean;
   onPendingToolDecision?:
     | ((decision: SessionToolDecision) => Promise<void> | void)
     | undefined;
@@ -48,6 +51,9 @@ export function ToolBody({
   );
   const command = shellCommand(event.tool ?? "", event.toolInput);
   const [open, setOpen] = useState(defaultExpanded);
+  const cost = showEstimatedToolCost ? <EstimatedToolCost events={[event]} /> : null;
+  const costFooter = showEstimatedToolCost ? <EstimatedToolCost events={[event]} detailed /> : null;
+  const hasDetail = event.toolResponse !== undefined || (command === undefined && event.toolInput !== undefined) || (showEstimatedToolCost && event.estimatedCost !== undefined);
 
   if (event.tool === "AskUserQuestion" || event.approvalKind === "question") {
     return (
@@ -55,6 +61,8 @@ export function ToolBody({
         event={event}
         visual={visual}
         onDecision={onPendingToolDecision}
+        cost={cost}
+        costFooter={costFooter}
       />
     );
   }
@@ -62,17 +70,19 @@ export function ToolBody({
   if (event.pending && hasApprovalBody(event.approvalRequest)) {
     return (
       <div className="not-prose">
-        <div className="flex items-center gap-1.5">
+        <div data-tool-header className="flex items-center gap-1.5">
           <span className="shrink-0 font-medium text-foreground">
             {visual.label}
           </span>
           <ApprovalBadge event={event} />
+          <span className="ml-auto">{cost}</span>
         </div>
         <TypedApprovalBody
           event={event}
           request={event.approvalRequest}
           onDecision={onPendingToolDecision}
         />
+        {costFooter}
       </div>
     );
   }
@@ -80,12 +90,13 @@ export function ToolBody({
   if (command !== undefined) {
     return (
       <div className="not-prose">
-        <div className="flex items-start gap-1.5">
+        <div data-tool-header className="flex items-start gap-1.5">
           <div className="min-w-0 flex-1">
             <CodeBlock bare language="bash" source={command} />
           </div>
           <ApprovalBadge event={event} />
-          {event.toolResponse !== undefined && (
+          {cost}
+          {hasDetail && (
             <button
               type="button"
               aria-expanded={open}
@@ -103,9 +114,10 @@ export function ToolBody({
             </button>
           )}
         </div>
-        {open && event.toolResponse !== undefined && (
+        {open && hasDetail && (
           <div className="mt-1.5">
-            <ResponseBlock response={event.toolResponse} />
+            {event.toolResponse !== undefined && <ResponseBlock response={event.toolResponse} />}
+            {costFooter}
           </div>
         )}
         {event.pending && onPendingToolDecision && (
@@ -119,8 +131,6 @@ export function ToolBody({
     );
   }
 
-  const hasDetail =
-    event.toolInput !== undefined || event.toolResponse !== undefined;
   const params = toolInputParams(event.tool ?? "", event.toolInput, event.cwd);
   const diff = toolDiff(event.tool ?? "", event.toolInput);
   const header = (
@@ -155,25 +165,28 @@ export function ToolBody({
 
   return (
     <div className="not-prose">
-      {hasDetail ? (
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-          className="flex w-full items-center gap-1.5 text-left hover:text-foreground"
-        >
-          {header}
-          <Icon
-            icon={UiChevronDown}
-            className={cn(
-              "ml-auto size-3 shrink-0 text-muted-foreground transition-transform",
-              open && "rotate-180",
-            )}
-          />
-        </button>
-      ) : (
-        <div className="flex items-center gap-1.5">{header}</div>
-      )}
+      <div data-tool-header className="flex items-center gap-1.5">
+        {hasDetail ? (
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((value) => !value)}
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-left hover:text-foreground"
+          >
+            {header}
+            <Icon
+              icon={UiChevronDown}
+              className={cn(
+                "ml-auto size-3 shrink-0 text-muted-foreground transition-transform",
+                open && "rotate-180",
+              )}
+            />
+          </button>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">{header}</div>
+        )}
+        {cost}
+      </div>
 
       {open && hasDetail && (
         <div className="mt-1.5 space-y-1.5">
@@ -190,6 +203,7 @@ export function ToolBody({
           {event.toolResponse !== undefined && (
             <ResponseBlock response={event.toolResponse} />
           )}
+          {costFooter}
         </div>
       )}
       {event.pending && onPendingToolDecision && (
@@ -207,9 +221,13 @@ function QuestionToolBody({
   event,
   visual,
   onDecision,
+  cost,
+  costFooter,
 }: {
   event: SessionEvent;
   visual: { label: string };
+  cost: ReactNode;
+  costFooter: ReactNode;
   onDecision?:
     | ((decision: SessionToolDecision) => Promise<void> | void)
     | undefined;
@@ -226,16 +244,17 @@ function QuestionToolBody({
 
   return (
     <div className="not-prose">
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div data-tool-header className="flex items-center gap-1.5">
         <span className="shrink-0 font-medium text-foreground">
           {visual.label}
         </span>
         <ApprovalBadge event={event} />
         {summary && questions.length !== 1 && (
-          <span className="min-w-0 truncate text-xs text-muted-foreground">
+          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
             {summary}
           </span>
         )}
+        <span className="ml-auto">{cost}</span>
       </div>
       <div className="mt-1.5 space-y-1.5">
         {questions.length > 0 ? (
@@ -268,6 +287,7 @@ function QuestionToolBody({
             onDecision={onDecision}
           />
         )}
+        {costFooter}
       </div>
     </div>
   );

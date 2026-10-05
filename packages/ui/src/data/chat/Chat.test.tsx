@@ -485,7 +485,7 @@ describe("Chat context meter", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Context 0% used")).toBeInTheDocument();
+    expect(screen.getByLabelText("Context unavailable")).toBeInTheDocument();
   });
 
   it("renders before usage when the selected model is resolved", () => {
@@ -498,7 +498,7 @@ describe("Chat context meter", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Context 0% used")).toBeInTheDocument();
+    expect(screen.getByLabelText("Context unavailable")).toBeInTheDocument();
   });
 
   it("shows terminal metadata instead of selected runtime identity", async () => {
@@ -535,7 +535,7 @@ describe("Chat context meter", () => {
       />,
     );
 
-    fireEvent.mouseEnter(screen.getByLabelText("Context 0% used"));
+    fireEvent.mouseEnter(screen.getByLabelText("Context unavailable"));
 
     expect(await screen.findByRole("tooltip")).toBeInTheDocument();
     expect(screen.getByText("claude-opus-terminal")).toBeInTheDocument();
@@ -597,7 +597,13 @@ describe("Chat Captain session projection", () => {
               role: "user",
               parts: [{ type: "text", text: "Edit the account" }],
             },
-            pendingMessage(),
+            {
+              ...pendingMessage(),
+              metadata: {
+                context: { usedTokens: 660_747, windowTokens: 1_050_000, freePercent: 37 },
+                usage: { totalTokens: 663_270 },
+              },
+            },
           ],
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
@@ -682,6 +688,7 @@ describe("Chat Captain session projection", () => {
           JSON.stringify({
             id: "session-1",
             revision: 2,
+            context: { usedTokens: 128_138, windowTokens: 1_000_000, freePercent: 87 },
             messages: [pendingMessage()],
           }),
           { status: 200, headers: { "Content-Type": "application/json" } },
@@ -697,6 +704,7 @@ describe("Chat Captain session projection", () => {
           JSON.stringify({
             id: "session-1",
             revision: 3,
+            context: { usedTokens: 89_595, windowTokens: 258_400, freePercent: 69 },
             messages: [
               {
                 id: "assistant-pending",
@@ -750,6 +758,7 @@ describe("Chat Captain session projection", () => {
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(sendMessages).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Context 31% used")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Approve" }),
     ).not.toBeInTheDocument();

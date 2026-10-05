@@ -188,6 +188,34 @@ export const CompactDensity: Story = {
   args: { session: SAMPLE_SESSION, defaultDensity: "compact" },
 };
 
+export const EstimatedToolCosts: Story = {
+  parameters: {
+    docs: { description: { story: "Enable **Show estimated tool cost** in the three-dot menu to see input, output, reasoning, cache usage and estimated dollars. Captain supplies `parts[].estimatedCost` as `{ cost, sharedCalls }`. Each model request includes conversation context and is shared equally across its tool calls; reading tool results belongs to later requests. Calls without usage data show Estimate unavailable. Estimates are hidden by default." } },
+  },
+  args: {
+    session: {
+      id: "estimated-tool-costs",
+      messages: [{
+        id: "priced-call", role: "assistant",
+        parts: [{
+          type: "dynamic-tool", toolName: "Read", toolCallId: "read-example",
+          state: "output-available", input: { file_path: "example.go" }, output: "package example",
+          estimatedCost: {
+            sharedCalls: 2,
+            cost: {
+              inputTokens: 1000, outputTokens: 20, reasoningTokens: 5, cacheReadTokens: 8000,
+              inputCost: 0.002, outputCost: 0.0002, cacheReadCost: 0.0008,
+            },
+          },
+        }, {
+          type: "dynamic-tool", toolName: "Bash", toolCallId: "unpriced-example",
+          state: "output-available", input: { command: "pwd" }, output: "/workspace",
+        }],
+      }],
+    } satisfies UnifiedSessionInput,
+  },
+};
+
 export const AskUserQuestion: Story = {
   args: {
     session: QUESTION_SESSION,
