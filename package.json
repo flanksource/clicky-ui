@@ -18,7 +18,7 @@
     "format": "prettier --write package.json pnpm-workspace.yaml README.md packages/ui/package.json packages/ui/README.md apps/kitchen-sink/package.json apps/playground/package.json apps/storybook/package.json apps/docs/package.json apps/docs/astro.config.mjs apps/docs/scripts/*.mjs apps/docs/src/content.config.ts apps/docs/src/styles/docs.css \"apps/docs/src/content/docs/**/*.{md,mdx}\" e2e/package.json",
     "format:check": "prettier --check package.json pnpm-workspace.yaml README.md packages/ui/package.json packages/ui/README.md apps/kitchen-sink/package.json apps/playground/package.json apps/storybook/package.json apps/docs/package.json apps/docs/astro.config.mjs apps/docs/scripts/*.mjs apps/docs/src/content.config.ts apps/docs/src/styles/docs.css \"apps/docs/src/content/docs/**/*.{md,mdx}\" e2e/package.json",
     "lint": "pnpm --filter @flanksource/clicky-ui lint && pnpm --filter kitchen-sink lint && pnpm --filter playground lint && pnpm --filter storybook lint && pnpm --filter e2e lint",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b && pnpm --filter @flanksource/clicky-ui run check:public-exports",
     "check": "pnpm --filter @flanksource/clicky-ui build:icons && pnpm run format:check && pnpm run lint && pnpm run typecheck"
   },
   "devDependencies": {

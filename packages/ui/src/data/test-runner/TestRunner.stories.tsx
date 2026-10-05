@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, within } from "storybook/test";
 import { TestRunner } from "./TestRunner";
 import { Modal } from "../../overlay/Modal";
 import { Button } from "../../components/button";
@@ -9,11 +10,10 @@ import { createTestRunnerRegistry } from "./adapter";
 import type { Test } from "./types";
 import {
   completedTests,
-  largeDetailTests,
-  largeTreeTests,
   runningTests,
   setupAdapter,
 } from "./TestRunner.fixtures";
+import { largeDetailTests, largeTreeTests } from "./TestRunner.large-fixtures";
 
 const meta: Meta<typeof TestRunner> = {
   title: "Data/TestRunner",
@@ -111,6 +111,14 @@ export const LargePayloads: Story = {
       <Harness tests={largeDetailTests} done />
     </div>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByText("imports 500 policy rows"));
+    const rows = canvas.getAllByRole("button", { name: "Expand value" });
+    await expect(rows).toHaveLength(500);
+    await userEvent.click(rows[499]!);
+    await expect(canvas.getByText("POL-000499")).toBeVisible();
+  },
 };
 
 /**
@@ -133,5 +141,13 @@ export const InsideDialog: Story = {
         </Modal>
       </div>
     );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement.ownerDocument.body);
+    await userEvent.click(canvas.getByTitle("Failed: neutral"));
+    const tree = within(canvas.getByRole("tree"));
+    await userEvent.click(tree.getByText("case 3.3.2.3"));
+    await expect(canvas.getByText("case 3.3.2.3 did not meet expectations")).toBeVisible();
+    await expect(tree.queryByText("case 3.3.3.3")).not.toBeInTheDocument();
   },
 };

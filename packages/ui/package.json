@@ -144,18 +144,19 @@
   },
   "scripts": {
     "dev": "vite dev",
-    "build": "pnpm run build:icons && vite build && node scripts/rewrite-declaration-imports.mjs && pnpm run check:declarations && vite build --mode cjs && node scripts/build-styles.mjs",
+    "build": "pnpm run build:icons && pnpm run check:public-exports && vite build && node scripts/rewrite-declaration-imports.mjs && pnpm run check:declarations && vite build --mode cjs && node scripts/build-styles.mjs",
     "build:icons": "tsx scripts/build-icons.ts",
     "build:icons:force": "tsx scripts/build-icons.ts --force",
     "download:icons": "tsx scripts/download-icons.ts",
     "build:storybook-schemas": "tsx scripts/build-storybook-schemas.ts",
     "check:declarations": "node scripts/check-declarations.mjs",
+    "check:public-exports": "tsc -p tsconfig.public-exports.json",
     "check:expression-exports": "node scripts/check-expression-exports.mjs",
     "vendor:expressions": "tsx scripts/vendor-expressions.ts",
     "vendor:expressions:check": "tsx scripts/vendor-expressions.ts --check",
     "test": "pnpm run build:icons && vitest run",
     "lint": "oxlint -c .oxlintrc.json src --deny-warnings",
-    "check": "pnpm run build:icons && tsc -b --noEmit && pnpm run lint"
+    "check": "pnpm run build:icons && tsc -b --noEmit && pnpm run check:public-exports && pnpm run lint"
   },
   "dependencies": {
     "@codemirror/autocomplete": "catalog:",

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "rootDir": ".",
+    "noEmit": true,
+    "paths": {
+      "react": ["./node_modules/@types/react/index.d.ts"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "@flanksource/clicky-ui/clicky": ["./packages/ui/src/clicky.ts"]
+    }
+  },
+  "include": ["typecheck/**/*.ts", "src/**/*.d.ts"]
+}

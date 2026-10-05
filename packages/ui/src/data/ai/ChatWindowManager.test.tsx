@@ -13,6 +13,7 @@ function wrapper(storageId: string) {
 afterEach(() => {
   localStorage.clear();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("ChatWindowManager", () => {
@@ -86,6 +87,7 @@ describe("ChatWindowManager", () => {
   });
 
   it("persists position/size to localStorage and rehydrates a fresh provider", async () => {
+    vi.useFakeTimers();
     const { result } = renderHook(() => useChatWindowManager(), { wrapper: wrapper("persist") });
     let id = "";
     act(() => {
@@ -93,13 +95,17 @@ describe("ChatWindowManager", () => {
     });
     act(() => result.current.updatePanel(id, { x: 111, y: 222, width: 400, height: 500 }));
 
-    // The debounced save fires after 1s; flush real time, then mount anew.
-    await new Promise((r) => setTimeout(r, 1100));
-    expect(localStorage.getItem("chat-panels:persist")).toContain("111");
+    await act(() => vi.advanceTimersByTimeAsync(999));
+    expect(localStorage.getItem("chat-panels:persist")).toBeNull();
+    act(() => result.current.updatePanel(id, { x: 112 }));
+    await act(() => vi.advanceTimersByTimeAsync(999));
+    expect(localStorage.getItem("chat-panels:persist")).toBeNull();
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(localStorage.getItem("chat-panels:persist")).toContain("112");
 
     const second = renderHook(() => useChatWindowManager(), { wrapper: wrapper("persist") });
     const restored = second.result.current.panels[0]!;
-    expect(restored.x).toBe(111);
+    expect(restored.x).toBe(112);
     expect(restored.width).toBe(400);
   });
 
