@@ -62,6 +62,11 @@ export interface SessionViewerMenuProps {
   hasEncryptedReasoning: boolean;
   showEncryptedReasoning: boolean;
   onToggleEncryptedReasoning: () => void;
+  showEstimatedToolCost: boolean;
+  onToggleEstimatedToolCost: () => void;
+  onEstimateTokens?: () => void;
+  onCalculateMissingTokens?: (() => void) | undefined;
+  estimatingTokens?: boolean;
 }
 
 /** The SessionViewer's "3-dot" menu: density and theme overrides as one-line
@@ -86,6 +91,11 @@ export function SessionViewerMenu({
   hasEncryptedReasoning,
   showEncryptedReasoning,
   onToggleEncryptedReasoning,
+  showEstimatedToolCost,
+  onToggleEstimatedToolCost,
+  onEstimateTokens,
+  onCalculateMissingTokens,
+  estimatingTokens,
 }: SessionViewerMenuProps) {
   return (
     <DropdownMenu
@@ -113,6 +123,16 @@ export function SessionViewerMenu({
             value={theme}
             onChange={onThemeChange}
           />
+
+          <Section>
+            {onEstimateTokens && <button type="button" role="menuitem" className={ROW_CLASS} disabled={estimatingTokens} onClick={onEstimateTokens}>Estimate tokens/cost for all rows</button>}
+            {onCalculateMissingTokens && <button type="button" role="menuitem" className={ROW_CLASS} disabled={estimatingTokens} onClick={onCalculateMissingTokens}>Calculate missing rows</button>}
+            <CheckRow
+              label="Show estimated tool cost"
+              checked={showEstimatedToolCost}
+              onToggle={onToggleEstimatedToolCost}
+            />
+          </Section>
 
           {filters.categories.length > 0 && (
             <Section heading="Categories">

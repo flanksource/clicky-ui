@@ -11,7 +11,7 @@ import { shortContextModelName } from "./ContextMeter.model";
 import { providerIcon, providerIconColor } from "./provider-icons";
 
 type ContextMeterBarProps = {
-  pct: number;
+  pct: number | undefined;
   provider?: string | undefined;
   executionMode?: string | undefined;
   model?: string | undefined;
@@ -45,7 +45,7 @@ export function ContextMeterBar({
         "inline-flex items-center gap-1.5 rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground",
         className,
       )}
-      aria-label={`Context ${pct}% used`}
+      aria-label={pct === undefined ? "Context unavailable" : `Context ${pct}% used`}
     >
       <span
         data-context-identity="provider"
@@ -107,7 +107,7 @@ export function ContextMeterBar({
               "block h-full rounded-full transition-all",
               barClassName,
             )}
-            style={{ width: `${pct}%` }}
+            style={{ width: `${pct ?? 0}%` }}
           />
         </span>
         <span
@@ -120,7 +120,7 @@ export function ContextMeterBar({
               "absolute inset-x-0 bottom-0 block w-full rounded-full transition-all",
               barClassName,
             )}
-            style={{ height: `${pct}%` }}
+            style={{ height: `${pct ?? 0}%` }}
           />
         </span>
       </span>
@@ -128,7 +128,7 @@ export function ContextMeterBar({
         data-context-identity="percentage"
         className={cn("shrink-0 font-medium tabular-nums", textClassName)}
       >
-        {pct}%
+        {pct === undefined ? "—" : `${pct}%`}
       </span>
     </span>
   );

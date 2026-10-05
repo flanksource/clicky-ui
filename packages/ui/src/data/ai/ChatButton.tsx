@@ -8,6 +8,7 @@ export type ChatButtonProps = Omit<ChatFabProps, "persistent">;
 export function ChatButton({
   icon = UiSparkles,
   label = "Open chat",
+  contextItems,
   className,
 }: ChatButtonProps) {
   return (
@@ -15,6 +16,7 @@ export function ChatButton({
       persistent
       icon={icon}
       label={label}
+      {...(contextItems ? { contextItems } : {})}
       className={cn(
         "static size-9 rounded-md bg-transparent text-foreground shadow-none hover:bg-accent",
         className,
