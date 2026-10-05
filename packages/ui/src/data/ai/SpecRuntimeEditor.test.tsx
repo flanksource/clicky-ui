@@ -439,7 +439,9 @@ describe("SpecRuntimeEditor", () => {
       within(modelSection).queryByRole("button", { name: "Add fallback" }),
     ).not.toBeInTheDocument();
     const bar = within(picker).getByRole("group", { name: "Fallback runtime" });
-    expect(within(bar).getByTitle("Anthropic API")).toHaveTextContent("API");
+    expect(within(bar).getByTitle("Runtime mode — API")).toHaveTextContent(
+      "API",
+    );
     expect(
       within(bar).getByTitle("Model — unspecified"),
     ).toBeInTheDocument();
@@ -456,10 +458,8 @@ describe("SpecRuntimeEditor", () => {
       ).getByRole("img", { name: "Anthropic API" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(within(bar).getByTitle("Family — Claude"));
-    fireEvent.click(await screen.findByRole("menuitem", { name: /^Codex/ }));
     fireEvent.click(within(bar).getByTitle("Model — unspecified"));
-    fireEvent.click(await screen.findByRole("menuitem", { name: /o4-mini/ }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: /o4-mini/ }));
     expect(
       await within(modelSection).findByTitle("Model — openai/o4-mini"),
     ).toBeInTheDocument();
@@ -470,11 +470,18 @@ describe("SpecRuntimeEditor", () => {
     const updatedBar = within(updatedPicker).getByRole("group", {
       name: "Fallback runtime",
     });
-    fireEvent.click(within(updatedBar).getByTitle("Reasoning effort"));
+    fireEvent.click(within(updatedBar).getByTitle("Runtime options"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Effort" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: /^High/ }));
 
-    expect(within(modelSection).getAllByText("o4-mini").length).toBe(2);
-    expect(within(modelSection).getAllByText("High").length).toBe(2);
+    const updatedRow = within(modelSection).getByRole("button", {
+      name: "Edit fallback o4-mini",
+    });
+    expect(within(updatedRow).getByText("o4-mini")).toBeInTheDocument();
+    expect(within(updatedRow).getByText("High")).toBeInTheDocument();
+    expect(
+      within(updatedBar).getByRole("combobox", { name: "Model" }),
+    ).toHaveTextContent("o4-mini");
     expect(
       within(modelSection).getByRole("button", {
         name: "Remove o4-mini",
@@ -797,17 +804,19 @@ describe("SpecRuntimeEditor", () => {
     render(<Host />);
 
     const bar = screen.getByRole("group", { name: "Runtime" });
-    expect(within(bar).getByTitle("Claude Code CLI")).toHaveTextContent("CLI");
-
-    fireEvent.click(within(bar).getByTitle("Claude Code CLI"));
-    fireEvent.click(
-      await screen.findByRole("menuitem", { name: /^Agent Claude Agent SDK/ }),
+    expect(within(bar).getByTitle("Runtime mode — CLI")).toHaveTextContent(
+      "CLI",
     );
 
-    expect(within(bar).getByTitle("Claude Agent SDK")).toHaveTextContent(
+    fireEvent.click(within(bar).getByTitle("Runtime mode — CLI"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Agent" }));
+
+    expect(within(bar).getByTitle("Runtime mode — Agent")).toHaveTextContent(
       "Agent",
     );
-    expect(within(bar).queryByTitle("Claude Code CLI")).not.toBeInTheDocument();
+    expect(
+      within(bar).queryByTitle("Runtime mode — CLI"),
+    ).not.toBeInTheDocument();
   });
 
   it("collapses a section when its heading toggle is clicked", () => {

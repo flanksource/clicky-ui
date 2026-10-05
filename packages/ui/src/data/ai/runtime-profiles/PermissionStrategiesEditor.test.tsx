@@ -118,15 +118,19 @@ describe("PermissionStrategiesEditor", () => {
         .map((field) => (field as HTMLSelectElement).value),
     ).toEqual(["group", "destructive"]);
     expect(
-      (screen.getByLabelText("Match value 1") as HTMLInputElement).value,
+      (
+        screen.getByRole("combobox", {
+          name: "Match value 1",
+        }) as HTMLInputElement
+      ).value,
     ).toBe("projects.write");
     expect(
       (screen.getByLabelText("Match value 2") as HTMLSelectElement).value,
     ).toBe("true");
 
-    fireEvent.click(screen.getByLabelText("Match value 1"));
+    fireEvent.click(screen.getByRole("combobox", { name: "Match value 1" }));
     expect(screen.getByRole("option", { name: "projects.write" })).toBeTruthy();
-    fireEvent.keyDown(screen.getByLabelText("Match value 1"), {
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Match value 1" }), {
       key: "Escape",
     });
     const matchBadge = screen.getByRole("button", {
