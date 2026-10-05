@@ -38,7 +38,10 @@ describe("Estimated tool cost display", () => {
     fireEvent.click(toggle);
 
     const estimate = screen.getByLabelText("Estimated tool cost");
-    expect(estimate).toHaveTextContent(/^~\$0\.0035$/);
+    expect(estimate).toHaveTextContent(/^~\$0\.0035\+8k$/);
+    const cacheDelta = within(estimate).getByLabelText("Cache read delta: 8,000 tokens");
+    expect(cacheDelta).toHaveAttribute("title", "Cache read delta: 8,000 tokens");
+    expect(cacheDelta.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
     expect(estimate.closest('[data-tool-header]')).not.toBeNull();
     expect(container.querySelector("button button")).toBeNull();
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
@@ -73,17 +76,19 @@ describe("Estimated tool cost display", () => {
       id: "waits", role: "assistant", parts: ["one", "two"].map((id) => ({
         type: "dynamic-tool", toolName: "Wait", toolCallId: id,
         input: { cell_id: id }, output: "Finished",
-        estimatedCost: { sharedCalls: 1, cost: { inputTokens: 10, outputTokens: 1, inputCost: 0.001 } },
+        estimatedCost: { sharedCalls: 1, cost: { inputTokens: 10, outputTokens: 1, cacheReadTokens: 500, inputCost: 0.001 } },
       })),
     }] }} />);
     fireEvent.click(screen.getByRole("button", { name: "Session options" }));
     fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Show estimated tool cost" }));
     expect(screen.getByLabelText("Estimated tool cost")).toHaveTextContent("~$0.0020");
+    expect(within(screen.getByLabelText("Estimated tool cost")).getByLabelText("Cache read delta: 1,000 tokens")).toHaveTextContent("+1k");
     expect(screen.getByLabelText("Estimated tool cost").closest('[data-tool-header]')).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Expand Wait × 2" }));
     const rows = screen.getAllByLabelText("Estimated tool cost");
     expect(rows).toHaveLength(2);
     expect(within(rows[0]!).getByText("~$0.0010")).toBeInTheDocument();
+    expect(rows.map((row) => within(row).getByLabelText("Cache read delta: 500 tokens").textContent)).toEqual(["+500", "+500"]);
     expect(screen.getByLabelText("Estimated tool cost details")).toHaveTextContent("~$0.0020");
   });
 
@@ -95,6 +100,7 @@ describe("Estimated tool cost display", () => {
     }] }] }} />);
     fireEvent.click(screen.getByRole("button", { name: "Session options" }));
     fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Show estimated tool cost" }));
+    expect(screen.queryByLabelText(/Cache read delta:/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Estimated tool cost details")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Toggle response" }));
     const footer = screen.getByLabelText("Estimated tool cost details");

@@ -40,6 +40,8 @@ export type ToolCallProps = {
   /** Calls made by the subagent this call spawned (an Agent/Task call), nested
    *  beneath it. A background subagent keeps calling after its parent returns. */
   subcalls?: AnyToolPart[] | undefined;
+  /** Descendants grouped by the call that spawned them. */
+  subcallsByParent?: ReadonlyMap<string, AnyToolPart[]> | undefined;
   className?: string;
 };
 
@@ -88,13 +90,14 @@ export function ToolCall({
   tool,
   registry: registryProp,
   subcalls = [],
+  subcallsByParent,
   className,
 }: ToolCallProps) {
   const needsApproval = part.state === "approval-requested";
   const [userOpen, setOpen] = useState(defaultOpen || needsApproval);
   // A nested approval must stay reachable, so it holds its parent open.
   const open =
-    userOpen || subcalls.some((call) => call.state === "approval-requested");
+    userOpen || needsApproval || hasPendingApproval(subcalls, subcallsByParent);
   const contextRegistry = useToolRenderRegistry();
   const registry = registryProp ?? contextRegistry;
   const status = STATUS_ICON[part.state];
@@ -176,6 +179,8 @@ export function ToolCall({
                 <ToolCall
                   key={call.toolCallId}
                   part={call}
+                  subcalls={subcallsByParent?.get(call.toolCallId)}
+                  subcallsByParent={subcallsByParent}
                   onApprove={onApprove}
                   registry={registry}
                   {...(renderToolResult ? { renderToolResult } : {})}
@@ -188,6 +193,16 @@ export function ToolCall({
 
       {needsApproval && <ApprovalControls part={part} onApprove={onApprove} />}
     </div>
+  );
+}
+
+function hasPendingApproval(
+  calls: AnyToolPart[],
+  grouped: ToolCallProps["subcallsByParent"],
+): boolean {
+  return calls.some(
+    (call) => call.state === "approval-requested" ||
+      hasPendingApproval(grouped?.get(call.toolCallId) ?? [], grouped),
   );
 }
 
@@ -211,22 +226,30 @@ function ApprovalControls({
   onApprove: ToolCallProps["onApprove"];
 }) {
   const [pending, setPending] = useState<"approve" | "deny">();
+  const [error, setError] = useState<string>();
   const approval = "approval" in part ? part.approval : undefined;
   if (!approval || !onApprove) return null;
-  const decide = (approved: boolean) => {
+  const decide = async (approved: boolean) => {
     setPending(approved ? "approve" : "deny");
-    void Promise.resolve(onApprove(approval.id, approved)).finally(() =>
-      setPending(undefined),
-    );
+    setError(undefined);
+    try {
+      await onApprove(approval.id, approved);
+    } catch (cause) {
+      setError(
+        `Cannot ${approved ? "approve" : "deny"} tool call: ${cause instanceof Error ? cause.message : String(cause)}`,
+      );
+    } finally {
+      setPending(undefined);
+    }
   };
   return (
-    <div className="mt-1.5 flex items-center gap-2 pl-4">
+    <div className="mt-1.5 flex flex-wrap items-center gap-2 pl-4">
       <Button
         type="button"
         size="sm"
         loading={pending === "approve"}
         disabled={pending !== undefined}
-        onClick={() => decide(true)}
+        onClick={() => void decide(true)}
       >
         Approve
       </Button>
@@ -236,10 +259,13 @@ function ApprovalControls({
         variant="outline"
         loading={pending === "deny"}
         disabled={pending !== undefined}
-        onClick={() => decide(false)}
+        onClick={() => void decide(false)}
       >
         Deny
       </Button>
+      {error && (
+        <div role="alert" className="w-full text-xs text-destructive">{error}</div>
+      )}
     </div>
   );
 }

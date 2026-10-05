@@ -79,6 +79,7 @@ export function Message({
               onApprove={onApprove}
               renderToolResult={renderToolResult}
               subcalls={isToolPart(part) ? subcalls.get(part.toolCallId) : undefined}
+              subcallsByParent={subcalls}
             />
           ),
         )}
@@ -161,12 +162,14 @@ function MessagePart({
   onApprove,
   renderToolResult,
   subcalls,
+  subcallsByParent,
 }: {
   part: MessagePartValue;
   isUser: boolean;
   onApprove: MessageActionHandlers["onApprove"];
   renderToolResult: MessageActionHandlers["renderToolResult"];
   subcalls: AnyToolPart[] | undefined;
+  subcallsByParent: ReadonlyMap<string, AnyToolPart[]>;
 }) {
   if (part.type === "text") {
     if (isUser) {
@@ -188,6 +191,7 @@ function MessagePart({
         part={part}
         onApprove={onApprove}
         subcalls={subcalls}
+        subcallsByParent={subcallsByParent}
         {...(renderToolResult ? { renderToolResult } : {})}
       />
     );

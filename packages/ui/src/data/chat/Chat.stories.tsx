@@ -84,10 +84,11 @@ export const WithRuntimeBar: Story = {
     await expect(runtime.getByTitle("Reasoning effort")).toHaveTextContent(
       "Medium",
     );
-    const meter = canvas.getByLabelText("Context 0% used");
+    const meter = canvas.getByLabelText("Context unavailable");
     await userEvent.hover(meter);
     const body = within(document.body);
     await waitFor(() => expect(body.getByRole("tooltip")).toBeInTheDocument());
+    await expect(within(body.getByRole("tooltip")).getAllByText("Unavailable").length).toBeGreaterThan(0);
     await expect(
       within(body.getByRole("tooltip")).queryByText("Claude Sonnet 4.5"),
     ).not.toBeInTheDocument();

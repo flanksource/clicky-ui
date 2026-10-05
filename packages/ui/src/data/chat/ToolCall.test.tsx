@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ToolCall } from "./ToolCall";
 import { createToolRenderRegistry } from "./tool-render/registry";
@@ -193,7 +193,7 @@ describe("ToolCall tool-render registry", () => {
     expect(busy).toBeDisabled();
     expect(screen.getByRole("button", { name: other })).toBeDisabled();
 
-    settle();
+    await act(async () => settle());
     await vi.waitFor(() => expect(screen.getByRole("button", { name: clicked })).toBeEnabled());
     expect(screen.getByRole("button", { name: other })).toBeEnabled();
   });

@@ -222,7 +222,9 @@ export function Chat({
   );
   const [usage, setUsage] = useState<ChatUsageSummary | null>(null);
   const [approvalError, setApprovalError] = useState<Error | undefined>();
-  const [approvalsInFlight, setApprovalsInFlight] = useState(0);
+  const [approvalsInFlight, setApprovalsInFlight] = useState(
+    () => new Map<string | undefined, number>(),
+  );
   const lastDefaultModel = useRef(defaultModel);
   const [draft, setDraft] = useState<{ id: number; text: string } | null>(null);
   const seededInitialPromptId = useRef<number | null>(null);
@@ -464,7 +466,9 @@ export function Chat({
   ) => {
     const approvalThreadId = threadId;
     setApprovalError(undefined);
-    setApprovalsInFlight((count) => count + 1);
+    setApprovalsInFlight((counts) =>
+      new Map(counts).set(approvalThreadId, (counts.get(approvalThreadId) ?? 0) + 1),
+    );
     try {
       if (!sessionsApi) {
         throw new Error(
@@ -491,7 +495,16 @@ export function Chat({
         cause instanceof Error ? cause : new Error(String(cause)),
       );
     } finally {
-      setApprovalsInFlight((count) => count - 1);
+      setApprovalsInFlight((counts) => {
+        const count = counts.get(approvalThreadId);
+        if (count === undefined || count < 1) {
+          throw new Error("Tool approval completed without a pending request.");
+        }
+        const next = new Map(counts);
+        if (count === 1) next.delete(approvalThreadId);
+        else next.set(approvalThreadId, count - 1);
+        return next;
+      });
     }
   };
 
@@ -548,7 +561,7 @@ export function Chat({
             : runtime.model
               ? { model: runtime.model }
               : {})}
-          suppressWaiting={approvalsInFlight > 0}
+          suppressWaiting={(approvalsInFlight.get(threadId) ?? 0) > 0}
           emptyState={empty}
           onRegenerate={(messageId) => void regenerate({ messageId })}
           onApprove={resolveToolApproval}
