@@ -2,7 +2,7 @@
 // sites of a selected edge (guards fetched on selection when the host's graph leaves them out) and the
 // details of a selected node. It knows no language: the host's vocabulary names and draws node kinds,
 // and the host's callbacks open nodes and sites.
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "../../components/button";
 import { cn } from "../../lib/utils";
 import { GraphDiagram } from "../GraphDiagram";
@@ -104,6 +104,7 @@ export interface CallGraphProps<G extends Graph = Graph> {
 }
 
 type Held<G> = { key: string; graph: G; revealed: string[] };
+type PendingExpansion = { key: string; nodeId: string; label: string; controller: AbortController };
 
 const NODE_WIDTH = 188;
 const NODE_HEIGHT = 32;
@@ -153,7 +154,19 @@ export function CallGraph<G extends Graph = Graph>(props: CallGraphProps<G>) {
   const load = useGraphLoad(fetchGraph, request, key);
 
   const [expanded, setExpanded] = useState<Held<G>>();
-  const [expanding, setExpanding] = useState<{ key: string; label: string; error?: string }>();
+  const [expanding, setExpanding] = useState<{ request: PendingExpansion; error?: string }>();
+  const pendingExpansion = useRef<PendingExpansion | undefined>(undefined);
+  const activeKey = useRef(key);
+  activeKey.current = key;
+  useEffect(() => {
+    setExpanding((current) => current?.request.key === key && !current.request.controller.signal.aborted ? current : undefined);
+    return () => {
+      if (pendingExpansion.current?.key === key) {
+        pendingExpansion.current.controller.abort();
+        pendingExpansion.current = undefined;
+      }
+    };
+  }, [key]);
   const [opening, setOpening] = useState({ nonce: 0, fit: false });
   const fresh = useMemo<Held<G> | undefined>(
     () => load.fresh && (expanded?.key === key ? expanded : { key, graph: load.fresh, revealed: [] }),
@@ -190,23 +203,34 @@ export function CallGraph<G extends Graph = Graph>(props: CallGraphProps<G>) {
   const selectedNode = selection?.kind === "node" ? visible?.nodes.find((node) => node.id === selection.id) : undefined;
   const selectedEdge = selection?.kind === "edge" ? visible?.edges.find((edge) => edge.id === selection.id) : undefined;
   const guards = useSiteGuards(props.loadSiteGuards, shown?.key, selectedEdge, graph);
-  const expansion = expanding?.key === shown?.key ? expanding : undefined;
+  const expansion = expanding?.request.key === key ? expanding : undefined;
 
   // A `+N` loads one more hop on the node's outer side and merges it into the graph this request drew.
   const expand = async (drawn: Held<G>, id: string) => {
+    if (drawn.key !== activeKey.current) return;
+    if (pendingExpansion.current?.key === drawn.key && pendingExpansion.current.nodeId === id) return;
+    pendingExpansion.current?.controller.abort();
     const node = requireNode(drawn.graph, id);
-    setExpanding({ key: drawn.key, label: node.label });
+    const request: PendingExpansion = { key: drawn.key, nodeId: id, label: node.label, controller: new AbortController() };
+    pendingExpansion.current = request;
+    setExpanding({ request });
     try {
       const data = await fetchGraph({
-        root: id, direction: expansionDirection(node), depth: 1, exclude, access, columns, purpose: "expand", signal: new AbortController().signal,
+        root: id, direction: expansionDirection(node), depth: 1, exclude, access, columns, purpose: "expand", signal: request.controller.signal,
       });
+      if (request.controller.signal.aborted || activeKey.current !== drawn.key || pendingExpansion.current !== request) return;
       setExpanded((held) => {
+        if (request.controller.signal.aborted || activeKey.current !== drawn.key) return held;
         const base = held?.key === drawn.key ? held : drawn;
         return { key: drawn.key, graph: mergeGraph(base.graph, data), revealed: [...base.revealed, ...data.nodes.map((entry) => entry.id)] };
       });
-      setExpanding(undefined);
+      setExpanding((current) => current?.request === request ? undefined : current);
     } catch (error) {
-      setExpanding({ key: drawn.key, label: node.label, error: `Cannot expand ${node.label}: ${errorMessage(error)}` });
+      if (request.controller.signal.aborted || activeKey.current !== drawn.key || pendingExpansion.current !== request) return;
+      setExpanding((current) => current?.request === request
+        ? { request, error: `Cannot expand ${node.label}: ${errorMessage(error)}` } : current);
+    } finally {
+      if (pendingExpansion.current === request) pendingExpansion.current = undefined;
     }
   };
 
@@ -253,7 +277,7 @@ export function CallGraph<G extends Graph = Graph>(props: CallGraphProps<G>) {
           </div>
           {(selectedEdge || selectedNode || expansion) && (
             <aside className="w-80 max-w-[45%] shrink-0 overflow-y-auto rounded-lg border border-border bg-card p-3" aria-label="Selection">
-              {expansion && <p role="status" className="mb-2 text-xs text-muted-foreground">{expansion.error ?? `Loading more around ${expansion.label}…`}</p>}
+              {expansion && <p role="status" className="mb-2 text-xs text-muted-foreground">{expansion.error ?? `Loading more around ${expansion.request.label}…`}</p>}
               {(selectedEdge || selectedNode) && (
                 <div className="mb-1 flex justify-end">
                   <Button type="button" size="sm" variant="ghost" aria-label="Close selection" onClick={() => select(undefined)}>×</Button>
