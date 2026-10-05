@@ -18,6 +18,8 @@ export type CodeBlockProps = {
   className?: string | undefined;
   /** Default expansion depth when rendering JSON as a tree. */
   jsonDefaultOpenDepth?: number | undefined;
+  /** Display format for parsed JSON values. */
+  jsonFormat?: "json" | "yaml" | undefined;
   /** Render only the code — no border, background, or language header. */
   bare?: boolean | undefined;
   /** Show a copy-to-clipboard button in the header (ignored when `bare`). */
@@ -54,6 +56,7 @@ export function CodeBlock({
   highlightedHtml,
   className,
   jsonDefaultOpenDepth = 2,
+  jsonFormat = "json",
   bare = false,
   copyable = false,
   downloadable = false,
@@ -150,14 +153,14 @@ export function CodeBlock({
   }
 
   if (parsedJson !== JSON_PARSE_FAILED) {
-    const tree = <JsonView data={parsedJson} format="json" defaultOpenDepth={jsonDefaultOpenDepth} />;
+    const tree = <JsonView data={parsedJson} format={jsonFormat} defaultOpenDepth={jsonDefaultOpenDepth} />;
     if (bare) return <div className={cn("overflow-auto text-xs", className)}>{tree}</div>;
     return (
       <div
         className={cn("overflow-hidden rounded-md border border-border bg-muted/40", className)}
         {...overrideAttrs}
       >
-        <CodeBlockHeader label="json" actions={headerActions} />
+        <CodeBlockHeader label={jsonFormat} actions={headerActions} />
         <div className="overflow-auto p-3 text-xs">{tree}</div>
       </div>
     );

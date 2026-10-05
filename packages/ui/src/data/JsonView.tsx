@@ -4,21 +4,25 @@ import { Button } from "../components/button";
 import { useDensityValue, type Density } from "../hooks/use-density";
 import { UiChevronRight } from "../icons";
 import { cn } from "../lib/utils";
+import { JsonSource } from "./json-view/JsonSource";
+import type { JsonViewOptions } from "./json-view/types";
 
-export type JsonViewProps = {
-  /** JSON-like value to render. */
-  data: unknown;
-  /** Property name displayed before the value. */
-  name?: string;
-  /** Current nesting depth; callers usually leave this unset. */
-  depth?: number;
-  /** Depth that starts expanded by default. */
-  defaultOpenDepth?: number;
-  /** YAML is the default; JSON retains braces and quoted strings. */
-  format?: "yaml" | "json";
-  /** Override the inherited application density for this viewer. */
-  density?: Density;
-};
+export type JsonViewProps = JsonViewOptions &
+  (
+    | {
+        /** Parsed JSON-like value. Strings remain literal values. */
+        data: unknown;
+        source?: never;
+        inputFormat?: never;
+      }
+    | {
+        /** Raw JSON or NDJSON, including input interrupted at EOF. */
+        source: string;
+        /** Source encoding. This is independent of the YAML/JSON display format. */
+        inputFormat?: "json" | "ndjson";
+        data?: never;
+      }
+  );
 
 const DENSITY_CLASSES: Record<Density, string> = {
   compact:
@@ -36,6 +40,14 @@ export function JsonView({
 }: JsonViewProps) {
   const inheritedDensity = useDensityValue();
   const activeDensity = density ?? inheritedDensity;
+  const hasSource = Object.hasOwn(props, "source");
+  if (hasSource === Object.hasOwn(props, "data"))
+    throw new Error("JsonView requires exactly one of data or source");
+  if (!hasSource && Object.hasOwn(props, "inputFormat"))
+    throw new Error("JsonView inputFormat requires source");
+  if (hasSource && typeof props.source !== "string")
+    throw new Error("JsonView source must be a string");
+  const { data, source, inputFormat = "json", ...options } = props;
   return (
     <div
       data-format={format}
@@ -45,12 +57,23 @@ export function JsonView({
         DENSITY_CLASSES[activeDensity],
       )}
     >
-      <JsonViewNode {...props} format={format} />
+      {hasSource && source !== undefined ? (
+        <JsonSource
+          source={source}
+          inputFormat={inputFormat}
+          renderValue={(value) => (
+            <JsonViewNode {...options} data={value} format={format} />
+          )}
+        />
+      ) : (
+        <JsonViewNode {...options} data={data} format={format} />
+      )}
     </div>
   );
 }
 
-type JsonViewNodeProps = Omit<JsonViewProps, "density"> & {
+type JsonViewNodeProps = Omit<JsonViewOptions, "density"> & {
+  data: unknown;
   format: "yaml" | "json";
   sequenceItem?: boolean;
 };
