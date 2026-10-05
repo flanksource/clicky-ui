@@ -91,6 +91,7 @@ const config: StorybookConfig = {
       "@flanksource/clicky-ui > react-rnd",
       "@flanksource/clicky-ui > marked",
       "@flanksource/clicky-ui > yaml",
+      "@flanksource/clicky-ui > jsonc-parser",
       "@flanksource/clicky-ui > streamdown",
       "@flanksource/clicky-ui > ai",
       "@flanksource/clicky-ui > @ai-sdk/react",
