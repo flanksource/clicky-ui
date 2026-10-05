@@ -63,6 +63,17 @@ function follows(before: Element, after: Element): boolean {
 }
 
 describe("ToolSchemaBrowser", () => {
+  it.each(["group", "tree"] as const)("limits incomplete child directories to their names in %s view", (view) => {
+    const onRule = vi.fn();
+    const tools: ToolMeta[] = view === "group"
+      ? [{ name: "unparented", group: "Read" }, { name: "sibling", group: "Read", parent: "Accounts" }]
+      : [{ name: "ungrouped", parent: "Accounts" }, { name: "sibling", group: "Read", parent: "Accounts" }];
+    render(<ToolSchemaBrowser tools={tools} onRule={onRule} />);
+    if (view === "tree") fireEvent.click(screen.getByRole("button", { name: "Tree" }));
+    fireEvent.click(screen.getByRole("button", { name: `Toggle ${view === "group" ? "General" : "Tools"} group` }));
+    expect(onRule).toHaveBeenCalledExactlyOnceWith({ name: [view === "group" ? "unparented" : "ungrouped"], policy: "ask" });
+  });
+
   it("renders a split detail pane with selected tool id, strictness, and annotations", () => {
     render(<ToolSchemaBrowser tools={TOOLS} />);
 

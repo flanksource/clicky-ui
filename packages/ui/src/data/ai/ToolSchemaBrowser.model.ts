@@ -167,9 +167,11 @@ export function directoryPermissionRule({
         ? { group }
         : { parent }
       : { group, parent };
-  // Metadata facets keep applying as the catalog grows; only a directory with
-  // no metadata at all falls back to the names it holds today.
-  if (!facets.group && !facets.parent) {
+  // Both facets must identify a child; a missing facet would cover siblings.
+  if (
+    (!facets.group && !facets.parent) ||
+    (depth === "child" && (!group || !parent))
+  ) {
     return { name: tools.map((tool) => tool.name).sort(), policy };
   }
   return {
@@ -183,8 +185,8 @@ function singleDirectoryValue(
   tools: ToolMeta[],
   key: "group" | "parent",
 ): string | undefined {
-  const values = new Set(tools.map((tool) => tool[key]).filter(Boolean));
-  return values.size === 1 ? [...values][0] : undefined;
+  const value = tools[0]?.[key];
+  return value && tools.every((tool) => tool[key] === value) ? value : undefined;
 }
 
 /** The badge a directory shows and the rule a click on it emits: one cycle step

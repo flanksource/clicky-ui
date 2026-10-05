@@ -50,6 +50,8 @@ export function EstimatedToolCost({
       : `Combined estimate for ${estimates.length} calls; each model request is shared equally across its tool calls.`;
   const description = `${allocation} Includes conversation context and generating the calls. Reading tool results is accounted for in subsequent model requests. Estimated cost in USD.`;
   if (!detailed) {
+    const cacheReadTokens = costs.reduce((sum, cost) => sum + (cost.cacheReadTokens ?? 0), 0);
+    const cacheReadDescription = `Cache read delta: ${cacheReadTokens.toLocaleString("en-US")} tokens`;
     return (
       <span
         role="group"
@@ -59,6 +61,17 @@ export function EstimatedToolCost({
       >
         <UiCoins className="size-3 shrink-0" />
         <span>{total > 0 ? `~${formatCost(total)}` : "—"}</span>
+        {cacheReadTokens > 0 && (
+          <span
+            role="group"
+            aria-label={cacheReadDescription}
+            title={cacheReadDescription}
+            className="ml-1 inline-flex items-center gap-0.5"
+          >
+            <UiDatabaseDown className="size-3 shrink-0" />
+            <span>+{compactTokens(cacheReadTokens)}</span>
+          </span>
+        )}
       </span>
     );
   }

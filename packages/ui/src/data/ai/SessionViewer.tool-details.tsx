@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useDensityValue } from "../../hooks/use-density";
 import { CodeBlock } from "../CodeBlock";
 import { CodeDiff } from "../CodeDiff";
 import type {
@@ -89,9 +90,10 @@ export function DetailBlock({
   language: string;
   source: string;
 }): ReactNode {
+  const density = useDensityValue();
   return (
     <div className="overflow-x-auto text-xs">
-      <CodeBlock bare language={language} source={source} />
+      <CodeBlock bare language={language} source={source} jsonFormat={density === "compact" ? "yaml" : "json"} />
     </div>
   );
 }

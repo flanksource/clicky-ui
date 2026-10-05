@@ -57,7 +57,17 @@ export function AdvancedChatConfig({
     ...(budget?.cost !== undefined ? { budget: { cost: budget.cost } } : {}),
   };
   const handleBarChange = ({ budget: limits, ...next }: RuntimeBarValue) => {
-    onRuntimeChange?.(next);
+    if (
+      next.model !== runtime.model ||
+      next.id !== runtime.id ||
+      next.mode !== runtime.mode ||
+      next.temperature !== runtime.temperature ||
+      next.effort !== runtime.effort ||
+      next.noCache !== runtime.noCache ||
+      next.fallbacks !== runtime.fallbacks
+    ) {
+      onRuntimeChange?.(next);
+    }
     if (limits?.cost === budget?.cost) return;
     const updated: ChatBudgetConfig = { ...budget };
     if (limits?.cost === undefined) delete updated.cost;
