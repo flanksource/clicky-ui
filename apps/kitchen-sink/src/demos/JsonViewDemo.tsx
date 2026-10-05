@@ -18,10 +18,13 @@ export function JsonViewDemo() {
     <DemoSection
       id="json-view"
       title="JsonView"
-      description="Recursive collapsible JSON tree with type-aware coloring."
+      description="Collapsible YAML by default, with a JSON format option and application density support."
     >
       <div className="bg-background rounded-md border border-border p-density-3 max-h-96 overflow-auto">
         <JsonView data={sample} name="config" />
+      </div>
+      <div className="bg-background rounded-md border border-border p-density-3 max-h-96 overflow-auto">
+        <JsonView data={sample} name="config" format="json" />
       </div>
     </DemoSection>
   );
