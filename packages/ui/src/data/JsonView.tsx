@@ -1,99 +1,185 @@
 import { useState } from "react";
+import { stringify } from "yaml";
+import { Button } from "../components/button";
+import { useDensityValue, type Density } from "../hooks/use-density";
+import { UiChevronRight } from "../icons";
+import { cn } from "../lib/utils";
 
 export type JsonViewProps = {
   /** JSON-like value to render. */
   data: unknown;
-  /** Optional property name displayed before nested object/array values. */
+  /** Property name displayed before the value. */
   name?: string;
   /** Current nesting depth; callers usually leave this unset. */
   depth?: number;
   /** Depth that starts expanded by default. */
   defaultOpenDepth?: number;
+  /** YAML is the default; JSON retains braces and quoted strings. */
+  format?: "yaml" | "json";
+  /** Override the inherited application density for this viewer. */
+  density?: Density;
 };
 
-export function JsonView({ data, name, depth = 0, defaultOpenDepth = 2 }: JsonViewProps) {
+const DENSITY_CLASSES: Record<Density, string> = {
+  compact:
+    "text-xs leading-4 [--json-view-indent:0.75rem] [--json-view-row-space:0px]",
+  comfortable:
+    "text-sm leading-5 [--json-view-indent:1rem] [--json-view-row-space:1px]",
+  spacious:
+    "text-base leading-6 [--json-view-indent:1.25rem] [--json-view-row-space:2px]",
+};
+
+export function JsonView({
+  density,
+  format = "yaml",
+  ...props
+}: JsonViewProps) {
+  const inheritedDensity = useDensityValue();
+  const activeDensity = density ?? inheritedDensity;
+  return (
+    <div
+      data-format={format}
+      data-density={activeDensity}
+      className={cn(
+        "font-mono whitespace-pre-wrap break-words",
+        DENSITY_CLASSES[activeDensity],
+      )}
+    >
+      <JsonViewNode {...props} format={format} />
+    </div>
+  );
+}
+
+type JsonViewNodeProps = Omit<JsonViewProps, "density"> & {
+  format: "yaml" | "json";
+  sequenceItem?: boolean;
+};
+
+function JsonViewNode({
+  data,
+  name,
+  depth = 0,
+  defaultOpenDepth = 2,
+  format,
+  sequenceItem = false,
+}: JsonViewNodeProps) {
   const [open, setOpen] = useState(depth < defaultOpenDepth);
-
-  if (data === null || data === undefined) {
-    return <span className="text-muted-foreground italic">null</span>;
-  }
-
-  if (typeof data === "string") {
-    return <span className="text-green-700 dark:text-green-400">"{data}"</span>;
-  }
-
-  if (typeof data === "number" || typeof data === "boolean") {
-    return <span className="text-blue-700 dark:text-blue-400">{String(data)}</span>;
-  }
-
-  if (typeof data !== "object") {
-    return <span className="text-muted-foreground">{String(data)}</span>;
-  }
-
   const isArray = Array.isArray(data);
-  const entries: Array<[string | number, unknown]> = isArray
-    ? (data as unknown[]).map((v, i) => [i, v])
-    : Object.entries(data as Record<string, unknown>);
-  const [openB, closeB] = isArray ? ["[", "]"] : ["{", "}"];
-
+  const entries =
+    data !== null && typeof data === "object" ? Object.entries(data) : [];
+  const prefix = (
+    <>
+      {sequenceItem && <span className="text-muted-foreground">- </span>}
+      {name !== undefined && (
+        <>
+          <span className="text-purple-600 [[data-theme=dark]_&]:text-purple-400">
+            {format === "yaml" ? yamlString(name) : name}
+          </span>
+          <span className="text-muted-foreground">: </span>
+        </>
+      )}
+    </>
+  );
   if (entries.length === 0) {
     return (
-      <span className="text-muted-foreground">
-        {openB}
-        {closeB}
-      </span>
+      <div className="py-[var(--json-view-row-space)]">
+        {prefix}
+        <JsonViewScalar data={data} format={format} />
+      </div>
     );
   }
-
+  const [openB, closeB] = isArray ? ["[", "]"] : ["{", "}"];
+  const summary = `${entries.length} ${isArray ? (entries.length === 1 ? "item" : "items") : entries.length === 1 ? "key" : "keys"}`;
   return (
-    <div className="text-sm font-mono" style={{ paddingLeft: depth > 0 ? "12px" : "0" }}>
-      <span
-        className="cursor-pointer hover:bg-accent rounded px-0.5 select-none"
+    <div>
+      <Button
+        variant="ghost"
+        type="button"
+        aria-expanded={open}
+        aria-label={`${open ? "Collapse" : "Expand"} ${name ?? "value"}`}
+        className="h-auto max-w-full justify-start gap-0 rounded px-0 py-[var(--json-view-row-space)] text-left font-normal text-[length:inherit] leading-[inherit] whitespace-pre-wrap [&_svg]:size-[0.75em]"
         onClick={() => setOpen(!open)}
       >
-        <span className="text-muted-foreground text-xs mr-1">{open ? "▼" : "▶"}</span>
-        {name && <span className="text-purple-600 dark:text-purple-400">{name}</span>}
-        {name && <span className="text-muted-foreground">: </span>}
-        {!open && (
+        <UiChevronRight
+          aria-hidden="true"
+          className={cn(
+            "mr-1 shrink-0 text-muted-foreground",
+            open && "rotate-90",
+          )}
+        />
+        <span>
+          {prefix}
           <span className="text-muted-foreground">
-            {openB} {entries.length}{" "}
-            {isArray
-              ? entries.length === 1
-                ? "item"
-                : "items"
-              : entries.length === 1
-                ? "key"
-                : "keys"}{" "}
-            {closeB}
+            {format === "json"
+              ? open
+                ? openB
+                : `${openB} ${summary} ${closeB}`
+              : !open || (name === undefined && !sequenceItem)
+                ? summary
+                : null}
           </span>
-        )}
-        {open && <span className="text-muted-foreground">{openB}</span>}
-      </span>
+        </span>
+      </Button>
       {open && (
         <>
-          {entries.map(([key, val]) => (
-            <div key={key} className="pl-3 border-l border-border ml-1">
-              {typeof val === "object" && val !== null ? (
-                <JsonView
-                  data={val}
-                  name={String(key)}
-                  depth={depth + 1}
-                  defaultOpenDepth={defaultOpenDepth}
-                />
-              ) : (
-                <div>
-                  <span className="text-purple-600 dark:text-purple-400">
-                    {isArray ? "" : String(key)}
-                  </span>
-                  {!isArray && <span className="text-muted-foreground">: </span>}
-                  <JsonView data={val} depth={depth + 1} defaultOpenDepth={defaultOpenDepth} />
-                </div>
-              )}
+          <div className="border-l border-border pl-[var(--json-view-indent)]">
+            {entries.map(([key, val]) => (
+              <JsonViewNode
+                key={key}
+                data={val}
+                {...(!isArray ? { name: key } : {})}
+                sequenceItem={isArray && format === "yaml"}
+                depth={depth + 1}
+                defaultOpenDepth={defaultOpenDepth}
+                format={format}
+              />
+            ))}
+          </div>
+          {format === "json" && (
+            <div className="text-muted-foreground py-[var(--json-view-row-space)]">
+              {closeB}
             </div>
-          ))}
-          <span className="text-muted-foreground">{closeB}</span>
+          )}
         </>
       )}
     </div>
   );
+}
+
+function JsonViewScalar({
+  data,
+  format,
+}: Pick<JsonViewProps, "data" | "format">) {
+  if (data === null || data === undefined)
+    return <span className="text-muted-foreground italic">null</span>;
+  if (typeof data === "string") {
+    return (
+      <span className="text-green-700 [[data-theme=dark]_&]:text-green-400">
+        {format === "yaml" ? yamlString(data) : JSON.stringify(data)}
+      </span>
+    );
+  }
+  if (typeof data === "number" || typeof data === "boolean") {
+    return (
+      <span className="text-blue-700 [[data-theme=dark]_&]:text-blue-400">
+        {String(data)}
+      </span>
+    );
+  }
+  return (
+    <span className="text-muted-foreground">
+      {typeof data === "object"
+        ? Array.isArray(data)
+          ? "[]"
+          : "{}"
+        : String(data)}
+    </span>
+  );
+}
+
+function yamlString(value: string): string {
+  return stringify(value, {
+    lineWidth: 0,
+    defaultStringType: value.includes("\n") ? "QUOTE_DOUBLE" : "PLAIN",
+  }).trimEnd();
 }
