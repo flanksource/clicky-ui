@@ -455,7 +455,7 @@ function PreviewResult({
     case "html":
       return <HtmlPreview html={result.html} />;
     case "json":
-      return <JsonView data={result.data} />;
+      return <JsonView data={result.data} format="json" />;
     case "url":
       return <UrlPreview format={format} url={result.url} />;
     case "blob":
@@ -483,7 +483,7 @@ function TextResult({
   if (format === "json" || isJsonContent(result.contentType)) {
     const parsed = parseJson(result.text);
     return parsed.ok ? (
-      <JsonView data={parsed.value} />
+      <JsonView data={parsed.value} format="json" />
     ) : (
       <TextPreview label="JSON output" text={result.text} />
     );
