@@ -2,7 +2,7 @@
 // each file focused: this one covers rendering of supervised-process and
 // exec-argv details, plus agent metadata/headerExtra/extraTabs. Progress bar
 // math, lifecycle controls, and copy affordances stay in TaskProgress.test.tsx.
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TaskProgress } from "./TaskProgress";
 import type { TaskSnapshot } from "./TaskSnapshot";
@@ -149,9 +149,13 @@ describe("TaskProgress details", () => {
     expect(screen.getByText("exit 0")).toBeInTheDocument();
     expect(screen.getByText("2.5s")).toBeInTheDocument();
     expect(screen.getByText("scanId")).toBeInTheDocument();
-    expect(screen.getByText('"scan-1"')).toBeInTheDocument();
+    const details = within(screen.getByRole("region", { name: "Execution details" }));
+    expect(details.getByText("scan-1")).toBeInTheDocument();
     expect(screen.getByText("endpointCount")).toBeInTheDocument();
     expect(screen.getByText("stats")).toBeInTheDocument();
+    for (const [key, value] of [["requests", 40], ["total", 60], ["templates", 18], ["matched", 4], ["errors", 2]] as const) {
+      expect(details.getByText(key).parentElement).toHaveTextContent(`${key}: ${value}`);
+    }
   });
 
   const agentRun = (details: Record<string, unknown>): TaskSnapshot[] => [
