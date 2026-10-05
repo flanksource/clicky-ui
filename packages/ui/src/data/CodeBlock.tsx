@@ -150,7 +150,7 @@ export function CodeBlock({
   }
 
   if (parsedJson !== JSON_PARSE_FAILED) {
-    const tree = <JsonView data={parsedJson} defaultOpenDepth={jsonDefaultOpenDepth} />;
+    const tree = <JsonView data={parsedJson} format="json" defaultOpenDepth={jsonDefaultOpenDepth} />;
     if (bare) return <div className={cn("overflow-auto text-xs", className)}>{tree}</div>;
     return (
       <div
