@@ -1,6 +1,9 @@
-import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { buildIcons } from "./build-icons";
+import * as iconSources from "./icon-sources";
 import {
   cloudResourceRows,
   kubernetesResourceRows,
@@ -73,5 +76,28 @@ describe("resource icon sources", () => {
         consumerName: "kube-missing-resource",
       }),
     ).rejects.toThrow("Missing vendored SVG");
+  });
+
+  it("reports the missing resource source, removes staging, and preserves generated icons", async () => {
+    const stagingPath = join(packageRoot, "src/icons.tmp");
+    const barrelPath = join(packageRoot, "src/icons/index.ts");
+    const originalBarrel = await readFile(barrelPath, "utf8");
+    const missingSourceError = `Missing vendored SVG for kube-pod (${podSource}). Run download:icons.`;
+    const readOriginalSource = iconSources.readIconSource;
+    vi.spyOn(iconSources, "readIconSource").mockImplementation((request) => {
+      if (request.spec === podSource)
+        return Promise.reject(new Error(missingSourceError));
+      return readOriginalSource(request);
+    });
+    try {
+      await expect
+        .soft(buildIcons({ force: true }))
+        .rejects.toThrow(missingSourceError);
+      expect.soft(existsSync(stagingPath)).toBe(false);
+      expect(await readFile(barrelPath, "utf8")).toBe(originalBarrel);
+    } finally {
+      vi.restoreAllMocks();
+      await rm(stagingPath, { recursive: true, force: true });
+    }
   });
 });

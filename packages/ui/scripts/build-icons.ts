@@ -1036,10 +1036,16 @@ export async function buildIcons({
 
     if (row.resource) {
       const base = variantPayload.outline;
-      if (!base)
-        throw new Error(
-          `Resource icon ${cleanConsumer} requires an outline glyph`,
-        );
+      if (!base) {
+        const outlineRow = `${row.consumerName} [outline]`;
+        if (!failures.some((failure) => failure.row === outlineRow)) {
+          failures.push({
+            row: outlineRow,
+            reason: `Resource icon ${cleanConsumer} requires an outline glyph`,
+          });
+        }
+        continue;
+      }
       const resource = generateResourceVariants({
         row: { ...row, resource: row.resource },
         baseName,
