@@ -145,6 +145,27 @@ Import gomplate-compatible Monaco language support from `@flanksource/clicky-ui/
 
 UI subpaths that render icons are intended for browser bundlers such as Vite, Rollup, Webpack, Rspack, and Bun's bundler. The Iconify React packages expose `.jsx` modules and CSS imports, so plain Node `import`/`require` of icon-heavy subpaths is not a supported verification target.
 
+### Cloud and Kubernetes resource icons
+
+The offline icon entrypoint includes 12 cloud resource glyphs with AWS, Azure, and Google Cloud badges, plus 39 Kubernetes Community glyphs. Cloud resources use a shared semantic palette; Kubernetes glyphs have a bare two-tone variant and a blue-and-white octagon variant.
+
+```tsx
+import {
+  UiCloudVmAws,
+  UiKubePod,
+  UiKubePodOctagon,
+  resourceIconPalette,
+} from "@flanksource/clicky-ui/icons";
+
+<UiCloudVmAws size={24} title="AWS virtual machine" />;
+<UiKubePod size={24} title="Pod" />;
+<UiKubePodOctagon size={24} title="Pod" />;
+```
+
+`size` sets both dimensions and defaults to `1em`. `title` supplies the accessible name; omit it when adjacent text already labels the icon. `resourceIconPalette` provides primary/accent colors for compute, network, config, policy, storage, and security. Runtime names such as `cloud-vm-aws` and `kube-pod-octagon` resolve through `clickyIconProvider`.
+
+The resource catalog lives in `scripts/resource-icon-catalog.ts`. Background variants use `Square`, `Circle`, `Octagon`, or `Shield` suffixes; provider variants use `Aws`, `Azure`, or `Gcp`. Run `pnpm --filter @flanksource/clicky-ui download:icons` to vendor missing sources, then `pnpm --filter @flanksource/clicky-ui build:icons:force` to regenerate components, exports, runtime registrations, and `NOTICE.md`. Kubernetes artwork is pinned to the upstream commit recorded in the catalog and retained under `icons/svg/kubernetes`. The Foundations/Resource Icons Storybook gallery shows the complete catalog.
+
 ### IntelliJ icon catalog
 
 Import the offline components from `@flanksource/clicky-ui/icons`:

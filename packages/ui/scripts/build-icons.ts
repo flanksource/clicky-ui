@@ -11,7 +11,7 @@
  * variant and `Ui<PascalCase>Filled` for the filled variant. Aliases re-export
  * the canonical component.
  */
-import { mkdir, writeFile, rm, rename, readFile } from "node:fs/promises";
+import { mkdir, writeFile, rm, rename } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,14 +22,17 @@ import {
   packageRoot,
   pascalCase,
   readIconSource,
+  readIconSelections,
   resolveAliasTarget,
-  selectionsPath,
   stripAliasArrow,
   stripUirPrefix,
   svgOpenTag,
   type SelectionRow,
-  type Selections,
 } from "./icon-sources";
+import { KUBERNETES_COMMUNITY_COMMIT } from "./resource-icon-catalog";
+import { generateResourceVariants, type Glyph } from "./resource-icon-codegen";
+import { extractKubernetesGlyph } from "./resource-icon-composition";
+import { resourceIconPalette } from "../src/resource-icon-palette";
 
 const iconsRoot = join(packageRoot, "src", "icons");
 const noticePath = join(packageRoot, "NOTICE.md");
@@ -726,7 +729,7 @@ export async function buildIcons({
     return;
   }
 
-  const sel: Selections = JSON.parse(await readFile(selectionsPath, "utf8"));
+  const sel = await readIconSelections();
 
   // Emit into a staging dir first, then atomically swap it in. Building beside
   // the live tree means a failure never leaves `src/icons/` half-written.
@@ -855,6 +858,7 @@ export async function buildIcons({
   const generated: { component: string; file: string }[] = [];
   const failures: { row: string; reason: string }[] = [];
   const skippedCollisions: string[] = [];
+  const resourceNotices: Array<{ component: string; source: string }> = [];
 
   for (const row of sel.rows) {
     // Skip change-types rows entirely — they're surfaced via the runtime
@@ -949,10 +953,8 @@ export async function buildIcons({
     ];
     const componentNames: string[] = [];
     // Capture each variant's normalised SVG so sub-icons can re-use the base.
-    const variantPayload: Record<
-      "outline" | "filled",
-      { inner: string; viewBox: string; spec: string }
-    > = {} as any;
+    const variantPayload: Partial<Record<"outline" | "filled", Glyph>> = {};
+    let upstreamGlyph: Glyph | undefined;
     for (const v of variants) {
       const compName = baseName + v.suffix;
       try {
@@ -960,12 +962,35 @@ export async function buildIcons({
           spec: v.spec,
           consumerName: cleanConsumer,
         });
-        const { inner, viewBox } = normalizeSvg(raw, {
-          recolor: shouldRecolor(v.spec),
+        const kubernetes = v.spec.startsWith("k8s-community:");
+        if (kubernetes && !row.resource) {
+          throw new Error(
+            `Kubernetes icon ${cleanConsumer} requires resource metadata`,
+          );
+        }
+        const source = kubernetes
+          ? extractKubernetesGlyph(
+              raw,
+              resourceIconPalette[row.resource!.category],
+            )
+          : raw;
+        const { inner, viewBox } = normalizeSvg(source, {
+          recolor: !kubernetes && shouldRecolor(v.spec),
         });
+        if (kubernetes) {
+          upstreamGlyph = {
+            ...normalizeSvg(extractKubernetesGlyph(raw, "upstream"), {
+              recolor: false,
+            }),
+            spec: v.spec,
+          };
+        }
         if (v.slot !== "dark")
           variantPayload[v.slot] = { inner, viewBox, spec: v.spec };
-        const defaultColor = DEFAULT_COLORS[baseName];
+        const defaultColor =
+          row.group === "cloud-resources" && row.resource
+            ? resourceIconPalette[row.resource.category].primary
+            : DEFAULT_COLORS[baseName];
         // Component body: when this component has a default semantic color,
         // wrap the <svg> body so the color is applied unless the consumer
         // overrides via className (`text-*`), style.color, or color prop.
@@ -1009,6 +1034,29 @@ export async function buildIcons({
       }
     }
 
+    if (row.resource) {
+      const base = variantPayload.outline;
+      if (!base)
+        throw new Error(
+          `Resource icon ${cleanConsumer} requires an outline glyph`,
+        );
+      const resource = generateResourceVariants({
+        row: { ...row, resource: row.resource },
+        baseName,
+        base,
+        ...(upstreamGlyph ? { upstream: upstreamGlyph } : {}),
+      });
+      parts.unshift(...resource.imports);
+      parts.push(...resource.parts);
+      componentNames.push(...resource.names);
+      resourceNotices.push(
+        ...resource.names.map((component) => ({
+          component,
+          source: `${base.spec} + ${component.slice(baseName.length)}`,
+        })),
+      );
+    }
+
     // Sub-icon compositions — emit additional components whose name is
     // `Ui<Base><Suffix>` (e.g. UiDatabasePlus). When both outline and filled
     // base variants are available, emit both `Ui<Base><Suffix>` (composed on
@@ -1019,7 +1067,7 @@ export async function buildIcons({
     const subRecipes = SUB_ICONS_BY_BASE[baseLookup] ?? [];
     if (subRecipes.length > 0) {
       const subBases: Array<{
-        base: typeof variantPayload.outline;
+        base: Glyph;
         suffix: string;
       }> = [];
       if (variantPayload.outline)
@@ -1248,6 +1296,10 @@ ${programmingEntries.join("\n")}
     `export { clickyIconProvider, iconsByConsumerName } from "./registry";`,
   );
   lines.push(`export { programmingIconCatalog } from "./programmingCatalog";`);
+  lines.push(`export { resourceIconPalette } from "../resource-icon-palette";`);
+  lines.push(
+    `export type { ResourceIconCategory } from "../resource-icon-palette";`,
+  );
   lines.push(
     `export type { ProgrammingIconEntry } from "./programmingCatalog";`,
   );
@@ -1290,6 +1342,7 @@ ${programmingEntries.join("\n")}
     "- Carbon Design — Apache 2.0 — https://github.com/carbon-design-system/carbon",
     "- Simple Icons — CC0 1.0 — https://github.com/simple-icons/simple-icons",
     "- Flanksource Icons — Apache 2.0 — https://github.com/flanksource/flanksource-icons",
+    `- Kubernetes community icons (commit ${KUBERNETES_COMMUNITY_COMMIT}) — Apache 2.0 — https://github.com/kubernetes/community/tree/${KUBERNETES_COMMUNITY_COMMIT}/icons`,
     "",
     "## Per-icon sources",
     "",
@@ -1312,6 +1365,9 @@ ${programmingEntries.join("\n")}
         `| ${componentNameForSelection(row)}Dark | ${row.dark} |`,
       );
     }
+  }
+  for (const { component, source } of resourceNotices) {
+    noticeLines.push(`| ${component} | ${source} |`);
   }
   await writeFile(noticePath, noticeLines.join("\n") + "\n");
 
