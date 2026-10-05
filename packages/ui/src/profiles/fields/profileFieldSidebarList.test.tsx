@@ -50,7 +50,7 @@ describe("ProfileFieldSidebarList", () => {
     expect(search).toHaveClass("h-7");
   });
 
-  it("leaves the field name on the row and moves type and actions into its menu", () => {
+  it("leaves the field name on the row and moves type and actions into its menu", async () => {
     render(
       <SidebarProbe
         configured={[
@@ -70,8 +70,8 @@ describe("ProfileFieldSidebarList", () => {
       screen.getByRole("button", { name: "More actions for created_at" }),
     );
 
-    const menu = screen.getByRole("menu", {
-      name: "More actions for created_at",
+    const menu = await screen.findByRole("menu", {
+      name: "created_at field actions",
     });
     expect(within(menu).getByText("datetime type")).toBeInTheDocument();
     expect(

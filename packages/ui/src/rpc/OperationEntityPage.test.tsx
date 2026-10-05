@@ -307,8 +307,9 @@ describe("OperationEntityPage", () => {
     renderPage(client);
 
     await waitFor(() =>
-      expect(screen.getByLabelText("Response body")).toHaveTextContent('name: "Fallback widget"'),
+      expect(screen.getByRole("region", { name: "Response body" })).toHaveTextContent("name: Fallback widget"),
     );
+    expect(screen.getByRole("region", { name: "Response body" })).toHaveTextContent("id: one");
   });
 
   it("labels surface-mode actions with the short verb, matching the list page", async () => {
