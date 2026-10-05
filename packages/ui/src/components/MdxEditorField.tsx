@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "../lib/utils";
 import type { FormSize } from "./json-schema-form-size";
 import { inputClass } from "./json-schema-form-utils";
+import { Button } from "./button";
 import { createMdxEditorPlugins } from "./mdx-editor-field-plugins";
 import type { MdxEditorFieldProps } from "./mdx-editor-options";
 
@@ -75,6 +76,10 @@ export function MdxEditorField({
   ...pluginOptions
 }: MdxEditorFieldProps) {
   const [mdx, setMdx] = useState<MdxEditorModule | null>(null);
+  const [parseError, setParseError] = useState<{
+    error: string;
+    source: string;
+  } | null>(null);
   const editorRef = useRef<MdxEditorMethods>(null);
   const lastValueRef = useRef(value);
   const readonly = readOnly || disabled;
@@ -96,6 +101,7 @@ export function MdxEditorField({
   useEffect(() => {
     if (!mdx || value === lastValueRef.current) return;
     lastValueRef.current = value;
+    setParseError(null);
     editorRef.current?.setMarkdown(value);
   }, [mdx, value]);
 
@@ -113,25 +119,49 @@ export function MdxEditorField({
     [mdx, pluginOptions],
   );
 
-  if (!mdx) {
-    const fallbackAriaLabel = ariaLabel ?? (id ? undefined : "Markdown");
+  const reportError = useCallback(
+    (error: { error: string; source: string }) => {
+      queueMicrotask(() => setParseError(error));
+    },
+    [],
+  );
+
+  const currentError = parseError;
+  if (!mdx || currentError) {
+    const fallbackAriaLabel =
+      ariaLabel ??
+      (currentError ? "Markdown source" : id ? undefined : "Markdown");
     return (
-      <textarea
-        id={id}
-        data-jsf-input
-        rows={6}
-        aria-label={fallbackAriaLabel}
-        className={cn(
-          inputClass(size),
-          "h-auto resize-y font-mono",
-          EDITOR_MIN_HEIGHT_CLASS[size],
-          textareaClassName,
+      <div className="min-w-0">
+        {currentError && (
+          <div role="alert" className="mb-2 text-sm text-destructive">
+            Markdown could not be loaded: {currentError.error}
+          </div>
         )}
-        value={value}
-        disabled={readonly}
-        placeholder={typeof placeholder === "string" ? placeholder : undefined}
-        onChange={(event) => commit(event.target.value)}
-      />
+        <textarea
+          id={id}
+          data-jsf-input
+          rows={6}
+          aria-label={fallbackAriaLabel}
+          className={cn(
+            inputClass(size),
+            "h-auto resize-y font-mono",
+            EDITOR_MIN_HEIGHT_CLASS[size],
+            textareaClassName,
+          )}
+          value={value}
+          disabled={readonly}
+          placeholder={
+            typeof placeholder === "string" ? placeholder : undefined
+          }
+          onChange={(event) => commit(event.target.value)}
+        />
+        {currentError && !readonly && (
+          <Button type="button" variant="outline" size="sm" onClick={() => setParseError(null)}>
+            Retry rich text
+          </Button>
+        )}
+      </div>
     );
   }
 
@@ -147,6 +177,7 @@ export function MdxEditorField({
         className={cn("clicky-mdx-editor-field", readonly && "clicky-mdx-editor-field-readonly", className)}
         contentEditableClassName={cn("clicky-mdx-editor-content", EDITOR_MIN_HEIGHT_CLASS[size], contentClassName)}
         onChange={commit}
+        onError={reportError}
       />
     </div>
   );
