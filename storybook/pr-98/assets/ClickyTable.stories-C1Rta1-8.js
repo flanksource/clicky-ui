@@ -1,0 +1,28 @@
+import{b as S}from"./Clicky-9oa5mBb_.js";import{a3 as h,a4 as C,a5 as D,a6 as v,a7 as y}from"./iframe-Bk9swcUR.js";import"./queryClient-bHl9vIbB.js";import"./suspense-Cn4jCU9d.js";import"./useQuery-D5goCVZl.js";import"./FilterForm-PpMuZq0k.js";import"./button-BwQwEt7k.js";import"./utils-DW-IJACk.js";import"./index-CPURVhFy.js";import"./loading-CDKfpJbq.js";import"./FilterBar-EmtL7p92.js";import"./floating-ui.react-6IB_hdLH.js";import"./index-CLDbtA8-.js";import"./index-B8STd8gT.js";import"./FilterPill-CVfnxEYE.js";import"./Icon-CT2tkhoJ.js";import"./Combobox-FqMST2xS.js";import"./modalStack-CaNd2wxr.js";import"./zIndex-BGbNBNA8.js";import"./json-schema-form-size-E77C3uZS.js";import"./timestamp-format-DJzkpO9P.js";import"./Modal-C5IY1XlS.js";import"./DateTimePicker-B8Somcyq.js";import"./MultiSelect-C0fLbA24.js";import"./RangeSlider-tdtmcZfs.js";import"./TimeRange-CGJEfSXy.js";import"./select-N3OZpg7E.js";import"./WorkloadPicker-dWfhUWSm.js";import"./NamespacePicker-CKLL9-TX.js";import"./formMetadata-BMSLWh73.js";import"./data-table-filter-values-BoCQDwQ9.js";import"./duration-BuesBvhN.js";import"./ErrorDetails-BJibrJF-.js";import"./string-Ye519DiV.js";import"./DataTable-CWDLplT2.js";import"./SortableHeader-CNy8zCPY.js";import"./router-D3XO_z-F.js";import"./Timestamp-BAd48HDa.js";import"./TagList-BCa_fqYa.js";import"./Badge-CMQ3mwrx.js";import"./HoverCard-B8M4ULNJ.js";import"./Properties-D-ofUfhJ.js";import"./IconButton-BVA8dYdd.js";import"./DropdownMenu-20164xk8.js";import"./DropdownMenuSubmenu-CBBihWZH.js";import"./StatusDot-1wwk9z-3.js";import"./callout-tones-EFt49BYo.js";import"./Tree-CzQzLCVS.js";import"./TreeNode-BVvLCmRg.js";import"./ObjectGraph-CR95mLol.js";import"./ExecutionTree-BpxPwfmF.js";import"./CodeBlock-ZaGV8WpW.js";import"./CodeDiff-CQZu6CxO.js";import"./SegmentedControl-GIOpFwGu.js";import"./HighlightedTokens-DCZYa5In.js";import"./preload-helper-BpddQVpQ.js";import"./JsonView-CPcCIR-n.js";import"./RenderedStackTrace-xZAzNxOM.js";import"./frame-heuristics-D62qKi0n.js";import"./StackFrameRow-366FvHR-.js";import"./FrameSourceWindow-Bwy9_jza.js";import"./useDebugAction-CilCnzcN.js";import"./debugConsoleSignal-B72erEWu.js";const x=[{name:"service",label:"Service",sortable:!0,grow:!0},{name:"status",label:"Status",kind:"status",sortable:!0,shrink:!0},{name:"labels",label:"Labels",kind:"tags",filterable:!0,grow:!0}],g=[{cells:{service:{kind:"text",text:"api"},status:{kind:"text",text:"healthy"},labels:{kind:"map",fields:[{name:"team",value:{kind:"text",text:"platform"}},{name:"tier",value:{kind:"text",text:"edge"}}]}},detail:{kind:"code",language:"json",source:JSON.stringify({requests:12492,errors:3},null,2)}},{cells:{service:{kind:"text",text:"worker"},status:{kind:"text",text:"degraded"},labels:{kind:"list",items:[{kind:"text",text:"team=data"},{kind:"text",text:"queue=imports"}]}},detail:{kind:"text",text:"Retry queue is above the warning threshold."}}],T=[{id:"download-yaml",label:"YAML",icon:h,iconClassName:"text-violet-600 dark:text-violet-400",onSelect:()=>{console.info("Download YAML")}},{id:"download-json",label:"JSON",icon:C,onSelect:()=>{console.info("Download JSON")}},{id:"download-csv",label:"CSV",icon:D,iconClassName:"text-emerald-600 dark:text-emerald-400",onSelect:()=>{console.info("Download CSV")}},{id:"download-pdf",label:"PDF",icon:v,iconClassName:"text-rose-600 dark:text-rose-400",onSelect:()=>{console.info("Download PDF")}},{id:"download-markdown",label:"Markdown",icon:y,onSelect:()=>{console.info("Download Markdown")}}],Le={title:"Data/Clicky/Table",component:S,args:{columns:x,rows:g,autoFilter:!0},argTypes:{onTableRowClick:{table:{disable:!0}},getTableRowHref:{table:{disable:!0}},isTableRowClickable:{table:{disable:!0}},search:{table:{disable:!0}},timeRange:{table:{disable:!0}},externalFilters:{table:{disable:!0}},pagination:{table:{disable:!0}},menuActions:{table:{disable:!0}}},parameters:{docs:{description:{component:"Lower-level Clicky table renderer. It maps Clicky columns and rows into DataTable while preserving Clicky cell renderers, details, filters, and runtime row handlers."}}}},e={},t={args:{rows:[]}},r={args:{menuActions:T}},o={args:{columns:[...x,{name:"owner",label:"Owner",shrink:!0,defaultHidden:!0}],rows:g.map((a,f)=>({...a,cells:{...a.cells,owner:{kind:"text",text:f===0?"team-edge":"team-data"}}}))}};var i,n,s;e.parameters={...e.parameters,docs:{...(i=e.parameters)==null?void 0:i.docs,source:{originalSource:"{}",...(s=(n=e.parameters)==null?void 0:n.docs)==null?void 0:s.source}}};var l,m,d;t.parameters={...t.parameters,docs:{...(l=t.parameters)==null?void 0:l.docs,source:{originalSource:`{
+  args: {
+    rows: []
+  }
+}`,...(d=(m=t.parameters)==null?void 0:m.docs)==null?void 0:d.source}}};var p,c,u;r.parameters={...r.parameters,docs:{...(p=r.parameters)==null?void 0:p.docs,source:{originalSource:`{
+  args: {
+    menuActions
+  }
+}`,...(u=(c=r.parameters)==null?void 0:c.docs)==null?void 0:u.source}}};var b,w,k;o.parameters={...o.parameters,docs:{...(b=o.parameters)==null?void 0:b.docs,source:{originalSource:`{
+  args: {
+    columns: [...columns, {
+      name: "owner",
+      label: "Owner",
+      shrink: true,
+      defaultHidden: true
+    }],
+    rows: rows.map((row, index) => ({
+      ...row,
+      cells: {
+        ...row.cells,
+        owner: {
+          kind: "text",
+          text: index === 0 ? "team-edge" : "team-data"
+        }
+      }
+    }))
+  }
+}`,...(k=(w=o.parameters)==null?void 0:w.docs)==null?void 0:k.source}}};const We=["Default","Empty","WithMenuActions","WithDefaultHiddenColumn"];export{e as Default,t as Empty,o as WithDefaultHiddenColumn,r as WithMenuActions,We as __namedExportsOrder,Le as default};
