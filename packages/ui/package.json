@@ -175,6 +175,7 @@
     "country-flag-icons": "catalog:",
     "dompurify": "^3.4.11",
     "jotai": "catalog:",
+    "jsonc-parser": "catalog:",
     "monaco-yaml": "catalog:",
     "tailwind-merge": "catalog:",
     "yaml": "catalog:"
