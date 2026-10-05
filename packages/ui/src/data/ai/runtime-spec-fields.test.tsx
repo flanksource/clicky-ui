@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { UiShield } from "../../icons";
+import { UiPauseCircle } from "../../icons";
 import { RuntimeBar } from "../runtime/RuntimeBar";
 import { SPEC_RUNTIME_FAMILIES } from "../runtime/runtime-mode";
 import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
@@ -47,8 +47,10 @@ describe("runtime spec fields", () => {
       onChange: vi.fn(),
       families: SPEC_RUNTIME_FAMILIES,
     }).find((entry) => entry.id === "permissions.mode");
-    expect(field?.icon).toBe(UiShield);
-    expect(field?.iconClassName).toBe("text-muted-foreground");
+    expect(field?.icon).toBe(UiPauseCircle);
+    expect(field?.iconClassName).toBe(
+      "text-teal-700 [[data-theme=dark]_&]:text-teal-400",
+    );
     render(
       <Harness initial={{ mode: "cli", permissions: { mode: "plan" } }} />,
     );
@@ -60,7 +62,7 @@ describe("runtime spec fields", () => {
       screen
         .getByRole("menuitem", { name: "Permission mode" })
         .querySelector("svg")?.parentElement,
-    ).toHaveClass("text-muted-foreground");
+    ).toHaveClass("text-teal-700");
     fireEvent.click(screen.getByRole("menuitem", { name: "Permission mode" }));
     expect(
       screen.getByRole("menuitem", { name: "Plan" }).querySelector("svg")

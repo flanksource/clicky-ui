@@ -5,18 +5,16 @@ export function runtimeBarInlineCount({
   identity,
   trigger,
   fields,
-  gap,
 }: {
   width: number;
   identity: number;
   trigger: number;
   fields: number[];
-  gap: number;
 }) {
-  let occupied = identity + trigger + gap;
+  let occupied = identity + trigger;
   let count = 0;
   for (const field of fields) {
-    occupied += field + gap;
+    occupied += field;
     if (occupied > width) break;
     count++;
   }
@@ -38,17 +36,11 @@ export function useRuntimeBarOverflow() {
       throw new Error(
         "Runtime bar measurement requires identity and a menu trigger",
       );
-    const spacing = getComputedStyle(measurement).columnGap;
-    const gap =
-      spacing === "normal" || spacing === "" ? 0 : Number.parseFloat(spacing);
-    if (!Number.isFinite(gap))
-      throw new Error(`Invalid runtime bar spacing: ${spacing}`);
     const count = runtimeBarInlineCount({
       width: width - 2,
       identity: identity.getBoundingClientRect().width,
       trigger: trigger.getBoundingClientRect().width,
       fields: controls.map((node) => node.getBoundingClientRect().width),
-      gap,
     });
     setVisibleCount((previous) => (previous === count ? previous : count));
   }, [container, measurement]);

@@ -53,17 +53,21 @@ describe("PermissionStrategiesEditor", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: "0 matching operations" }).closest(
-        "[data-accordion-row]",
-      ),
+      screen
+        .getByRole("button", { name: "0 matching operations" })
+        .closest("[data-accordion-row]"),
     ).not.toBeNull();
     fireEvent.click(
-      screen.getByRole("button", { name: /Custom conditions.*Policy: Ask/i }),
+      screen.getByRole("button", {
+        name: /^Group is billing\.write Policy: Ask/i,
+      }),
     );
     expect(
-      (screen.getByRole("combobox", {
-        name: "Match preset",
-      }) as HTMLInputElement).value,
+      (
+        screen.getByRole("combobox", {
+          name: "Match preset",
+        }) as HTMLInputElement
+      ).value,
     ).toBe("Custom conditions");
 
     fireEvent.click(screen.getByRole("combobox", { name: "Match preset" }));
@@ -96,7 +100,9 @@ describe("PermissionStrategiesEditor", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Custom conditions.*Policy: Off/i }),
+      screen.getByRole("button", {
+        name: /^Group is projects\.write · Destructive is Yes Policy: Off/i,
+      }),
     );
     expect(
       screen.getByRole("radio", { name: "Off" }).getAttribute("aria-checked"),
@@ -119,9 +125,7 @@ describe("PermissionStrategiesEditor", () => {
     ).toBe("true");
 
     fireEvent.click(screen.getByLabelText("Match value 1"));
-    expect(
-      screen.getByRole("option", { name: "projects.write" }),
-    ).toBeTruthy();
+    expect(screen.getByRole("option", { name: "projects.write" })).toBeTruthy();
     fireEvent.keyDown(screen.getByLabelText("Match value 1"), {
       key: "Escape",
     });
@@ -159,14 +163,16 @@ describe("PermissionStrategiesEditor", () => {
       JSON.stringify([{ group: "*", policy: "ask" }]),
     );
     const customHeader = screen.getByRole("button", {
-      name: /Custom conditions.*Policy: Ask/i,
+      name: /^Group is \* Policy: Ask/i,
     });
     fireEvent.click(customHeader);
     fireEvent.click(customHeader);
     expect(
-      (screen.getByRole("combobox", {
-        name: "Match preset",
-      }) as HTMLInputElement).value,
+      (
+        screen.getByRole("combobox", {
+          name: "Match preset",
+        }) as HTMLInputElement
+      ).value,
     ).toBe("Custom conditions");
   });
 
@@ -176,7 +182,9 @@ describe("PermissionStrategiesEditor", () => {
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Tool name projects_list.*Ask/i }),
+      screen.getByRole("button", {
+        name: /^Tool name is projects_list Policy: Ask/i,
+      }),
     );
     fireEvent.change(screen.getByLabelText("Match operator 1"), {
       target: { value: "in" },
@@ -196,6 +204,31 @@ describe("PermissionStrategiesEditor", () => {
           policy: "ask",
         },
       ]),
+    );
+  });
+
+  it("adds a condition from a searchable picker that explains each field", () => {
+    render(
+      <EditorHarness initial={[{ name: "projects_list", policy: "ask" }]} />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /^Tool name is projects_list Policy: Ask/i,
+      }),
+    );
+    fireEvent.click(screen.getByRole("combobox", { name: "Add condition" }));
+    expect(
+      screen.getByText("GET, POST, PATCH or DELETE for HTTP-backed tools."),
+    ).toBeTruthy();
+    // The row's own field <select> also lists "HTTP method"; pick the picker's.
+    const [pickerOption] = screen
+      .getAllByRole("option", { name: /HTTP method/ })
+      .filter((option) => option.tagName !== "OPTION");
+    fireEvent.mouseDown(pickerOption!);
+
+    expect(screen.getByTestId("policy-json").textContent).toBe(
+      JSON.stringify([{ name: "projects_list", policy: "ask", method: "*" }]),
     );
   });
 });

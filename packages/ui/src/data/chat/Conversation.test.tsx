@@ -30,6 +30,13 @@ describe("Conversation", () => {
     expect(screen.getByText("Waiting for response...")).toBeInTheDocument();
   });
 
+  it("hides the waiting indicator while another control reports progress", () => {
+    render(<Conversation messages={[USER_MESSAGE]} status="submitted" suppressWaiting />);
+
+    expect(screen.queryByText("Waiting for response...")).not.toBeInTheDocument();
+    expect(screen.getByText("hello")).toBeInTheDocument();
+  });
+
   it("shows request errors from the chat transport", () => {
     render(
       <Conversation

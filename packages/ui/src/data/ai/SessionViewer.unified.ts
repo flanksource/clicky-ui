@@ -42,6 +42,7 @@ export interface SessionUIPart {
   data?: unknown;
   approval?: SessionApproval;
   pending?: boolean;
+  estimatedCost?: { cost: SessionCost; sharedCalls: number };
 }
 
 /** One message in a session (AI SDK v6 UIMessage + provenance). */

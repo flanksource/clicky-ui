@@ -19,6 +19,8 @@ export interface GraphDiagramNodesProps {
   place: GraphPlacer;
   nodeWidth: number;
   nodeHeight: number;
+  /** Heights of the nodes not drawn at `nodeHeight`, by id: the compact ones. */
+  nodeHeights: Readonly<Record<string, number>>;
   selectedId: string | undefined;
   onNodeSelect: ((id: string) => void) | undefined;
   onNodeExpand: ((id: string) => void) | undefined;
@@ -86,12 +88,15 @@ function NodeLabel({ node, oneLine }: { node: GraphDiagramNode; oneLine: boolean
 function NodeBody({
   node,
   oneLine,
+  compact,
   selected,
   onSelect,
 }: {
   node: GraphDiagramNode;
   /** The node is too short for two label lines. */
   oneLine: boolean;
+  /** Its icon and label on one short line, left-aligned, without its detail or badge. */
+  compact: boolean;
   selected: boolean;
   onSelect: (() => void) | undefined;
 }) {
@@ -99,8 +104,11 @@ function NodeBody({
   return (
     <div
       className={cn(
-        "flex h-full w-full flex-col items-center justify-center gap-0.5 border px-3 py-1.5 text-center text-xs shadow-sm",
-        node.shape === "pill" ? "rounded-full" : "rounded-lg",
+        "flex h-full w-full border text-xs shadow-sm",
+        compact
+          ? "items-center px-2 text-left text-[11px]"
+          : "flex-col items-center justify-center gap-0.5 px-3 py-1.5 text-center",
+        node.shape === "pill" ? "rounded-full" : compact ? "rounded-md" : "rounded-lg",
         TONE_NODE_CLASS[tone],
         node.muted && "border-dashed text-muted-foreground shadow-none",
         node.muted && tone === "neutral" && "bg-muted",
@@ -119,11 +127,11 @@ function NodeBody({
       aria-label={node.ariaLabel}
       title={node.title}
     >
-      <NodeLabel node={node} oneLine={oneLine} />
-      {node.detail != null && (
+      <NodeLabel node={node} oneLine={oneLine || compact} />
+      {!compact && node.detail != null && (
         <span className="line-clamp-1 text-[10px] leading-tight text-muted-foreground">{node.detail}</span>
       )}
-      {node.badge != null && <span className="mt-0.5">{node.badge}</span>}
+      {!compact && node.badge != null && <span className="mt-0.5">{node.badge}</span>}
     </div>
   );
 }
@@ -134,6 +142,7 @@ export function GraphDiagramNodes({
   place,
   nodeWidth,
   nodeHeight,
+  nodeHeights,
   selectedId,
   onNodeSelect,
   onNodeExpand,
@@ -141,25 +150,31 @@ export function GraphDiagramNodes({
 }: GraphDiagramNodesProps) {
   return (
     <>
-      {nodes.map((node) => (
-        <div
-          key={node.id}
-          data-graph-node={node.id}
-          className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2"
-          style={{ ...place(requireEntry(positions, node.id, "layout position")), width: nodeWidth, height: nodeHeight }}
-          {...(onNodeHover ? hoverHandlers(node.id, onNodeHover) : {})}
-        >
-          <NodeBody
-            node={node}
-            oneLine={nodeHeight < TWO_LINE_HEIGHT}
-            selected={selectedId != null && node.id === selectedId}
-            onSelect={onNodeSelect ? () => onNodeSelect(node.id) : undefined}
-          />
-          {node.expandCount != null && node.expandCount > 0 && (
-            <ExpandControl node={node} onExpand={onNodeExpand ? () => onNodeExpand(node.id) : undefined} />
-          )}
-        </div>
-      ))}
+      {nodes.map((node) => {
+        const height = nodeHeights[node.id] ?? nodeHeight;
+        const compact = node.id in nodeHeights;
+        return (
+          <div
+            key={node.id}
+            data-graph-node={node.id}
+            data-graph-node-size={compact ? "compact" : "regular"}
+            className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2"
+            style={{ ...place(requireEntry(positions, node.id, "layout position")), width: nodeWidth, height }}
+            {...(onNodeHover ? hoverHandlers(node.id, onNodeHover) : {})}
+          >
+            <NodeBody
+              node={node}
+              oneLine={height < TWO_LINE_HEIGHT}
+              compact={compact}
+              selected={selectedId != null && node.id === selectedId}
+              onSelect={onNodeSelect ? () => onNodeSelect(node.id) : undefined}
+            />
+            {node.expandCount != null && node.expandCount > 0 && (
+              <ExpandControl node={node} onExpand={onNodeExpand ? () => onNodeExpand(node.id) : undefined} />
+            )}
+          </div>
+        );
+      })}
     </>
   );
 }
@@ -169,7 +184,11 @@ export interface GraphDiagramGroupBoxesProps {
   groups: GraphDiagramGroup[] | undefined;
 }
 
-/** Group rectangles, drawn behind the edges and nodes, each captioned on its top border. */
+/**
+ * Group rectangles, drawn behind the edges and nodes, each captioned on its top border. A box lets the
+ * pointer through to the stage, so a click inside it never lands on the box; only its caption takes
+ * the pointer, for its tooltip.
+ */
 export function GraphDiagramGroupBoxes({ boxes, groups }: GraphDiagramGroupBoxesProps) {
   const captions = new Map(groups?.map((group) => [group.id, group]));
   return (
@@ -180,12 +199,12 @@ export function GraphDiagramGroupBoxes({ boxes, groups }: GraphDiagramGroupBoxes
           <div
             key={box.id}
             data-graph-group={box.id}
-            className="absolute rounded-xl border border-dashed border-border bg-muted/30"
+            className="pointer-events-none absolute rounded-xl border border-dashed border-border bg-muted/30"
             style={{ left: box.x, top: box.y, width: box.width, height: box.height }}
           >
             <span
               title={caption?.title}
-              className="absolute left-2 top-0 max-w-[calc(100%-1rem)] -translate-y-1/2 truncate rounded border border-border bg-background px-1.5 text-[10px] font-medium leading-4 text-muted-foreground"
+              className="pointer-events-auto absolute left-2 top-0 max-w-[calc(100%-1rem)] -translate-y-1/2 truncate rounded border border-border bg-background px-1.5 text-[10px] font-medium leading-4 text-muted-foreground"
             >
               {caption ? caption.label : box.group}
             </span>

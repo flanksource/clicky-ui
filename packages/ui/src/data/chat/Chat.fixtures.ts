@@ -108,7 +108,7 @@ const TEXT_TURN: UIMessageChunk[] = [
     type: "finish",
     messageMetadata: {
       usage: { inputTokens: 920, outputTokens: 280, totalTokens: 1200 },
-      contextTokens: 1200,
+      context: { usedTokens: 1200, windowTokens: 128_000, freePercent: 99 },
       cost: 0.004,
     },
   },
@@ -138,7 +138,7 @@ const TOOL_TURN: UIMessageChunk[] = [
     type: "finish",
     messageMetadata: {
       usage: { inputTokens: 2600, outputTokens: 800, totalTokens: 3400 },
-      contextTokens: 3400,
+      context: { usedTokens: 3400, windowTokens: 128_000, freePercent: 97 },
       cost: 0.011,
     },
   },

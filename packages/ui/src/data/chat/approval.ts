@@ -2,8 +2,8 @@ import type { UIMessage } from "ai";
 import type { ChatModelRuntime, ChatUsageBreakdown } from "./types";
 
 export type CaptainChatContext = {
-  usedTokens?: number;
-  windowTokens?: number;
+  usedTokens: number;
+  windowTokens: number;
   freePercent: number;
 };
 

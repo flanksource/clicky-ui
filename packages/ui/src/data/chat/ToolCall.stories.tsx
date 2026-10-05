@@ -438,6 +438,51 @@ export const WithHostAdapter: Story = {
   render: wrap,
 };
 
+const AGENT_CALL_ID = "call-agent-review";
+
+function subagentCall(
+  toolCallId: string,
+  toolName: string,
+  state: AnyToolPart["state"],
+  input: Record<string, unknown>,
+): AnyToolPart {
+  return toolPart({
+    toolCallId,
+    toolName,
+    state,
+    input,
+    output: state === "output-available" ? "ok" : undefined,
+    toolMetadata: { parentToolCallId: AGENT_CALL_ID },
+  });
+}
+
+/** A background Agent call returns at once; the calls its subagent keeps making
+ *  nest beneath it, with a running count in the header. */
+export const SubagentCalls: Story = {
+  args: {
+    defaultOpen: true,
+    part: toolPart({
+      toolCallId: AGENT_CALL_ID,
+      toolName: "Agent",
+      input: { subagent_type: "general-purpose", description: "Review children 1-5", run_in_background: true },
+      output: "Async agent launched successfully.",
+    }),
+    subcalls: [
+      subagentCall("call-sub-1", "Bash", "output-available", { command: "gavel todos get d961560d" }),
+      subagentCall("call-sub-2", "Bash", "output-available", { command: "git log --oneline -5" }),
+      subagentCall("call-sub-3", "Read", "input-available", { file_path: "pkg/ledger/report.go" }),
+    ],
+  },
+  render: wrap,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("3 calls · 1 running")).toBeInTheDocument();
+    await expect(
+      canvasElement.querySelector('[data-slot="tool-call-subcalls"]'),
+    ).not.toBeNull();
+  },
+};
+
 /** The transport double-encodes results as `{output: "<json>"}`; the renderer
  *  unwraps that before anything else sees it. */
 export const TransportEnvelope: Story = {

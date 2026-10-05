@@ -50,7 +50,7 @@ export type ContextMeterProps = {
    *  (chat toolbar). Both open the same hover popover. */
   mode?: ContextMeterMode;
   /** Share of the context window used, 0–100 — drives the fill and tone. */
-  usedPercent: number;
+  usedPercent?: number | undefined;
   /** Context-window tokens shown in the popover. */
   usedTokens?: number | undefined;
   windowTokens?: number | undefined;
@@ -230,7 +230,9 @@ export function ContextMeter({
     },
     [],
   );
-  const pct = Math.min(100, Math.max(0, Math.round(usedPercent)));
+  const pct = usedPercent === undefined ? undefined : Math.min(100, Math.max(0, Math.round(usedPercent)));
+  const textTone = pct === undefined ? "text-muted-foreground" : contextTextTone(pct);
+  const barTone = pct === undefined ? "bg-muted" : contextBarTone(pct);
   const totalTokens = tokens?.total ?? 0;
   const totalCost = cost?.total ?? 0;
   const EffortGlyph = effort ? effortLevelIcon(effort) : undefined;
@@ -287,7 +289,7 @@ export function ContextMeter({
           "inline-flex items-center rounded-md px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
           className,
         )}
-        aria-label={`Context ${pct}% used`}
+        aria-label={pct === undefined ? "Context unavailable" : `Context ${pct}% used`}
       >
         <span className="relative inline-flex size-9 shrink-0 items-center justify-center">
           <svg
@@ -296,7 +298,7 @@ export function ContextMeter({
             width="36"
             height="36"
             viewBox="0 0 36 36"
-            className={cn("absolute inset-0", contextRingTone(pct))}
+            className={cn("absolute inset-0", pct === undefined ? "text-muted-foreground" : contextRingTone(pct))}
           >
             <circle
               cx="18"
@@ -315,7 +317,7 @@ export function ContextMeter({
               stroke="currentColor"
               strokeWidth="3"
               strokeDasharray={GAUGE_CIRCUMFERENCE}
-              strokeDashoffset={(1 - pct / 100) * GAUGE_CIRCUMFERENCE}
+              strokeDashoffset={(1 - (pct ?? 0) / 100) * GAUGE_CIRCUMFERENCE}
               strokeLinecap="round"
               transform="rotate(-90 18 18)"
             />
@@ -329,10 +331,10 @@ export function ContextMeter({
             <span
               className={cn(
                 "relative text-[9px] font-semibold tabular-nums",
-                contextTextTone(pct),
+                textTone,
               )}
             >
-              {pct}
+              {pct ?? "—"}
             </span>
           )}
         </span>
@@ -340,8 +342,8 @@ export function ContextMeter({
     ) : (
       <ContextMeterBar
         pct={pct}
-        barClassName={contextBarTone(pct)}
-        textClassName={contextTextTone(pct)}
+        barClassName={barTone}
+        textClassName={textTone}
         {...(provider ? { provider } : {})}
         {...(executionMode ? { executionMode } : {})}
         {...(model ? { model } : {})}
@@ -363,9 +365,9 @@ export function ContextMeter({
         <div className="flex items-center justify-between gap-2">
           <span className="font-semibold">Context usage</span>
           <span
-            className={cn("font-semibold tabular-nums", contextTextTone(pct))}
+            className={cn("font-semibold tabular-nums", textTone)}
           >
-            {pct}%
+            {pct === undefined ? "Unavailable" : `${pct}%`}
           </span>
         </div>
 
@@ -449,20 +451,20 @@ export function ContextMeter({
         <div className="space-y-1.5">
           <div className="h-1.5 overflow-hidden rounded-full bg-muted">
             <div
-              className={cn("h-full rounded-full", contextBarTone(pct))}
-              style={{ width: `${pct}%` }}
+              className={cn("h-full rounded-full", barTone)}
+              style={{ width: `${pct ?? 0}%` }}
             />
           </div>
-          {windowTokens ? (
+          {windowTokens !== undefined && usedTokens !== undefined && pct !== undefined ? (
             <>
               <Row
                 label="Window"
-                value={`${compactTokens(usedTokens ?? 0)} / ${compactTokens(windowTokens)}`}
+                value={`${compactTokens(usedTokens)} / ${compactTokens(windowTokens)}`}
               />
               <Row label="Free" value={`${100 - pct}%`} />
             </>
           ) : (
-            <Row label="Used" value={`${pct}%`} />
+            <Row label="Used" value={pct === undefined ? "Unavailable" : `${pct}%`} />
           )}
           {messageCount != null ? (
             <Row label="Messages" value={String(messageCount)} />

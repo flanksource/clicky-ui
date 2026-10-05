@@ -7,12 +7,25 @@ const meta: Meta<typeof JsonView> = {
   args: {
     data: { service: "api", status: "healthy", replicas: 3 },
     defaultOpenDepth: 2,
+    format: "yaml",
+  },
+  argTypes: {
+    format: {
+      control: "inline-radio",
+      options: ["yaml", "json"],
+      table: { defaultValue: { summary: "yaml" } },
+    },
+    density: {
+      control: "select",
+      options: ["compact", "comfortable", "spacious"],
+      table: { defaultValue: { summary: "Inherited" } },
+    },
   },
   parameters: {
     docs: {
       description: {
         component:
-          "Recursive JSON/object viewer for compact diagnostics and raw payload inspection. Objects and arrays can be expanded by depth while primitive values stay inline.",
+          'Collapsible structured-data viewer with YAML as the default format. Set format="json" for braces and quoted strings. Density follows the application or Storybook toolbar (compact, comfortable, spacious); the density prop overrides it for one viewer. Objects and arrays expand by depth, with type-aware coloring and safely quoted YAML strings.',
       },
     },
   },
@@ -49,4 +62,34 @@ export const DeepNested: Story = {
 
 export const EmptyContainers: Story = {
   args: { data: { obj: {}, arr: [] } },
+};
+
+export const Json: Story = {
+  args: { ...MixedTypes.args, format: "json" },
+};
+
+export const Compact: Story = {
+  args: { ...MixedTypes.args, density: "compact" },
+};
+
+export const Comfortable: Story = {
+  args: { ...MixedTypes.args, density: "comfortable" },
+};
+
+export const Spacious: Story = {
+  args: { ...MixedTypes.args, density: "spacious" },
+};
+
+export const YamlStringsAndSequences: Story = {
+  args: {
+    defaultOpenDepth: 4,
+    data: {
+      strings: ["true", "null", "42", "", "a: b", "first\nsecond"],
+      "special: key": "safely quoted",
+      services: [
+        { name: "api", ports: [8080, 9090] },
+        { name: "worker", ports: [] },
+      ],
+    },
+  },
 };

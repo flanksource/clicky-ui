@@ -12,7 +12,7 @@ describe("SessionMetadataBadges context meter", () => {
     (_label, metadata) => {
       render(<SessionMetadataBadges metadata={metadata} showContextMeter />);
 
-      expect(screen.getByLabelText("Context 0% used")).toBeInTheDocument();
+      expect(screen.getByLabelText("Context unavailable")).toBeInTheDocument();
     },
   );
 
@@ -29,7 +29,7 @@ describe("SessionMetadataBadges context meter", () => {
       />,
     );
 
-    const meter = screen.getByLabelText("Context 0% used");
+    const meter = screen.getByLabelText("Context unavailable");
     expect(
       meter.querySelector('[data-context-provider="anthropic"]'),
     ).not.toBeNull();

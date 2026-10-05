@@ -110,6 +110,18 @@ function columns(props: Partial<Parameters<typeof GraphDiagram>[0]> = {}) {
 }
 
 describe("GraphDiagram columns layout", () => {
+  it("draws a compact node on one line at the compact height, and a regular node at the node height", () => {
+    const { container } = columns({
+      nodes: [...callNodes, { id: "status", label: "STATUSCODE", level: 1, group: "AsPolicy", size: "compact" }],
+      nodeHeight: 32,
+      compactNodeHeight: 22,
+    });
+    const box = (id: string) => container.querySelector<HTMLElement>(`[data-graph-node="${id}"]`);
+
+    expect([box("status")?.style.height, box("status")?.getAttribute("data-graph-node-size"), box("walk")?.style.height, box("walk")?.getAttribute("data-graph-node-size")])
+      .toEqual(["22px", "compact", "32px", "regular"]);
+  });
+
   it("renders every node and a caption per group, falling back to the group id", () => {
     columns({ groups: [{ id: "query", label: "uir/query" }] });
 
@@ -139,6 +151,14 @@ describe("GraphDiagram columns layout", () => {
       svg?.querySelector("path[marker-end]")?.getAttribute("pointer-events"),
       svg?.querySelector("path[role=button]")?.getAttribute("pointer-events"),
     ]).toEqual([true, "visibleStroke", "stroke"]);
+  });
+
+  it("lets the pointer through a group box to the edges inside it, and keeps its caption's tooltip", () => {
+    columns({ onEdgeSelect: () => {}, groups: [{ id: "query", label: "uir/query", title: "github.com/flanksource/uir/query" }] });
+    const caption = screen.getByText("uir/query");
+    const box = caption.closest("[data-graph-group]");
+
+    expect([box?.classList.contains("pointer-events-none"), caption.classList.contains("pointer-events-auto")]).toEqual([true, true]);
   });
 
   it("sizes the stage to the layout and positions a node in the same pixel space", () => {
@@ -386,5 +406,15 @@ describe("GraphDiagram zoomable", () => {
       "translate(0px, 0px) scale(1)",
       "translate(0px, 0px) scale(4)",
     ]);
+  });
+
+  it("zooms on an unmodified wheel with wheelZoom zoom, one notch a button step", () => {
+    const { container } = columns({ zoomable: true, wheelZoom: "zoom" });
+    const stage = container.querySelector<HTMLElement>("[data-graph-stage]");
+    if (!stage?.parentElement) throw new Error("zoomable diagram rendered no stage");
+
+    fireEvent.wheel(stage.parentElement, { deltaY: -1000 });
+
+    expect(stage.style.transform).toBe("translate(0px, 0px) scale(1.25)");
   });
 });

@@ -35,6 +35,9 @@ import type {
   ApprovalKind,
   ApprovalRequest,
 } from "./approval-request";
+import type { SessionTokenSizer } from "./session-token-sizing";
+import { SessionTokenContext, useSessionTokenSizing } from "./use-session-token-sizing";
+export type { SessionTokenSizer, SessionTokenSize, SessionTokenSizingRequest, SessionTokenSizingResult } from "./session-token-sizing";
 
 export type {
   SessionEntry,
@@ -67,6 +70,9 @@ export interface SessionToolDecision extends ApprovalDecisionFields {
 }
 
 export interface SessionViewerProps {
+
+  /** Explicit menu actions only; never invoked automatically when a transcript loads. */
+  sizeTokens?: SessionTokenSizer;
   /** A captain session: parsed `SessionEntry[]` or raw log text (JSON / JSONL). */
   session: SessionInput;
   className?: string;
@@ -157,6 +163,7 @@ export function SessionViewer({
   renderMessageBadge,
   pendingTools = [],
   onPendingToolDecision,
+  sizeTokens,
 }: SessionViewerProps) {
   const allEvents = useMemo(
     () => mergePendingTools(normalizeSession(session), pendingTools),
@@ -164,6 +171,7 @@ export function SessionViewer({
   );
   const displayItems = useMemo(() => collapseWaitRuns(allEvents), [allEvents]);
   const metadata = useMemo(() => getSessionMetadata(session), [session]);
+  const tokenSizing = useSessionTokenSizing(session, allEvents, sizeTokens);
 
   const pageDensity = useDensityValue();
   const [densityOverride, setDensityOverride] = useState<Density | undefined>(
@@ -187,6 +195,7 @@ export function SessionViewer({
   >(undefined);
   const effectiveShowThinking = showThinkingOverride ?? showThinking;
   const [showEncryptedReasoning, setShowEncryptedReasoning] = useState(false);
+  const [showEstimatedToolCost, setShowEstimatedToolCost] = useState(false);
 
   const filters = useMemo(() => collectSessionFilters(allEvents), [allEvents]);
   const hasThinking = useMemo(
@@ -265,6 +274,9 @@ export function SessionViewer({
       hasEncryptedReasoning={hasEncryptedReasoning}
       showEncryptedReasoning={showEncryptedReasoning}
       onToggleEncryptedReasoning={() => setShowEncryptedReasoning((shown) => !shown)}
+      showEstimatedToolCost={showEstimatedToolCost}
+      onToggleEstimatedToolCost={() => setShowEstimatedToolCost((shown) => !shown)}
+      {...(tokenSizing.estimateAll ? { onEstimateTokens: tokenSizing.estimateAll, onCalculateMissingTokens: tokenSizing.calculateMissing, estimatingTokens: tokenSizing.pending } : {})}
     />
   ) : null;
   // When a host supplies `menuContainer`, the menu is portaled into it (e.g. the
@@ -287,6 +299,7 @@ export function SessionViewer({
               key={item.id}
               group={item}
               last={last}
+              showEstimatedToolCost={showEstimatedToolCost}
               defaultExpanded={defaultExpanded}
               showRowMetadata={showRowMetadata}
               showRaw={showRaw}
@@ -298,6 +311,7 @@ export function SessionViewer({
               key={item.id}
               event={item}
               initialPrompt={item.id === firstUserEventId}
+              showEstimatedToolCost={showEstimatedToolCost}
               last={last}
               defaultExpanded={defaultExpanded}
               showRowMetadata={showRowMetadata}
@@ -319,6 +333,7 @@ export function SessionViewer({
       )}
       {...dataAttrs}
     >
+      <SessionTokenContext.Provider value={tokenSizing.context}>
       <DensityValueProvider density={effectiveDensity}>
         {menu && menuContainer && createPortal(menu, menuContainer)}
         {(showHeader || headerActions || inlineMenu) && (
@@ -390,6 +405,7 @@ export function SessionViewer({
           list
         )}
       </DensityValueProvider>
+      </SessionTokenContext.Provider>
     </div>
   );
 }

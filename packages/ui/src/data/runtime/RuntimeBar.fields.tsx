@@ -155,8 +155,8 @@ export function effortField({
     label: "Effort",
     title: "Reasoning effort",
     isSet: Boolean(value),
-    icon: UiBrain,
-    iconClassName: "text-muted-foreground",
+    icon: glyph ?? UiBrain,
+    iconClassName: glyph ? effortLevelColor(value!) : "text-muted-foreground",
     caption: (
       <>
         <span className={SEGMENT_KEY_CLASS}>Effort</span>

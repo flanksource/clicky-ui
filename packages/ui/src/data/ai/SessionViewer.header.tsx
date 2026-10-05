@@ -27,7 +27,7 @@ export function SessionContextMeter({
   return (
     <ContextMeter
       mode={mode}
-      usedPercent={context ? 100 - context.freePercent : 0}
+      usedPercent={context ? 100 - context.freePercent : undefined}
       {...(context
         ? {
             usedTokens: context.usedTokens,

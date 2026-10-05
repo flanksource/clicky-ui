@@ -30,13 +30,16 @@ export type ToolCallProps = {
    *  `approval-requested`). Receives the approval id, the decision, and an
    *  optional reason. */
   onApprove?:
-    | ((approvalId: string, approved: boolean, reason?: string) => void)
+    | ((approvalId: string, approved: boolean, reason?: string) => void | Promise<unknown>)
     | undefined;
   renderToolResult?: ToolResultRenderer;
   /** Catalog entry for this tool. Defaults to the registry's catalog lookup. */
   tool?: ToolMeta | undefined;
   /** Renderer registry override. Defaults to the provided context registry. */
   registry?: ToolRenderRegistry | undefined;
+  /** Calls made by the subagent this call spawned (an Agent/Task call), nested
+   *  beneath it. A background subagent keeps calling after its parent returns. */
+  subcalls?: AnyToolPart[] | undefined;
   className?: string;
 };
 
@@ -84,10 +87,14 @@ export function ToolCall({
   renderToolResult,
   tool,
   registry: registryProp,
+  subcalls = [],
   className,
 }: ToolCallProps) {
   const needsApproval = part.state === "approval-requested";
-  const [open, setOpen] = useState(defaultOpen || needsApproval);
+  const [userOpen, setOpen] = useState(defaultOpen || needsApproval);
+  // A nested approval must stay reachable, so it holds its parent open.
+  const open =
+    userOpen || subcalls.some((call) => call.state === "approval-requested");
   const contextRegistry = useToolRenderRegistry();
   const registry = registryProp ?? contextRegistry;
   const status = STATUS_ICON[part.state];
@@ -131,6 +138,9 @@ export function ToolCall({
             title={STATUS_LABEL[part.state]}
             className={cn("size-3 shrink-0", status.className)}
           />
+          {subcalls.length > 0 ? (
+            <span className="shrink-0 text-xs">{subcallsLabel(subcalls)}</span>
+          ) : null}
           {!open && summary ? (
             <span className="min-w-0 flex-1 truncate text-xs">{summary}</span>
           ) : null}
@@ -157,6 +167,22 @@ export function ToolCall({
             output={normalized.value}
             {...(renderToolResult ? { renderToolResult } : {})}
           />
+          {subcalls.length > 0 && (
+            <div
+              data-slot="tool-call-subcalls"
+              className="border-l border-border pl-2"
+            >
+              {subcalls.map((call) => (
+                <ToolCall
+                  key={call.toolCallId}
+                  part={call}
+                  onApprove={onApprove}
+                  registry={registry}
+                  {...(renderToolResult ? { renderToolResult } : {})}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -165,8 +191,18 @@ export function ToolCall({
   );
 }
 
+function subcallsLabel(subcalls: AnyToolPart[]): string {
+  const running = subcalls.filter(
+    (call) => call.state === "input-streaming" || call.state === "input-available",
+  ).length;
+  const count = `${subcalls.length} ${subcalls.length === 1 ? "call" : "calls"}`;
+  return running > 0 ? `${count} · ${running} running` : count;
+}
+
 /** Approve/Deny controls shown while a tool call awaits human approval. The
- *  approval id comes from the part's `approval` envelope (AI SDK v6). */
+ *  approval id comes from the part's `approval` envelope (AI SDK v6). While a
+ *  returned decision promise is in flight the clicked button shows progress
+ *  and both are disabled. */
 function ApprovalControls({
   part,
   onApprove,
@@ -174,14 +210,23 @@ function ApprovalControls({
   part: AnyToolPart;
   onApprove: ToolCallProps["onApprove"];
 }) {
+  const [pending, setPending] = useState<"approve" | "deny">();
   const approval = "approval" in part ? part.approval : undefined;
   if (!approval || !onApprove) return null;
+  const decide = (approved: boolean) => {
+    setPending(approved ? "approve" : "deny");
+    void Promise.resolve(onApprove(approval.id, approved)).finally(() =>
+      setPending(undefined),
+    );
+  };
   return (
     <div className="mt-1.5 flex items-center gap-2 pl-4">
       <Button
         type="button"
         size="sm"
-        onClick={() => onApprove(approval.id, true)}
+        loading={pending === "approve"}
+        disabled={pending !== undefined}
+        onClick={() => decide(true)}
       >
         Approve
       </Button>
@@ -189,7 +234,9 @@ function ApprovalControls({
         type="button"
         size="sm"
         variant="outline"
-        onClick={() => onApprove(approval.id, false)}
+        loading={pending === "deny"}
+        disabled={pending !== undefined}
+        onClick={() => decide(false)}
       >
         Deny
       </Button>

@@ -1,6 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { UiShield } from "../../../icons";
+import {
+  UiFastForwardCircle,
+  UiHandPalm,
+  UiPencilSimpleLine,
+  UiShield,
+  UiShieldSlash,
+} from "../../../icons";
 import type { DropdownMenuItem } from "../../../overlay/DropdownMenu";
 import { UNSPECIFIED_HINT, UNSPECIFIED_LABEL } from "../../runtime/unspecified";
 import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
@@ -61,8 +67,42 @@ describe("permissionField", () => {
     });
 
     expect(field?.icon).toBe(UiShield);
+    expect(field?.iconClassName).toBe("text-muted-foreground");
     expect(field?.isSet).toBe(false);
   });
+
+  it.each([
+    {
+      family: "claude",
+      icon: UiFastForwardCircle,
+      color: "text-violet-700 [[data-theme=dark]_&]:text-violet-400",
+    },
+    {
+      family: "codex",
+      icon: UiHandPalm,
+      color: "text-sky-700 [[data-theme=dark]_&]:text-sky-400",
+    },
+    {
+      family: "gemini",
+      icon: UiPencilSimpleLine,
+      color: "text-amber-700 [[data-theme=dark]_&]:text-amber-400",
+    },
+  ])(
+    "uses the selected posture's icon and color for $family",
+    ({ family, icon, color }) => {
+      const field = permissionField({
+        spec: { mode: "cli", permissions: { mode: "acceptEdits" } },
+        families: families(undefined).map((runtime) => ({
+          ...runtime,
+          id: family,
+        })),
+        onChange: vi.fn(),
+      });
+
+      expect(field?.icon).toBe(icon);
+      expect(field?.iconClassName).toBe(color);
+    },
+  );
 
   it("offers only the postures the runtime's schema publishes, led by Unspecified", () => {
     const field = permissionField({
@@ -169,6 +209,8 @@ describe("permissionField", () => {
       "not available for Claude CLI",
     );
     expect(field!.items.at(-1)?.disabled).toBe(true);
+    expect(field?.icon).toBe(UiShieldSlash);
+    expect(field?.iconClassName).toBe("text-destructive");
   });
 
   it("writes the chosen posture into the spec and clears it to Unspecified", () => {

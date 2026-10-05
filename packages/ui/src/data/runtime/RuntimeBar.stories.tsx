@@ -48,14 +48,14 @@ const MODELS: ChatModel[] = [
 
 function RuntimeBarStory({
   initial,
-  variant = "segmented",
   families,
+  className,
   showTimeout = false,
   showCost = false,
 }: {
   initial: AISpecRuntimeValue;
-  variant?: RuntimeBarProps["variant"];
   families?: RuntimeBarProps["families"];
+  className?: RuntimeBarProps["className"];
   showTimeout?: boolean;
   showCost?: boolean;
 }) {
@@ -67,7 +67,7 @@ function RuntimeBarStory({
         onChange={setValue}
         models={MODELS}
         families={families}
-        variant={variant}
+        className={className}
         showTimeout={showTimeout}
         showCost={showCost}
       />
@@ -82,27 +82,16 @@ const meta = {
   title: "AI/RuntimeBar",
   component: RuntimeBar,
   tags: ["autodocs"],
-  argTypes: {
-    variant: {
-      control: "inline-radio",
-      options: ["segmented", "combo"],
-    },
-  },
-  args: {
-    variant: "segmented",
-  },
   parameters: {
     layout: "fullscreen",
     docs: {
       description: {
         component:
-          "Mode comes first and filters the combined provider/model picker. Both layouts show supplied settings inline when space permits and move them into the three-dot menu on narrower containers. Unset settings are menu-only. Use showTimeout/showCost for run limits and actions.fields with runtimeSpecFields for permission mode, Source and Commit timing. Host fields provide isSet, caption and menu items; actions.menu adds entries such as Advanced. Custom model IDs and limits remain editable in their dropdowns.",
+          "Mode comes first and filters the combined provider/model picker. Supplied settings appear inline when space permits and move them into the three-dot menu on narrower containers. Constrain the parent width or set className (for example, max-w-sm) to cap the bar; resizing either restores settings as space returns. Unset settings are menu-only. Use showTimeout/showCost for run limits and actions.fields with runtimeSpecFields for permission mode, Source and Commit timing. Host fields provide isSet, caption and menu items; actions.menu adds entries such as Advanced. Custom model IDs and limits remain editable in their dropdowns.",
       },
     },
   },
-  render: ({ variant }) => (
-    <RuntimeBarStory initial={{ mode: "agent" }} variant={variant} />
-  ),
+  render: () => <RuntimeBarStory initial={{ mode: "agent" }} />,
 } satisfies Meta<typeof RuntimeBar>;
 
 export default meta;
@@ -111,14 +100,29 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {};
 
 export const WithModelAndEffort: Story = {
-  render: ({ variant }) => (
+  render: () => (
     <RuntimeBarStory
-      variant={variant}
       initial={{
         mode: "cli",
         model: "openai/gpt-5-codex",
         effort: "high",
       }}
+    />
+  ),
+};
+
+export const MaximumWidth: Story = {
+  render: () => (
+    <RuntimeBarStory
+      className="max-w-sm"
+      initial={{
+        mode: "cli",
+        model: "anthropic/claude-sonnet-4-6",
+        effort: "medium",
+        budget: { timeout: "30m", cost: 2 },
+      }}
+      showTimeout
+      showCost
     />
   ),
 };
@@ -145,7 +149,6 @@ function NarrowRuntimeBarStory() {
 }
 
 export const NarrowContainer: Story = {
-  args: { variant: "segmented" },
   render: () => <NarrowRuntimeBarStory />,
   play: async ({ canvasElement }) => {
     const bar = within(canvasElement).getByRole("group", {
@@ -199,7 +202,6 @@ function HostActionsStory({ inline }: { inline: boolean }) {
 }
 
 export const HostActions: Story = {
-  args: { variant: "segmented" },
   render: () => (
     <div className="grid gap-4">
       <HostActionsStory inline />
@@ -229,13 +231,9 @@ export const HostActions: Story = {
   },
 };
 
-export const Combo: Story = {
-  args: {
-    variant: "combo",
-  },
-  render: ({ variant }) => (
+export const WithLimits: Story = {
+  render: () => (
     <RuntimeBarStory
-      variant={variant}
       initial={{
         mode: "cli",
         model: "openai/gpt-5-codex",
@@ -272,11 +270,9 @@ export const Combo: Story = {
 /** A hosted-API family the catalog does not describe keeps model entry available
  *  as free text even when there are no catalog rows. */
 export const NoModelsForFamily: Story = {
-  args: { variant: "segmented" },
-  render: ({ variant }) => (
+  render: () => (
     <RuntimeBarStory
       initial={{ mode: "api" }}
-      variant={variant}
       families={[
         {
           id: "gemini",
@@ -306,10 +302,8 @@ export const NoModelsForFamily: Story = {
 };
 
 export const SwitchingFamilyKeepsTheMode: Story = {
-  args: { variant: "segmented" },
-  render: ({ variant }) => (
+  render: () => (
     <RuntimeBarStory
-      variant={variant}
       initial={{ mode: "cli", model: "anthropic/claude-opus-4-1" }}
     />
   ),
@@ -334,11 +328,9 @@ export const SwitchingFamilyKeepsTheMode: Story = {
 };
 
 export const UnavailableModesAreOmitted: Story = {
-  args: { variant: "segmented" },
-  render: ({ variant }) => (
+  render: () => (
     <RuntimeBarStory
       initial={{ mode: "agent" }}
-      variant={variant}
       families={[
         {
           id: "claude",
@@ -373,7 +365,7 @@ export const UnavailableModesAreOmitted: Story = {
   },
 };
 
-function SpecSettingsStory({ variant }: Pick<RuntimeBarProps, "variant">) {
+function SpecSettingsStory() {
   const [value, setValue] = useState<AISpecRuntimeValue>({
     mode: "cli",
     model: "anthropic/claude-sonnet-4-6",
@@ -386,7 +378,6 @@ function SpecSettingsStory({ variant }: Pick<RuntimeBarProps, "variant">) {
   return (
     <div className="grid gap-4 p-6">
       <RuntimeBar
-        variant={variant}
         value={value}
         onChange={setValue}
         models={MODELS}
@@ -407,5 +398,5 @@ function SpecSettingsStory({ variant }: Pick<RuntimeBarProps, "variant">) {
 }
 
 export const WithSpecSettings: Story = {
-  render: ({ variant }) => <SpecSettingsStory variant={variant} />,
+  render: () => <SpecSettingsStory />,
 };

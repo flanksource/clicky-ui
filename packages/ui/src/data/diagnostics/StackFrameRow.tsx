@@ -65,13 +65,13 @@ export function StackFrameRow({
   return (
     <div
       className={[
-        "group grid gap-2 px-3 py-1.5 text-xs",
+        "group grid gap-x-2 gap-y-0.5 px-3 py-0.5 text-xs",
         showIndex ? "grid-cols-[2rem_minmax(0,1fr)_auto]" : "grid-cols-[1.25rem_minmax(0,1fr)_auto]",
         frame.runtime ? "text-muted-foreground" : "text-foreground",
       ].join(" ")}
     >
       <div className="flex items-start justify-end gap-1 pt-0.5 font-mono text-[10px] text-muted-foreground">
-        {showIndex && <span>{index + 1}</span>}
+        {showIndex && <span data-frame-index>{index + 1}</span>}
         <Icon icon={frameIcon(frame)} className="mt-px shrink-0 text-[11px]" />
       </div>
 
@@ -140,7 +140,7 @@ export function StackFrameRow({
           <FrameSourceWindow frame={frame} />
         </div>
       ) : null}
-      {detail ? <div className="col-span-3">{detail}</div> : null}
+      {detail ? <div className="col-start-2 col-span-2 min-w-0">{detail}</div> : null}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type ChatTransport, type UIMessage } from "ai";
 import { cn } from "../../lib/utils";
@@ -222,6 +222,7 @@ export function Chat({
   );
   const [usage, setUsage] = useState<ChatUsageSummary | null>(null);
   const [approvalError, setApprovalError] = useState<Error | undefined>();
+  const [approvalsInFlight, setApprovalsInFlight] = useState(0);
   const lastDefaultModel = useRef(defaultModel);
   const [draft, setDraft] = useState<{ id: number; text: string } | null>(null);
   const seededInitialPromptId = useRef<number | null>(null);
@@ -354,12 +355,22 @@ export function Chat({
   const setMessagesRef = useRef(setMessages);
   setMessagesRef.current = setMessages;
   const hydratedUsageRef = useRef<ChatUsageSummary | null>(null);
+  const hydratedAssistantRef = useRef<ChatUIMessage | undefined>(undefined);
+
+  const applySession = useCallback((session: CaptainChatSession) => {
+    const snapshot = usageSnapshotFromSession(session);
+    hydratedUsageRef.current = snapshot;
+    hydratedAssistantRef.current = [...session.messages].reverse().find((message) => message.role === "assistant") as ChatUIMessage | undefined;
+    setUsage(snapshot);
+    setMessagesRef.current(session.messages as ChatUIMessage[]);
+  }, []);
 
   useEffect(() => {
     if (!sessionsApi || !threadId) return;
     let cancelled = false;
     setApprovalError(undefined);
     hydratedUsageRef.current = null;
+    hydratedAssistantRef.current = undefined;
     setUsage(null);
     setMessagesRef.current([]);
     void getChatSession(sessionsApi, threadId)
@@ -370,10 +381,7 @@ export function Chat({
             `Captain chat session response ID "${session.id}" does not match requested session "${threadId}".`,
           );
         }
-        const snapshot = usageSnapshotFromSession(session);
-        hydratedUsageRef.current = snapshot;
-        setUsage(snapshot);
-        setMessagesRef.current(session.messages as ChatUIMessage[]);
+        applySession(session);
         onSessionHydratedRef.current?.(session);
       })
       .catch((cause) => {
@@ -385,7 +393,7 @@ export function Chat({
     return () => {
       cancelled = true;
     };
-  }, [sessionsApi, threadId]);
+  }, [applySession, sessionsApi, threadId]);
 
   useEffect(() => {
     onMessageCountChangeRef.current?.(
@@ -408,29 +416,29 @@ export function Chat({
 
   // Surface a usage snapshot after each settled assistant turn. The backend
   // rides usage/cost on the finish part's messageMetadata; we read it off the
-  // last assistant message and resolve maxTokens from the selected model.
+  // last assistant message, preserving provider context independently of billing.
   const onUsageRef = useRef(onUsage);
   onUsageRef.current = onUsage;
   useEffect(() => {
     if (status !== "ready") return;
     const last = [...messages].reverse().find((m) => m.role === "assistant");
+    if (hydratedUsageRef.current && last?.id === hydratedAssistantRef.current?.id && last?.metadata === hydratedAssistantRef.current?.metadata) {
+      setUsage(hydratedUsageRef.current);
+      onUsageRef.current?.(hydratedUsageRef.current);
+      return;
+    }
     const meta = last?.metadata;
     if (!meta) {
-      setUsage(hydratedUsageRef.current);
-      if (hydratedUsageRef.current) {
-        onUsageRef.current?.(hydratedUsageRef.current);
-      }
+      setUsage(null);
       return;
     }
     const settledModel = meta.model
       ? selectedChatModel(models, { id: meta.model, model: meta.model })
       : undefined;
     const snapshot = usageSnapshotFromMetadata(meta, {
-      contextWindow: settledModel?.contextWindow,
       modelLabel: settledModel?.label,
       messageCount: messages.length,
     });
-    hydratedUsageRef.current = snapshot;
     setUsage(snapshot);
     onUsageRef.current?.(snapshot);
   }, [messages, models, status]);
@@ -456,6 +464,7 @@ export function Chat({
   ) => {
     const approvalThreadId = threadId;
     setApprovalError(undefined);
+    setApprovalsInFlight((count) => count + 1);
     try {
       if (!sessionsApi) {
         throw new Error(
@@ -475,12 +484,14 @@ export function Chat({
           `Captain chat session response ID "${session.id}" does not match active session "${approvalThreadId ?? ""}".`,
         );
       }
-      setMessages(session.messages as ChatUIMessage[]);
+      applySession(session);
     } catch (cause) {
       if (activeThreadRef.current !== approvalThreadId) return;
       setApprovalError(
         cause instanceof Error ? cause : new Error(String(cause)),
       );
+    } finally {
+      setApprovalsInFlight((count) => count - 1);
     }
   };
 
@@ -537,11 +548,10 @@ export function Chat({
             : runtime.model
               ? { model: runtime.model }
               : {})}
+          suppressWaiting={approvalsInFlight > 0}
           emptyState={empty}
           onRegenerate={(messageId) => void regenerate({ messageId })}
-          onApprove={(id, approved, reason) =>
-            void resolveToolApproval(id, approved, reason)
-          }
+          onApprove={resolveToolApproval}
           {...(renderToolResult ? { renderToolResult } : {})}
         />
         <div className="flex flex-col gap-2 p-4 pt-0">

@@ -201,6 +201,48 @@ describe("Workspace", () => {
     ).toBeInTheDocument();
   });
 
+  it("holds the sides a host names collapsed, hiding their toggles, and keeps the layout it stores for their return", () => {
+    const width = (side: string) =>
+      screen
+        .getByTestId(`workspace-region-${side}`)
+        .style.getPropertyValue("--workspace-region-width");
+    const { rerender } = render(<Workspace panes={panes} storageKey="held" />);
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Explorer" }));
+    const stored = window.localStorage.getItem("held");
+
+    rerender(
+      <Workspace panes={panes} storageKey="held" collapsedSides={["left", "right"]} />,
+    );
+    const held = {
+      widths: [width("left"), width("right")],
+      panes: [screen.queryByText("Symbols"), screen.queryByText("Values")],
+      toggles: screen.queryAllByRole("button", { name: /(left|right) side$/ }),
+      stored: window.localStorage.getItem("held") === stored,
+    };
+    rerender(<Workspace panes={panes} storageKey="held" />);
+
+    expect({
+      held,
+      returned: [width("left"), width("right"), screen.getByRole("button", { name: "Expand Explorer" }).tagName],
+    }).toEqual({
+      held: { widths: ["0px", "0px"], panes: [null, null], toggles: [], stored: true },
+      returned: ["280px", "340px", "BUTTON"],
+    });
+  });
+
+  it("keeps the stored layout of sides a host holds collapsed from the first render", () => {
+    render(<Workspace panes={panes} storageKey="held" />);
+    fireEvent.click(screen.getByRole("button", { name: "Collapse Explorer" }));
+    const stored = window.localStorage.getItem("held");
+
+    const { unmount } = render(
+      <Workspace panes={panes} storageKey="held" collapsedSides={["left"]} />,
+    );
+    unmount();
+
+    expect(window.localStorage.getItem("held")).toBe(stored);
+  });
+
   it("renders pane icons, named header slots, and the workspace top-right slot", () => {
     render(
       <Workspace

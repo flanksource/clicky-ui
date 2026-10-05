@@ -34,8 +34,13 @@ export {
 } from "./ContextBadges";
 export {
   ToolPreferences,
+  ToolPreferencesMenu,
+  AdvancedChatSettings,
   CompactToolPreferencesList,
+  type AdvancedChatSettingsProps,
+  type AdvancedTab,
   type CompactToolPreferencesListProps,
+  type ToolPreferencesMenuProps,
   type ToolPreferencesProps,
   type ClaudePermissionMode,
   type ToolAnnotations,
@@ -395,6 +400,10 @@ export {
   type SessionEvent,
   type SessionInput,
   type SessionThemeOverride,
+  type SessionTokenSizer,
+  type SessionTokenSize,
+  type SessionTokenSizingRequest,
+  type SessionTokenSizingResult,
 } from "./SessionViewer";
 export type {
   ApprovalDecisionFields,

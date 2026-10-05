@@ -63,6 +63,46 @@ describe("columnsLayout", () => {
     });
   });
 
+  it("stacks compact nodes at their own height and gap, and pads a group of only compact nodes tighter", () => {
+    const layout = columnsLayout(
+      [
+        { id: "a", level: 0, group: "g1", compact: true },
+        { id: "b", level: 0, group: "g1", compact: true },
+        { id: "c", level: 0, group: "g2" },
+      ],
+      [],
+      { ...metrics, compactNodeHeight: 20, compactRowGap: 4, compactGroupPadding: 6 },
+    );
+
+    expect(layout).toEqual({
+      width: 156,
+      height: 162,
+      positions: {
+        a: { x: 78, y: 36 },
+        b: { x: 78, y: 60 },
+        c: { x: 78, y: 114 },
+      },
+      groups: [
+        { id: "0:g1", group: "g1", level: 0, x: 22, y: 20, width: 112, height: 56 },
+        { id: "0:g2", group: "g2", level: 0, x: 20, y: 86, width: 116, height: 56 },
+      ],
+    });
+  });
+
+  it("keeps the regular gap between a compact node and a regular one in the same group", () => {
+    const layout = columnsLayout(
+      [
+        { id: "a", level: 0, group: "g", compact: true },
+        { id: "b", level: 0, group: "g" },
+      ],
+      [],
+      { ...metrics, compactNodeHeight: 20, compactRowGap: 4, compactGroupPadding: 6 },
+    );
+
+    // Regular padding 8: a's centre 20 + 8 + 10; b's top after a's 20px and the regular 10px gap.
+    expect([layout.positions.a, layout.positions.b, layout.groups[0]?.height]).toEqual([{ x: 78, y: 38 }, { x: 78, y: 78 }, 86]);
+  });
+
   it("orders a column by its neighbours' positions in the column nearer level 0, uncrossing edges", () => {
     // Input order would draw p→y and q→x as a crossing; so would n→p and m→q.
     const layout = columnsLayout(

@@ -17,6 +17,7 @@ import {
   type WorkspaceLayoutDefaults,
   type WorkspaceLayoutState,
   type WorkspacePaneSpec,
+  type WorkspaceSideLocation,
 } from "./Workspace.model";
 import {
   WorkspaceSideRegion,
@@ -44,6 +45,11 @@ export type WorkspaceProps = {
   onValueChange?: (value: WorkspaceLayoutState) => void;
   storageKey?: string;
   slots?: WorkspaceSlots;
+  /**
+   * Sides the host holds collapsed for now, such as while the center shows something that needs the
+   * full width: they render collapsed and lose their toggle, and the layout state keeps how they were.
+   */
+  collapsedSides?: WorkspaceSideLocation[];
   className?: string;
 };
 
@@ -110,6 +116,7 @@ export function Workspace({
   onValueChange,
   storageKey,
   slots,
+  collapsedSides,
   className,
 }: WorkspaceProps) {
   validateWorkspacePanes(panes);
@@ -195,6 +202,18 @@ export function Workspace({
       writeWorkspaceLayoutState(storageKey, internal);
   }, [internal, storageKey, value]);
 
+  const held = (location: WorkspaceSideLocation) =>
+    collapsedSides?.includes(location) ?? false;
+  const shown: WorkspaceLayoutState = collapsedSides?.length
+    ? {
+        ...state,
+        sideCollapsed: {
+          left: held("left") || state.sideCollapsed.left,
+          right: held("right") || state.sideCollapsed.right,
+        },
+      }
+    : state;
+
   return (
     <div
       className={cn(
@@ -203,8 +222,8 @@ export function Workspace({
       )}
     >
       <WorkspaceTopRight
-        hasLeft={groups.left.length > 0}
-        hasRight={groups.right.length > 0}
+        hasLeft={groups.left.length > 0 && !held("left")}
+        hasRight={groups.right.length > 0 && !held("right")}
         {...(slots ? { slots } : {})}
         state={state}
         update={update}
@@ -212,7 +231,7 @@ export function Workspace({
       <WorkspaceSideRegion
         location="left"
         panes={groups.left}
-        state={state}
+        state={shown}
         update={update}
       />
       <WorkspaceSingleRegion
@@ -223,7 +242,7 @@ export function Workspace({
       <WorkspaceSideRegion
         location="right"
         panes={groups.right}
-        state={state}
+        state={shown}
         update={update}
       />
       {groups.bottom && (

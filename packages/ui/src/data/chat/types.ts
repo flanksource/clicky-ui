@@ -101,15 +101,16 @@ export interface ChatMessageMetadata {
   cost?: number;
   /** Cumulative thread cost in USD (when the turn is persisted to a thread). */
   threadCostUsd?: number;
-  /** This turn's input-token count, ≈ current context-window occupancy. */
-  contextTokens?: number;
+  /** Latest provider context snapshot, independent of billing usage. */
+  context?: { usedTokens: number; windowTokens: number; freePercent: number };
 }
 
 /** A flattened usage snapshot a chat surfaces for a gauge: tokens used out of the
  *  model's context window, plus cumulative cost. */
 export interface ChatUsageSummary {
-  usedTokens: number;
-  maxTokens: number;
+  usedTokens?: number;
+  maxTokens?: number;
+  freePercent?: number;
   cost?: number;
   usage?: ChatUsageBreakdown;
   costBreakdown?: ChatCostBreakdown;
@@ -358,6 +359,14 @@ export function toolPartName(part: AnyToolPart): string {
     return part.toolName;
   }
   return part.type.slice("tool-".length);
+}
+
+/** The tool call that spawned the subagent which made this call, from the
+ *  part's `toolMetadata.parentToolCallId`; undefined for the main thread's own
+ *  calls. */
+export function toolPartParentId(part: AnyToolPart): string | undefined {
+  const parent = part.toolMetadata?.["parentToolCallId"];
+  return typeof parent === "string" && parent !== "" ? parent : undefined;
 }
 
 export interface ToolResultRenderArgs {

@@ -149,7 +149,7 @@ describe("TaskProgress details", () => {
     expect(screen.getByText("exit 0")).toBeInTheDocument();
     expect(screen.getByText("2.5s")).toBeInTheDocument();
     expect(screen.getByText("scanId")).toBeInTheDocument();
-    expect(screen.getByText('"scan-1"')).toBeInTheDocument();
+    expect(screen.getByText("scan-1")).toBeInTheDocument();
     expect(screen.getByText("endpointCount")).toBeInTheDocument();
     expect(screen.getByText("stats")).toBeInTheDocument();
   });

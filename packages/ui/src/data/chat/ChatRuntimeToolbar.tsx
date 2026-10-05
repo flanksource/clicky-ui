@@ -37,15 +37,12 @@ export function ChatRuntimeToolbar({
   const showContextMeter = Boolean(threadId || selectedModel || usage);
   if (!showRuntimeBar && !showContextMeter) return null;
 
-  const contextWindow = usage?.maxTokens ?? 0;
-  const usedTokens = usage?.usedTokens ?? 0;
   const ModelGlyph = providerIcon(usage?.provider);
 
   return (
     <div className="flex flex-1 items-center gap-2">
       {showRuntimeBar && (
         <RuntimeBar
-          variant="combo"
           value={runtime}
           onChange={onRuntimeChange}
           models={models}
@@ -60,12 +57,10 @@ export function ChatRuntimeToolbar({
           <ContextMeter
             mode="gauge"
             usedPercent={
-              contextWindow > 0
-                ? Math.round((usedTokens / contextWindow) * 100)
-                : 0
+              usage?.freePercent !== undefined ? 100 - usage.freePercent : undefined
             }
-            usedTokens={usedTokens}
-            {...(contextWindow > 0 ? { windowTokens: contextWindow } : {})}
+            usedTokens={usage?.usedTokens}
+            windowTokens={usage?.maxTokens}
             {...(usage?.messageCount != null
               ? { messageCount: usage.messageCount }
               : {})}
