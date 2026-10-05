@@ -1,0 +1,1 @@
+function r(n){return/^[A-Za-z0-9_@%+=:,./-]+$/.test(n)?n:`'${n.replaceAll("'",`'"'"'`)}'`}function s({command:n,args:o,cwd:e}){const t=[n,...o??[]].map(r).join(" ");return e?`cd ${r(e)} && ${t}`:t}export{s as a,r as s};
