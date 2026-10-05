@@ -1,3 +1,5 @@
+// @vitest-environment node
+
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,6 +31,8 @@ function validator() {
   const ajv = new Ajv2020({ strict: true, strictTypes: false, allErrors: true });
   return ajv.compile(metaSchema);
 }
+
+const validate = validator();
 
 describe("json-schema-form.schema.json", () => {
   it("compiles as a 2020-12 meta-schema in strict mode", () => {
@@ -139,7 +143,6 @@ describe("json-schema-form.schema.json", () => {
   ];
 
   it.each(validSchemas)("accepts %s", (_, schema) => {
-    const validate = validator();
     expect(validate(schema), JSON.stringify(validate.errors)).toBe(true);
   });
 
@@ -171,7 +174,6 @@ describe("json-schema-form.schema.json", () => {
     ["nested under properties/items/properties", nest, "/properties/a/items/properties/b"],
   ])("rejects %s", (_, wrap, prefix) => {
     it.each(invalidFields)("%s", (_, field, path) => {
-      const validate = validator();
       expect(validate(wrap(field))).toBe(false);
       expect(validate.errors?.map((e) => e.instancePath)).toContain(`${prefix}${path}`);
     });

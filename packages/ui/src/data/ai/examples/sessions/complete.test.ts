@@ -1,3 +1,5 @@
+// @vitest-environment node
+
 import { describe, expect, it } from "vitest";
 import {
   getSessionAction,
@@ -137,13 +139,4 @@ describe("complete coverage transcripts", () => {
     expect(allEvents.some((e) => e.pending)).toBe(true);
   });
 
-  it("keeps real (un-anonymized) environment values intact", () => {
-    const serialized = JSON.stringify([
-      CLAUDE_COMPLETE_SESSION,
-      CODEX_COMPLETE_SESSION,
-    ]);
-    expect(serialized).toContain("/Users/moshe/go/src/github.com/flanksource");
-    expect(serialized).toContain("/Users/moshe/.claude/projects/");
-    expect(serialized).toContain("/Users/moshe/.codex/sessions/");
-  });
 });

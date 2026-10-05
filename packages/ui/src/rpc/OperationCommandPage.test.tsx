@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClickyDocument } from "../data/Clicky";
 import type { ParameterValues } from "./formMetadata";
 import type { ExecutionResponse, OpenAPISpec } from "./types";
@@ -112,11 +112,13 @@ function renderPage(
 }
 
 describe("OperationCommandPage", () => {
+  afterEach(() => vi.useRealTimers());
   beforeEach(() => {
     window.history.replaceState(null, "", "/");
   });
 
   it("auto-runs GET by default when initial values satisfy required parameters", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const client = makeClient((params) =>
       clickyResponse(
         makeClickyDocument([{ name: "id", label: "ID", value: params.id }]),
@@ -125,18 +127,18 @@ describe("OperationCommandPage", () => {
     );
 
     renderPage(client, { initialValues: { id: "autorun-widget" } });
-
-    await screen.findByRole("heading", { name: "Get widget" });
-    await waitFor(() =>
+    await vi.waitFor(async () => {
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(screen.getByRole("heading", { name: "Get widget" })).toBeInTheDocument();
       expect(client.executeMock).toHaveBeenCalledWith(
         "/api/v1/widgets/{id}",
         "get",
         { id: "autorun-widget" },
         { Accept: "application/clicky+json" },
-      ),
-    );
-    await waitFor(() => expect(client.executeMock).toHaveBeenCalledTimes(1));
-    await new Promise((resolve) => window.setTimeout(resolve, 350));
+      );
+    });
+    expect(client.executeMock).toHaveBeenCalledTimes(1);
+    await act(() => vi.advanceTimersByTimeAsync(350));
     expect(client.executeMock).toHaveBeenCalledTimes(1);
   });
 
@@ -381,6 +383,7 @@ describe("OperationCommandPage", () => {
   });
 
   it("honors explicit autoRun false for GET operations", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const spec: OpenAPISpec = {
       openapi: "3.0.0",
       info: { title: "test", version: "1" },
@@ -414,8 +417,11 @@ describe("OperationCommandPage", () => {
       </QueryClientProvider>,
     );
 
-    await screen.findByRole("heading", { name: "List widgets" });
-    await new Promise((resolve) => window.setTimeout(resolve, 350));
+    await vi.waitFor(async () => {
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(screen.getByRole("heading", { name: "List widgets" })).toBeInTheDocument();
+    });
+    await act(() => vi.advanceTimersByTimeAsync(350));
     expect(executeMock).not.toHaveBeenCalled();
   });
 

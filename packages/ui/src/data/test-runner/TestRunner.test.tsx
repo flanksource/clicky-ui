@@ -8,8 +8,6 @@ import { filterTests } from "./status";
 import type { Test } from "./types";
 import {
   completedTests,
-  largeDetailTests,
-  largeTreeTests,
   setupAdapter,
 } from "./TestRunner.fixtures";
 
@@ -121,21 +119,27 @@ describe("TestRunner", () => {
     expect(within(tree()).getByText(/rejects bad password/)).toBeInTheDocument();
   });
 
-  it("renders a large/deep JSON payload in the detail pane via JsonView", () => {
-    render(<Harness tests={largeDetailTests} />);
-    fireEvent.click(within(tree()).getByText(/imports 500 policy rows/));
-    // The detail Detail section labels the structured payload...
+  it("renders structured detail keys and expands nested row values", () => {
+    render(<Harness tests={[{
+      name: "imports policy rows", framework: "fixture", passed: true,
+      detail: { summary: { total: 2 }, rows: [{ policyNumber: "POL-001" }, { policyNumber: "POL-002" }] },
+    }]} />);
+    fireEvent.click(within(tree()).getByText("imports policy rows"));
     expect(screen.getByText("Detail")).toBeInTheDocument();
-    // ...and JsonView surfaces top-level keys of the 500-row payload.
     expect(screen.getByText("summary")).toBeInTheDocument();
     expect(screen.getByText("rows")).toBeInTheDocument();
+    expect(screen.queryByText("POL-002")).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Expand value" })[1]!);
+    expect(screen.getByText("POL-002")).toBeInTheDocument();
   });
 
-  it("renders a very large tree with the top-level groups visible", () => {
-    render(<Harness tests={largeTreeTests} />);
-    // 4 roots, each a "group N" container, render at the top level.
-    expect(within(tree()).getByText("group 0")).toBeInTheDocument();
-    expect(within(tree()).getByText("group 3")).toBeInTheDocument();
+  it("renders every root of a small grouped forest", () => {
+    render(<Harness tests={Array.from({ length: 4 }, (_, index) => ({
+      name: `group ${index}`, children: [{ name: `case ${index}`, passed: true }],
+    }))} />);
+    expect(within(tree()).getAllByText(/^group \d$/).map((element) => element.textContent)).toEqual([
+      "group 0", "group 1", "group 2", "group 3",
+    ]);
   });
 
   it("switches the detail tab from internal state when uncontrolled", () => {

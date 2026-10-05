@@ -1,0 +1,229 @@
+diff --git a/apps/playground/src/pages/flanksource/merivio/_approval-evidence/scoped.test.tsx b/apps/playground/src/pages/flanksource/merivio/_approval-evidence/scoped.test.tsx
+new file mode 100644
+index 000000000..bc89d4c5b
+--- /dev/null
++++ b/apps/playground/src/pages/flanksource/merivio/_approval-evidence/scoped.test.tsx
+@@ -0,0 +1,175 @@
++// @vitest-environment jsdom
++
++import { cleanup, render } from "@testing-library/react";
++import { afterEach, describe, expect, it } from "vitest";
++
++import { AdvancedProvider } from "./advanced";
++import { DEFAULT_CONVENTIONS } from "./conventions";
++import { APPROVAL_FIXTURES, KNOWN_REFERENCES } from "./fixtures";
++import type { ApprovalEvidenceRow, ApprovalFixture } from "./fixtures/types";
++import { lensPlan } from "./lenses";
++import { ApprovalReview } from "./shell";
++
++const FULL_IDENTIFIER = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{40,}/i;
++
++afterEach(cleanup);
++
++function build(id: string): ApprovalEvidenceRow {
++  const found = APPROVAL_FIXTURES.find((fixture) => fixture.id === id);
++  if (!found) throw new Error(`no fixture ${id}`);
++  return found.build();
++}
++
++function renderRow(row: ApprovalEvidenceRow, advanced = false) {
++  return render(
++    <AdvancedProvider advanced={advanced}>
++      <ApprovalReview row={row} known={KNOWN_REFERENCES} conventions={DEFAULT_CONVENTIONS} />
++    </AdvancedProvider>,
++  );
++}
++
++function providerBlocks(container: HTMLElement) {
++  return {
++    collapsed: container.querySelectorAll("[data-provider-data='collapsed']").length,
++    open: container.querySelectorAll("[data-provider-data='open']").length,
++  };
++}
++
++function textOf(container: HTMLElement, selector: string): string[] {
++  return [...container.querySelectorAll(selector)].map((element) => element.textContent ?? "");
++}
++
++describe.each(APPROVAL_FIXTURES.map((fixture) => [fixture.id, fixture] as const))("%s", (_id, fixture: ApprovalFixture) => {
++  it("keeps compact and advanced lens, provider and identifier invariants", () => {
++    const row = fixture.build();
++    const compact = renderRow(row);
++    const { container } = compact;
++    const lenses = [...container.querySelectorAll<HTMLDetailsElement>("details[data-lens]")].map((lens) => [lens.dataset.lens, lens.open]);
++    expect(lenses).toEqual([["change", true], ["calculation", false], ["origin", false]]);
++    const rendered = [...container.querySelectorAll("[data-part]")].flatMap((element) =>
++      element.getAttribute("data-part")!.split(" ").map((part) => `${part} → ${element.closest("[data-lens]")?.getAttribute("data-lens")}`),
++    );
++    const planned = [...lensPlan(row)].flatMap(([path, placement]) => (placement.at === "lens" ? [`${path} → ${placement.lens}`] : []));
++    expect(rendered.sort()).toEqual(planned.sort());
++    expect(container.textContent?.match(FULL_IDENTIFIER)?.[0]).toBeUndefined();
++    const collapsed = providerBlocks(container);
++    compact.unmount();
++    const advancedView = renderRow(row, true);
++    const advanced = providerBlocks(advancedView.container);
++    expect([collapsed.open, advanced.collapsed, advanced.open >= collapsed.collapsed]).toEqual([0, 0, true]);
++    expect(advancedView.container.textContent?.match(FULL_IDENTIFIER)?.[0]).toBeUndefined();
++  });
++});
++
++describe("evidence state", () => {
++  function state(id: string) {
++    const { container } = renderRow(build(id));
++    return {
++      header: container.querySelector("header [data-evidence-state]")?.getAttribute("data-evidence-state"),
++      banner: container.querySelector("header [data-missing-evidence]") !== null,
++      empty: container.querySelector("[data-lens='calculation'] [data-empty-state]")?.textContent ?? null,
++      readiness: textOf(container, "[data-lens='calculation'] [data-part='readinessIssues'] [data-entity-ref]"),
++    };
++  }
++
++  it.each([
++    ["journal-evidence", { header: "sealed", banner: false, empty: null, readiness: [] }],
++    ["journal-needs-input", { header: "unsealed", banner: false, empty: null, readiness: ["Account Accounts receivable610"] }],
++    ["journal-legacy", { header: "missing", banner: true, empty: "No evaluation was captured for this request.", readiness: [] }],
++    [
++      "journal-create",
++      { header: "never", banner: false, empty: "Resolved when the template was saved; template actions capture no evaluation.", readiness: [] },
++    ],
++  ])("%s states its evidence in the header and explains an empty calculation", (id, expected) => {
++    expect(state(id)).toEqual(expected);
++  });
++});
++
++describe("the change", () => {
++  it("lists the sealed tax journal's lines as the journal page does, signed, with a footer proving they balance", () => {
++    const { container } = renderRow(build("journal-evidence"));
++    expect({
++      headers: textOf(container, "[data-lens='change'] [data-postings] thead th"),
++      totals: textOf(container, "[data-lens='change'] [data-postings] tfoot td"),
++    }).toEqual({
++      headers: ["Account", "Contact", "Description", "Dimensions", "Net", "Tax", "Gross"],
++      totals: ["Balanced · debits R654.00 = credits R654.00", "R0.00", "R0.00", "R0.00"],
++    });
++  });
++
++  it("keeps the matched line's amount in where it came from, apart from what the journal moves", () => {
++    const { container } = renderRow(build("journal-evidence"));
++    const inside = (selector: string) => textOf(container, selector).join(" ");
++    expect([inside("header"), inside("[data-lens='origin']").includes("R5 013.99"), inside("details[data-lens='change']").includes("R5 013.99")]).toEqual([
++      expect.stringContaining("Debits R654.00"),
++      true,
++      false,
++    ]);
++  });
++
++  it("checks a template's stored amount against the journal it posts", () => {
++    const { container } = renderRow(build("journal-create"));
++    expect(textOf(container, "[data-part='row.amount']")).toEqual([expect.stringContaining("same as the debits")]);
++  });
++
++  it("diffs each reclassified field against the account the rule captured", () => {
++    const { container } = renderRow(build("account-metadata"));
++    const rows = [...container.querySelectorAll("[data-field-diff] tbody tr")].map((row) => [...row.querySelectorAll("td")].map((cell) => cell.textContent));
++    expect(rows).toEqual([
++      ["Tax category", "absent from the captured account", "Interestinterest", "dimensions.tax_category"],
++      ["Statement section", "absent from the captured account", "Finance costs", "statementSection"],
++    ]);
++  });
++
++  it("lays the reconciled lines out as the webapp does, provider minus local", () => {
++    const { container } = renderRow(build("provider-reconcile"));
++    expect({
++      headers: textOf(container, "[data-reconcile-diff] thead th"),
++      differences: textOf(container, "[data-reconcile-diff] tbody td:last-child"),
++    }).toEqual({ headers: ["Account", "Applied locally", "Provider", "Difference"], differences: ["R2.44", "-R2.44"] });
++  });
++});
++
++describe("tables", () => {
++  function headers(container: HTMLElement, scope: string): string[][] {
++    return [...container.querySelectorAll(`${scope} table`)].map((table) => [...table.querySelectorAll("th")].map((th) => th.textContent ?? ""));
++  }
++
++  it("names each line of a reconciled copy's account once, not once per key that points at it", () => {
++    const lines = headers(renderRow(build("provider-reconcile")).container, "[data-copy]").filter((columns) => columns.includes("Account"));
++    expect(lines.map((columns) => columns.filter((column) => column.toLowerCase().startsWith("account")))).toEqual([["Account"], ["Account"]]);
++  });
++
++  it("folds a trial-balance row's code and name into its account chip", () => {
++    const tbLines = headers(renderRow(build("journal-evidence")).container, "[data-lens='calculation']").find(
++      (columns) => columns.includes("account_id") && columns.includes("closing"),
++    )!;
++    expect([tbLines.includes("code"), tbLines.includes("name")]).toEqual([false, false]);
++  });
++});
++
++describe("cards", () => {
++  it("heads each fixed-asset action with the asset it maps, not the field that happens to come first", () => {
++    const { container } = renderRow(build("fixed-asset-mapping"));
++    expect(textOf(container, "details[data-lens='change'] [data-card-identity]").slice(0, 3)).toEqual([
++      "Asset WorkstationFA-0008",
++      "Asset InverterFA-0007",
++      "Asset TabletFA-0003",
++    ]);
++  });
++});
++
++describe("the sealed tax journal", () => {
++  // Provider payloads: inputs.line, inputs.account, inputs.contact, the three inputs.journal.lines and inputs.journal.provider.metadata.
++  it("renders chips for the records it names and keeps all seven provider payloads to one line each", () => {
++    const { container } = renderRow(build("journal-evidence"));
++    const kinds = [...container.querySelectorAll("[data-entity-ref]")].map((chip) => chip.getAttribute("data-entity-ref"));
++    expect({
++      providerBlocks: providerBlocks(container).collapsed,
++      hasRule: kinds.includes("rule"),
++      hasContact: kinds.includes("contact"),
++      hasLedgerAccount: container.querySelector("[data-entity-ref='account'][title*='tax://CAPEXINPUT2']") !== null,
++      trialBalanceOnce: container.textContent?.includes("Same as Tb"),
++    }).toEqual({ providerBlocks: 7, hasRule: true, hasContact: true, hasLedgerAccount: true, trialBalanceOnce: true });
++  });
++});
+--- a/apps/playground/src/pages/_run-controls/model.test.ts
++++ b/apps/playground/src/pages/_run-controls/model.test.ts
+@@ -1,6 +1,7 @@
+ import { describe, expect, it } from "vitest";
+ 
+ import { EFFORT_ICONS, type EffortLevel } from "@flanksource/clicky-ui/ai";
++import type { ChatModel } from "@flanksource/clicky-ui/chat";
+ 
+ import { RUN_EFFORTS, RUN_FAMILIES, RUN_MODELS } from "./fixture";
+ import {
+@@ -48,29 +49,30 @@
+ });
+ 
+ describe("compactModelName", () => {
++  const models: ChatModel[] = [
++    { id: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5", provider: "anthropic" },
++    { id: "gpt-5.1-codex", label: "GPT-5.1 Codex", provider: "openai" },
++  ];
+   // The whole point: shortening the id keeps the release date, shortening the
+   // catalog label drops it. A header needs the second.
+   it("drops the release date by resolving the label first", () => {
+-    expect(compactModelName("claude-sonnet-4-5-20250929", RUN_MODELS)).toBe("sonnet-4.5");
++    expect(compactModelName("claude-sonnet-4-5-20250929", models)).toBe("sonnet-4.5");
+     expect(shortRunModelName("claude-sonnet-4-5-20250929")).toBe("sonnet-4.5.20250929");
+   });
+ 
+-  it("compacts every model in the catalog", () => {
+-    expect(RUN_MODELS.map((entry) => compactModelName(entry.id, RUN_MODELS))).toEqual([
++  it("compacts Claude and GPT labels from a supplied catalog", () => {
++    expect(models.map((entry) => compactModelName(entry.id, models))).toEqual([
+       "sonnet-4.5",
+-      "opus-4.5",
+-      "haiku-4.5",
+       "gpt-5.1 codex",
+-      "gpt-5.1",
+     ]);
+   });
+ 
+   it("falls back to shortening the id when the catalog does not know it", () => {
+-    expect(compactModelName("mistral-large-2411", RUN_MODELS)).toBe("mistral-large-2411");
++    expect(compactModelName("mistral-large-2411", models)).toBe("mistral-large-2411");
+   });
+ 
+   it("reports an absent model as default", () => {
+-    expect(compactModelName(undefined, RUN_MODELS)).toBe("default");
++    expect(compactModelName(undefined, models)).toBe("default");
+   });
+ });
