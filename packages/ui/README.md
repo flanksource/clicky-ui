@@ -125,6 +125,8 @@ import "@flanksource/clicky-ui/mdx-editor.css"; // only if you render the markdo
 
 Without this import the field renders, but its toolbar and content are unstyled.
 
+If Markdown cannot be imported, the field displays the parsing error and preserves the document in a source editor. Correct the source and choose **Retry rich text** to reopen the rich-text editor. Source edits use the same `onChange` callback; read-only and disabled fields remain protected. Loading another document through `value` retries its import automatically.
+
 ## Bundle size guidance
 
 Prefer subpath imports in production apps:
