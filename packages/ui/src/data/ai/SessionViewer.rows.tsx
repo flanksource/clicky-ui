@@ -21,6 +21,8 @@ import { ToolBody } from "./SessionViewer.tool-row";
 import type { SessionToolDecision } from "./SessionViewer";
 import { Markdown } from "../Markdown";
 import { MessageFilePart } from "../chat/MessageFilePart";
+import { EstimatedToolCost } from "./SessionViewer.tool-cost";
+import { SessionRowTokens } from "./SessionViewer.tokens";
 
 export function SessionRow({
   event,
@@ -28,6 +30,7 @@ export function SessionRow({
   last,
   defaultExpanded,
   showRowMetadata = false,
+  showEstimatedToolCost = false,
   showRaw = false,
   renderMessageBadge,
   onPendingToolDecision,
@@ -37,6 +40,7 @@ export function SessionRow({
   last: boolean;
   defaultExpanded: boolean;
   showRowMetadata?: boolean;
+  showEstimatedToolCost?: boolean;
   showRaw?: boolean;
   renderMessageBadge?: ((event: SessionEvent) => ReactNode) | undefined;
   onPendingToolDecision?:
@@ -83,8 +87,10 @@ export function SessionRow({
             event.kind === "assistant" ? renderMessageBadge?.(event) : undefined
           }
           onPendingToolDecision={onPendingToolDecision}
+          showEstimatedToolCost={showEstimatedToolCost}
         />
         {showRowMetadata && <EventMetadata event={event} />}
+        <SessionRowTokens event={event} />
         {showRaw && event.raw !== undefined && (
           <RawEventBlock raw={event.raw} />
         )}
@@ -98,6 +104,7 @@ export function WaitGroupRow({
   last,
   defaultExpanded,
   showRowMetadata = false,
+  showEstimatedToolCost = false,
   showRaw = false,
   renderMessageBadge,
   onPendingToolDecision,
@@ -106,6 +113,7 @@ export function WaitGroupRow({
   last: boolean;
   defaultExpanded: boolean;
   showRowMetadata?: boolean;
+  showEstimatedToolCost?: boolean;
   showRaw?: boolean;
   renderMessageBadge?: ((event: SessionEvent) => ReactNode) | undefined;
   onPendingToolDecision?:
@@ -145,22 +153,25 @@ export function WaitGroupRow({
         <Icon icon={visual.icon} className="h-3 w-3" />
       </span>
       <div className="min-w-0 flex-1 pt-px">
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
-          onClick={() => setOpen((value) => !value)}
-          className="flex w-full items-center gap-1.5 text-left hover:text-foreground"
-        >
-          <span className="font-medium text-foreground">{label}</span>
-          <Icon
-            icon={UiChevronDown}
-            className={cn(
-              "ml-auto size-3 shrink-0 text-muted-foreground transition-transform",
-              open && "rotate-180",
-            )}
-          />
-        </button>
+        <div data-tool-header className="flex items-center gap-1.5">
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
+            onClick={() => setOpen((value) => !value)}
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-left hover:text-foreground"
+          >
+            <span className="font-medium text-foreground">{label}</span>
+            <Icon
+              icon={UiChevronDown}
+              className={cn(
+                "ml-auto size-3 shrink-0 text-muted-foreground transition-transform",
+                open && "rotate-180",
+              )}
+            />
+          </button>
+          {showEstimatedToolCost && !open && <EstimatedToolCost events={group.events} />}
+        </div>
         {showRowMetadata && (
           <EventMetadata
             event={metadataEvent}
@@ -176,6 +187,7 @@ export function WaitGroupRow({
                 last={index === group.events.length - 1}
                 defaultExpanded={defaultExpanded}
                 showRowMetadata={showRowMetadata}
+                showEstimatedToolCost={showEstimatedToolCost}
                 showRaw={showRaw}
                 renderMessageBadge={renderMessageBadge}
                 onPendingToolDecision={onPendingToolDecision}
@@ -183,6 +195,7 @@ export function WaitGroupRow({
             ))}
           </ol>
         )}
+        {open && showEstimatedToolCost && <EstimatedToolCost events={group.events} detailed />}
       </div>
     </li>
   );
@@ -213,6 +226,7 @@ function UserRow({
             {event.file ? <MessageFilePart part={event.file} /> : event.text && <Markdown text={event.text} />}
           </div>
           {showRowMetadata && <EventMetadata event={event} align="right" />}
+          <SessionRowTokens event={event} />
           {showRaw && event.raw !== undefined && (
             <RawEventBlock raw={event.raw} align="right" />
           )}
@@ -305,10 +319,12 @@ function EventBody({
   defaultExpanded,
   messageBadge,
   onPendingToolDecision,
+  showEstimatedToolCost,
 }: {
   event: SessionEvent;
   visual: EventVisual;
   defaultExpanded: boolean;
+  showEstimatedToolCost: boolean;
   messageBadge?: ReactNode;
   onPendingToolDecision?:
   | ((decision: SessionToolDecision) => Promise<void> | void)
@@ -321,6 +337,7 @@ function EventBody({
         visual={visual}
         defaultExpanded={defaultExpanded}
         onPendingToolDecision={onPendingToolDecision}
+        showEstimatedToolCost={showEstimatedToolCost}
       />
     );
   if (event.kind === "thinking") return <ThinkingBody event={event} />;

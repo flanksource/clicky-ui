@@ -171,6 +171,7 @@ export interface SessionEvent {
   tool?: string;
   toolInput?: Record<string, unknown>;
   toolResponse?: string;
+  estimatedCost?: SessionUIPart["estimatedCost"];
   /** Prose for user/assistant/thinking, or the error message for errors. */
   text?: string;
   /** Canonical file part rendered as an attachment thumbnail or chip. */
@@ -269,6 +270,7 @@ function toolEvent(
     turnId?: string;
     agentId?: string;
     toolState?: string;
+    estimatedCost?: SessionUIPart["estimatedCost"];
     approval?: SessionUIPart["approval"];
     pending?: boolean;
     toolCallId?: string;
@@ -291,6 +293,7 @@ function toolEvent(
     ...(meta.turnId ? { turnId: meta.turnId } : {}),
     ...(meta.agentId ? { agentId: meta.agentId } : {}),
     ...(meta.toolState ? { toolState: meta.toolState } : {}),
+    ...(meta.estimatedCost ? { estimatedCost: meta.estimatedCost } : {}),
     ...(meta.approval ? { approval: meta.approval } : {}),
     pending: meta.pending ?? false,
     ...(meta.toolCallId ? { toolCallId: meta.toolCallId } : {}),
@@ -538,6 +541,7 @@ function partEvent(
         ...(part.approval ? { approval: part.approval } : {}),
         pending,
         ...(part.toolCallId ? { toolCallId: part.toolCallId } : {}),
+        ...(part.estimatedCost ? { estimatedCost: part.estimatedCost } : {}),
         ...(part.approval?.id ? { approvalId: part.approval.id } : {}),
         ...(meta.raw !== undefined ? { raw: meta.raw } : {}),
       },

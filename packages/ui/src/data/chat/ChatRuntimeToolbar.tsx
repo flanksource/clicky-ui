@@ -37,8 +37,6 @@ export function ChatRuntimeToolbar({
   const showContextMeter = Boolean(threadId || selectedModel || usage);
   if (!showRuntimeBar && !showContextMeter) return null;
 
-  const contextWindow = usage?.maxTokens ?? 0;
-  const usedTokens = usage?.usedTokens ?? 0;
   const ModelGlyph = providerIcon(usage?.provider);
 
   return (
@@ -59,12 +57,10 @@ export function ChatRuntimeToolbar({
           <ContextMeter
             mode="gauge"
             usedPercent={
-              contextWindow > 0
-                ? Math.round((usedTokens / contextWindow) * 100)
-                : 0
+              usage?.freePercent !== undefined ? 100 - usage.freePercent : undefined
             }
-            usedTokens={usedTokens}
-            {...(contextWindow > 0 ? { windowTokens: contextWindow } : {})}
+            usedTokens={usage?.usedTokens}
+            windowTokens={usage?.maxTokens}
             {...(usage?.messageCount != null
               ? { messageCount: usage.messageCount }
               : {})}

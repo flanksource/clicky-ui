@@ -18,7 +18,6 @@ import type { CaptainChatSession } from "./approval";
 export function usageSnapshotFromMetadata(
   metadata: ChatMessageMetadata,
   options: {
-    contextWindow?: number | undefined;
     modelLabel?: string | undefined;
     messageCount: number;
   },
@@ -26,8 +25,11 @@ export function usageSnapshotFromMetadata(
   const cost =
     metadata.threadCostUsd ?? metadata.costBreakdown?.totalUsd ?? metadata.cost;
   return {
-    usedTokens: metadata.contextTokens ?? metadata.usage?.totalTokens ?? 0,
-    maxTokens: options.contextWindow ?? 0,
+    ...(metadata.context ? {
+      usedTokens: metadata.context.usedTokens,
+      maxTokens: metadata.context.windowTokens,
+      freePercent: metadata.context.freePercent,
+    } : {}),
     messageCount: options.messageCount,
     ...(cost != null ? { cost } : {}),
     ...(metadata.usage ? { usage: metadata.usage } : {}),
@@ -74,8 +76,11 @@ export function usageSnapshotFromSession(
       : bucketCost
     : undefined;
   return {
-    usedTokens: session.context?.usedTokens ?? 0,
-    maxTokens: session.context?.windowTokens ?? 0,
+    ...(session.context ? {
+      usedTokens: session.context.usedTokens,
+      maxTokens: session.context.windowTokens,
+      freePercent: session.context.freePercent,
+    } : {}),
     messageCount: session.messages.length,
     ...(cost !== undefined ? { cost } : {}),
     ...(session.usage ? { usage: session.usage } : {}),
