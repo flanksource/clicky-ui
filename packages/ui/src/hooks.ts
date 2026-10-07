@@ -35,6 +35,7 @@ export {
   EventSourceProvider,
   type EventSourceProviderProps,
 } from "./hooks/event-source-provider";
+export { createEventHub, type EventHubOptions } from "./hooks/event-hub";
 export {
   useTaskRun,
   useTaskRuns,
