@@ -218,6 +218,28 @@ Both hooks persist their choice to `localStorage` under `clicky-ui-theme` / `cli
 </script>
 ```
 
+## Multiplexing SSE streams
+
+Browsers cap HTTP/1.1 at six connections per host, shared across tabs, so an app that opens one native `EventSource` per topic can starve its own fetches. `createEventHub` returns an `EventSourceFactory` that multiplexes every stream the hooks open (`useTaskRun`, `usePrompts`, `useLogTail`, ...) over one real connection to a server events endpoint (such as clicky's `sse.Hub`). Wrap the tree in `EventSourceProvider` once:
+
+```tsx
+import { EventSourceProvider, createEventHub } from "@flanksource/clicky-ui/hooks";
+
+// Create the hub once at module scope so every render shares one connection.
+// `buildId` is the build the page was served with (e.g. from a <meta> tag);
+// when the server's hello reports a different build the page reloads once.
+// Omit it (or pass null) to never reload.
+const eventHub = createEventHub({ buildId: document.querySelector<HTMLMetaElement>('meta[name="app-build"]')?.content });
+
+root.render(
+  <EventSourceProvider value={eventHub}>
+    <App />
+  </EventSourceProvider>,
+);
+```
+
+Options: `url` (default `/api/events`), `buildId` (`string | null`), and `onBuildMismatch` (default `window.location.reload()`). Each hub keeps its own connection, so two hubs never share state.
+
 ## Lint rules
 
 The package ships opt-in [oxlint](https://oxc.rs/docs/guide/usage/linter/js-plugins.html)
