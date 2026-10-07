@@ -7,6 +7,8 @@ export interface GraphDiagramNode {
   label: ReactNode;
   /** Drawn before the label, on the same line. Give the icon its own `title` so it names itself. */
   icon?: ReactNode;
+  /** Right-aligned content on a record row, such as a column type. */
+  aside?: ReactNode;
   detail?: ReactNode;
   badge?: ReactNode;
   tone?: BadgeTone;
@@ -49,6 +51,8 @@ export interface GraphDiagramEdge {
 export interface GraphDiagramGroup {
   id: string;
   label: ReactNode;
+  /** A record draws a header and flush compact member rows. Defaults to a box. */
+  variant?: "box" | "record";
   /** Full text for the group, shown as its caption's native tooltip: what a shortened `label` stands for. */
   title?: string;
 }

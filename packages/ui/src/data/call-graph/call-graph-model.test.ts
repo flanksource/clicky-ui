@@ -13,8 +13,9 @@ import {
   type DiagramOptions,
   type GraphView,
 } from "./call-graph-model";
-import { UIR_CALL_GRAPH_VOCABULARY, type CallGraphVocabulary } from "./call-graph-vocabulary";
+import { dataNodeGlyph, UIR_CALL_GRAPH_VOCABULARY, type CallGraphVocabulary } from "./call-graph-vocabulary";
 import type { CallGraph, CallGraphNode } from "./types";
+import { oipaDataGraph, OIPA_VOCABULARY } from "./call-graph.fixtures";
 
 const LONG_GUARD = "a.very.long.condition(value) == expected";
 const PKG = "example.com/mod/pkg";
@@ -217,6 +218,49 @@ const DATA: CallGraph = {
   omitted: {},
 };
 const DATA_LABELS = { call: "call", dispatch: "dispatch", read: "reads", write: "writes" };
+
+describe("record groups", () => {
+  const graph = oipaDataGraph({ access: ["call", "read", "write"], columns: true });
+  const glyphs: DiagramGlyphs = { node: (glyph) => glyph, edge: () => undefined, group: (caption, glyph) => `${glyph ?? "group"}:${caption}` };
+  const draw = (graph: CallGraph, grouped = true) => toDiagram({ graph, visible: graph, direction: "both", options: { grouped, guardLabel: "none", truncateAt: 24 }, glyphs, vocabulary: OIPA_VOCABULARY, edgeLabels: DATA_LABELS });
+
+  it("uses the key glyph only for a column explicitly marked as a primary key", () => {
+    const base: CallGraphNode = { id: "column:Customers.ID", identifier: {}, kind: "column", label: "ID", depth: 1, in: 1, out: 0 };
+    expect([
+      dataNodeGlyph({ ...base, properties: { primaryKey: "true" } }),
+      dataNodeGlyph({ ...base, properties: { primaryKey: "false" } }),
+      dataNodeGlyph(base),
+      dataNodeGlyph({ ...base, kind: "field", properties: { primaryKey: "true" } }),
+    ]).toEqual(["primary_key", "column", "column", "field"]);
+  });
+
+  it("draws columns and fields as records with their owner glyph and column types", () => {
+    const diagram = draw(graph);
+    expect(diagram.groups.find((group) => group.id === "AsClient")).toEqual({ id: "AsClient", label: "table:AsClient", title: "AsClient", variant: "record" });
+    expect(diagram.groups.find((group) => group.id === "Policy")).toMatchObject({ label: "entity:Policy", variant: "record" });
+    expect(diagram.nodes.find((node) => node.id === "column:AsClient.CLIENTGUID")).toMatchObject({ size: "compact", aside: "uniqueidentifier", icon: "primary_key" });
+    expect(diagram.groups.find((group) => group.id === "Database")?.variant).toBeUndefined();
+  });
+
+  it("keeps a root column compact and tinted inside its record", () => {
+    const diagram = draw({ ...graph, roots: ["column:AsClient.CLIENTGUID"] });
+    expect(diagram.nodes.find((node) => node.id === "column:AsClient.CLIENTGUID")).toMatchObject({ size: "compact", tone: "info" });
+    expect(draw({ ...graph, roots: ["column:AsClient.CLIENTGUID"] }, false).nodes.find((node) => node.id === "column:AsClient.CLIENTGUID")?.size).toBeUndefined();
+  });
+
+  it("keeps mixed member kinds and non-data nodes in ordinary boxes", () => {
+    const mixed = { ...graph, nodes: [...graph.nodes, { id: "field:Client.Name", identifier: {}, kind: "field", label: "Name", group: "AsClient", depth: 2, in: 0, out: 0 }] };
+    expect(draw(mixed).groups.find((group) => group.id === "AsClient")?.variant).toBeUndefined();
+    const sourced = { ...graph, nodes: [...graph.nodes, { id: "func:Client", identifier: {}, kind: "function", label: "Client", group: "AsClient", depth: 2, in: 0, out: 0 }] };
+    expect(draw(sourced).groups.find((group) => group.id === "AsClient")?.variant).toBeUndefined();
+  });
+
+  it("classifies the visible group alone even when hidden nodes have another kind", () => {
+    const full = { ...graph, nodes: [...graph.nodes, { id: "func:Client", identifier: {}, kind: "function", label: "Client", group: "AsClient", depth: 4, in: 0, out: 0 }] };
+    const diagram = toDiagram({ graph: full, visible: graph, direction: "both", options: { grouped: true, guardLabel: "none", truncateAt: 24 }, glyphs, vocabulary: OIPA_VOCABULARY, edgeLabels: DATA_LABELS });
+    expect(diagram.groups.find((group) => group.id === "AsClient")?.variant).toBe("record");
+  });
+});
 
 describe("graph facts", () => {
   it("reports a node's totals only on the side the response walked", () => {

@@ -330,6 +330,14 @@ describe("CallGraph with data access", () => {
   const ready = () => screen.findByRole("group", { name: "Call graph of SchemeInstall" });
   const legend = () => within(screen.getByRole("list", { name: "Legend" })).getAllByRole("listitem").map((item) => item.textContent);
 
+  it("lists primary key columns only when those column nodes are drawn", async () => {
+    renderData();
+    await ready();
+    expect(legend()).not.toContain("primary key column");
+    fireEvent.click(screen.getByRole("switch", { name: "Columns" }));
+    await waitFor(() => expect(legend()).toContain("primary key column"));
+  });
+
   it("sends the access types and the columns switch with each request, and refetches when either changes", async () => {
     const { fetchGraph } = renderData();
     await ready();

@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import type { BadgeTone } from "../Badge";
 import type { GraphDiagramEdge, GraphDiagramGroup, GraphDiagramNode } from "../graph-diagram-model";
 import { edgeLabel, edgeTitle, groupCaption, isConditional, type PillOptions } from "./call-graph-labels";
-import { nodeTitle, siteKey, type CallGraphVocabulary } from "./call-graph-vocabulary";
+import { DATA_MEMBER_OWNER, dataMemberAside, isDataMember, nodeTitle, siteKey, type CallGraphVocabulary } from "./call-graph-vocabulary";
 import {
   CALL_GRAPH_ACCESS,
   type CallGraph,
@@ -70,7 +70,7 @@ export interface DiagramGlyphs {
   node(glyph: string, words: string): ReactNode;
   /** The pill icon of an edge type; a plain call has none. */
   edge(type: CallGraphEdgeType): ReactNode | undefined;
-  group(caption: string): ReactNode;
+  group(caption: string, glyph?: string): ReactNode;
 }
 
 export interface DiagramInput {
@@ -222,12 +222,13 @@ function groupRank(graph: CallGraph, vocabulary: CallGraphVocabulary): (node: Ca
   };
 }
 
-function toDiagramNode(node: CallGraphNode, { graph, visible, direction, options, glyphs, vocabulary }: DiagramInput): DiagramNode {
+function toDiagramNode(node: CallGraphNode, { graph, visible, direction, options, glyphs, vocabulary }: DiagramInput, records: ReadonlyMap<string, string>): DiagramNode {
   const count = expandCount(graph, visible, node.id, direction, vocabulary);
   const isRoot = graph.roots.includes(node.id);
   const tone = isRoot ? "info" : node.unresolved ? "warning" : undefined;
   // A table, column, entity or field is a name its group box already places: one short line will do.
-  const compact = !isRoot && vocabulary.isData(node) && !vocabulary.hasSource(node);
+  const compact = (node.group !== undefined && records.has(node.group)) || (!isRoot && vocabulary.isData(node) && !vocabulary.hasSource(node));
+  const aside = dataMemberAside(node);
   return {
     id: node.id,
     label: node.label,
@@ -236,6 +237,7 @@ function toDiagramNode(node: CallGraphNode, { graph, visible, direction, options
     level: node.depth,
     ...(options.grouped && node.group !== undefined ? { group: node.group } : {}),
     ...(compact ? { size: "compact" as const } : {}),
+    ...(aside !== undefined ? { aside } : {}),
     ...(tone !== undefined ? { tone } : {}),
     ...(vocabulary.muted(node) ? { muted: true } : {}),
     ...(count > 0 ? { expandCount: count } : {}),
@@ -281,12 +283,30 @@ export function columnGap({
   return Math.max(MIN_COLUMN_GAP, Math.round(Math.max(0, ...chars) * PILL_CHAR_WIDTH) + PILL_CHROME);
 }
 
+export function recordGroups(visible: VisibleGraph, vocabulary: CallGraphVocabulary): Map<string, string> {
+  const grouped = new Map<string, CallGraphNode[]>();
+  for (const node of visible.nodes) {
+    if (node.group !== undefined) grouped.set(node.group, [...(grouped.get(node.group) ?? []), node]);
+  }
+  const records = new Map<string, string>();
+  for (const [group, nodes] of grouped) {
+    const kind = nodes[0]?.kind;
+    if (kind !== undefined && nodes.every((node) => vocabulary.isData(node) && isDataMember(node) && node.kind === kind)) {
+      const owner = DATA_MEMBER_OWNER[kind];
+      if (owner === undefined) throw new Error(`call graph: no owner kind for data member "${kind}"`);
+      records.set(group, owner);
+    }
+  }
+  return records;
+}
+
 export function toDiagram(input: DiagramInput): Diagram {
   const { graph, visible, options, glyphs, vocabulary } = input;
   const rank = groupRank(graph, vocabulary);
+  const records = options.grouped ? recordGroups(visible, vocabulary) : new Map<string, string>();
   return {
-    nodes: [...visible.nodes].sort((a, b) => rank(a) - rank(b)).map((node) => toDiagramNode(node, input)),
+    nodes: [...visible.nodes].sort((a, b) => rank(a) - rank(b)).map((node) => toDiagramNode(node, input, records)),
     edges: visible.edges.map((edge) => toDiagramEdge(edge, input)),
-    groups: options.grouped ? (graph.groups ?? []).map(({ id, label }) => ({ id, label: glyphs.group(groupCaption(label)), title: label })) : [],
+    groups: options.grouped ? (graph.groups ?? []).map(({ id, label }) => ({ id, label: glyphs.group(groupCaption(label), records.get(id)), title: label, ...(records.has(id) ? { variant: "record" as const } : {}) })) : [],
   };
 }

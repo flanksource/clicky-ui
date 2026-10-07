@@ -8,6 +8,7 @@ import {
   callsItself,
   DATA_KIND_WORDS,
   dataNodeBacking,
+  dataNodeGlyph,
   dataNodeStatus,
   isDataNode,
   type CallGraphVocabulary,
@@ -190,7 +191,7 @@ export const OIPA_VOCABULARY: CallGraphVocabulary = {
     ...CALL_GRAPH_DATA_GLYPHS,
     { id: "unresolved", name: "unresolved name", icon: UiWarningCircle },
   ],
-  glyphOf: (_graph, node) => (node.unresolved ? "unresolved" : node.kind),
+  glyphOf: (_graph, node) => (node.unresolved ? "unresolved" : dataNodeGlyph(node)),
   kindOf: (graph, node) => {
     if (node.unresolved) return `unresolved ${node.kind}`;
     const kind = OIPA_KINDS[node.kind];
@@ -246,6 +247,23 @@ const DATA_FACTS: DataFact[] = [
 
 const DEPTHS: Record<string, number> = { [DATA_IDS.install]: 0, [DATA_IDS.packet]: 1, [DATA_IDS.proc]: 2 };
 
+const DATA_PROPERTIES: Record<string, Record<string, string>> = {
+  [DATA_IDS.policyStatus]: { column: "AsPolicy.STATUSCODE" },
+  [DATA_IDS.planGuid]: { sqlType: "uniqueidentifier" },
+  [DATA_IDS.statusCode]: { sqlType: "nvarchar(2)" },
+  [DATA_IDS.classGroupStatus]: { sqlType: "nvarchar(2)" },
+  "column:AsClient.CLIENTGUID": { sqlType: "uniqueidentifier", primaryKey: "true" },
+  "column:AsClient.TYPECODE": { sqlType: "nvarchar(2)" },
+  "column:AsClient.STATUSCODE": { sqlType: "nvarchar(2)" },
+  "column:AsClient.FIRSTNAME": { sqlType: "nvarchar(100)" },
+  "column:AsClient.LASTNAME": { sqlType: "nvarchar(100)" },
+  "column:AsClient.DATEOFBIRTH": { sqlType: "datetime2" },
+  "column:AsClient.SEXCODE": { sqlType: "nvarchar(2)" },
+  "column:AsClient.TAXID": { sqlType: "nvarchar(20)" },
+  "column:AsClient.COUNTRYCODE": { sqlType: "nvarchar(3)" },
+  "column:AsClient.UPDATEDGMT": { sqlType: "datetime2" },
+};
+
 function dataNode(id: string, depth: number): CallGraphNode {
   const [kind, name = ""] = id.split(":") as [string, string];
   const [owner = "", member = name] = name.split(".");
@@ -254,7 +272,7 @@ function dataNode(id: string, depth: number): CallGraphNode {
   if (id === DATA_IDS.packet) return oipaNode(id, "TransactionBusinessRulePacket", "SchemeInstallPacket", PLAN, depth, totals, "TransactionBusinessRulePacket");
   const group = kind === "column" || kind === "field" ? owner : kind === "entity" ? "Fields" : "Database";
   const label = kind === "column" || kind === "field" ? member : name;
-  const properties = id === DATA_IDS.policyStatus ? { column: "AsPolicy.STATUSCODE" } : undefined;
+  const properties = DATA_PROPERTIES[id];
   return { id, identifier: {}, kind, label, group, depth, ...totals, ...(properties ? { properties } : {}) };
 }
 

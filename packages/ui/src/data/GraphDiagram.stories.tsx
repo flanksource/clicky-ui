@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
-import { UiFunction, UiInterface, UiMethod, UiUnknown } from "../icons";
+import { UiFunction, UiInterface, UiKey, UiMethod, UiSqlColumn, UiSqlTable, UiUnknown } from "../icons";
 import {
   GraphDiagram,
   type GraphDiagramEdge,
@@ -96,6 +96,27 @@ export const SingleNode: Story = {
       <GraphDiagram {...args} />
     </div>
   ),
+};
+
+export const RecordGroups: Story = {
+  name: "Record groups",
+  args: {
+    layout: "columns",
+    nodeWidth: 240,
+    compactNodeHeight: 22,
+    recordHeaderHeight: 24,
+    ariaLabel: "Record data access",
+    groups: [{ id: "Customers", label: <span className="flex items-center gap-1.5"><UiSqlTable />Customers</span>, title: "dbo.Customers", variant: "record" }],
+    nodes: [
+      { id: "load", label: "LoadCustomer", level: 0 },
+      { id: "id", label: "ID", icon: <UiKey />, aside: "uniqueidentifier", level: 1, group: "Customers", size: "compact" },
+      { id: "name", label: "Name", icon: <UiSqlColumn />, aside: "nvarchar(100)", level: 1, group: "Customers", size: "compact" },
+      { id: "status", label: "Status", icon: <UiSqlColumn />, aside: "nvarchar(2)", level: 1, group: "Customers", size: "compact" },
+    ],
+    edges: [{ id: "load-name", from: "load", to: "name", label: "read", tone: "success" }],
+  },
+  render: (args) => <CallGraph {...args} />,
+  parameters: { docs: { description: { story: "Set a group's variant to record and its members' size to compact. The header uses recordHeaderHeight; each flush row uses compactNodeHeight. The aside slot shows a type, and edges attach to the row at the card's side. A record holding a regular node fails with its group and node id." } } },
 };
 
 const RING_NODE_COUNT = 8;

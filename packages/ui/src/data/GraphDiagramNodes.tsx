@@ -21,6 +21,7 @@ export interface GraphDiagramNodesProps {
   nodeHeight: number;
   /** Heights of the nodes not drawn at `nodeHeight`, by id: the compact ones. */
   nodeHeights: Readonly<Record<string, number>>;
+  recordNodes: ReadonlySet<string>;
   selectedId: string | undefined;
   onNodeSelect: ((id: string) => void) | undefined;
   onNodeExpand: ((id: string) => void) | undefined;
@@ -76,7 +77,7 @@ function NodeLabel({ node, oneLine }: { node: GraphDiagramNode; oneLine: boolean
   );
   if (node.icon == null) return label;
   return (
-    <span className="flex max-w-full items-center gap-1.5">
+    <span className="flex min-w-0 max-w-full items-center gap-1.5">
       <span data-graph-node-icon="" className="flex shrink-0 text-base leading-none">
         {node.icon}
       </span>
@@ -89,6 +90,7 @@ function NodeBody({
   node,
   oneLine,
   compact,
+  row,
   selected,
   onSelect,
 }: {
@@ -97,6 +99,7 @@ function NodeBody({
   oneLine: boolean;
   /** Its icon and label on one short line, left-aligned, without its detail or badge. */
   compact: boolean;
+  row: boolean;
   selected: boolean;
   onSelect: (() => void) | undefined;
 }) {
@@ -104,15 +107,16 @@ function NodeBody({
   return (
     <div
       className={cn(
-        "flex h-full w-full border text-xs shadow-sm",
+        "flex h-full w-full text-xs",
+        row ? "border-t border-border/60 hover:bg-accent" : "border shadow-sm",
         compact
           ? "items-center px-2 text-left text-[11px]"
           : "flex-col items-center justify-center gap-0.5 px-3 py-1.5 text-center",
-        node.shape === "pill" ? "rounded-full" : compact ? "rounded-md" : "rounded-lg",
-        TONE_NODE_CLASS[tone],
-        node.muted && "border-dashed text-muted-foreground shadow-none",
-        node.muted && tone === "neutral" && "bg-muted",
-        selected && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+        !row && (node.shape === "pill" ? "rounded-full" : compact ? "rounded-md" : "rounded-lg"),
+        row ? (tone === "info" ? "bg-sky-500/10 text-foreground" : "text-foreground") : TONE_NODE_CLASS[tone],
+        node.muted && (row ? "text-muted-foreground" : "border-dashed text-muted-foreground shadow-none"),
+        !row && node.muted && tone === "neutral" && "bg-muted",
+        selected && (row ? "bg-primary/10 ring-2 ring-inset ring-primary" : "ring-2 ring-primary ring-offset-2 ring-offset-background"),
         onSelect && "cursor-pointer",
       )}
       {...(onSelect
@@ -128,6 +132,7 @@ function NodeBody({
       title={node.title}
     >
       <NodeLabel node={node} oneLine={oneLine || compact} />
+      {row && node.aside != null && <span className="ml-auto min-w-0 truncate pl-2 font-mono text-[10px] text-muted-foreground">{node.aside}</span>}
       {!compact && node.detail != null && (
         <span className="line-clamp-1 text-[10px] leading-tight text-muted-foreground">{node.detail}</span>
       )}
@@ -143,6 +148,7 @@ export function GraphDiagramNodes({
   nodeWidth,
   nodeHeight,
   nodeHeights,
+  recordNodes,
   selectedId,
   onNodeSelect,
   onNodeExpand,
@@ -166,6 +172,7 @@ export function GraphDiagramNodes({
               node={node}
               oneLine={height < TWO_LINE_HEIGHT}
               compact={compact}
+              row={recordNodes.has(node.id)}
               selected={selectedId != null && node.id === selectedId}
               onSelect={onNodeSelect ? () => onNodeSelect(node.id) : undefined}
             />
@@ -199,15 +206,21 @@ export function GraphDiagramGroupBoxes({ boxes, groups }: GraphDiagramGroupBoxes
           <div
             key={box.id}
             data-graph-group={box.id}
-            className="pointer-events-none absolute rounded-xl border border-dashed border-border bg-muted/30"
+            data-graph-group-variant={box.record ? "record" : "box"}
+            className={cn("pointer-events-none absolute border border-border", box.record ? "overflow-hidden rounded-md bg-card shadow-sm" : "rounded-xl border-dashed bg-muted/30")}
             style={{ left: box.x, top: box.y, width: box.width, height: box.height }}
           >
-            <span
+            {box.record ? <div
+              data-graph-record-header=""
+              title={caption?.title}
+              className="pointer-events-auto flex items-center bg-muted px-2 text-[11px] font-semibold"
+              style={{ height: box.headerHeight }}
+            ><span className="min-w-0 truncate">{caption ? caption.label : box.group}</span></div> : <span
               title={caption?.title}
               className="pointer-events-auto absolute left-2 top-0 max-w-[calc(100%-1rem)] -translate-y-1/2 truncate rounded border border-border bg-background px-1.5 text-[10px] font-medium leading-4 text-muted-foreground"
             >
               {caption ? caption.label : box.group}
-            </span>
+            </span>}
           </div>
         );
       })}

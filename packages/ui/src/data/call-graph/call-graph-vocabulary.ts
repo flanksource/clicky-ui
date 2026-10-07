@@ -10,6 +10,7 @@ import {
   UiFunction1Dark,
   UiFunctionSquare,
   UiInterface,
+  UiKey,
   UiMethod,
   UiMethod11,
   UiMethod11Dark,
@@ -113,6 +114,7 @@ export const DATA_KIND_WORDS: Readonly<Record<string, string>> = {
 export const CALL_GRAPH_DATA_GLYPHS: readonly CallGraphGlyph[] = [
   { id: "table", name: "table", icon: UiSqlTable },
   { id: "column", name: "column", icon: UiSqlColumn },
+  { id: "primary_key", name: "primary key column", icon: UiKey },
   { id: "procedure", name: "stored procedure", icon: UiSqlStoredProc },
   { id: "entity", name: "entity", icon: UiTableProperties },
   { id: "field", name: "field", icon: UiField },
@@ -120,6 +122,20 @@ export const CALL_GRAPH_DATA_GLYPHS: readonly CallGraphGlyph[] = [
 
 export function isDataNode(node: CallGraphNode): boolean {
   return Object.hasOwn(DATA_KIND_WORDS, node.kind);
+}
+
+export const DATA_MEMBER_OWNER: Readonly<Record<string, string>> = { column: "table", field: "entity" };
+
+export function isDataMember(node: CallGraphNode): boolean {
+  return isDataNode(node) && Object.hasOwn(DATA_MEMBER_OWNER, node.kind);
+}
+
+export function dataNodeGlyph(node: CallGraphNode): string {
+  return node.kind === "column" && node.properties?.primaryKey === "true" ? "primary_key" : node.kind;
+}
+
+export function dataMemberAside(node: CallGraphNode): string | undefined {
+  return node.kind === "column" ? node.properties?.sqlType : undefined;
 }
 
 /** The data node's name: its id after `<kind>:`, else its label. */
@@ -188,7 +204,7 @@ function uirGlyph(graph: CallGraph, node: CallGraphNode): string {
   if (node.unresolved) return "unresolved";
   if (isBuiltin(node)) return "builtin";
   if (isPackageScope(node)) return "package";
-  if (isDataNode(node)) return node.kind;
+  if (isDataNode(node)) return dataNodeGlyph(node);
   if (callsItself(graph, node)) return "recursive";
   if (isExternal(node) && node.kind === "func") return "external_func";
   if (interfaceMethods(graph).has(node.id)) return "interface_method";
