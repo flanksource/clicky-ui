@@ -14,6 +14,10 @@ export interface ColumnsLayoutNode extends GraphLayoutNode {
 }
 
 export interface ColumnsLayoutOptions {
+  /** Group ids drawn as records with a header and flush compact rows. */
+  records?: readonly string[];
+  /** Height of a record's header in px. Defaults to 24. */
+  recordHeaderHeight?: number;
   /** Node bounding-box width in px. Defaults to 168. */
   nodeWidth?: number;
   /** Node bounding-box height in px. Defaults to 60. */
@@ -49,6 +53,8 @@ export interface GraphLayoutGroupBox {
   y: number;
   width: number;
   height: number;
+  record: boolean;
+  headerHeight: number;
 }
 
 export interface ColumnsLayoutResult extends GraphLayoutResult {
@@ -102,6 +108,8 @@ function mustGet<K, V>(map: ReadonlyMap<K, V>, key: K, what: string): V {
 
 function columnMetrics(options: ColumnsLayoutOptions): ColumnMetrics {
   return {
+    records: options.records ?? [],
+    recordHeaderHeight: options.recordHeaderHeight ?? 24,
     nodeWidth: options.nodeWidth ?? DEFAULT_NODE_WIDTH,
     nodeHeight: options.nodeHeight ?? DEFAULT_NODE_HEIGHT,
     columnGap: options.columnGap ?? DEFAULT_COLUMN_GAP,
@@ -156,7 +164,12 @@ function indexNeighbours(
  * rectangle. A grouped run of only compact nodes takes the compact gap and padding; any other run the
  * regular ones, whatever its order, so a column's height does not depend on how it is ordered.
  */
-function runMetrics(group: string | undefined, nodes: readonly ColumnsLayoutNode[], m: ColumnMetrics) {
+function runMetrics(group: string | undefined, nodes: readonly ColumnsLayoutNode[], m: ColumnMetrics, record: boolean) {
+  if (record) {
+    const regular = nodes.find((node) => !node.compact);
+    if (regular) throw new Error(`columnsLayout: record group "${group}" holds non-compact node "${regular.id}"`);
+    return { pad: 0, gap: 0, heightOf: () => m.compactNodeHeight, height: m.recordHeaderHeight + nodes.length * m.compactNodeHeight };
+  }
   const compact = group !== undefined && nodes.every((node) => node.compact === true);
   const pad = group === undefined ? 0 : compact ? m.compactGroupPadding : m.groupPadding;
   const gap = compact ? m.compactRowGap : m.rowGap;
@@ -168,7 +181,7 @@ function runMetrics(group: string | undefined, nodes: readonly ColumnsLayoutNode
 function columnHeight(column: readonly ColumnsLayoutNode[], m: ColumnMetrics): number {
   const runs = new Map<string | undefined, ColumnsLayoutNode[]>();
   for (const node of column) runs.set(node.group, [...(runs.get(node.group) ?? []), node]);
-  const stacked = [...runs].reduce((sum, [group, nodes]) => sum + runMetrics(group, nodes, m).height, 0);
+  const stacked = [...runs].reduce((sum, [group, nodes]) => sum + runMetrics(group, nodes, m, group !== undefined && m.records.includes(group)).height, 0);
   return stacked + (runs.size - 1) * m.rowGap;
 }
 
@@ -207,8 +220,10 @@ function stackColumn(
   const boxes: GraphLayoutGroupBox[] = [];
   let cursor = origin.top;
   for (const { group, nodes } of runs) {
-    const { pad, gap, heightOf, height } = runMetrics(group, nodes, m);
-    let top = cursor + pad;
+    const record = group !== undefined && m.records.includes(group);
+    const { pad, gap, heightOf, height } = runMetrics(group, nodes, m, record);
+    const headerHeight = record ? m.recordHeaderHeight : 0;
+    let top = cursor + pad + headerHeight;
     for (const node of nodes) {
       placed.set(node.id, { x: origin.x, y: top + heightOf(node) / 2 });
       top += heightOf(node) + gap;
@@ -222,6 +237,8 @@ function stackColumn(
         y: cursor,
         width: m.nodeWidth + 2 * pad,
         height,
+        record,
+        headerHeight,
       });
     }
     cursor += height + m.rowGap;

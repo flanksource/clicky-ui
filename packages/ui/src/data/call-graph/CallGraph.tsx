@@ -21,7 +21,7 @@ import {
   type DiagramGlyphs,
   type DiagramOptions,
 } from "./call-graph-model";
-import { UIR_CALL_GRAPH_VOCABULARY, type CallGraphVocabulary } from "./call-graph-vocabulary";
+import { requireGlyph, UIR_CALL_GRAPH_VOCABULARY, type CallGraphVocabulary } from "./call-graph-vocabulary";
 import { EdgeTypeGlyph, GroupCaption, NodeGlyphIcon } from "./CallGraphGlyphs";
 import { EdgeSites, Legend, NodeDetails, type CallGraphAction } from "./CallGraphParts";
 import { CallGraphToolbar } from "./CallGraphToolbar";
@@ -181,7 +181,7 @@ export function CallGraph<G extends Graph = Graph>(props: CallGraphProps<G>) {
   const glyphs = useMemo<DiagramGlyphs>(() => ({
     node: (glyph, words) => <NodeGlyphIcon vocabulary={vocabulary} glyph={glyph} title={words} />,
     edge: (type) => (type === "call" ? undefined : <EdgeTypeGlyph type={type} title={labels[type]} />),
-    group: (caption) => <GroupCaption icon={vocabulary.group.icon} caption={caption} />,
+    group: (caption, glyph) => <GroupCaption icon={glyph === undefined ? vocabulary.group.icon : requireGlyph(vocabulary, glyph).icon} caption={caption} />,
   }), [vocabulary, labels.dispatch, labels.read, labels.write]);
   const guardLabel = props.guardLabel ?? "innermost";
   const diagram = useMemo(
@@ -269,7 +269,7 @@ export function CallGraph<G extends Graph = Graph>(props: CallGraphProps<G>) {
         <div className="flex min-h-0 flex-1 gap-3">
           <div className={cn("relative min-h-64 min-w-0 flex-1 rounded-lg border border-border bg-background", load.loading && "opacity-60")}>
             <GraphDiagram key={`${shown.key}:${opening.nonce}`} nodes={diagram.nodes} edges={diagram.edges} groups={diagram.groups} layout="columns" zoomable wheelZoom="zoom" edgeFocus="auto"
-              focusId={rootId} {...(opening.fit ? {} : { fitMinScale: READABLE_SCALE })} nodeWidth={NODE_WIDTH} nodeHeight={NODE_HEIGHT} compactNodeHeight={COMPACT_NODE_HEIGHT} columnGap={columnGap(diagram)} rowGap={ROW_GAP}
+              focusId={rootId} {...(opening.fit ? {} : { fitMinScale: READABLE_SCALE })} nodeWidth={NODE_WIDTH} nodeHeight={NODE_HEIGHT} compactNodeHeight={COMPACT_NODE_HEIGHT} recordHeaderHeight={24} columnGap={columnGap(diagram)} rowGap={ROW_GAP}
               className="h-full" ariaLabel={`Call graph of ${requireNode(graph, rootId).label}`}
               onNodeSelect={(id: string) => select({ kind: "node", id })} onEdgeSelect={(id: string) => select({ kind: "edge", id })}
               {...(fresh ? { onNodeExpand: (id: string) => void expand(fresh, id) } : {})}

@@ -122,6 +122,17 @@ export const OipaDataAccess: Story = {
   },
 };
 
+export const OipaRecordGroups: Story = {
+  name: "OIPA columns and fields as records",
+  render: () => (
+    <div className="h-[560px]">
+      <CallGraph root={DATA_IDS.install} vocabulary={OIPA_VOCABULARY} depth={3} dataAccess columns
+        fetchGraph={(params) => delay(oipaDataGraph(params))} nodeHref={ruleHref} />
+    </div>
+  ),
+  parameters: { docs: { description: { story: "Only the visible columns and fields are listed. Groups of one member kind become record cards with a table or entity header. Column sqlType facts appear on the right, and primaryKey: true facts use the key glyph. Tables, procedures and mixed groups retain their box layout." } } },
+};
+
 export const NoRoot: Story = {
   args: { root: undefined, emptyMessage: "Select a transaction or business rule to draw its call graph." },
 };

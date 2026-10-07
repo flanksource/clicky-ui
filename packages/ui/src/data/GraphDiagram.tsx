@@ -67,6 +67,8 @@ export interface GraphDiagramProps {
    * compact nodes stacks them closer and pads them tighter. Defaults to 24.
    */
   compactNodeHeight?: number;
+  /** "columns" layout: height of a record group's header in px. Defaults to 24. */
+  recordHeaderHeight?: number;
   /** "columns" layout: horizontal gap between columns in px. Leave room for edge label pills. */
   columnGap?: number;
   /** "columns" layout: vertical gap between stacked nodes in px. */
@@ -97,6 +99,8 @@ interface LayoutOptions {
   nodeWidth: number;
   nodeHeight: number;
   compactNodeHeight: number;
+  records: readonly string[];
+  recordHeaderHeight: number;
   columnGap: number | undefined;
   rowGap: number | undefined;
 }
@@ -129,7 +133,7 @@ function requireLevel(node: GraphDiagramNode): number {
 function layoutNodes(
   nodes: GraphDiagramNode[],
   edges: GraphDiagramEdge[],
-  { layout, nodeWidth, nodeHeight, compactNodeHeight, columnGap, rowGap }: LayoutOptions,
+  { layout, nodeWidth, nodeHeight, compactNodeHeight, records, recordHeaderHeight, columnGap, rowGap }: LayoutOptions,
 ): ColumnsLayoutResult {
   switch (layout) {
     case "ring":
@@ -147,6 +151,8 @@ function layoutNodes(
           nodeWidth,
           nodeHeight,
           compactNodeHeight,
+          records,
+          recordHeaderHeight,
           ...(columnGap !== undefined ? { columnGap } : {}),
           ...(rowGap !== undefined ? { rowGap } : {}),
         },
@@ -205,6 +211,7 @@ export function GraphDiagram({
   nodeWidth = DEFAULT_NODE_WIDTH,
   nodeHeight = DEFAULT_NODE_HEIGHT,
   compactNodeHeight = DEFAULT_COMPACT_NODE_HEIGHT,
+  recordHeaderHeight = 24,
   columnGap,
   rowGap,
   zoomable = false,
@@ -217,10 +224,12 @@ export function GraphDiagram({
 }: GraphDiagramProps) {
   assertEdgesReferenceKnownNodes(nodes, edges);
   const markerPrefix = `graph-diagram-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const records = useMemo(() => groups?.filter((group) => group.variant === "record").map((group) => group.id) ?? [], [groups]);
+  const recordNodes = useMemo(() => new Set(layout === "columns" ? nodes.filter((node) => node.group !== undefined && records.includes(node.group)).map((node) => node.id) : []), [layout, nodes, records]);
 
   const { width, height, positions, groups: groupBoxes } = useMemo(
-    () => layoutNodes(nodes, edges, { layout, nodeWidth, nodeHeight, compactNodeHeight, columnGap, rowGap }),
-    [layout, nodes, edges, nodeWidth, nodeHeight, compactNodeHeight, columnGap, rowGap],
+    () => layoutNodes(nodes, edges, { layout, nodeWidth, nodeHeight, compactNodeHeight, records, recordHeaderHeight, columnGap, rowGap }),
+    [layout, nodes, edges, nodeWidth, nodeHeight, compactNodeHeight, records, recordHeaderHeight, columnGap, rowGap],
   );
   const nodeHeights = useMemo(() => compactHeights(nodes, layout, compactNodeHeight), [nodes, layout, compactNodeHeight]);
   const routes = useMemo(
@@ -282,6 +291,7 @@ export function GraphDiagram({
             nodeWidth={nodeWidth}
             nodeHeight={nodeHeight}
             nodeHeights={nodeHeights}
+            recordNodes={recordNodes}
             selectedId={selectedId}
             onNodeSelect={onNodeSelect}
             onNodeExpand={onNodeExpand}

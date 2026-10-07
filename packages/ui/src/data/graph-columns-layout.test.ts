@@ -2,6 +2,40 @@ import { describe, expect, it } from "vitest";
 import { columnsLayout } from "./graph-columns-layout";
 
 describe("columnsLayout", () => {
+  it("stacks record rows flush below the header with card edges at the node edges", () => {
+    const layout = columnsLayout(
+      ["id", "name", "status"].map((id) => ({ id, level: 0, group: "Customers", compact: true })),
+      [],
+      { records: ["Customers"], nodeWidth: 180, compactNodeHeight: 22, recordHeaderHeight: 30, padding: 20 },
+    );
+    expect(layout.groups).toEqual([
+      { id: "0:Customers", group: "Customers", level: 0, x: 32, y: 20, width: 180, height: 96, record: true, headerHeight: 30 },
+    ]);
+    expect(layout.positions).toEqual({ id: { x: 122, y: 61 }, name: { x: 122, y: 83 }, status: { x: 122, y: 105 } });
+    expect(layout.height).toBe(136);
+  });
+
+  it("rejects a regular node in a record, naming the group and node", () => {
+    expect(() => columnsLayout([{ id: "regular", level: 0, group: "Customers" }], [], { records: ["Customers"] }))
+      .toThrow(/Customers.*regular/);
+  });
+
+  it("centres record runs and repeats the header when a group spans columns", () => {
+    const layout = columnsLayout([
+      { id: "root", level: 0, group: "Customers", compact: true },
+      ...["a", "b", "c"].map((id) => ({ id, level: 1, group: "Customers", compact: true })),
+    ], [], { records: ["Customers"], compactNodeHeight: 22 });
+    expect(layout.groups.map(({ id, y, height, record, headerHeight }) => ({ id, y, height, record, headerHeight }))).toEqual([
+      { id: "0:Customers", y: 46, height: 46, record: true, headerHeight: 24 },
+      { id: "1:Customers", y: 24, height: 90, record: true, headerHeight: 24 },
+    ]);
+    expect([layout.positions.root?.y, layout.positions.b?.y, layout.height]).toEqual([81, 81, 138]);
+  });
+
+  it("keeps compact boxes at the default gap and padding", () => {
+    const layout = columnsLayout(["a", "b"].map((id) => ({ id, level: 0, group: "box", compact: true })), []);
+    expect([layout.positions.a?.y, layout.positions.b?.y, layout.groups[0]?.height]).toEqual([44, 72, 68]);
+  });
   // Column pitch = nodeWidth + columnGap = 160; row pitch = nodeHeight + rowGap = 50.
   const metrics = {
     nodeWidth: 100,
@@ -57,8 +91,8 @@ describe("columnsLayout", () => {
         b: { x: 78, y: 164 },
       },
       groups: [
-        { id: "0:g1", group: "g1", level: 0, x: 20, y: 20, width: 116, height: 106 },
-        { id: "0:g2", group: "g2", level: 0, x: 20, y: 136, width: 116, height: 56 },
+        { id: "0:g1", group: "g1", level: 0, x: 20, y: 20, width: 116, height: 106, record: false, headerHeight: 0 },
+        { id: "0:g2", group: "g2", level: 0, x: 20, y: 136, width: 116, height: 56, record: false, headerHeight: 0 },
       ],
     });
   });
@@ -83,8 +117,8 @@ describe("columnsLayout", () => {
         c: { x: 78, y: 114 },
       },
       groups: [
-        { id: "0:g1", group: "g1", level: 0, x: 22, y: 20, width: 112, height: 56 },
-        { id: "0:g2", group: "g2", level: 0, x: 20, y: 86, width: 116, height: 56 },
+        { id: "0:g1", group: "g1", level: 0, x: 22, y: 20, width: 112, height: 56, record: false, headerHeight: 0 },
+        { id: "0:g2", group: "g2", level: 0, x: 20, y: 86, width: 116, height: 56, record: false, headerHeight: 0 },
       ],
     });
   });

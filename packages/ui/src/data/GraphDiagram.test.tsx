@@ -14,6 +14,24 @@ const edges: GraphDiagramEdge[] = [
 ];
 
 describe("GraphDiagram", () => {
+  it("renders a record header and flush selectable rows with types and an inset selection", () => {
+    const row: GraphDiagramNode = { id: "customer-id", label: "ID", group: "Customers", level: 0, size: "compact", aside: "uniqueidentifier", tone: "info" };
+    const props = { nodes: [row], edges: [], groups: [{ id: "Customers", label: "Customers", title: "dbo.Customers", variant: "record" as const }], layout: "columns" as const, ariaLabel: "Records", onNodeSelect: vi.fn() };
+    const { container, rerender } = render(<GraphDiagram {...props} />);
+    const card = container.querySelector('[data-graph-group="0:Customers"]');
+    expect(card?.getAttribute("data-graph-group-variant")).toBe("record");
+    expect(card?.querySelector('[data-graph-record-header]')?.textContent).toBe("Customers");
+    expect(card?.querySelector('[data-graph-record-header]')?.getAttribute("title")).toBe("dbo.Customers");
+    const button = screen.getByRole("button", { name: "ID uniqueidentifier" });
+    expect(button.className).not.toMatch(/rounded|shadow|border-sky/);
+    expect(button).toHaveClass("border-t", "bg-sky-500/10");
+    fireEvent.keyDown(button, { key: "Enter" });
+    expect(props.onNodeSelect).toHaveBeenCalledWith(row.id);
+    rerender(<GraphDiagram {...props} selectedId={row.id} />);
+    expect(button).toHaveAttribute("aria-pressed", "true");
+    expect(button).toHaveClass("ring-inset", "bg-primary/10");
+    expect(button.className).not.toContain("ring-offset");
+  });
   it("renders every node's label", () => {
     render(<GraphDiagram nodes={nodes} edges={edges} ariaLabel="Deadlock graph" />);
 
