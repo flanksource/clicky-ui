@@ -37,8 +37,6 @@ lint:
 pre:
 - name: build
   run: pnpm --filter @flanksource/clicky-ui run build
-- name: install-storybook-browser
-  run: pnpm --filter storybook exec playwright install chromium
 procfile: {}
 secrets: {}
 ssh: {}
