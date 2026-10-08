@@ -44,6 +44,7 @@ export {
 export {
   CALL_GRAPH_DEFAULT_DEPTH,
   CALL_GRAPH_MAX_DEPTH,
+  baseAccess as baseCallGraphAccess,
   mergeGraph as mergeCallGraph,
   toggleAccess as toggleCallGraphAccess,
 } from "./call-graph-model";

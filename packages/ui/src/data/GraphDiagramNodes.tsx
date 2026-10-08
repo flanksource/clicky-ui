@@ -1,21 +1,22 @@
 import type { KeyboardEvent } from "react";
 import { cn } from "../lib/utils";
 import type { GraphLayoutPosition } from "./graph-layout";
-import type { GraphLayoutGroupBox } from "./graph-columns-layout";
 import {
   activateOnKey,
   hoverHandlers,
   nodeName,
   requireEntry,
   TONE_NODE_CLASS,
-  type GraphDiagramGroup,
   type GraphDiagramNode,
   type GraphPlacer,
 } from "./graph-diagram-model";
 
 export interface GraphDiagramNodesProps {
+  /** The nodes to draw: members scrolled out of their window and collapsed groups' stand-ins are left out. */
   nodes: GraphDiagramNode[];
   positions: Record<string, GraphLayoutPosition>;
+  /** The windowed group box each scrolling member belongs to, by node id: a wheel over the member scrolls it. */
+  windowOf: ReadonlyMap<string, string>;
   place: GraphPlacer;
   nodeWidth: number;
   nodeHeight: number;
@@ -133,6 +134,12 @@ function NodeBody({
     >
       <NodeLabel node={node} oneLine={oneLine || compact} />
       {row && node.aside != null && <span className="ml-auto min-w-0 truncate pl-2 font-mono text-[10px] text-muted-foreground">{node.aside}</span>}
+      {node.mark != null && (
+        // Kept out of the node's accessible name, which stays the node's own; the mark is its tooltip.
+        <span data-graph-node-mark="" aria-hidden className={cn("flex shrink-0 items-center", compact ? (row && node.aside != null ? "pl-1" : "ml-auto pl-1") : "absolute right-1 top-1")}>
+          {node.mark}
+        </span>
+      )}
       {!compact && node.detail != null && (
         <span className="line-clamp-1 text-[10px] leading-tight text-muted-foreground">{node.detail}</span>
       )}
@@ -144,6 +151,7 @@ function NodeBody({
 export function GraphDiagramNodes({
   nodes,
   positions,
+  windowOf,
   place,
   nodeWidth,
   nodeHeight,
@@ -159,11 +167,13 @@ export function GraphDiagramNodes({
       {nodes.map((node) => {
         const height = nodeHeights[node.id] ?? nodeHeight;
         const compact = node.id in nodeHeights;
+        const windowBox = windowOf.get(node.id);
         return (
           <div
             key={node.id}
             data-graph-node={node.id}
             data-graph-node-size={compact ? "compact" : "regular"}
+            {...(windowBox !== undefined ? { "data-graph-window": windowBox } : {})}
             className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2"
             style={{ ...place(requireEntry(positions, node.id, "layout position")), width: nodeWidth, height }}
             {...(onNodeHover ? hoverHandlers(node.id, onNodeHover) : {})}
@@ -179,48 +189,6 @@ export function GraphDiagramNodes({
             {node.expandCount != null && node.expandCount > 0 && (
               <ExpandControl node={node} onExpand={onNodeExpand ? () => onNodeExpand(node.id) : undefined} />
             )}
-          </div>
-        );
-      })}
-    </>
-  );
-}
-
-export interface GraphDiagramGroupBoxesProps {
-  boxes: GraphLayoutGroupBox[];
-  groups: GraphDiagramGroup[] | undefined;
-}
-
-/**
- * Group rectangles, drawn behind the edges and nodes, each captioned on its top border. A box lets the
- * pointer through to the stage, so a click inside it never lands on the box; only its caption takes
- * the pointer, for its tooltip.
- */
-export function GraphDiagramGroupBoxes({ boxes, groups }: GraphDiagramGroupBoxesProps) {
-  const captions = new Map(groups?.map((group) => [group.id, group]));
-  return (
-    <>
-      {boxes.map((box) => {
-        const caption = captions.get(box.group);
-        return (
-          <div
-            key={box.id}
-            data-graph-group={box.id}
-            data-graph-group-variant={box.record ? "record" : "box"}
-            className={cn("pointer-events-none absolute border border-border", box.record ? "overflow-hidden rounded-md bg-card shadow-sm" : "rounded-xl border-dashed bg-muted/30")}
-            style={{ left: box.x, top: box.y, width: box.width, height: box.height }}
-          >
-            {box.record ? <div
-              data-graph-record-header=""
-              title={caption?.title}
-              className="pointer-events-auto flex items-center bg-muted px-2 text-[11px] font-semibold"
-              style={{ height: box.headerHeight }}
-            ><span className="min-w-0 truncate">{caption ? caption.label : box.group}</span></div> : <span
-              title={caption?.title}
-              className="pointer-events-auto absolute left-2 top-0 max-w-[calc(100%-1rem)] -translate-y-1/2 truncate rounded border border-border bg-background px-1.5 text-[10px] font-medium leading-4 text-muted-foreground"
-            >
-              {caption ? caption.label : box.group}
-            </span>}
           </div>
         );
       })}

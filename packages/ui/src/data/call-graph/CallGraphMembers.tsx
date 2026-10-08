@@ -1,15 +1,17 @@
 import { useState, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
+import { AccessMark } from "../AccessMark";
 import { Badge } from "../Badge";
+import type { DataAccess } from "../data-access";
 import type { MemberAccess, MemberAccessKind } from "./call-graph-labels";
 
 /** How many chips or names a list shows before a "+N more" button reveals the rest. */
 const MEMBER_LIMIT = 8;
 
-const ACCESS_MARK: Record<MemberAccessKind, { text: string; words: string; className: string }> = {
-  read: { text: "R", words: "read", className: "text-emerald-600 dark:text-emerald-400" },
-  write: { text: "W", words: "written", className: "text-amber-600 dark:text-amber-400" },
-  both: { text: "RW", words: "read and written", className: "text-sky-600 dark:text-sky-400" },
+const ACCESS_MARK: Record<MemberAccessKind, { access: DataAccess; words: string }> = {
+  read: { access: "read", words: "read" },
+  write: { access: "write", words: "written" },
+  both: { access: "readwrite", words: "read and written" },
 };
 
 /** The first `limit` items on one wrapping line, then a button that shows the rest. */
@@ -32,7 +34,7 @@ function Overflowing({ label, items, limit, className }: { label: string; items:
 
 /**
  * The columns or fields a read or write touches, as chips on one wrapping line. When they are not all
- * touched the same way, each chip is marked R, W or RW.
+ * touched the same way, each chip carries its `AccessMark`.
  */
 export function MemberChipList({ label, members, limit = MEMBER_LIMIT }: { label: string; members: readonly MemberAccess[]; limit?: number }) {
   const marked = new Set(members.map((member) => member.access)).size > 1;
@@ -42,7 +44,7 @@ export function MemberChipList({ label, members, limit = MEMBER_LIMIT }: { label
       <li key={member.name} data-member={member.name} {...(marked ? { "data-access": member.access, title: `${member.name}: ${mark.words}` } : {})}>
         <Badge variant="outline" size="sm" clickToCopy={false} className="gap-1 font-mono">
           {member.name}
-          {marked && <span aria-hidden className={cn("text-[9px] font-semibold", mark.className)}>{mark.text}</span>}
+          {marked && <AccessMark access={mark.access} className="text-xs" />}
         </Badge>
       </li>
     );

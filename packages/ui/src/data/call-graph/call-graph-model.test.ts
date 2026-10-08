@@ -292,6 +292,13 @@ describe("toggleAccess", () => {
   it("refuses to turn the last access type off", () => {
     expect(() => toggleAccess(["write"], "write")).toThrow("call graph: write is the only access type on");
   });
+
+  it("toggles variables on top of the others, last in order, and never counts them as the one kept on", () => {
+    expect([toggleAccess(["call"], "variable"), toggleAccess(["variable", "read"], "call"), toggleAccess(["write", "variable"], "variable")]).toEqual([
+      ["call", "variable"], ["call", "read", "variable"], ["write"],
+    ]);
+    expect(() => toggleAccess(["write", "variable"], "write")).toThrow("call graph: write is the only access type on");
+  });
 });
 
 describe("mergeGraph of data access", () => {

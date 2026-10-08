@@ -5,12 +5,15 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "../../components/button";
 import { cn } from "../../lib/utils";
+import { AccessMark } from "../AccessMark";
 import { GraphDiagram } from "../GraphDiagram";
 import { matchesExclude, type ExcludeMatcher } from "./call-graph-exclude";
 import type { GuardLabel } from "./call-graph-labels";
 import {
+  baseAccess,
   CALL_GRAPH_DEFAULT_DEPTH,
   CALL_GRAPH_MAX_DEPTH,
+  collapsibleGroups,
   columnGap,
   DEFAULT_EDGE_LABELS,
   expansionDirection,
@@ -59,12 +62,21 @@ export interface CallGraphProps<G extends Graph = Graph> {
   onSelectedChange?: (selected: CallGraphSelection | undefined) => void;
   /** The source reports reads and writes of data: shows the Access toggles and the Columns switch. */
   dataAccess?: boolean;
-  /** The edge types the host follows, never empty; all three by default. Controlled with `onAccessChange`. */
+  /** The source can follow the variables a body reads and writes: shows a Variables toggle beside the Access ones. Needs `dataAccess`. */
+  variableAccess?: boolean;
+  /** The edge types the host follows, at least one of call, read and write; all three by default. Controlled with `onAccessChange`. */
   access?: CallGraphAccess[];
   onAccessChange?: (access: CallGraphAccess[]) => void;
   /** Columns and fields as nodes of their own; collapsed into tables and entities by default. */
   columns?: boolean;
   onColumnsChange?: (columns: boolean) => void;
+  /**
+   * The groups drawn as their header alone, by `graph.groups` id: each folds into one node, and its
+   * members' edges merge onto it, counting the members. The root's group never folds. Controlled with
+   * `onCollapsedGroupsChange`; without one the component holds it, starting here, none by default.
+   */
+  collapsedGroups?: string[];
+  onCollapsedGroupsChange?: (ids: string[]) => void;
   /** The groups the graph reached, drawn or excluded. Without it the graph offers no exclusions. */
   groupFacts?: (graph: G) => CallGraphGroupFact[];
   /** The patterns in force when `exclude` is undefined: the host's defaults, as its response reports them. */
@@ -127,7 +139,7 @@ function Alert({ message }: { message: string | undefined }) {
   return <div role="alert" className="whitespace-pre-wrap rounded-md border border-destructive p-3 text-sm text-destructive">{message}</div>;
 }
 
-const ACCESS_WORDS: Record<CallGraphAccess, string> = { call: "Calls", read: "Reads", write: "Writes" };
+const ACCESS_WORDS: Record<CallGraphAccess, string> = { call: "Calls", read: "Reads", write: "Writes", variable: "Variables" };
 
 function accessWords(access: readonly CallGraphAccess[]): string {
   return access.map((type) => ACCESS_WORDS[type]).join(" and ");
@@ -146,7 +158,11 @@ export function CallGraph<G extends Graph = Graph>(props: CallGraphProps<G>) {
   const [exclude, setExclude] = useHeld(props.exclude, props.onExcludeChange);
   const [access, setAccess] = useHeld(props.access ?? [...CALL_GRAPH_ACCESS], props.onAccessChange);
   const [columns, setColumns] = useHeld(props.columns ?? false, props.onColumnsChange);
-  if (access.length === 0) throw new Error("call graph: access must name at least one of call, read and write");
+  const [collapsedGroups, setCollapsedGroups] = useHeld(props.collapsedGroups ?? [], props.onCollapsedGroupsChange);
+  if (baseAccess(access).length === 0) throw new Error("call graph: access must name at least one of call, read and write");
+  if (access.includes("variable") && !(props.dataAccess && props.variableAccess)) {
+    throw new Error("call graph: access names variable, but the host does not offer variableAccess");
+  }
   const [ownSelection, setOwnSelection] = useState<{ key: string; selected: CallGraphSelection }>();
 
   const request: GraphRequest | undefined = root === undefined ? undefined : { root, direction, depth, exclude, access, columns, purpose: "load" };
@@ -182,12 +198,17 @@ export function CallGraph<G extends Graph = Graph>(props: CallGraphProps<G>) {
     node: (glyph, words) => <NodeGlyphIcon vocabulary={vocabulary} glyph={glyph} title={words} />,
     edge: (type) => (type === "call" ? undefined : <EdgeTypeGlyph type={type} title={labels[type]} />),
     group: (caption, glyph) => <GroupCaption icon={glyph === undefined ? vocabulary.group.icon : requireGlyph(vocabulary, glyph).icon} caption={caption} />,
+    access: (access) => <AccessMark access={access} />,
   }), [vocabulary, labels.dispatch, labels.read, labels.write]);
   const guardLabel = props.guardLabel ?? "innermost";
   const diagram = useMemo(
-    () => graph && visible && toDiagram({ graph, visible, direction, options: { ...OPTIONS, guardLabel }, glyphs, vocabulary, edgeLabels: labels }),
-    [graph, visible, direction, guardLabel, glyphs, vocabulary, labels.call, labels.dispatch, labels.read, labels.write],
+    () => graph && visible && toDiagram({ graph, visible, direction, options: { ...OPTIONS, guardLabel }, glyphs, vocabulary, edgeLabels: labels, collapsed: collapsedGroups }),
+    [graph, visible, direction, guardLabel, glyphs, vocabulary, labels.call, labels.dispatch, labels.read, labels.write, collapsedGroups],
   );
+  // What a selection is looked up in: the graph as drawn, collapsed groups folded into their stand-ins.
+  const drawn = diagram?.drawn;
+  const collapsible = useMemo(() => (graph && visible ? collapsibleGroups(graph, visible) : []), [graph, visible]);
+  const toggleGroup = (id: string) => setCollapsedGroups(collapsedGroups.includes(id) ? collapsedGroups.filter((entry) => entry !== id) : [...collapsedGroups, id]);
 
   const rootId = graph?.roots[0];
   const selection = props.onSelectedChange ? props.selected : ownSelection?.key === shown?.key ? ownSelection?.selected : undefined;
@@ -200,9 +221,12 @@ export function CallGraph<G extends Graph = Graph>(props: CallGraphProps<G>) {
     const accepted = onOpenNode && (canOpenNode?.(node, drawn) ?? true) ? () => onOpenNode(node, drawn) : undefined;
     return action(props.nodeHref?.(node, drawn), accepted);
   };
-  const selectedNode = selection?.kind === "node" ? visible?.nodes.find((node) => node.id === selection.id) : undefined;
-  const selectedEdge = selection?.kind === "edge" ? visible?.edges.find((edge) => edge.id === selection.id) : undefined;
-  const guards = useSiteGuards(props.loadSiteGuards, shown?.key, selectedEdge, graph);
+  const selectedNode = selection?.kind === "node" ? drawn?.visible.nodes.find((node) => node.id === selection.id) : undefined;
+  const selectedEdge = selection?.kind === "edge" ? drawn?.visible.edges.find((edge) => edge.id === selection.id) : undefined;
+  // A merged edge stands for several the host knows: it has no guards of its own to load.
+  const mergedEdge = selectedEdge !== undefined && drawn?.merged.has(selectedEdge.id) === true;
+  const standIn = selectedNode !== undefined && drawn?.folds.has(selectedNode.id) === true;
+  const guards = useSiteGuards(props.loadSiteGuards, shown?.key, mergedEdge ? undefined : selectedEdge, graph);
   const expansion = expanding?.request.key === key ? expanding : undefined;
 
   // A `+N` loads one more hop on the node's outer side and merges it into the graph this request drew.
@@ -242,7 +266,13 @@ export function CallGraph<G extends Graph = Graph>(props: CallGraphProps<G>) {
       {...(onPinnedChange ? { pin: { pinned: props.pinned ?? false, canPin: rootId !== undefined, onPin: (pinned: boolean) => onPinnedChange(pinned, rootId) } } : {})}
       {...(groups ? { exclusions: { exclude: effectiveExclude, groups, matches: props.excludeMatcher ?? matchesExclude, busy: load.loading, vocabulary,
         onExclude: (patterns: string[]) => setExclude(patterns), onDefaults: () => setExclude(undefined) } } : {})}
-      {...(props.dataAccess ? { data: { access, onAccess: setAccess, columns, onColumns: setColumns } } : {})}
+      {...(props.dataAccess ? { data: { access, onAccess: setAccess, columns, onColumns: setColumns, variables: props.variableAccess ?? false } } : {})}
+      {...(collapsible.length > 0 ? { groupCollapse: {
+        anyCollapsed: collapsedGroups.some((id) => collapsible.includes(id)),
+        anyExpanded: collapsible.some((id) => !collapsedGroups.includes(id)),
+        onExpandAll: () => setCollapsedGroups([]),
+        onCollapseAll: () => setCollapsedGroups(collapsible),
+      } } : {})}
       onDirection={setDirection} onDepth={setDepth}
       onFit={() => setOpening({ nonce: opening.nonce + 1, fit: true })} onReset={() => setOpening({ nonce: opening.nonce + 1, fit: false })} />
   );
@@ -259,8 +289,8 @@ export function CallGraph<G extends Graph = Graph>(props: CallGraphProps<G>) {
       {graph && props.renderHeader?.(graph)}
       {!shown && load.loading && <Notice>Loading call graph…</Notice>}
       {graph && !rootId && <Notice>The root resolved to no node in this scope.</Notice>}
-      {graph && rootId && graph.edges.length === 0 && access.length < CALL_GRAPH_ACCESS.length && (
-        <Notice>{`Nothing is reachable with ${accessWords(access)} only.`}</Notice>
+      {graph && rootId && graph.edges.length === 0 && baseAccess(access).length < CALL_GRAPH_ACCESS.length && (
+        <Notice>{`Nothing is reachable with ${accessWords(baseAccess(access))} only.`}</Notice>
       )}
       {graph && rootId && graph.edges.length > 0 && !selectedEdge && !selectedNode && (
         <p className="text-xs text-muted-foreground">Select an edge to list its sites, or a node to see its details.</p>
@@ -270,7 +300,7 @@ export function CallGraph<G extends Graph = Graph>(props: CallGraphProps<G>) {
           <div className={cn("relative min-h-64 min-w-0 flex-1 rounded-lg border border-border bg-background", load.loading && "opacity-60")}>
             <GraphDiagram key={`${shown.key}:${opening.nonce}`} nodes={diagram.nodes} edges={diagram.edges} groups={diagram.groups} layout="columns" zoomable wheelZoom="zoom" edgeFocus="auto"
               focusId={rootId} {...(opening.fit ? {} : { fitMinScale: READABLE_SCALE })} nodeWidth={NODE_WIDTH} nodeHeight={NODE_HEIGHT} compactNodeHeight={COMPACT_NODE_HEIGHT} recordHeaderHeight={24} columnGap={columnGap(diagram)} rowGap={ROW_GAP}
-              className="h-full" ariaLabel={`Call graph of ${requireNode(graph, rootId).label}`}
+              className="h-full" ariaLabel={`Call graph of ${requireNode(graph, rootId).label}`} onGroupToggle={toggleGroup}
               onNodeSelect={(id: string) => select({ kind: "node", id })} onEdgeSelect={(id: string) => select({ kind: "edge", id })}
               {...(fresh ? { onNodeExpand: (id: string) => void expand(fresh, id) } : {})}
               {...(selectedNode ? { selectedId: selectedNode.id } : {})} {...(selectedEdge ? { selectedEdgeId: selectedEdge.id } : {})} />
@@ -283,15 +313,15 @@ export function CallGraph<G extends Graph = Graph>(props: CallGraphProps<G>) {
                   <Button type="button" size="sm" variant="ghost" aria-label="Close selection" onClick={() => select(undefined)}>×</Button>
                 </div>
               )}
-              {selectedEdge ? (
-                <EdgeSites edge={selectedEdge} graph={graph} labels={labels} guards={guards} lazyGuards={props.loadSiteGuards !== undefined}
-                  siteAction={(props.siteHref || props.onRevealSite) && vocabulary.hasSource(requireNode(graph, selectedEdge.from))
+              {selectedEdge && drawn ? (
+                <EdgeSites edge={selectedEdge} graph={drawn.graph} labels={labels} guards={guards} lazyGuards={props.loadSiteGuards !== undefined}
+                  siteAction={(props.siteHref || props.onRevealSite) && !drawn.folds.has(selectedEdge.from) && vocabulary.hasSource(requireNode(graph, selectedEdge.from))
                     ? (site) => action(props.siteHref?.(site, selectedEdge, graph), props.onRevealSite && (() => props.onRevealSite?.(site, selectedEdge, graph))) ?? {}
                     : undefined} />
-              ) : selectedNode && (
-                <NodeDetails node={selectedNode} graph={graph} vocabulary={vocabulary} isRoot={selectedNode.id === rootId} openLabel={props.openLabel ?? "Open"}
-                  opens={props.nodeHref !== undefined || props.onOpenNode !== undefined} open={openAction(selectedNode, graph)}
-                  onFocus={props.onFocusNode && ((id: string) => props.onFocusNode?.(id, graph))} />
+              ) : selectedNode && drawn && (
+                <NodeDetails node={selectedNode} graph={drawn.graph} vocabulary={vocabulary} isRoot={selectedNode.id === rootId} openLabel={props.openLabel ?? "Open"}
+                  opens={!standIn && (props.nodeHref !== undefined || props.onOpenNode !== undefined)} open={standIn ? undefined : openAction(selectedNode, graph)}
+                  onFocus={standIn ? undefined : props.onFocusNode && ((id: string) => props.onFocusNode?.(id, graph))} />
               )}
             </aside>
           )}

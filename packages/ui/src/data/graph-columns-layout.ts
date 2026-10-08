@@ -13,9 +13,19 @@ export interface ColumnsLayoutNode extends GraphLayoutNode {
   compact?: boolean;
 }
 
+/** The most members a group shows at once in a column; a group with more scrolls them in a window this many rows tall. */
+export const GROUP_MEMBER_WINDOW = 10;
+/** Height of the "rows a–b of n" footer under a windowed group's rows. */
+const GROUP_WINDOW_FOOTER_HEIGHT = 18;
+
 export interface ColumnsLayoutOptions {
   /** Group ids drawn as records with a header and flush compact rows. */
   records?: readonly string[];
+  /**
+   * Group ids drawn as their header alone, `recordHeaderHeight` tall. Each holds one node per column it
+   * is drawn in, the stand-in its edges attach to, placed at the header's middle.
+   */
+  collapsed?: readonly string[];
   /** Height of a record's header in px. Defaults to 24. */
   recordHeaderHeight?: number;
   /** Node bounding-box width in px. Defaults to 168. */
@@ -55,6 +65,28 @@ export interface GraphLayoutGroupBox {
   height: number;
   record: boolean;
   headerHeight: number;
+  /** Set when the group holds more members in this column than `GROUP_MEMBER_WINDOW`: they scroll in a window. */
+  window?: GroupMemberWindow;
+  /** Drawn as its header alone: see `ColumnsLayoutOptions.collapsed`. */
+  collapsed?: true;
+}
+
+/**
+ * The rows a group with more members than `GROUP_MEMBER_WINDOW` shows at once. The layout places every
+ * member as if the group were drawn whole; a member shown from row `start` is drawn `tops[start]` higher.
+ */
+export interface GroupMemberWindow {
+  /** The members in this column, top to bottom. */
+  members: string[];
+  /** Each member's top, from the first member's top. */
+  tops: number[];
+  /** How many rows show at once. */
+  rows: number;
+  /** Top of the area members are drawn in, and its height. */
+  top: number;
+  height: number;
+  /** Height of the footer below that area, inside the group's rectangle. */
+  footerHeight: number;
 }
 
 export interface ColumnsLayoutResult extends GraphLayoutResult {
@@ -109,6 +141,7 @@ function mustGet<K, V>(map: ReadonlyMap<K, V>, key: K, what: string): V {
 function columnMetrics(options: ColumnsLayoutOptions): ColumnMetrics {
   return {
     records: options.records ?? [],
+    collapsed: options.collapsed ?? [],
     recordHeaderHeight: options.recordHeaderHeight ?? 24,
     nodeWidth: options.nodeWidth ?? DEFAULT_NODE_WIDTH,
     nodeHeight: options.nodeHeight ?? DEFAULT_NODE_HEIGHT,
@@ -159,23 +192,48 @@ function indexNeighbours(
   return neighbours;
 }
 
+interface RunMetrics {
+  pad: number;
+  gap: number;
+  heightOf: (node: ColumnsLayoutNode) => number;
+  /** Room above the first node inside the run's rectangle: a record's header. */
+  header: number;
+  height: number;
+  /** The height members are drawn in, when there are more of them than the window holds. */
+  view?: number;
+  collapsed: boolean;
+}
+
+function collapsedRun(group: string, nodes: readonly ColumnsLayoutNode[], m: ColumnMetrics): RunMetrics {
+  if (nodes.length !== 1) throw new Error(`columnsLayout: collapsed group "${group}" holds ${nodes.length} nodes in a column; it draws one stand-in`);
+  return { pad: 0, gap: 0, heightOf: () => m.recordHeaderHeight, header: 0, height: m.recordHeaderHeight, collapsed: true };
+}
+
 /**
  * How a run of nodes stacks: each node's height, the gap between them and the padding inside the run's
  * rectangle. A grouped run of only compact nodes takes the compact gap and padding; any other run the
- * regular ones, whatever its order, so a column's height does not depend on how it is ordered.
+ * regular ones, whatever its order, so a column's height does not depend on how it is ordered. A group
+ * of more than `GROUP_MEMBER_WINDOW` members is only as tall as that many of its tallest rows, over a footer.
  */
-function runMetrics(group: string | undefined, nodes: readonly ColumnsLayoutNode[], m: ColumnMetrics, record: boolean) {
+function runMetrics(group: string | undefined, nodes: readonly ColumnsLayoutNode[], m: ColumnMetrics, record: boolean): RunMetrics {
+  if (group !== undefined && m.collapsed.includes(group)) return collapsedRun(group, nodes, m);
+  let stack: Omit<RunMetrics, "height" | "collapsed">;
   if (record) {
     const regular = nodes.find((node) => !node.compact);
     if (regular) throw new Error(`columnsLayout: record group "${group}" holds non-compact node "${regular.id}"`);
-    return { pad: 0, gap: 0, heightOf: () => m.compactNodeHeight, height: m.recordHeaderHeight + nodes.length * m.compactNodeHeight };
+    stack = { pad: 0, gap: 0, heightOf: () => m.compactNodeHeight, header: m.recordHeaderHeight };
+  } else {
+    const compact = group !== undefined && nodes.every((node) => node.compact === true);
+    const heightOf = (node: ColumnsLayoutNode) => (node.compact ? m.compactNodeHeight : m.nodeHeight);
+    stack = { pad: group === undefined ? 0 : compact ? m.compactGroupPadding : m.groupPadding, gap: compact ? m.compactRowGap : m.rowGap, heightOf, header: 0 };
   }
-  const compact = group !== undefined && nodes.every((node) => node.compact === true);
-  const pad = group === undefined ? 0 : compact ? m.compactGroupPadding : m.groupPadding;
-  const gap = compact ? m.compactRowGap : m.rowGap;
-  const heightOf = (node: ColumnsLayoutNode) => (node.compact ? m.compactNodeHeight : m.nodeHeight);
-  const height = nodes.reduce((sum, node) => sum + heightOf(node), 0) + (nodes.length - 1) * gap + 2 * pad;
-  return { pad, gap, heightOf, height };
+  const chrome = stack.header + 2 * stack.pad;
+  if (group === undefined || nodes.length <= GROUP_MEMBER_WINDOW) {
+    const stacked = nodes.reduce((sum, node) => sum + stack.heightOf(node), 0) + (nodes.length - 1) * stack.gap;
+    return { ...stack, height: chrome + stacked, collapsed: false };
+  }
+  const view = GROUP_MEMBER_WINDOW * Math.max(...nodes.map(stack.heightOf)) + (GROUP_MEMBER_WINDOW - 1) * stack.gap;
+  return { ...stack, view, height: chrome + view + GROUP_WINDOW_FOOTER_HEIGHT, collapsed: false };
 }
 
 function columnHeight(column: readonly ColumnsLayoutNode[], m: ColumnMetrics): number {
@@ -221,27 +279,33 @@ function stackColumn(
   let cursor = origin.top;
   for (const { group, nodes } of runs) {
     const record = group !== undefined && m.records.includes(group);
-    const { pad, gap, heightOf, height } = runMetrics(group, nodes, m, record);
-    const headerHeight = record ? m.recordHeaderHeight : 0;
-    let top = cursor + pad + headerHeight;
+    const run = runMetrics(group, nodes, m, record);
+    const first = cursor + run.pad + run.header;
+    const tops: number[] = [];
+    let top = first;
     for (const node of nodes) {
-      placed.set(node.id, { x: origin.x, y: top + heightOf(node) / 2 });
-      top += heightOf(node) + gap;
+      tops.push(top - first);
+      placed.set(node.id, { x: origin.x, y: top + run.heightOf(node) / 2 });
+      top += run.heightOf(node) + run.gap;
     }
     if (group !== undefined) {
+      const memberWindow: GroupMemberWindow | undefined = run.view === undefined ? undefined
+        : { members: nodes.map((node) => node.id), tops, rows: GROUP_MEMBER_WINDOW, top: first, height: run.view, footerHeight: GROUP_WINDOW_FOOTER_HEIGHT };
       boxes.push({
         id: `${origin.level}:${group}`,
         group,
         level: origin.level,
-        x: origin.x - m.nodeWidth / 2 - pad,
+        x: origin.x - m.nodeWidth / 2 - run.pad,
         y: cursor,
-        width: m.nodeWidth + 2 * pad,
-        height,
+        width: m.nodeWidth + 2 * run.pad,
+        height: run.height,
         record,
-        headerHeight,
+        headerHeight: run.collapsed ? m.recordHeaderHeight : run.header,
+        ...(memberWindow ? { window: memberWindow } : {}),
+        ...(run.collapsed ? { collapsed: true as const } : {}),
       });
     }
-    cursor += height + m.rowGap;
+    cursor += run.height + m.rowGap;
   }
   return boxes;
 }

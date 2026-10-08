@@ -1,9 +1,10 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "../../components/button";
+import { IconButton } from "../../components/IconButton";
 import { InputField } from "../../components/InputField";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { Switch } from "../../components/Switch";
-import { UiFilter, UiHome, UiWarningTriangle } from "../../icons";
+import { UiCollapseAll, UiExpandAll, UiFilter, UiHome, UiWarningTriangle } from "../../icons";
 import { DropdownMenu } from "../../overlay/DropdownMenu";
 import { Badge } from "../Badge";
 import {
@@ -17,7 +18,7 @@ import {
   type ExcludeMatcher,
 } from "./call-graph-exclude";
 import { capitalize, excludedTally, omittedParts } from "./call-graph-labels";
-import { toggleAccess } from "./call-graph-model";
+import { baseAccess, toggleAccess } from "./call-graph-model";
 import type { CallGraphVocabulary } from "./call-graph-vocabulary";
 import { CALL_GRAPH_ACCESS, type CallGraphAccess, type CallGraphDirection, type CallGraphGroupFact, type CallGraphOmitted } from "./types";
 
@@ -129,25 +130,29 @@ function GroupFacets({ exclude, groups, matches, onExclude, onDefaults, busy, vo
   );
 }
 
-const ACCESS_LABELS: Record<CallGraphAccess, string> = { call: "Calls", read: "Reads", write: "Writes" };
+const ACCESS_LABELS: Record<CallGraphAccess, string> = { call: "Calls", read: "Reads", write: "Writes", variable: "Variables" };
 
 export interface DataAccessProps {
   access: CallGraphAccess[];
   onAccess: (access: CallGraphAccess[]) => void;
   columns: boolean;
   onColumns: (columns: boolean) => void;
+  /** Offers the Variables toggle, on top of the access types. */
+  variables?: boolean;
 }
 
-/** Which edge types the graph follows, at least one, and whether columns and fields are nodes of their own. */
-function DataAccessControls({ access, onAccess, columns, onColumns }: DataAccessProps) {
+/** Which edge types the graph follows, at least one of calls, reads and writes, and whether columns and fields are nodes of their own. */
+function DataAccessControls({ access, onAccess, columns, onColumns, variables }: DataAccessProps) {
+  const lastOn = baseAccess(access).length === 1;
   return (
     <>
       <div className="flex items-center gap-1" role="group" aria-label="Access">
-        {CALL_GRAPH_ACCESS.map((type) => {
+        {(variables ? [...CALL_GRAPH_ACCESS, "variable" as const] : CALL_GRAPH_ACCESS).map((type) => {
           const on = access.includes(type);
+          const kept = on && lastOn && type !== "variable";
           return (
-            <Button key={type} type="button" size="sm" variant={on ? "secondary" : "outline"} aria-pressed={on} disabled={on && access.length === 1}
-              title={on && access.length === 1 ? "At least one kind of access stays on" : undefined} onClick={() => onAccess(toggleAccess(access, type))}>
+            <Button key={type} type="button" size="sm" variant={on ? "secondary" : "outline"} aria-pressed={on} disabled={kept}
+              title={kept ? "At least one kind of access stays on" : undefined} onClick={() => onAccess(toggleAccess(access, type))}>
               {ACCESS_LABELS[type]}
             </Button>
           );
@@ -158,9 +163,28 @@ function DataAccessControls({ access, onAccess, columns, onColumns }: DataAccess
   );
 }
 
+export interface GroupCollapseProps {
+  anyCollapsed: boolean;
+  anyExpanded: boolean;
+  onExpandAll: () => void;
+  onCollapseAll: () => void;
+}
+
+/** Expand or collapse every group the graph draws at once. */
+function GroupCollapseControls({ anyCollapsed, anyExpanded, onExpandAll, onCollapseAll }: GroupCollapseProps) {
+  return (
+    <div className="flex items-center gap-0.5" role="group" aria-label="Groups">
+      <IconButton icon={UiExpandAll} label="Expand all groups" className="size-7" disabled={!anyCollapsed} onClick={onExpandAll} />
+      <IconButton icon={UiCollapseAll} label="Collapse all groups" className="size-7" disabled={!anyExpanded} onClick={onCollapseAll} />
+    </div>
+  );
+}
+
 export interface CallGraphToolbarProps {
   /** Shown only when the host's graph has reads and writes. */
   data?: DataAccessProps | undefined;
+  /** Shown only when the graph draws a group that can collapse. */
+  groupCollapse?: GroupCollapseProps | undefined;
   direction: CallGraphDirection;
   depth: number;
   maxDepth: number;
@@ -195,6 +219,7 @@ export function CallGraphToolbar(props: CallGraphToolbarProps) {
       )}
       <Button type="button" variant="outline" size="sm" onClick={props.onFit}>Fit</Button>
       <Button type="button" variant="outline" size="sm" onClick={props.onReset}><UiHome />Reset</Button>
+      {props.groupCollapse && <GroupCollapseControls {...props.groupCollapse} />}
       {exclusions && hasExternal && (
         <Switch checked={exclusions.exclude.includes(EXCLUDE_EXTERNAL)} disabled={exclusions.busy} label="Hide all external"
           onChange={(hidden) => exclusions.onExclude(setExternalHidden(exclusions.exclude, hidden))} />

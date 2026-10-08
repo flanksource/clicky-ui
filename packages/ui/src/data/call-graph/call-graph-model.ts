@@ -3,6 +3,7 @@
 // so it renders nothing itself.
 import type { ReactNode } from "react";
 import type { BadgeTone } from "../Badge";
+import { mergeAccess, type DataAccess } from "../data-access";
 import type { GraphDiagramEdge, GraphDiagramGroup, GraphDiagramNode } from "../graph-diagram-model";
 import { edgeLabel, edgeTitle, groupCaption, isConditional, type PillOptions } from "./call-graph-labels";
 import { DATA_MEMBER_OWNER, dataMemberAside, isDataMember, nodeTitle, siteKey, type CallGraphVocabulary } from "./call-graph-vocabulary";
@@ -32,8 +33,16 @@ const EDGE_TONE: Record<Exclude<CallGraphEdgeType, "call">, BadgeTone> = { dispa
 /** Turns one access type on or off, in the usual order. Turning the last one off fails: a graph follows something. */
 export function toggleAccess(access: readonly CallGraphAccess[], type: CallGraphAccess): CallGraphAccess[] {
   const on = !access.includes(type);
-  if (!on && access.length === 1) throw new Error(`call graph: ${type} is the only access type on`);
-  return CALL_GRAPH_ACCESS.filter((entry) => (entry === type ? on : access.includes(entry)));
+  if (!on && type !== "variable" && baseAccess(access).length === 1) throw new Error(`call graph: ${type} is the only access type on`);
+  return ACCESS_ORDER.filter((entry) => (entry === type ? on : access.includes(entry)));
+}
+
+/** Every access type in the usual order: variables last, on top of the others. */
+const ACCESS_ORDER: readonly CallGraphAccess[] = [...CALL_GRAPH_ACCESS, "variable"];
+
+/** The access types of `access` that are not variables, at least one of which a graph follows. */
+export function baseAccess(access: readonly CallGraphAccess[]): CallGraphAccess[] {
+  return access.filter((type) => CALL_GRAPH_ACCESS.includes(type));
 }
 
 export interface GraphView {
@@ -56,12 +65,14 @@ export interface DiagramOptions extends PillOptions {
 
 export type DiagramNode = GraphDiagramNode & { label: string; level: number; title: string };
 export type DiagramEdge = GraphDiagramEdge & { dashed: boolean };
-export type DiagramGroup = GraphDiagramGroup & { title: string };
+export type DiagramGroup = GraphDiagramGroup & { title: string; aside?: string };
 
 export interface Diagram {
   nodes: DiagramNode[];
   edges: DiagramEdge[];
   groups: DiagramGroup[];
+  /** The graph as drawn, collapsed groups folded into their stand-ins: what a selection is looked up in. */
+  drawn: DrawnGraph;
 }
 
 /** Draws the glyphs the model chooses. The component supplies icons; the tests supply strings. */
@@ -71,6 +82,8 @@ export interface DiagramGlyphs {
   /** The pill icon of an edge type; a plain call has none. */
   edge(type: CallGraphEdgeType): ReactNode | undefined;
   group(caption: string, glyph?: string): ReactNode;
+  /** The mark of a node the reads and writes into it access; without it no node is marked. */
+  access?(access: DataAccess): ReactNode;
 }
 
 export interface DiagramInput {
@@ -81,6 +94,11 @@ export interface DiagramInput {
   glyphs: DiagramGlyphs;
   vocabulary: CallGraphVocabulary;
   edgeLabels: CallGraphEdgeLabels;
+  /**
+   * The groups drawn as their header alone, by id: each folds into one stand-in node, and its members'
+   * edges merge onto it. The root's group never folds. Leave it out and no group can collapse.
+   */
+  collapsed?: readonly string[];
 }
 
 export function requireNode(graph: CallGraph, id: string): CallGraphNode {
@@ -114,10 +132,16 @@ export function expansionDirection(node: CallGraphNode): Exclude<CallGraphDirect
   return outerSide(node) === "in" ? "callers" : "callees";
 }
 
+/** A node's edges on its outer side, as the response holds them. */
+function outerEdges(graph: CallGraph, node: CallGraphNode): CallGraphEdge[] {
+  const side = outerSide(node);
+  return graph.edges.filter((edge) => (side === "out" ? edge.from : edge.to) === node.id);
+}
+
 /** The ids at the far end of a node's edges on its outer side, as the response holds them. */
 function outerNeighbours(graph: CallGraph, node: CallGraphNode): string[] {
   const side = outerSide(node);
-  return graph.edges.filter((edge) => (side === "out" ? edge.from : edge.to) === node.id).map((edge) => (side === "out" ? edge.to : edge.from));
+  return outerEdges(graph, node).map((edge) => (side === "out" ? edge.to : edge.from));
 }
 
 /** The neighbours on a node's outer side that the response holds and are not drawn. */
@@ -129,8 +153,8 @@ export function hiddenNeighbours(graph: CallGraph, visible: VisibleGraph, nodeId
 /**
  * The `+N` on a node: how many more edges there are to load on its outer side. Only that side's count
  * is a total (`out` for the root and callees, `in` for callers); the other equals the edges in the
- * response. Excluded neighbours are in neither. From it come off the edges drawn. A node without a
- * source cannot be expanded, nor can the side the direction hides.
+ * response. Excluded neighbours are in neither. From it come off the edges drawn, a merged edge counting
+ * every edge it stands for. A node without a source cannot be expanded, nor can the side the direction hides.
  */
 export function expandCount(
   graph: CallGraph,
@@ -138,12 +162,15 @@ export function expandCount(
   nodeId: string,
   direction: CallGraphDirection,
   vocabulary: Pick<CallGraphVocabulary, "hasSource">,
+  merged: ReadonlyMap<string, EdgeMerge> = new Map(),
 ): number {
   const node = requireNode(graph, nodeId);
   const side = outerSide(node);
   if (!vocabulary.hasSource(node) || direction === (side === "out" ? "callers" : "callees")) return 0;
   const drawn = new Set(visible.nodes.map((entry) => entry.id));
-  const accounted = outerNeighbours(graph, node).filter((id) => drawn.has(id)).length;
+  const accounted = outerEdges(graph, node)
+    .filter((edge) => drawn.has(side === "out" ? edge.to : edge.from))
+    .reduce((sum, edge) => sum + (merged.get(edge.id)?.sources.length ?? 1), 0);
   return Math.max(0, (side === "out" ? node.out : node.in) - accounted);
 }
 
@@ -222,13 +249,20 @@ function groupRank(graph: CallGraph, vocabulary: CallGraphVocabulary): (node: Ca
   };
 }
 
-function toDiagramNode(node: CallGraphNode, { graph, visible, direction, options, glyphs, vocabulary }: DiagramInput, records: ReadonlyMap<string, string>): DiagramNode {
-  const count = expandCount(graph, visible, node.id, direction, vocabulary);
+/** How the reads and writes among `edges` into the node access it, or undefined when none do. */
+function accessInto(edges: readonly CallGraphEdge[], id: string): DataAccess | undefined {
+  return edges.reduce<DataAccess | undefined>((held, edge) => (edge.to === id && (edge.type === "read" || edge.type === "write") ? mergeAccess(held, edge.type) : held), undefined);
+}
+
+function toDiagramNode(node: CallGraphNode, { direction, options, glyphs, vocabulary }: DiagramInput, drawn: DrawnGraph, records: ReadonlyMap<string, string>): DiagramNode {
+  const { graph, visible } = drawn;
+  const count = expandCount(graph, visible, node.id, direction, vocabulary, drawn.merged);
   const isRoot = graph.roots.includes(node.id);
   const tone = isRoot ? "info" : node.unresolved ? "warning" : undefined;
   // A table, column, entity or field is a name its group box already places: one short line will do.
   const compact = (node.group !== undefined && records.has(node.group)) || (!isRoot && vocabulary.isData(node) && !vocabulary.hasSource(node));
   const aside = dataMemberAside(node);
+  const access = glyphs.access && accessInto(visible.edges, node.id);
   return {
     id: node.id,
     label: node.label,
@@ -238,14 +272,16 @@ function toDiagramNode(node: CallGraphNode, { graph, visible, direction, options
     ...(options.grouped && node.group !== undefined ? { group: node.group } : {}),
     ...(compact ? { size: "compact" as const } : {}),
     ...(aside !== undefined ? { aside } : {}),
+    ...(access ? { mark: glyphs.access?.(access) } : {}),
     ...(tone !== undefined ? { tone } : {}),
     ...(vocabulary.muted(node) ? { muted: true } : {}),
     ...(count > 0 ? { expandCount: count } : {}),
   };
 }
 
-function toDiagramEdge(edge: CallGraphEdge, { options, glyphs, edgeLabels }: DiagramInput): DiagramEdge {
-  const label = edgeLabel(edge, options);
+function toDiagramEdge(edge: CallGraphEdge, { options, glyphs, edgeLabels, vocabulary }: DiagramInput, drawn: DrawnGraph): DiagramEdge {
+  const merge = drawn.merged.get(edge.id);
+  const label = [edgeLabel(edge, options), merge && countWords(merge.members, drawn.graph, vocabulary)].filter(Boolean).join(" · ") || undefined;
   const title = edgeTitle(edge);
   return {
     id: edge.id,
@@ -300,13 +336,152 @@ export function recordGroups(visible: VisibleGraph, vocabulary: CallGraphVocabul
   return records;
 }
 
-export function toDiagram(input: DiagramInput): Diagram {
-  const { graph, visible, options, glyphs, vocabulary } = input;
-  const rank = groupRank(graph, vocabulary);
-  const records = options.grouped ? recordGroups(visible, vocabulary) : new Map<string, string>();
+/** A collapsed group's members, and the stand-in node drawn for them. */
+export interface GroupFold {
+  group: string;
+  members: CallGraphNode[];
+}
+
+/** One edge drawn for the edges of several members: the edges it stands for and the members at their ends. */
+export interface EdgeMerge {
+  sources: CallGraphEdge[];
+  members: CallGraphNode[];
+}
+
+export interface DrawnGraph {
+  graph: CallGraph;
+  visible: VisibleGraph;
+  /** By stand-in id. */
+  folds: ReadonlyMap<string, GroupFold>;
+  /** By the id of the edge drawn for them. */
+  merged: ReadonlyMap<string, EdgeMerge>;
+}
+
+const STAND_IN_PREFIX = "group:";
+
+/** The id of the node a collapsed group is drawn as. */
+export function standInId(group: string): string {
+  return `${STAND_IN_PREFIX}${group}`;
+}
+
+function rootGroups(graph: CallGraph): Set<string | undefined> {
+  return new Set(graph.roots.map((id) => requireNode(graph, id).group));
+}
+
+/** The groups that hold a drawn node and can collapse: every one but the root's, in first-drawn order. */
+export function collapsibleGroups(graph: CallGraph, visible: VisibleGraph): string[] {
+  const roots = rootGroups(graph);
+  return [...new Set(visible.nodes.map((node) => node.group))].filter((group): group is string => group !== undefined && !roots.has(group));
+}
+
+/** "10 columns", "2 fields", "3 variables": how many members, in the words of their one kind, else "members". */
+function countWords(members: readonly CallGraphNode[], graph: CallGraph, vocabulary: CallGraphVocabulary): string {
+  const [first] = members;
+  const kind = first && members.every((member) => member.kind === first.kind) ? vocabulary.kindOf(graph, first) : "member";
+  return `${members.length} ${kind}${members.length === 1 ? "" : "s"}`;
+}
+
+/** A merged edge's properties: the names of the members it stands for, gathered as columns, fields or members. */
+function memberProperties(members: readonly CallGraphNode[]): Record<string, string> {
+  const keys: Record<string, string> = { column: "columns", field: "fields" };
+  const names = new Map<string, string[]>();
+  for (const member of members) {
+    const key = keys[member.kind] ?? "members";
+    names.set(key, [...(names.get(key) ?? []), member.label]);
+  }
+  return Object.fromEntries([...names].map(([key, list]) => [key, list.join(", ")]));
+}
+
+function mergeEdges(id: string, sources: readonly CallGraphEdge[], standInOf: ReadonlyMap<string, string>, nodes: ReadonlyMap<string, CallGraphNode>): [CallGraphEdge, EdgeMerge] {
+  const [first] = sources;
+  if (!first) throw new Error(`call graph: merged edge "${id}" stands for no edge`);
+  const memberIds = [...new Set(sources.flatMap((edge) => [edge.from, edge.to]).filter((end) => standInOf.has(end)))];
+  const members = memberIds.map((member) => {
+    const node = nodes.get(member);
+    if (!node) throw new Error(`call graph: no node "${member}"`);
+    return node;
+  });
+  const kind = sources.every((edge) => edge.kind === first.kind) ? first.kind : undefined;
+  const edge: CallGraphEdge = {
+    id, from: standInOf.get(first.from) ?? first.from, to: standInOf.get(first.to) ?? first.to, type: first.type,
+    ...(kind !== undefined ? { kind } : {}),
+    sites: distinctSites(sources.flatMap((source) => source.sites)),
+    properties: memberProperties(members),
+  };
+  return [edge, { sources: [...sources], members }];
+}
+
+/** Edges with an end in a collapsed group, re-ended on its stand-in and merged per stand-in, other end and type. */
+function foldEdges(edges: readonly CallGraphEdge[], standInOf: ReadonlyMap<string, string>, nodes: ReadonlyMap<string, CallGraphNode>) {
+  const kept: CallGraphEdge[] = [];
+  const grouped = new Map<string, CallGraphEdge[]>();
+  for (const edge of edges) {
+    const from = standInOf.get(edge.from) ?? edge.from;
+    const to = standInOf.get(edge.to) ?? edge.to;
+    if (from === edge.from && to === edge.to) kept.push(edge);
+    else grouped.set(`${from}|${to}|${edge.type}`, [...(grouped.get(`${from}|${to}|${edge.type}`) ?? []), edge]);
+  }
+  const merged = new Map([...grouped].map(([id, sources]) => mergeEdges(id, sources, standInOf, nodes)).map(([edge, merge]) => [edge.id, { edge, merge }]));
+  return { edges: [...kept, ...[...merged.values()].map(({ edge }) => edge)], merged: new Map([...merged].map(([id, { merge }]) => [id, merge])) };
+}
+
+/** The node a collapsed group is drawn as: its owner's kind for a record, else its first member's, at the depth nearest the root. */
+function standInNode(id: string, fold: GroupFold, graph: CallGraph, records: ReadonlyMap<string, string>, edges: readonly CallGraphEdge[]): CallGraphNode {
+  const [first, ...rest] = fold.members;
+  if (!first) throw new Error(`call graph: collapsed group "${fold.group}" holds no node`);
+  const nearest = rest.reduce((best, member) => (Math.abs(member.depth) < Math.abs(best.depth) ? member : best), first);
   return {
-    nodes: [...visible.nodes].sort((a, b) => rank(a) - rank(b)).map((node) => toDiagramNode(node, input, records)),
-    edges: visible.edges.map((edge) => toDiagramEdge(edge, input)),
-    groups: options.grouped ? (graph.groups ?? []).map(({ id, label }) => ({ id, label: glyphs.group(groupCaption(label), records.get(id)), title: label, ...(records.has(id) ? { variant: "record" as const } : {}) })) : [],
+    id, identifier: {}, kind: records.get(fold.group) ?? first.kind,
+    label: graph.groups?.find((group) => group.id === fold.group)?.label ?? fold.group,
+    group: fold.group, depth: nearest.depth,
+    in: edges.filter((edge) => edge.to === id).length, out: edges.filter((edge) => edge.from === id).length,
+  };
+}
+
+/** The graph with each collapsed group's drawn members folded into one stand-in. */
+function foldGroups(graph: CallGraph, visible: VisibleGraph, collapsed: readonly string[], records: ReadonlyMap<string, string>): DrawnGraph {
+  const roots = rootGroups(graph);
+  const folds = new Map<string, GroupFold>();
+  const standInOf = new Map<string, string>();
+  for (const node of visible.nodes) {
+    if (node.group === undefined || roots.has(node.group) || !collapsed.includes(node.group)) continue;
+    const id = standInId(node.group);
+    folds.set(id, { group: node.group, members: [...(folds.get(id)?.members ?? []), node] });
+    standInOf.set(node.id, id);
+  }
+  if (folds.size === 0) return { graph, visible, folds, merged: new Map() };
+  const { edges, merged } = foldEdges(graph.edges, standInOf, new Map(graph.nodes.map((node) => [node.id, node])));
+  const standIns = [...folds].map(([id, fold]) => standInNode(id, fold, graph, records, edges));
+  const nodes = [...visible.nodes.filter((node) => !standInOf.has(node.id)), ...standIns];
+  const drawnIds = new Set(nodes.map((node) => node.id));
+  return {
+    graph: { ...graph, nodes: [...graph.nodes.filter((node) => !standInOf.has(node.id)), ...standIns], edges },
+    visible: { nodes, edges: edges.filter((edge) => drawnIds.has(edge.from) && drawnIds.has(edge.to)) },
+    folds,
+    merged,
+  };
+}
+
+function toDiagramGroup({ id, label }: CallGraphGroup, { glyphs, graph, vocabulary }: DiagramInput, drawn: DrawnGraph, records: ReadonlyMap<string, string>, collapsible: ReadonlySet<string> | undefined): DiagramGroup {
+  const fold = drawn.folds.get(standInId(id));
+  return {
+    id, label: glyphs.group(groupCaption(label), records.get(id)), title: label,
+    ...(records.has(id) ? { variant: "record" as const } : {}),
+    ...(collapsible?.has(id) ? { collapsed: fold !== undefined } : {}),
+    ...(fold ? { aside: countWords(fold.members, graph, vocabulary) } : {}),
+  };
+}
+
+export function toDiagram(input: DiagramInput): Diagram {
+  const { graph, visible, options, vocabulary, collapsed } = input;
+  const records = options.grouped ? recordGroups(visible, vocabulary) : new Map<string, string>();
+  const drawn = options.grouped && collapsed ? foldGroups(graph, visible, collapsed, records) : { graph, visible, folds: new Map(), merged: new Map() };
+  const collapsible = options.grouped && collapsed ? new Set(collapsibleGroups(graph, visible)) : undefined;
+  const rank = groupRank(drawn.graph, vocabulary);
+  return {
+    nodes: [...drawn.visible.nodes].sort((a, b) => rank(a) - rank(b)).map((node) => toDiagramNode(node, input, drawn, records)),
+    edges: drawn.visible.edges.map((edge) => toDiagramEdge(edge, input, drawn)),
+    groups: options.grouped ? (graph.groups ?? []).map((group) => toDiagramGroup(group, input, drawn, records, collapsible)) : [],
+    drawn,
   };
 }

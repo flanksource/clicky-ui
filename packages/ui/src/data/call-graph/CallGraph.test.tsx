@@ -368,6 +368,34 @@ describe("CallGraph with data access", () => {
     }).toEqual({ pressed: ["false", "false", "true"], lastOn: true, changed: [[["call", "write"]]] });
   });
 
+  it("offers a Variables toggle only to a host that follows variables, sending it on top of the access types", async () => {
+    const onAccessChange = vi.fn();
+    const { fetchGraph, rerender } = renderData({ variableAccess: true, access: ["call", "read", "write"], onAccessChange });
+    await ready();
+
+    fireEvent.click(screen.getByRole("button", { name: "Variables" }));
+    rerender(<CallGraph root={DATA_IDS.install} fetchGraph={fetchGraph} vocabulary={OIPA_VOCABULARY} depth={3} dataAccess variableAccess
+      access={["call", "read", "write", "variable"]} onAccessChange={onAccessChange} />);
+    await waitFor(() => expect(fetchGraph).toHaveBeenCalledTimes(2));
+
+    expect({
+      changed: onAccessChange.mock.calls,
+      sent: fetchGraph.mock.calls.map(([params]) => params.access),
+      pressed: screen.getByRole("button", { name: "Variables" }).getAttribute("aria-pressed"),
+    }).toEqual({
+      changed: [[["call", "read", "write", "variable"]]],
+      sent: [["call", "read", "write"], ["call", "read", "write", "variable"]],
+      pressed: "true",
+    });
+  });
+
+  it("offers no Variables toggle by default", async () => {
+    renderData();
+    await ready();
+
+    expect(screen.queryByRole("button", { name: "Variables" })).toBeNull();
+  });
+
   it("offers no access or columns controls to a host whose graph has no data", async () => {
     renderGo();
     await screen.findByRole("group", { name: "Call graph of Pipeline.RunExpr" });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { columnsLayout } from "./graph-columns-layout";
+import { columnsLayout, GROUP_MEMBER_WINDOW } from "./graph-columns-layout";
 
 describe("columnsLayout", () => {
   it("stacks record rows flush below the header with card edges at the node edges", () => {
@@ -294,5 +294,72 @@ describe("columnsLayout", () => {
     expect(() =>
       columnsLayout([{ id: "a", level: 0 }], [{ id: "bad-edge", from: "a", to: "ghost" }], metrics),
     ).toThrow(/bad-edge/);
+  });
+});
+
+describe("columnsLayout member windows", () => {
+  const rows = (count: number) => Array.from({ length: count }, (_, index) => `m${index}`);
+  // 22px rows under a 30px header, the record's top at the 20px padding; the footer is 18px.
+  const record = (count: number) =>
+    columnsLayout(rows(count).map((id) => ({ id, level: 0, group: "AsPolicy", compact: true })), [], {
+      records: ["AsPolicy"], nodeWidth: 180, compactNodeHeight: 22, recordHeaderHeight: 30, padding: 20,
+    });
+
+  it("draws a record of more members than the window as a window of rows over a footer, its members stacked on below", () => {
+    const layout = record(GROUP_MEMBER_WINDOW + 2);
+    expect({ box: layout.groups[0], first: layout.positions.m0, last: layout.positions.m11, height: layout.height }).toEqual({
+      box: {
+        id: "0:AsPolicy", group: "AsPolicy", level: 0, x: 32, y: 20, width: 180, height: 30 + 10 * 22 + 18, record: true, headerHeight: 30,
+        window: { members: rows(12), tops: rows(12).map((_, index) => index * 22), rows: GROUP_MEMBER_WINDOW, top: 50, height: 220, footerHeight: 18 },
+      },
+      first: { x: 122, y: 61 },
+      last: { x: 122, y: 50 + 11 * 22 + 11 },
+      height: 268 + 40,
+    });
+  });
+
+  it("draws a record of exactly the window's members whole, with no window", () => {
+    const [box] = record(GROUP_MEMBER_WINDOW).groups;
+    expect({ height: box?.height, window: box?.window }).toEqual({ height: 30 + 10 * 22, window: undefined });
+  });
+
+  it("windows a box of compact members at the compact gap, between its padding", () => {
+    const layout = columnsLayout(rows(11).map((id) => ({ id, level: 0, group: "Variables", compact: true })), []);
+    // Defaults: 24px rows 4px apart, 8px padding, the box's top at the 24px padding.
+    expect({ box: layout.groups[0], first: layout.positions.m0 }).toMatchObject({
+      box: { y: 24, height: 8 + (10 * 24 + 9 * 4) + 18 + 8, window: { top: 32, height: 10 * 24 + 9 * 4, tops: rows(11).map((_, index) => index * 28), rows: 10 } },
+      first: { y: 44 },
+    });
+  });
+
+  it("windows only the column holding more than the window, when a group spans columns", () => {
+    const layout = columnsLayout([
+      ...rows(3).map((id) => ({ id: `a${id}`, level: 0, group: "AsPolicy", compact: true })),
+      ...rows(12).map((id) => ({ id: `b${id}`, level: 1, group: "AsPolicy", compact: true })),
+    ], [], { records: ["AsPolicy"] });
+    expect(layout.groups.map((box) => [box.id, box.window?.members.length])).toEqual([["0:AsPolicy", undefined], ["1:AsPolicy", 12]]);
+  });
+});
+
+describe("columnsLayout collapsed groups", () => {
+  it("draws a collapsed group as its header alone, with its one node at the header's middle", () => {
+    const layout = columnsLayout(
+      [{ id: "root", level: 0 }, { id: "group:AsPolicy", level: 1, group: "AsPolicy", compact: true }, { id: "group:pkg", level: 1, group: "pkg" }],
+      [],
+      { records: ["AsPolicy"], collapsed: ["AsPolicy", "pkg"], nodeWidth: 180, nodeHeight: 32, recordHeaderHeight: 30, rowGap: 14, padding: 20 },
+    );
+    const [policy, pkg] = layout.groups;
+    expect({ policy, pkg, policyNode: layout.positions["group:AsPolicy"]?.y, pkgNode: layout.positions["group:pkg"]?.y }).toEqual({
+      policy: { id: "1:AsPolicy", group: "AsPolicy", level: 1, x: policy?.x, y: policy?.y, width: 180, height: 30, record: true, headerHeight: 30, collapsed: true },
+      pkg: { id: "1:pkg", group: "pkg", level: 1, x: pkg?.x, y: (policy?.y ?? 0) + 30 + 14, width: 180, height: 30, record: false, headerHeight: 30, collapsed: true },
+      policyNode: (policy?.y ?? 0) + 15,
+      pkgNode: (pkg?.y ?? 0) + 15,
+    });
+  });
+
+  it("rejects a collapsed group holding more than its one stand-in node in a column, naming the group", () => {
+    expect(() =>
+      columnsLayout([{ id: "a", level: 0, group: "pkg" }, { id: "b", level: 0, group: "pkg" }], [], { collapsed: ["pkg"] }),
+    ).toThrow(/collapsed group "pkg".*2 nodes/);
   });
 });

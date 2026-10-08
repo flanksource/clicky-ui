@@ -5,7 +5,9 @@ import { UiFullscreen, UiHome, UiZoomIn, UiZoomOut } from "../icons";
 import { columnsLayout, type ColumnsLayoutResult } from "./graph-columns-layout";
 import { ringLayout, routeEdges, type GraphLayoutPosition } from "./graph-layout";
 import { GraphDiagramEdgeLabels, GraphDiagramEdgePaths } from "./GraphDiagramEdges";
-import { GraphDiagramGroupBoxes, GraphDiagramNodes } from "./GraphDiagramNodes";
+import { GraphDiagramGroupBoxes } from "./GraphDiagramGroups";
+import { GraphDiagramNodes } from "./GraphDiagramNodes";
+import { useGroupWindows } from "./use-group-windows";
 import {
   requireEntry,
   type GraphDiagramEdge,
@@ -58,8 +60,13 @@ export interface GraphDiagramProps {
    * "auto": a diagram with more than 32 edges is focused, a smaller one shows everything.
    */
   edgeFocus?: GraphDiagramEdgeFocus;
-  /** "columns" layout: captions for the group rectangles. A group without an entry shows its id. */
+  /**
+   * "columns" layout: captions for the group rectangles. A group without an entry shows its id. A group
+   * with more than `GROUP_MEMBER_WINDOW` members in a column scrolls them in a window that many rows tall.
+   */
   groups?: GraphDiagramGroup[];
+  /** "columns" layout: the chevron of a group whose `collapsed` is set asks to collapse or expand it. */
+  onGroupToggle?: (groupId: string) => void;
   nodeWidth?: number;
   nodeHeight?: number;
   /**
@@ -100,15 +107,35 @@ interface LayoutOptions {
   nodeHeight: number;
   compactNodeHeight: number;
   records: readonly string[];
+  collapsed: readonly string[];
   recordHeaderHeight: number;
   columnGap: number | undefined;
   rowGap: number | undefined;
 }
 
-/** The heights of the nodes not drawn at the node height: the compact ones, in the "columns" layout. */
-function compactHeights(nodes: GraphDiagramNode[], layout: GraphDiagramLayout, compactNodeHeight: number): Record<string, number> {
+/**
+ * The heights of the nodes not drawn at the node height, in the "columns" layout: the compact ones, and
+ * the stand-ins of collapsed groups, as tall as the header they are drawn as.
+ */
+function compactHeights(nodes: GraphDiagramNode[], layout: GraphDiagramLayout, compactNodeHeight: number, standIns: ReadonlySet<string>, headerHeight: number): Record<string, number> {
   if (layout !== "columns") return {};
-  return Object.fromEntries(nodes.filter((node) => node.size === "compact").map((node) => [node.id, compactNodeHeight]));
+  return Object.fromEntries(nodes.flatMap((node): [string, number][] => {
+    if (standIns.has(node.id)) return [[node.id, headerHeight]];
+    return node.size === "compact" ? [[node.id, compactNodeHeight]] : [];
+  }));
+}
+
+/** The one node each collapsed group holds, by group id. */
+function collapsedStandIns(nodes: GraphDiagramNode[], groups: GraphDiagramGroup[] | undefined): Map<string, string> {
+  const collapsed = new Set(groups?.filter((group) => group.collapsed === true).map((group) => group.id));
+  const standIns = new Map<string, string>();
+  for (const node of nodes) {
+    if (node.group === undefined || !collapsed.has(node.group)) continue;
+    const held = standIns.get(node.group);
+    if (held !== undefined) throw new Error(`GraphDiagram: collapsed group "${node.group}" holds "${held}" and "${node.id}"; it draws one stand-in`);
+    standIns.set(node.group, node.id);
+  }
+  return standIns;
 }
 
 function assertEdgesReferenceKnownNodes(nodes: GraphDiagramNode[], edges: GraphDiagramEdge[]): void {
@@ -133,7 +160,7 @@ function requireLevel(node: GraphDiagramNode): number {
 function layoutNodes(
   nodes: GraphDiagramNode[],
   edges: GraphDiagramEdge[],
-  { layout, nodeWidth, nodeHeight, compactNodeHeight, records, recordHeaderHeight, columnGap, rowGap }: LayoutOptions,
+  { layout, nodeWidth, nodeHeight, compactNodeHeight, records, collapsed, recordHeaderHeight, columnGap, rowGap }: LayoutOptions,
 ): ColumnsLayoutResult {
   switch (layout) {
     case "ring":
@@ -152,6 +179,7 @@ function layoutNodes(
           nodeHeight,
           compactNodeHeight,
           records,
+          collapsed,
           recordHeaderHeight,
           ...(columnGap !== undefined ? { columnGap } : {}),
           ...(rowGap !== undefined ? { rowGap } : {}),
@@ -208,6 +236,7 @@ export function GraphDiagram({
   onEdgeSelect,
   edgeFocus = "auto",
   groups,
+  onGroupToggle,
   nodeWidth = DEFAULT_NODE_WIDTH,
   nodeHeight = DEFAULT_NODE_HEIGHT,
   compactNodeHeight = DEFAULT_COMPACT_NODE_HEIGHT,
@@ -226,16 +255,16 @@ export function GraphDiagram({
   const markerPrefix = `graph-diagram-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const records = useMemo(() => groups?.filter((group) => group.variant === "record").map((group) => group.id) ?? [], [groups]);
   const recordNodes = useMemo(() => new Set(layout === "columns" ? nodes.filter((node) => node.group !== undefined && records.includes(node.group)).map((node) => node.id) : []), [layout, nodes, records]);
+  const standIns = useMemo(() => (layout === "columns" ? collapsedStandIns(nodes, groups) : new Map<string, string>()), [layout, nodes, groups]);
+  const collapsed = useMemo(() => [...standIns.keys()], [standIns]);
 
-  const { width, height, positions, groups: groupBoxes } = useMemo(
-    () => layoutNodes(nodes, edges, { layout, nodeWidth, nodeHeight, compactNodeHeight, records, recordHeaderHeight, columnGap, rowGap }),
-    [layout, nodes, edges, nodeWidth, nodeHeight, compactNodeHeight, records, recordHeaderHeight, columnGap, rowGap],
+  const { width, height, positions: laidOut, groups: groupBoxes } = useMemo(
+    () => layoutNodes(nodes, edges, { layout, nodeWidth, nodeHeight, compactNodeHeight, records, collapsed, recordHeaderHeight, columnGap, rowGap }),
+    [layout, nodes, edges, nodeWidth, nodeHeight, compactNodeHeight, records, collapsed, recordHeaderHeight, columnGap, rowGap],
   );
-  const nodeHeights = useMemo(() => compactHeights(nodes, layout, compactNodeHeight), [nodes, layout, compactNodeHeight]);
-  const routes = useMemo(
-    () =>
-      routeEdges(edges, positions, { nodeWidth, nodeHeight, nodeHeights }, { anchor: layout === "columns" ? "side" : "center" }),
-    [edges, positions, nodeWidth, nodeHeight, nodeHeights, layout],
+  const nodeHeights = useMemo(
+    () => compactHeights(nodes, layout, compactNodeHeight, new Set(standIns.values()), recordHeaderHeight),
+    [nodes, layout, compactNodeHeight, standIns, recordHeaderHeight],
   );
 
   const panZoom = usePanZoom({
@@ -243,8 +272,23 @@ export function GraphDiagram({
     wheel: wheelZoom,
     contentWidth: width,
     contentHeight: height,
-    opening: openingFit(positions, fitMinScale, focusId),
+    opening: openingFit(laidOut, fitMinScale, focusId),
   });
+  const windows = useGroupWindows({ boxes: groupBoxes, positions: laidOut, reveal: selectedId ?? focusId, stageRef: panZoom.contentRef, scale: zoomable ? panZoom.transform.scale : 1 });
+  const { positions } = windows;
+  const routes = useMemo(
+    () =>
+      routeEdges(edges, positions, { nodeWidth, nodeHeight, nodeHeights }, { anchor: layout === "columns" ? "side" : "center" }),
+    [edges, positions, nodeWidth, nodeHeight, nodeHeights, layout],
+  );
+  const drawnNodes = useMemo(() => {
+    const standing = new Set(standIns.values());
+    return nodes.filter((node) => !windows.hidden.has(node.id) && !standing.has(node.id));
+  }, [nodes, windows.hidden, standIns]);
+  const windowOf = useMemo(
+    () => new Map(groupBoxes.flatMap((box) => (box.window ? box.window.members.map((id): [string, string] => [id, box.id]) : []))),
+    [groupBoxes],
+  );
   const natural = layout === "columns" || zoomable;
   const place: GraphPlacer = natural
     ? ({ x, y }) => ({ left: x, top: y })
@@ -270,7 +314,8 @@ export function GraphDiagram({
         className={cn("relative", natural ? !zoomable && "mx-auto" : "w-full")}
         style={stageStyle({ width, height }, natural, zoomable ? panZoom : undefined)}
       >
-        <GraphDiagramGroupBoxes boxes={groupBoxes} groups={groups} />
+        <GraphDiagramGroupBoxes boxes={groupBoxes} groups={groups} starts={windows.starts} onScroll={windows.scroll} onGroupToggle={onGroupToggle}
+          standIns={standIns} selectedId={selectedId} onNodeSelect={onNodeSelect} />
         <GraphDiagramEdgePaths
           edges={edges}
           nodes={nodes}
@@ -285,8 +330,9 @@ export function GraphDiagram({
         <div className="pointer-events-none absolute inset-0">
           <GraphDiagramEdgeLabels edges={edges} routes={routes} place={place} spread={natural} {...edgeSelection} />
           <GraphDiagramNodes
-            nodes={nodes}
+            nodes={drawnNodes}
             positions={positions}
+            windowOf={windowOf}
             place={place}
             nodeWidth={nodeWidth}
             nodeHeight={nodeHeight}

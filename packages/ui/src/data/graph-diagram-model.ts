@@ -9,6 +9,11 @@ export interface GraphDiagramNode {
   icon?: ReactNode;
   /** Right-aligned content on a record row, such as a column type. */
   aside?: ReactNode;
+  /**
+   * A small mark at the end of the node's line, such as how it is accessed (see `AccessMark`). It is
+   * hidden from assistive technology, so the node's accessible name stays its own: give it a title.
+   */
+  mark?: ReactNode;
   detail?: ReactNode;
   badge?: ReactNode;
   tone?: BadgeTone;
@@ -55,6 +60,20 @@ export interface GraphDiagramGroup {
   variant?: "box" | "record";
   /** Full text for the group, shown as its caption's native tooltip: what a shortened `label` stands for. */
   title?: string;
+  /**
+   * "columns" layout: whether the group is drawn as its header alone. Set (true or false) to make it
+   * collapsible: its header then shows a chevron calling `onGroupToggle`. A collapsed group holds one
+   * node, the stand-in its edges attach to, which is not drawn: its header stands for it.
+   */
+  collapsed?: boolean;
+  /** Right-aligned content in the group's header, such as what a collapsed group holds. */
+  aside?: ReactNode;
+}
+
+/** The group's name in words: its title, else a plain-text label, else its id. */
+export function groupName(group: GraphDiagramGroup | undefined, id: string): string {
+  if (group?.title !== undefined) return group.title;
+  return typeof group?.label === "string" ? group.label : id;
 }
 
 export type GraphDiagramLayout = "ring" | "columns";
