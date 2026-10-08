@@ -245,6 +245,27 @@ describe("TreeNode lazy children", () => {
     expect(loadChildren).toHaveBeenCalledTimes(1);
   });
 
+  it("leaves an unloaded lazy node closed and unfetched on expand-all, and still opens it by hand", async () => {
+    const loadChildren = vi.fn(() => Promise.resolve([{ id: "c1", label: "child-1" }] as Node[]));
+    const props = {
+      node: lazyRoot,
+      getChildren: (n: Node) => n.children,
+      getKey: (n: Node) => n.id,
+      defaultOpen: () => false,
+      hasMoreChildren: (n: Node) => n.lazy === true && !n.children,
+      loadChildren,
+      renderRow: ({ node }: { node: Node }) => <span>{node.label}</span>,
+    };
+    const { rerender } = render(<TreeNode<Node> {...props} expandAll={null} />);
+    rerender(<TreeNode<Node> {...props} expandAll={true} />);
+    const bulk = { expanded: screen.getByText("root").closest("[role='treeitem']")!.getAttribute("aria-expanded"), loads: loadChildren.mock.calls.length };
+
+    fireEvent.click(screen.getByText("root"));
+    await waitFor(() => expect(screen.getByText("child-1")).toBeInTheDocument());
+
+    expect(bulk).toEqual({ expanded: "false", loads: 0 });
+  });
+
   it("does not re-fetch when collapsed and reopened after a successful load", async () => {
     const loadChildren = vi.fn(() =>
       Promise.resolve([{ id: "c1", label: "child-1" }] as Node[]),

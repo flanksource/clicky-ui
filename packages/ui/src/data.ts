@@ -13,7 +13,14 @@ export {
   type BadgeVariant,
 } from "./data/Badge";
 export { CodeBlock, type CodeBlockProps } from "./data/CodeBlock";
-export { CodeDiff, type CodeDiffProps, type CodeDiffView } from "./data/CodeDiff";
+export {
+  CodeDiff,
+  type CodeDiffProps,
+  type CodeDiffView,
+  type DiffLineTarget,
+  type DiffLineWidget,
+  type DiffSide,
+} from "./data/CodeDiff";
 export { CodeLine, type CodeLineProps } from "./data/CodeLine";
 export {
   computeLineDiff,
@@ -366,11 +373,15 @@ export {
 } from "./data/graph-layout";
 export {
   columnsLayout,
+  GROUP_MEMBER_WINDOW,
   type ColumnsLayoutNode,
   type ColumnsLayoutOptions,
   type ColumnsLayoutResult,
   type GraphLayoutGroupBox,
+  type GroupMemberWindow,
 } from "./data/graph-columns-layout";
+export { AccessMark, type AccessMarkProps } from "./data/AccessMark";
+export { mergeAccess, type DataAccess } from "./data/data-access";
 export { TreeNode, type TreeNodeProps, type TreeRowContext } from "./data/TreeNode";
 export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHeader";
 export { Timeline, type TimelineItem, type TimelineProps } from "./data/Timeline";

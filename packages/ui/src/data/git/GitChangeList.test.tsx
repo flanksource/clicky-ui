@@ -1,6 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { GitCommitList, GitFileList, type GitCommitItem, type GitFileChangeItem } from "./GitChangeList";
+import {
+  GitCommitList,
+  GitDiffPanel,
+  GitFileList,
+  type GitCommitItem,
+  type GitFileChangeItem,
+} from "./GitChangeList";
 
 // Stub the async highlighter so CodeDiff renders its plain-text fallback
 // deterministically (each diff line's text stays a single node) without loading
@@ -81,5 +87,31 @@ describe("GitFileList", () => {
     fireEvent.click(screen.getByText("go.mod"));
 
     expect(await screen.findByText("patch unavailable")).toBeInTheDocument();
+  });
+});
+
+describe("GitDiffPanel line annotations", () => {
+  const payload = { diff: "@@ -1,2 +1,2 @@\n a\n-b\n+B\n", path: "x.txt" };
+
+  it("forwards onLineAction and lineWidgets to the diff", async () => {
+    const onLineAction = vi.fn();
+    render(
+      <GitDiffPanel
+        payload={payload}
+        onLineAction={onLineAction}
+        lineWidgets={[{ key: "c1", side: "new", line: 2, node: <span>looks good</span> }]}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText("looks good")).toBeInTheDocument());
+    const addRow = document.querySelector('[data-diff-line="add"]') as HTMLElement;
+    expect(addRow.nextElementSibling?.getAttribute("data-diff-widget")).toBe("c1");
+    fireEvent.click(addRow.querySelector("button") as HTMLElement);
+    expect(onLineAction).toHaveBeenCalledWith({ side: "new", line: 2, content: "B" });
+  });
+
+  it("renders no gutter buttons without onLineAction", async () => {
+    render(<GitDiffPanel payload={payload} />);
+    await waitFor(() => expect(document.querySelector("[data-diff-line]")).not.toBeNull());
+    expect(document.querySelectorAll("button")).toHaveLength(0);
   });
 });
