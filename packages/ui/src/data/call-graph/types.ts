@@ -63,9 +63,14 @@ export interface CallGraphNode {
 /** A call, a call one of several targets is chosen for at run time, or a read or write of data. */
 export type CallGraphEdgeType = "call" | "dispatch" | "read" | "write";
 
-/** What `fetchGraph` asks the graph to follow: `call` covers dispatch too. */
-export type CallGraphAccess = "call" | "read" | "write";
+/**
+ * What `fetchGraph` asks the graph to follow: `call` covers dispatch too.
+ * `variable` follows the variables a body reads and writes, on top of the
+ * others, for a host that offers it (`variableAccess`).
+ */
+export type CallGraphAccess = "call" | "read" | "write" | "variable";
 
+/** The access types a graph follows by default; at least one of them stays on. */
 export const CALL_GRAPH_ACCESS: readonly CallGraphAccess[] = ["call", "read", "write"];
 
 export interface CallGraphEdge {
