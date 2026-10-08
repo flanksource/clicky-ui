@@ -7,7 +7,10 @@ import { zIndex } from "./zIndex";
 // topmost reacts to Escape, and each renders above the one it opened over.
 const stack: string[] = [];
 const listeners = new Set<() => void>();
-const escapeStack: Array<{ id: string; onEscape: () => void }> = [];
+// `dismissed` marks a layer whose onEscape already ran but whose close has not
+// committed yet, so a quick second Escape reaches the layer beneath it.
+type EscapeLayer = { id: string; dismissed: boolean; onEscape: () => void };
+const escapeStack: EscapeLayer[] = [];
 let escapeDocument: Document | null = null;
 // Running guided tours. A tour dims the page from `zIndex.tour`, far above the
 // modal band, so floating content opened *during* a tour (the menu a step tells
@@ -42,12 +45,13 @@ function onEscapeKeyDown(event: KeyboardEvent) {
     return;
   }
 
-  const top = escapeStack[escapeStack.length - 1];
+  const top = escapeStack.findLast((entry) => !entry.dismissed);
   if (!top) return;
 
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation();
+  top.dismissed = true;
   top.onEscape();
 }
 
@@ -109,17 +113,25 @@ export function useEscapeLayer(open: boolean, onEscape: () => void, enabled = tr
   const id = useId();
   const onEscapeRef = useRef(onEscape);
   onEscapeRef.current = onEscape;
+  const entryRef = useRef<EscapeLayer | null>(null);
+
+  // A dismissed layer that re-rendered without closing owns Escape again.
+  useEffect(() => {
+    if (entryRef.current) entryRef.current.dismissed = false;
+  });
 
   useEffect(() => {
     if (!open || !enabled) return;
 
     ensureEscapeListener();
-    escapeStack.push({
-      id,
-      onEscape: () => onEscapeRef.current(),
-    });
+    const entry: EscapeLayer = { id, dismissed: false, onEscape: () => onEscapeRef.current() };
+    entryRef.current = entry;
+    escapeStack.push(entry);
 
-    return () => removeEscapeLayer(id);
+    return () => {
+      entryRef.current = null;
+      removeEscapeLayer(id);
+    };
   }, [enabled, id, open]);
 }
 

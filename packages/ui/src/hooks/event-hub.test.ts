@@ -6,6 +6,7 @@ class FakeRealEventSource {
   static instances: FakeRealEventSource[] = [];
   readonly listeners = new Map<string, Set<(ev: Event) => void>>();
   onerror: ((ev: Event) => void) | null = null;
+  readyState = 0;
   readonly close = vi.fn();
 
   constructor(readonly url: string) {
@@ -31,7 +32,10 @@ class FakeRealEventSource {
     }
   }
 
-  fail() {
+  // terminal mirrors a non-200 / wrong Content-Type response: the browser sets
+  // CLOSED and never reconnects on its own.
+  fail({ terminal = false }: { terminal?: boolean } = {}) {
+    this.readyState = terminal ? 2 : 0;
     this.onerror?.(new Event("error"));
   }
 }
@@ -310,6 +314,69 @@ describe("createEventHub", () => {
     expect(second.readyState).toBe(1);
     expect(firstOpen).toHaveBeenCalledTimes(1);
     expect(secondOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a failed sub CLOSED across a real connection drop and the next hello", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const open = createEventHub();
+    const stream = open("/api/todos/session/stream");
+    const real = FakeRealEventSource.instances[0];
+    real.emit("__hello", helloPayload("conn-1"));
+    await flush();
+    real.emit("s1/__closed", closedPayload(500, "boom"));
+
+    const errored = vi.fn();
+    stream.onerror = errored;
+    real.fail();
+    real.emit("__hello", helloPayload("conn-2"));
+    await flush();
+
+    expect({ readyState: stream.readyState, errors: errored.mock.calls.length, posts: posts().length }).toEqual({
+      readyState: 2,
+      errors: 0,
+      posts: 1,
+    });
+  });
+
+  it("ignores a subscribe response that lands after the connection it was sent on dropped", async () => {
+    const open = createEventHub();
+    const stream = open("/api/prs/stream");
+    const real = FakeRealEventSource.instances[0];
+    const opened = vi.fn();
+    stream.onopen = opened;
+
+    real.emit("__hello", helloPayload("conn-1"));
+    real.fail();
+    await flush();
+
+    expect({ readyState: stream.readyState, opens: opened.mock.calls.length }).toEqual({ readyState: 0, opens: 0 });
+  });
+
+  it("recreates the real connection after a terminal error and rebinds every active sub", async () => {
+    vi.useFakeTimers();
+    const open = createEventHub();
+    const stream = open("/api/prs/stream");
+    const message = vi.fn();
+    stream.addEventListener("pr", message);
+    const first = FakeRealEventSource.instances[0];
+    first.emit("__hello", helloPayload("conn-1"));
+    await vi.advanceTimersByTimeAsync(0);
+
+    first.fail({ terminal: true });
+    expect(stream.readyState).toBe(0);
+    const subRoutes = [...first.listeners].filter(([type, set]) => type.startsWith("s1/") && set.size > 0);
+    expect(subRoutes).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(FakeRealEventSource.instances).toHaveLength(2);
+    const second = FakeRealEventSource.instances[1];
+    second.emit("__hello", helloPayload("conn-2"));
+    await vi.advanceTimersByTimeAsync(0);
+    second.emit("s1/pr", "updated");
+
+    expect(stream.readyState).toBe(1);
+    expect(posts().map((call) => call.url)).toEqual(["/api/events/conn-1/subs", "/api/events/conn-2/subs"]);
+    expect(message.mock.calls.map(([event]) => (event as MessageEvent).data)).toEqual(["updated"]);
   });
 
   it("tears down the real connection only after every sub has been closed for the grace period", async () => {

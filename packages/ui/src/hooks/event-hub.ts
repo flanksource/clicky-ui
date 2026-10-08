@@ -152,14 +152,17 @@ export function createEventHub(options: EventHubOptions = {}): EventSourceFactor
 
   async function postSub(sub: Sub): Promise<void> {
     const conn = connId;
-    if (!conn || sub.disposed) return;
+    if (!conn || sub.disposed || sub.readyState === READY_STATE_CLOSED) return;
+    // A response for a connection that has since dropped (or a sub that has
+    // since failed) is stale: the next __hello re-subscribes on the live one.
+    const stale = () => sub.disposed || conn !== connId || sub.readyState === READY_STATE_CLOSED;
     try {
       const res = await fetch(`${hubUrl}/${conn}/subs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: sub.id, path: sub.url }),
       });
-      if (sub.disposed) return;
+      if (stale()) return;
       if (res.status === 204) {
         sub.readyState = READY_STATE_OPEN;
         dispatch(sub, "open", new Event("open"));
@@ -168,7 +171,7 @@ export function createEventHub(options: EventHubOptions = {}): EventSourceFactor
       if (res.status === 404) return; // stale conn id; the next __hello retries
       failSub(sub, `subscribe failed: ${res.status}`);
     } catch (err) {
-      if (sub.disposed) return;
+      if (stale()) return;
       failSub(sub, "subscribe request failed", err);
     }
   }
@@ -185,15 +188,27 @@ export function createEventHub(options: EventHubOptions = {}): EventSourceFactor
     }
   }
 
-  function onRealError(): void {
+  function onRealError(es: EventSourceLike): void {
     connId = null;
     for (const sub of subs.values()) {
-      if (sub.disposed) continue;
+      if (sub.disposed || sub.readyState === READY_STATE_CLOSED) continue;
       sub.readyState = READY_STATE_CONNECTING;
       dispatch(sub, "error", new Event("error"));
     }
-    // Native EventSource reconnects on its own; the next __hello re-subscribes
-    // everything and dispatches 'open' again.
+    // Native EventSource reconnects on its own after a transient error; the
+    // next __hello re-subscribes everything and dispatches 'open' again. A
+    // CLOSED source (non-200 or wrong Content-Type) never reconnects, so drop
+    // it and open a replacement after a delay.
+    if (es.readyState !== READY_STATE_CLOSED || real !== es) return;
+    for (const sub of subs.values()) {
+      for (const [eventName, handler] of sub.routedHandlers) es.removeEventListener(eventName, handler);
+      sub.routedHandlers.clear();
+    }
+    es.onerror = null;
+    real = null;
+    setTimeout(() => {
+      if (!real && subs.size > 0) ensureRealOpen();
+    }, RESUBSCRIBE_DELAY_MS);
   }
 
   function ensureRealOpen(): EventSourceLike {
@@ -207,9 +222,21 @@ export function createEventHub(options: EventHubOptions = {}): EventSourceFactor
     connId = null;
     const es = new EventSource(hubUrl);
     es.addEventListener("__hello", (event) => onHello(event as MessageEvent));
-    es.onerror = () => onRealError();
+    es.onerror = () => onRealError(es);
     real = es;
+    routeActiveSubs();
     return es;
+  }
+
+  // routeActiveSubs binds every live sub's routing onto a freshly created real
+  // connection (a replacement after a terminal error has none yet).
+  function routeActiveSubs(): void {
+    for (const sub of subs.values()) {
+      if (sub.disposed) continue;
+      routeName(sub, "message");
+      for (const name of sub.listeners.keys()) routeName(sub, name);
+      routeClosed(sub);
+    }
   }
 
   const eventNameFor = (sub: Sub, name: string) => `${sub.id}/${name}`;
@@ -219,15 +246,16 @@ export function createEventHub(options: EventHubOptions = {}): EventSourceFactor
   // "open" is synthetic (dispatched locally on subscribe/reconnect) and never
   // arrives on the wire, so it is never routed. A closed sub has no routing to
   // register: its real connection may already be torn down, and no frame for
-  // it can arrive.
+  // it can arrive. With no real connection (awaiting a replacement after a
+  // terminal error) routing is deferred to routeActiveSubs.
   function routeName(sub: Sub, name: string): void {
     const eventName = eventNameFor(sub, name);
-    if (name === "open" || sub.disposed || sub.routedHandlers.has(eventName)) return;
+    if (!real || name === "open" || sub.disposed || sub.routedHandlers.has(eventName)) return;
     const handler = (event: Event) => {
       const message = event as MessageEvent;
       dispatch(sub, name, new MessageEvent(name, { data: message.data, lastEventId: message.lastEventId }));
     };
-    real!.addEventListener(eventName, handler);
+    real.addEventListener(eventName, handler);
     sub.routedHandlers.set(eventName, handler);
   }
 
@@ -258,9 +286,9 @@ export function createEventHub(options: EventHubOptions = {}): EventSourceFactor
   // payload drives re-subscription rather than being handed to consumers.
   function routeClosed(sub: Sub): void {
     const eventName = eventNameFor(sub, "__closed");
-    if (sub.routedHandlers.has(eventName)) return;
+    if (!real || sub.routedHandlers.has(eventName)) return;
     const handler = (event: Event) => onSubClosed(sub, event as MessageEvent);
-    real!.addEventListener(eventName, handler);
+    real.addEventListener(eventName, handler);
     sub.routedHandlers.set(eventName, handler);
   }
 

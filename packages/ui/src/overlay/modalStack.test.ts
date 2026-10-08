@@ -1,7 +1,35 @@
-import { describe, expect, it } from "vitest";
-import { renderHook } from "@testing-library/react";
-import { useFloatingZIndex, useModalStack, useTourLayer } from "./modalStack";
+import { describe, expect, it, vi } from "vitest";
+import { fireEvent, renderHook } from "@testing-library/react";
+import { useEscapeLayer, useFloatingZIndex, useModalStack, useTourLayer } from "./modalStack";
 import { zIndex } from "./zIndex";
+
+describe("useEscapeLayer", () => {
+  it("routes a second Escape to the parent layer before the dismissed child unmounts", () => {
+    const closeParent = vi.fn();
+    const closeChild = vi.fn();
+    const parent = renderHook(() => useEscapeLayer(true, closeParent));
+    const child = renderHook(() => useEscapeLayer(true, closeChild));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect([closeChild.mock.calls.length, closeParent.mock.calls.length]).toEqual([1, 1]);
+    child.unmount();
+    parent.unmount();
+  });
+
+  it("owns Escape again once a layer that stayed open re-renders", () => {
+    const keepOpen = vi.fn();
+    const layer = renderHook(() => useEscapeLayer(true, keepOpen));
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    layer.rerender();
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(keepOpen).toHaveBeenCalledTimes(2);
+    layer.unmount();
+  });
+});
 
 describe("useFloatingZIndex", () => {
   it("sits at the popover floor with nothing else open", () => {
