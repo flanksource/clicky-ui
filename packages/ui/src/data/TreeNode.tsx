@@ -132,7 +132,9 @@ export function TreeNode<T>({
   const secondaryNode = isSecondary?.(node) ?? false;
   const childrenAllSecondary =
     hasChildren && isSecondary != null && children!.every((c) => isSecondary(c));
-  const skipExpandAll = secondaryNode || childrenAllSecondary;
+  // An unloaded lazy node never opens in bulk either: opening it would fetch,
+  // and bulk operations never trigger loads. Collapse-all still closes it.
+  const skipExpandAll = secondaryNode || childrenAllSecondary || (expandAll === true && lazyUnloaded);
   // A non-null `expandAll` is a live bulk state, not just a one-off change
   // signal: a node mounted *while* expand-all is active (because an ancestor
   // just opened) inherits it as its initial open state, so opening a parent

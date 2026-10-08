@@ -14,7 +14,7 @@ import {
   UiRemove,
 } from "../../icons";
 import type { IconComponent } from "../../icons/types";
-import { CodeDiff } from "../CodeDiff";
+import { CodeDiff, type DiffLineTarget, type DiffLineWidget } from "../CodeDiff";
 import { languageFromPath } from "../code-highlight";
 import { dateKey, formatFallbackTime, formatGitCommitDateHeader } from "./git-dates";
 
@@ -76,6 +76,10 @@ export type GitDiffPanelProps = {
   emptyLabel?: string;
   className?: string;
   maxHeightClassName?: string;
+  /** Forwarded to `CodeDiff`: shows a gutter "+" button per numbered line. */
+  onLineAction?: (target: DiffLineTarget) => void;
+  /** Forwarded to `CodeDiff`: rows rendered under the matching diff line. */
+  lineWidgets?: DiffLineWidget[];
 };
 
 export type GitCommitListProps = {
@@ -200,6 +204,8 @@ export function GitDiffPanel({
   emptyLabel = "No text diff available",
   className,
   maxHeightClassName = "max-h-[520px]",
+  onLineAction,
+  lineWidgets,
 }: GitDiffPanelProps) {
   if (loading) {
     return (
@@ -246,6 +252,8 @@ export function GitDiffPanel({
         unified={payload.diff}
         className={cn("overflow-auto px-1 py-2", maxHeightClassName)}
         {...(language ? { language } : {})}
+        {...(onLineAction ? { onLineAction } : {})}
+        {...(lineWidgets ? { lineWidgets } : {})}
       />
     </div>
   );

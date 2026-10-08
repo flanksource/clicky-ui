@@ -1,7 +1,7 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { SegmentedControl, type SegmentedOption } from "../components/SegmentedControl";
-import { UiColumns, UiFile, UiRows } from "../icons";
+import { UiAdd, UiColumns, UiFile, UiRows } from "../icons";
 import {
   computeLineDiff,
   parseUnifiedDiff,
@@ -27,7 +27,40 @@ type CodeDiffInput =
   | { original: string; modified: string; unified?: never }
   | { unified: string; original?: never; modified?: never };
 
+export type DiffSide = "old" | "new";
+
+/** The diff line a gutter "+" button was clicked on. */
+export interface DiffLineTarget {
+  side: DiffSide;
+  line: number;
+  content: string;
+}
+
+/** A node rendered as a full-width row directly below the row at `(side, line)`. */
+export interface DiffLineWidget {
+  key: string;
+  side: DiffSide;
+  line: number;
+  node: ReactNode;
+}
+
+type LineAnnotations = {
+  onLineAction: ((target: DiffLineTarget) => void) | undefined;
+  lineWidgets: DiffLineWidget[] | undefined;
+};
+
 export type CodeDiffProps = CodeDiffInput & {
+  /**
+   * When set, every numbered line shows a "+" button in its gutter (on row hover
+   * or keyboard focus). Added/context lines report side `new`, deleted lines
+   * `old`; in split view the left column is `old` and the right `new`.
+   */
+  onLineAction?: ((target: DiffLineTarget) => void) | undefined;
+  /**
+   * Rendered as a full-width row directly below the row matching `(side, line)`,
+   * in array order. A context line matches both its `old` and `new` number.
+   */
+  lineWidgets?: DiffLineWidget[] | undefined;
   /** Highlighter language hint, e.g. `typescript`, `go`, `python`. */
   language?: string | undefined;
   /** Unified (single column) or split (side-by-side). Defaults to `unified`. */
@@ -65,7 +98,8 @@ const MARKER: Record<DiffLineType, string> = { context: "", add: "+", remove: "-
 
 export function CodeDiff(props: CodeDiffProps) {
   const { language, view: viewProp = "unified", showLineNumbers = true, bare = false, className } = props;
-  const { unified, original, modified } = props;
+  const { unified, original, modified, onLineAction, lineWidgets } = props;
+  const annotations: LineAnnotations = { onLineAction, lineWidgets };
 
   // `view` prop seeds the default; the header toggle then owns it.
   const [view, setView] = useState<CodeDiffView>(viewProp);
@@ -124,9 +158,9 @@ export function CodeDiff(props: CodeDiffProps) {
       <Fragment key={index}>
         {filePath && <FileHeader path={filePath} />}
         {view === "split" ? (
-          <SplitHunk hunk={hunk} showLineNumbers={showLineNumbers} />
+          <SplitHunk hunk={hunk} showLineNumbers={showLineNumbers} annotations={annotations} />
         ) : (
-          <UnifiedHunk hunk={hunk} showLineNumbers={showLineNumbers} />
+          <UnifiedHunk hunk={hunk} showLineNumbers={showLineNumbers} annotations={annotations} />
         )}
       </Fragment>
     );
@@ -197,44 +231,112 @@ function resolveHunks(
   }));
 }
 
-function UnifiedHunk({ hunk, showLineNumbers }: { hunk: ResolvedHunk; showLineNumbers: boolean }) {
+type HunkProps = {
+  hunk: ResolvedHunk;
+  showLineNumbers: boolean;
+  annotations: LineAnnotations;
+};
+
+// Which side of `line` a widget at (side, number) attaches to: context lines
+// carry both numbers, add lines only `new`, remove lines only `old`.
+function lineHasPosition(line: DiffLine, side: DiffSide, number: number): boolean {
+  if (side === "old") return line.type !== "add" && line.oldNumber === number;
+  return line.type !== "remove" && line.newNumber === number;
+}
+
+function WidgetRows({ widgets }: { widgets: DiffLineWidget[] }) {
+  return (
+    <>
+      {widgets.map((widget) => (
+        <div
+          key={widget.key}
+          data-diff-widget={widget.key}
+          className="whitespace-normal border-y border-border bg-background px-3 py-2 font-sans text-sm leading-normal text-foreground"
+        >
+          {widget.node}
+        </div>
+      ))}
+    </>
+  );
+}
+
+function UnifiedHunk({ hunk, showLineNumbers, annotations }: HunkProps) {
+  const { onLineAction, lineWidgets } = annotations;
   return (
     <>
       {hunk.header && <HunkHeader header={hunk.header} />}
       {hunk.lines.map((resolved, index) => {
         const { line } = resolved;
         const tokens = line.type === "remove" ? resolved.oldTokens : resolved.newTokens;
+        const actionSide: DiffSide = line.type === "remove" ? "old" : "new";
+        const widgets = lineWidgets?.filter((w) => lineHasPosition(line, w.side, w.line));
         return (
-          <div key={index} className={cn("flex", ROW_TINT[line.type])} data-diff-line={line.type}>
-            {showLineNumbers && (
-              <>
-                <Gutter value={line.oldNumber} />
-                <Gutter value={line.newNumber} />
-              </>
-            )}
-            <Marker type={line.type} />
-            <code className="whitespace-pre pl-1 pr-3">
-              <HighlightedTokens tokens={tokens} content={line.content} />
-            </code>
-          </div>
+          <Fragment key={index}>
+            <div className={cn("group flex", ROW_TINT[line.type])} data-diff-line={line.type}>
+              {showLineNumbers && (
+                <>
+                  <Gutter
+                    value={line.oldNumber}
+                    line={line}
+                    side="old"
+                    actionSide={actionSide}
+                    onLineAction={onLineAction}
+                  />
+                  <Gutter
+                    value={line.newNumber}
+                    line={line}
+                    side="new"
+                    actionSide={actionSide}
+                    onLineAction={onLineAction}
+                  />
+                </>
+              )}
+              <Marker type={line.type} />
+              <code className="whitespace-pre pl-1 pr-3">
+                <HighlightedTokens tokens={tokens} content={line.content} />
+              </code>
+            </div>
+            {widgets && <WidgetRows widgets={widgets} />}
+          </Fragment>
         );
       })}
     </>
   );
 }
 
-function SplitHunk({ hunk, showLineNumbers }: { hunk: ResolvedHunk; showLineNumbers: boolean }) {
+function SplitHunk({ hunk, showLineNumbers, annotations }: HunkProps) {
   const pairs = useMemo(() => pairLines(hunk.lines), [hunk.lines]);
+  const { onLineAction, lineWidgets } = annotations;
   return (
     <>
       {hunk.header && <HunkHeader header={hunk.header} />}
-      {pairs.map((pair, index) => (
-        <div key={index} className="flex">
-          <SplitCell resolved={pair.left} side="old" showLineNumbers={showLineNumbers} />
-          <span aria-hidden className="w-px shrink-0 bg-border" />
-          <SplitCell resolved={pair.right} side="new" showLineNumbers={showLineNumbers} />
-        </div>
-      ))}
+      {pairs.map((pair, index) => {
+        const widgets = lineWidgets?.filter(
+          (w) =>
+            (pair.left !== undefined && lineHasPosition(pair.left.line, w.side, w.line) && w.side === "old") ||
+            (pair.right !== undefined && lineHasPosition(pair.right.line, w.side, w.line) && w.side === "new"),
+        );
+        return (
+          <Fragment key={index}>
+            <div className="flex">
+              <SplitCell
+                resolved={pair.left}
+                side="old"
+                showLineNumbers={showLineNumbers}
+                onLineAction={onLineAction}
+              />
+              <span aria-hidden className="w-px shrink-0 bg-border" />
+              <SplitCell
+                resolved={pair.right}
+                side="new"
+                showLineNumbers={showLineNumbers}
+                onLineAction={onLineAction}
+              />
+            </div>
+            {widgets && <WidgetRows widgets={widgets} />}
+          </Fragment>
+        );
+      })}
     </>
   );
 }
@@ -269,10 +371,12 @@ function SplitCell({
   resolved,
   side,
   showLineNumbers,
+  onLineAction,
 }: {
   resolved: ResolvedLine | undefined;
-  side: "old" | "new";
+  side: DiffSide;
   showLineNumbers: boolean;
+  onLineAction: LineAnnotations["onLineAction"];
 }) {
   if (!resolved) return <div className="min-w-0 flex-1" />;
   const { line } = resolved;
@@ -282,8 +386,13 @@ function SplitCell({
   const number = side === "old" ? line.oldNumber : line.newNumber;
   const tokens = side === "old" ? resolved.oldTokens : resolved.newTokens;
   return (
-    <div className={cn("flex min-w-0 flex-1", active && ROW_TINT[line.type])} data-diff-line={type}>
-      {showLineNumbers && <Gutter value={number} />}
+    <div
+      className={cn("group flex min-w-0 flex-1", active && ROW_TINT[line.type])}
+      data-diff-line={type}
+    >
+      {showLineNumbers && (
+        <Gutter value={number} line={line} side={side} actionSide={side} onLineAction={onLineAction} />
+      )}
       <Marker type={type} />
       <code className="min-w-0 whitespace-pre pl-1 pr-3">
         <HighlightedTokens tokens={tokens} content={line.content} />
@@ -310,10 +419,35 @@ function HunkHeader({ header }: { header: string }) {
   );
 }
 
-function Gutter({ value }: { value: number | undefined }) {
+// `side` is the number this gutter shows; the "+" button only renders in the
+// `actionSide` gutter so a unified row (two gutters) exposes exactly one.
+function Gutter({
+  value,
+  line,
+  side,
+  actionSide,
+  onLineAction,
+}: {
+  value: number | undefined;
+  line: DiffLine;
+  side: DiffSide;
+  actionSide: DiffSide;
+  onLineAction: LineAnnotations["onLineAction"];
+}) {
+  const showAction = onLineAction !== undefined && value !== undefined && side === actionSide;
   return (
-    <span className="w-10 shrink-0 select-none px-2 text-right tabular-nums text-muted-foreground">
+    <span className="relative w-10 shrink-0 select-none px-2 text-right tabular-nums text-muted-foreground">
       {value ?? ""}
+      {showAction && (
+        <button
+          type="button"
+          aria-label={`Comment on line ${value}`}
+          onClick={() => onLineAction({ side, line: value, content: line.content })}
+          className="absolute inset-y-0 left-0.5 flex items-center rounded-sm bg-background text-primary opacity-0 hover:text-primary/80 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover:opacity-100"
+        >
+          <UiAdd className="size-3.5" />
+        </button>
+      )}
     </span>
   );
 }

@@ -175,3 +175,42 @@ export const ViewToggle: Story = {
     });
   },
 };
+
+const COMMENT_WIDGET_CLASS = "rounded-md border border-border bg-muted/40 p-2 text-xs";
+
+// `onLineAction` adds a hover "+" per numbered line; `lineWidgets` render
+// comment threads as full-width rows under their line. Works in both views.
+export const InlineComments: Story = {
+  args: {
+    language: "typescript",
+    original: TS_BEFORE,
+    modified: TS_AFTER,
+    onLineAction: () => {},
+    lineWidgets: [
+      {
+        key: "thread-1",
+        side: "old",
+        line: 2,
+        node: <div className={COMMENT_WIDGET_CLASS}>Why drop the string concatenation here?</div>,
+      },
+      {
+        key: "thread-2",
+        side: "new",
+        line: 2,
+        node: <div className={COMMENT_WIDGET_CLASS}>Nit: extract the suffix into a constant.</div>,
+      },
+    ],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await waitFor(() => {
+      expect(canvasElement.querySelectorAll("[data-diff-widget]").length).toBe(2);
+    });
+    expect(canvas.getByText("Nit: extract the suffix into a constant.")).toBeInTheDocument();
+    expect(canvasElement.querySelectorAll("[data-diff-line] button").length).toBeGreaterThan(0);
+  },
+};
+
+export const InlineCommentsSplit: Story = {
+  args: { ...InlineComments.args, view: "split" },
+};
