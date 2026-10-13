@@ -1,5 +1,6 @@
 import { useState, type MouseEvent, type ReactNode } from "react";
 import { Icon } from "../Icon";
+import { cn } from "../../lib/utils";
 import {
   UiCheck,
   UiChevronRight,
@@ -13,6 +14,7 @@ import {
   isApplicationStackFrame,
   parseDiagnosticsStackTrace,
   parseInlineJsonContextValue,
+  reportPageLine,
   type ErrorDiagnostics,
   type ErrorStackFrame,
 } from "./error-diagnostics";
@@ -26,9 +28,19 @@ export type ErrorDetailsProps = {
   // CopyBadge with the raw string. MC's playbook view passes a richer JsonView
   // here; smaller consumers (plugin iframes) can leave it unset.
   renderJsonContext?: (entry: { label: string; value: string; data: unknown }) => ReactNode;
+  // Controls rendered in the summary row beside Copy, e.g. a retry button.
+  // Clicks on them do not toggle the details.
+  actions?: ReactNode;
+  className?: string;
 };
 
-export function ErrorDetails({ diagnostics, title = "Error", renderJsonContext }: ErrorDetailsProps) {
+export function ErrorDetails({
+  diagnostics,
+  title = "Error",
+  renderJsonContext,
+  actions,
+  className,
+}: ErrorDetailsProps) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const scalarContext = diagnostics.context.filter(
     ([, value]) => !parseInlineJsonContextValue(value),
@@ -57,7 +69,7 @@ export function ErrorDetails({ diagnostics, title = "Error", renderJsonContext }
     }
   };
   return (
-    <details className="group rounded-md border border-destructive/30 bg-destructive/5">
+    <details className={cn("group rounded-md border border-destructive/30 bg-destructive/5", className)}>
       <summary className="flex cursor-pointer list-none items-start gap-2 p-3">
         <Icon icon={UiWarningTriangle} className="mt-0.5 shrink-0 text-destructive" />
         <div className="min-w-0 flex-1">
@@ -67,6 +79,12 @@ export function ErrorDetails({ diagnostics, title = "Error", renderJsonContext }
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2 text-xs font-medium text-muted-foreground sm:flex-row sm:items-center sm:gap-3">
+          {actions && (
+            // Swallow the click so a summary-row action does not open or close the details.
+            <span className="inline-flex" onClick={(event) => event.preventDefault()}>
+              {actions}
+            </span>
+          )}
           <button
             type="button"
             aria-label={
@@ -193,6 +211,8 @@ export function ErrorDetails({ diagnostics, title = "Error", renderJsonContext }
 
 function diagnosticReport(diagnostics: ErrorDiagnostics, title: string): string {
   const lines = [`${title}: ${diagnostics.message}`];
+  const page = reportPageLine();
+  if (page) lines.push(page);
   if (diagnostics.trace) lines.push(`Trace: ${diagnostics.trace}`);
   if (diagnostics.time) lines.push(`Time: ${diagnostics.time}`);
   if (diagnostics.context.length > 0) {

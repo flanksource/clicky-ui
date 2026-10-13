@@ -1,9 +1,11 @@
 import { Icon } from "../Icon";
 import { ProgressBar, type ProgressSegment } from "../ProgressBar";
 import { cn } from "../../lib/utils";
-import { UiCheck, UiClock, UiLoader } from "../../icons";
+import { UiClock, UiLoader } from "../../icons";
 import type { RunMeta, Test } from "./types";
-import { aggregateStatusCounts } from "./status";
+import { aggregateStatusCounts, type TestOutcome } from "./status";
+import { TEST_OUTCOMES } from "./marks";
+import { OutcomeIcon } from "./MarkIcons";
 
 export type TestRunSummaryProps = {
   tests: Test[];
@@ -51,21 +53,40 @@ export function TestRunSummary({
     { count: t.passed, color: "bg-green-500", label: "passed" },
     { count: t.skipped, color: "bg-yellow-400", label: "skipped" },
     { count: t.failed, color: "bg-red-500", label: "failed" },
+    { count: t.warned, color: "bg-amber-400", label: "warned" },
     { count: t.timedout, color: "bg-amber-500", label: "timed out" },
     { count: t.running, color: "bg-blue-400", label: "running" },
     { count: t.pending, color: "bg-muted-foreground/40", label: "queued" },
   ];
 
-  // Each status appears once, as a coloured count chip — no separate gauge-card
-  // row repeating the same numbers as percentages.
-  const chips: { n: number; label: string; tone: string }[] = [
-    { n: t.passed, label: "passed", tone: "text-green-600 dark:text-green-400" },
-    { n: t.failed, label: "failed", tone: "text-red-600 dark:text-red-400" },
-    { n: t.timedout, label: "timed out", tone: "text-amber-600 dark:text-amber-400" },
-    { n: t.skipped, label: "skipped", tone: "text-yellow-700 dark:text-yellow-500" },
-    { n: t.running, label: "running", tone: "text-blue-600 dark:text-blue-400" },
-    { n: t.pending, label: "queued", tone: "text-muted-foreground" },
+  // Each status appears once, as its outcome mark and a count — the same
+  // glyphs the tree uses, so the header reads in the tree's vocabulary.
+  const chips: { n: number; label: string; outcome: TestOutcome }[] = [
+    { n: t.passed, label: "passed", outcome: "passed" },
+    { n: t.failed, label: "failed", outcome: "failed" },
+    { n: t.warned, label: "warned", outcome: "warned" },
+    { n: t.timedout, label: "timed out", outcome: "timedout" },
+    { n: t.skipped, label: "skipped", outcome: "skipped" },
+    { n: t.running, label: "running", outcome: "running" },
+    { n: t.pending, label: "queued", outcome: "pending" },
   ];
+  const chipRow = chips
+    .filter((c) => c.n > 0)
+    .map((c) => (
+      <span
+        key={c.label}
+        className={cn(
+          "inline-flex items-center gap-0.5 tabular-nums",
+          TEST_OUTCOMES[c.outcome].className,
+        )}
+        aria-label={`${c.n} ${c.label}`}
+        title={`${c.n} ${c.label}`}
+        data-summary-outcome={c.outcome}
+      >
+        <OutcomeIcon outcome={c.outcome} />
+        {c.n}
+      </span>
+    ));
 
   if (compact) {
     return (
@@ -76,16 +97,10 @@ export function TestRunSummary({
         )}
       >
         <span className="font-medium text-foreground">
-          {t.total} tests
+          {t.total} {t.total === 1 ? "test" : "tests"}
           {runMeta?.kind === "rerun" ? ` · rerun #${runMeta.sequence}` : ""}
         </span>
-        {chips
-          .filter((c) => c.n > 0)
-          .map((c) => (
-            <span key={c.label} className={c.tone}>
-              {c.n} {c.label}
-            </span>
-          ))}
+        {chipRow}
         {elapsed && (
           <span className="inline-flex items-center gap-1">
             <Icon icon={UiClock} className="text-xs" />
@@ -100,11 +115,7 @@ export function TestRunSummary({
             </span>
           </span>
         )}
-        {done ? (
-          <Icon icon={UiCheck} className="text-green-600 dark:text-green-400" />
-        ) : (
-          <Icon icon={UiLoader} className="animate-spin text-blue-500" />
-        )}
+        {!done && <Icon icon={UiLoader} className="animate-spin text-blue-500" />}
       </div>
     );
   }
@@ -113,27 +124,17 @@ export function TestRunSummary({
     <div className={cn("flex min-w-[18rem] flex-col items-end gap-1.5", className)}>
       <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
         <span className="font-medium text-foreground">
-          {t.total} tests
+          {t.total} {t.total === 1 ? "test" : "tests"}
           {runMeta?.kind === "rerun" ? ` · rerun #${runMeta.sequence}` : ""}
         </span>
-        {chips
-          .filter((c) => c.n > 0)
-          .map((c) => (
-            <span key={c.label} className={c.tone}>
-              {c.n} {c.label}
-            </span>
-          ))}
+        {chipRow}
         {elapsed && (
           <span className="inline-flex items-center gap-1">
             <Icon icon={UiClock} className="text-xs" />
             {elapsed}
           </span>
         )}
-        {done ? (
-          <Icon icon={UiCheck} className="text-green-600 dark:text-green-400" />
-        ) : (
-          <Icon icon={UiLoader} className="animate-spin text-blue-500" />
-        )}
+        {!done && <Icon icon={UiLoader} className="animate-spin text-blue-500" />}
       </div>
 
       {t.total > 0 && (

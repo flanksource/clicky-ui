@@ -11,6 +11,7 @@
 import type { ReactNode } from "react";
 import type { Test } from "./types";
 import type { TestRunnerContext } from "./context";
+import { mergeCopySections, type CopySections } from "./copy";
 
 export type AdapterContext = {
   node: Test;
@@ -29,10 +30,9 @@ export type TestNodeAdapter = {
   /** Claim the node. The first registered adapter to return true wins per surface. */
   match: (node: Test, runner: TestRunnerContext) => boolean;
   /**
-   * Replace the framework icon for the node — return any node (e.g. a brand
-   * logo via the host's own icon provider) or null to fall back to the built-in
-   * `frameworkIcon`. Lets hosts restore devicon/logos glyphs without clicky
-   * depending on a runtime icon provider.
+   * Replace the framework icon for the node — return any node, or null to fall
+   * back to the built-in tool mark (`TEST_TOOLS`). For a tool the catalog
+   * lacks, prefer adding it to `TEST_TOOLS` so every surface shows it.
    */
   renderFrameworkIcon?: (c: AdapterContext) => ReactNode;
   /** Extra decoration rendered between the framework icon and the node name. */
@@ -44,6 +44,12 @@ export type TestNodeAdapter = {
   /** Node-scoped action buttons rendered in the detail header. */
   nodeActions?: (c: AdapterContext) => ReactNode;
   /**
+   * Domain facts, brief sections and menu items for the header's "Copy details"
+   * button, merged (in registration order) across all matching adapters on top
+   * of the generic sections every node gets.
+   */
+  copy?: (c: AdapterContext) => CopySections;
+  /**
    * Whether `renderDetail` owns its own full-height scroll container. When
    * false (the default for custom bodies), the panel wraps it in a scroll
    * region. The built-in default body owns its scroll.
@@ -52,9 +58,9 @@ export type TestNodeAdapter = {
 };
 
 /**
- * Ordered set of node adapters. First match wins per surface; `detailTabs` are
- * the exception — they merge across every matching adapter so independent
- * adapters can each contribute a tab.
+ * Ordered set of node adapters. First match wins per surface; `detailTabs` and
+ * `copy` are the exceptions — they merge across every matching adapter so
+ * independent adapters can each contribute a tab or a copy section.
  */
 export class TestNodeAdapterRegistry {
   readonly adapters: TestNodeAdapter[];
@@ -105,6 +111,17 @@ export class TestNodeAdapterRegistry {
       }
     }
     return tabs;
+  }
+
+  /**
+   * Merge `copy` sections from every matching adapter, de-duplicated by fact
+   * label, section title and item label — the first contributor wins.
+   */
+  resolveCopy(node: Test, runner: TestRunnerContext): Required<CopySections> {
+    const ctx: AdapterContext = { node, runner };
+    return mergeCopySections(
+      this.adapters.flatMap((a) => (a.copy && a.match(node, runner) ? [a.copy(ctx)] : [])),
+    );
   }
 
   /** True when the resolved detail adapter owns its own scroll region. */

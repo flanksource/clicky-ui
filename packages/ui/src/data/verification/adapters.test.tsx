@@ -34,6 +34,18 @@ function renderDetail(selected: Test) {
   );
 }
 
+/** The rendered Expectation as label → value text, in display order. */
+function expectationRows(): Record<string, string> {
+  const list = document.querySelector("[data-expectation]");
+  if (!list) throw new Error("no Expectation rendered");
+  return Object.fromEntries(
+    [...list.querySelectorAll("dt")].map((dt) => [
+      dt.textContent ?? "",
+      dt.nextElementSibling?.textContent ?? "",
+    ]),
+  );
+}
+
 describe("verificationAdapters: fixture/CEL detail", () => {
   it("shows the CEL expression, the variable table, and expected/actual when they differ", () => {
     renderDetail({
@@ -47,12 +59,26 @@ describe("verificationAdapters: fixture/CEL detail", () => {
       },
     });
 
-    expect(screen.getByText("results.failed == 0")).toBeInTheDocument();
-    const varRow = screen.getByText("failed").closest("tr");
-    expect(varRow?.textContent).toBe("failed3");
-    expect(screen.getByText('["todos/runtime/lifecycle.go"]')).toBeInTheDocument();
-    expect(screen.getByText("expected").parentElement?.textContent).toBe("expected 0");
-    expect(screen.getByText("actual").parentElement?.textContent).toBe("actual 3");
+    expect(expectationRows()).toEqual({
+      expression: "results.failed == 0",
+      failed: "3",
+      changed_files: '["todos/runtime/lifecycle.go"]',
+      expected: "0",
+      actual: "3",
+    });
+  });
+
+  it("renders a structured CEL var (a recorder summary) as a tree, not one JSON line", () => {
+    const http = { entries: 4, statuses: { "500": 1 } };
+    renderDetail({
+      name: "sync pushes todos",
+      failed: true,
+      context: { cel_expression: "http.errors == 0", cel_vars: { http } },
+    });
+
+    expect(screen.queryByText(JSON.stringify(http))).not.toBeInTheDocument();
+    expect(screen.getByText(/entries/)).toBeInTheDocument();
+    expect(screen.getByText(/statuses/)).toBeInTheDocument();
   });
 
   it("prefers detail.cel_trace over the plain expression", () => {
@@ -64,8 +90,7 @@ describe("verificationAdapters: fixture/CEL detail", () => {
       detail: { cel_trace: trace },
     });
 
-    expect(screen.getByText((_, el) => el?.textContent === trace)).toBeInTheDocument();
-    expect(screen.queryByText("results.failed == 0")).not.toBeInTheDocument();
+    expect(expectationRows()).toEqual({ expression: trace });
   });
 
   it("still shows expected/actual when the values are equal — a failing node's evidence must not be hidden", () => {
@@ -75,8 +100,7 @@ describe("verificationAdapters: fixture/CEL detail", () => {
       context: { cel_expression: "x == y", expected: 3, actual: 3 },
     });
 
-    expect(screen.getByText("expected").parentElement?.textContent).toBe("expected 3");
-    expect(screen.getByText("actual").parentElement?.textContent).toBe("actual 3");
+    expect(expectationRows()).toEqual({ expression: "x == y", expected: "3", actual: "3" });
   });
 
   it("reveals a structured expected/actual value when the CEL gate comes only from detail.cel_trace", () => {
@@ -87,8 +111,11 @@ describe("verificationAdapters: fixture/CEL detail", () => {
       detail: { cel_trace: "cel: config.count == 1" },
     });
 
-    expect(screen.getByText("expected").parentElement?.textContent).toBe('expected {"count":1}');
-    expect(screen.getByText("actual").parentElement?.textContent).toBe('actual {"count":2}');
+    expect(expectationRows()).toEqual({
+      expression: "cel: config.count == 1",
+      expected: '{"count":1}',
+      actual: '{"count":2}',
+    });
   });
 
   it("omits the CEL block entirely for a passing node", () => {

@@ -2,7 +2,12 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useResourceClock } from "../../hooks/use-resource-clock";
 import { UiLoader } from "../../icons";
 import { formatDuration } from "../../lib/format";
-import { DataTable, type DataTableColumn, type DataTableFooterContext } from "../DataTable";
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTableFooterContext,
+  type DataTableMenuAction,
+} from "../DataTable";
 import { Icon } from "../Icon";
 import { JsonView } from "../JsonView";
 import type { HAREntry } from "./types";
@@ -23,6 +28,8 @@ export type HarPanelProps = {
   className?: string;
   /** Optional private body store used only when an expanded row needs a preview. */
   bodySource?: HarPanelBodySource;
+  /** Entries for the table's overflow menu, e.g. a `useClickyExport` action. */
+  menuActions?: DataTableMenuAction[];
 };
 
 export type HarPanelBodySource = {
@@ -93,6 +100,7 @@ export function HarPanel({
   emptyLabel = "No HTTP traffic captured",
   className,
   bodySource,
+  menuActions,
 }: HarPanelProps) {
   const filteredEntries = useMemo(() => {
     if (search === undefined || search.trim() === "") return entries;
@@ -122,6 +130,7 @@ export function HarPanel({
           globalFilterPlaceholder="Filter URL, method, or body…"
           defaultSort={{ key: "time", dir: "asc" }}
           emptyMessage={emptyLabel}
+          {...(menuActions ? { menuActions } : {})}
           {...(runningCount > 0
             ? {
                 footer: ({ visibleRowCount, totalRowCount }: DataTableFooterContext) =>

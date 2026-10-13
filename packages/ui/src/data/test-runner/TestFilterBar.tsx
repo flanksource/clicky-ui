@@ -1,9 +1,15 @@
-import { Icon } from "../Icon";
 import { cn } from "../../lib/utils";
-import { UiAdd, UiRemove } from "../../icons";
-import { frameworkIcon } from "./frameworkIcon";
-import { formatCount, STATUS_LABELS, type StatusCounts } from "./status";
-import { cycleFilterState, type FilterMode, type TestFilters } from "./filterState";
+import { Icon } from "../Icon";
+import { UiChevronDown } from "../../icons";
+import { DropdownMenu } from "../../overlay/DropdownMenu";
+import { FilterBarContext } from "../../components/filter-bar-context";
+import { MultiFilterPanel } from "../../components/filter-bar-multi";
+import { summarizeMultiFilter } from "../../components/filter-bar-field-utils";
+import type { MultiSelectOption } from "../../components/MultiSelect";
+import { OutcomeIcon, ToolIcon } from "./MarkIcons";
+import { toolMark } from "./marks";
+import { STATUS_LABELS, type StatusCounts, type TestOutcome } from "./status";
+import type { FilterMode, FilterState, TestFilters } from "./filterState";
 
 export type TestFilterBarProps = {
   filters: TestFilters;
@@ -13,39 +19,66 @@ export type TestFilterBarProps = {
   className?: string;
 };
 
-type StatusDef = { key: keyof StatusCounts; label: string; badge: string };
+// Picks commit straight away: the runner, not a form, owns the filter state.
+const COMMIT_IMMEDIATELY = { autoSubmit: false, compact: false };
 
-const STATUS_BADGES: Record<keyof StatusCounts, string> = {
-  failed: "bg-red-500",
-  warned: "bg-amber-400",
-  timedout: "bg-amber-500",
-  passed: "bg-green-500",
-  skipped: "bg-yellow-400",
-  running: "bg-blue-500",
-  pending: "bg-muted-foreground",
-  total: "bg-muted-foreground",
-};
-
-const STATUS_DEFS: StatusDef[] = STATUS_LABELS.map((d) => ({
-  ...d,
-  badge: STATUS_BADGES[d.key],
-}));
-
-function pillClass(mode: FilterMode | undefined): string {
-  if (mode === "include") return "bg-accent border-border font-medium text-foreground";
-  if (mode === "exclude") return "bg-foreground text-background border-foreground font-medium";
-  return "border-border text-muted-foreground hover:bg-accent";
-}
-
-function StateMarker({ mode }: { mode: FilterMode | undefined }) {
-  if (mode === "include") return <Icon icon={UiAdd} className="text-xs" />;
-  if (mode === "exclude") return <Icon icon={UiRemove} className="text-xs" />;
-  return <span className="h-2 w-2 rounded-full bg-current opacity-30" aria-hidden />;
+function Facet({
+  label,
+  options,
+  state,
+  onChange,
+}: {
+  label: string;
+  options: MultiSelectOption[];
+  state: FilterState<string>;
+  onChange: (next: FilterState<string>) => void;
+}) {
+  const value: Record<string, FilterMode> = Object.fromEntries(state);
+  const active = state.size > 0;
+  return (
+    <DropdownMenu
+      align="right"
+      menuLabel={label}
+      menuClassName="p-2"
+      trigger={
+        <span
+          role="button"
+          tabIndex={0}
+          className={cn(
+            "inline-flex h-6 items-center gap-0.5 rounded px-1.5 text-xs transition-colors",
+            active
+              ? "bg-muted font-medium text-foreground"
+              : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+          )}
+        >
+          {summarizeMultiFilter(label, value)}
+          <Icon icon={UiChevronDown} className="text-[10px] opacity-60" />
+        </span>
+      }
+    >
+      {() => (
+        <FilterBarContext.Provider value={COMMIT_IMMEDIATELY}>
+          <MultiFilterPanel
+            chrome="embedded"
+            filter={{
+              key: label,
+              kind: "multi",
+              label,
+              options,
+              value,
+              onChange: (v) => onChange(new Map(Object.entries(v))),
+            }}
+          />
+        </FilterBarContext.Provider>
+      )}
+    </DropdownMenu>
+  );
 }
 
 /**
- * Tri-state status + framework filter pills. Named TestFilterBar to avoid the
- * pre-existing generic `FilterBar` export in clicky-ui/components.
+ * Status and tool facets as compact, muted menu triggers sized for the tree
+ * toolbar; each opens a tri-state (include / exclude) option list. Named
+ * TestFilterBar to avoid the generic `FilterBar` export in clicky-ui/components.
  */
 export function TestFilterBar({
   filters,
@@ -54,75 +87,36 @@ export function TestFilterBar({
   frameworks,
   className,
 }: TestFilterBarProps) {
-  const hasActive = filters.status.size > 0 || filters.framework.size > 0;
+  const statusOptions: MultiSelectOption[] = STATUS_LABELS.filter((d) => counts[d.key] > 0).map(
+    (d) => ({
+      value: d.key,
+      label: d.label,
+      icon: <OutcomeIcon outcome={d.key as TestOutcome} />,
+      count: counts[d.key],
+    }),
+  );
+  const toolOptions: MultiSelectOption[] = frameworks.map((fw) => ({
+    value: fw,
+    label: toolMark(fw)?.label ?? fw,
+    title: fw,
+    icon: <ToolIcon tool={fw} />,
+  }));
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
-      {STATUS_DEFS.map((sf) => {
-        const count = counts[sf.key];
-        if (count === 0) return null;
-        const mode = filters.status.get(sf.key);
-        return (
-          <button
-            key={sf.key}
-            type="button"
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors",
-              pillClass(mode),
-            )}
-            onClick={() => onChange({ ...filters, status: cycleFilterState(filters.status, sf.key) })}
-            title={`${sf.label}: ${mode ?? "neutral"}`}
-          >
-            <span
-              className={cn(
-                "inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white",
-                sf.badge,
-              )}
-            >
-              {formatCount(count)}
-            </span>
-            <StateMarker mode={mode} />
-            {sf.label}
-          </button>
-        );
-      })}
-
+    <div className={cn("flex items-center gap-0.5", className)}>
+      <Facet
+        label="Status"
+        options={statusOptions}
+        state={filters.status}
+        onChange={(status) => onChange({ ...filters, status })}
+      />
       {frameworks.length > 1 && (
-        <>
-          <span className="mx-0.5 text-border">|</span>
-          {frameworks.map((fw) => {
-            const icon = frameworkIcon(fw);
-            const mode = filters.framework.get(fw);
-            return (
-              <button
-                key={fw}
-                type="button"
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors",
-                  pillClass(mode),
-                )}
-                onClick={() =>
-                  onChange({ ...filters, framework: cycleFilterState(filters.framework, fw) })
-                }
-                title={`${fw}: ${mode ?? "neutral"}`}
-              >
-                <StateMarker mode={mode} />
-                {icon && <Icon icon={icon} className="text-sm" />}
-                {fw}
-              </button>
-            );
-          })}
-        </>
-      )}
-
-      {hasActive && (
-        <button
-          type="button"
-          className="ml-1 text-xs text-muted-foreground hover:text-foreground"
-          onClick={() => onChange({ status: new Map(), framework: new Map() })}
-        >
-          Clear
-        </button>
+        <Facet
+          label="Tool"
+          options={toolOptions}
+          state={filters.framework}
+          onChange={(framework) => onChange({ ...filters, framework })}
+        />
       )}
     </div>
   );

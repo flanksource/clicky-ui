@@ -45,6 +45,7 @@ describe("ErrorDetails", () => {
     expect(writeText).toHaveBeenCalledWith(
       [
         `Error: ${diagnostics.message}`,
+        `Page: ${window.location.origin}${window.location.pathname}`,
         `Trace: ${diagnostics.trace}`,
         `Time: ${diagnostics.time}`,
         "",
@@ -90,6 +91,25 @@ describe("ErrorDetails", () => {
     expect(report.startsWith("Failed to load /api/v1/profile/profile-om-malawi-scheme: ")).toBe(
       true,
     );
+  });
+
+  it("renders summary actions whose clicks leave the details closed", () => {
+    const onRetry = vi.fn();
+    render(
+      <ErrorDetails
+        diagnostics={diagnostics}
+        actions={
+          <button type="button" onClick={onRetry}>
+            Retry
+          </button>
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(onRetry).toHaveBeenCalledOnce();
+    expect(screen.getByText(diagnostics.message).closest("details")).not.toHaveAttribute("open");
   });
 
   it("surfaces clipboard failures without expanding the details", async () => {

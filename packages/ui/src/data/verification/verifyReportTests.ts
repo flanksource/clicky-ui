@@ -94,7 +94,7 @@ function checklistItemTest(item: VerifyChecklistItem, index: number): Test {
  * `testStatus` checks `pending` before `failed`, so a container explicitly
  * flagged both `failed` and `pending` (one item failed, another is still
  * unjudged) would render as queued instead of failed. Leaving the container
- * status-less lets the shared roll-up (`statusIconFor`/`statusToneFor`: failed
+ * status-less lets the shared roll-up (`outcomeFor`/`statusToneFor`: failed
  * → warned → running → pending → passed, via `sum()` over the children) decide
  * instead.
  */

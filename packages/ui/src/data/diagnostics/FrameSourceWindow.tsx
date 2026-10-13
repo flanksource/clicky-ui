@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { cn } from "../../lib/utils";
 import { highlightToLines, type HighlightedLine } from "../code-highlight";
 import { HighlightedTokens } from "../HighlightedTokens";
 import type { FrameSource } from "./FrameSourceWindow.utils";
@@ -65,12 +66,10 @@ export function FrameSourceWindow({
 
   return (
     <div
-      className={[
+      className={cn(
         "mx-3 mb-2 ml-12 overflow-x-auto rounded border border-border/60 bg-muted/30 py-1 font-mono text-[11px] leading-relaxed",
         className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
+      )}
     >
       {lines.map((source, i) => {
         const lineNumber = numbers?.[i] ?? start + i;

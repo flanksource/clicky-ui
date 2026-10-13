@@ -47,7 +47,7 @@ describe("TestNodeAdapterRegistry.resolveFrameworkIcon", () => {
     expect(reg.resolveFrameworkIcon(node("x"), runner)?.id).toBe("logo");
   });
 
-  it("returns null when no adapter overrides it (built-in frameworkIcon wins)", () => {
+  it("returns null when no adapter overrides it (the built-in tool mark wins)", () => {
     const reg = createTestRunnerRegistry([adapter("a", { renderDetail: () => "d" })]);
     expect(reg.resolveFrameworkIcon(node("x"), runner)).toBeNull();
   });
@@ -70,6 +70,54 @@ describe("TestNodeAdapterRegistry.resolveTabs", () => {
     const tabs = reg.resolveTabs(node("x"), runner);
     expect(tabs).toHaveLength(1);
     expect(tabs[0].label).toBe("First");
+  });
+});
+
+describe("TestNodeAdapterRegistry.resolveCopy", () => {
+  it("merges copy sections across every matching adapter in registration order, first wins per title/label", () => {
+    const reg = createTestRunnerRegistry([
+      adapter("skip", {
+        match: (n) => n.name === "other",
+        copy: () => ({ brief: [{ title: "Skipped", body: "never" }] }),
+      }),
+      adapter("command", {
+        copy: () => ({
+          brief: [{ title: "Command", lang: "sh", body: "$ todos --help" }],
+          items: [{ label: "Copy command", value: "todos --help" }],
+        }),
+      }),
+      adapter("no-copy", { renderDetail: () => "d" }),
+      adapter("recording", {
+        copy: () => ({
+          facts: [{ label: "Recording", value: "http" }],
+          brief: [
+            { title: "Command", body: "$ shadowed" },
+            { title: "Recording", body: "kind: http" },
+          ],
+          items: [
+            { label: "Copy command", value: "shadowed" },
+            { label: "Copy recording path", reason: "stored in a recordstore stream" },
+          ],
+        }),
+      }),
+    ]);
+
+    expect(reg.resolveCopy(node("x"), runner)).toEqual({
+      facts: [{ label: "Recording", value: "http" }],
+      brief: [
+        { title: "Command", lang: "sh", body: "$ todos --help" },
+        { title: "Recording", body: "kind: http" },
+      ],
+      items: [
+        { label: "Copy command", value: "todos --help" },
+        { label: "Copy recording path", reason: "stored in a recordstore stream" },
+      ],
+    });
+  });
+
+  it("returns empty facts, brief and items when no adapter contributes copy", () => {
+    const reg = createTestRunnerRegistry([adapter("a", { renderDetail: () => "d" })]);
+    expect(reg.resolveCopy(node("x"), runner)).toEqual({ facts: [], brief: [], items: [] });
   });
 });
 

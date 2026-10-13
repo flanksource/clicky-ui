@@ -109,6 +109,14 @@ describe("VerificationResults", () => {
   });
 
   describe("filter bar survives filtering out the only match", () => {
+    // Opens the Status facet unless it's already open (the menu stays open
+    // between picks, so a second pick cycles the row include → exclude).
+    function failedOption() {
+      if (!screen.queryByRole("menu", { name: "Status" }))
+        fireEvent.click(screen.getByRole("button", { name: /^Status/ }));
+      return within(screen.getByRole("menu", { name: "Status" })).getByText("Failed");
+    }
+
     it("keeps the filter bar and the unfiltered summary total after excluding the only failed node", () => {
       render(
         <VerificationResults
@@ -122,12 +130,12 @@ describe("VerificationResults", () => {
       );
 
       expect(screen.getByText("2 tests")).toBeInTheDocument();
-      fireEvent.click(screen.getByTitle(/Failed/));
+      fireEvent.click(failedOption());
       // Filtering to only "Failed" hides the passing node from the tree...
       expect(within(tree()).queryByText("lint the repo")).not.toBeInTheDocument();
-      // ...but the filter bar (with its Failed pill) and the total count must
+      // ...but the filter bar (its Status facet) and the total count must
       // still be driven by the full report, not the now-filtered tree.
-      expect(screen.getByTitle(/Failed/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^Status/ })).toBeInTheDocument();
       expect(screen.getByText("2 tests")).toBeInTheDocument();
     });
 
@@ -138,15 +146,14 @@ describe("VerificationResults", () => {
         <VerificationResults report={report({ tests: [{ name: "assert no regressions", failed: true }] })} />,
       );
 
-      const failedPill = () => screen.getByTitle(/Failed/);
-      fireEvent.click(failedPill());
-      fireEvent.click(failedPill());
-      // Excluding the only node legitimately empties the tree itself (Tree
-      // renders its empty state, dropping the `tree` role) — the regression is
-      // whether the *header* (pill + summary) disappears along with it.
+      fireEvent.click(failedOption());
+      fireEvent.click(failedOption());
+      // Excluding the only node legitimately empties the tree; the regression
+      // is whether the Status facet (in the tree toolbar) and the summary
+      // disappear along with it, leaving no way to undo the filter.
       expect(screen.queryByText("assert no regressions")).not.toBeInTheDocument();
-      expect(screen.getByTitle(/Failed/)).toBeInTheDocument();
-      expect(screen.getByText("1 tests")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^Status/ })).toBeInTheDocument();
+      expect(screen.getByText("1 test")).toBeInTheDocument();
     });
   });
 

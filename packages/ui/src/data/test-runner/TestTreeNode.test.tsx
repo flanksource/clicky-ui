@@ -30,6 +30,16 @@ function renderRow(node: Test) {
   );
 }
 
+describe("TestTreeNode count badges", () => {
+  // A subtree of warnings only (a lint rule, a soft-failing suite) still has a
+  // size worth showing; without a warned badge its row carried no count at all.
+  it("shows a warned count on a container whose leaves are all warned", () => {
+    const warnedLeaves = Array.from({ length: 3 }, (_, i) => ({ name: `w${i}`, warned: true }));
+    renderRow({ name: "rule", children: warnedLeaves } as Test);
+    expect(screen.getByText("3")).toBeTruthy();
+  });
+});
+
 describe("TestTreeNode message line", () => {
   it("renders a failed node's message under its name with the full text as the title", () => {
     renderRow({ name: "trace", failed: true, message: ROOT_CAUSE } as Test);

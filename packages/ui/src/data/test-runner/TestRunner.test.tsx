@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { TestRunner } from "./TestRunner";
 import { createTestRunnerRegistry } from "./adapter";
@@ -113,10 +113,20 @@ describe("TestRunner", () => {
 
   it("filters the tree to only failing branches when Failed is included", () => {
     render(<Harness />);
-    // The status pill shows the count + label; clicking includes it.
-    fireEvent.click(screen.getByTitle(/Failed/));
+    // The facets live in the tree toolbar, beside expand/collapse.
+    fireEvent.click(within(tree()).getByRole("button", { name: /^Status/ }));
+    fireEvent.click(within(screen.getByRole("menu", { name: "Status" })).getByText("Failed"));
     expect(within(tree()).queryByText(/issues a refund/)).not.toBeInTheDocument();
     expect(within(tree()).getByText(/rejects bad password/)).toBeInTheDocument();
+  });
+
+  it("narrows even a small forest to the tests whose name matches the text filter", () => {
+    render(<Harness />);
+    fireEvent.change(within(tree()).getByRole("searchbox", { name: "Filter tests" }), {
+      target: { value: "refund" },
+    });
+    expect(within(tree()).getByText(/issues a refund/)).toBeInTheDocument();
+    expect(within(tree()).queryByText(/rejects bad password/)).not.toBeInTheDocument();
   });
 
   it("renders structured detail keys and expands nested row values", () => {
@@ -173,11 +183,11 @@ describe("TestRunner", () => {
 
   it("renders no header bar at all when hideHeader is set", () => {
     render(<Harness hideHeader />);
-    // No title, no summary, no filter pills — a host renders its own combined
+    // No title, no summary, no filter facets — a host renders its own combined
     // header instead (e.g. a dialog embedding TestRunSummary + filters itself).
     expect(screen.queryByText("Test Results")).not.toBeInTheDocument();
     expect(screen.queryByText(/\d+ tests/)).not.toBeInTheDocument();
-    expect(screen.queryByTitle(/Failed/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Status/ })).not.toBeInTheDocument();
     // The tree/detail split still renders underneath.
     expect(tree()).toBeInTheDocument();
   });
@@ -185,6 +195,30 @@ describe("TestRunner", () => {
   it("renders the header bar by default when hideHeader is omitted", () => {
     render(<Harness />);
     expect(screen.getByText("Test Results")).toBeInTheDocument();
+  });
+
+  describe("in a container narrower than the split needs", () => {
+    const PHONE_WIDTH = 390;
+    afterEach(() => vi.restoreAllMocks());
+
+    it("shows the tree alone, then the selected test's detail with a way back", () => {
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+        width: PHONE_WIDTH,
+      } as DOMRect);
+      render(<Harness />);
+      expect(screen.queryByText("Select a test to view its details.")).toBeNull();
+
+      fireEvent.click(within(tree()).getByText(/rejects bad password/));
+      expect(screen.queryByRole("tree")).toBeNull();
+      expect(screen.getByText("status 401 Unauthorized").textContent).toBe(
+        "status 401 Unauthorized",
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Back to results" }));
+      expect(within(tree()).getByText(/rejects bad password/).textContent).toMatch(
+        /rejects bad password/,
+      );
+    });
   });
 
   it("renders the host-controlled tab and reports clicks via onTabChange", () => {

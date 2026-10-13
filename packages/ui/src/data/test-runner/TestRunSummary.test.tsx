@@ -14,6 +14,25 @@ describe("TestRunSummary", () => {
     expect(screen.getByText(/^\d+%$/)).toBeInTheDocument();
   });
 
+  it("counts warned tests, so the chips add up to the total", () => {
+    const WARNED = 2;
+    const tests = [
+      { name: "a", passed: true },
+      ...Array.from({ length: WARNED }, (_, i) => ({ name: `w${i}`, warned: true })),
+    ];
+    render(<TestRunSummary tests={tests} done now={0} startTime={0} endTime={1000} />);
+    expect(screen.getByLabelText(`${WARNED} warned`)).toHaveTextContent(String(WARNED));
+  });
+
+  it("says 1 test, not 1 tests, in both layouts", () => {
+    const one = [{ name: "only", passed: true }];
+    const { unmount } = render(<TestRunSummary tests={one} done now={0} />);
+    expect(screen.getByText("1 test")).toBeInTheDocument();
+    unmount();
+    render(<TestRunSummary tests={one} done now={0} compact />);
+    expect(screen.getByText("1 test")).toBeInTheDocument();
+  });
+
   it("renders the same total in the default two-line layout", () => {
     render(<TestRunSummary tests={completedTests} done now={0} startTime={0} endTime={1000} />);
     expect(screen.getByText(/\d+ tests/)).toBeInTheDocument();

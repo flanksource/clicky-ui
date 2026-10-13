@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Tree } from "../Tree";
 import { cn } from "../../lib/utils";
 import type { Test } from "./types";
@@ -25,9 +26,10 @@ const nodeKey = (() => {
 /**
  * The left pane: the test forest rendered through the clicky `Tree`. Selection,
  * handlers and adapters all come from the runner context; failing branches and
- * the top level open by default.
+ * the top level open by default. A name filter is always shown, and `actions`
+ * sit in the tree toolbar beside it and Expand all / Collapse all.
  */
-export function TestTree({ className }: { className?: string }) {
+export function TestTree({ className, actions }: { className?: string; actions?: ReactNode }) {
   const runner = useTestRunner();
   return (
     <Tree<Test>
@@ -40,8 +42,11 @@ export function TestTree({ className }: { className?: string }) {
       expandAll={runner.expandAll}
       onExpandAllChange={runner.onExpandAllChange}
       defaultOpen={(node, depth) => depth < 1 || hasFailed(node)}
+      showSearch
+      searchLabel="Filter tests"
       getSearchText={(node) => `${node.name} ${node.framework ?? ""}`}
       renderRow={({ node, selected }) => <TestTreeNode node={node} selected={selected} />}
+      actions={actions}
     />
   );
 }

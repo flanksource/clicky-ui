@@ -10,7 +10,7 @@ import {
   hasPending,
   humanizeName,
   STATUS_LABELS,
-  statusIconFor,
+  outcomeFor,
   statusToneFor,
   sum,
   sumNonTaskTests,
@@ -19,7 +19,6 @@ import {
 } from "./status";
 import type { Test } from "./types";
 import { decodeFilterState } from "./filterState";
-import { UiError, UiHourglass, UiLoader, UiPass } from "../../icons";
 
 const leaf = (name: string, flag: Partial<Test>): Test => ({ name, ...flag });
 
@@ -113,19 +112,15 @@ describe("testStatus", () => {
   });
 });
 
-describe("statusIconFor / statusToneFor", () => {
-  it("map leaf verdicts to clicky icons and semantic tones", () => {
-    expect(statusIconFor(leaf("x", { passed: true }))).toBe(UiPass);
-    expect(statusIconFor(leaf("x", { failed: true }))).toBe(UiError);
-    expect(statusIconFor(leaf("x", { running: true }))).toBe(UiLoader);
-    expect(statusIconFor(leaf("x", { timed_out: true }))).toBe(UiHourglass);
+describe("statusToneFor / outcomeFor", () => {
+  it("map leaf verdicts to semantic tones", () => {
     expect(statusToneFor(leaf("x", { passed: true }))).toBe("success");
     expect(statusToneFor(leaf("x", { failed: true }))).toBe("danger");
   });
 
   it("rolls a container with a failing descendant up to danger", () => {
     expect(statusToneFor(suite[0])).toBe("danger");
-    expect(statusIconFor(suite[0])).toBe(UiError);
+    expect(outcomeFor(suite[0])).toBe("failed");
   });
 });
 

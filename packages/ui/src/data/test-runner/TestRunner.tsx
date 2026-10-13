@@ -2,7 +2,8 @@ import { useMemo, type ReactNode } from "react";
 import { Icon } from "../Icon";
 import { SplitPane } from "../../layout/SplitPane";
 import { cn } from "../../lib/utils";
-import { UiBeaker } from "../../icons";
+import { UiArrowLeft, UiBeaker } from "../../icons";
+import { useContainerWiderThan } from "../../hooks/use-container-width";
 import type { RunMeta, SnapshotStatus, Test } from "./types";
 import { aggregateStatusCounts, collectFrameworks } from "./status";
 import { type TestFilters } from "./filterState";
@@ -64,10 +65,11 @@ export type TestRunnerProps = {
    * header) to avoid duplicating it.
    */
   showSummary?: boolean;
-  /** Extra header content (e.g. export/download controls owned by the host). */
+  /** Run actions at the right end of the one-line header (e.g. re-run, export, copy). */
   headerSlot?: ReactNode;
   /**
-   * Suppresses the entire built-in header bar (title, summary, filter row).
+   * Suppresses the built-in header bar (title, summary) and the status/tool
+   * facets in the tree toolbar.
    * Defaults to false; pass true when a host renders its own combined header
    * (e.g. a dialog header that already embeds `TestRunSummary` and filters) so
    * the runner doesn't render a second bordered bar underneath it.
@@ -86,6 +88,8 @@ function toRegistry(
   if (adapters instanceof TestNodeAdapterRegistry) return adapters;
   return createTestRunnerRegistry(adapters ?? []);
 }
+
+const SPLIT_MIN_WIDTH = 640;
 
 /**
  * Top-level, pure-presentational test runner: a summary/filter header over a
@@ -168,61 +172,90 @@ export function TestRunner({
   const summaryTests = allTests ?? tests;
   const frameworks = useMemo(() => collectFrameworks(summaryTests), [summaryTests]);
   const filterCounts = useMemo(() => aggregateStatusCounts(summaryTests), [summaryTests]);
-  const hasContent = summaryTests.length > 0;
+  // A host that hides the header renders its own filters (see hideHeader).
+  const filterBar =
+    !hideHeader && summaryTests.length > 0 ? (
+      <TestFilterBar
+        filters={filters}
+        onChange={onFiltersChange}
+        counts={filterCounts}
+        frameworks={frameworks}
+      />
+    ) : null;
+  // Below this the split leaves both panes too narrow to read, so the runner
+  // goes master/detail: the tree, then the selected test with a way back.
+  const { ref, wider: roomy } = useContainerWiderThan(SPLIT_MIN_WIDTH);
 
   return (
     <TestRunnerProvider value={ctx}>
-      <div className={cn("flex h-full min-h-0 flex-col bg-background", className)}>
+      <div ref={ref} className={cn("flex h-full min-h-0 flex-col bg-background", className)}>
         {!hideHeader && (
-          <div className="border-b border-border bg-card px-density-4 py-density-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                {title === undefined ? (
-                  <h1 className="inline-flex items-center gap-1.5 text-lg font-bold">
-                    <Icon icon={UiBeaker} className="text-primary" />
-                    Test Results
-                  </h1>
-                ) : (
-                  title
-                )}
-                {statusText && <span className="text-sm text-muted-foreground">{statusText}</span>}
-              </div>
-              <div className="flex items-center gap-3">
-                {headerSlot}
-                {showSummary && (
-                  <TestRunSummary
-                    tests={summaryTests}
-                    startTime={startTime}
-                    endTime={endTime}
-                    done={done}
-                    now={now}
-                    runMeta={runMeta}
-                  />
-                )}
-              </div>
+          <div
+            className="flex min-w-0 items-center gap-3 border-b border-border bg-card px-density-4 py-density-2"
+            data-runner-header=""
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              {title === undefined ? (
+                <h1 className="inline-flex shrink-0 items-center gap-1.5 text-base font-bold">
+                  <Icon icon={UiBeaker} className="text-primary" />
+                  Test Results
+                </h1>
+              ) : (
+                title
+              )}
+              {statusText && (
+                <span className="truncate text-sm text-muted-foreground">{statusText}</span>
+              )}
             </div>
-            {hasContent && (
-              <div className="mt-2">
-                <TestFilterBar
-                  filters={filters}
-                  onChange={onFiltersChange}
-                  counts={filterCounts}
-                  frameworks={frameworks}
-                />
+            {showSummary && (
+              <TestRunSummary
+                tests={summaryTests}
+                startTime={startTime}
+                endTime={endTime}
+                done={done}
+                now={now}
+                runMeta={runMeta}
+                compact
+                className="ml-auto flex-nowrap"
+              />
+            )}
+            {headerSlot && (
+              <div className={cn("flex shrink-0 items-center gap-1", !showSummary && "ml-auto")}>
+                {headerSlot}
               </div>
             )}
           </div>
         )}
 
-        <SplitPane
-          className="min-h-0 flex-1"
-          defaultSplit={defaultSplit}
-          minLeft={25}
-          minRight={30}
-          leftClass="border-r-2 border-border bg-muted/30"
-          left={<TestTree />}
-          right={<TestDetailPanel />}
-        />
+        {roomy ? (
+          <SplitPane
+            className="min-h-0 flex-1"
+            defaultSplit={defaultSplit}
+            minLeft={25}
+            minRight={30}
+            leftClass="border-r-2 border-border bg-muted/30"
+            left={<TestTree actions={filterBar} />}
+            right={<TestDetailPanel />}
+          />
+        ) : selected ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <button
+              type="button"
+              onClick={() => onSelect(null)}
+              className="inline-flex items-center gap-1.5 border-b border-border px-density-3 py-density-2 text-left text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Icon icon={UiArrowLeft} />
+              Back to results
+            </button>
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <TestDetailPanel />
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <TestTree actions={filterBar} />
+          </div>
+        )}
       </div>
     </TestRunnerProvider>
   );
