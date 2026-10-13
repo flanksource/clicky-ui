@@ -1,8 +1,10 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import * as matchers from "@testing-library/jest-dom/matchers";
 import { describe, expect, it, vi } from "vitest";
 import { OperationSchedules } from "./OperationSchedules";
 import type { OperationSchedule } from "./operation-schedule-types";
 import type { ResolvedOperation } from "./types";
+expect.extend(matchers);
 
 const operations: ResolvedOperation[] = [
   {
@@ -55,6 +57,7 @@ const operations: ResolvedOperation[] = [
 
 const schedule: OperationSchedule = {
   id: "schedule-1",
+  targets: ["dev", "qa"],
   name: "Weekly cleanup",
   operationId: "truncateCycles",
   args: { batchSize: 500 },
@@ -71,10 +74,24 @@ function handlers() {
     onDelete: vi.fn(async () => undefined),
     onRunSaved: vi.fn(async () => undefined),
     onRunDraft: vi.fn(async () => undefined),
+    targetOptions: [{ value: "dev", label: "Development" }, { value: "qa", label: "QA" }],
+    defaultTargets: ["dev", "qa"],
   };
 }
 
 describe("OperationSchedules", () => {
+  it("requires a target when creating a schedule without environment defaults", async () => {
+    const callbacks = { ...handlers(), defaultTargets: [] };
+    render(<OperationSchedules operations={operations} schedules={[]} {...callbacks} />);
+    fireEvent.click(screen.getByRole("button", { name: "Add schedule" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Operation" }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: /Truncate cycle history/ }));
+    expect(screen.getByRole("button", { name: "Save schedule" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Run now" })).toBeDisabled();
+    expect(callbacks.onCreate).not.toHaveBeenCalled();
+    expect(callbacks.onRunDraft).not.toHaveBeenCalled();
+  });
+
   it("lists saved schedules and runs one after confirmation", async () => {
     const callbacks = handlers();
     render(
@@ -110,7 +127,7 @@ describe("OperationSchedules", () => {
       <OperationSchedules
         operations={operations}
         schedules={[]}
-        cli={{ executable: "oipa-cli", globalFlags: { context: "dev" } }}
+        cli={{ executable: "oipa-cli", targetFlag: "context" }}
         {...callbacks}
       />,
     );
@@ -142,7 +159,7 @@ describe("OperationSchedules", () => {
       target: { value: "750" },
     });
     expect(
-      screen.getByText("oipa-cli --context=dev cycle truncate --batchSize=750"),
+      screen.getByText("oipa-cli --context=dev cycle truncate --batchSize=750 oipa-cli --context=qa cycle truncate --batchSize=750"),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Copy CLI command" }),
@@ -160,6 +177,7 @@ describe("OperationSchedules", () => {
       expect(callbacks.onCreate).toHaveBeenCalledWith({
         name: "Sunday cleanup",
         operationId: "truncateCycles",
+        targets: ["dev", "qa"],
         args: { batchSize: 750 },
         cron: "0 2 * * 0",
         timezone: expect.any(String),

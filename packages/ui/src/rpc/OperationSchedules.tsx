@@ -24,6 +24,9 @@ export function OperationSchedules(_props: OperationSchedulesProps) {
     onRunSaved,
     onRunDraft,
     cli,
+    targetOptions,
+    defaultTargets,
+    targetLabel,
   } = _props;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<OperationSchedule>();
@@ -101,6 +104,7 @@ export function OperationSchedules(_props: OperationSchedulesProps) {
               >
                 <div className="min-w-0">
                   <div className="truncate font-semibold">{schedule.name}</div>
+                  <div className="text-xs text-muted-foreground">{schedule.targets.join(", ")}</div>
                   <div className="truncate text-xs text-muted-foreground">
                     {operationLabel(operation)}
                   </div>
@@ -159,6 +163,9 @@ export function OperationSchedules(_props: OperationSchedulesProps) {
       <OperationScheduleDialog
         open={dialogOpen}
         operations={operations}
+        targetOptions={targetOptions}
+        {...(defaultTargets ? { defaultTargets } : {})}
+        {...(targetLabel ? { targetLabel } : {})}
         {...(editing ? { schedule: editing } : {})}
         onClose={() => setDialogOpen(false)}
         onSave={(input) =>
@@ -193,6 +200,7 @@ export function OperationSchedules(_props: OperationSchedulesProps) {
       >
         <p className="text-sm text-muted-foreground">
           The recurring schedule is unchanged.
+          {confirmRun ? ` Targets: ${confirmRun.targets.join(", ")}.` : ""}
         </p>
       </Modal>
       <Modal

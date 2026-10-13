@@ -75,6 +75,7 @@ const operations: ResolvedOperation[] = [
 const initialSchedules: OperationSchedule[] = [
   {
     id: "weekly-cleanup",
+    targets: ["dev", "qa"],
     name: "Weekly cycle cleanup",
     operationId: "truncateCycles",
     args: { batchSize: 500 },
@@ -86,6 +87,7 @@ const initialSchedules: OperationSchedule[] = [
   },
   {
     id: "monthly-indexes",
+    targets: ["qa"],
     name: "Monthly index rebuild",
     operationId: "rebuildIndexes",
     args: {},
@@ -120,6 +122,8 @@ function SchedulesStory() {
       <OperationSchedules
         operations={operations}
         schedules={schedules}
+        targetOptions={[{ value: "dev", label: "Development" }, { value: "qa", label: "QA" }]}
+        defaultTargets={["dev"]}
         onCreate={create}
         onUpdate={update}
         onDelete={remove}
