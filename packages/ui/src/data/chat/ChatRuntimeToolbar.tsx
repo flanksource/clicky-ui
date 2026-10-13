@@ -40,20 +40,22 @@ export function ChatRuntimeToolbar({
   const ModelGlyph = providerIcon(usage?.provider);
 
   return (
-    <div className="flex flex-1 items-center gap-2">
+    <div className="flex min-w-0 flex-1 items-center gap-2">
       {showRuntimeBar && (
-        <RuntimeBar
-          value={runtime}
-          onChange={onRuntimeChange}
-          models={models}
-          reasoningEfforts={reasoningEfforts}
-          locked={locked}
-          {...(runtimeFamilies ? { families: runtimeFamilies } : {})}
-        />
+        <div className="min-w-0 flex-1">
+          <RuntimeBar
+            value={runtime}
+            onChange={onRuntimeChange}
+            models={models}
+            reasoningEfforts={reasoningEfforts}
+            locked={locked}
+            {...(runtimeFamilies ? { families: runtimeFamilies } : {})}
+          />
+        </div>
       )}
       {showContextMeter && (
         <>
-          <div className="flex-1" />
+          {!showRuntimeBar && <div className="flex-1" />}
           <ContextMeter
             mode="gauge"
             usedPercent={

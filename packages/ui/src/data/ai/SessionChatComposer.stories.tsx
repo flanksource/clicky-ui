@@ -64,6 +64,14 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const DisabledWithReason: Story = {
+  args: { disabledReason: "Loading session…" },
+  play: async ({ canvasElement }) => {
+    const textbox = within(canvasElement).getByPlaceholderText("Loading session…");
+    await expect(textbox).toBeDisabled();
+  },
+};
+
 export const WithPermissionModePicker: Story = {
   render: () => <InteractivePickerStory />,
   play: async ({ canvasElement }) => {

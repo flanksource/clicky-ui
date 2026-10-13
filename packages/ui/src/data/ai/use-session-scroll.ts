@@ -55,6 +55,13 @@ export interface SessionScrollOptions {
   bottomThreshold?: number;
   /** Distance (px) from the top at which older rows start loading. */
   topThreshold?: number;
+  /** Identity of the first item. When it changes under the same resetKey while
+   *  `total` grows, older items were prepended (a fetched page of history): the
+   *  window grows to include them and the reader's position is kept. */
+  firstKey?: string;
+  /** Called as the reader scrolls up near the top with every local item
+   *  already rendered — the cue to fetch older history. */
+  onReachStart?: () => void;
 }
 
 export interface SessionScrollState {
@@ -78,10 +85,25 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
   const anchorHeightRef = useRef<number | null>(null);
   const scrollBottomPendingRef = useRef(true);
   const loadingOlderRef = useRef(false);
-  const previousTotalRef = useRef({ resetKey, total });
+  const firstKey = options.firstKey;
+  const previousTotalRef = useRef({ resetKey, total, firstKey });
+  const lastScrollHeightRef = useRef<number | null>(null);
+  const prependedRef = useRef(false);
+  const onReachStartRef = useRef(options.onReachStart);
+  onReachStartRef.current = options.onReachStart;
 
   const [visibleCount, setVisibleCount] = useState(windowSize);
   const [following, setFollowing] = useState(true);
+  // A prepend grows the window during render, so the commit that mounts the
+  // older rows is the one whose layout effect restores the reader's position.
+  const [tracked, setTracked] = useState({ resetKey, total, firstKey });
+  if (tracked.resetKey !== resetKey || tracked.total !== total || tracked.firstKey !== firstKey) {
+    if (enabled && tracked.resetKey === resetKey && tracked.firstKey !== firstKey && total > tracked.total) {
+      prependedRef.current = true;
+      setVisibleCount((count) => count + total - tracked.total);
+    }
+    setTracked({ resetKey, total, firstKey });
+  }
   const effectiveCount = enabled ? visibleCount : total;
   const startIndex = Math.max(0, total - effectiveCount);
   const hasMore = enabled && startIndex > 0;
@@ -127,11 +149,17 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
 
   useLayoutEffect(() => {
     const previous = previousTotalRef.current;
-    previousTotalRef.current = { resetKey, total };
-    if (enabled && previous.resetKey === resetKey && !followingRef.current && total > previous.total) {
+    previousTotalRef.current = { resetKey, total, firstKey };
+    if (
+      enabled &&
+      previous.resetKey === resetKey &&
+      previous.firstKey === firstKey &&
+      !followingRef.current &&
+      total > previous.total
+    ) {
       setVisibleCount((count) => count + total - previous.total);
     }
-  }, [enabled, resetKey, total]);
+  }, [enabled, resetKey, total, firstKey]);
 
   // After each commit, either snap to bottom (pending pin) or preserve the reader's
   // position when older rows were prepended (anchor), then release the load latch.
@@ -142,6 +170,9 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
       scrollBottomPendingRef.current = false;
       anchorHeightRef.current = null;
       scrollToBottom();
+    } else if (prependedRef.current && lastScrollHeightRef.current != null) {
+      el.scrollTop += el.scrollHeight - lastScrollHeightRef.current;
+      lastScrollTopRef.current = el.scrollTop;
     } else if (anchorHeightRef.current != null) {
       el.scrollTop += el.scrollHeight - anchorHeightRef.current;
       anchorHeightRef.current = null;
@@ -149,6 +180,8 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
     } else if (followingRef.current) {
       scrollToBottom();
     }
+    prependedRef.current = false;
+    lastScrollHeightRef.current = el.scrollHeight;
     loadingOlderRef.current = false;
   }, [enabled, visibleCount, total, scrollToBottom]);
 
@@ -163,13 +196,19 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
         setFollowing(false);
       }
       lastScrollTopRef.current = el.scrollTop;
-      if (hasMoreRef.current && movedUp && isNearTop(el.scrollTop, topThreshold)) growOlderRef.current();
+      lastScrollHeightRef.current = el.scrollHeight;
+      if (movedUp && isNearTop(el.scrollTop, topThreshold)) loadOlder();
     };
     const onWheel = (event: WheelEvent) => {
       if (event.deltaY >= 0) return;
       followingRef.current = false;
       setFollowing(false);
-      if (hasMoreRef.current && isNearTop(el.scrollTop, topThreshold)) growOlderRef.current();
+      if (isNearTop(el.scrollTop, topThreshold)) loadOlder();
+    };
+    // Rendered rows first; once every local row is mounted, ask for history.
+    const loadOlder = () => {
+      if (hasMoreRef.current) growOlderRef.current();
+      else onReachStartRef.current?.();
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     el.addEventListener("wheel", onWheel, { passive: true });

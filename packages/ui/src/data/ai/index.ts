@@ -16,6 +16,7 @@ export {
 export {
   ChatWindow,
   ChatWindowLayer,
+  CHAT_WINDOW_MOBILE_QUERY,
   type ChatWindowProps,
   type ChatContextPickerRenderProps,
 } from "./ChatWindow";
@@ -428,6 +429,7 @@ export type {
   SandboxPlatformPolicy,
   StdinWrite,
 } from "./approval-request";
+export { SessionTail, type SessionTailProps } from "./SessionTail";
 export {
   SessionInspector,
   type SessionInspectorOptions,
@@ -439,13 +441,16 @@ export {
   isTerminalSessionLifecycle,
   mergeSessionMessages,
   openRemoteSession,
-  sessionFollowUrl,
+  sessionUrl,
+  DEFAULT_SESSION_PAGE_SIZE,
   TERMINAL_SESSION_LIFECYCLES,
   useRemoteSession,
   type RemoteSessionHandle,
   type RemoteSessionOptions,
   type RemoteSessionState,
+  type RemoteSessionView,
   type SessionFollowState,
+  type SessionInspectorLoadState,
 } from "./SessionInspector.remote";
 export { isSessionInspectorTab } from "./SessionInspector.tabs.model";
 export { SessionApprovalsPanel } from "./SessionInspector.approvals";
@@ -525,6 +530,7 @@ export {
   type SessionMetadataEvent,
   type SessionPlan,
   type SessionPlanEvent,
+  type SessionTranscriptWindow,
   type SessionTurn,
   type SessionUsage,
   type UnifiedSessionInput,

@@ -53,6 +53,9 @@ export interface SessionUIMessage {
   turnId?: string;
   provenance?: SessionProvenance;
   raw?: unknown;
+  /** Synthesised from a prompt run before its transcript exists; the
+   *  transcript's own messages replace it under different ids. */
+  placeholder?: boolean;
 }
 
 export interface SessionApproval {
@@ -222,8 +225,17 @@ export interface SessionLiveProcess {
   command?: string;
 }
 
+/** captain `session.TranscriptWindow`: the full transcript behind a windowed read. */
+export interface SessionTranscriptWindow {
+  messages: number;
+  events: number;
+  toolCalls: number;
+}
+
 export interface UnifiedSessionInput {
   id?: string;
+  detailAvailable?: boolean;
+  detailSource?: Record<string, string>;
   /** Monotonic aggregate revision; a follow stream's `state` frame carrying a
    *  higher one means aggregate facets (plan, approvals, …) changed. */
   revision?: number;
@@ -253,6 +265,9 @@ export interface UnifiedSessionInput {
   cost?: SessionCost;
   toolCosts?: SessionCost[];
   messages?: SessionUIMessage[];
+  /** The whole transcript's counts, present only when the read was windowed
+   *  (`?tail=`, `?before=`) and so returned fewer rows than these. */
+  window?: SessionTranscriptWindow;
   turns?: SessionTurn[];
   capabilities?: SessionCapabilities;
   budget?: SessionBudget;

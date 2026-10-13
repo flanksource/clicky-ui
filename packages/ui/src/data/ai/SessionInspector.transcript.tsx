@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { EmptyState } from "./SessionInspector.panel-parts";
 import { cn } from "../../lib/utils";
 import {
   createTurnPalette,
@@ -47,20 +48,28 @@ export function SessionTranscript({
     () =>
       createTurnPalette(
         session.id,
-        turns.map((turn) => turn.id),
+        turns.map((turn) => turn.id)
       ),
-    [session.id, turns],
+    [session.id, turns]
   );
   const turnBadges = useMemo(
     () => buildTurnBadges(turns, palette),
-    [palette, turns],
+    [palette, turns]
   );
   const turnBadgeById = useMemo(
     () => new Map(turnBadges.map((badge) => [badge.id, badge])),
-    [turnBadges],
+    [turnBadges]
   );
   const viewerClassName = cn("min-h-0 flex-1", viewerProps?.className);
   const scrollResetKey = session.id ?? viewerProps?.scrollResetKey;
+
+  if (
+    session.detailAvailable === false &&
+    !session.messages?.length &&
+    !session.events?.length
+  ) {
+    return <EmptyState>Transcript unavailable</EmptyState>;
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -70,9 +79,7 @@ export function SessionTranscript({
         {...viewerProps}
         windowSize={viewerProps?.windowSize ?? 10}
         batchSize={viewerProps?.batchSize ?? 10}
-        {...(scrollResetKey !== undefined
-          ? { scrollResetKey }
-          : {})}
+        {...(scrollResetKey !== undefined ? { scrollResetKey } : {})}
         className={viewerClassName}
         showHeader={false}
         showContextMeter={false}
@@ -98,7 +105,7 @@ export function SessionTranscript({
 
 function buildTurnBadges(
   turns: SessionTurn[],
-  palette: Record<string, TurnPalette>,
+  palette: Record<string, TurnPalette>
 ) {
   return turns.map((turn): TurnBadge => {
     const color = palette[turn.id] ?? "sky";
@@ -138,7 +145,7 @@ function TranscriptTurnBadge({
       className={cn(
         "inline-flex shrink-0 rounded border px-1 py-px font-mono text-[9px] font-semibold leading-none",
         placement === "message" && "mt-1",
-        badge.className,
+        badge.className
       )}
     >
       {badge.label}

@@ -567,7 +567,7 @@ export function Chat({
           onApprove={resolveToolApproval}
           {...(renderToolResult ? { renderToolResult } : {})}
         />
-        <div className="flex flex-col gap-2 p-4 pt-0">
+        <div className="flex shrink-0 flex-col gap-2 p-4 pt-0 pb-[max(1rem,env(safe-area-inset-bottom))]">
           {chips && chips.length > 0 && (
             <Suggestions suggestions={chips} onSelect={pickSuggestion} />
           )}

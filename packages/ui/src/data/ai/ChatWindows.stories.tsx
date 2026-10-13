@@ -135,6 +135,33 @@ export const MultiWindow: Story = {
   },
 };
 
+export const MobileSheet: Story = {
+  parameters: {
+    viewport: { defaultViewport: "mobile1" },
+    docs: {
+      description: {
+        story:
+          "Below 768px (CHAT_WINDOW_MOBILE_QUERY, AppShell md) each window is a full-screen sheet respecting the device safe areas: back button in the header, transcript scrolling, composer pinned to the bottom, no drag, resize or maximize. Only the most recently focused window is visible.",
+      },
+    },
+  },
+  render: () => (
+    <ChatWindowManagerProvider storageId="story-mobile">
+      <div className="h-screen w-screen bg-muted/30">
+        <OpenOnMount />
+        <ChatFab icon={UiComment} />
+        <ChatWindowLayer {...layerProps} />
+      </div>
+    </ChatWindowManagerProvider>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await waitFor(() =>
+      expect(canvas.getByTestId("chat-window-sheet")).toBeInTheDocument(),
+    );
+  },
+};
+
 export const LaunchFromFab: Story = {
   render: () => (
     <ChatWindowManagerProvider storageId="story-fab">
