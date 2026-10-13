@@ -53,10 +53,15 @@ describe("Properties", () => {
   it("preserves false and zero values and renders timestamp values as dates", () => {
     render(<Properties items={[
       { key: "enabled", value: false, type: "boolean" },
+      { key: "ready", value: true, type: "boolean" },
+      { key: "unknown", value: null, type: "boolean" },
       { key: "count", value: 0, type: "number" },
       { key: "started", value: 1704067200000, type: "date" },
     ]} />);
-    expect(screen.getByText("false")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "enabled value" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "ready value" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "ready value" })).toBeDisabled();
+    expect(screen.getByText("null")).toBeInTheDocument();
     expect(screen.getByText("0")).toBeInTheDocument();
     expect(screen.getByText("2024-01-01T00:00:00.000Z")).toHaveAttribute("dateTime", "2024-01-01T00:00:00.000Z");
   });
