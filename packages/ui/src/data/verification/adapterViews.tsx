@@ -4,33 +4,28 @@
 // Refresh). Ported from gavel's VerificationStepOutput.tsx (the checklist list
 // and the CelDetails block).
 
-import { cn } from "../../lib/utils";
-import { Icon, type StaticIconComponent } from "../Icon";
-import { UiError, UiPass, UiPause } from "../../icons";
 import { JsonView } from "../JsonView";
-import { TestOutput, type Test, type FixtureContext } from "../test-runner";
+import {
+  Expectation,
+  OutcomeIcon,
+  TestOutput,
+  type FixtureContext,
+  type Test,
+  type TestOutcome,
+} from "../test-runner";
 
 // ── Checklist: the synthesized "Acceptance criteria" node and its items ────
 
-type ChecklistState = "passed" | "failed" | "pending";
-
-function checklistItemState(item: Test): ChecklistState {
+function checklistItemOutcome(item: Test): TestOutcome {
   if (item.failed) return "failed";
   if (item.passed) return "passed";
   return "pending";
 }
 
-const CHECKLIST_ICONS: Record<ChecklistState, { icon: StaticIconComponent; tone: string }> = {
-  passed: { icon: UiPass, tone: "text-emerald-600" },
-  failed: { icon: UiError, tone: "text-red-600" },
-  pending: { icon: UiPause, tone: "text-muted-foreground" },
-};
-
 function ChecklistItemRow({ item }: { item: Test }) {
-  const { icon, tone } = CHECKLIST_ICONS[checklistItemState(item)];
   return (
     <li className="flex items-start gap-1.5 text-xs">
-      <Icon icon={icon} className={cn("mt-0.5 shrink-0 text-sm", tone)} />
+      <OutcomeIcon outcome={checklistItemOutcome(item)} className="mt-0.5 text-sm" />
       <span className="min-w-0">
         {item.name}
         {item.message ? (
@@ -79,60 +74,26 @@ function comparisonValue(hasCelGate: boolean, value: unknown): unknown {
   return value;
 }
 
-function formatCelValue(value: unknown): string {
-  if (typeof value === "string") return value;
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}
-
 // CEL detail is rendered only for a failing node: the expression and the
 // values it saw are what explain the verdict.
 export function CelDetails({ node }: { node: Test }) {
   if (node.passed) return null;
   const context = node.context as FixtureContext | undefined;
-  const vars = Object.entries(context?.cel_vars ?? {});
+  const vars = context?.cel_vars ?? {};
   const expression = readCelTrace(node.detail) || context?.cel_expression;
   const hasCelGate = !!expression;
   const expected = comparisonValue(hasCelGate, context?.expected);
   const actual = comparisonValue(hasCelGate, context?.actual);
   const hasComparison = expected !== undefined || actual !== undefined;
-  if (!expression && vars.length === 0 && !hasComparison) return null;
+  if (!expression && Object.keys(vars).length === 0 && !hasComparison) return null;
   return (
-    <div className="space-y-1 rounded border border-border bg-muted/30 px-2 py-1.5">
-      {expression && (
-        <div>
-          <span className="text-[10px] uppercase text-muted-foreground">expression</span>
-          <code className="block overflow-x-auto whitespace-pre text-[11px]">{expression}</code>
-        </div>
-      )}
-      {vars.length > 0 && (
-        <table className="w-full table-fixed text-[11px]">
-          <tbody>
-            {vars.map(([name, value]) => (
-              <tr key={name} className="align-top">
-                <td className="w-1/3 truncate pr-2 font-medium text-muted-foreground">{name}</td>
-                <td className="break-words font-mono">{formatCelValue(value)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {expected !== undefined && (
-        <div className="text-[11px]">
-          <span className="text-muted-foreground">expected </span>
-          <span className="font-mono">{formatCelValue(expected)}</span>
-        </div>
-      )}
-      {actual !== undefined && (
-        <div className="text-[11px]">
-          <span className="text-muted-foreground">actual </span>
-          <span className="font-mono">{formatCelValue(actual)}</span>
-        </div>
-      )}
-    </div>
+    <Expectation
+      check={expression}
+      checkLabel="expression"
+      vars={vars}
+      expected={expected}
+      actual={actual}
+    />
   );
 }
 

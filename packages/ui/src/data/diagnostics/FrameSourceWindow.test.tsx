@@ -109,6 +109,25 @@ describe("FrameSourceWindow", () => {
     expect(focalRow.className).toMatch(/bg-primary/);
   });
 
+  // The default margins and border are the stack-frame indent. A frameless caller
+  // (a verification line preview) supplies its own frame, so its className must
+  // replace those defaults rather than sit beside them with CSS order deciding.
+  it("lets className replace the stack-frame margins and border", async () => {
+    const { container } = render(
+      <FrameSourceWindow
+        frame={{ sourceLines: ["a"], sourceStartLine: 1, line: 1 }}
+        className="m-0 rounded-none border-0"
+      />,
+    );
+    await waitFor(() => expect(container.querySelector('span[style*="color"]')).not.toBeNull());
+    const classes = (container.firstElementChild as HTMLElement).className.split(" ");
+    expect(classes).toEqual(expect.arrayContaining(["m-0", "rounded-none", "border-0"]));
+    expect(classes).not.toEqual(expect.arrayContaining(["ml-12"]));
+    expect(classes).not.toContain("mx-3");
+    expect(classes).not.toContain("rounded");
+    expect(classes).not.toContain("border");
+  });
+
   // This window is shared by JVM frames, exception frames and frameless callers.
   // Defaulting an absent language to "java" coloured Go dumps and template errors
   // with Java grammar — wrong rather than merely absent.

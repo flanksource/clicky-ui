@@ -5,36 +5,174 @@
 // components forbids mixing component declarations with plain exports).
 
 import { ChecklistDetail, FixtureDetail } from "./adapterViews";
+import { UiTerminal } from "../../icons";
 import {
   createTestRunnerRegistry,
+  outcomeFor,
+  type BriefSection,
+  type CopySections,
+  type FixtureContext,
   type Test,
   type TestNodeAdapter,
   type TestNodeAdapterRegistry,
+  type TestOutcome,
+  type TestSummary,
 } from "../test-runner";
 
 function isChecklistNode(node: Test): boolean {
   return node.framework === "checklist";
 }
 
+function checklistMark(item: Test): string {
+  if (item.failed) return "[ ]";
+  if (item.passed) return "[x]";
+  return "[?]";
+}
+
+/** `- [x]/[ ]/[?] criterion — reason` for each item, or the leaf itself. */
+function checklistCopy(node: Test): CopySections {
+  const items = node.children && node.children.length > 0 ? node.children : [node];
+  const lines = items.map(
+    (item) => `- ${checklistMark(item)} ${item.name}${item.message ? ` — ${item.message}` : ""}`,
+  );
+  return { brief: [{ title: "Criteria", body: lines.join("\n") }] };
+}
+
 const checklistAdapter: TestNodeAdapter = {
   id: "verification-checklist",
   match: isChecklistNode,
   renderDetail: ({ node }) => <ChecklistDetail node={node} />,
+  copy: ({ node }) => checklistCopy(node),
 };
 
 function isFixtureNode(node: Test): boolean {
   return node.context !== undefined;
 }
 
+// ── Copy sections for fixture steps (exec / query / table / test / lint) ───
+
+function readCelTrace(detail: unknown): string | undefined {
+  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+    const value = (detail as Record<string, unknown>).cel_trace;
+    if (typeof value === "string" && value.length > 0) return value;
+  }
+  return undefined;
+}
+
+// Mirrors CelDetails: without a CEL gate, a command step's `actual` is the whole
+// command result object, already covered by the Command section and output.
+function comparisonValue(hasCelGate: boolean, value: unknown): unknown {
+  if (value === undefined) return undefined;
+  if (hasCelGate) return value;
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) return undefined;
+  return value;
+}
+
+function formatValue(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+}
+
+function commandSection(node: Test, context: FixtureContext | undefined): BriefSection[] {
+  const command = context?.command ?? node.command;
+  if (!command) return [];
+  const cwd = context?.cwd ?? node.work_dir;
+  const exit = context?.exit_code;
+  const lines = [`$ ${command}`, cwd && `cwd: ${cwd}`, exit !== undefined && `exit: ${exit}`];
+  return [{ title: "Command", lang: "sh", body: lines.filter(Boolean).join("\n") }];
+}
+
+function assertionSection(node: Test, context: FixtureContext | undefined): BriefSection[] {
+  const expression = context?.cel_expression;
+  const trace = readCelTrace(node.detail);
+  const hasCelGate = !!(expression || trace);
+  const vars = context?.cel_vars ?? {};
+  const expected = comparisonValue(hasCelGate, context?.expected);
+  const actual = comparisonValue(hasCelGate, context?.actual);
+  const lines = [
+    expression && `expression: ${expression}`,
+    trace && `trace:\n${trace}`,
+    Object.keys(vars).length > 0 && `vars: ${formatValue(vars)}`,
+    expected !== undefined && `expected: ${formatValue(expected)}`,
+    actual !== undefined && `actual: ${formatValue(actual)}`,
+  ].filter(Boolean);
+  return lines.length > 0 ? [{ title: "Assertion", body: lines.join("\n") }] : [];
+}
+
+const OUTCOME_GLYPH: Record<TestOutcome, string> = {
+  passed: "✓",
+  failed: "✗",
+  errored: "✗",
+  timedout: "⏱",
+  warned: "!",
+  skipped: "-",
+  pending: "○",
+  running: "…",
+};
+
+function childLine(child: Test): string {
+  const outcome = outcomeFor(child);
+  const exit = (child.context as FixtureContext | undefined)?.exit_code;
+  const reason = child.message ?? (exit ? `exit ${exit}` : undefined);
+  return `${outcome ? OUTCOME_GLYPH[outcome] : "·"} ${child.name}${reason ? ` — ${reason}` : ""}`;
+}
+
+function summaryLine(summary: TestSummary): string {
+  const counts: [number | undefined, string][] = [
+    [summary.Passed, "passed"],
+    [summary.Failed, "failed"],
+    [summary.Warned, "warned"],
+    [summary.Timedout, "timed out"],
+    [summary.Skipped, "skipped"],
+    [summary.Pending, "pending"],
+    [summary.Running, "running"],
+  ];
+  const parts = counts.filter(([n]) => !!n).map(([n, label]) => `${n} ${label}`);
+  return [`${summary.Total} total`, ...parts].join(" · ");
+}
+
+function resultsSection(node: Test): BriefSection[] {
+  const lines = [
+    ...(node.summary ? [summaryLine(node.summary)] : []),
+    ...(node.children ?? []).map(childLine),
+  ];
+  return lines.length > 0 ? [{ title: "Results", body: lines.join("\n") }] : [];
+}
+
+/** Command, CEL assertion and per-child verdicts for a fixture step or its parent. */
+function fixtureCopy(node: Test): CopySections {
+  const context = node.context as FixtureContext | undefined;
+  const command = context?.command ?? node.command;
+  return {
+    brief: [
+      ...commandSection(node, context),
+      ...assertionSection(node, context),
+      ...resultsSection(node),
+    ],
+    items: command ? [{ label: "Copy command", icon: UiTerminal, value: command }] : [],
+  };
+}
+
 const fixtureAdapter: TestNodeAdapter = {
   id: "verification-fixture",
   match: isFixtureNode,
   renderDetail: ({ node }) => <FixtureDetail node={node} />,
+  copy: ({ node }) => fixtureCopy(node),
+};
+
+// gavel's FixtureResult.Type values plus "fixture" (a markdown table of rows).
+// Table and runner-step parents carry no `context`, so the fixture adapter
+// never claims them; this copy-only adapter gives them the same sections.
+const FIXTURE_STEP_FRAMEWORKS = new Set(["exec", "query", "fixture", "test", "lint", "verify"]);
+
+const fixtureStepCopyAdapter: TestNodeAdapter = {
+  id: "verification-step-copy",
+  match: (node) => FIXTURE_STEP_FRAMEWORKS.has(node.framework ?? ""),
+  copy: ({ node }) => fixtureCopy(node),
 };
 
 /** Default node adapters for VerificationResults: checklist items and
  *  fixture/CEL steps. Registration order matters only when a node could match
  *  both — a checklist node never carries a `context`, so the two never race. */
 export function verificationAdapters(): TestNodeAdapterRegistry {
-  return createTestRunnerRegistry([checklistAdapter, fixtureAdapter]);
+  return createTestRunnerRegistry([checklistAdapter, fixtureAdapter, fixtureStepCopyAdapter]);
 }

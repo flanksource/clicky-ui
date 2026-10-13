@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { TestFilterBar } from "./TestFilterBar";
-import { emptyTestFilters } from "./filterState";
+import { emptyTestFilters, type TestFilters } from "./filterState";
 import type { StatusCounts } from "./status";
 
 const counts: StatusCounts = {
@@ -15,41 +15,79 @@ const counts: StatusCounts = {
   pending: 1,
 };
 
+function renderBar({
+  filters = emptyTestFilters(),
+  frameworks = [] as string[],
+  barCounts = counts,
+} = {}) {
+  const onChange = vi.fn<(next: TestFilters) => void>();
+  render(
+    <TestFilterBar filters={filters} onChange={onChange} counts={barCounts} frameworks={frameworks} />,
+  );
+  return onChange;
+}
+
+function openFacet(name: string) {
+  fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${name}`) }));
+  const menu = screen.getByRole("menu", { name });
+  return {
+    menu,
+    values: Array.from(menu.querySelectorAll("[data-filter-option]")).map((o) =>
+      o.getAttribute("data-filter-option"),
+    ),
+  };
+}
+
 describe("TestFilterBar", () => {
-  it("renders one pill per non-zero status, in STATUS_LABELS order", () => {
-    render(
-      <TestFilterBar
-        filters={emptyTestFilters()}
-        onChange={vi.fn()}
-        counts={counts}
-        frameworks={[]}
-      />,
-    );
-    // running is zero, so it's hidden; the rest render in the fixed key order
-    // Failed, Warned, Timed out, Passed, Skipped, Queued.
-    const labels = screen
-      .getAllByRole("button", { name: /./ })
-      .map((el) => el.textContent?.trim())
-      .filter((t): t is string => !!t && t !== "Clear");
-    expect(labels).toEqual([
-      "1Failed",
-      "1Warned",
-      "1Timed out",
-      "1Passed",
-      "1Skipped",
-      "1Queued",
+  it("lists every non-zero status in the Status facet, in STATUS_LABELS order", () => {
+    renderBar();
+    // running is zero, so it's not offered.
+    expect(openFacet("Status").values).toEqual([
+      "failed",
+      "warned",
+      "timedout",
+      "passed",
+      "skipped",
+      "pending",
     ]);
   });
 
-  it("hides a status pill whose count is zero", () => {
-    render(
-      <TestFilterBar
-        filters={emptyTestFilters()}
-        onChange={vi.fn()}
-        counts={{ ...counts, warned: 0 }}
-        frameworks={[]}
-      />,
-    );
-    expect(screen.queryByTitle(/Warned/)).not.toBeInTheDocument();
+  it("includes a status when its option is picked", () => {
+    const onChange = renderBar();
+    const { menu } = openFacet("Status");
+    fireEvent.click(within(menu).getByText("Failed"));
+    expect(onChange).toHaveBeenLastCalledWith({
+      status: new Map([["failed", "include"]]),
+      framework: new Map(),
+    });
+  });
+
+  it("summarises included and excluded statuses on the trigger", () => {
+    renderBar({
+      filters: {
+        status: new Map([
+          ["failed", "include"],
+          ["passed", "exclude"],
+        ]),
+        framework: new Map(),
+      },
+    });
+    expect(screen.getByRole("button", { name: /^Status/ })).toHaveTextContent("Status +1 -1");
+  });
+
+  it("hides the Tool facet when the run uses a single tool", () => {
+    renderBar({ frameworks: ["go test"] });
+    expect(screen.queryByRole("button", { name: /^Tool/ })).not.toBeInTheDocument();
+  });
+
+  it("labels Tool options by their mark and filters by the wire name", () => {
+    const onChange = renderBar({ frameworks: ["exec", "verify"] });
+    const { menu, values } = openFacet("Tool");
+    expect(values).toEqual(["exec", "verify"]);
+    fireEvent.click(within(menu).getByText("AI review"));
+    expect(onChange).toHaveBeenLastCalledWith({
+      status: new Map(),
+      framework: new Map([["verify", "include"]]),
+    });
   });
 });

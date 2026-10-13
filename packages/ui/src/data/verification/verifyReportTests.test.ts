@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { verifyReportCounts, verifyReportTests } from "./verifyReportTests";
-import { aggregateStatusCounts, statusIconFor, statusToneFor, sum } from "../test-runner";
-import { UiError, UiPass } from "../../icons";
+import { aggregateStatusCounts, outcomeFor, statusToneFor, sum } from "../test-runner";
 import {
   emptyVerifySummary,
   summarizeVerifyNodes,
@@ -235,7 +234,7 @@ describe("verifyReportTests", () => {
       // Roll-up: one failed leaf outranks the still-pending one, so the
       // container itself must render as failed, not queued.
       expect(statusToneFor(acceptance)).toBe("danger");
-      expect(statusIconFor(acceptance)).toBe(UiError);
+      expect(outcomeFor(acceptance)).toBe("failed");
     });
 
     it("falls back to a numbered criterion name when an item's name is empty", () => {
@@ -249,7 +248,7 @@ describe("verifyReportTests", () => {
       );
       const acceptance = tests[0]!;
       expect(statusToneFor(acceptance)).toBe("danger");
-      expect(statusIconFor(acceptance)).toBe(UiError);
+      expect(outcomeFor(acceptance)).toBe("failed");
     });
 
     it("omits the Acceptance criteria node when the checklist is empty", () => {
@@ -262,7 +261,7 @@ describe("verifyReportTests", () => {
         report({ checklist: [{ item: "a", passed: true }, { item: "b", passed: true }] }),
       );
       expect(statusToneFor(tests[0]!)).toBe("success");
-      expect(statusIconFor(tests[0]!)).toBe(UiPass);
+      expect(outcomeFor(tests[0]!)).toBe("passed");
     });
   });
 

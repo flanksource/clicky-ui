@@ -10,6 +10,7 @@ export {
   TestOutput,
   TestAttempts,
 } from "./TestFailureDetail";
+export { Expectation, type ExpectationProps } from "./Expectation";
 export { TestRunSummary, type TestRunSummaryProps } from "./TestRunSummary";
 export { TestFilterBar, type TestFilterBarProps } from "./TestFilterBar";
 
@@ -28,6 +29,18 @@ export {
 } from "./adapter";
 
 export {
+  genericCopySections,
+  mergeCopySections,
+  buildBrief,
+  buildNodeBrief,
+  buildNodeJson,
+  type BriefFact,
+  type BriefSection,
+  type CopyItem,
+  type CopySections,
+} from "./copy";
+
+export {
   type StatusCounts,
   type TestStatus,
   sum,
@@ -38,7 +51,8 @@ export {
   hasPending,
   testStatus,
   totalDuration,
-  statusIconFor,
+  outcomeFor,
+  type TestOutcome,
   statusToneFor,
   formatTestDuration,
   formatCount,
@@ -48,7 +62,17 @@ export {
   filterTests,
 } from "./status";
 
-export { frameworkIcon } from "./frameworkIcon";
+export {
+  TEST_OUTCOMES,
+  LINT_SEVERITIES,
+  TEST_TOOLS,
+  toolMark,
+  type ResultMark,
+  type LintSeverity,
+  type ToolKind,
+  type ToolMark,
+} from "./marks";
+export { OutcomeIcon, LintSeverityIcon, ToolIcon } from "./MarkIcons";
 
 export { slugify, annotateRoutePaths, findNodeByRoutePath } from "./routePath";
 

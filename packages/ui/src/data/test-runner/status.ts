@@ -1,19 +1,8 @@
 // Pure status/roll-up helpers for the test runner — ported from Gavel's
-// utils.ts (Tests-only subset). No JSX here. The two status mappers
-// (statusIconFor / statusToneFor) replace Gavel's raw-Tailwind statusIcon /
-// statusColor with clicky's icon set and semantic Badge tones.
+// utils.ts (Tests-only subset). No JSX here. `outcomeFor` resolves the outcome
+// marks.tsx draws; `statusToneFor` maps it to a semantic Badge tone.
 
-import type { StaticIconComponent } from "../Icon";
 import type { BadgeTone } from "../Badge";
-import {
-  UiClass,
-  UiError,
-  UiHourglass,
-  UiLoader,
-  UiPass,
-  UiPause,
-  UiWarningTriangle,
-} from "../../icons";
 import type { Test, TestSummary } from "./types";
 import { matchesFilterState, type FilterState } from "./filterState";
 
@@ -171,47 +160,48 @@ export function testStatus(t: Test): TestStatus | null {
   return null;
 }
 
-/** Pick the clicky icon for a node, rolling up container state. */
-export function statusIconFor(t: Test): StaticIconComponent {
-  if (t.timed_out) return UiHourglass;
-  if (t.running) return UiLoader;
-  if (t.pending) return UiPause;
-  if (t.failed) return UiError;
-  if (t.warned) return UiWarningTriangle;
-  if (t.skipped) return UiPause;
-  if (t.passed) return UiPass;
-  if (t.children && t.children.length > 0) {
-    const s = sum(t);
-    if (hasTimedOutDescendant(t)) return UiHourglass;
-    if (s.failed > 0) return UiError;
-    if (s.warned > 0) return UiWarningTriangle;
-    if (s.running > 0) return UiLoader;
-    if (s.pending > 0) return UiPause;
-    return UiPass;
-  }
-  return UiClass;
+/**
+ * A test or lint result's outcome. `errored` is a result the runner could not
+ * produce at all (the engine crashed, the child run never reported) — distinct
+ * from a test that ran and failed.
+ */
+export type TestOutcome = TestStatus | "errored";
+
+/**
+ * Resolve a node's outcome, rolling a container up to its worst child: a
+ * timeout anywhere, then failed, warned, running, queued, else passed. Null for
+ * a status-less leaf.
+ */
+export function outcomeFor(t: Test): TestOutcome | null {
+  const own = testStatus(t);
+  if (own) return own;
+  if (!t.children?.length) return null;
+  const s = sum(t);
+  if (hasTimedOutDescendant(t)) return "timedout";
+  if (s.failed > 0) return "failed";
+  if (s.warned > 0) return "warned";
+  if (s.running > 0) return "running";
+  if (s.pending > 0) return "pending";
+  if (s.total > 0 && s.skipped === s.total) return "skipped";
+  return "passed";
 }
 
 /** Map a node's status to a semantic Badge tone, rolling up container state. */
 export function statusToneFor(t: Test): BadgeTone {
-  if (t.timed_out) return "warning";
-  if (t.running) return "info";
-  if (t.pending) return "neutral";
-  if (t.failed) return "danger";
-  if (t.warned) return "warning";
-  if (t.skipped) return "warning";
-  if (t.passed) return "success";
-  if (t.children && t.children.length > 0) {
-    const s = sum(t);
-    if (hasTimedOutDescendant(t)) return "warning";
-    if (s.failed > 0) return "danger";
-    if (s.warned > 0) return "warning";
-    if (s.running > 0) return "info";
-    if (s.pending > 0) return "neutral";
-    return "success";
-  }
-  return "neutral";
+  const outcome = outcomeFor(t);
+  return outcome ? OUTCOME_TONE[outcome] : "neutral";
 }
+
+const OUTCOME_TONE: Record<TestOutcome, BadgeTone> = {
+  failed: "danger",
+  errored: "danger",
+  timedout: "warning",
+  warned: "warning",
+  skipped: "warning",
+  running: "info",
+  pending: "neutral",
+  passed: "success",
+};
 
 // --- formatting ----------------------------------------------------------
 

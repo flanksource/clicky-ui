@@ -1,50 +1,39 @@
 import { LogViewer } from "../LogViewer";
 import { cn } from "../../lib/utils";
+import { Expectation } from "./Expectation";
 import type { FailureDetail, Test, TestAttempt } from "./types";
 import { formatTestDuration } from "./status";
 
-function Field({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string | undefined;
-  mono?: boolean;
-}) {
-  if (!value) return null;
-  return (
-    <div className="space-y-1">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <pre
-        className={cn(
-          "whitespace-pre-wrap break-words rounded-md bg-muted p-2 text-xs",
-          mono && "font-mono",
-        )}
-      >
-        {value}
-      </pre>
-    </div>
-  );
-}
-
-/** Renders a structured failure (expected/actual/matcher/location/stack). */
+/** Renders a structured failure: its summary, the expectation, and the stack. */
 export function TestFailureDetail({ failure }: { failure: FailureDetail }) {
+  const hasExpectation = !!(
+    failure.matcher ||
+    failure.expected ||
+    failure.actual ||
+    failure.location
+  );
   return (
-    <div className="space-y-3 rounded-md border border-red-200 bg-red-50/50 p-3 dark:border-red-900 dark:bg-red-950/30">
+    <div className="space-y-2">
       {failure.summary && (
         <p className="text-sm font-medium text-red-700 dark:text-red-300">{failure.summary}</p>
       )}
-      <Field label="Matcher" value={failure.matcher} mono />
-      <Field label="Expected" value={failure.expected} mono />
-      <Field label="Actual" value={failure.actual} mono />
-      <Field label="Location" value={failure.location} mono />
+      {hasExpectation && (
+        <Expectation
+          check={failure.matcher}
+          expected={failure.expected || undefined}
+          actual={failure.actual || undefined}
+          location={failure.location}
+        />
+      )}
       {failure.stack && <LogViewer logs={failure.stack} collapsedLines={6} />}
     </div>
   );
 }
 
-/** stdout / stderr blocks, each via the collapsible LogViewer. */
+// A quarter of the detail pane, which TestDetailPanel makes a size container.
+const OUTPUT_MAX_HEIGHT = "25cqh";
+
+/** stdout / stderr as terminal blocks, each scrolling within a quarter of the detail pane. */
 export function TestOutput({ node }: { node: Test }) {
   if (!node.stdout && !node.stderr) return null;
   return (
@@ -52,13 +41,18 @@ export function TestOutput({ node }: { node: Test }) {
       {node.stdout && (
         <div className="space-y-1">
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">stdout</div>
-          <LogViewer logs={node.stdout} />
+          <LogViewer logs={node.stdout} variant="terminal" maxHeight={OUTPUT_MAX_HEIGHT} />
         </div>
       )}
       {node.stderr && (
         <div className="space-y-1">
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">stderr</div>
-          <LogViewer logs={node.stderr} borderClass="border-red-300 dark:border-red-900" />
+          <LogViewer
+            logs={node.stderr}
+            variant="terminal"
+            maxHeight={OUTPUT_MAX_HEIGHT}
+            borderClass="border-red-500/70"
+          />
         </div>
       )}
     </div>

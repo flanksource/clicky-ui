@@ -94,6 +94,15 @@ function detailBlocks(value: unknown): ErrorDetailBlock[] {
   });
 }
 
+// reportPageLine names the page an error report came from. Origin and path
+// only: a report is pasted into issues and chats, and a query string or
+// fragment routinely carries a session token, a signed URL or a search term
+// the reporter did not mean to publish.
+export function reportPageLine(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return `Page: ${window.location.origin}${window.location.pathname}`;
+}
+
 export function parseDiagnosticsStackTrace(stacktrace: string): ParsedErrorStackTrace {
   const lines = stacktrace
     .split(/\r?\n/)

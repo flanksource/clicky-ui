@@ -1,19 +1,19 @@
 import { Icon } from "../Icon";
 import { Badge } from "../Badge";
 import { IconButton } from "../../components/IconButton";
-import { UiRefresh, UiStop } from "../../icons";
+import { UiClass, UiRefresh, UiStop } from "../../icons";
 import { cn } from "../../lib/utils";
 import type { Test } from "./types";
 import { useTestRunner } from "./context";
 import {
   formatTestDuration,
   humanizeName,
-  statusIconFor,
+  outcomeFor,
   sum,
   testStatus,
   totalDuration,
 } from "./status";
-import { frameworkIcon } from "./frameworkIcon";
+import { OutcomeIcon, ToolIcon } from "./MarkIcons";
 
 const NAME_TONE: Record<string, string> = {
   failed: "text-red-600 dark:text-red-400",
@@ -35,6 +35,7 @@ function CountBadges({ node }: { node: Test }) {
     <span className="flex shrink-0 items-center gap-1">
       {s.passed > 0 && <Badge tone="success" variant="solid" size="xxs" count={s.passed} />}
       {s.failed > 0 && <Badge tone="danger" variant="solid" size="xxs" count={s.failed} />}
+      {s.warned > 0 && <Badge tone="warning" variant="outline" size="xxs" count={s.warned} />}
       {s.timedout > 0 && <Badge tone="warning" variant="solid" size="xxs" count={s.timedout} />}
       {s.skipped > 0 && <Badge tone="warning" variant="soft" size="xxs" count={s.skipped} />}
       {s.running > 0 && <Badge tone="info" variant="solid" size="xxs" count={s.running} />}
@@ -53,7 +54,7 @@ export function TestTreeNode({ node, selected }: { node: Test; selected: boolean
   const runner = useTestRunner();
   const hasChildren = (node.children?.length ?? 0) > 0;
   const status = testStatus(node);
-  const fwIcon = frameworkIcon(node.framework);
+  const outcome = outcomeFor(node);
   const fwAdapter = runner.adapters.resolveFrameworkIcon(node, runner);
   const fwNode = fwAdapter?.renderFrameworkIcon?.({ node, runner });
   const leadingAdapter = runner.adapters.resolveRowLeading(node, runner);
@@ -66,30 +67,42 @@ export function TestTreeNode({ node, selected }: { node: Test; selected: boolean
 
   return (
     <>
-      <Icon icon={statusIconFor(node)} className={cn("shrink-0", node.running && "animate-spin")} />
+      {outcome ? (
+        <OutcomeIcon outcome={outcome} />
+      ) : (
+        <Icon icon={UiClass} className="shrink-0 text-muted-foreground" />
+      )}
 
       {fwNode != null ? (
-        <span className="flex shrink-0 items-center text-sm opacity-60">{fwNode}</span>
+        <span className="flex shrink-0 items-center text-sm">{fwNode}</span>
       ) : (
-        fwIcon && <Icon icon={fwIcon} className="shrink-0 text-sm opacity-60" />
+        <ToolIcon tool={node.framework} className="text-sm" />
       )}
 
       {leadingAdapter?.renderRowLeading?.({ node, runner })}
 
-      <span className="flex min-w-0 flex-col" title={message || undefined}>
-        <span
-          className={cn(
-            "truncate",
-            selected ? "font-semibold" : "font-medium",
-            (status && NAME_TONE[status]) || "text-foreground",
-          )}
-        >
-          {humanizeName(node.name, node.framework)}
-        </span>
-        {message && <span className="truncate text-xs text-muted-foreground">{message}</span>}
+      <span
+        className={cn(
+          "min-w-0 truncate",
+          selected ? "font-semibold" : "font-medium",
+          (status && NAME_TONE[status]) || "text-foreground",
+        )}
+        title={message || undefined}
+      >
+        {humanizeName(node.name, node.framework)}
       </span>
-
-      <span className="flex-1" />
+      {/* The verdict trails the name on the same line and gives way first. */}
+      {message ? (
+        <span
+          className="min-w-0 flex-1 shrink-[100] truncate text-xs text-muted-foreground"
+          title={message}
+          data-row-message=""
+        >
+          {message}
+        </span>
+      ) : (
+        <span className="flex-1" />
+      )}
 
       {node.progress && node.progress.total > 0 && !node.passed && !node.failed && (
         <span className="flex shrink-0 items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
