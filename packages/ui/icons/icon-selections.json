@@ -2865,6 +2865,94 @@
       "note": "Model vendor mark: Hugging Face. Simple Icons, currentColor."
     },
     {
+      "consumerName": "logo-go",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:go",
+      "filled": "skip",
+      "note": "Test tool mark: go test, ginkgo and golangci-lint (Go has no per-tool marks). Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-vitest",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:vitest",
+      "filled": "skip",
+      "note": "Test tool mark: Vitest. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-jest",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:jest",
+      "filled": "skip",
+      "note": "Test tool mark: Jest. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-playwright",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:playwright",
+      "filled": "skip",
+      "note": "Test tool mark: Playwright. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-eslint",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:eslint",
+      "filled": "skip",
+      "note": "Lint tool mark: ESLint. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-oxc",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:oxc",
+      "filled": "skip",
+      "note": "Lint tool mark: oxlint (the Oxc project). Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-typescript",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:typescript",
+      "filled": "skip",
+      "note": "Lint tool mark: tsc. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-python",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:python",
+      "filled": "skip",
+      "note": "Lint tool mark: pyright (no Simple Icons mark of its own). Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-ruff",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:ruff",
+      "filled": "skip",
+      "note": "Lint tool mark: Ruff. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-markdown",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:markdown",
+      "filled": "skip",
+      "note": "Test/lint tool mark: markdown fixtures, markdownlint and Vale (prose). Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-react",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:react",
+      "filled": "skip",
+      "note": "Lint tool mark: react-doctor. Simple Icons, currentColor."
+    },
+    {
       "consumerName": "receipt",
       "group": "data-analytics",
       "status": "NEW",
