@@ -106,6 +106,40 @@ describe("ClickyTable renderRowDetail", () => {
     ).toBeInTheDocument();
   });
 
+  it("passes a json column's code block as its structured value, not its text", () => {
+    const processes = [{ id: "process1", victim: true }];
+    const renderRowDetail = vi.fn((row: Record<string, unknown>) => (
+      <div>Processes: {(row.processes as typeof processes).map((p) => p.id).join(",")}</div>
+    ));
+
+    render(
+      <ClickyTable
+        columns={columns}
+        rows={[
+          {
+            cells: {
+              id: { kind: "text", text: "deadlock-1", filterValue: "deadlock-1" },
+              name: { kind: "text", text: "First deadlock" },
+              // How clicky's ColumnTextable presents a ColumnTypeJSON value.
+              processes: { kind: "code", language: "json", source: JSON.stringify(processes), plain: JSON.stringify(processes) },
+              statement: { kind: "code", language: "sql", source: "SELECT 1", plain: "SELECT 1" },
+            },
+          },
+        ]}
+        renderRowDetail={renderRowDetail}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("First deadlock"));
+    expect(screen.getByText("Processes: process1").textContent).toBe("Processes: process1");
+    expect(renderRowDetail).toHaveBeenCalledWith({
+      id: "deadlock-1",
+      name: "First deadlock",
+      processes,
+      statement: "SELECT 1",
+    });
+  });
+
   it("confines an inline (row-style) detail's intrinsic width so it cannot stretch the table", () => {
     // A `pre`/tree-shaped detail (a SQL statement, a call tree) has no
     // natural wrap point. Without `w-0 min-w-full overflow-x-auto` on the

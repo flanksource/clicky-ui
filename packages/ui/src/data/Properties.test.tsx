@@ -2,6 +2,9 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Properties, type PropertiesItem } from "./Properties";
 import { UiChevronRight, UiCopy } from "../icons";
+import * as matchers from "@testing-library/jest-dom/matchers";
+
+expect.extend(matchers);
 
 type Row = PropertiesItem<string>;
 
@@ -19,6 +22,54 @@ function namespaceRow(): HTMLElement {
 
 describe("Properties", () => {
   beforeEach(() => localStorage.clear());
+
+  it("renders typed bytes, durations and percentages with their raw values available", () => {
+    render(<Properties items={[
+      { key: "memory", value: 1048576, type: "bytes" },
+      { key: "elapsed", value: 1500, type: "duration", unit: "ms" },
+      { key: "load", value: 0.5, type: "number", unit: "percentunit" },
+      { key: "unsupported", value: -1, type: "bytes" },
+    ]} />);
+    expect(screen.getByText("1 MB")).toHaveAttribute("title", "1048576");
+    expect(screen.getByText("1.5 s")).toHaveAttribute("title", "1500");
+    expect(screen.getByText("50%")).toHaveAttribute("title", "0.5");
+    expect(screen.getByText("-1 B")).toBeInTheDocument();
+  });
+
+  it("renders expandable structured values and explicitly typed JSON strings", () => {
+    const { container } = render(<Properties items={[
+      { key: "usage", value: { used: 1024, pools: ["heap"] } },
+      { key: "config", value: '{"enabled":false}', type: "json" },
+      { key: "literal", value: '{"message":"literal"}' },
+      { key: "empty", value: null },
+    ]} />);
+    expect(container.querySelectorAll('[data-format="json"]')).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Collapse value" })).toHaveLength(2);
+    expect(screen.getByText("false")).toBeInTheDocument();
+    expect(screen.getByText('{"message":"literal"}')).toBeInTheDocument();
+    expect(screen.getByText("null")).toBeInTheDocument();
+  });
+
+  it("preserves false and zero values and renders timestamp values as dates", () => {
+    render(<Properties items={[
+      { key: "enabled", value: false, type: "boolean" },
+      { key: "count", value: 0, type: "number" },
+      { key: "started", value: 1704067200000, type: "date" },
+    ]} />);
+    expect(screen.getByText("false")).toBeInTheDocument();
+    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.getByText("2024-01-01T00:00:00.000Z")).toHaveAttribute("dateTime", "2024-01-01T00:00:00.000Z");
+  });
+
+  it("rejects invalid numeric values instead of rendering them as zero bytes", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect(() => render(<Properties items={[{ key: "memory", value: Number.NaN, type: "bytes" }]} />))
+        .toThrow("Property memory: expected a finite numeric value for bytes");
+    } finally {
+      error.mockRestore();
+    }
+  });
 
   it("renders one row per visible item with default label formatting", () => {
     render(<Properties items={items} />);
