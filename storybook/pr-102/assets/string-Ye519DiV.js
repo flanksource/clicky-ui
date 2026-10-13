@@ -1,0 +1,2 @@
+function c(n){let i=n.length;for(;i>0&&n[i-1]==="/";)i--;return n.slice(0,i)}function l(n,i){let e=0,t=n.length;for(;e<t&&i.includes(n[e]);)e++;for(;t>e&&i.includes(n[t-1]);)t--;return n.slice(e,t)}function o(n){let i=n.length;for(;i>0&&n[i-1]===`
+`;)i--;return n.slice(0,i)}function h(n,i=" "){let e="",t=0;for(;t<n.length;){const r=n.indexOf("<",t);if(r===-1)return e+n.slice(t);const s=n.indexOf(">",r+1);if(s===-1)return e+n.slice(t);if(s===r+1){e+=n.slice(t,s+1),t=s+1;continue}e+=n.slice(t,r)+i,t=s+1}return e}export{l as a,h as b,o as c,c as s};
