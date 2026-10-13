@@ -52,6 +52,14 @@ export class FakeEventSource implements EventSourceLike {
     this.dispatch(new Event("error"));
   }
 
+  /** A transient drop the browser recovers from: the error fires while the
+   *  stream is reconnecting (CONNECTING), then the stream is open again. */
+  dropConnection() {
+    this.readyState = 0;
+    this.dispatch(new Event("error"));
+    this.readyState = 1;
+  }
+
   private dispatch(event: Event) {
     if (this.closed) throw new Error(`frame ${event.type} sent to a closed stream ${this.url}`);
     for (const listener of this.listeners.get(event.type) ?? []) {
@@ -90,7 +98,9 @@ export function jsonResponse(body: unknown, status = 200) {
 
 /** Stubs `fetch` with a per-URL queue of responses; the last response for a
  *  URL repeats, and an unknown URL fails the test loudly. */
-export function stubSessionFetch(routes: Record<string, Array<() => Response>>) {
+export function stubSessionFetch(
+  routes: Record<string, Array<() => Response | Promise<Response>>>,
+) {
   const calls = new Map<string, number>();
   const mock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);

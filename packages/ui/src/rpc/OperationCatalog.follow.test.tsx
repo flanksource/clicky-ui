@@ -264,7 +264,8 @@ describe("OperationCatalog follow mode", () => {
       source.emit("event", { sessionId: SESSION_ID, sequence: 1, row: { _id: "a2", status: "closed" } });
     });
 
-    await screen.findByText(/without its presented row/);
+    const [shown] = await screen.findAllByText(/without its presented row/);
+    expect(shown).toBeVisible();
     expect(screen.queryByText("a2")).not.toBeInTheDocument();
   });
 
@@ -326,6 +327,7 @@ describe("OperationCatalog follow mode", () => {
       source.emit("event", { sessionId: SESSION_ID, sequence: 1, error: "upstream reader closed" });
     });
 
-    await screen.findByText(/upstream reader closed/);
+    const [shown] = await screen.findAllByText(/upstream reader closed/);
+    expect(shown).toBeVisible();
   });
 });

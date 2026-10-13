@@ -157,7 +157,8 @@ describe("SessionsCatalog", () => {
     const { client, executeCommand } = makeClient(SESSIONS_SURFACE_KEY);
     renderCatalog(client, { ...props, urlState: false });
 
-    expect(await screen.findByText((content) => content.includes(message))).toBeInTheDocument();
+    const [shown] = await screen.findAllByText((content) => content.includes(message));
+    expect(shown).toBeVisible();
     expect(executeCommand).not.toHaveBeenCalled();
   });
 });
