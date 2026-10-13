@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "../components/button";
+import { Combobox } from "../components/Combobox";
+import type { ComboboxOption } from "../components/combobox-types";
 import { CopyButton } from "../components/CopyButton";
 import { Field } from "../components/Field";
 import { InputField } from "../components/InputField";
@@ -27,6 +29,9 @@ import { OperationPicker } from "./OperationPicker";
 export interface OperationScheduleDialogProps {
   open: boolean;
   operations: readonly ResolvedOperation[];
+  targetOptions: ComboboxOption[];
+  defaultTargets?: string[];
+  targetLabel?: string;
   schedule?: OperationSchedule;
   cli?: OperationScheduleCLI;
   onClose: () => void;
@@ -35,7 +40,18 @@ export interface OperationScheduleDialogProps {
 }
 
 export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
-  const { open, operations, schedule, cli, onClose, onSave, onRunNow } = _props;
+  const {
+    open,
+    operations,
+    schedule,
+    cli,
+    targetOptions,
+    defaultTargets,
+    targetLabel = "Targets",
+    onClose,
+    onSave,
+    onRunNow,
+  } = _props;
   const [input, setInput] = useState<OperationScheduleInput>(
     newOperationScheduleInput,
   );
@@ -46,11 +62,16 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
   useEffect(() => {
     if (!open) return;
     setInput(
-      schedule ? scheduleToInput(schedule) : newOperationScheduleInput(),
+      schedule
+        ? scheduleToInput(schedule)
+        : {
+            ...newOperationScheduleInput(),
+            targets: [...(defaultTargets ?? [])],
+          },
     );
     setError(undefined);
     setConfirmingRun(false);
-  }, [open, schedule]);
+  }, [open, schedule, defaultTargets]);
 
   const operation = operationByID(operations, input.operationId);
   const schema = operationInputSchema(operation);
@@ -58,7 +79,16 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
     operation?.operation["x-clicky"]?.schedule?.suggestions ?? [];
   const destructive =
     operation?.operation["x-clicky"]?.toolHints?.destructiveHint === true;
-  const cliCommand = operationCLICommand(operation, input.args, cli);
+  const cliCommand = cli?.targetFlag
+    ? input.targets
+        .map((target) =>
+          operationCLICommand(operation, input.args, {
+            ...cli,
+            globalFlags: { ...cli.globalFlags, [cli.targetFlag!]: target },
+          }),
+        )
+        .join("\n")
+    : operationCLICommand(operation, input.args, cli);
 
   const selectOperation = (operationId: string) => {
     const selected = operationByID(operations, operationId);
@@ -90,7 +120,11 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
     setPending("run");
     setError(undefined);
     try {
-      await onRunNow({ operationId: input.operationId, args: input.args });
+      await onRunNow({
+        operationId: input.operationId,
+        args: input.args,
+        targets: input.targets,
+      });
       setConfirmingRun(false);
       onClose();
     } catch (nextError) {
@@ -102,9 +136,12 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
   };
 
   const canSave = Boolean(
-    input.name.trim() && input.operationId && input.cron.trim(),
+    input.name.trim() &&
+    input.operationId &&
+    input.cron.trim() &&
+    input.targets.length,
   );
-  const canRun = Boolean(input.operationId);
+  const canRun = Boolean(input.operationId && input.targets.length);
 
   return (
     <>
@@ -139,6 +176,23 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
         }
       >
         <div className="space-y-5">
+          <Field
+            label={targetLabel}
+            htmlFor="operation-schedule-targets"
+            required
+          >
+            <Combobox
+              id="operation-schedule-targets"
+              multiple
+              variant="tags"
+              ariaLabel={targetLabel}
+              ariaRequired
+              allowCustomValue={false}
+              options={targetOptions}
+              value={input.targets}
+              onChange={(targets) => setInput({ ...input, targets })}
+            />
+          </Field>
           <Field
             label="Schedule name"
             htmlFor="operation-schedule-name"
@@ -178,7 +232,7 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
             <section className="space-y-1">
               <h3 className="text-sm font-semibold">Equivalent CLI command</h3>
               <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
-                <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap text-xs">
+                <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre text-xs">
                   {cliCommand}
                 </code>
                 <CopyButton value={cliCommand} label="Copy CLI command" />
@@ -225,6 +279,9 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
         <p className="text-sm text-muted-foreground">
           This runs the configured operation once without creating or changing a
           recurring schedule.
+        </p>
+        <p className="mt-2 text-sm">
+          {targetLabel}: {input.targets.join(", ")}
         </p>
       </Modal>
     </>

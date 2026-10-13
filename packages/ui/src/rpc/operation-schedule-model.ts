@@ -34,6 +34,7 @@ export function newOperationScheduleInput(): OperationScheduleInput {
   return {
     name: "",
     operationId: "",
+    targets: [],
     args: {},
     cron: DEFAULT_CRON,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
@@ -45,6 +46,7 @@ export function scheduleToInput(schedule: OperationSchedule): OperationScheduleI
   return {
     name: schedule.name,
     operationId: schedule.operationId,
+    targets: [...schedule.targets],
     args: schedule.args,
     cron: schedule.cron,
     timezone: schedule.timezone,
