@@ -4361,7 +4361,8 @@ const NON_TEXT_COLUMN_TYPES: ReadonlySet<string> = new Set([
 /**
  * clickyCellRawValue is the raw value a host row-detail renderer sees for one
  * cell — the server's scalar over its rendered text, and the structured
- * payload itself for the two tree/graph node kinds, so a renderer can hand
+ * payload itself for the two tree/graph node kinds and a json column's code
+ * block, so a renderer can hand
  * `executionRoots` straight to `<ExecutionTree>` / `objects` to `<ObjectGraph>`
  * without re-parsing text the server already gave it structured.
  *
@@ -4376,6 +4377,11 @@ function clickyCellRawValue(node: ClickyNode | null | undefined, column?: Clicky
   if (node.kind === "object-graph") return node.objects ?? [];
   if (node.kind === "map" || node.kind === "list") {
     return clickyNodeJSONValue(node);
+  }
+  // clicky presents a json column's value as a json code block; its source is
+  // that value marshalled, so the row detail gets the structure back.
+  if (node.kind === "code" && node.language === "json") {
+    return JSON.parse(node.source ?? "null");
   }
   if (node.filterValue !== undefined) return node.filterValue;
   const text = clickyNodeText(node);

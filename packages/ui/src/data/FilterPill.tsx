@@ -10,7 +10,7 @@ export type FilterPillProps = {
   mode?: FilterMode;
   /** Primary visible label. */
   label: ReactNode;
-  /** Optional count badge rendered before the label. */
+  /** Optional count: a badge before the label, or muted text after it on a tri-state option. */
   count?: number;
   /** Iconify name or imported icon component. */
   icon?: string | StaticIconComponent;
@@ -175,6 +175,9 @@ export function FilterPill({
   className,
 }: FilterPillProps) {
   const triState = !!onModeChange;
+  const iconNode = icon && (
+    <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} className="text-sm" />
+  );
   const content = (
     <>
       {count !== undefined && (
@@ -187,14 +190,28 @@ export function FilterPill({
           {count}
         </span>
       )}
-      {icon && (
-        <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} className="text-sm" />
-      )}
+      {iconNode}
       <span className="truncate">{label}</span>
     </>
   );
 
   if (triState) {
+    // In an option list the count is a facet of the label, not a badge: it
+    // trails the label in muted text so the labels stay aligned.
+    const optionContent = (
+      <>
+        {iconNode}
+        <span className="truncate">{label}</span>
+        {count !== undefined && (
+          <span
+            className="shrink-0 text-[10px] tabular-nums text-muted-foreground"
+            data-pill-count=""
+          >
+            {count}
+          </span>
+        )}
+      </>
+    );
     const control = (
       <TristateSwitch
         mode={mode}
@@ -205,7 +222,7 @@ export function FilterPill({
     );
     const labelContent = (
       <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-foreground">
-        {content}
+        {optionContent}
       </span>
     );
 

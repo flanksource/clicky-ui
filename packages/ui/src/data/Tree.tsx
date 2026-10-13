@@ -24,6 +24,8 @@ export type TreeProps<T> = Omit<
   showControls?: boolean;
   /** Keep search visible for small or empty trees. */
   showSearch?: boolean;
+  /** Placeholder and accessible name of the search box, e.g. "Filter tests". */
+  searchLabel?: string;
   /** URL or parent-controlled search query. */
   searchQuery?: string;
   onSearchQueryChange?: (query: string) => void;
@@ -259,6 +261,7 @@ export function Tree<T>({
   ariaLabel,
   showControls = true,
   showSearch = false,
+  searchLabel,
   searchQuery,
   onSearchQueryChange,
   expandAll: controlledExpandAll,
@@ -366,9 +369,9 @@ export function Tree<T>({
                   type="search"
                   value={filterQuery}
                   onChange={(event) => setFilterQuery(event.target.value)}
-                  placeholder="Filter tree"
-                  className="h-5 w-full min-w-0 border-0 bg-transparent p-0 text-xs outline-none placeholder:text-placeholder"
-                  aria-label="Filter tree nodes"
+                  placeholder={searchLabel ?? "Filter tree"}
+                  className="h-5 w-full min-w-0 border-0 bg-transparent p-0 text-xs outline-none placeholder:text-placeholder [&::-webkit-search-cancel-button]:appearance-none"
+                  aria-label={searchLabel ?? "Filter tree nodes"}
                 />
                 {filterQuery && (
                   <button

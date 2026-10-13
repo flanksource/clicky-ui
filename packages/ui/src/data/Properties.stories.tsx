@@ -38,6 +38,20 @@ export const Default: Story = {
   args: { items: baseItems },
 };
 
+export const TypedValues: Story = {
+  args: {
+    items: [
+      { key: "heap_bytes", value: 1048576, type: "bytes" },
+      { key: "uptime", value: 90000, type: "duration", unit: "ms" },
+      { key: "cpu", value: 0.25, type: "number", unit: "percentunit" },
+      { key: "enabled", value: false, type: "boolean" },
+      { key: "started_at", value: 1704067200000, type: "date" },
+      { key: "usage", value: { used: 1024, pools: ["heap", "non-heap"] } },
+      { key: "config", value: '{"enabled":true}', type: "json" },
+    ],
+  },
+};
+
 export const NestedLabels: Story = {
   render: () => (
     <Properties

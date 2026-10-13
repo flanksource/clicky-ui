@@ -18,6 +18,7 @@ import { DropdownMenu } from "../overlay/DropdownMenu";
 import { Icon, type StaticIconComponent } from "./Icon";
 import { formatPropertyLabel } from "./properties-utils";
 import { PropertiesContext } from "./properties-context";
+import { PropertyValue } from "./PropertyValue";
 
 export type PropertiesAction<V = unknown> = {
   /** Stable action id. */
@@ -39,6 +40,10 @@ export type PropertiesItem<V = unknown> = {
   key: string;
   /** Property value passed to renderers and actions. */
   value: V;
+  /** Optional display type; structured values otherwise render as JSON. */
+  type?: "text" | "json" | "bytes" | "duration" | "number" | "boolean" | "date";
+  /** Unit for numeric values, such as ms, s, bytes, or percent. */
+  unit?: string;
   /** Secondary text shown below the label. */
   subtitle?: ReactNode;
   /** Hide this row without removing it from the item array. */
@@ -233,7 +238,7 @@ export function Properties<V = unknown>({
                   >
                     {renderValue
                       ? renderValue(item.key, item.value, item)
-                      : defaultRenderValue(item.value)}
+                      : <PropertyValue item={item} density={activeDensity} />}
                   </div>
                   <ActionList
                     actions={suffixActions}
@@ -428,23 +433,4 @@ function PropertiesActionButton<V>({
       />
     </button>
   );
-}
-
-function defaultRenderValue(value: unknown): ReactNode {
-  if (value === null || value === undefined) {
-    return <span className="font-mono italic text-muted-foreground">null</span>;
-  }
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") {
-    return <span className="font-mono">{String(value)}</span>;
-  }
-  try {
-    return (
-      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed">
-        {JSON.stringify(value, null, 2)}
-      </pre>
-    );
-  } catch {
-    return String(value);
-  }
 }
