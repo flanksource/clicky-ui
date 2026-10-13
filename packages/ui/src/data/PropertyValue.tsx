@@ -30,5 +30,8 @@ export function PropertyValue({ item, density }: { item: PropertiesItem; density
   if (type === "boolean" && typeof value !== "boolean") {
     throw new Error(`Property ${item.key}: expected a boolean`);
   }
+  if (typeof value === "boolean") {
+    return <input type="checkbox" checked={value} disabled aria-label={`${item.key} value`} title={String(value)} className="h-4 w-4 accent-primary" />;
+  }
   return <span className="whitespace-pre-wrap break-words font-mono">{String(value)}</span>;
 }
