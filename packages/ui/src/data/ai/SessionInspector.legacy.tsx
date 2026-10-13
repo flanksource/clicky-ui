@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { SessionInspectorPanel } from "./SessionInspector.panels";
+import { PinnedComposer } from "./SessionInspector.composer-slot";
 import { CompactSessionInspectorToolbar } from "./SessionInspector.compact";
 import { InspectorTabs } from "./SessionInspector.tabs";
 import {
@@ -80,7 +81,7 @@ export function LegacySessionInspector({
       ) : (
         <InspectorTabs tab={tab} tabs={compactTabs} onSelect={setTab} />
       )}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {compact ? (
           <>
             <div
@@ -128,12 +129,8 @@ export function LegacySessionInspector({
             )}
           </div>
         )}
-        {composer ? (
-          <div className="shrink-0 border-t border-border p-density-3">
-            {composer}
-          </div>
-        ) : null}
-      </div>
+      </main>
+      {composer ? <PinnedComposer>{composer}</PinnedComposer> : null}
     </div>
   );
 }

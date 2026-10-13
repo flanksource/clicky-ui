@@ -64,4 +64,43 @@ describe("PromptInput", () => {
     );
     expect(textbox).toHaveValue("Trace the formula");
   });
+
+  describe("disabledReason", () => {
+    const REASON = "Loading session…";
+
+    it("shows the reason as the placeholder of the disabled textarea and blocks sending", () => {
+      const onSubmit = vi.fn();
+      render(
+        <PromptInput
+          disabled
+          disabledReason={REASON}
+          placeholder="Ask something"
+          onSubmit={onSubmit}
+        />,
+      );
+
+      const textbox = screen.getByRole("textbox");
+      expect(textbox).toBeDisabled();
+      expect(textbox).toHaveAttribute("placeholder", REASON);
+      expect(textbox).toHaveAttribute("title", REASON);
+      expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+      fireEvent.keyDown(textbox, { key: "Enter" });
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("ignores the reason while the input is enabled", () => {
+      render(
+        <PromptInput
+          disabledReason={REASON}
+          placeholder="Ask something"
+          onSubmit={vi.fn()}
+        />,
+      );
+
+      const textbox = screen.getByRole("textbox");
+      expect(textbox).toBeEnabled();
+      expect(textbox).toHaveAttribute("placeholder", "Ask something");
+      expect(textbox).not.toHaveAttribute("title");
+    });
+  });
 });

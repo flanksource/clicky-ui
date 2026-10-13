@@ -29,6 +29,10 @@ export type PromptInputProps = {
   status?: ChatStatus | undefined;
   allowSubmitWhileStreaming?: boolean | undefined;
   disabled?: boolean | undefined;
+  /** Why the input is disabled. Shown in place of the placeholder (and as the
+   *  tooltip) while `disabled`, so a locked input says why instead of just
+   *  looking dead. Ignored while enabled. */
+  disabledReason?: string | undefined;
   stopLabel?: string | undefined;
   placeholder?: string | undefined;
   /** Enables the attachment button and chips. */
@@ -56,6 +60,7 @@ export function PromptInput({
   status,
   allowSubmitWhileStreaming = false,
   disabled = false,
+  disabledReason,
   stopLabel = "Stop",
   placeholder = "What would you like to know?",
   enableAttachments = false,
@@ -143,7 +148,8 @@ export function PromptInput({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          placeholder={disabled && disabledReason ? disabledReason : placeholder}
+          {...(disabled && disabledReason ? { title: disabledReason } : {})}
           disabled={disabled}
           rows={1}
           className="max-h-48 min-h-9 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-placeholder"
@@ -173,7 +179,7 @@ export function PromptInput({
       </div>
 
       {(toolbar || enableAttachments) && (
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           {enableAttachments && (
             <AttachmentButton
               onAdd={(p) => setFiles((f) => [...f, ...p])}

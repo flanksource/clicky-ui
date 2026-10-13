@@ -42,7 +42,7 @@ export function ChatFab({
       }}
       {...(!persistent ? { style: { zIndex: zIndex.chatFab } } : {})}
       className={cn(
-        "fixed bottom-4 right-4 flex h-12 w-12 items-center justify-center",
+        "fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 flex h-12 w-12 items-center justify-center",
         "rounded-full bg-primary text-primary-foreground shadow-lg transition-colors hover:bg-primary/90",
         className,
       )}

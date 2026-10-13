@@ -182,6 +182,55 @@ export const Mobile: Story = {
   },
 };
 
+export const CompactMobileComposer: Story = {
+  args: {
+    layout: "compact",
+    session: {
+      ...INSPECTOR_SESSION,
+      messages: Array.from({ length: 30 }, (_, index) => ({
+        id: `message-${index}`,
+        role: index % 2 ? ("user" as const) : ("assistant" as const),
+        parts: [
+          {
+            type: "text" as const,
+            text: `Transcript message ${index + 1}\n\nEnough text to make the transcript taller than a phone screen.`,
+          },
+        ],
+      })),
+    },
+    composer: (
+      <div
+        data-testid="session-composer"
+        className="rounded-md border border-input px-density-2 py-density-2 text-sm text-muted-foreground"
+      >
+        Continue this session…
+      </div>
+    ),
+  },
+  parameters: {
+    viewport: { defaultViewport: "mobile1" },
+    docs: {
+      description: {
+        story:
+          "In layout=\"compact\" the composer slot is pinned below the transcript: the transcript scrolls, the composer stays on screen.",
+      },
+    },
+  },
+  render: (args) => (
+    <div className="h-dvh">
+      <SessionInspector {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const composer = within(canvasElement).getByTestId("session-composer");
+    await waitFor(() => {
+      const { bottom } = composer.getBoundingClientRect();
+      expect(bottom).toBeLessThanOrEqual(window.innerHeight);
+      expect(bottom).toBeGreaterThan(0);
+    });
+  },
+};
+
 export const LegacyTranscript: Story = {
   args: { session: SAMPLE_SESSION },
 };

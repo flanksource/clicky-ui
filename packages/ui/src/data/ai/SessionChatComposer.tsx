@@ -26,6 +26,9 @@ export type SessionChatComposerProps = {
   capabilities: SessionChatCapabilities;
   queued?: SessionChatQueuedMessage[];
   error?: string;
+  /** Disables the input and shows this reason in it (e.g. while the session
+   *  it continues is still loading, or could not be read). */
+  disabledReason?: string;
   onSubmit: (text: string) => void;
   onInterrupt?: () => void;
   toolbar?: ReactNode;
@@ -46,6 +49,7 @@ export function SessionChatComposer({
   capabilities,
   queued = [],
   error,
+  disabledReason,
   onSubmit,
   onInterrupt,
   toolbar,
@@ -59,6 +63,7 @@ export function SessionChatComposer({
   const active = status === "running" || status === "interrupting";
   const canSubmitWhileActive = capabilities.steer || capabilities.followUp;
   const disabled =
+    disabledReason !== undefined ||
     status === "starting" ||
     status === "interrupting" ||
     status === "stopping" ||
@@ -109,6 +114,7 @@ export function SessionChatComposer({
       <PromptInput
         status={active ? "streaming" : "ready"}
         disabled={disabled}
+        {...(disabledReason !== undefined ? { disabledReason } : {})}
         allowSubmitWhileStreaming={canSubmitWhileActive}
         stopLabel="Interrupt"
         placeholder={

@@ -111,6 +111,12 @@ export interface SessionViewerProps {
   batchSize?: number;
   /** Stable identity used to reset the transcript window when switching sessions. */
   scrollResetKey?: string;
+  /** `scrollable` mode: called when the reader scrolls to the top with every
+   *  row already rendered, to fetch older history. Prepended rows keep the
+   *  reader's position. */
+  onReachStart?: () => void;
+  /** Shows a "Loading earlier messages…" row above the transcript. */
+  loadingOlder?: boolean;
   /** Show per-row timestamp/source/model/turn/agent metadata. Defaults to false. */
   showRowMetadata?: boolean;
   /** Show a per-row raw JSON payload expander when available. Defaults to false. */
@@ -158,6 +164,8 @@ export function SessionViewer({
   windowSize = 60,
   batchSize = 40,
   scrollResetKey,
+  onReachStart,
+  loadingOlder = false,
   showRowMetadata = false,
   showRaw = false,
   renderMessageBadge,
@@ -228,6 +236,8 @@ export function SessionViewer({
     windowSize,
     batchSize,
     resetKey,
+    ...(allEvents[0] ? { firstKey: allEvents[0].id } : {}),
+    ...(onReachStart ? { onReachStart } : {}),
   });
 
   if (allEvents.length === 0) {
@@ -385,6 +395,11 @@ export function SessionViewer({
                 data-session-viewer-content
                 className="p-density-3 @min-[48rem]/session-viewer:p-density-4"
               >
+                {loadingOlder ? (
+                  <p role="status" className="pb-density-2 text-center text-xs text-muted-foreground">
+                    Loading earlier messages…
+                  </p>
+                ) : null}
                 {list}
               </div>
             </div>

@@ -485,6 +485,8 @@ export {
   processStateIcon,
   processStateColor,
 } from "./data/diagnostics/utils";
+export { GoroutineCard, type GoroutineCardProps } from "./data/diagnostics/GoroutineCard";
+export { ThreadCard, type ThreadCardProps } from "./data/diagnostics/ThreadCard";
 export {
   parseGoroutineDump,
   countGoroutinesByState,

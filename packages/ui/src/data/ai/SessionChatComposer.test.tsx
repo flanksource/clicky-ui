@@ -196,4 +196,22 @@ describe("SessionChatComposer permission mode picker", () => {
       screen.getByRole("combobox", { name: "Permission mode" }),
     ).toBeInTheDocument();
   });
+
+  it("disables the input and says why while the host reports a reason", () => {
+    const onSubmit = vi.fn();
+    render(
+      <SessionChatComposer
+        status="idle"
+        capabilities={capabilities}
+        disabledReason="This session cannot be read"
+        onSubmit={onSubmit}
+      />,
+    );
+
+    const textbox = screen.getByRole("textbox");
+    expect(textbox).toBeDisabled();
+    expect(textbox).toHaveAttribute("placeholder", "This session cannot be read");
+    fireEvent.keyDown(textbox, { key: "Enter" });
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 });

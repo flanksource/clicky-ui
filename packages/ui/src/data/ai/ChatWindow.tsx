@@ -8,9 +8,7 @@ import {
 } from "react";
 import type { Props as RndProps } from "react-rnd";
 import { cn } from "../../lib/utils";
-import { Button } from "../../components/button";
-import { Icon } from "../Icon";
-import { UiAdd, UiClose, UiFullscreen, UiGitBranch } from "../../icons";
+import { useMediaQuery } from "../../hooks/use-media-query";
 import { Chat } from "../chat/Chat";
 import { forkChatSession, type CaptainChatSession } from "../chat/approval";
 import type {
@@ -19,9 +17,9 @@ import type {
   ClaudePermissionMode,
 } from "../chat/types";
 import { useChatWindowManager } from "./chat-window-context";
-import { ThreadPicker } from "./ThreadPicker";
+import { ChatWindowHeader } from "./ChatWindow.header";
 import { ContextBadges } from "./ContextBadges";
-import { ToolPreferences, type ToolMeta } from "./ToolPreferences";
+import type { ToolMeta } from "./ToolPreferences";
 import type { ChatContextItem } from "./context";
 import { chatWindowRequestBody } from "./ChatWindowRequestBody";
 import {
@@ -43,6 +41,12 @@ import type {
 import { useChatThreadSetup } from "./ChatWindow.thread";
 import { ChatThreadSetupStatus } from "./ChatWindow.thread-status";
 import type { ChatWindowProps } from "./ChatWindow.types";
+import {
+  CHAT_WINDOW_MOBILE_QUERY,
+  ChatWindowFloating,
+  ChatWindowSheet,
+} from "./ChatWindow.placement";
+export { CHAT_WINDOW_MOBILE_QUERY };
 export type {
   ChatContextPickerRenderProps,
   ChatWindowProps,
@@ -50,16 +54,8 @@ export type {
 
 const EMPTY_TOOLS: ToolMeta[] = [];
 
-const MAXIMIZE_CSS = `
-.chat-maximized .react-draggable {
-  transform: none !important;
-  width: auto !important;
-  height: auto !important;
-  inset: 0 !important;
-  position: absolute !important;
-}`;
-
-/** A draggable, resizable floating chat window. It lazy-loads `react-rnd` (an
+/** A draggable, resizable floating chat window — or, below
+ *  {@link CHAT_WINDOW_MOBILE_QUERY}, a full-screen sheet. It lazy-loads `react-rnd` (an
  *  optional dependency, so consumers of just the inner <Chat> never pull it)
  *  and renders the existing <Chat> beneath a drag-handle header with thread
  *  switching, a context-badge row and optional tool preferences. */
@@ -78,8 +74,15 @@ export function ChatWindow({
   headerExtras,
   renderContextPicker,
 }: ChatWindowProps) {
-  const { updatePanel, closePanel, bringToFront, maximizePanel, openPanel } =
-    useChatWindowManager();
+  const {
+    panels,
+    updatePanel,
+    closePanel,
+    bringToFront,
+    maximizePanel,
+    openPanel,
+  } = useChatWindowManager();
+  const mobile = useMediaQuery(CHAT_WINDOW_MOBILE_QUERY);
   const threadSetup = useChatThreadSetup({
     threadId: panel.threadId,
     api: sessionsApi,
@@ -218,6 +221,7 @@ export function ChatWindow({
   }, []);
 
   useEffect(() => {
+    if (mobile) return;
     let active = true;
     import("react-rnd").then((m) => {
       if (active) setRnd(() => m.Rnd as unknown as ComponentType<RndProps>);
@@ -225,7 +229,7 @@ export function ChatWindow({
     return () => {
       active = false;
     };
-  }, []);
+  }, [mobile]);
 
   const removeContext = useCallback(
     (id: string) =>
@@ -331,92 +335,57 @@ export function ChatWindow({
   }, [forking, messageCount, openPanel, panel.threadId, sessionsApi]);
 
   const header = (
-    <div className="chat-drag-handle flex cursor-move items-center gap-1 border-b border-border bg-muted/40 px-2 py-1.5">
-      {threadsSource != null || sessionsApi !== null ? (
-        <ThreadPicker
-          threadId={panel.threadId}
-          onSelect={(tid) => updatePanel(panel.id, { threadId: tid })}
-          onNew={() => updatePanel(panel.id, { threadId: null })}
-          refreshToken={titleRefresh}
-          {...(threadsSource
-            ? { source: threadsSource }
-            : sessionsApi !== null
-              ? { api: sessionsApi }
-              : {})}
-        />
-      ) : (
-        <span className="px-1 text-sm font-medium">{title}</span>
-      )}
-      <div className="flex-1" />
-      {headerExtras}
-      <ToolPreferences
-        tools={resolvedTools}
-        value={toolPrefs}
-        onRule={handleToolRule}
-        rules={userToolRules}
-        onRulesChange={setUserToolRules}
-        models={resolvedModels}
-        runtime={runtime}
-        onRuntimeChange={handleRuntimeChange}
-        runtimeFamilies={runtimeFamilies}
-        reasoningEfforts={reasoningEfforts}
-        permissionMode={permissionMode}
-        onPermissionModeChange={handlePermissionModeChange}
-        budget={budget}
-        onBudgetChange={setBudget}
-        runtimeLocked={runtimeLocked}
-        {...(sessionsApi ? { costsApi: sessionsApi } : {})}
-        {...(panel.threadId ? { threadId: panel.threadId } : {})}
-        toolsLoading={toolsLoading}
-        toolsError={toolsError}
-        catalogLoading={catalogLoading}
-        catalogError={catalogError}
-        onCatalogRetry={retryCatalogs}
-      />
-      {sessionsApi && (
-        <Button
-          variant="ghost"
-          size="icon"
-          title={
-            messageCount === 0
-              ? "Send a message before forking this conversation"
-              : "Fork conversation into a new window"
-          }
-          disabled={!panel.threadId || messageCount === 0 || forking}
-          onClick={() => void handleFork()}
-        >
-          <Icon icon={UiGitBranch} className="size-4" />
-        </Button>
-      )}
-      <Button
-        variant="ghost"
-        size="icon"
-        title="New window"
-        onClick={() => openPanel()}
-      >
-        <Icon icon={UiAdd} className="size-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        title={panel.maximized ? "Restore" : "Maximize"}
-        onClick={() => maximizePanel(panel.id)}
-      >
-        <Icon icon={UiFullscreen} className="size-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        title="Close"
-        onClick={() => closePanel(panel.id)}
-      >
-        <Icon icon={UiClose} className="size-4" />
-      </Button>
-    </div>
+    <ChatWindowHeader
+      mobile={mobile}
+      title={title}
+      threadId={panel.threadId}
+      maximized={panel.maximized}
+      threadsSource={threadsSource}
+      sessionsApi={sessionsApi}
+      titleRefresh={titleRefresh}
+      headerExtras={headerExtras}
+      toolPreferences={{
+        tools: resolvedTools,
+        value: toolPrefs,
+        onRule: handleToolRule,
+        rules: userToolRules,
+        onRulesChange: setUserToolRules,
+        models: resolvedModels,
+        runtime,
+        onRuntimeChange: handleRuntimeChange,
+        runtimeFamilies,
+        reasoningEfforts,
+        permissionMode,
+        onPermissionModeChange: handlePermissionModeChange,
+        budget,
+        onBudgetChange: setBudget,
+        runtimeLocked,
+        ...(sessionsApi ? { costsApi: sessionsApi } : {}),
+        ...(panel.threadId ? { threadId: panel.threadId } : {}),
+        toolsLoading,
+        toolsError,
+        catalogLoading,
+        catalogError,
+        onCatalogRetry: retryCatalogs,
+      }}
+      hasMessages={messageCount > 0}
+      forkDisabled={!panel.threadId || messageCount === 0 || forking}
+      onSelectThread={(threadId) => updatePanel(panel.id, { threadId })}
+      onNewThread={() => updatePanel(panel.id, { threadId: null })}
+      onFork={() => void handleFork()}
+      onNewWindow={() => openPanel()}
+      onMaximize={() => maximizePanel(panel.id)}
+      onClose={() => closePanel(panel.id)}
+    />
   );
 
   const frame = (
-    <div className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl">
+    <div
+      className={cn(
+        "flex h-full flex-col overflow-hidden bg-background",
+        !mobile && "rounded-lg border border-border shadow-xl",
+      )}
+    >
       {header}
       {(renderContextPicker || panel.contextItems.length > 0) && (
         <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-2 py-1.5">
@@ -469,72 +438,33 @@ export function ChatWindow({
     </div>
   );
 
-  const outerClass = cn(
-    "fixed pointer-events-none",
-    panel.maximized ? "inset-4 chat-maximized" : "inset-0",
-  );
+  const layerStyle = { zIndex: panel.zIndex };
 
-  // Until react-rnd loads (and as a graceful fallback if it never does) the
-  // window is statically positioned — still usable, just not draggable.
-  if (!Rnd) {
+  if (mobile) {
+    const front = panels.reduce((top, p) => (p.zIndex >= top.zIndex ? p : top));
     return (
-      <div className={outerClass} style={{ zIndex: panel.zIndex }}>
-        <div
-          className="pointer-events-auto h-full"
-          style={
-            panel.maximized
-              ? { position: "relative", width: "100%", height: "100%" }
-              : {
-                  position: "absolute",
-                  left: panel.x,
-                  top: panel.y,
-                  width: panel.width,
-                  height: panel.height,
-                }
-          }
-        >
-          {frame}
-        </div>
-      </div>
+      <ChatWindowSheet layerStyle={layerStyle} hidden={front.id !== panel.id}>
+        {frame}
+      </ChatWindowSheet>
     );
   }
 
   return (
-    <div className={outerClass} style={{ zIndex: panel.zIndex }}>
-      <style>{MAXIMIZE_CSS}</style>
-      <Rnd
-        default={{
-          x: panel.x,
-          y: panel.y,
-          width: panel.width,
-          height: panel.height,
-        }}
-        style={{ pointerEvents: "auto" }}
-        minWidth={Math.min(360, Math.max(1, window.innerWidth - 32))}
-        minHeight={Math.min(400, Math.max(1, window.innerHeight - 32))}
-        bounds="parent"
-        dragHandleClassName="chat-drag-handle"
-        disableDragging={panel.maximized}
-        enableResizing={!panel.maximized}
-        onDragStart={() => bringToFront(panel.id)}
-        onDragStop={(_e, d) => updatePanel(panel.id, { x: d.x, y: d.y })}
-        onResizeStop={(_e, _dir, ref, _delta, pos) =>
-          updatePanel(panel.id, {
-            width: ref.offsetWidth,
-            height: ref.offsetHeight,
-            x: pos.x,
-            y: pos.y,
-          })
-        }
-      >
-        {frame}
-      </Rnd>
-    </div>
+    <ChatWindowFloating
+      panel={panel}
+      layerStyle={layerStyle}
+      Rnd={Rnd}
+      onDragStart={() => bringToFront(panel.id)}
+      onGeometryChange={(partial) => updatePanel(panel.id, partial)}
+    >
+      {frame}
+    </ChatWindowFloating>
   );
 }
 
 /** Renders every open window for the current {@link useChatWindowManager}.
- *  Drop one of these near the root alongside a <ChatFab/>. */
+ *  Below {@link CHAT_WINDOW_MOBILE_QUERY} each is a full-screen sheet and only
+ *  the most recently focused one is visible. Drop one of these near the root alongside a <ChatFab/>. */
 export function ChatWindowLayer(props: Omit<ChatWindowProps, "panel">) {
   const { panels } = useChatWindowManager();
   return (

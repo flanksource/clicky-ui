@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { SessionInspectorPanel } from "./SessionInspector.panels";
+import { PinnedComposer } from "./SessionInspector.composer-slot";
 import { SessionInspectorHeader } from "./SessionInspector.summary";
 import { CompactSessionInspectorToolbar } from "./SessionInspector.compact";
 import { InspectorTabs } from "./SessionInspector.tabs";
@@ -27,6 +28,8 @@ import { useInspectorTab } from "./SessionInspector.tab-state";
 import {
   useRemoteCollection,
   useRemoteSession,
+  useReportLoadState,
+  type SessionInspectorLoadState,
 } from "./SessionInspector.remote";
 import { RemoteSessionStatus } from "./SessionInspector.remote-view";
 import type { SessionViewerProps } from "./SessionViewer";
@@ -76,6 +79,10 @@ export interface SessionInspectorOptions {
    *  tab still lists pending requests but renders no Approve/Deny controls. */
   onResolveApproval?: ApprovalResolveHandler;
   composer?: ReactNode;
+  /** With `src`: fires on the initial load result (`loading`, then `ready` or
+   *  `error`) and when the follow stream later sends a terminal error frame.
+   *  Never fires for an in-memory `session`. */
+  onLoadStateChange?: (state: SessionInspectorLoadState) => void;
 }
 
 export function SessionInspector({
@@ -83,6 +90,7 @@ export function SessionInspector({
   src,
   follow,
   className,
+  onLoadStateChange,
   ...options
 }: SessionInspectorProps) {
   if (session !== undefined && src !== undefined) {
@@ -95,6 +103,11 @@ export function SessionInspector({
   }
   const followOptions = follow === undefined ? {} : { follow };
   const remote = useRemoteSession(src, followOptions);
+  useReportLoadState({
+    state: remote,
+    enabled: src !== undefined,
+    onChange: onLoadStateChange,
+  });
   const collection =
     session !== undefined && isSessionCollectionInput(session)
       ? session
@@ -107,6 +120,19 @@ export function SessionInspector({
       : collection
         ? remoteCollection.collection
         : session;
+
+  // A URL-backed transcript pages older history in as the reader scrolls up.
+  const viewOptions =
+    src !== undefined && (remote.hasOlder || remote.loadingOlder)
+      ? {
+          ...options,
+          transcriptProps: {
+            ...options.transcriptProps,
+            onReachStart: () => void remote.loadOlder(),
+            loadingOlder: remote.loadingOlder === true,
+          },
+        }
+      : options;
 
   // A URL-backed inspector always renders inside the status wrapper, so an
   // error arriving mid-follow adds the alert without remounting the view.
@@ -128,12 +154,13 @@ export function SessionInspector({
       loading={status.loading}
       {...(status.error ? { error: status.error } : {})}
       {...(className ? { className } : {})}
+      {...(options.composer ? { composer: options.composer } : {})}
     >
       {resolved ? (
         <SessionInspectorView
           session={resolved}
           {...followOptions}
-          {...options}
+          {...viewOptions}
         />
       ) : null}
     </RemoteSessionStatus>
@@ -330,64 +357,25 @@ function CollectionSessionInspector({
           <InspectorTabs tab={tab} tabs={compactTabs} onSelect={setTab} />
         </>
       )}
-      <div
-        className={cn(
-          "min-h-0 flex-1 overflow-y-auto",
-          !compact && "flex flex-col lg:overflow-hidden",
-        )}
-      >
-        <main
-          className={cn(
-            "flex min-w-0 flex-col",
-            compact ? "min-h-0" : "min-h-[28rem] flex-1 lg:min-h-0",
-          )}
-        >
-          {compact ? (
-            <>
-              <div
-                className={cn(
-                  "min-h-0 flex-1 overflow-hidden",
-                  tab !== "transcript" && "hidden",
-                )}
-              >
-                <SessionTranscript
-                  session={hierarchy.filtered}
-                  viewerProps={{
-                    ...compactTranscriptProps,
-                    className: transcriptClassName,
-                  }}
-                />
-              </div>
-              {tab !== "transcript" ? (
-                <div className="min-h-0 flex-1 overflow-auto p-density-4">
-                  <SessionInspectorPanel
-                    tab={tab}
-                    detail={panelDetail}
-                    session={hierarchy.current}
-                    {...(onPlanChange ? { onPlanChange } : {})}
-                    {...(onResolveApproval ? { onResolveApproval } : {})}
-                  />
-                </div>
-              ) : null}
-            </>
-          ) : (
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {compact ? (
+          <>
             <div
               className={cn(
-                "min-h-0 flex-1",
-                tab === "transcript"
-                  ? "overflow-hidden"
-                  : "overflow-auto p-density-4",
+                "min-h-0 flex-1 overflow-hidden",
+                tab !== "transcript" && "hidden",
               )}
             >
-              {tab === "transcript" ? (
-                <SessionTranscript
-                  session={hierarchy.filtered}
-                  viewerProps={{
-                    ...transcriptProps,
-                    className: transcriptClassName,
-                  }}
-                />
-              ) : (
+              <SessionTranscript
+                session={hierarchy.filtered}
+                viewerProps={{
+                  ...compactTranscriptProps,
+                  className: transcriptClassName,
+                }}
+              />
+            </div>
+            {tab !== "transcript" ? (
+              <div className="min-h-0 flex-1 overflow-auto p-density-4">
                 <SessionInspectorPanel
                   tab={tab}
                   detail={panelDetail}
@@ -395,16 +383,39 @@ function CollectionSessionInspector({
                   {...(onPlanChange ? { onPlanChange } : {})}
                   {...(onResolveApproval ? { onResolveApproval } : {})}
                 />
-              )}
-            </div>
-          )}
-          {composer ? (
-            <div className="shrink-0 border-t border-border p-density-3">
-              {composer}
-            </div>
-          ) : null}
-        </main>
-      </div>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div
+            className={cn(
+              "min-h-0 flex-1",
+              tab === "transcript"
+                ? "overflow-hidden"
+                : "overflow-auto p-density-4",
+            )}
+          >
+            {tab === "transcript" ? (
+              <SessionTranscript
+                session={hierarchy.filtered}
+                viewerProps={{
+                  ...transcriptProps,
+                  className: transcriptClassName,
+                }}
+              />
+            ) : (
+              <SessionInspectorPanel
+                tab={tab}
+                detail={panelDetail}
+                session={hierarchy.current}
+                {...(onPlanChange ? { onPlanChange } : {})}
+                {...(onResolveApproval ? { onResolveApproval } : {})}
+              />
+            )}
+          </div>
+        )}
+      </main>
+      {composer ? <PinnedComposer>{composer}</PinnedComposer> : null}
     </div>
   );
 }

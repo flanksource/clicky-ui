@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionInspector } from "./SessionInspector";
 import {
   isTerminalSessionLifecycle,
-  sessionFollowUrl,
+  sessionUrl,
 } from "./SessionInspector.remote";
 import type { SessionCollectionInput } from "./SessionInspector.collection";
 import { collectionSession } from "./SessionInspector.collection.fixtures";
@@ -25,7 +25,12 @@ import {
 } from "../../test/fake-session-stream.test-utils";
 
 const SRC = "/api/captain/sessions/remote";
+// The first read asks for the tail; see SessionInspector.remote.
+const TAIL = `${SRC}?tail=100`;
+// A session with no messages yet is followed from the start; otherwise the
+// stream resumes after the newest message the first read returned.
 const FOLLOW_URL = `${SRC}?follow=1`;
+const followAfter = (id: string) => `${SRC}?follow=1&after=${id}`;
 const TERMINAL = ["succeeded", "partial", "failed", "cancelled", "interrupted", "completed"];
 
 // The transcript re-renders a message once its markdown resolves, so a node
@@ -36,14 +41,15 @@ const expectText = (text: string) =>
 beforeEach(resetFakeEventSources);
 afterEach(() => vi.unstubAllGlobals());
 
-describe("sessionFollowUrl", () => {
+describe("sessionUrl", () => {
   it.each([
-    { src: "/api/captain/sessions/a", want: "/api/captain/sessions/a?follow=1" },
-    { src: "/api/captain/sessions/a?tail=50", want: "/api/captain/sessions/a?tail=50&follow=1" },
-    { src: "/api/captain/sessions/a?", want: "/api/captain/sessions/a?follow=1" },
-    { src: "/api/captain/sessions/a#plan", want: "/api/captain/sessions/a?follow=1#plan" },
-  ])("appends follow=1 to $src", ({ src, want }) => {
-    expect(sessionFollowUrl(src)).toBe(want);
+    { src: "/api/captain/sessions/a", params: { follow: 1 }, want: "/api/captain/sessions/a?follow=1" },
+    { src: "/api/captain/sessions/a?project=acme", params: { follow: 1, after: "m9" }, want: "/api/captain/sessions/a?project=acme&follow=1&after=m9" },
+    { src: "/api/captain/sessions/a?tail=50", params: { tail: 100 }, want: "/api/captain/sessions/a?tail=100" },
+    { src: "/api/captain/sessions/a?", params: { follow: 1 }, want: "/api/captain/sessions/a?follow=1" },
+    { src: "/api/captain/sessions/a#plan", params: { before: "m 1", limit: 5 }, want: "/api/captain/sessions/a?before=m+1&limit=5#plan" },
+  ])("sets $params on $src", ({ src, params, want }) => {
+    expect(sessionUrl(src, params)).toBe(want);
   });
 });
 
@@ -59,7 +65,7 @@ describe("isTerminalSessionLifecycle", () => {
 describe("SessionInspector src", () => {
   it("shows a loading state, then renders the Plan tab from the fetched plan.content", async () => {
     const fetchMock = stubSessionFetch({
-      [SRC]: [
+      [TAIL]: [
         () =>
           jsonResponse(
             remoteSession({
@@ -77,14 +83,14 @@ describe("SessionInspector src", () => {
       await screen.findByRole("heading", { name: "Shadow activities by age" }),
     ).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      SRC,
+      TAIL,
       expect.objectContaining({ headers: { Accept: "application/json" } }),
     );
   });
 
   it.each(TERMINAL)("opens no event stream for a %s session", async (lifecycleStatus) => {
     stubSessionFetch({
-      [SRC]: [() => jsonResponse(remoteSession({ lifecycleStatus, messages: [textMessage("m1", "final answer")] }))],
+      [TAIL]: [() => jsonResponse(remoteSession({ lifecycleStatus, messages: [textMessage("m1", "final answer")] }))],
     });
 
     renderWithFakeStream(<SessionInspector src={SRC} />);
@@ -95,8 +101,8 @@ describe("SessionInspector src", () => {
 
   it("follow={true} streams a terminal session and follow={false} never streams a live one", async () => {
     stubSessionFetch({
-      [SRC]: [() => jsonResponse(remoteSession({ lifecycleStatus: "succeeded" }))],
-      "/api/captain/sessions/live": [() => jsonResponse(remoteSession({ id: "live", lifecycleStatus: "running", messages: [textMessage("m1", "live answer")] }))],
+      [TAIL]: [() => jsonResponse(remoteSession({ lifecycleStatus: "succeeded" }))],
+      "/api/captain/sessions/live?tail=100": [() => jsonResponse(remoteSession({ id: "live", lifecycleStatus: "running", messages: [textMessage("m1", "live answer")] }))],
     });
 
     const { unmount } = renderWithFakeStream(<SessionInspector src={SRC} follow />);
@@ -112,13 +118,13 @@ describe("SessionInspector src", () => {
 
   it("merges streamed entry frames by id: a known id replaces, a new id appends", async () => {
     stubSessionFetch({
-      [SRC]: [() => jsonResponse(remoteSession({ messages: [textMessage("m1", "first draft")] }))],
+      [TAIL]: [() => jsonResponse(remoteSession({ messages: [textMessage("m1", "first draft")] }))],
     });
 
     renderWithFakeStream(<SessionInspector src={SRC} />);
     await expectText("first draft");
     const stream = lastEventSource();
-    expect(stream.url).toBe(FOLLOW_URL);
+    expect(stream.url).toBe(followAfter("m1"));
 
     act(() => stream.emit("entry", textMessage("m1", "first answer, enriched")));
     act(() => stream.emit("entry", textMessage("m2", "second answer")));
@@ -128,9 +134,28 @@ describe("SessionInspector src", () => {
     expect(screen.queryByText("first draft")).not.toBeInTheDocument();
   });
 
+  it("follows from the start past a prompt-run placeholder, and drops it once the transcript streams in", async () => {
+    // Read before the agent wrote its first transcript line: the only message
+    // is the placeholder the server synthesised from the prompt run.
+    const placeholder = { ...textMessage("run-1-user", "prompt from the run"), role: "user", placeholder: true };
+    stubSessionFetch({
+      [TAIL]: [() => jsonResponse(remoteSession({ messages: [placeholder] }))],
+    });
+
+    renderWithFakeStream(<SessionInspector src={SRC} />);
+    await expectText("prompt from the run");
+    const stream = lastEventSource();
+    expect(stream.url).toBe(FOLLOW_URL);
+
+    act(() => stream.emit("entry", { ...textMessage("t1", "prompt from the transcript"), role: "user" }));
+
+    await expectText("prompt from the transcript");
+    expect(screen.queryByText("prompt from the run")).not.toBeInTheDocument();
+  });
+
   it("refetches the aggregate on a higher state revision and keeps streamed entries", async () => {
     const fetchMock = stubSessionFetch({
-      [SRC]: [
+      [TAIL]: [
         () => jsonResponse(remoteSession({ revision: 3, plan: { content: "# Draft plan" } })),
         () => jsonResponse(remoteSession({ revision: 4, plan: { content: "# Approved plan" } })),
       ],
@@ -154,7 +179,7 @@ describe("SessionInspector src", () => {
   });
 
   it("closes the stream when a state frame reports a terminal lifecycle", async () => {
-    stubSessionFetch({ [SRC]: [() => jsonResponse(remoteSession({ revision: 2 }))] });
+    stubSessionFetch({ [TAIL]: [() => jsonResponse(remoteSession({ revision: 2 }))] });
 
     renderWithFakeStream(<SessionInspector src={SRC} />);
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
@@ -167,7 +192,7 @@ describe("SessionInspector src", () => {
 
   it("does not refetch on the first state frame's facets alone", async () => {
     const fetchMock = stubSessionFetch({
-      [SRC]: [() => jsonResponse(remoteSession({ revision: 5, plan: { content: "# Draft plan" } }))],
+      [TAIL]: [() => jsonResponse(remoteSession({ revision: 5, plan: { content: "# Draft plan" } }))],
     });
 
     renderWithFakeStream(<SessionInspector src={SRC} defaultTab="plan" />);
@@ -184,7 +209,7 @@ describe("SessionInspector src", () => {
 
   it("refetches a later frame with the same revision but different facets, updating the Plan tab", async () => {
     const fetchMock = stubSessionFetch({
-      [SRC]: [
+      [TAIL]: [
         () => jsonResponse(remoteSession({ revision: 5, plan: { content: "# Draft plan" } })),
         () => jsonResponse(remoteSession({ revision: 5, plan: { content: "# Revised plan" } })),
       ],
@@ -208,7 +233,7 @@ describe("SessionInspector src", () => {
 
   it("does not refetch when a later frame repeats the same facets and revision", async () => {
     const fetchMock = stubSessionFetch({
-      [SRC]: [() => jsonResponse(remoteSession({ revision: 5, plan: { content: "# Draft plan" } }))],
+      [TAIL]: [() => jsonResponse(remoteSession({ revision: 5, plan: { content: "# Draft plan" } }))],
     });
 
     renderWithFakeStream(<SessionInspector src={SRC} defaultTab="plan" />);
@@ -227,7 +252,7 @@ describe("SessionInspector src", () => {
   });
 
   it("surfaces an error when a state frame is missing facets", async () => {
-    stubSessionFetch({ [SRC]: [() => jsonResponse(remoteSession({ revision: 2 }))] });
+    stubSessionFetch({ [TAIL]: [() => jsonResponse(remoteSession({ revision: 2 }))] });
 
     renderWithFakeStream(<SessionInspector src={SRC} />);
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
@@ -240,10 +265,10 @@ describe("SessionInspector src", () => {
   });
 
   it("closes the old stream and opens a new one when src changes", async () => {
-    const next = "/api/captain/sessions/next?tail=10";
+    const next = "/api/captain/sessions/next?project=acme";
     stubSessionFetch({
-      [SRC]: [() => jsonResponse(remoteSession({ messages: [textMessage("a", "old session")] }))],
-      [next]: [() => jsonResponse(remoteSession({ id: "next", messages: [textMessage("b", "new session")] }))],
+      [TAIL]: [() => jsonResponse(remoteSession({ messages: [textMessage("a", "old session")] }))],
+      [`${next}&tail=100`]: [() => jsonResponse(remoteSession({ id: "next", messages: [textMessage("b", "new session")] }))],
     });
 
     const { rerender } = renderWithFakeStream(<SessionInspector src={SRC} />);
@@ -255,8 +280,8 @@ describe("SessionInspector src", () => {
     expect(first.closed).toBe(true);
     await expectText("new session");
     expect(FakeEventSource.instances.map((es) => es.url)).toEqual([
-      FOLLOW_URL,
-      "/api/captain/sessions/next?tail=10&follow=1",
+      followAfter("a"),
+      "/api/captain/sessions/next?project=acme&follow=1&after=b",
     ]);
     expect(screen.queryByText("old session")).not.toBeInTheDocument();
   });
@@ -273,7 +298,7 @@ describe("SessionInspector src", () => {
       shown: "no route for session remote",
     },
   ])("displays $name of a 404 response", async ({ response, shown }) => {
-    stubSessionFetch({ [SRC]: [response] });
+    stubSessionFetch({ [TAIL]: [response] });
 
     renderWithFakeStream(<SessionInspector src={SRC} />);
 
@@ -284,7 +309,7 @@ describe("SessionInspector src", () => {
   });
 
   it("surfaces an error frame from the stream beside the loaded session", async () => {
-    stubSessionFetch({ [SRC]: [() => jsonResponse(remoteSession({ messages: [textMessage("m1", "kept answer")] }))] });
+    stubSessionFetch({ [TAIL]: [() => jsonResponse(remoteSession({ messages: [textMessage("m1", "kept answer")] }))] });
 
     renderWithFakeStream(<SessionInspector src={SRC} />);
     await expectText("kept answer");
@@ -299,7 +324,7 @@ describe("SessionInspector src", () => {
   });
 
   it("surfaces a stream connection failure that delivered no data", async () => {
-    stubSessionFetch({ [SRC]: [() => jsonResponse(remoteSession())] });
+    stubSessionFetch({ [TAIL]: [() => jsonResponse(remoteSession())] });
 
     renderWithFakeStream(<SessionInspector src={SRC} />);
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
@@ -338,7 +363,7 @@ describe("SessionInspector collection items with src", () => {
 
   it("lazy-loads an item's src only when it is selected in the picker", async () => {
     const fetchMock = stubSessionFetch({
-      [attempt2Src]: [
+      [`${attempt2Src}?tail=100`]: [
         () =>
           jsonResponse(
             remoteSession({
@@ -369,7 +394,7 @@ describe("SessionInspector collection items with src", () => {
 
   it("follows a selected live src item and closes its stream when the item leaves the collection", async () => {
     stubSessionFetch({
-      [attempt2Src]: [() => jsonResponse(remoteSession({ id: "attempt-2", messages: [textMessage("a2", "live attempt two")] }))],
+      [`${attempt2Src}?tail=100`]: [() => jsonResponse(remoteSession({ id: "attempt-2", messages: [textMessage("a2", "live attempt two")] }))],
     });
     const selected = ["attempt-1", "attempt-2"];
 
@@ -378,7 +403,7 @@ describe("SessionInspector collection items with src", () => {
     );
     await expectText("live attempt two");
     const stream = lastEventSource();
-    expect(stream.url).toBe(`${attempt2Src}?follow=1`);
+    expect(stream.url).toBe(`${attempt2Src}?follow=1&after=a2`);
 
     act(() => stream.emit("entry", textMessage("a2-2", "attempt two follow-up")));
     await expectText("attempt two follow-up");
@@ -396,7 +421,7 @@ describe("SessionInspector collection items with src", () => {
   it("loads and follows a current item that only carries src", async () => {
     const currentSrc = "/api/captain/sessions/attempt-3";
     stubSessionFetch({
-      [currentSrc]: [() => jsonResponse(remoteSession({ id: "attempt-3", messages: [textMessage("a3", "attempt three answer")] }))],
+      [`${currentSrc}?tail=100`]: [() => jsonResponse(remoteSession({ id: "attempt-3", messages: [textMessage("a3", "attempt three answer")] }))],
     });
 
     renderWithFakeStream(
@@ -412,7 +437,7 @@ describe("SessionInspector collection items with src", () => {
     expect(screen.getByText("Loading session…")).toBeInTheDocument();
     await expectText("attempt three answer");
     const stream = lastEventSource();
-    expect(stream.url).toBe(`${currentSrc}?follow=1`);
+    expect(stream.url).toBe(`${currentSrc}?follow=1&after=a3`);
 
     act(() => stream.emit("entry", textMessage("a3-2", "attempt three follow-up")));
     await expectText("attempt three follow-up");

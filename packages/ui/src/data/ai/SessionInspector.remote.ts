@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useEventSourceFactory,
   type EventSourceFactory,
@@ -10,18 +10,25 @@ import type {
   UnifiedSessionInput,
 } from "./SessionViewer.unified";
 
-// SessionInspector.remote loads a session from a URL and follows it live.
-// The contract (captain `SessionHandler`):
-//   GET {src}  Accept: application/json → one UnifiedSessionInput; a non-2xx
-//              body is `{error, …}` JSON or plain text, surfaced verbatim.
-//   GET {src}?follow=1 (SSE) → `entry` frames (one SessionUIMessage, upserted
+// SessionInspector.remote loads a session from a URL and follows it live,
+// asking only for the transcript's tail. The contract (captain
+// `SessionHandler`):
+//   GET {src}?tail=N  Accept: application/json → one UnifiedSessionInput with
+//              the newest N messages, and `window` (the full counts) when older
+//              ones were left out; a non-2xx body is `{error, …}` JSON or plain
+//              text, surfaced verbatim.
+//   GET {src}?before=<id>&limit=N → the N messages ahead of <id>: one page of
+//              history, loaded on demand (`loadOlder`) and prepended.
+//   GET {src}?follow=1&after=<id> (SSE) → `entry` frames for the messages
+//              after <id> and every later change (one SessionUIMessage, upserted
 //              by id), `state` frames ({revision, lifecycleStatus,
 //              activityState, facets}), `error` frames ({error}) and `: ping`
 //              comments. The server closes the stream once the session is
 //              terminal.
 // A `state` frame with a higher revision means aggregate facets (plan,
-// approvals, files, …) changed, so the aggregate is refetched; entries
-// streamed while it was in flight stay merged on top. `facets` is an opaque
+// approvals, files, …) changed, so the tail is refetched and merged into the
+// messages already held; entries streamed while it was in flight stay merged
+// on top. `facets` is an opaque
 // fingerprint of the non-message session facets (plan, todos, files, approval
 // requests): the first frame's value is the baseline (no refetch from it
 // alone), and any later frame whose `facets` differs from the last one seen
@@ -43,17 +50,27 @@ export function isTerminalSessionLifecycle(status: string | undefined) {
   );
 }
 
+/** Messages asked for by the first read and by each page of history. */
+export const DEFAULT_SESSION_PAGE_SIZE = 100;
+
 export interface RemoteSessionOptions {
   /** Force (`true`) or suppress (`false`) the live stream. By default a
    *  session follows only while it reports a non-terminal `lifecycleStatus`;
    *  a session that reports none is not followed. */
   follow?: boolean;
+  /** Messages per read: the first read's `tail` and each history page's
+   *  `limit`. Defaults to DEFAULT_SESSION_PAGE_SIZE. */
+  pageSize?: number;
 }
 
 export interface RemoteSessionState {
   session?: UnifiedSessionInput;
   error?: string;
   loading: boolean;
+  /** Older messages exist that `loadOlder` has not fetched yet. */
+  hasOlder?: boolean;
+  /** A `loadOlder` page is in flight. */
+  loadingOlder?: boolean;
 }
 
 /** The payload of a follow stream's `state` frame. */
@@ -71,20 +88,22 @@ export interface RemoteSessionHandle {
   /** Settles with the first fetched session, or rejects with the load error
    *  (which `onChange` has already reported as `error`). */
   loaded: Promise<UnifiedSessionInput>;
+  /** Fetches the page of history before the oldest message held and
+   *  prepends it; a no-op while one is in flight or nothing older remains. */
+  loadOlder: () => Promise<void>;
   close: () => void;
 }
 
-/** `src` with `follow=1` appended to its query, keeping any fragment last. */
-export function sessionFollowUrl(src: string) {
+/** `src` with `params` set in its query (replacing any of the same name),
+ *  keeping any fragment last. */
+export function sessionUrl(src: string, params: Record<string, string | number>) {
   const hashAt = src.indexOf("#");
   const base = hashAt === -1 ? src : src.slice(0, hashAt);
   const hash = hashAt === -1 ? "" : src.slice(hashAt);
-  const separator = !base.includes("?")
-    ? "?"
-    : base.endsWith("?") || base.endsWith("&")
-      ? ""
-      : "&";
-  return `${base}${separator}follow=1${hash}`;
+  const queryAt = base.indexOf("?");
+  const query = new URLSearchParams(queryAt === -1 ? "" : base.slice(queryAt + 1));
+  for (const [name, value] of Object.entries(params)) query.set(name, String(value));
+  return `${queryAt === -1 ? base : base.slice(0, queryAt)}?${query}${hash}`;
 }
 
 export async function fetchRemoteSession(
@@ -117,12 +136,15 @@ export async function fetchRemoteSession(
   return parsed as UnifiedSessionInput;
 }
 
-/** Upserts messages by id: a known id is replaced in place, a new one appended. */
+/** Upserts messages by id: a known id is replaced in place, a new one appended.
+ *  Placeholders stand in for a transcript that does not exist yet; the first
+ *  real message replaces them all, since its ids never match theirs. */
 export function mergeSessionMessages(
   base: readonly SessionUIMessage[] | undefined,
   incoming: readonly SessionUIMessage[],
 ): SessionUIMessage[] {
-  const merged = [...(base ?? [])];
+  const real = incoming.some((message) => !message.placeholder);
+  const merged = (base ?? []).filter((message) => !(real && message.placeholder));
   for (const message of incoming) {
     const index = merged.findIndex((existing) => existing.id === message.id);
     if (index === -1) merged.push(message);
@@ -137,6 +159,7 @@ export function openRemoteSession(
   src: string,
   {
     follow,
+    pageSize = DEFAULT_SESSION_PAGE_SIZE,
     eventSourceFactory,
     onChange,
   }: RemoteSessionOptions & {
@@ -144,7 +167,9 @@ export function openRemoteSession(
     onChange: (state: RemoteSessionState) => void;
   },
 ): RemoteSessionHandle {
-  const url = sessionFollowUrl(src);
+  let url = sessionUrl(src, { follow: 1 });
+  let olderPage: Promise<void> | undefined;
+  let pageError: string | undefined;
   const aborter = new AbortController();
   const streamed = new Map<string, { message: SessionUIMessage; seq: number }>();
   let closed = false;
@@ -169,24 +194,62 @@ export function openRemoteSession(
     emit({ ...state, loading: false, error: message });
   };
 
+  // Reads the tail and merges it into the messages already held — older pages
+  // and streamed entries — so a refetch never drops history the reader loaded.
   const refresh = async () => {
     const current = ++generation;
     const startedAt = seq;
-    const fetched = await fetchRemoteSession(src, aborter.signal);
+    const fetched = await fetchRemoteSession(sessionUrl(src, { tail: pageSize }), aborter.signal);
     if (closed || current !== generation) return undefined;
     const fetchedIds = new Set(fetched.messages?.map((message) => message.id));
     const keep = [...streamed.values()]
       .filter((entry) => entry.seq > startedAt || !fetchedIds.has(entry.message.id))
       .map((entry) => entry.message);
+    const held = mergeSessionMessages(state.session?.messages, fetched.messages ?? []);
     const session = {
       ...fetched,
-      messages: mergeSessionMessages(fetched.messages, keep),
+      messages: mergeSessionMessages(held, keep),
     };
     if (typeof fetched.revision === "number") {
       revision = Math.max(revision ?? fetched.revision, fetched.revision);
     }
-    emit({ ...state, session, loading: false });
+    const hasOlder =
+      state.session === undefined
+        ? (fetched.window?.messages ?? 0) > (fetched.messages?.length ?? 0)
+        : state.hasOlder;
+    emit({ ...state, session, loading: false, hasOlder: hasOlder ?? false });
     return session;
+  };
+
+  const loadOlder = (): Promise<void> => {
+    const oldest = state.session?.messages?.[0]?.id;
+    if (closed || olderPage || !state.hasOlder || !oldest) return olderPage ?? Promise.resolve();
+    emit({ ...state, loadingOlder: true });
+    olderPage = fetchRemoteSession(sessionUrl(src, { before: oldest, limit: pageSize }), aborter.signal)
+      .then((page) => {
+        const older = page.messages ?? [];
+        // A page that loads clears the alert a failed page raised, never a
+        // stream's terminal error.
+        const { error, ...rest } = state;
+        const session = state.session!;
+        emit({
+          ...rest,
+          ...(error !== undefined && error !== pageError ? { error } : {}),
+          loadingOlder: false,
+          hasOlder: older.length === pageSize,
+          session: { ...session, messages: mergeSessionMessages(older, session.messages ?? []) },
+        });
+        pageError = undefined;
+      })
+      .catch((reason: unknown) => {
+        if (closed) return;
+        pageError = errorMessage(reason);
+        emit({ ...state, loadingOlder: false, error: pageError });
+      })
+      .finally(() => {
+        olderPage = undefined;
+      });
+    return olderPage;
   };
 
   const readFrame = (event: Event): unknown => {
@@ -251,7 +314,13 @@ export function openRemoteSession(
     if (isTerminalSessionLifecycle(next.lifecycleStatus)) stopFollowing();
   };
 
+  // Resumes after the newest real message held, so the server replays only
+  // what came later; a placeholder is no position in the transcript, so a
+  // reader holding only placeholders follows from the start. A reconnect
+  // reuses this URL; replayed entries upsert by id.
   const startFollowing = () => {
+    const newest = state.session?.messages?.filter((message) => !message.placeholder).at(-1)?.id;
+    url = sessionUrl(src, newest ? { follow: 1, after: newest } : { follow: 1 });
     const es = eventSourceFactory(url);
     source = es;
     let received = false;
@@ -301,6 +370,7 @@ export function openRemoteSession(
 
   return {
     loaded,
+    loadOlder,
     close: () => {
       closed = true;
       aborter.abort();
@@ -312,16 +382,22 @@ export function openRemoteSession(
 const IDLE: RemoteSessionState = { loading: false };
 const LOADING: RemoteSessionState = { loading: true };
 
+export interface RemoteSessionView extends RemoteSessionState {
+  /** See RemoteSessionHandle.loadOlder; a no-op before the session loads. */
+  loadOlder: () => Promise<void>;
+}
+
 /** Loads `src` (undefined loads nothing) and follows it on demand; see
- *  `RemoteSessionOptions.follow`. Changing `src` or `follow`, or unmounting,
- *  closes the previous stream. */
+ *  `RemoteSessionOptions`. Changing `src`, `follow` or `pageSize`, or
+ *  unmounting, closes the previous stream. */
 export function useRemoteSession(
   src: string | undefined,
-  { follow }: RemoteSessionOptions = {},
-): RemoteSessionState {
+  { follow, pageSize }: RemoteSessionOptions = {},
+): RemoteSessionView {
   const eventSourceFactory = useEventSourceFactory();
   const factoryRef = useRef(eventSourceFactory);
   factoryRef.current = eventSourceFactory;
+  const handleRef = useRef<RemoteSessionHandle>(undefined);
   const [snapshot, setSnapshot] = useState<{
     src: string;
     state: RemoteSessionState;
@@ -332,16 +408,53 @@ export function useRemoteSession(
     setSnapshot({ src, state: LOADING });
     const handle = openRemoteSession(src, {
       ...(follow === undefined ? {} : { follow }),
+      ...(pageSize === undefined ? {} : { pageSize }),
       eventSourceFactory: factoryRef.current,
       onChange: (state) => setSnapshot({ src, state }),
     });
+    handleRef.current = handle;
     // A load failure already reached the state through onChange as `error`.
     handle.loaded.catch(() => undefined);
-    return handle.close;
-  }, [src, follow]);
+    return () => {
+      handle.close();
+      if (handleRef.current === handle) handleRef.current = undefined;
+    };
+  }, [src, follow, pageSize]);
 
-  if (src === undefined) return IDLE;
-  return snapshot?.src === src ? snapshot.state : LOADING;
+  const loadOlder = useCallback(() => handleRef.current?.loadOlder() ?? Promise.resolve(), []);
+  const state = src === undefined ? IDLE : snapshot?.src === src ? snapshot.state : LOADING;
+  return useMemo(() => ({ ...state, loadOlder }), [state, loadOlder]);
+}
+
+/** What a host learns about a `src`-backed inspector's load. `error` carries
+ *  the server's message (a 404 body's `error` field or plain text) or the
+ *  follow stream's terminal error frame. */
+export type SessionInspectorLoadState =
+  | { status: "loading" | "ready" }
+  | { status: "error"; error: Error };
+
+/** Reports `state` to `onChange` whenever its status or error changes; never
+ *  when `enabled` is false (in-memory sessions have no load to report). */
+export function useReportLoadState({
+  state,
+  enabled,
+  onChange,
+}: {
+  state: RemoteSessionState;
+  enabled: boolean;
+  onChange: ((state: SessionInspectorLoadState) => void) | undefined;
+}) {
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const { loading, error } = state;
+  useEffect(() => {
+    if (!enabled) return;
+    onChangeRef.current?.(
+      error !== undefined
+        ? { status: "error", error: new Error(error) }
+        : { status: loading ? "loading" : "ready" },
+    );
+  }, [enabled, loading, error]);
 }
 
 export interface RemoteCollectionState {
