@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { DOCUMENT_ANCHOR, type Comment } from "@flanksource/clicky-ui/comments";
 
-import { describeElement, elementBoxWithin, resolveAnchor, type Box } from "./dom-anchor";
+import {
+  describeElement,
+  elementBoxWithin,
+  overlayLabel,
+  resolveAnchor,
+  type Box,
+} from "./dom-anchor";
 
 export type AnchorPin = {
   anchor: string;
@@ -13,6 +19,8 @@ export type AnchorPin = {
 
 export type DomAnchors = {
   pins: AnchorPin[];
+  /** Pins inside open dialogs, with viewport (not scroll-container) boxes. */
+  overlayPins: AnchorPin[];
   /** Anchors whose element is no longer in the page. */
   orphans: string[];
   labels: Record<string, string>;
@@ -87,6 +95,7 @@ export function useDomAnchors(
 ): DomAnchors {
   const { scrollRef, contentRef } = refs;
   const [pins, setPins] = useState<AnchorPin[]>([]);
+  const [overlayPins, setOverlayPins] = useState<AnchorPin[]>([]);
   const [orphans, setOrphans] = useState<string[]>([]);
   const [labels, setLabels] = useState<Record<string, string>>({});
   const registeredRef = useRef<string[]>([]);
@@ -101,27 +110,38 @@ export function useDomAnchors(
     registeredRef.current = [];
 
     const nextPins: AnchorPin[] = [];
+    const nextOverlayPins: AnchorPin[] = [];
     const nextOrphans: string[] = [];
     const nextLabels: Record<string, string> = {};
 
     tallyAnchors(comments).forEach((tally, position) => {
       const element = resolveAnchor(content, tally.anchor);
+      const dialog = overlayLabel(tally.anchor);
       if (!(element instanceof HTMLElement)) {
-        nextOrphans.push(tally.anchor);
+        // A closed dialog is expected, not a broken anchor.
+        if (dialog === null) nextOrphans.push(tally.anchor);
+        else nextLabels[tally.anchor] = `In dialog “${dialog}” (closed)`;
         return;
       }
       registerAnchor(tally.anchor, element);
       registeredRef.current.push(tally.anchor);
       nextLabels[tally.anchor] = describeElement(element);
-      nextPins.push({
+      const { left, top, width, height } = element.getBoundingClientRect();
+      (dialog === null ? nextPins : nextOverlayPins).push({
         anchor: tally.anchor,
         index: position + 1,
-        box: elementBoxWithin(element, scroll),
+        box:
+          dialog === null
+            ? elementBoxWithin(element, scroll)
+            : { left, top, width, height },
         count: tally.count,
       });
     });
 
     setPins((current) => (samePins(current, nextPins) ? current : nextPins));
+    setOverlayPins((current) =>
+      samePins(current, nextOverlayPins) ? current : nextOverlayPins,
+    );
     setOrphans((current) => (sameList(current, nextOrphans) ? current : nextOrphans));
     setLabels((current) => {
       const keys = Object.keys(nextLabels);
@@ -165,5 +185,21 @@ export function useDomAnchors(
     };
   }, [contentRef, scheduleRecompute]);
 
-  return { pins, orphans, labels, recompute: scheduleRecompute };
+  // Dialogs portal into document.body and scroll on their own, so their
+  // anchors need the whole document watched, but only while any exist.
+  const watchOverlays = comments.some(
+    (comment) => !comment.parentId && overlayLabel(comment.anchor ?? "") !== null,
+  );
+  useEffect(() => {
+    if (!watchOverlays) return;
+    const mutationObserver = new MutationObserver(scheduleRecompute);
+    mutationObserver.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("scroll", scheduleRecompute, true);
+    return () => {
+      mutationObserver.disconnect();
+      window.removeEventListener("scroll", scheduleRecompute, true);
+    };
+  }, [scheduleRecompute, watchOverlays]);
+
+  return { pins, overlayPins, orphans, labels, recompute: scheduleRecompute };
 }
