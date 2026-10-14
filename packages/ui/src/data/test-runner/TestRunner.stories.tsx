@@ -144,7 +144,10 @@ export const InsideDialog: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement.ownerDocument.body);
-    await userEvent.click(canvas.getByTitle("Failed: neutral"));
+    await userEvent.click(canvas.getByRole("button", { name: /^Status/ }));
+    const statusMenu = within(await canvas.findByRole("menu", { name: "Status" }));
+    await userEvent.click(statusMenu.getByText("Failed"));
+    await userEvent.keyboard("{Escape}");
     const tree = within(canvas.getByRole("tree"));
     await userEvent.click(tree.getByText("case 3.3.2.3"));
     await expect(canvas.getByText("case 3.3.2.3 did not meet expectations")).toBeVisible();

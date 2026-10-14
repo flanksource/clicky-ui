@@ -63,8 +63,9 @@ describe("ClickyTable defaultHidden columns", () => {
     fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
     fireEvent.click(screen.getByRole("checkbox", { name: /host/i }));
 
-    const [storageKey] = Object.keys(window.localStorage);
-    expect(storageKey).toBeDefined();
+    expect(window.localStorage.length).toBe(1);
+    const storageKey = window.localStorage.key(0);
+    expect(storageKey).toMatch(/^clicky-ui-data-table-column-visibility:/);
     expect(window.localStorage.getItem(storageKey!)).toBe(
       JSON.stringify({ "cells.clientHost": false }),
     );

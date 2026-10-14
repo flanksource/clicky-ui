@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import { UiGearSix } from "../../icons";
 import { cn } from "../../lib/utils";
 import type { ChatModel } from "../chat/types";
@@ -262,8 +262,12 @@ export const WithLimits: Story = {
     await userEvent.click(body.getByRole("menuitem", { name: "Budget" }));
     await expect(body.getByLabelText("Budget (USD)")).toHaveValue("2");
     await userEvent.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(body.queryByRole("menu", { name: "Budget" })).not.toBeInTheDocument(),
+    );
+    await expect(body.getByRole("menu", { name: "Runtime options" })).toBeInTheDocument();
     await userEvent.keyboard("{Escape}");
-    await expect(body.queryByRole("menu")).not.toBeInTheDocument();
+    await waitFor(() => expect(body.queryByRole("menu")).not.toBeInTheDocument());
   },
 };
 
