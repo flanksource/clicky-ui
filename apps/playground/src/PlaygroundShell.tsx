@@ -12,9 +12,13 @@ import {
   CommentSidePanel,
   DOCUMENT_ANCHOR,
   useCommentContext,
+  useFloatingZIndex,
 } from "@flanksource/clicky-ui";
 
-import { CommentOverlay } from "./comments/CommentOverlay";
+import {
+  CommentOverlay,
+  DialogCommentOverlay,
+} from "./comments/CommentOverlay";
 import { useReactGrabComments } from "./comments/useReactGrabComments";
 import { PlaygroundCommentReview } from "./comments/PlaygroundCommentReview";
 import { useResolvedCommentReview } from "./comments/useResolvedCommentReview";
@@ -46,6 +50,7 @@ import {
   type PlaygroundComments,
 } from "./comments/useComments";
 import { useDomAnchors } from "./comments/useDomAnchors";
+import { overlayLabel } from "./comments/dom-anchor";
 import {
   fallbackPageSlug,
   loadPage,
@@ -129,7 +134,7 @@ export function PlaygroundShell({
       ? "Save or revert the source before changing pages"
       : undefined;
 
-  const { pins, orphans, labels } = useDomAnchors(
+  const { pins, overlayPins, orphans, labels } = useDomAnchors(
     { scrollRef: ctx.contentRef, contentRef },
     view === "preview" ? ctx.comments : [],
     ctx.registerAnchor,
@@ -211,6 +216,13 @@ export function PlaygroundShell({
     (review === "resolved" ||
       ctx.railMode !== "closed" ||
       ctx.comments.length > 0);
+  // Commenting inside a portaled dialog: lift the rail over the modal backdrop
+  // so its composer can be clicked without closing the dialog.
+  const floatingZIndex = useFloatingZIndex();
+  const railOverDialog =
+    ctx.railMode === "focused" &&
+    ctx.focusedAnchor !== null &&
+    overlayLabel(ctx.focusedAnchor) !== null;
   const editorOpen = editing && active !== undefined;
   const actionPage = pageAction?.page ?? active;
 
@@ -376,19 +388,32 @@ export function PlaygroundShell({
             </div>
 
             {view === "preview" && (
-              <CommentOverlay
-                pins={pins}
-                focusedAnchor={
-                  ctx.railMode === "focused" ? ctx.focusedAnchor : null
-                }
-                onFocus={ctx.focusAnchor}
-              />
+              <>
+                <CommentOverlay
+                  pins={pins}
+                  focusedAnchor={
+                    ctx.railMode === "focused" ? ctx.focusedAnchor : null
+                  }
+                  onFocus={ctx.focusAnchor}
+                />
+                <DialogCommentOverlay
+                  pins={overlayPins}
+                  focusedAnchor={
+                    ctx.railMode === "focused" ? ctx.focusedAnchor : null
+                  }
+                  onFocus={ctx.focusAnchor}
+                />
+              </>
             )}
           </ReviewProvider>
         </div>
 
         {railVisible && (
-          <div className="shrink-0 overflow-y-auto border-l border-border p-density-3">
+          <div
+            data-comment-rail
+            className="relative shrink-0 overflow-y-auto border-l border-border bg-background p-density-3"
+            {...(railOverDialog ? { style: { zIndex: floatingZIndex } } : {})}
+          >
             {review === "resolved" ? (
               <PlaygroundCommentReview
                 allComments={allComments}
