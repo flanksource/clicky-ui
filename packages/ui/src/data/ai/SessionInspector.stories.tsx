@@ -422,16 +422,18 @@ export const ControlledTabAndSelection: Story = {
 const REMOTE_SRC = "/stories/captain/sessions/session-parity";
 const STREAMED_TEXT = "Streamed from the follow stream";
 
-const remoteFetch: typeof fetch = async (input) =>
-  String(input) === REMOTE_SRC
+const remoteFetch: typeof fetch = async (input) => {
+  const url = new URL(input instanceof Request ? input.url : String(input), window.location.origin);
+  return url.pathname === REMOTE_SRC
     ? new Response(
         JSON.stringify({ ...INSPECTOR_SESSION, revision: 1, lifecycleStatus: "running" }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       )
-    : new Response(JSON.stringify({ error: `session ${String(input)} not found` }), {
+    : new Response(JSON.stringify({ error: `session ${url.pathname} not found` }), {
         status: 404,
         headers: { "Content-Type": "application/json" },
       });
+};
 
 function scriptedFollowStream(url: string): EventSourceLike {
   const listeners = new Map<string, EventListenerOrEventListenerObject[]>();
