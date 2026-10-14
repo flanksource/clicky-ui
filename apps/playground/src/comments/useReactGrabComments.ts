@@ -2,7 +2,9 @@ import { useEffect, useRef, type RefObject } from "react";
 import { commentPlugin, type ContextMenuActionContext } from "react-grab";
 
 import type { CommentScreenshotCapture } from "../../plugins/comments-model";
-import { cssPath } from "./dom-anchor";
+import { writeClipboard } from "./clipboard";
+import { copyContextMarkdown } from "./copy-context";
+import { commentAnchor } from "./dom-anchor";
 import { captureScreenshot } from "./screenshot";
 
 type Selection = {
@@ -24,21 +26,23 @@ export function useReactGrabComments(options: {
     let hadCommentPlugin = false;
     let previousDefaultAction: string | undefined;
 
-    const enabled = (context: { element: Element }) => {
+    const anchorOf = (element: Element) => {
       const { contentRef, enabled } = current.current;
-      return enabled && Boolean(contentRef.current?.contains(context.element));
+      const content = contentRef.current;
+      return enabled && content ? commentAnchor(element, content) : null;
     };
+    const enabled = (context: { element: Element }) =>
+      anchorOf(context.element) !== null;
     const select = (
       context: ContextMenuActionContext,
       withScreenshot: boolean,
     ) => {
-      const root = current.current.contentRef.current;
-      if (!root || !enabled(context)) {
+      const anchor = anchorOf(context.element);
+      if (anchor === null) {
         throw new Error(
-          "React Grab selected an element outside the playground artifact",
+          "React Grab selected an element outside the playground artifact and its titled dialogs",
         );
       }
-      const anchor = cssPath(context.element, root);
       context.hideContextMenu();
       context.cleanup();
       current.current.onSelect({
@@ -49,6 +53,23 @@ export function useReactGrabComments(options: {
           : {}),
       });
     };
+    // copyScreenshot puts the element's PNG and its copy context on the
+    // clipboard as one item. Everything starts synchronously, inside the
+    // action's gesture, which both getDisplayMedia and the clipboard require.
+    const copyScreenshot = (context: ContextMenuActionContext) => {
+      const text = copyContextMarkdown([context.element]);
+      context.hideContextMenu();
+      context.cleanup();
+      const image = captureScreenshot(context.element).then((capture) => {
+        if (capture.status !== "captured") {
+          throw new Error(`screenshot ${capture.reason}`);
+        }
+        return fetch(capture.dataUrl).then((response) => response.blob());
+      });
+      writeClipboard(text, image).catch((error: unknown) => {
+        console.error("[playground] Copy screenshot failed:", error);
+      });
+    };
     const register = () => {
       const grab = window.__REACT_GRAB__;
       if (!grab || registered) return;
@@ -57,7 +78,16 @@ export function useReactGrabComments(options: {
       if (hadCommentPlugin) grab.unregisterPlugin("comment");
       grab.registerPlugin({
         name: "playground-comments",
+        hooks: {
+          transformCopyContent: (_content, elements) =>
+            copyContextMarkdown(elements),
+        },
         actions: [
+          {
+            id: "playground-copy-screenshot",
+            label: "Copy screenshot",
+            onAction: copyScreenshot,
+          },
           {
             id: "playground-comment",
             label: "Comment",

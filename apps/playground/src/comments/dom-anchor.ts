@@ -13,6 +13,8 @@ export type Box = { left: number; top: number; width: number; height: number };
 const SAFE_ID = /^[A-Za-z][\w-]*$/;
 const ROOT_ANCHOR = ":scope";
 const MAX_LABEL_TEXT = 60;
+const OVERLAY_SEPARATOR = " >> ";
+const OVERLAY_ANCHOR = /^\[role="dialog"\]\[aria-label="((?:[^"\\]|\\.)*)"\] >> /;
 
 function childIndex(parent: Element, child: Element): number {
   return Array.prototype.indexOf.call(parent.children, child) + 1;
@@ -47,11 +49,42 @@ export function cssPath(target: Element, root: Element): string {
   return segments.join(" > ");
 }
 
+/**
+ * Builds the anchor for a clicked element. Elements inside the artifact get a
+ * path from `content`. Overlays (e.g. `Modal`) portal into `document.body`, so
+ * an element inside a titled dialog is keyed on that dialog's `aria-label`
+ * followed by a path within it. Anything else is not commentable (null).
+ */
+export function commentAnchor(target: Element, content: Element): string | null {
+  if (content.contains(target)) return cssPath(target, content);
+  const dialog = target.closest('[role="dialog"][aria-label]');
+  const label = dialog?.getAttribute("aria-label");
+  if (!dialog || !label) return null;
+  const quoted = label.replace(/["\\]/g, "\\$&");
+  return `[role="dialog"][aria-label="${quoted}"]${OVERLAY_SEPARATOR}${cssPath(target, dialog)}`;
+}
+
+/** The dialog title an overlay anchor is keyed on, or null for artifact anchors. */
+export function overlayLabel(anchor: string): string | null {
+  const match = OVERLAY_ANCHOR.exec(anchor);
+  return match?.[1] ? match[1].replace(/\\(["\\])/g, "$1") : null;
+}
+
 /** Resolves a stored anchor, returning null when the node is gone (orphaned). */
 export function resolveAnchor(root: Element, anchor: string): Element | null {
   if (anchor === ROOT_ANCHOR) return root;
+  const separator = anchor.indexOf(OVERLAY_SEPARATOR);
+  if (separator !== -1) {
+    const dialog = query(root.ownerDocument, anchor.slice(0, separator));
+    const path = anchor.slice(separator + OVERLAY_SEPARATOR.length);
+    return dialog && (path === ROOT_ANCHOR ? dialog : query(dialog, path));
+  }
+  return query(root, anchor);
+}
+
+function query(root: ParentNode, selector: string): Element | null {
   try {
-    return root.querySelector(anchor);
+    return root.querySelector(selector);
   } catch {
     // A selector stored against an older DOM can be unparseable. Treating that
     // as an orphan is the visible, domain-meaningful outcome — the sidebar says

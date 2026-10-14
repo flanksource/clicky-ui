@@ -113,6 +113,7 @@ export function useComments(
   const preparedSelection = useRef<{
     page: string;
     anchor: string;
+    target: Element;
     context: Promise<PromiseSettledResult<CommentElementContext>>;
     screenshot?: Promise<CommentScreenshotCapture>;
   } | null>(null);
@@ -126,6 +127,7 @@ export function useComments(
       preparedSelection.current = {
         page,
         anchor,
+        target,
         context: captureElementContext(
           target,
           `apps/playground/src/pages/${page}.tsx`,
@@ -202,21 +204,22 @@ export function useComments(
               "Playground content is not mounted for comment capture",
             );
           }
-          const target =
-            anchor === null || anchor === DOCUMENT_ANCHOR
-              ? content
-              : resolveAnchor(content, anchor);
-          if (!target) {
-            throw new Error(
-              `Comment anchor ${JSON.stringify(anchor)} no longer matches an element`,
-            );
-          }
-
           const prepared =
             preparedSelection.current?.page === page &&
             preparedSelection.current.anchor === anchor
               ? preparedSelection.current
               : null;
+          // A dialog may close between picking an element and posting; the
+          // prepared selection captured its context while it was still open.
+          const target =
+            anchor === null || anchor === DOCUMENT_ANCHOR
+              ? content
+              : (resolveAnchor(content, anchor) ?? prepared?.target);
+          if (!target) {
+            throw new Error(
+              `Comment anchor ${JSON.stringify(anchor)} no longer matches an element`,
+            );
+          }
           const screenshot =
             actionId === "screenshot"
               ? (prepared?.screenshot ?? captureScreenshot(target))
