@@ -154,17 +154,17 @@ function MenuSubmenu({ item }: { item: DropdownMenuItem }) {
     [hover, click, role, dismiss, listNav],
   );
 
-  useEscapeLayer(isOpen, () => setIsOpen(false));
+  useEscapeLayer(isOpen, () => context.onOpenChange(false));
 
   useEffect(() => {
     if (!tree) return;
-    const closeAll = () => setIsOpen(false);
+    const closeAll = () => context.onOpenChange(false);
     const closeSiblings = (event: {
       nodeId: string;
       parentId: string | null;
     }) => {
       if (event.nodeId !== nodeId && event.parentId === parentId) {
-        setIsOpen(false);
+        context.onOpenChange(false);
       }
     };
     tree.events.on("click", closeAll);
@@ -173,7 +173,7 @@ function MenuSubmenu({ item }: { item: DropdownMenuItem }) {
       tree.events.off("click", closeAll);
       tree.events.off("menuopen", closeSiblings);
     };
-  }, [tree, nodeId, parentId]);
+  }, [tree, nodeId, parentId, context.onOpenChange]);
 
   useEffect(() => {
     if (isOpen && tree) tree.events.emit("menuopen", { parentId, nodeId });
