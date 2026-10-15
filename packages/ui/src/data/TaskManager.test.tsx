@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TaskManager } from "./TaskManager";
 import type { TaskRunMeta, TaskSnapshot } from "./TaskSnapshot";
@@ -68,6 +68,31 @@ describe("TaskManager selection", () => {
     await waitFor(() => expect(screen.getByText("reorg idx_c")).toBeInTheDocument());
   });
 
+  it("renders a run table and all child progress in the selected row detail", async () => {
+    const snapshots: TaskSnapshot[] = [
+      { id: "group", name: "Batch", type: "group", status: "running", groupId: "g1", total: 5, running: 1 },
+      ...["First", "Second", "Third", "Fourth", "Fifth"].map((name, index) => ({
+        id: `task-${index}`,
+        name,
+        type: "task" as const,
+        status: index === 0 ? "running" : "pending",
+        groupId: "g1",
+      })),
+    ];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => ({
+      ok: true,
+      json: async () => String(input).includes("/tasks/g1") ? snapshots : [{ ...RUN, name: "Batch", status: "running", total: 5, completed: 0, running: 1 }],
+    }) as Response));
+
+    renderManager(createClient(), <TaskManager basePath="/api/v1" selectedId="g1" onSelectRun={() => {}} />);
+
+    const table = await screen.findByRole("table");
+    expect(within(table).getByRole("columnheader", { name: /^Run / })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: /^Status / })).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: /^Progress / })).toBeInTheDocument();
+    expect(await screen.findByText("Fifth")).toBeInTheDocument();
+  });
+
   it("calls onSelectRun with the run id when a collapsed row is clicked", async () => {
     vi.stubGlobal("fetch", mockFetch());
     const onSelectRun = vi.fn();
@@ -88,7 +113,7 @@ describe("TaskManager selection", () => {
     expect(onSelectRun).toHaveBeenCalledWith(null);
   });
 
-  it("groups an unfiltered task list by application", async () => {
+  it("keeps application kinds in FilterBar without a Kind table column", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({
       ok: true,
       json: async () => [
@@ -99,10 +124,89 @@ describe("TaskManager selection", () => {
 
     renderManager(createClient(), <TaskManager basePath="/api/v1" />);
 
-    expect(await screen.findByRole("heading", { name: "OpenSCAD" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Orca" })).toBeInTheDocument();
+    const table = await screen.findByRole("table");
+    expect(within(table).queryByRole("columnheader", { name: /^Kind / })).not.toBeInTheDocument();
+    fireEvent.focus(screen.getByRole("combobox", { name: "Kind" }));
+    expect(screen.getByRole("option", { name: "OpenSCAD" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Orca" })).toBeInTheDocument();
     expect(screen.getByText("Preview model")).toBeInTheDocument();
     expect(screen.getByText("Slice model")).toBeInTheDocument();
+  });
+
+  it("shows run labels as tags and formats the elapsed duration from run timestamps", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      json: async () => [{
+        ...RUN,
+        labels: { team: "platform", region: "eu" },
+        startedAt: "2026-10-15T07:00:00Z",
+        finishedAt: "2026-10-15T07:02:00Z",
+      }],
+    }) as Response));
+
+    renderManager(createClient(), <TaskManager basePath="/api/v1" />);
+
+    const table = await screen.findByRole("table");
+    expect(within(table).getAllByRole("columnheader").map((header) => header.textContent?.replace(/[↕↑↓]/g, "").trim())).toEqual([
+      "Run", "Status", "Duration", "Progress", "Labels", "Started", "Finished",
+    ]);
+    const row = within(table).getAllByRole("row")[1]!;
+    expect(within(row).getByText("team")).toBeInTheDocument();
+    expect(within(row).getByText("platform")).toBeInTheDocument();
+    expect(within(row).getByText("region")).toBeInTheDocument();
+    expect(within(row).getByText("eu")).toBeInTheDocument();
+    expect(row).toHaveTextContent("2 min");
+  });
+
+  it("uses FilterBar controls to query by kind, status, and a run label", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => [{ ...RUN, labels: { team: "platform" } }],
+    }) as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    renderManager(createClient(), <TaskManager basePath="/api/v1" />);
+
+    await screen.findByText("fix-run");
+    fireEvent.focus(screen.getByLabelText("Kind"));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "sql-fix" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/tasks?kind=sql-fix",
+      expect.anything(),
+    ));
+
+    fireEvent.focus(screen.getByLabelText("Status"));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Failed" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/tasks?kind=sql-fix&status=failed",
+      expect.anything(),
+    ));
+
+    fireEvent.focus(screen.getByLabelText("Labels"));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "team=platform" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/tasks?kind=sql-fix&status=failed&label=team%3Dplatform",
+      expect.anything(),
+    ));
+  });
+
+  it("keeps the table filters visible when the listing is empty", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => [] }) as Response));
+    renderManager(createClient(), <TaskManager basePath="/api/v1" />);
+
+    expect(await screen.findByText("No background tasks.")).toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Kind" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Status" })).toBeInTheDocument();
+  });
+
+  it("keeps status visible within the run cell in a compact panel", async () => {
+    vi.stubGlobal("fetch", mockFetch());
+    renderManager(createClient(), <TaskManager basePath="/api/v1" compact />);
+
+    const table = await screen.findByRole("table");
+    expect(within(table).getAllByRole("columnheader")).toHaveLength(3);
+    expect(within(table).getByText("sql-fix")).toBeInTheDocument();
+    expect(within(table).getByText("warning")).toBeInTheDocument();
   });
 
   it("scopes the run listing with label equality filters", async () => {
@@ -234,7 +338,8 @@ describe("TaskManager selection", () => {
     // Narrow to status=failed. The transport re-subscribes, but the warning run
     // stays on screen until the new stream delivers — it must not be cached as
     // if it were the failed-only result.
-    fireEvent.change(screen.getByDisplayValue("Any status"), { target: { value: "failed" } });
+    fireEvent.focus(screen.getByLabelText("Status"));
+    fireEvent.mouseDown(screen.getByRole("option", { name: "Failed" }));
     await waitFor(() => {
       expect(eventSources.map((source) => source.url)).toContain(
         "/api/v1/tasks/runs/stream?kind=sql-fix&status=failed",

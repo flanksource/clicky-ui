@@ -2,22 +2,25 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { hashKey, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
 import { cn } from "../lib/utils";
+import { formatDuration } from "../lib/format";
+import { useResourceClock } from "../hooks/use-resource-clock";
 import { useTaskRun, useTaskRuns } from "../hooks/use-task-run";
+import type { FilterBarFilter } from "../components/FilterBar";
 import { Icon } from "./Icon";
+import { DataTable, type DataTableColumn } from "./DataTable";
+import { splitTagToken } from "./cells/tag-utils";
 import { ProgressBar } from "./ProgressBar";
-import { Timestamp } from "./cells/Timestamp";
 import { TaskProgress } from "./TaskProgress";
 import { taskWorkProgress } from "./task-work-progress";
 import type { TaskControlAction, TaskRunMeta, TaskSnapshot } from "./TaskSnapshot";
 import type { TaskHeaderExtra } from "./TaskHeaderExtras";
 import type { TaskExtraTabs } from "./TaskStreamTabs";
 import { taskQueryKeys } from "./task-query-keys";
-import { taskSegments, taskStatusBg, taskStatusColor, taskStatusIcon } from "./task-status";
+import { taskSegments, taskStatusColor, taskStatusIcon } from "./task-status";
 
 // TaskManager is the generic clicky-ui task-manager view: it lists every run
 // (TaskRunMeta) from GET {basePath}/tasks with kind/status filters, and expands
-// each row into a live <TaskProgress> for that run id. Runs are grouped by kind,
-// which applications use as their stable task identity.
+// each row into a live <TaskProgress> for that run id.
 //
 // Requires a react-query QueryClientProvider in the host app (like
 // TimeseriesPanel and CacheBrowser): control actions run through useMutation,
@@ -32,6 +35,8 @@ export interface TaskManagerProps {
   labels?: Record<string, string>;
   pollMs?: number;
   className?: string;
+  /** Keep the run columns usable in a narrow panel. */
+  compact?: boolean;
   /**
    * Currently-selected (expanded) run id, e.g. driven from the URL. When set,
    * the matching run renders expanded and selection is controlled — otherwise
@@ -55,12 +60,79 @@ export interface TaskManagerProps {
   headerExtra?: TaskHeaderExtra;
 }
 
+type RunTableRow = Record<string, unknown> & {
+  id: string;
+  name: string;
+  kind: string;
+  status: string;
+  startedAt?: string;
+  finishedAt?: string;
+  labels?: Record<string, string>;
+  run: TaskRunMeta;
+};
+
+const progressColumn: DataTableColumn<RunTableRow> = {
+  key: "progress", label: "Progress", minWidth: 180,
+  accessor: (row) => taskWorkProgress(row.run).done,
+  render: (_, row) => {
+    const progress = taskWorkProgress(row.run);
+    return (
+      <div className="min-w-36 space-y-1">
+        <span className="text-xs tabular-nums text-muted-foreground">{progress.label}</span>
+        {progress.total > 0 && <ProgressBar segments={taskSegments(progress.counts)} total={progress.total} height="h-1.5" />}
+      </div>
+    );
+  },
+};
+const startedColumn: DataTableColumn<RunTableRow> = { key: "startedAt", label: "Started", kind: "timestamp", sortable: true };
+const durationColumn: DataTableColumn<RunTableRow> = {
+  key: "duration", label: "Duration", sortable: true,
+  accessor: (row) => row.startedAt ? Date.parse(row.finishedAt ?? new Date().toISOString()) - Date.parse(row.startedAt) : null,
+  render: (_, row) => <RunDuration startedAt={row.startedAt} finishedAt={row.finishedAt} />,
+};
+const runColumns: DataTableColumn<RunTableRow>[] = [
+  { key: "name", label: "Run", sortable: true, grow: true, minWidth: 220 },
+  {
+    key: "status", label: "Status", sortable: true,
+    render: (_, row) => (
+      <span className={cn("inline-flex items-center gap-1.5 capitalize", taskStatusColor(row.status))}>
+        <Icon icon={taskStatusIcon(row.status)} {...(row.status === "running" ? { className: "animate-spin" } : {})} />
+        {row.status}
+      </span>
+    ),
+  },
+  durationColumn,
+  progressColumn,
+  { key: "labels", label: "Labels", kind: "tags", tags: { maxVisible: 2 }, minWidth: 160 },
+  startedColumn,
+  { key: "finishedAt", label: "Finished", kind: "timestamp", sortable: true },
+];
+const compactRunColumns: DataTableColumn<RunTableRow>[] = [
+  {
+    key: "name", label: "Run", sortable: true, grow: true, minWidth: 220,
+    render: (_, row) => (
+      <div className="space-y-0.5">
+        <div className="font-medium">{row.name}</div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{applicationLabel(row.kind)}</span>
+          <span className={cn("inline-flex items-center gap-1 capitalize", taskStatusColor(row.status))}>
+            <Icon icon={taskStatusIcon(row.status)} />{row.status}
+          </span>
+        </div>
+      </div>
+    ),
+  },
+  progressColumn,
+  startedColumn,
+];
+
 export function TaskManager({
   basePath,
   kind,
   labels,
   pollMs,
   className,
+  compact,
   selectedId,
   onSelectRun,
   extraTabs,
@@ -68,13 +140,21 @@ export function TaskManager({
 }: TaskManagerProps) {
   const [kindFilter, setKindFilter] = useState<string>(kind ?? "");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [labelFilter, setLabelFilter] = useState("");
+  const [filterOptions, setFilterOptions] = useState({ kinds: [] as string[], labels: [] as string[] });
+  const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const apiBase = basePath ?? "/api/v1";
   const activeKind = kind ?? (kindFilter || undefined);
+  const activeLabels = useMemo(() => {
+    if (!labelFilter) return labels;
+    const selected = splitTagToken(labelFilter);
+    return { ...labels, [selected.key]: selected.value };
+  }, [labels, labelFilter]);
   const { runs, runsKey, status } = useTaskRuns({
     basePath: apiBase,
     kind: activeKind,
-    labels,
+    labels: activeLabels,
     status: statusFilter || undefined,
     pollMs,
   });
@@ -83,9 +163,9 @@ export function TaskManager({
       basePath: apiBase,
       kind: activeKind,
       status: statusFilter || undefined,
-      labels,
+      labels: activeLabels,
     }),
-    [activeKind, apiBase, labels, statusFilter],
+    [activeKind, apiBase, activeLabels, statusFilter],
   );
 
   // Changing a filter re-subscribes the transport but leaves the previous
@@ -97,87 +177,74 @@ export function TaskManager({
     queryClient.setQueryData(runsQueryKey, runs);
   }, [queryClient, runs, runsKey, runsQueryKey]);
 
-  const kinds = useMemo(() => {
-    const set = new Set<string>();
-    for (const r of runs) if (r.kind) set.add(r.kind);
-    return [...set].sort();
+  useEffect(() => {
+    setFilterOptions((previous) => {
+      const kinds = [...new Set([...previous.kinds, ...runs.flatMap((run) => run.kind ? [run.kind] : [])])].sort();
+      const labels = [...new Set([...previous.labels, ...runs.flatMap((run) => Object.entries(run.labels ?? {}).map(([key, value]) => `${key}=${value}`))])].sort();
+      if (kinds.length === previous.kinds.length && labels.length === previous.labels.length) return previous;
+      return { kinds, labels };
+    });
   }, [runs]);
-  const applications = useMemo(() => groupRunsByApplication(runs), [runs]);
+  const filters: FilterBarFilter[] = [
+    ...(!kind ? [{ key: "kind", kind: "enum" as const, label: "Kind", placeholder: "All kinds", value: kindFilter, options: filterOptions.kinds.map((value) => ({ value, label: applicationLabel(value) })), onChange: setKindFilter }] : []),
+    { key: "status", kind: "enum", label: "Status", placeholder: "Any status", value: statusFilter, options: [
+      { value: "running", label: "Running" },
+      { value: "pending", label: "Pending" },
+      { value: "success", label: "Success" },
+      { value: "failed", label: "Failed" },
+      { value: "warning", label: "Warning" },
+      { value: "canceled", label: "Canceled" },
+    ], onChange: setStatusFilter },
+    { key: "labels", kind: "enum", label: "Labels", placeholder: "Any label", value: labelFilter,
+      options: filterOptions.labels.filter((token) => !(splitTagToken(token).key in (labels ?? {}))).map((value) => ({ value })),
+      onChange: setLabelFilter },
+  ];
+  const rows = useMemo<RunTableRow[]>(() => runs.map((run) => ({
+    id: run.id,
+    name: run.name,
+    kind: run.kind || "other",
+    status: run.status,
+    ...(run.startedAt ? { startedAt: run.startedAt } : {}),
+    ...(run.finishedAt ? { finishedAt: run.finishedAt } : {}),
+    ...(run.labels ? { labels: run.labels } : {}),
+    run,
+  })), [runs]);
+  const openId = onSelectRun ? selectedId : localSelectedId;
 
   return (
-    <div className={cn("space-y-3", className)}>
-      <div className="flex flex-wrap items-center gap-2">
-        {!kind && (
-          <select
-            className="rounded-md border bg-background px-2 py-1 text-xs"
-            value={kindFilter}
-            onChange={(e) => setKindFilter(e.target.value)}
-          >
-            <option value="">All kinds</option>
-            {kinds.map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
-        )}
-        <select
-          className="rounded-md border bg-background px-2 py-1 text-xs"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">Any status</option>
-          <option value="running">Running</option>
-          <option value="pending">Pending</option>
-          <option value="success">Success</option>
-          <option value="failed">Failed</option>
-          <option value="warning">Warning</option>
-          <option value="canceled">Canceled</option>
-        </select>
-        <span className="text-xs text-muted-foreground">{status}</span>
-      </div>
-
-      {runs.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No background tasks.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {applications.map((application) => (
-            <section key={application.kind}>
-              <h3 className="mb-1 px-1 text-xs font-semibold text-muted-foreground">
-                {applicationLabel(application.kind)}
-              </h3>
-              <div className="overflow-hidden rounded-lg border bg-card">
-                {application.runs.map((run) => (
-                  <RunRow
-                    key={run.id}
-                    run={run}
-                    basePath={basePath}
-                    pollMs={pollMs}
-                    selectedId={selectedId}
-                    onSelectRun={onSelectRun}
-                    runsQueryKey={runsQueryKey}
-                    extraTabs={extraTabs}
-                    headerExtra={headerExtra}
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
+    <DataTable
+      {...(className ? { className } : {})}
+      data={rows}
+      columns={compact ? compactRunColumns : runColumns}
+      emptyMessage="No background tasks."
+      externalFilters={filters}
+      filterBarProps={{ trailing: <span className="text-xs text-muted-foreground">{status}</span> }}
+      getRowId={(row) => row.id}
+      defaultSort={{ key: "startedAt", dir: "desc" }}
+      expandedRowIds={openId ? [openId] : []}
+      onExpandedRowIdsChange={(ids) => {
+        const next = ids.find((id) => id !== openId) ?? null;
+        if (onSelectRun) onSelectRun(next);
+        else setLocalSelectedId(next);
+      }}
+      renderExpandedRow={(row) => (
+        <ExpandedRun
+          run={row.run}
+          basePath={basePath}
+          pollMs={pollMs}
+          runsQueryKey={runsQueryKey}
+          extraTabs={extraTabs}
+          headerExtra={headerExtra}
+        />
       )}
-    </div>
+    />
   );
 }
 
-function groupRunsByApplication(runs: TaskRunMeta[]) {
-  const grouped = new Map<string, TaskRunMeta[]>();
-  for (const run of runs) {
-    const application = run.kind || "other";
-    grouped.set(application, [...(grouped.get(application) ?? []), run]);
-  }
-  return [...grouped].map(([kind, applicationRuns]) => ({ kind, runs: applicationRuns }));
+function RunDuration({ startedAt, finishedAt }: { startedAt: string | undefined; finishedAt: string | undefined }) {
+  const now = useResourceClock(!!startedAt && !finishedAt);
+  if (!startedAt) return <span className="text-muted-foreground">—</span>;
+  return <span className="tabular-nums">{formatDuration(Math.max(0, (finishedAt ? Date.parse(finishedAt) : now) - Date.parse(startedAt)))}</span>;
 }
 
 function applicationLabel(kind: string): string {
@@ -191,12 +258,10 @@ function applicationLabel(kind: string): string {
   return names[kind] ?? kind;
 }
 
-function RunRow({
+function ExpandedRun({
   run,
   basePath,
   pollMs,
-  selectedId,
-  onSelectRun,
   runsQueryKey,
   extraTabs,
   headerExtra,
@@ -204,104 +269,11 @@ function RunRow({
   run: TaskRunMeta;
   basePath: string | undefined;
   pollMs: number | undefined;
-  selectedId: string | undefined;
-  onSelectRun: ((id: string | null) => void) | undefined;
   runsQueryKey: QueryKey;
   extraTabs: TaskExtraTabs | undefined;
   headerExtra: TaskHeaderExtra | undefined;
 }) {
-  const [localOpen, setLocalOpen] = useState(false);
-  // Controlled by selectedId when a selection handler is wired; otherwise the
-  // row owns its expand state (backward compatible for router-less consumers).
-  const controlled = onSelectRun !== undefined;
-  const open = controlled ? selectedId === run.id : localOpen;
-  const toggle = () => {
-    if (controlled) onSelectRun(open ? null : run.id);
-    else setLocalOpen((v) => !v);
-  };
-  const isTerminal = run.status !== "running" && run.status !== "pending";
-  const progress = taskWorkProgress(run);
-
-  return (
-    <div className="border-b last:border-0">
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-muted/50"
-        onClick={toggle}
-      >
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <Icon
-              icon={taskStatusIcon(run.status)}
-              className={cn(taskStatusColor(run.status), run.status === "running" && "animate-spin")}
-            />
-            <span className="truncate font-medium">{run.name}</span>
-            {run.kind && (
-              <span className="rounded-full bg-muted px-1.5 py-0 text-[10px] text-muted-foreground">
-                {run.kind}
-              </span>
-            )}
-            {isTerminal && (
-              <span
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-xs",
-                  taskStatusColor(run.status),
-                  taskStatusBg(run.status),
-                )}
-              >
-                {run.status}
-              </span>
-            )}
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-            {run.startedAt && <Timestamp value={run.startedAt} format="relative" />}
-            <span>
-              {progress.label}
-            </span>
-            {Object.entries(run.labels ?? {}).map(([k, v]) => (
-              <span key={k} className="font-mono">
-                {k}={v}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="w-40 shrink-0">
-          <ProgressBar
-            segments={taskSegments(progress.counts)}
-            total={progress.total || 1}
-            height="h-1.5"
-          />
-        </div>
-      </button>
-      {open && (
-        <ExpandedRun
-          runId={run.id}
-          basePath={basePath}
-          pollMs={pollMs}
-          runsQueryKey={runsQueryKey}
-          extraTabs={extraTabs}
-          headerExtra={headerExtra}
-        />
-      )}
-    </div>
-  );
-}
-
-function ExpandedRun({
-  runId,
-  basePath,
-  pollMs,
-  runsQueryKey,
-  extraTabs,
-  headerExtra,
-}: {
-  runId: string;
-  basePath: string | undefined;
-  pollMs: number | undefined;
-  runsQueryKey: QueryKey;
-  extraTabs: TaskExtraTabs | undefined;
-  headerExtra: TaskHeaderExtra | undefined;
-}) {
+  const runId = run.id;
   const { snapshots, status } = useTaskRun({ id: runId, basePath, pollMs });
   const apiBase = basePath ?? "/api/v1";
   const queryClient = useQueryClient();
@@ -354,12 +326,23 @@ function ExpandedRun({
       action,
       target: task,
     });
+  const progress = taskWorkProgress(run);
   return (
-    <div className="border-t bg-muted/30 px-4 py-3">
+    <div className="space-y-3 bg-muted/20 px-4 py-4">
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
+        <span>{progress.completed} completed</span>
+        <span>{progress.running} running</span>
+        <span>{progress.failed} failed</span>
+        <span>{progress.counts.pending + progress.unstarted} waiting</span>
+        {Object.entries(run.labels ?? {}).map(([key, value]) => (
+          <span key={key} className="font-mono">{key}={value}</span>
+        ))}
+      </div>
       <TaskProgress
         snapshots={snapshots}
-        connectionStatus={status}
         compact
+        connectionStatus={status}
+        initialShowAllTasks
         onControl={control}
         onTaskControl={controlTask}
         metricsBaseUrl={`${apiBase}/tasks/metrics/`}

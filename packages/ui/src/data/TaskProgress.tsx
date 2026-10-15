@@ -46,6 +46,8 @@ export interface TaskProgressProps {
   title?: string;
   /** Tighter spacing for embedding in a panel. */
   compact?: boolean;
+  /** Show every child task when the group first opens. */
+  initialShowAllTasks?: boolean;
   className?: string;
   onControl?: (action: TaskControlAction, group: TaskSnapshot) => void | Promise<void>;
   onTaskControl?: (
@@ -72,6 +74,7 @@ export function TaskProgress({
   snapshots,
   title,
   compact,
+  initialShowAllTasks,
   className,
   onControl,
   onTaskControl,
@@ -100,6 +103,7 @@ export function TaskProgress({
           group={g}
           tasks={tasks.filter((t) => g.groupId ? t.groupId === g.groupId : t.group === g.id)}
           compact={compact}
+          initialShowAllTasks={initialShowAllTasks}
           {...(onControl ? { onControl } : {})}
           {...(onTaskControl ? { onTaskControl } : {})}
           {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
@@ -116,6 +120,7 @@ function TaskGroupCard({
   group: g,
   tasks,
   compact,
+  initialShowAllTasks,
   onControl,
   onTaskControl,
   metricsBaseUrl,
@@ -126,6 +131,7 @@ function TaskGroupCard({
   group: TaskSnapshot;
   tasks: TaskSnapshot[];
   compact: boolean | undefined;
+  initialShowAllTasks: boolean | undefined;
   extraTabs?: TaskExtraTabs;
   headerExtra?: TaskHeaderExtra;
   onControl?: (action: TaskControlAction, group: TaskSnapshot) => void | Promise<void>;
@@ -137,7 +143,7 @@ function TaskGroupCard({
   metricsBaseUrl?: string;
   connectionStatus?: string;
 }) {
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(initialShowAllTasks ?? false);
   const { state: copyState, copy } = useCopyFlash();
   const work = taskWorkProgress(g);
   const total = g.work ? work.total : g.total ?? tasks.length;
@@ -176,8 +182,8 @@ function TaskGroupCard({
   ];
 
   return (
-    <div className={cn("rounded-lg border bg-card", compact ? "p-3" : "p-4")}>
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <div className={cn("rounded-lg border bg-card", compact ? "p-2" : "p-4")}>
+      <div className={cn("flex items-center justify-between gap-3", compact ? "mb-2" : "mb-3")}>
         <h3 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
           <Icon
             icon={taskStatusIcon(g.status)}
@@ -223,7 +229,7 @@ function TaskGroupCard({
       </div>
 
       {total > 0 && (
-        <div className="mb-3">
+        <div className={compact ? "mb-2" : "mb-3"}>
           <ProgressBar segments={taskSegments(counts)} total={total} height="h-1.5" />
         </div>
       )}
@@ -243,7 +249,7 @@ function TaskGroupCard({
       {hiddenCompleted > 0 || hiddenPending > 0 ? (
         <button
           type="button"
-          className="border-b py-1.5 text-xs text-muted-foreground hover:text-foreground"
+          className={cn("border-b text-xs text-muted-foreground hover:text-foreground", compact ? "py-1" : "py-1.5")}
           onClick={() => setShowAll((v) => !v)}
         >
           {showAll
@@ -257,6 +263,7 @@ function TaskGroupCard({
           key={t.id}
           task={t}
           group={g}
+          compact={compact}
           {...(onTaskControl ? { onTaskControl } : {})}
           {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
           {...(connectionStatus ? { connectionStatus } : {})}
@@ -271,6 +278,7 @@ function TaskGroupCard({
 function TaskRow({
   task: t,
   group,
+  compact,
   onTaskControl,
   metricsBaseUrl,
   connectionStatus,
@@ -279,6 +287,7 @@ function TaskRow({
 }: {
   task: TaskSnapshot;
   group: TaskSnapshot;
+  compact: boolean | undefined;
   metricsBaseUrl?: string;
   connectionStatus?: string;
   extraTabs?: TaskExtraTabs;
@@ -315,14 +324,15 @@ function TaskRow({
   return (
     <div
       className={cn(
-        "group flex items-start gap-3 border-b py-2 last:border-0",
+        "group flex items-start border-b last:border-0",
+        compact ? "gap-2 py-1" : "gap-3 py-2",
         expandable && "-mx-1 cursor-pointer rounded px-1 hover:bg-muted/50",
       )}
       onClick={expandable ? () => setExpanded((v) => !v) : undefined}
     >
       <Icon
         icon={taskStatusIcon(t.status)}
-        className={cn(taskStatusColor(t.status), "mt-0.5 text-lg", t.status === "running" && "animate-spin")}
+        className={cn(taskStatusColor(t.status), "mt-0.5", compact ? "text-base" : "text-lg", t.status === "running" && "animate-spin")}
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
