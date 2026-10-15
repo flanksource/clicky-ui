@@ -126,9 +126,11 @@ export function TerminalCastPlayer({
         {timeline.exit?.command ? <code className="font-mono text-foreground">{timeline.exit.command}</code> : null}
         {timeline.exit ? <ExitBadge exit={timeline.exit} /> : null}
         {timeline.exit?.truncated ? (
-          <Badge variant="soft" tone="warning" size="sm" title="Size caps or a full buffer stopped some output events being recorded">
-            output truncated
-          </Badge>
+          <span title="Size caps or a full buffer stopped some output events being recorded">
+            <Badge variant="soft" tone="warning" size="sm">
+              output truncated
+            </Badge>
+          </span>
         ) : null}
         <span className="tabular-nums">{`${timeline.width}x${timeline.height}`}</span>
         <span className="flex-1" />
