@@ -13,6 +13,7 @@ import {
   testStatus,
   totalDuration,
 } from "./status";
+import { toolKeyFor } from "./marks";
 import { OutcomeIcon, ToolIcon } from "./MarkIcons";
 
 const NAME_TONE: Record<string, string> = {
@@ -76,7 +77,7 @@ export function TestTreeNode({ node, selected }: { node: Test; selected: boolean
       {fwNode != null ? (
         <span className="flex shrink-0 items-center text-sm">{fwNode}</span>
       ) : (
-        <ToolIcon tool={node.framework} className="text-sm" />
+        <ToolIcon tool={toolKeyFor(node)} className="text-sm" />
       )}
 
       {leadingAdapter?.renderRowLeading?.({ node, runner })}

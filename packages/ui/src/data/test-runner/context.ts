@@ -37,6 +37,8 @@ export type TestRunnerContext = {
   activeTab?: string | undefined;
   /** Called with the picked tab id when the detail tab is controlled. */
   onTabChange?: ((tabId: string) => void) | undefined;
+  activeAttempt?: number | undefined;
+  onAttemptChange?: ((attempt: number) => void) | undefined;
 
   onSelect: (node: Test | null) => void;
   onFiltersChange: (next: TestFilters) => void;

@@ -4,7 +4,10 @@
 // Refresh). Ported from gavel's VerificationStepOutput.tsx (the checklist list
 // and the CelDetails block).
 
+import type { ReactNode } from "react";
 import { JsonView } from "../JsonView";
+import { readStepDetail, type WaitDetail } from "./stepKind";
+import { MalformedStepDetail, StepKindSections } from "./stepKindViews";
 import {
   Expectation,
   OutcomeIcon,
@@ -97,10 +100,17 @@ export function CelDetails({ node }: { node: Test }) {
   );
 }
 
-export function FixtureDetail({ node }: { node: Test }) {
+function rawStepDetail(rest: Record<string, unknown>): Record<string, unknown> | undefined {
+  return Object.keys(rest).length > 0 ? rest : undefined;
+}
+
+export function FixtureDetail({ node, renderWait }: { node: Test; renderWait?: (wait: WaitDetail) => ReactNode }) {
   const context = node.context as FixtureContext | undefined;
   const command = context?.command ?? node.command;
   const cwd = context?.cwd ?? node.work_dir;
+  const stepDetail = readStepDetail(node.detail);
+  // A typed step shows its own sections, so the raw block keeps only what they don't cover.
+  const rawDetail = stepDetail.kind === "step" ? rawStepDetail(stepDetail.step.rest) : node.detail;
   return (
     <div className="space-y-4 p-density-4">
       {node.message && (
@@ -124,10 +134,12 @@ export function FixtureDetail({ node }: { node: Test }) {
       )}
       <TestOutput node={node} />
       <CelDetails node={node} />
-      {node.detail != null && (
+      {stepDetail.kind === "step" && <StepKindSections step={stepDetail.step} {...(renderWait ? { renderWait } : {})} />}
+      {stepDetail.kind === "invalid" && <MalformedStepDetail error={stepDetail.error} />}
+      {rawDetail != null && (
         <div className="space-y-1">
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Detail</div>
-          <JsonView data={node.detail} />
+          <JsonView data={rawDetail} />
         </div>
       )}
     </div>
