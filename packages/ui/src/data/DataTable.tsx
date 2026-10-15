@@ -824,6 +824,10 @@ type DataTableInnerProps<
     row: T,
     context: DataTableRowDetailContext<T>,
   ) => ReactNode;
+  /** Controlled ids of rows with inline detail open. */
+  expandedRowIds?: string[];
+  /** Called with the next open row ids when an inline detail row is toggled. */
+  onExpandedRowIdsChange?: (ids: string[]) => void;
   /** Render each result as a full-width card while retaining filters and paging. */
   renderCard?: (row: T) => ReactNode;
   /**
@@ -1004,6 +1008,8 @@ function DataTableInner<T extends Record<string, unknown>>({
   isRowClickable,
   getRowHref,
   renderExpandedRow,
+  expandedRowIds,
+  onExpandedRowIdsChange,
   renderCard,
   detailStyle = "row",
   detailDialogTitle,
@@ -1100,7 +1106,7 @@ function DataTableInner<T extends Record<string, unknown>>({
     if (boundedFilters) onBoundedFiltersChange?.(updated);
     else setNumberFilters(updated);
   };
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [localExpandedRows, setLocalExpandedRows] = useState<Record<string, boolean>>({});
   const [detailRow, setDetailRow] = useState<InternalRow<T> | null>(null);
   const [localGroupingMode, setLocalGroupingMode] = useState<
     string | undefined
@@ -2198,7 +2204,10 @@ function DataTableInner<T extends Record<string, unknown>>({
   const rowStream = useMemo<Array<RowStreamItem<T>>>(() => {
     const withExpansion = (record: InternalRow<T>): RowStreamItem<T>[] => {
       const row = { kind: "row", record } as const;
-      if (detailStyle !== "row" || !renderExpandedRow || !expandedRows[record.id]) {
+      const expanded = expandedRowIds
+        ? expandedRowIds.includes(record.id)
+        : localExpandedRows[record.id];
+      if (detailStyle !== "row" || !renderExpandedRow || !expanded) {
         return [row];
       }
       const content = renderExpandedRow(record.row, {
@@ -2220,7 +2229,8 @@ function DataTableInner<T extends Record<string, unknown>>({
     visibleSorted,
     detailStyle,
     renderExpandedRow,
-    expandedRows,
+    expandedRowIds,
+    localExpandedRows,
     effectiveColumns,
     visibleColumns,
     filterActionsByColumn,
@@ -2868,7 +2878,9 @@ function DataTableInner<T extends Record<string, unknown>>({
                       );
                     }
                     const href = getRowHref?.(record.row);
-                    const expanded = expandedRows[record.id] ?? false;
+                    const expanded = expandedRowIds
+                      ? expandedRowIds.includes(record.id)
+                      : (localExpandedRows[record.id] ?? false);
                     const expandedContent =
                       renderExpandedRow?.(record.row, {
                         columns: effectiveColumns,
@@ -2894,10 +2906,18 @@ function DataTableInner<T extends Record<string, unknown>>({
                     const activateRow = () => {
                       if (selectionClickEnabled) toggleRowSelection(record);
                       if (expandsInline) {
-                        setExpandedRows((current) => ({
-                          ...current,
-                          [record.id]: !current[record.id],
-                        }));
+                        if (expandedRowIds) {
+                          onExpandedRowIdsChange?.(
+                            expanded
+                              ? expandedRowIds.filter((id) => id !== record.id)
+                              : [...expandedRowIds, record.id],
+                          );
+                        } else {
+                          setLocalExpandedRows((current) => ({
+                            ...current,
+                            [record.id]: !current[record.id],
+                          }));
+                        }
                       }
                       if (opensDialog) setDetailRow(record);
                       if (rowClickEnabled) onRowClick?.(record.row);
