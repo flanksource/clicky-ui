@@ -74,6 +74,7 @@ function TaskPanelDropdown({ basePath, kind, labels, onSelectRun, selectedId, tr
       {() => (
         <div className="max-h-[min(42rem,calc(100vh-5rem))] overflow-auto p-3">
           <TaskManager
+            compact
             {...(basePath ? { basePath } : {})}
             {...(kind ? { kind } : {})}
             {...(labels ? { labels } : {})}

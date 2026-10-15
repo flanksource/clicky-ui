@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TaskManagerButton } from "./TaskManagerButton";
 
 vi.mock("./TaskManager", () => ({
-  TaskManager: ({ kind, labels }: { kind?: string; labels?: Record<string, string> }) => (
-    <div data-testid="task-manager-panel">{kind} {labels?.job}</div>
+  TaskManager: ({ kind, labels, compact }: { kind?: string; labels?: Record<string, string>; compact?: boolean }) => (
+    <div data-testid="task-manager-panel" data-compact={compact}>{kind} {labels?.job}</div>
   ),
 }));
 
@@ -83,5 +83,6 @@ describe("TaskManagerButton", () => {
     expect(screen.getByText("384 MB")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("Tasks (2 active)"));
     expect(await screen.findByTestId("task-manager-panel")).toHaveTextContent("makerprint job-1");
+    expect(screen.getByTestId("task-manager-panel")).toHaveAttribute("data-compact", "true");
   });
 });
