@@ -571,3 +571,5 @@ export type {
   HARLog,
   HARPostData,
 } from "./data/har/types";
+
+export * from "./data/traces";

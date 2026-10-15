@@ -133,16 +133,5 @@ export type ProcessSampleRow = {
   rssBytes: number;
 };
 
+/** A record of a kind `TraceView` has no dedicated viewer for. */
 export type TraceRow = Record<string, unknown>;
-
-/** The trace kinds `TraceView` has a dedicated viewer for. */
-export const TRACE_KINDS = [
-  "http",
-  "http_proxy",
-  "pg_proxy",
-  "sql_statements",
-  "terminal",
-  "process_tree",
-] as const;
-
-export type TraceKind = (typeof TRACE_KINDS)[number];
