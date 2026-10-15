@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useResolvedTheme } from "../hooks/use-theme";
 import { highlightToLines, type HighlightedLine } from "./code-highlight";
 import { HighlightedTokens } from "./HighlightedTokens";
 
@@ -13,17 +14,18 @@ export interface CodeLineProps {
 // stack frame or trace node ran, shown without the gutter and frame of a block.
 export function CodeLine({ code, language, className }: CodeLineProps) {
   const [tokens, setTokens] = useState<HighlightedLine | undefined>(undefined);
+  const theme = useResolvedTheme();
 
   useEffect(() => {
     let cancelled = false;
     setTokens(undefined);
-    highlightToLines(code, { lang: language }).then((out) => {
+    highlightToLines(code, { lang: language, theme: theme === "dark" ? "github-dark" : "github-light" }).then((out) => {
       if (!cancelled) setTokens(out?.[0]);
     });
     return () => {
       cancelled = true;
     };
-  }, [code, language]);
+  }, [code, language, theme]);
 
   return (
     <code className={["whitespace-pre font-mono", className].filter(Boolean).join(" ")}>

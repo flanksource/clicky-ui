@@ -5,6 +5,7 @@ import { ButtonDemo } from "./demos/ButtonDemo";
 import { IconDemo } from "./demos/IconDemo";
 import { GeneratedIconsDemo } from "./demos/GeneratedIconsDemo";
 import { BadgeDemo } from "./demos/BadgeDemo";
+import { SymbolBadgeDemo } from "./demos/SymbolBadgeDemo";
 import { AvatarDemo } from "./demos/AvatarDemo";
 import { FormFieldsDemo } from "./demos/FormFieldsDemo";
 import { JsonSchemaFormListenersDemo } from "./demos/listeners/JsonSchemaFormListenersDemo";
@@ -145,6 +146,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
     title: "Display",
     items: [
       { id: "badge", label: "Badge", component: BadgeDemo, icon: UiTag },
+      { id: "symbol-badge", label: "SymbolBadge", component: SymbolBadgeDemo, icon: UiFileCode },
       {
         id: "avatar",
         label: "Avatar",
