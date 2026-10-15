@@ -22,6 +22,7 @@ export {
   type DiffSide,
 } from "./data/CodeDiff";
 export { CodeLine, type CodeLineProps } from "./data/CodeLine";
+export { SymbolBadge, type SymbolBadgeProps, type SymbolBadgeStyle } from "./data/SymbolBadge";
 export {
   computeLineDiff,
   parseUnifiedDiff,
