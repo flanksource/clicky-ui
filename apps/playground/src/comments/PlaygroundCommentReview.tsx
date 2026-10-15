@@ -16,6 +16,7 @@ import {
 } from "@flanksource/clicky-ui/icons";
 
 import { findPage, pageTitle, pages } from "../registry";
+import { CommentCapture } from "./CommentCapture";
 import type { PageComment } from "./useComments";
 
 export type ResolvedReviewItem = PageComment & { parentId?: null };
@@ -181,6 +182,9 @@ export function PlaygroundCommentReview({
               config={config}
               compact
               defaultExpanded
+              renderRootDetails={(comment) => (
+                <CommentCapture comment={comment} />
+              )}
               onReply={onReply}
               {...(threadToMarkdown ? { threadToMarkdown } : {})}
             />

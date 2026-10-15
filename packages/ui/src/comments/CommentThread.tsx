@@ -28,6 +28,7 @@ export type CommentThreadProps = CommentCallbacks & {
   hideComposer?: boolean;
   createActions?: readonly CommentCreateAction[];
   renderRootMeta?: (comment: Comment) => ReactNode;
+  renderRootDetails?: (comment: Comment) => ReactNode;
   renderBody?: (body: string) => ReactNode;
   threadToMarkdown?: (thread: readonly Comment[]) => string;
 };
@@ -49,6 +50,7 @@ export function CommentThread({
   hideComposer = false,
   createActions,
   renderRootMeta,
+  renderRootDetails,
   renderBody,
   threadToMarkdown,
   onCreate,
@@ -74,6 +76,7 @@ export function CommentThread({
         compact={compact}
         defaultExpanded={defaultExpanded}
         {...(renderRootMeta ? { renderRootMeta } : {})}
+        {...(renderRootDetails ? { renderRootDetails } : {})}
         {...(renderBody ? { renderBody } : {})}
         {...(threadToMarkdown ? { threadToMarkdown } : {})}
         {...listHandlers}

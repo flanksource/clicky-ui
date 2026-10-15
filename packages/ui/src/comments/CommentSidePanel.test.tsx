@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { CommentProvider } from "./CommentProvider";
 import { CommentSidePanel } from "./CommentSidePanel";
@@ -26,7 +27,13 @@ const comments: Comment[] = [
   },
 ];
 
-function TestSurface({ scrollTo }: { scrollTo: ReturnType<typeof vi.fn> }) {
+function TestSurface({
+  scrollTo,
+  renderRootDetails,
+}: {
+  scrollTo: ReturnType<typeof vi.fn>;
+  renderRootDetails?: (comment: Comment) => ReactNode;
+}) {
   const ctx = useCommentContext();
   return (
     <div>
@@ -56,12 +63,41 @@ function TestSurface({ scrollTo }: { scrollTo: ReturnType<typeof vi.fn> }) {
       <button type="button" onClick={ctx.openCommentList}>
         Open comments
       </button>
-      <CommentSidePanel focusedAlignment="anchor" />
+      <CommentSidePanel
+        focusedAlignment="anchor"
+        {...(renderRootDetails ? { renderRootDetails } : {})}
+      />
     </div>
   );
 }
 
 describe("CommentSidePanel anchor navigation", () => {
+  it("keeps the comment list open while expanding capture context", () => {
+    const scrollTo = vi.fn();
+    render(
+      <CommentProvider
+        comments={comments}
+        config={config}
+        resolveAnchor={strictAnchorResolver}
+      >
+        <TestSurface
+          scrollTo={scrollTo}
+          renderRootDetails={() => (
+            <details>
+              <summary>Capture context</summary>
+              <pre>Captured HTML</pre>
+            </details>
+          )}
+        />
+      </CommentProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open comments" }));
+    fireEvent.click(screen.getByText("Capture context"));
+    expect(screen.queryByTestId("comment-all-rail")).toBeTruthy();
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
   it("scrolls and focuses a clicked thread while preserving interactive controls", () => {
     const scrollTo = vi.fn();
     render(

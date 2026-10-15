@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiComment } from "../icons";
@@ -38,6 +45,7 @@ export type CommentSidePanelProps = {
   className?: string;
   /** Serialize one whole thread for Copy and its maximized Markdown tab. */
   threadToMarkdown?: (thread: readonly Comment[]) => string;
+  renderRootDetails?: (comment: Comment) => ReactNode;
   createActions?: readonly CommentCreateAction[];
 };
 
@@ -138,12 +146,14 @@ function AllComments({
   label,
   emptyLabel,
   threadToMarkdown,
+  renderRootDetails,
 }: {
   ctx: CommentContextValue;
   comments: Comment[];
   label: (a: CommentAnchor) => string;
   emptyLabel: string;
   threadToMarkdown?: (thread: readonly Comment[]) => string;
+  renderRootDetails?: (comment: Comment) => ReactNode;
 }) {
   const ordered = useMemo(() => {
     const anchorOrder = new Map(orderedAnchors(ctx).map((a, i) => [a, i]));
@@ -158,7 +168,7 @@ function AllComments({
     const target = event.target as Element;
     if (
       target.closest(
-        'button, a, input, textarea, select, [contenteditable="true"]',
+        'button, a, details, input, textarea, select, [contenteditable="true"]',
       )
     )
       return;
@@ -212,6 +222,7 @@ function AllComments({
             activateThread(event, c.anchor ?? DOCUMENT_ANCHOR),
         })}
         {...handlers}
+        {...(renderRootDetails ? { renderRootDetails } : {})}
         {...(threadToMarkdown ? { threadToMarkdown } : {})}
       />
     </div>
@@ -225,6 +236,7 @@ function FocusedComments({
   label,
   compact,
   threadToMarkdown,
+  renderRootDetails,
   createActions,
 }: {
   ctx: CommentContextValue;
@@ -233,6 +245,7 @@ function FocusedComments({
   label: string;
   compact?: boolean;
   threadToMarkdown?: (thread: readonly Comment[]) => string;
+  renderRootDetails?: (comment: Comment) => ReactNode;
   createActions?: readonly CommentCreateAction[];
 }) {
   const comments = selectAnchorThreads(visible, anchor);
@@ -257,6 +270,7 @@ function FocusedComments({
           hasComments ? "Add another top-level comment…" : "Add a comment…"
         }
         {...ctx.callbacks}
+        {...(renderRootDetails ? { renderRootDetails } : {})}
         {...(createActions ? { createActions } : {})}
         {...(threadToMarkdown ? { threadToMarkdown } : {})}
       />
@@ -415,6 +429,9 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
           {...(props.threadToMarkdown
             ? { threadToMarkdown: props.threadToMarkdown }
             : {})}
+          {...(props.renderRootDetails
+            ? { renderRootDetails: props.renderRootDetails }
+            : {})}
         />
       ) : ctx.railMode === "focused" && ctx.focusedAnchor ? (
         <div
@@ -427,11 +444,16 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
             ctx={ctx}
             comments={ctx.comments}
             anchor={ctx.focusedAnchor}
-            {...(props.createActions ? { createActions: props.createActions } : {})}
+            {...(props.createActions
+              ? { createActions: props.createActions }
+              : {})}
             label={label(ctx.focusedAnchor)}
             {...(props.compact !== undefined ? { compact: props.compact } : {})}
             {...(props.threadToMarkdown
               ? { threadToMarkdown: props.threadToMarkdown }
+              : {})}
+            {...(props.renderRootDetails
+              ? { renderRootDetails: props.renderRootDetails }
               : {})}
           />
         </div>
