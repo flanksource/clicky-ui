@@ -45,11 +45,17 @@ Monaco is configured for TSX but **not** wired to the real type graph: pulling `
 
 Filesystem operations go through `plugins/sources-server.ts` and are confined to `src/pages/**`: slugs must match `^[a-z0-9][a-z0-9-]*(/[a-z0-9][a-z0-9-]*)*$`, parents may not be symbolic links, and every resolved path is re-checked for containment before anything is changed. Filesystem actions are dev-server only.
 
+## Verification cookbook
+
+Open [Every step kind, every state](http://localhost:5274/?page=gavel%2Ftest-results-cookbook&recipe=step-kinds&tab=result) after starting `pnpm run dev:playground`. Select a step in the tree, then use **Detail** to inspect execution or **Outputs** for its final structured result.
+
+The step-kinds recipe uses the compact wait summary: condition, actual elapsed badge, outcome and final-output preview, with complete values in Outputs. The attempt selector lives in the detail header and is hidden for a single attempt. Choose the retried launch to compare refused and successful attempts; execution, wait, Outputs and Copy details follow that selection. `step=<node name>&attempt=1` preserves the selected step and attempt across reloads. The Data tab contains only final wait summaries, including nested service readiness waits.
+
 ## Feedback
 
 Two complementary tools:
 
-**react-grab** — hover any element, press `⌘C` to copy it with its React component stack and source location, formatted for a coding agent. It loads in development and built preview.
+**react-grab** — hover any element, press `⌘C` to copy it as Markdown for a coding agent: the component, the page URL, a selector for that instance, its React component stack and up to 4 KB of raw HTML (the same body gavel's react-grab plugin writes). **Copy screenshot** puts the element's PNG and that same Markdown on the clipboard as one item. It loads in development and built preview.
 
 **Comment pins** — select an element through react-grab and choose **Comment** or **Comment with screenshot**. Write one draft in the focused rail, then choose **Post comment** or **Post with screenshot**. Plain comments never request screen capture. Successful PNGs live under `.playground/screenshots/` (gitignored); cancellation or browser limitations are recorded when capture was requested. Use **Comment on page** for a whole-page note. Every new root persists source context and up to 4 KB of raw HTML.
 

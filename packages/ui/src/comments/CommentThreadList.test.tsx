@@ -36,6 +36,28 @@ function deferred() {
 }
 
 describe("CommentThreadList", () => {
+  it("shows root capture details in the rail and maximized thread", () => {
+    render(
+      <CommentThreadList
+        comments={comments}
+        config={config}
+        renderRootDetails={(comment) => <p>Capture for {comment.id}</p>}
+      />,
+    );
+
+    expect(screen.queryByText("Capture for r1")).toBeTruthy();
+    expect(screen.queryByText("Capture for c1")).toBeNull();
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Comment actions" })[0]!,
+    );
+    fireEvent.click(screen.getByText("Maximise"));
+    expect(
+      screen
+        .getByTestId("comment-thread-modal")
+        .textContent?.includes("Capture for r1"),
+    ).toBe(true);
+  });
+
   it.each([
     ["root", 0],
     ["reply", 1],
