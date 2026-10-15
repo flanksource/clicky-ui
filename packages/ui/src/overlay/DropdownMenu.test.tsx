@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { DropdownMenu } from "./DropdownMenu";
@@ -329,6 +329,28 @@ describe("DropdownMenu", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "Xero" }));
     expect(onParent).not.toHaveBeenCalled();
     expect(screen.getByRole("menuitem", { name: "Accounts" })).toBeInTheDocument();
+  });
+
+  it("cancels a pending hover open when Escape closes a clicked submenu", () => {
+    vi.useFakeTimers();
+    try {
+      render(<DropdownMenu label="Add" items={nestedItems()} />);
+      fireEvent.click(screen.getByRole("button", { name: /add/i }));
+      const trigger = screen.getByRole("menuitem", { name: "Xero" });
+      fireEvent.mouseEnter(trigger);
+      fireEvent.click(trigger);
+      expect(screen.getByRole("menuitem", { name: "Accounts" })).toBeInTheDocument();
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      act(() => vi.advanceTimersByTime(75));
+      expect(screen.queryByRole("menuitem", { name: "Accounts" })).not.toBeInTheDocument();
+      expect(screen.getByRole("menu")).toBeInTheDocument();
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("selecting a nested item fires its onSelect and closes the whole menu", () => {

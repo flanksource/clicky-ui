@@ -131,7 +131,10 @@ describe("QueryBrowser", () => {
     expect(within(dialog).getByText("id")).toBeInTheDocument();
     expect(within(dialog).getByText("nullable")).toBeInTheDocument();
     expect(within(dialog).getByText("null")).toBeInTheDocument();
-    expect(within(dialog).getByText(/"status": "ready"/)).toBeInTheDocument();
+    const nestedValue = within(dialog).getByText("nested").closest("dt")!.parentElement!;
+    expect(nestedValue.querySelector('[data-format="json"]')).toBeInTheDocument();
+    expect(within(nestedValue).getByText("status")).toBeInTheDocument();
+    expect(within(nestedValue).getByText('"ready"')).toBeInTheDocument();
   });
 
   it("renders failed queries with the diagnostic error details panel", async () => {

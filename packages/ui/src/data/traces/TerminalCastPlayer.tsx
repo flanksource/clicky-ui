@@ -127,9 +127,7 @@ export function TerminalCastPlayer({
         {timeline.exit ? <ExitBadge exit={timeline.exit} /> : null}
         {timeline.exit?.truncated ? (
           <span title="Size caps or a full buffer stopped some output events being recorded">
-            <Badge variant="soft" tone="warning" size="sm">
-              output truncated
-            </Badge>
+            <Badge variant="soft" tone="warning" size="sm">output truncated</Badge>
           </span>
         ) : null}
         <span className="tabular-nums">{`${timeline.width}x${timeline.height}`}</span>
