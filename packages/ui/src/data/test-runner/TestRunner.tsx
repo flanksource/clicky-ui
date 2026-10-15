@@ -44,6 +44,8 @@ export type TestRunnerProps = {
   activeTab?: string;
   /** Called with the picked tab id when `activeTab` is controlled. */
   onTabChange?: (tabId: string) => void;
+  activeAttempt?: number;
+  onAttemptChange?: (attempt: number) => void;
 
   onSelect: (node: Test | null) => void;
   onFiltersChange: (next: TestFilters) => void;
@@ -111,6 +113,8 @@ export function TestRunner({
   busy,
   activeTab,
   onTabChange,
+  activeAttempt,
+  onAttemptChange,
   onSelect,
   onFiltersChange,
   onExpandAllChange,
@@ -141,6 +145,8 @@ export function TestRunner({
       busy: busy ?? {},
       activeTab,
       onTabChange,
+      activeAttempt,
+      onAttemptChange,
       onSelect,
       onFiltersChange,
       onExpandAllChange,
@@ -160,6 +166,8 @@ export function TestRunner({
       busy,
       activeTab,
       onTabChange,
+      activeAttempt,
+      onAttemptChange,
       onSelect,
       onFiltersChange,
       onExpandAllChange,

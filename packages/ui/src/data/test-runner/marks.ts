@@ -12,8 +12,12 @@ import {
   UiCircleOutline,
   UiCircleX,
   UiBeaker,
+  UiChatDots,
+  UiClipboardText,
   UiCopy,
+  UiCursorClick,
   UiDatabase,
+  UiGlobe,
   UiInfo,
   UiKey,
   UiListChecks,
@@ -31,7 +35,9 @@ import {
   UiLogoVitest,
   UiPass,
   UiProhibit,
+  UiRobotAi,
   UiSealCheck,
+  UiServer,
   UiSkipForward,
   UiSparkles,
   UiTerminal,
@@ -131,6 +137,31 @@ export const TEST_TOOLS: Record<string, ToolMark> = {
     className: "text-violet-600 dark:text-violet-400",
   },
   query: { icon: UiDatabase, label: "Query", kind: "fixture", className: MUTED },
+  // Typed step kinds (gavel fixtures/kind registry): the node's `framework`
+  // is the kind name. `ai` is the runner behind `verify` but is a prompt/CEL
+  // round-trip rather than an acceptance-criteria review, so it takes the
+  // same violet family with its own glyph and label.
+  services: { icon: UiServer, label: "Services", kind: "fixture", className: MUTED },
+  todo: { icon: UiClipboardText, label: "TODO step", kind: "fixture", className: MUTED },
+  todo_prompt: { icon: UiChatDots, label: "TODO prompt run", kind: "fixture", className: MUTED },
+  ai: {
+    icon: UiRobotAi,
+    label: "AI step",
+    kind: "fixture",
+    className: "text-violet-600 dark:text-violet-400",
+  },
+  browser: { icon: UiGlobe, label: "Browser", kind: "fixture", className: MUTED },
+  // The fixture-step twin of the `playwright` test framework above; both
+  // arrive as framework "playwright", so toolKeyFor() picks this key when the
+  // node carries `detail.step`. Muted like every other fixture step, so the
+  // brand green stays on the spec results the framework reports.
+  "playwright-step": {
+    icon: UiLogoPlaywright,
+    label: "Playwright step",
+    kind: "fixture",
+    className: MUTED,
+  },
+  "agent-browser": { icon: UiCursorClick, label: "Agent browser", kind: "fixture", className: MUTED },
   criterion: { icon: UiSealCheck, label: "Acceptance criterion", kind: "fixture", className: MUTED },
   checklist: { icon: UiSealCheck, label: "Acceptance criteria", kind: "fixture", className: MUTED },
   "golangci-lint": { icon: UiLogoGo, label: "golangci-lint", kind: "lint", className: GO },
@@ -180,5 +211,22 @@ export const TEST_TOOLS: Record<string, ToolMark> = {
 /** The tool's mark, or null for a tool the catalog doesn't know (render its name alone). */
 export function toolMark(tool: string | undefined): ToolMark | null {
   return (tool && TEST_TOOLS[tool]) || null;
+}
+
+function hasStepInfo(detail: unknown): boolean {
+  if (detail === null || typeof detail !== "object" || Array.isArray(detail)) return false;
+  const step = (detail as Record<string, unknown>).step;
+  return step !== null && typeof step === "object" && !Array.isArray(step);
+}
+
+/**
+ * The TEST_TOOLS key for a node. A node's `framework` is the key, except that
+ * "playwright" names both the test framework and the `playwright` fixture-step
+ * kind: a node carrying `detail.step` (the fixture verifier's step id and
+ * kind) is the step.
+ */
+export function toolKeyFor(node: { framework?: string | undefined; detail?: unknown }): string | undefined {
+  if (node.framework === "playwright" && hasStepInfo(node.detail)) return "playwright-step";
+  return node.framework;
 }
 

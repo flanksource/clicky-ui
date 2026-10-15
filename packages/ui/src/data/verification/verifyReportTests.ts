@@ -40,7 +40,7 @@ function verifySummaryToTestSummary(summary: VerifySummary): TestSummary {
 // compiles with exactOptionalPropertyTypes — so an absent field must be an
 // absent key, not a key explicitly set to undefined. Each is assigned only
 // when present rather than copied through in one object literal.
-function verifyNodeTest(node: VerifyNode): Test {
+export function verifyNodeTest(node: VerifyNode): Test {
   const test: Test = { name: node.name };
   if (node.framework !== undefined) test.framework = node.framework;
   if (node.task_id !== undefined) test.task_id = node.task_id;

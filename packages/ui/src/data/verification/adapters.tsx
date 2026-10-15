@@ -4,8 +4,12 @@
 // split out so this file's only exports are the registry (react/only-export-
 // components forbids mixing component declarations with plain exports).
 
+import type { ReactNode } from "react";
 import { ChecklistDetail, FixtureDetail } from "./adapterViews";
+import { StepOutputs } from "./stepKindViews";
+import { verifyNodeTest } from "./verifyReportTests";
 import { UiTerminal } from "../../icons";
+import { hasStepDetail, readStepDetail, stepKindCopy, type WaitDetail } from "./stepKind";
 import {
   createTestRunnerRegistry,
   outcomeFor,
@@ -45,8 +49,10 @@ const checklistAdapter: TestNodeAdapter = {
   copy: ({ node }) => checklistCopy(node),
 };
 
+// A typed step kind (services, todo, …) may report no command or CEL context at
+// all, so `detail.step` claims the node as well.
 function isFixtureNode(node: Test): boolean {
-  return node.context !== undefined;
+  return node.context !== undefined || hasStepDetail(node.detail);
 }
 
 // ── Copy sections for fixture steps (exec / query / table / test / lint) ───
@@ -142,37 +148,82 @@ function resultsSection(node: Test): BriefSection[] {
 function fixtureCopy(node: Test): CopySections {
   const context = node.context as FixtureContext | undefined;
   const command = context?.command ?? node.command;
+  const stepDetail = readStepDetail(node.detail);
   return {
     brief: [
       ...commandSection(node, context),
       ...assertionSection(node, context),
+      ...(stepDetail.kind === "step" ? stepKindCopy(stepDetail.step) : []),
       ...resultsSection(node),
     ],
     items: command ? [{ label: "Copy command", icon: UiTerminal, value: command }] : [],
   };
 }
 
-const fixtureAdapter: TestNodeAdapter = {
-  id: "verification-fixture",
-  match: isFixtureNode,
-  renderDetail: ({ node }) => <FixtureDetail node={node} />,
-  copy: ({ node }) => fixtureCopy(node),
-};
+// gavel's FixtureResult.Type values plus "fixture" (a markdown table of rows)
+// and the typed step kinds. Table and runner-step parents carry no `context`,
+// so the fixture adapter never claims them; this copy-only adapter gives them
+// the same sections. "playwright" is also a test framework, so it counts as a
+// step only when the node carries `detail.step`.
+const FIXTURE_STEP_FRAMEWORKS = new Set([
+  "exec",
+  "query",
+  "fixture",
+  "test",
+  "lint",
+  "verify",
+  "services",
+  "todo",
+  "todo_prompt",
+  "ai",
+  "browser",
+  "playwright",
+  "agent-browser",
+]);
 
-// gavel's FixtureResult.Type values plus "fixture" (a markdown table of rows).
-// Table and runner-step parents carry no `context`, so the fixture adapter
-// never claims them; this copy-only adapter gives them the same sections.
-const FIXTURE_STEP_FRAMEWORKS = new Set(["exec", "query", "fixture", "test", "lint", "verify"]);
+function isFixtureStepNode(node: Test): boolean {
+  const framework = node.framework ?? "";
+  if (framework === "playwright") return hasStepDetail(node.detail);
+  return FIXTURE_STEP_FRAMEWORKS.has(framework);
+}
 
 const fixtureStepCopyAdapter: TestNodeAdapter = {
   id: "verification-step-copy",
-  match: (node) => FIXTURE_STEP_FRAMEWORKS.has(node.framework ?? ""),
+  match: isFixtureStepNode,
   copy: ({ node }) => fixtureCopy(node),
 };
 
 /** Default node adapters for VerificationResults: checklist items and
  *  fixture/CEL steps. Registration order matters only when a node could match
  *  both — a checklist node never carries a `context`, so the two never race. */
-export function verificationAdapters(): TestNodeAdapterRegistry {
+export type VerificationAdapterOptions = {
+  /** Override the wait section while retaining the fixture's other detail sections. */
+  renderWait?: (wait: WaitDetail) => ReactNode;
+};
+
+export function verificationAdapters(options: VerificationAdapterOptions = {}): TestNodeAdapterRegistry {
+  const fixtureAdapter: TestNodeAdapter = {
+    id: "verification-fixture",
+    match: isFixtureNode,
+    renderDetail: ({ node }) => <FixtureDetail node={node} {...options} />,
+    detailAttempts: ({ node }) => {
+      const detail = readStepDetail(node.detail);
+      if (detail.kind !== "step") return [];
+      return detail.step.attempts.map((attempt) => ({
+        id: attempt.attempt, status: attempt.status,
+        ...(attempt.durationMs !== undefined ? { durationMs: attempt.durationMs } : {}),
+        node: attempt.result ? verifyNodeTest(attempt.result) : {
+          name: node.name, message: `Attempt ${attempt.attempt}: execution evidence was not stored in this report.`,
+          detail: { step: detail.step.step },
+        },
+      }));
+    },
+    detailTabs: ({ node }) => {
+      const detail = readStepDetail(node.detail);
+      if (detail.kind !== "step" || detail.step.outputs === undefined) return [];
+      return [{ id: "outputs", label: "Outputs", render: () => <StepOutputs outputs={detail.step.outputs} /> }];
+    },
+    copy: ({ node }) => fixtureCopy(node),
+  };
   return createTestRunnerRegistry([checklistAdapter, fixtureAdapter, fixtureStepCopyAdapter]);
 }
