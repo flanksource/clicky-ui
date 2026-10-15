@@ -17,6 +17,8 @@ export type CommentThreadListProps = {
   defaultExpanded?: boolean;
   /** Extra content rendered above each root card (e.g. an anchor label). */
   renderRootMeta?: (comment: Comment) => ReactNode;
+  /** Extra content rendered with each root thread, including its maximized view. */
+  renderRootDetails?: (comment: Comment) => ReactNode;
   /** Props merged onto each thread wrapper (e.g. for scroll anchoring). */
   getThreadProps?: (comment: Comment) => HTMLAttributes<HTMLDivElement>;
   /** Custom body renderer forwarded to each card. */
@@ -94,6 +96,7 @@ export function CommentThreadList({
   compact = false,
   defaultExpanded = false,
   renderRootMeta,
+  renderRootDetails,
   getThreadProps,
   renderBody,
   threadToMarkdown,
@@ -172,6 +175,7 @@ export function CommentThreadList({
                 {...cardHandlers(root.id)}
                 {...(onReply ? { onReply: () => setReplyingTo(root.id) } : {})}
               />
+              {renderRootDetails?.(root)}
               {replies.length > 0 && (
                 <div className="space-y-1.5">
                   {replies.map((reply) => (
@@ -242,6 +246,8 @@ export function CommentThreadList({
                         ? { onReply: () => setModalReplyTo(message.id) }
                         : {})}
                     />
+                    {message.id === maximizedRoot.id &&
+                      renderRootDetails?.(maximizedRoot)}
                     {onReply && modalReplyTo === message.id && (
                       <ReplyInput
                         onCancel={() => setModalReplyTo(null)}

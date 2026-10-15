@@ -20,6 +20,7 @@ import {
   DialogCommentOverlay,
 } from "./comments/CommentOverlay";
 import { useReactGrabComments } from "./comments/useReactGrabComments";
+import { CommentCapture } from "./comments/CommentCapture";
 import { PlaygroundCommentReview } from "./comments/PlaygroundCommentReview";
 import { useResolvedCommentReview } from "./comments/useResolvedCommentReview";
 import { AnnotationVisibilityProvider } from "./annotations";
@@ -455,6 +456,9 @@ export function PlaygroundShell({
                   { id: "screenshot", label: "Post with screenshot" },
                 ]}
                 threadToMarkdown={feedback.threadToMarkdown}
+                renderRootDetails={(comment) => (
+                  <CommentCapture comment={comment} />
+                )}
               />
             )}
           </div>
