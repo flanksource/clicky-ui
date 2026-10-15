@@ -14,6 +14,7 @@ import { InlineError } from "./InlineError";
 
 export function OperationSchedules(_props: OperationSchedulesProps) {
   const {
+    client,
     operations,
     schedules,
     disabled,
@@ -104,7 +105,12 @@ export function OperationSchedules(_props: OperationSchedulesProps) {
               >
                 <div className="min-w-0">
                   <div className="truncate font-semibold">{schedule.name}</div>
-                  <div className="text-xs text-muted-foreground">{schedule.targets.join(", ")}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {schedule.targets.join(", ")}
+                    {schedule.concurrency && schedule.targets.length > 1
+                      ? ` · ${schedule.concurrency} at once`
+                      : ""}
+                  </div>
                   <div className="truncate text-xs text-muted-foreground">
                     {operationLabel(operation)}
                   </div>
@@ -161,6 +167,7 @@ export function OperationSchedules(_props: OperationSchedulesProps) {
         </div>
       )}
       <OperationScheduleDialog
+        client={client}
         open={dialogOpen}
         operations={operations}
         targetOptions={targetOptions}
