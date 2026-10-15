@@ -92,6 +92,11 @@ export { CommandOutput, type CommandOutputProps } from "./rpc/CommandOutput";
 export { FilterForm, type FilterFormProps } from "./rpc/FilterForm";
 export { InlineError, type InlineErrorProps } from "./rpc/InlineError";
 export {
+  OperationArgsForm,
+  type OperationArgs,
+  type OperationArgsFormProps,
+} from "./rpc/OperationArgsForm";
+export {
   OperationActionDialog,
   type OperationActionDialogProps,
 } from "./rpc/OperationActionDialog";

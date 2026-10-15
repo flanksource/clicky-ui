@@ -145,6 +145,42 @@ describe("FilterForm placeholders", () => {
   });
 });
 
+describe("FilterForm onChange", () => {
+  it("reports the initial values and every edit so it can run as a controlled field set", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    const onChange = vi.fn();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FilterForm
+          client={makeClient()}
+          path="/jobs"
+          method="POST"
+          parameters={[
+            { name: "batch-size", in: "query", schema: { type: "integer", default: "30" } },
+            { name: "dry-run", in: "query", schema: { type: "boolean", default: false } },
+          ]}
+          initialValues={{ "batch-size": "5" }}
+          showSubmit={false}
+          onChange={onChange}
+          onSubmit={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith({ "batch-size": "5", "dry-run": "false" }),
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "Dry Run" }));
+    await waitFor(() =>
+      expect(onChange).toHaveBeenLastCalledWith({ "batch-size": "5", "dry-run": "true" }),
+    );
+    expect(screen.queryByRole("button", { name: "Execute request" })).toBeNull();
+  });
+});
+
 describe("FilterForm multi-value filters", () => {
   it("renders a standard multi-select combobox without tristate option controls", async () => {
     const queryClient = new QueryClient({

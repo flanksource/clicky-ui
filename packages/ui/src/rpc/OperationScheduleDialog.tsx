@@ -5,13 +5,11 @@ import type { ComboboxOption } from "../components/combobox-types";
 import { CopyButton } from "../components/CopyButton";
 import { Field } from "../components/Field";
 import { InputField } from "../components/InputField";
-import { JsonSchemaForm } from "../components/JsonSchemaForm";
 import { ScheduleEditor } from "../components/ScheduleEditor";
 import { Modal } from "../overlay/Modal";
 import {
   newOperationScheduleInput,
   operationByID,
-  operationInputSchema,
   operationLabel,
   scheduleToInput,
 } from "./operation-schedule-model";
@@ -23,10 +21,14 @@ import type {
   OperationScheduleRunInput,
 } from "./operation-schedule-types";
 import type { ResolvedOperation } from "./types";
+import type { OperationsApiClient } from "./useOperations";
 import { InlineError } from "./InlineError";
+import { OperationArgsForm } from "./OperationArgsForm";
 import { OperationPicker } from "./OperationPicker";
 
 export interface OperationScheduleDialogProps {
+  /** Client for the argument form's lookups (the operation's parameter pickers). */
+  client: OperationsApiClient;
   open: boolean;
   operations: readonly ResolvedOperation[];
   targetOptions: ComboboxOption[];
@@ -41,6 +43,7 @@ export interface OperationScheduleDialogProps {
 
 export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
   const {
+    client,
     open,
     operations,
     schedule,
@@ -58,9 +61,15 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
   const [pending, setPending] = useState<"save" | "run">();
   const [error, setError] = useState<unknown>();
   const [confirmingRun, setConfirmingRun] = useState(false);
+  const [concurrencyText, setConcurrencyText] = useState("1");
+  const [argsValid, setArgsValid] = useState(true);
+  // Each opening remounts the argument form so it loads the args set below,
+  // not the ones a previous opening left in input.
+  const [argsSession, setArgsSession] = useState(0);
 
   useEffect(() => {
     if (!open) return;
+    setArgsSession((session) => session + 1);
     setInput(
       schedule
         ? scheduleToInput(schedule)
@@ -69,12 +78,30 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
             targets: [...(defaultTargets ?? [])],
           },
     );
+    setConcurrencyText(String(schedule?.concurrency ?? 1));
     setError(undefined);
     setConfirmingRun(false);
   }, [open, schedule, defaultTargets]);
 
+  const multiTarget = input.targets.length > 1;
+  const concurrency = Number(concurrencyText);
+  const concurrencyValid =
+    !multiTarget ||
+    (concurrencyText.trim() !== "" &&
+      Number.isInteger(concurrency) &&
+      concurrency >= 1 &&
+      concurrency <= input.targets.length);
+  const concurrencyPayload = multiTarget ? { concurrency } : {};
+
+  const changeTargets = (targets: string[]) => {
+    setInput({ ...input, targets });
+    const limit = Math.max(1, targets.length);
+    setConcurrencyText((current) =>
+      Number(current) > limit ? String(limit) : current,
+    );
+  };
+
   const operation = operationByID(operations, input.operationId);
-  const schema = operationInputSchema(operation);
   const suggestions =
     operation?.operation["x-clicky"]?.schedule?.suggestions ?? [];
   const destructive =
@@ -107,7 +134,7 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
     setPending("save");
     setError(undefined);
     try {
-      await onSave(input);
+      await onSave({ ...input, ...concurrencyPayload });
       onClose();
     } catch (nextError) {
       setError(nextError);
@@ -124,6 +151,7 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
         operationId: input.operationId,
         args: input.args,
         targets: input.targets,
+        ...concurrencyPayload,
       });
       setConfirmingRun(false);
       onClose();
@@ -139,9 +167,13 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
     input.name.trim() &&
     input.operationId &&
     input.cron.trim() &&
-    input.targets.length,
+    input.targets.length &&
+    concurrencyValid &&
+    argsValid,
   );
-  const canRun = Boolean(input.operationId && input.targets.length);
+  const canRun = Boolean(
+    input.operationId && input.targets.length && concurrencyValid && argsValid,
+  );
 
   return (
     <>
@@ -190,9 +222,33 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
               allowCustomValue={false}
               options={targetOptions}
               value={input.targets}
-              onChange={(targets) => setInput({ ...input, targets })}
+              onChange={changeTargets}
             />
           </Field>
+          {multiTarget ? (
+            <Field
+              label={`${targetLabel} at once`}
+              htmlFor="operation-schedule-concurrency"
+              error={
+                concurrencyValid
+                  ? undefined
+                  : `Enter a whole number from 1 to ${input.targets.length}.`
+              }
+              helper={`How many of the ${input.targets.length} selected run at the same time; the rest wait their turn.`}
+            >
+              <InputField
+                id="operation-schedule-concurrency"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={input.targets.length}
+                step={1}
+                invalid={!concurrencyValid}
+                value={concurrencyText}
+                onChange={setConcurrencyText}
+              />
+            </Field>
+          ) : null}
           <Field
             label="Schedule name"
             htmlFor="operation-schedule-name"
@@ -211,22 +267,19 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
             onChange={selectOperation}
           />
           {operation ? (
-            schema && Object.keys(schema.properties ?? {}).length > 0 ? (
-              <section className="space-y-2">
-                <h3 className="text-sm font-semibold">Arguments</h3>
-                <JsonSchemaForm
-                  schema={schema}
-                  value={input.args}
-                  onChange={(args) => setInput({ ...input, args })}
-                  idPrefix="operation-schedule-args"
-                  showPreferencesMenu={false}
-                />
-              </section>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                This operation has no arguments.
-              </p>
-            )
+            <section className="space-y-2">
+              <h3 className="text-sm font-semibold">Arguments</h3>
+              <OperationArgsForm
+                key={`${argsSession}:${input.operationId}`}
+                client={client}
+                operation={operation}
+                args={input.args}
+                onChange={(args) =>
+                  setInput((current) => ({ ...current, args }))
+                }
+                onValidityChange={setArgsValid}
+              />
+            </section>
           ) : null}
           {cliCommand ? (
             <section className="space-y-1">
@@ -282,6 +335,7 @@ export function OperationScheduleDialog(_props: OperationScheduleDialogProps) {
         </p>
         <p className="mt-2 text-sm">
           {targetLabel}: {input.targets.join(", ")}
+          {multiTarget ? ` (${concurrency} at once)` : ""}
         </p>
       </Modal>
     </>

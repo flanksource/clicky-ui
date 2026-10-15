@@ -35,6 +35,10 @@ export type FilterFormProps = {
   excludedParameterNames?: string[] | undefined;
   /** Renders operation controls as form rows or the shared table FilterBar. */
   presentation?: "form" | "filter-bar" | undefined;
+  /** Called with the current values whenever they change, starting with the
+   *  initial values, so the form can act as a controlled field set inside a
+   *  host form (pair with showSubmit={false}). */
+  onChange?: ((values: ParameterValues) => void) | undefined;
   onSubmit: (values: ParameterValues) => void | Promise<void>;
 };
 
@@ -57,6 +61,7 @@ export function FilterForm({
   showSubmit = true,
   excludedParameterNames = [],
   presentation = "form",
+  onChange,
   onSubmit,
 }: FilterFormProps) {
   const resetKey = useMemo(
@@ -79,6 +84,15 @@ export function FilterForm({
   const [error, setError] = useState("");
   const debouncedValues = useDebouncedRecord(values, 250);
   const lastAutoSubmitted = useRef<string | null>(null);
+  // The latest callback is read from a ref so a host passing an inline
+  // function is notified per value change, not per render.
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+  useEffect(() => {
+    onChangeRef.current?.(values);
+  }, [values]);
   const lookupParameters = useMemo(
     () => packLookupParameterValues(debouncedValues, parameters),
     [debouncedValues, parameters]

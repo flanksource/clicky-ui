@@ -1,4 +1,3 @@
-import type { JsonSchemaObject } from "../components/json-schema-form-types";
 import { DEFAULT_CRON } from "../components/schedule-types";
 import type { OperationSchedule, OperationScheduleInput } from "./operation-schedule-types";
 import type { ResolvedOperation } from "./types";
@@ -20,14 +19,6 @@ export function operationByID(
   operationID: string,
 ): ResolvedOperation | undefined {
   return operations.find(({ operation }) => operation.operationId === operationID);
-}
-
-export function operationInputSchema(
-  operation: ResolvedOperation | undefined,
-): JsonSchemaObject | undefined {
-  const schema = operation?.operation.requestBody?.content?.["application/json"]?.schema;
-  if (!schema || schema.type !== "object") return undefined;
-  return schema as JsonSchemaObject;
 }
 
 export function newOperationScheduleInput(): OperationScheduleInput {
