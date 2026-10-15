@@ -3,16 +3,21 @@ import type {
   CommentScreenshotUnavailableReason,
 } from "../../plugins/comments-model";
 
-type CroppableTrack = MediaStreamTrack & {
-  cropTo?: (target: unknown) => Promise<void>;
+type CapturedTabTrack = MediaStreamTrack & {
+  getCaptureHandle?: () => { handle: string } | null;
 };
 
-type CropTargetFactory = {
-  fromElement?: (element: Element) => Promise<unknown>;
+type CaptureMediaDevices = MediaDevices & {
+  setCaptureHandleConfig?: (config: {
+    handle: string;
+    exposeOrigin: boolean;
+    permittedOrigins: string[];
+  }) => void;
 };
 
 let retainedDisplayStream: MediaStream | undefined;
 let pendingDisplayStream: Promise<MediaStream> | undefined;
+let captureHandle: string | undefined;
 const CAPTURE_TIMEOUT_MS = 10_000;
 
 function stopStream(stream: MediaStream): void {
@@ -20,21 +25,50 @@ function stopStream(stream: MediaStream): void {
 }
 
 function requestNewDisplayStream(): Promise<MediaStream> {
+  const mediaDevices = navigator.mediaDevices as CaptureMediaDevices;
+  captureHandle ??= crypto.randomUUID();
+  if (!mediaDevices.setCaptureHandleConfig) {
+    throw new Error("browser does not support capture handles");
+  }
+  mediaDevices.setCaptureHandleConfig({
+    handle: captureHandle,
+    exposeOrigin: false,
+    permittedOrigins: [window.location.origin],
+  });
   return navigator.mediaDevices.getDisplayMedia({
     video: { displaySurface: "browser" },
     audio: false,
     preferCurrentTab: true,
+    selfBrowserSurface: "include",
+    monitorTypeSurfaces: "exclude",
   } as DisplayMediaStreamOptions);
 }
 
-function hasLiveVideo(stream: MediaStream): boolean {
-  return stream.getVideoTracks().some((track) => track.readyState === "live");
+function isCurrentTab(stream: MediaStream): boolean {
+  const track = stream.getVideoTracks()[0] as CapturedTabTrack | undefined;
+  return (
+    track?.readyState === "live" &&
+    track.getSettings().displaySurface === "browser" &&
+    track.getCaptureHandle?.()?.handle === captureHandle
+  );
+}
+
+function assertCurrentTab(stream: MediaStream): void {
+  const track = stream.getVideoTracks()[0] as CapturedTabTrack | undefined;
+  if (!track || track.readyState !== "live") {
+    throw new Error("selected display stream has no live video track");
+  }
+  if (!isCurrentTab(stream)) {
+    throw new Error("select this tab to capture a playground element");
+  }
 }
 
 function retainDisplayStream(stream: MediaStream): MediaStream {
-  if (!hasLiveVideo(stream)) {
+  try {
+    assertCurrentTab(stream);
+  } catch (error) {
     stopStream(stream);
-    throw new Error("selected display stream has no live video track");
+    throw error;
   }
   retainedDisplayStream = stream;
   stream.getTracks().forEach((track) => {
@@ -50,7 +84,7 @@ function retainDisplayStream(stream: MediaStream): MediaStream {
 }
 
 function requestDisplayStream(): Promise<MediaStream> {
-  if (retainedDisplayStream && hasLiveVideo(retainedDisplayStream)) {
+  if (retainedDisplayStream && isCurrentTab(retainedDisplayStream)) {
     return Promise.resolve(retainedDisplayStream);
   }
   if (retainedDisplayStream) stopStream(retainedDisplayStream);
@@ -76,22 +110,40 @@ function nextPaint(): Promise<void> {
   });
 }
 
-async function cropToElement(
-  track: CroppableTrack | undefined,
+function frameRectForElement(
+  video: HTMLVideoElement,
   element: Element,
-): Promise<void> {
-  const cropTarget = (
-    window as typeof window & { CropTarget?: CropTargetFactory }
-  ).CropTarget;
-  if (!track?.cropTo || !cropTarget?.fromElement) return;
-  try {
-    await track.cropTo(await cropTarget.fromElement(element));
-  } catch {
-    // Region Capture is optional; the selected page frame remains useful.
+): { x: number; y: number; width: number; height: number } {
+  const bounds = element.getBoundingClientRect();
+  if (!element.isConnected || bounds.width <= 0 || bounds.height <= 0) {
+    throw new Error("selected element is no longer visible");
   }
+  if (!video.videoWidth || !video.videoHeight) {
+    throw new Error("captured tab has no video frame");
+  }
+  const scaleX = video.videoWidth / window.innerWidth;
+  const scaleY = video.videoHeight / window.innerHeight;
+  if (
+    !Number.isFinite(scaleX) ||
+    !Number.isFinite(scaleY) ||
+    Math.abs(scaleX - scaleY) > Math.max(scaleX, scaleY) * 0.02
+  ) {
+    throw new Error("captured tab has invalid viewport dimensions");
+  }
+  const x = Math.max(0, Math.floor(bounds.left * scaleX));
+  const y = Math.max(0, Math.floor(bounds.top * scaleY));
+  const right = Math.min(video.videoWidth, Math.ceil(bounds.right * scaleX));
+  const bottom = Math.min(video.videoHeight, Math.ceil(bounds.bottom * scaleY));
+  if (right <= x || bottom <= y) {
+    throw new Error("selected element is outside the captured viewport");
+  }
+  return { x, y, width: right - x, height: bottom - y };
 }
 
-async function frameToDataUrl(stream: MediaStream): Promise<string> {
+async function frameToDataUrl(
+  stream: MediaStream,
+  element: Element,
+): Promise<string> {
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;
@@ -100,13 +152,24 @@ async function frameToDataUrl(stream: MediaStream): Promise<string> {
     await video.play();
     await nextPaint();
 
+    const rect = frameRectForElement(video, element);
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1;
-    canvas.height = video.videoHeight || 1;
+    canvas.width = rect.width;
+    canvas.height = rect.height;
     const context = canvas.getContext("2d");
     if (!context)
       throw new Error("browser could not create a screenshot canvas");
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    context.drawImage(
+      video,
+      rect.x,
+      rect.y,
+      rect.width,
+      rect.height,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
 
     const blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
@@ -137,32 +200,46 @@ function unavailableReason(error: unknown): CommentScreenshotUnavailableReason {
 export async function captureScreenshot(
   element: Element,
 ): Promise<CommentScreenshotCapture> {
-  if (!navigator.mediaDevices?.getDisplayMedia) {
+  const mediaDevices = navigator.mediaDevices as
+    | CaptureMediaDevices
+    | undefined;
+  if (
+    !mediaDevices?.getDisplayMedia ||
+    !mediaDevices.setCaptureHandleConfig ||
+    !crypto.randomUUID
+  ) {
     return { status: "unavailable", reason: "unsupported" };
   }
 
   try {
     const stream = await requestDisplayStream();
+    try {
+      assertCurrentTab(stream);
+    } catch (error) {
+      if (retainedDisplayStream === stream) retainedDisplayStream = undefined;
+      stopStream(stream);
+      throw error;
+    }
     const source = stream.getVideoTracks()[0];
     if (!source) throw new Error("selected display stream has no video track");
 
-    // Keep the shared source uncropped so each comment starts with a fresh frame.
-    const track = source.clone() as CroppableTrack;
+    const track = source.clone();
     const captureStream = new MediaStream([track]);
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      const frame = (async () => {
-        await cropToElement(track, element);
-        return frameToDataUrl(captureStream);
-      })();
+      const frame = frameToDataUrl(captureStream, element);
       const stalled = new Promise<never>((_, reject) => {
         timeout = setTimeout(() => {
-          if (retainedDisplayStream === stream) retainedDisplayStream = undefined;
+          if (retainedDisplayStream === stream)
+            retainedDisplayStream = undefined;
           stopStream(stream);
           reject(new Error("screenshot capture timed out"));
         }, CAPTURE_TIMEOUT_MS);
       });
-      return { status: "captured", dataUrl: await Promise.race([frame, stalled]) };
+      return {
+        status: "captured",
+        dataUrl: await Promise.race([frame, stalled]),
+      };
     } finally {
       clearTimeout(timeout);
       track.stop();
