@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CodeLine } from "./CodeLine";
+import { ThemeContext } from "../hooks/use-theme";
 
 vi.mock("./code-highlight", () => ({
   highlightToLines: vi.fn(async () => null),
@@ -26,7 +27,7 @@ describe("CodeLine", () => {
     ]);
     render(<CodeLine code={JAVA_LINE} language="java" />);
     await waitFor(() => expect(screen.getByText("return")).toHaveStyle({ color: KEYWORD_COLOR }));
-    expect(mockHighlight).toHaveBeenCalledWith(JAVA_LINE, { lang: "java" });
+    expect(mockHighlight).toHaveBeenCalledWith(JAVA_LINE, { lang: "java", theme: "github-light" });
     expect(screen.getByText("return").closest("code")).toHaveTextContent(JAVA_LINE);
   });
 
@@ -34,5 +35,26 @@ describe("CodeLine", () => {
     render(<CodeLine code={JAVA_LINE} />);
     await waitFor(() => expect(mockHighlight).toHaveBeenCalled());
     expect(screen.getByText(JAVA_LINE).tagName).toBe("CODE");
+  });
+
+  it("formats with the surrounding dark theme", async () => {
+    render(<ThemeContext.Provider value={{ theme: "dark", resolvedTheme: "dark", setTheme: vi.fn() }}>
+      <CodeLine code={JAVA_LINE} language="java" />
+    </ThemeContext.Provider>);
+    await waitFor(() => expect(mockHighlight).toHaveBeenCalledWith(JAVA_LINE, { lang: "java", theme: "github-dark" }));
+  });
+
+  it("reformats existing source when the surrounding theme changes", async () => {
+    const light = { theme: "light", resolvedTheme: "light", setTheme: vi.fn() } as const;
+    const dark = { ...light, theme: "dark", resolvedTheme: "dark" } as const;
+    const { rerender } = render(<ThemeContext.Provider value={light}>
+      <CodeLine code={JAVA_LINE} language="java" />
+    </ThemeContext.Provider>);
+    await waitFor(() => expect(mockHighlight).toHaveBeenLastCalledWith(JAVA_LINE, { lang: "java", theme: "github-light" }));
+    rerender(<ThemeContext.Provider value={dark}>
+      <CodeLine code={JAVA_LINE} language="java" />
+    </ThemeContext.Provider>);
+    await waitFor(() => expect(mockHighlight).toHaveBeenLastCalledWith(JAVA_LINE, { lang: "java", theme: "github-dark" }));
+    expect(screen.getByText(JAVA_LINE)).toHaveTextContent(JAVA_LINE);
   });
 });
