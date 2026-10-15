@@ -24,6 +24,8 @@ export type DetailTab = {
   render: () => ReactNode;
 };
 
+export type DetailAttempt = { id: number; status: string; durationMs?: number; node: Test };
+
 export type TestNodeAdapter = {
   /** Stable identifier, used as a React key and for debugging. */
   id: string;
@@ -41,6 +43,8 @@ export type TestNodeAdapter = {
   renderDetail?: (c: AdapterContext) => ReactNode;
   /** Extra detail tabs, merged (in registration order) across all matching adapters. */
   detailTabs?: (c: AdapterContext) => DetailTab[];
+  /** Stored attempt views for the header chooser; tree and run totals remain step-level. */
+  detailAttempts?: (c: AdapterContext) => DetailAttempt[];
   /** Node-scoped action buttons rendered in the detail header. */
   nodeActions?: (c: AdapterContext) => ReactNode;
   /**
@@ -95,6 +99,10 @@ export class TestNodeAdapterRegistry {
 
   resolveActions(node: Test, runner: TestRunnerContext): TestNodeAdapter | null {
     return this.firstWith(node, runner, (a) => !!a.nodeActions);
+  }
+
+  resolveAttempts(node: Test, runner: TestRunnerContext): DetailAttempt[] {
+    return this.firstWith(node, runner, (a) => !!a.detailAttempts)?.detailAttempts?.({ node, runner }) ?? [];
   }
 
   /** Merge `detailTabs` from every matching adapter, de-duplicated by tab id. */

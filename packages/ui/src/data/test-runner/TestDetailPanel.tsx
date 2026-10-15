@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Icon } from "../Icon";
 import { Button } from "../../components/button";
+import { Select } from "../../components/select";
 import { SplitButton } from "../../components/SplitButton";
 import { useCopyFlash } from "../../components/clipboard";
 import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
@@ -21,6 +22,7 @@ import type { Test } from "./types";
 import { useTestRunner } from "./context";
 import { buildNodeBrief, buildNodeJson, type CopyItem } from "./copy";
 import { formatTestDuration, outcomeFor, sum } from "./status";
+import { toolKeyFor } from "./marks";
 import { OutcomeIcon, ToolIcon } from "./MarkIcons";
 import { TestAttempts, TestFailureDetail, TestOutput } from "./TestFailureDetail";
 
@@ -93,11 +95,11 @@ function CopyDetailsButton({ node }: { node: Test }) {
   );
 }
 
-function DetailHeader({ node, actions }: { node: Test; actions?: ReactNode }) {
+function DetailHeader({ node, actionNode, actions, attemptChooser }: { node: Test; actionNode: Test; actions?: ReactNode; attemptChooser?: ReactNode }) {
   const runner = useTestRunner();
   const outcome = outcomeFor(node);
-  const canRerun = !!runner.onRerun && node.framework !== "task";
-  const canStop = !!runner.onStop && !!node.can_stop && !!node.task_id;
+  const canRerun = !!runner.onRerun && actionNode.framework !== "task";
+  const canStop = !!runner.onStop && !!actionNode.can_stop && !!actionNode.task_id;
   const location = node.file ? `${node.file}${node.line ? `:${node.line}` : ""}` : undefined;
   return (
     <div
@@ -114,7 +116,7 @@ function DetailHeader({ node, actions }: { node: Test; actions?: ReactNode }) {
       </h2>
       {node.framework && (
         <span className="inline-flex shrink-0 items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-          <ToolIcon tool={node.framework} className="text-sm" />
+          <ToolIcon tool={toolKeyFor(node)} className="text-sm" />
           {node.framework}
         </span>
       )}
@@ -133,13 +135,14 @@ function DetailHeader({ node, actions }: { node: Test; actions?: ReactNode }) {
         </span>
       )}
       <div className="ml-auto flex shrink-0 items-center gap-1">
+        {attemptChooser}
         {actions}
         <CopyDetailsButton node={node} />
         {canRerun && (
           <Button
             size="sm"
             disabled={runner.busy.rerun}
-            onClick={() => runner.onRerun!(node)}
+            onClick={() => runner.onRerun!(actionNode)}
             title="Rerun this test or subtree"
           >
             <Icon icon={UiRefresh} className="mr-1 text-sm" />
@@ -151,7 +154,7 @@ function DetailHeader({ node, actions }: { node: Test; actions?: ReactNode }) {
             size="sm"
             variant="destructive"
             disabled={runner.busy.stop}
-            onClick={() => runner.onStop!(node)}
+            onClick={() => runner.onStop!(actionNode)}
             title="Stop this running task"
           >
             <Icon icon={UiStop} className="mr-1 text-sm" />
@@ -170,7 +173,8 @@ function DetailHeader({ node, actions }: { node: Test; actions?: ReactNode }) {
  */
 export function TestDetailPanel() {
   const runner = useTestRunner();
-  const node = runner.selected;
+  const selected = runner.selected;
+  const [attemptSelection, setAttemptSelection] = useState<{ key: string; id: number } | null>(null);
   // Tab state is controlled when the host supplies activeTab (e.g. to mirror it
   // into the URL); otherwise the panel owns it. The render below tolerates an
   // unknown id by falling back to the built-in "detail" tab.
@@ -182,7 +186,7 @@ export function TestDetailPanel() {
     else setInternalTab(id);
   };
 
-  if (!node) {
+  if (!selected) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         <div className="text-center">
@@ -193,15 +197,30 @@ export function TestDetailPanel() {
     );
   }
 
+  const attempts = runner.adapters.resolveAttempts(selected, runner);
+  const key = selected.task_id ?? selected.name;
+  const attemptId = runner.activeAttempt ?? (attemptSelection?.key === key ? attemptSelection.id : undefined);
+  const attempt = attempts.find((a) => a.id === attemptId) ?? attempts.at(-1);
+  const node = attempts.length > 1 && attempt ? attempt.node : selected;
+  const attemptChooser = attempts.length > 1 && attempt ? (
+    <div className="w-44 shrink-0">
+      <Select aria-label="Attempt" value={String(attempt.id)} className="h-7 text-xs" onChange={(event) => {
+        const id = Number(event.target.value);
+        if (runner.onAttemptChange) runner.onAttemptChange(id);
+        else setAttemptSelection({ key, id });
+      }} options={attempts.map((a) => ({ value: String(a.id), label: `Attempt ${a.id}/${attempts.length} · ${a.status}${a.durationMs !== undefined ? ` · ${formatTestDuration(a.durationMs * 1e6)}` : ""}` }))} />
+    </div>
+  ) : null;
+
   const detailAdapter = runner.adapters.resolveDetail(node, runner);
-  const actionAdapter = runner.adapters.resolveActions(node, runner);
+  const actionAdapter = runner.adapters.resolveActions(selected, runner);
   const tabs = runner.adapters.resolveTabs(node, runner);
   const ownsScroll = runner.adapters.ownsScroll(node, runner);
 
   const body = detailAdapter?.renderDetail
     ? detailAdapter.renderDetail({ node, runner })
     : <DefaultDetailBody node={node} />;
-  const actions = actionAdapter?.nodeActions?.({ node, runner });
+  const actions = actionAdapter?.nodeActions?.({ node: selected, runner });
 
   // A size container, so log blocks can cap themselves at a share of the pane (cqh).
   const detailRegion = cn("min-h-0 flex-1 [container-type:size]", !ownsScroll && "overflow-y-auto");
@@ -210,7 +229,7 @@ export function TestDetailPanel() {
   if (tabs.length === 0) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <DetailHeader node={node} actions={actions} />
+        <DetailHeader node={node} actionNode={selected} actions={actions} attemptChooser={attemptChooser} />
         <div className={detailRegion}>{body}</div>
       </div>
     );
@@ -222,7 +241,7 @@ export function TestDetailPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <DetailHeader node={node} actions={actions} />
+      <DetailHeader node={node} actionNode={selected} actions={actions} attemptChooser={attemptChooser} />
       <div className="flex shrink-0 items-center gap-1 border-b border-border px-density-2 py-density-1">
         {allTabs.map((t) => (
           <TabButton

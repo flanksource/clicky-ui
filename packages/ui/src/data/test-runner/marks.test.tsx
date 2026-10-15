@@ -4,6 +4,7 @@ import {
   LINT_SEVERITIES,
   TEST_OUTCOMES,
   TEST_TOOLS,
+  toolKeyFor,
   toolMark,
   type TestOutcome,
 } from "./marks";
@@ -30,6 +31,10 @@ const GAVEL_LINTERS = [
 // Fixture step types (fixtures FixtureResult.Type, e.g. types/exec.go "exec")
 // plus the "checklist" node verifyReportTests synthesizes.
 const FIXTURE_STEPS = ["exec", "test", "lint", "verify", "query", "criterion", "checklist"];
+// Typed step kinds (fixtures/kind registry): the node's `framework` is the
+// kind name. `playwright` is deliberately absent — it is also a test
+// framework, so the step is told apart by `detail.step` (toolKeyFor).
+const FIXTURE_STEP_KINDS = ["services", "todo", "todo_prompt", "ai", "browser", "agent-browser"];
 
 describe("test outcome marks", () => {
   it("cover every status the filter bar counts, plus errored", () => {
@@ -121,9 +126,49 @@ describe("test and lint tool marks", () => {
     ).toEqual([]);
   });
 
+  it("mark every typed step kind as a fixture step with a glyph of its own", () => {
+    const keys = [...FIXTURE_STEP_KINDS, "playwright-step"];
+    expect(keys.filter((k) => toolMark(k)?.kind !== "fixture")).toEqual([]);
+    const glyphs = keys.map((k) => toolMark(k)!.icon);
+    expect(new Set(glyphs).size).toBe(glyphs.length);
+  });
+
+  it("keeps the AI step apart from the AI review it shares a runner with", () => {
+    expect(toolMark("ai")!.icon).not.toBe(toolMark("verify")!.icon);
+    expect(toolMark("ai")!.label).toBe("AI step");
+    expect(toolMark("verify")!.label).toBe("AI review");
+  });
+
   it("return null for a tool the catalog does not know", () => {
     expect(toolMark("rspec")).toBeNull();
     expect(toolMark(undefined)).toBeNull();
+  });
+
+  it("tells a playwright fixture step from the playwright test framework by detail.step", () => {
+    const step: Test = {
+      name: "watch",
+      framework: "playwright",
+      detail: { step: { id: "watch", kind: "playwright" } },
+    };
+    const spec: Test = { name: "checkout › pays", framework: "playwright", detail: { trace: "t.zip" } };
+    expect([toolKeyFor(step), toolKeyFor(spec)]).toEqual(["playwright-step", "playwright"]);
+    expect(toolMark(toolKeyFor(step))!.kind).toBe("fixture");
+    expect(toolMark(toolKeyFor(spec))!.kind).toBe("test");
+  });
+
+  it("keys every other node by its framework, step or not", () => {
+    const withStep = (framework: string): Test => ({
+      name: "n",
+      framework,
+      detail: { step: { id: "n", kind: framework } },
+    });
+    expect(FIXTURE_STEP_KINDS.map((k) => toolKeyFor(withStep(k)))).toEqual(FIXTURE_STEP_KINDS);
+    expect(toolKeyFor({ name: "n" })).toBeUndefined();
+  });
+
+  it("draws the step glyph, not the test glyph, for a playwright fixture step", () => {
+    const { container } = render(<ToolIcon tool="playwright-step" />);
+    expect(container.querySelector("svg")?.getAttribute("aria-label")).toBe("Playwright step");
   });
 
   it("render a labelled glyph for known tools and nothing for unknown ones", () => {

@@ -29,6 +29,55 @@ export function App() {
 }
 ```
 
+## Verification details
+
+`VerificationResults` renders typed fixture steps through `verificationAdapters()`. **Detail** explains execution: commands, assertions, a compact wait summary, events and exported variables. **Outputs** contains the selected attempt's final structured result, including `null` and empty objects. The header's attempt selector appears for multiple attempts and defaults to the latest; selecting an attempt switches its execution, wait, Outputs and Copy details together, while the tree and run totals retain the step's overall verdict. Reports without stored historical evidence say so when that attempt is selected.
+
+Waits retain the effective policy, outcome, actual elapsed `durationMs`, final `outputs`, and optional terminal `error` and `trace`. Intermediate poll values are not persisted. The summary shows the condition, elapsed badge, outcome and truncated output preview on one line; the full condition is available on hover, full outputs in the Outputs tab, and schedule/error diagnostics in the Wait details disclosure. `TestRunner` and `VerificationResults` accept `activeAttempt` and `onAttemptChange` for hosts that store the selection in the URL. Domain adapters supply `{ id, status, durationMs, node }` views through `detailAttempts`.
+
+Hosts can replace just the wait section without replacing the rest of the fixture renderer:
+
+```tsx
+import {
+  VerificationResults,
+  verificationAdapters,
+  type VerifyReport,
+} from "@flanksource/clicky-ui/data";
+
+const adapters = verificationAdapters({
+  renderWait: (wait) => (
+    <p>{wait.outcome}: {wait.durationMs}ms</p>
+  ),
+});
+
+export function VerificationPanel({ report }: { report: VerifyReport }) {
+  return <VerificationResults report={report} adapters={adapters} />;
+}
+```
+
+The optional `renderWait` callback receives the parsed final `WaitDetail`. Omitting it uses the compact row; returning `null` deliberately hides the wait section. `StepWait` exposes the standard rendering for custom compositions, and `StepOutputs` renders final outputs independently of the execution sections.
+
+## Typed properties
+
+`Properties` displays metadata as a two-column list. Each item has a stable `key`, a raw `value`, and an optional `type` and `unit`. Objects and arrays use the expandable JSON viewer; strings remain literal unless `type: "json"` is specified. Numeric types require finite numbers, and formatted values retain the original value in a tooltip.
+
+```tsx
+import { Properties } from "@flanksource/clicky-ui/data";
+
+export function RuntimeProperties() {
+  return <Properties keyRef="runtime" items={[
+    { key: "memory", value: 1048576, type: "bytes" },
+    { key: "uptime", value: 90000, type: "duration", unit: "ms" },
+    { key: "load", value: 0.25, type: "number", unit: "percentunit" },
+    { key: "enabled", value: false, type: "boolean" },
+    { key: "started", value: 1704067200000, type: "date" },
+    { key: "config", value: '{"enabled":true}', type: "json" },
+  ]} />;
+}
+```
+
+`type` accepts `text`, `json`, `bytes`, `duration`, `number`, `boolean`, or `date`. Bytes use binary scaling. Durations default to milliseconds; set `unit: "s"` for seconds. Numeric units also accept the shared unit registry, including `percent`, `percentunit`, and `Bps`. Dates accept a `Date`, an ISO string, or a timestamp in milliseconds. `keyRef` persists the density selected in the display menu. Custom `renderValue` renderers override typed formatting, and `prefixActions` or `suffixActions` add per-row actions without changing the raw value.
+
 ## Clicky AST Renderer
 
 ```tsx

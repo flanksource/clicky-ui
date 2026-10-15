@@ -66,3 +66,15 @@ describe("TestTreeNode message line", () => {
     expect(container.querySelectorAll("[title]").length).toBe(0);
   });
 });
+
+describe("TestTreeNode framework mark", () => {
+  const spec = { name: "n", framework: "playwright", passed: true };
+
+  it("draws the Playwright step mark for a fixture step and the test mark for a spec", () => {
+    const step = renderRow({ ...spec, detail: { step: { id: "watch", kind: "playwright" } } } as Test);
+    expect(step.container.querySelector('svg[aria-label="Playwright step"]')).not.toBeNull();
+    step.unmount();
+    const test = renderRow(spec as Test);
+    expect(test.container.querySelector('svg[aria-label="Playwright"]')).not.toBeNull();
+  });
+});

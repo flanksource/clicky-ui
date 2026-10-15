@@ -26,6 +26,7 @@ export {
   type TestNodeAdapter,
   type AdapterContext,
   type DetailTab,
+  type DetailAttempt,
 } from "./adapter";
 
 export {
@@ -67,6 +68,7 @@ export {
   LINT_SEVERITIES,
   TEST_TOOLS,
   toolMark,
+  toolKeyFor,
   type ResultMark,
   type LintSeverity,
   type ToolKind,

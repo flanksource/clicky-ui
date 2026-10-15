@@ -142,6 +142,54 @@ export const ErroredWithNoTests: Story = {
   ),
 };
 
+/** A typed `todo_prompt` step: a wait that polled three times, a retried launch, and its exports. */
+export const TypedStepWithWait: Story = {
+  render: () => {
+    const plan = {
+      name: "plan reaches review",
+      framework: "todo_prompt",
+      passed: true,
+      duration: 41_000_000_000,
+      detail: {
+        step: { id: "plan", kind: "todo_prompt" },
+        outputs: { plan: { content: "Add greet/greet.go with a Greeting helper" } },
+        exports: { PLAN_ID: { value: "plan-3", step: "plan" } },
+        attempts: [
+          { attempt: 1, status: "failed", error: "launch refused: admission queue full", durationMs: 2100 },
+          { attempt: 2, status: "passed", durationMs: 38900 },
+        ],
+        wait: {
+          policy: {
+            until: "todo.status == 'review'",
+            failWhen: "todo.status in ['failed','ask']",
+            interval: "1s",
+            backoff: { factor: 1.5, max: "10s" },
+            jitter: "20%",
+            timeout: "3m",
+          },
+          outcome: "satisfied",
+          durationMs: 3000, outputs: { todo: { status: "review" } },
+        },
+      },
+    };
+    const { attempts: _attempts, ...detail } = plan.detail;
+    const attempts = [
+      { ...plan.detail.attempts[0], result: { name: plan.name, framework: plan.framework, failed: true, message: "launch refused: admission queue full", detail: { step: detail.step, outputs: { launch: { failed: true } } } } },
+      { ...plan.detail.attempts[1], result: { ...plan, detail } },
+    ];
+    const selected = { ...plan, detail: { ...detail, attempts } };
+    return (
+      <div className="h-screen">
+        <VerificationResults
+          report={report({ tests: [selected] })}
+          selected={selected}
+          onSelect={() => {}}
+        />
+      </div>
+    );
+  },
+};
+
 export const Empty: Story = {
   render: () => (
     <div className="h-screen">

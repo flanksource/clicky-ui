@@ -35,6 +35,8 @@ export type VerificationResultsProps = {
    */
   selected?: Test | null;
   onSelect?: (node: Test | null) => void;
+  activeAttempt?: number;
+  onAttemptChange?: (attempt: number) => void;
   /** Controlled status/framework filters — omit to let the component own filter state. */
   filters?: TestFilters;
   onFiltersChange?: (next: TestFilters) => void;
@@ -73,6 +75,8 @@ export function VerificationResults({
   emptyText = "No verification has run yet",
   selected: controlledSelected,
   onSelect: controlledOnSelect,
+  activeAttempt,
+  onAttemptChange,
   filters: controlledFilters,
   onFiltersChange: controlledOnFiltersChange,
 }: VerificationResultsProps) {
@@ -151,6 +155,8 @@ export function VerificationResults({
         title={title}
         adapters={adapters}
         onSelect={setSelected}
+        {...(activeAttempt !== undefined ? { activeAttempt } : {})}
+        {...(onAttemptChange ? { onAttemptChange } : {})}
         onFiltersChange={setFilters}
         onExpandAllChange={setExpandAll}
       />
