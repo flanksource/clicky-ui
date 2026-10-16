@@ -1,3 +1,4 @@
+import type { StackFrame, StackRecord } from "../traces/types";
 import { parseJvmThreadDump, countThreadsByState, type ParsedThread } from "./jvm-stacktrace";
 
 export type DumpFormat = "go" | "jvm" | "unknown";
@@ -127,6 +128,56 @@ export function parseGoroutineDump(text: string): ParsedGoroutine[] {
   }
 
   return goroutines;
+}
+
+function recordFrame(frame: StackFrame, kind: ParsedGoroutineFrame["kind"]): ParsedGoroutineFrame {
+  const file = frame.file ? normalizeFilePath(frame.file) : undefined;
+  return {
+    functionName: frame.func,
+    // A record's func carries no argument list, so only the package path is stripped.
+    displayName: stripPackageQualifier(frame.func),
+    kind,
+    runtime: isRuntimeFrame(frame.func),
+    ...(file ? { file, line: frame.line, location: `${file}${frame.line ? `:${frame.line}` : ""}` } : {}),
+  };
+}
+
+/**
+ * Goroutines from `stacks` records of Go format, already parsed server side:
+ * no text is parsed. A record of another format or one that failed is a caller
+ * error and throws.
+ */
+export function goroutinesFromRecords(records: StackRecord[]): ParsedGoroutine[] {
+  return records.map((record) => {
+    if (record.format !== "go" || record.error || record.goroutineId === undefined) {
+      throw new Error(
+        `stack record ${record.checkpointId}/${record.key} is not a Go goroutine record (format "${record.format}"${record.error ? `, error "${record.error}"` : ""})`,
+      );
+    }
+    const frames = [
+      ...(record.frames ?? []).map((frame) => recordFrame(frame, "frame")),
+      ...(record.createdBy ? [recordFrame(record.createdBy, "created_by")] : []),
+    ];
+    const state = record.state ?? "";
+    const rawState = [
+      state,
+      ...(record.waitMinutes ? [`${record.waitMinutes} minutes`] : []),
+      ...(record.lockedToThread ? ["locked to thread"] : []),
+    ].join(", ");
+    const topFunction = frames.find((frame) => frame.kind === "frame")?.functionName;
+    return {
+      id: record.goroutineId,
+      state: normalizeState(state),
+      rawState,
+      frames,
+      raw: record.raw,
+      userFrameCount: frames.filter((frame) => !frame.runtime && frame.kind === "frame").length,
+      searchText: `goroutine ${record.goroutineId} [${rawState}]\n${frames
+        .map((frame) => `${frame.functionName} ${frame.file || ""}`)
+        .join("\n")}`.toLowerCase(),
+      ...(topFunction !== undefined ? { topFunction } : {}),
+    };
+  });
 }
 
 export function countGoroutinesByState(goroutines: ParsedGoroutine[]): Map<string, number> {

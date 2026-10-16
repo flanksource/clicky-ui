@@ -24,10 +24,13 @@ import { buildNodeBrief, buildNodeJson, type CopyItem } from "./copy";
 import { formatTestDuration, outcomeFor, sum } from "./status";
 import { toolKeyFor } from "./marks";
 import { OutcomeIcon, ToolIcon } from "./MarkIcons";
-import { TestAttempts, TestFailureDetail, TestOutput } from "./TestFailureDetail";
+import { TestFailureDetail, TestOutput } from "./TestFailureDetail";
+import { TestAttemptDetail } from "./TestAttemptDetail";
 
 /** Built-in detail body — used when no adapter contributes `renderDetail`. */
 function DefaultDetailBody({ node }: { node: Test }) {
+  const runner = useTestRunner();
+  const attempt = node.attempts?.at(-1);
   const hasChildren = (node.children?.length ?? 0) > 0;
   const counts = hasChildren ? sum(node) : null;
   return (
@@ -37,7 +40,13 @@ function DefaultDetailBody({ node }: { node: Test }) {
       )}
       {node.failure_detail && <TestFailureDetail failure={node.failure_detail} />}
       <TestOutput node={node} />
-      {node.attempts && node.attempts.length > 0 && <TestAttempts attempts={node.attempts} />}
+      {attempt && (
+        <TestAttemptDetail
+          key={`${attempt.run_kind ?? ""}:${attempt.sequence}`}
+          attempt={attempt}
+          {...(runner.fetchProcessMetrics ? { fetchProcessMetrics: runner.fetchProcessMetrics } : {})}
+        />
+      )}
       {counts && counts.total > 0 && (
         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
           <span>{counts.total} total</span>

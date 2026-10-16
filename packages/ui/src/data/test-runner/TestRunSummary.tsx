@@ -54,6 +54,7 @@ export function TestRunSummary({
     { count: t.skipped, color: "bg-yellow-400", label: "skipped" },
     { count: t.failed, color: "bg-red-500", label: "failed" },
     { count: t.warned, color: "bg-amber-400", label: "warned" },
+    { count: t.aborted, color: "bg-red-300", label: "aborted" },
     { count: t.timedout, color: "bg-amber-500", label: "timed out" },
     { count: t.running, color: "bg-blue-400", label: "running" },
     { count: t.pending, color: "bg-muted-foreground/40", label: "queued" },
@@ -65,6 +66,7 @@ export function TestRunSummary({
     { n: t.passed, label: "passed", outcome: "passed" },
     { n: t.failed, label: "failed", outcome: "failed" },
     { n: t.warned, label: "warned", outcome: "warned" },
+    { n: t.aborted, label: "aborted", outcome: "aborted" },
     { n: t.timedout, label: "timed out", outcome: "timedout" },
     { n: t.skipped, label: "skipped", outcome: "skipped" },
     { n: t.running, label: "running", outcome: "running" },
@@ -88,6 +90,33 @@ export function TestRunSummary({
       </span>
     ));
 
+  const runChips = (
+    <>
+      {runMeta?.timed_out && (
+        <span
+          className={cn("inline-flex items-center gap-0.5", TEST_OUTCOMES.timedout.className)}
+          title="The run hit its timeout"
+          data-summary-run="timed-out"
+        >
+          <OutcomeIcon outcome="timedout" />
+          Timed out
+        </span>
+      )}
+      {runMeta?.exit_code !== undefined && (
+        <span
+          className={cn(
+            "inline-flex items-center tabular-nums",
+            runMeta.exit_code === 0 ? "text-muted-foreground" : TEST_OUTCOMES.failed.className,
+          )}
+          title={`Exit code ${runMeta.exit_code}`}
+          data-summary-run="exit-code"
+        >
+          exit {runMeta.exit_code}
+        </span>
+      )}
+    </>
+  );
+
   if (compact) {
     return (
       <div
@@ -101,6 +130,7 @@ export function TestRunSummary({
           {runMeta?.kind === "rerun" ? ` · rerun #${runMeta.sequence}` : ""}
         </span>
         {chipRow}
+        {runChips}
         {elapsed && (
           <span className="inline-flex items-center gap-1">
             <Icon icon={UiClock} className="text-xs" />
@@ -128,6 +158,7 @@ export function TestRunSummary({
           {runMeta?.kind === "rerun" ? ` · rerun #${runMeta.sequence}` : ""}
         </span>
         {chipRow}
+        {runChips}
         {elapsed && (
           <span className="inline-flex items-center gap-1">
             <Icon icon={UiClock} className="text-xs" />

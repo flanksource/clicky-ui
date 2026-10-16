@@ -5,11 +5,15 @@ export { TestRunner, type TestRunnerProps } from "./TestRunner";
 export { TestTree } from "./TestTree";
 export { TestTreeNode } from "./TestTreeNode";
 export { TestDetailPanel } from "./TestDetailPanel";
+export { TestFailureDetail, TestOutput } from "./TestFailureDetail";
+export { TestAttemptDetail, type TestAttemptDetailProps } from "./TestAttemptDetail";
+export { TestAttempts } from "./TestAttempts";
 export {
-  TestFailureDetail,
-  TestOutput,
-  TestAttempts,
-} from "./TestFailureDetail";
+  ProcessNotFoundError,
+  type FetchProcessMetrics,
+  type ProcessMetrics,
+} from "./process-metrics";
+export { attemptStatus, isAttemptLive, testAttemptViews, type AttemptStatus } from "./attempts";
 export { Expectation, type ExpectationProps } from "./Expectation";
 export { TestRunSummary, type TestRunSummaryProps } from "./TestRunSummary";
 export { TestFilterBar, type TestFilterBarProps } from "./TestFilterBar";

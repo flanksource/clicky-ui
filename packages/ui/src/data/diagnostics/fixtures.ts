@@ -1,6 +1,6 @@
 import type { ProcessNode } from "./types";
 
-const sampleStack = `goroutine 1 [running]:
+export const sampleStack = `goroutine 1 [running]:
 main.main()
 \t/home/user/go/src/app/main.go:42 +0x1a2
 runtime.main()

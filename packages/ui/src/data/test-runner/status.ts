@@ -18,6 +18,8 @@ export type StatusCounts = {
   passed: number;
   failed: number;
   warned: number;
+  /** Never ran because the run stopped after an earlier failure; not an intentional skip. */
+  aborted: number;
   skipped: number;
   pending: number;
   running: number;
@@ -29,6 +31,7 @@ const emptyCounts = (): StatusCounts => ({
   passed: 0,
   failed: 0,
   warned: 0,
+  aborted: 0,
   skipped: 0,
   pending: 0,
   running: 0,
@@ -40,6 +43,7 @@ const addCounts = (r: StatusCounts, s: StatusCounts) => {
   r.passed += s.passed;
   r.failed += s.failed;
   r.warned += s.warned;
+  r.aborted += s.aborted;
   r.skipped += s.skipped;
   r.pending += s.pending;
   r.running += s.running;
@@ -51,6 +55,7 @@ const countsFromSummary = (summary: TestSummary): StatusCounts => ({
   passed: summary.Passed,
   failed: summary.Failed,
   warned: summary.Warned || 0,
+  aborted: summary.Aborted || 0,
   skipped: summary.Skipped,
   pending: summary.Pending || 0,
   running: summary.Running || 0,
@@ -60,13 +65,21 @@ const countsFromSummary = (summary: TestSummary): StatusCounts => ({
 const countsFromLeaf = (t: Test): StatusCounts => {
   const isTimedOut = !!t.timed_out;
   const counted =
-    isTimedOut || t.passed || t.failed || t.warned || t.skipped || t.pending || t.running;
+    isTimedOut ||
+    t.passed ||
+    t.failed ||
+    t.warned ||
+    t.aborted ||
+    t.skipped ||
+    t.pending ||
+    t.running;
   return {
     total: counted ? 1 : 0,
     passed: !isTimedOut && t.passed ? 1 : 0,
     failed: !isTimedOut && t.failed ? 1 : 0,
     warned: !isTimedOut && t.warned ? 1 : 0,
-    skipped: !isTimedOut && t.skipped ? 1 : 0,
+    aborted: !isTimedOut && t.aborted ? 1 : 0,
+    skipped: !isTimedOut && !t.aborted && t.skipped ? 1 : 0,
     pending: !isTimedOut && t.pending ? 1 : 0,
     running: !isTimedOut && t.running ? 1 : 0,
     timedout: isTimedOut ? 1 : 0,
@@ -94,6 +107,7 @@ export function aggregateStatusCounts(tests: Test[]): StatusCounts {
 export const STATUS_LABELS: { key: keyof StatusCounts; label: string }[] = [
   { key: "failed", label: "Failed" },
   { key: "warned", label: "Warned" },
+  { key: "aborted", label: "Aborted" },
   { key: "timedout", label: "Timed out" },
   { key: "passed", label: "Passed" },
   { key: "skipped", label: "Skipped" },
@@ -143,6 +157,7 @@ export type TestStatus =
   | "passed"
   | "failed"
   | "warned"
+  | "aborted"
   | "skipped"
   | "pending"
   | "running"
@@ -155,6 +170,7 @@ export function testStatus(t: Test): TestStatus | null {
   if (t.pending) return "pending";
   if (t.failed) return "failed";
   if (t.warned) return "warned";
+  if (t.aborted) return "aborted";
   if (t.skipped) return "skipped";
   if (t.passed) return "passed";
   return null;
@@ -180,6 +196,7 @@ export function outcomeFor(t: Test): TestOutcome | null {
   if (hasTimedOutDescendant(t)) return "timedout";
   if (s.failed > 0) return "failed";
   if (s.warned > 0) return "warned";
+  if (s.aborted > 0) return "aborted";
   if (s.running > 0) return "running";
   if (s.pending > 0) return "pending";
   if (s.total > 0 && s.skipped === s.total) return "skipped";
@@ -197,6 +214,7 @@ const OUTCOME_TONE: Record<TestOutcome, BadgeTone> = {
   errored: "danger",
   timedout: "warning",
   warned: "warning",
+  aborted: "danger",
   skipped: "warning",
   running: "info",
   pending: "neutral",
@@ -269,7 +287,7 @@ function joinChainNames(parent: string | undefined, child: string | undefined): 
 }
 
 function isCollapsibleContainer(t: Test): boolean {
-  return !(t.passed || t.failed || t.skipped || t.pending);
+  return !(t.passed || t.failed || t.aborted || t.skipped || t.pending);
 }
 
 // Re-deriving a collapsed/filtered node invalidates any cached summary; drop it

@@ -17,6 +17,7 @@ import { TestTree } from "./TestTree";
 import { TestDetailPanel } from "./TestDetailPanel";
 import { TestRunSummary } from "./TestRunSummary";
 import { TestFilterBar } from "./TestFilterBar";
+import type { FetchProcessMetrics } from "./process-metrics";
 
 export type TestRunnerProps = {
   tests: Test[];
@@ -52,6 +53,13 @@ export type TestRunnerProps = {
   onExpandAllChange: (next: boolean | null) => void;
   onRerun?: (node: Test) => void;
   onStop?: (node: Test) => void;
+
+  /**
+   * Reads a live attempt's process (CPU, RSS, open files) by pid. The detail
+   * pane polls it every two seconds while the attempt runs, and stops when the
+   * attempt finishes or the fetch rejects with `ProcessNotFoundError`.
+   */
+  fetchProcessMetrics?: FetchProcessMetrics;
 
   /** Domain node adapters, or a pre-built registry. Defaults to default-only. */
   adapters?: TestNodeAdapter[] | TestNodeAdapterRegistry;
@@ -120,6 +128,7 @@ export function TestRunner({
   onExpandAllChange,
   onRerun,
   onStop,
+  fetchProcessMetrics,
   adapters,
   title,
   showSummary = true,
@@ -152,6 +161,7 @@ export function TestRunner({
       onExpandAllChange,
       onRerun,
       onStop,
+      fetchProcessMetrics,
       adapters: registry,
     }),
     [
@@ -173,6 +183,7 @@ export function TestRunner({
       onExpandAllChange,
       onRerun,
       onStop,
+      fetchProcessMetrics,
       registry,
     ],
   );

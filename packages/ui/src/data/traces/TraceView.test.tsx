@@ -1,6 +1,14 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { httpExchangeRows, processNodeRows, processSampleRows, sqlStatementRows, terminalEvents } from "./fixtures";
+import {
+  goProfileRecords,
+  httpExchangeRows,
+  processNodeRows,
+  processSampleRows,
+  sqlStatementRows,
+  stackRecords,
+  terminalEvents,
+} from "./fixtures";
 import { TraceView } from "./TraceView";
 
 describe("TraceView", () => {
@@ -26,6 +34,88 @@ describe("TraceView", () => {
     fireEvent.click(screen.getByText("orphan"));
     expect(screen.getByText("orphan").closest('[role="treeitem"]')).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("img", { name: "CPU % over 12 samples" })).toBeInTheDocument();
+  });
+
+  describe("goprof", () => {
+    const otherProcess = goProfileRecords.map((record) => ({ ...record, key: "101:100", checkpointId: `${record.checkpointId}-child` }));
+
+    it("renders one process's records as a Go profile view without a process heading", () => {
+      render(<TraceView kind="goprof" rows={goProfileRecords} />);
+      expect(screen.getByRole("combobox", { name: "Profile checkpoint" })).toHaveValue("prof-cpu");
+      expect(screen.getByText("Total 2.3 s across 7 functions")).toBeInTheDocument();
+      expect(document.querySelectorAll("[data-go-profile]")).toHaveLength(1);
+      expect(screen.queryByText("100:1")).toBeNull();
+    });
+
+    it("renders one profile view per process key when the records span several, each under its key", () => {
+      render(<TraceView kind="goprof" rows={[...goProfileRecords, ...otherProcess]} />);
+      const sections = [...document.querySelectorAll("[data-trace-process]")];
+      expect(sections.map((section) => section.getAttribute("data-trace-process"))).toEqual(["100:1", "101:100"]);
+      sections.forEach((section) => expect(within(section as HTMLElement).getByRole("combobox", { name: "Profile checkpoint" })).toBeInTheDocument());
+      expect(screen.getByText("101:100")).toBeInTheDocument();
+    });
+
+    it("scopes each process's checkpoints to its own records", () => {
+      render(<TraceView kind="goprof" rows={[...goProfileRecords, ...otherProcess]} />);
+      const child = within(document.querySelector('[data-trace-process="101:100"]') as HTMLElement);
+      const picker = child.getByRole("combobox", { name: "Profile checkpoint" });
+      expect(picker).toHaveValue("prof-cpu-child");
+      expect(within(picker).getAllByRole("option").map((option) => option.getAttribute("value"))).toEqual(["prof-cpu-child", "prof-heap-child"]);
+    });
+
+    it("throws, naming the row, when a record has no process key", () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      expect(() => render(<TraceView kind="goprof" rows={[{ checkpointId: "c" }]} />)).toThrow(/trace kind "goprof" row 0 has no "key"/);
+    });
+  });
+
+  describe("stacks", () => {
+    const section = (key: string) => within(document.querySelector(`[data-trace-process="${key}"]`) as HTMLElement);
+    const checkpointIds = (key: string) =>
+      [...document.querySelectorAll(`[data-trace-process="${key}"] [data-stack-checkpoint]`)].map((node) => node.getAttribute("data-stack-checkpoint"));
+
+    it("groups the records of each process into one stack dump per checkpoint, latest first", () => {
+      render(<TraceView kind="stacks" rows={stackRecords} />);
+      expect([...document.querySelectorAll("[data-trace-process]")].map((node) => node.getAttribute("data-trace-process"))).toEqual([
+        "100:1",
+        "101:100",
+        "102:101",
+      ]);
+      expect(checkpointIds("100:1")).toEqual(["ckpt-timeout", "ckpt-periodic"]);
+    });
+
+    it("renders each checkpoint's goroutines from only that checkpoint's records", () => {
+      render(<TraceView kind="stacks" rows={stackRecords} />);
+      const timeout = within(document.querySelector('[data-stack-checkpoint="ckpt-timeout"]') as HTMLElement);
+      const periodic = within(document.querySelector('[data-stack-checkpoint="ckpt-periodic"]') as HTMLElement);
+      expect(timeout.getByText("3 / 3 goroutines")).toBeInTheDocument();
+      expect(timeout.getByText("g22")).toBeInTheDocument();
+      expect(periodic.getByText("2 / 2 goroutines")).toBeInTheDocument();
+      expect(periodic.queryByText("g22")).toBeNull();
+    });
+
+    it("shows how each checkpoint was taken", () => {
+      render(<TraceView kind="stacks" rows={stackRecords} />);
+      expect(section("100:1").getAllByText("inprocess")).toHaveLength(2);
+      expect(section("101:100").getByText("native")).toBeInTheDocument();
+    });
+
+    it("shows a native dump's raw text and a failed dump's error", () => {
+      render(<TraceView kind="stacks" rows={stackRecords} />);
+      expect(section("101:100").getByText(/Sampling process 101/)).toBeInTheDocument();
+      expect(section("102:101").getByText("the process exited before a stack could be read")).toBeInTheDocument();
+    });
+
+    it("omits the process headings when the records are of one process", () => {
+      render(<TraceView kind="stacks" rows={stackRecords.filter((record) => record.key === "100:1")} />);
+      expect(screen.queryByText("100:1")).toBeNull();
+      expect(checkpointIds("100:1")).toEqual(["ckpt-timeout", "ckpt-periodic"]);
+    });
+
+    it("throws, naming the row, when a record has no checkpoint", () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      expect(() => render(<TraceView kind="stacks" rows={[{ key: "100:1" }]} />)).toThrow(/trace kind "stacks" row 0 has no "checkpointId"/);
+    });
   });
 
   it("renders any other kind as a table over the row keys", () => {

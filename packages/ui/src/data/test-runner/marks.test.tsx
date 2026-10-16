@@ -76,6 +76,7 @@ describe("outcomeFor", () => {
     [{ passed: true }, "passed"],
     [{ failed: true }, "failed"],
     [{ warned: true }, "warned"],
+    [{ aborted: true, skipped: true }, "aborted"],
     [{ skipped: true }, "skipped"],
     [{ pending: true }, "pending"],
     [{ running: true }, "running"],

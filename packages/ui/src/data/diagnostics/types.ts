@@ -21,11 +21,5 @@ export interface StackCapture {
   collected_at?: string;
 }
 
-export interface RunMeta {
-  version?: string;
-  sequence: number;
-  kind?: "initial" | "rerun" | string;
-  started?: string;
-  ended?: string;
-  args?: Record<string, unknown>;
-}
+/** The test-runner run metadata; diagnostics shares it rather than keeping a duplicate. */
+export type { RunMeta } from "../test-runner/types";

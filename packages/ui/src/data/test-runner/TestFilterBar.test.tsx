@@ -8,6 +8,7 @@ const counts: StatusCounts = {
   total: 6,
   failed: 1,
   warned: 1,
+  aborted: 0,
   timedout: 1,
   passed: 1,
   skipped: 1,

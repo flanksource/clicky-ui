@@ -54,3 +54,49 @@ export const Gomega: Story = {
     </div>
   ),
 };
+
+const PANIC_STACK = `goroutine 18 [running]:
+testing.tRunner.func1.2({0x1, 0x2})
+\t/usr/local/go1.22/src/testing/testing.go:1631 +0x24a
+billing.TestCharge(0xc000)
+\t/app/billing/charge_test.go:44 +0x1a
+created by testing.(*T).Run
+\t/usr/local/go1.22/src/testing/testing.go:1742 +0x390
+`;
+
+/** A panic stack is a Go goroutine dump, shown as a goroutine card instead of a log. */
+export const GoPanic: Story = {
+  args: {
+    failure: {
+      kind: "panic",
+      summary: "panic: runtime error: invalid memory address or nil pointer dereference",
+      location: "billing/charge_test.go:44",
+      stack: PANIC_STACK,
+    },
+  },
+  render: (args) => (
+    <div className="max-w-2xl">
+      <TestFailureDetail {...args} />
+    </div>
+  ),
+};
+
+/** Several goroutines keep the search, state chips and hide-runtime filter. */
+export const GoPanicWithManyGoroutines: Story = {
+  args: {
+    failure: {
+      kind: "panic",
+      summary: "panic: send on closed channel",
+      stack: `${PANIC_STACK}
+goroutine 1 [chan receive]:
+main.main()
+\t/app/main.go:9 +0x20
+`,
+    },
+  },
+  render: (args) => (
+    <div className="max-w-2xl">
+      <TestFailureDetail {...args} />
+    </div>
+  ),
+};

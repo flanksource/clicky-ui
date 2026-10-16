@@ -244,3 +244,54 @@ describe("filterTests", () => {
     expect(filterTests(suite, new Map(), new Map())).toBe(suite);
   });
 });
+
+describe("aborted", () => {
+  const aborted = leaf("after-failure", { aborted: true, skipped: true });
+
+  it("counts an aborted skipped leaf once, as aborted, apart from an intentional skip", () => {
+    const parent: Test = {
+      name: "pkg",
+      children: [leaf("ok", { passed: true }), leaf("skip", { skipped: true }), aborted],
+    };
+    expect(sum(parent)).toMatchObject({ total: 3, passed: 1, aborted: 1, skipped: 1, failed: 0 });
+  });
+
+  it("counts an aborted leaf that is not marked skipped", () => {
+    expect(sum(leaf("x", { aborted: true }))).toMatchObject({ total: 1, aborted: 1, skipped: 0 });
+  });
+
+  it("reads Aborted from a server summary, defaulting to 0", () => {
+    const base = { Total: 4, Passed: 1, Failed: 1, Skipped: 0, Pending: 0, Duration: 0 };
+    expect(sum({ name: "a", summary: { ...base, Aborted: 2 } }).aborted).toBe(2);
+    expect(sum({ name: "b", summary: base }).aborted).toBe(0);
+  });
+
+  it("ranks after warned and before skipped", () => {
+    expect(testStatus(aborted)).toBe("aborted");
+    expect(testStatus(leaf("w", { warned: true, aborted: true }))).toBe("warned");
+    expect(testStatus(leaf("f", { failed: true, aborted: true }))).toBe("failed");
+    expect(testStatus(leaf("t", { timed_out: true, aborted: true }))).toBe("timedout");
+  });
+
+  it("rolls a container with an aborted child up to aborted unless something failed or warned", () => {
+    expect(outcomeFor({ name: "p", children: [leaf("ok", { passed: true }), aborted] })).toBe("aborted");
+    expect(outcomeFor({ name: "p", children: [leaf("w", { warned: true }), aborted] })).toBe("warned");
+    expect(outcomeFor({ name: "p", children: [leaf("f", { failed: true }), aborted] })).toBe("failed");
+  });
+
+  it("has a danger tone and is listed after warned in the filter labels", () => {
+    expect(statusToneFor(aborted)).toBe("danger");
+    const keys = STATUS_LABELS.map((l) => l.key);
+    expect(keys.indexOf("aborted")).toBe(keys.indexOf("warned") + 1);
+  });
+
+  it("filters by the aborted status", () => {
+    const tests = [{ name: "pkg", children: [leaf("ok", { passed: true }), aborted] }];
+    const kept = filterTests(tests, decodeFilterState(["aborted"]), new Map());
+    expect(kept[0]!.children!.map((c) => c.name)).toEqual(["after-failure"]);
+  });
+
+  it("does not collapse an aborted leaf into a chain", () => {
+    expect(collapseSingleChildChains([aborted])).toEqual([aborted]);
+  });
+});

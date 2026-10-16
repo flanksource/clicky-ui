@@ -1,10 +1,26 @@
+import { useMemo } from "react";
 import { LogViewer } from "../LogViewer";
-import { cn } from "../../lib/utils";
+import { parseStackDump } from "../diagnostics/stacktrace";
+import { StackDumpView } from "../diagnostics/StackDumpView";
 import { Expectation } from "./Expectation";
-import type { FailureDetail, Test, TestAttempt } from "./types";
-import { formatTestDuration } from "./status";
+import type { FailureDetail, Test } from "./types";
 
-/** Renders a structured failure: its summary, the expectation, and the stack. */
+/** A failure stack: a Go panic dump as goroutine cards, anything else as a log. */
+function FailureStack({ stack }: { stack: string }) {
+  const parsed = useMemo(() => parseStackDump(stack), [stack]);
+  if (parsed.format !== "go") return <LogViewer logs={stack} collapsedLines={6} />;
+  return (
+    <div className="flex max-h-[32rem] min-h-0 flex-col" data-failure-stack="go">
+      <StackDumpView text={stack} singleItem={parsed.goroutines.length === 1} />
+    </div>
+  );
+}
+
+/**
+ * Renders a structured failure: its summary, the expectation, and the stack.
+ * A stack that is a Go goroutine dump (a panic) is shown as searchable
+ * goroutine cards; any other stack stays a log.
+ */
 export function TestFailureDetail({ failure }: { failure: FailureDetail }) {
   const hasExpectation = !!(
     failure.matcher ||
@@ -25,7 +41,7 @@ export function TestFailureDetail({ failure }: { failure: FailureDetail }) {
           location={failure.location}
         />
       )}
-      {failure.stack && <LogViewer logs={failure.stack} collapsedLines={6} />}
+      {failure.stack && <FailureStack stack={failure.stack} />}
     </div>
   );
 }
@@ -55,37 +71,6 @@ export function TestOutput({ node }: { node: Test }) {
           />
         </div>
       )}
-    </div>
-  );
-}
-
-function attemptTone(a: TestAttempt): string {
-  if (a.failed || a.timed_out) return "text-red-600 dark:text-red-400";
-  if (a.passed) return "text-green-600 dark:text-green-400";
-  return "text-muted-foreground";
-}
-
-/** Prior attempts list for flaky/reran tests. */
-export function TestAttempts({ attempts }: { attempts: TestAttempt[] }) {
-  if (attempts.length === 0) return null;
-  return (
-    <div className="space-y-1">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-        Attempts ({attempts.length})
-      </div>
-      <ul className="divide-y divide-border rounded-md border border-border text-xs">
-        {attempts.map((a) => (
-          <li key={a.sequence} className="flex items-center justify-between gap-2 px-2 py-1">
-            <span className={cn("font-medium", attemptTone(a))}>
-              #{a.sequence} {a.run_kind ?? ""}
-            </span>
-            <span className="truncate text-muted-foreground">{a.message}</span>
-            {a.duration ? (
-              <span className="shrink-0 text-muted-foreground">{formatTestDuration(a.duration)}</span>
-            ) : null}
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

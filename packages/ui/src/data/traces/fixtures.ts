@@ -1,8 +1,15 @@
+import { SAMPLE_FACETS, SAMPLE_FACET_ORDER } from "./process-facets";
+import type { TraceWindow } from "./TraceWindowList";
 import type {
+  GoProfileRecord,
   HttpExchangeRow,
+  ProcessDescriptor,
+  ProcessEnv,
   ProcessNodeRow,
   ProcessSampleRow,
   SqlStatementRow,
+  StackFrame,
+  StackRecord,
   TerminalEvent,
 } from "./types";
 
@@ -244,3 +251,318 @@ export const processSampleRows: ProcessSampleRow[] = Array.from({ length: 12 }, 
   memoryPercent: 2 + tick * 0.2,
   rssBytes: 100_000_000 + tick * 30_000_000,
 }));
+
+export const processEnvFixture: ProcessEnv = {
+  PATH: "/usr/local/bin:/usr/bin",
+  HOME: "/home/dev",
+  GOFLAGS: "-mod=readonly",
+  API_TOKEN: "********",
+};
+
+/** processNodeRows with a working directory, the stack transports each process offers, and the root's recorded environment. */
+export const processDetailRows: ProcessNodeRow[] = processNodeRows.map((row) => {
+  switch (row.key) {
+    case "100:1":
+      return {
+        ...row,
+        cwd: "/work/repo",
+        stackTransports: [
+          { transport: "inprocess", destructive: false },
+          { transport: "native", destructive: false },
+        ],
+        environment: processEnvFixture,
+      };
+    case "101:100":
+      return {
+        ...row,
+        cwd: "/work/repo/pkg",
+        stackTransports: [
+          { transport: "native", destructive: false },
+          { transport: "sigquit", destructive: true },
+        ],
+      };
+    case "102:101":
+      return { ...row, environmentError: "permission denied reading the environment of pid 102" };
+    default:
+      return row;
+  }
+});
+
+const frame = (func: string, file: string, line: number): StackFrame => ({ func, file, line });
+
+type GoroutineSpec = {
+  id: number;
+  state: string;
+  waitMinutes?: number;
+  frames: StackFrame[];
+  createdBy?: StackFrame;
+};
+
+/** The checkpoint of a Go dump: one record per goroutine, each with the text it was parsed from. */
+function goStackRecords(
+  checkpoint: Pick<StackRecord, "checkpointId" | "takenAt" | "reason" | "transport" | "key" | "pid">,
+  goroutines: GoroutineSpec[],
+): StackRecord[] {
+  return goroutines.map(({ id, state, waitMinutes, frames, createdBy }) => ({
+    ...checkpoint,
+    format: "go",
+    goroutineId: id,
+    state,
+    ...(waitMinutes ? { waitMinutes } : {}),
+    frames,
+    ...(createdBy ? { createdBy } : {}),
+    raw: [
+      `goroutine ${id} [${state}${waitMinutes ? `, ${waitMinutes} minutes` : ""}]:`,
+      ...frames.flatMap((f) => [`${f.func}(...)`, `\t${f.file}:${f.line}`]),
+      ...(createdBy ? [`created by ${createdBy.func}`, `\t${createdBy.file}:${createdBy.line}`] : []),
+    ].join("\n"),
+  }));
+}
+
+const ROOT_CHECKPOINT = { key: "100:1", pid: 100, transport: "inprocess" } as const;
+
+/** A native stack sample, which the UI shows as raw text. */
+export const nativeSample = `Sampling process 101 for 1 seconds
+Call graph:
+    12 Thread_1001  DispatchQueue_1: com.apple.main-thread  (serial)
+      12 start  (in dyld) + 6076
+        12 main  (in go) + 88
+`;
+
+/**
+ * `stacks` records: the root dumped twice in-process (a periodic reading, then the watchdog
+ * timeout), a busy child sampled natively, and an exited child whose dump failed.
+ */
+export const stackRecords: StackRecord[] = [
+  ...goStackRecords(
+    { ...ROOT_CHECKPOINT, checkpointId: "ckpt-periodic", takenAt: "2026-10-01T09:00:10.000Z", reason: "periodic" },
+    [
+      {
+        id: 1,
+        state: "running",
+        frames: [frame("main.main", "/app/cmd/gavel/main.go", 42), frame("runtime.main", "runtime/proc.go", 250)],
+      },
+      {
+        id: 17,
+        state: "chan receive",
+        frames: [frame("app/runner.(*Runner).wait", "/app/runner/runner.go", 118)],
+        createdBy: frame("app/runner.New", "/app/runner/runner.go", 58),
+      },
+    ],
+  ),
+  ...goStackRecords(
+    { ...ROOT_CHECKPOINT, checkpointId: "ckpt-timeout", takenAt: "2026-10-01T09:00:28.000Z", reason: "timeout" },
+    [
+      {
+        id: 1,
+        state: "running",
+        frames: [frame("main.main", "/app/cmd/gavel/main.go", 42), frame("runtime.main", "runtime/proc.go", 250)],
+      },
+      {
+        id: 17,
+        state: "chan receive",
+        waitMinutes: 2,
+        frames: [frame("app/runner.(*Runner).wait", "/app/runner/runner.go", 118)],
+        createdBy: frame("app/runner.New", "/app/runner/runner.go", 58),
+      },
+      {
+        id: 22,
+        state: "select",
+        frames: [frame("database/sql.(*DB).connectionOpener", "database/sql/sql.go", 1196)],
+        createdBy: frame("database/sql.OpenDB", "database/sql/sql.go", 791),
+      },
+    ],
+  ),
+  {
+    checkpointId: "ckpt-native",
+    takenAt: "2026-10-01T09:00:29.000Z",
+    reason: "manual",
+    transport: "native",
+    key: "101:100",
+    pid: 101,
+    format: "native",
+    raw: nativeSample,
+  },
+  {
+    checkpointId: "ckpt-exited",
+    takenAt: "2026-10-01T09:00:09.800Z",
+    reason: "final",
+    transport: "native",
+    key: "102:101",
+    pid: 102,
+    format: "",
+    raw: "",
+    error: "the process exited before a stack could be read",
+  },
+];
+
+const establishedSocket: ProcessDescriptor = {
+  fd: "7",
+  type: "IPv4",
+  name: "127.0.0.1:8080->127.0.0.1:51044",
+  protocol: "TCP",
+  state: "ESTABLISHED",
+  localAddr: "127.0.0.1:8080",
+  remoteAddr: "127.0.0.1:51044",
+};
+const listeningPort: ProcessDescriptor = {
+  fd: "6",
+  type: "IPv4",
+  name: "*:8080",
+  protocol: "TCP",
+  state: "LISTEN",
+  localAddr: "0.0.0.0:8080",
+  port: 8080,
+};
+const stdin: ProcessDescriptor = { fd: "0", type: "CHR", name: "/dev/null" };
+const traceFile: ProcessDescriptor = { fd: "3", type: "REG", name: "/work/repo/.gavel/traces/run-1/process_tree.jsonl" };
+const pkgDir: ProcessDescriptor = { fd: "4", type: "DIR", name: "/work/repo/pkg" };
+const NO_DESCRIPTORS: ProcessDescriptor[] = [];
+
+const filesEarly = [stdin, traceFile];
+const filesMid = [stdin, traceFile, pkgDir];
+const filesLate = [stdin, pkgDir];
+
+/** What the process held at each tick; the sample stores a list only when it differs from the previous tick's. */
+const openSocket = [establishedSocket];
+const listening = [listeningPort];
+const heldAt: Record<(typeof SAMPLE_FACET_ORDER)[number], (tick: number) => ProcessDescriptor[]> = {
+  openFiles: (tick) => (tick >= 9 ? filesLate : tick >= 5 ? filesMid : filesEarly),
+  sockets: (tick) => (tick >= 6 && tick < 10 ? openSocket : NO_DESCRIPTORS),
+  ports: () => listening,
+  connections: (tick) => (tick >= 6 && tick < 10 ? openSocket : NO_DESCRIPTORS),
+};
+
+/**
+ * processSampleRows from a session that armed every facet and disk IO. Open files change at
+ * ticks 5 and 9, a socket and a connection appear at tick 6 and close at tick 10 (an empty list
+ * is not stored), and the listening port never changes, so only tick 1 stores its list.
+ */
+export const processFacetSampleRows: ProcessSampleRow[] = processSampleRows.map((row) => {
+  const sample: ProcessSampleRow = {
+    ...row,
+    diskReadBytes: row.tick * 4_000_000,
+    diskWriteBytes: row.tick * row.tick * 500_000,
+  };
+  for (const facet of SAMPLE_FACET_ORDER) {
+    const { countKey, listKey } = SAMPLE_FACETS[facet];
+    const held = heldAt[facet](row.tick);
+    sample[countKey] = held.length;
+    const changed = row.tick === 1 || held !== heldAt[facet](row.tick - 1);
+    if (changed && held.length > 0) sample[listKey] = held;
+  }
+  return sample;
+});
+
+const profileFrame = (func: string, line: number): StackFrame => frame(func, "/app/runner/work.go", line);
+
+const PROFILE_CHECKPOINT = { key: "100:1", pid: 100, source: "pprof", reason: "timeout" } as const;
+
+const cpuStacks: Array<{ frames: StackFrame[]; samples: number; nanos: number }> = [
+  {
+    frames: [
+      profileFrame("app/runner.hashChunk", 88),
+      profileFrame("app/runner.(*Runner).process", 61),
+      profileFrame("app/runner.(*Runner).Run", 34),
+      profileFrame("main.main", 42),
+    ],
+    samples: 120,
+    nanos: 1_200_000_000,
+  },
+  {
+    frames: [
+      profileFrame("compress/flate.(*compressor).deflate", 640),
+      profileFrame("app/runner.(*Runner).process", 66),
+      profileFrame("app/runner.(*Runner).Run", 34),
+      profileFrame("main.main", 42),
+    ],
+    samples: 60,
+    nanos: 600_000_000,
+  },
+  {
+    frames: [
+      profileFrame("app/runner.hashChunk", 90),
+      profileFrame("app/runner.(*Runner).verify", 112),
+      profileFrame("app/runner.(*Runner).Run", 36),
+      profileFrame("main.main", 42),
+    ],
+    samples: 30,
+    nanos: 300_000_000,
+  },
+  {
+    frames: [profileFrame("runtime.mallocgc", 1200), profileFrame("app/runner.(*Runner).process", 70), profileFrame("main.main", 42)],
+    samples: 20,
+    nanos: 200_000_000,
+  },
+];
+
+const heapStacks: Array<{ frames: StackFrame[]; bytes: number; objects: number }> = [
+  {
+    frames: [profileFrame("bytes.growSlice", 249), profileFrame("app/runner.(*Runner).buffer", 142), profileFrame("main.main", 42)],
+    bytes: 96 * 1024 * 1024,
+    objects: 96,
+  },
+  {
+    frames: [profileFrame("app/runner.newChunk", 77), profileFrame("app/runner.(*Runner).process", 61), profileFrame("main.main", 42)],
+    bytes: 24 * 1024 * 1024,
+    objects: 3072,
+  },
+];
+
+/**
+ * `goprof` records: a CPU profile taken at the watchdog timeout (two sample types) and an
+ * earlier heap profile (in-use and allocated space).
+ */
+export const goProfileRecords: GoProfileRecord[] = [
+  ...cpuStacks.flatMap((stack, index): GoProfileRecord[] =>
+    (
+      [
+        ["samples", "count", stack.samples],
+        ["cpu", "nanoseconds", stack.nanos],
+      ] as const
+    ).map(([sampleType, unit, value]) => ({
+      ...PROFILE_CHECKPOINT,
+      checkpointId: "prof-cpu",
+      takenAt: "2026-10-01T09:00:28.000Z",
+      profile: "cpu",
+      sampleType,
+      unit,
+      value,
+      frames: stack.frames,
+      stackHash: `cpu-${index}`,
+    })),
+  ),
+  ...heapStacks.flatMap((stack, index): GoProfileRecord[] =>
+    (
+      [
+        ["inuse_objects", "count", stack.objects],
+        ["inuse_space", "bytes", stack.bytes],
+      ] as const
+    ).map(([sampleType, unit, value]) => ({
+      ...PROFILE_CHECKPOINT,
+      checkpointId: "prof-heap",
+      takenAt: "2026-10-01T09:00:12.000Z",
+      reason: "periodic",
+      profile: "heap",
+      sampleType,
+      unit,
+      value,
+      frames: stack.frames,
+      stackHash: `heap-${index}`,
+    })),
+  ),
+];
+
+/** Two armed windows of one fixture step: an HTTP capture and a process capture, with chips beyond the six that fit. */
+export const traceWindows: TraceWindow[] = [
+  {
+    kind: "http_proxy",
+    stream: "step-1",
+    afterSeq: 0,
+    toSeq: 0,
+    run_id: "run-1",
+    count: 2,
+    summary: { count: 2, hosts: 1, errors: 0, bytesIn: 4096, bytesOut: 512, p95Ms: 120, slowest: 340, extra: "hidden" },
+  },
+  { kind: "process_tree", stream: "step-1", afterSeq: 4, toSeq: 9, run_id: "run-1", count: 1, summary: { processes: 4 } },
+];

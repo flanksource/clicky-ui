@@ -16,6 +16,7 @@ import {
   UiClipboardText,
   UiCopy,
   UiCursorClick,
+  UiDebugStop,
   UiDatabase,
   UiGlobe,
   UiInfo,
@@ -66,6 +67,7 @@ export const TEST_OUTCOMES: Record<TestOutcome, ResultMark> = {
   errored: { icon: UiProhibit, label: "Could not run", className: RED },
   timedout: { icon: UiTimer, label: LABEL.timedout!, className: AMBER },
   warned: { icon: UiWarningTriangle, label: LABEL.warned!, className: AMBER },
+  aborted: { icon: UiDebugStop, label: LABEL.aborted!, className: "text-red-400 dark:text-red-300" },
   passed: {
     icon: UiPass,
     label: LABEL.passed!,

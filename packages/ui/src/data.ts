@@ -388,6 +388,7 @@ export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHead
 export { Timeline, type TimelineItem, type TimelineProps } from "./data/Timeline";
 export * from "./data/git";
 export * from "./data/test-runner";
+export * from "./data/lint";
 export * from "./data/verification";
 export * from "./data/cache-browser";
 export * from "./data/query-browser";
@@ -478,6 +479,9 @@ export {
   DiagnosticsDetailPanel,
   type DiagnosticsDetailPanelProps,
 } from "./data/diagnostics/DiagnosticsDetailPanel";
+export { StackDumpView, type StackDumpViewProps } from "./data/diagnostics/StackDumpView";
+export { MetricTile, type MetricTileProps } from "./data/diagnostics/MetricTile";
+export { cpuTone, memoryTone } from "./data/diagnostics/metric-tone";
 export type { ProcessNode, StackCapture, RunMeta } from "./data/diagnostics/types";
 export {
   findProcessByPID,

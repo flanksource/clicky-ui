@@ -114,13 +114,52 @@ export type ProcessNodeRow = {
   startedAt: string;
   exitedAt?: string | null;
   lastSeenAt: string;
-  cpuPercent: number;
+  /** CPU % over the last sampling window (per core); unknown until a full window has been observed. */
+  cpuPercent?: number | null;
   rssBytes: number;
-  peakCpuPercent: number;
+  /** Highest known `cpuPercent`; unknown until one is known. */
+  peakCpuPercent?: number | null;
   peakRssBytes: number;
-  stack?: string;
-  stackError?: string;
+  /**
+   * The ways a stack of this process can be collected, as the `stacks` kind's
+   * dumpers offer them for it. A destructive transport (sigquit) kills the
+   * process. Absent when no dumper can reach it.
+   */
+  stackTransports?: ProcessStackTransport[];
+  /** The environment read once when the node was created, already masked. Absent unless the tree armed `environment`. */
+  environment?: ProcessEnv;
+  /** Why the environment could not be read. */
+  environmentError?: string;
 };
+
+/** One way to take a stack dump of a process. */
+export type ProcessStackTransport = {
+  /** "inprocess", "native", "pprof", "gops" or "sigquit". */
+  transport: string;
+  /** Taking the dump terminates the process. */
+  destructive: boolean;
+};
+
+/** The environment of a process: variable name to value. */
+export type ProcessEnv = Record<string, string>;
+
+/**
+ * One file, socket or connection a process holds open, as `process_samples`
+ * stores it (the clicky `process.Descriptor` shape).
+ */
+export type ProcessDescriptor = {
+  fd: string;
+  type: string;
+  name: string;
+  protocol?: string;
+  state?: string;
+  localAddr?: string;
+  remoteAddr?: string;
+  port?: number;
+};
+
+/** The descriptor facets a `process_samples` session can arm. */
+export type ProcessSampleFacet = "openFiles" | "sockets" | "ports" | "connections";
 
 /** One `process_samples` record: a process's usage at one tick. */
 export type ProcessSampleRow = {
@@ -128,9 +167,94 @@ export type ProcessSampleRow = {
   tick: number;
   key: string;
   pid: number;
-  cpuPercent: number;
+  /** CPU % over the window ending at this sample; unknown on a process's first sample. */
+  cpuPercent?: number | null;
   memoryPercent: number;
   rssBytes: number;
+  /** Cumulative bytes the process has read from disk. */
+  diskReadBytes?: number;
+  /** Cumulative bytes the process has written to disk. */
+  diskWriteBytes?: number;
+  /** Counts, present on every tick of a session that armed the facet and absent otherwise. */
+  openFiles?: number;
+  sockets?: number;
+  ports?: number;
+  connections?: number;
+  /**
+   * The full lists, stored only on a tick where they differ from the process's
+   * previously stored list (the first tick always stores them). An empty list is
+   * omitted, so a zero count with no list means the list is empty.
+   */
+  openFileList?: ProcessDescriptor[];
+  socketList?: ProcessDescriptor[];
+  portList?: ProcessDescriptor[];
+  connectionList?: ProcessDescriptor[];
+};
+
+/** A source location in a stack or profile. */
+export type StackFrame = {
+  func: string;
+  file: string;
+  line: number;
+};
+
+/** The format of a stack dump: Go goroutines or a native thread sample. Empty on a dump that failed. */
+export type StackFormat = "go" | "native" | "";
+
+/**
+ * One `stacks` record: a goroutine (Go format), or a whole dump (native format,
+ * no frames). A dump that failed is one record with `error` set. Records of one
+ * checkpoint share a `checkpointId`.
+ */
+export type StackRecord = {
+  checkpointId: string;
+  takenAt: string;
+  /** Why the checkpoint was taken, for example a watchdog timeout or a manual request. */
+  reason: string;
+  /** How it was taken: "inprocess", "native", "pprof", "gops" or "sigquit". */
+  transport: string;
+  /** The `process_tree` key of the dumped process. */
+  key: string;
+  pid: number;
+  format: StackFormat;
+  goroutineId?: number;
+  /** The goroutine state, for example "running" or "chan receive". */
+  state?: string;
+  waitMinutes?: number;
+  lockedToThread?: boolean;
+  /** Innermost frame first. */
+  frames?: StackFrame[];
+  createdBy?: StackFrame;
+  raw: string;
+  error?: string;
+};
+
+/**
+ * What a view needs of a profile sample, whatever produced it (a `goprof` record,
+ * later a `jfr` sample): a value of some type and unit, attributed to a stack.
+ */
+export type ProfileSample = {
+  /** For example "cpu", "samples", "inuse_space" or "alloc_objects". */
+  sampleType: string;
+  /** For example "nanoseconds", "bytes" or "count". */
+  unit: string;
+  value: number;
+  /** Innermost frame first. */
+  frames: StackFrame[];
+};
+
+/** One `goprof` record: a pprof sample type's value for one stack, at one checkpoint. */
+export type GoProfileRecord = ProfileSample & {
+  checkpointId: string;
+  takenAt: string;
+  reason: string;
+  /** Where the profile was read from: "pprof", "gops" or "file". */
+  source: string;
+  key: string;
+  pid: number;
+  /** "cpu", "heap", "allocs", "mutex", "block" or "goroutine". */
+  profile: string;
+  stackHash: string;
 };
 
 /** A record of a kind `TraceView` has no dedicated viewer for. */

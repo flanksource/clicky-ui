@@ -197,6 +197,7 @@ describe("verify report golden payload", () => {
       passed: 16,
       failed: 5,
       warned: 1,
+      aborted: 0,
       skipped: 1,
       pending: 1,
       running: 0,
