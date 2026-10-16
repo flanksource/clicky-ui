@@ -26,6 +26,7 @@ const entry = {
   expressions: resolve(__dirname, "src/expressions.ts"),
   "expressions/playground": resolve(__dirname, "src/expressions/playground.ts"),
   profiles: resolve(__dirname, "src/profiles.ts"),
+  connections: resolve(__dirname, "src/connections.ts"),
   chat: resolve(__dirname, "src/chat.ts"),
   ai: resolve(__dirname, "src/ai.ts"),
   "runtime-profile": resolve(__dirname, "src/runtime-profile.ts"),
