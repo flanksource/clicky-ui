@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { processNodeRows, processSampleRows } from "./fixtures";
-import { buildProcessForest, cpuSeriesByKey, flattenForest, sparklinePoints } from "./process-tree";
+import {
+  buildProcessForest,
+  cpuSeriesByKey,
+  flattenForest,
+  formatCpuPercent,
+  formatProcessTimestamp,
+  processLifetimeMs,
+  processSeries,
+  pruneExitedProcesses,
+  sparklinePoints,
+} from "./process-tree";
 import type { ProcessNodeRow } from "./types";
 
 const node = (key: string, parentKey?: string, startedAt = "2026-10-01T09:00:00.000Z"): ProcessNodeRow => ({
@@ -48,6 +58,95 @@ describe("buildProcessForest", () => {
   it("throws on a parent cycle, which no root reaches", () => {
     expect(() => buildProcessForest([node("1", "2"), node("2", "1")])).toThrow(/cycle/);
     expect(() => buildProcessForest([node("1", "1")])).toThrow(/cycle/);
+  });
+});
+
+describe("pruneExitedProcesses", () => {
+  const exited = (key: string, parentKey?: string): ProcessNodeRow => ({ ...node(key, parentKey), status: "exited" });
+  const keys = (forest: ReturnType<typeof buildProcessForest>) => flattenForest(forest).map((n) => n.row.key);
+
+  it("drops an exited leaf but keeps live processes", () => {
+    const pruned = pruneExitedProcesses(buildProcessForest([node("1"), exited("2", "1"), node("3", "1")]));
+    expect(keys(pruned)).toEqual(["1", "3"]);
+  });
+
+  it("keeps an exited ancestor while it still has a live descendant", () => {
+    const pruned = pruneExitedProcesses(buildProcessForest([exited("1"), exited("2", "1"), node("3", "2")]));
+    expect(keys(pruned)).toEqual(["1", "2", "3"]);
+    expect(pruned[0]!.exited).toBe(true);
+  });
+
+  it("drops a whole exited subtree with no live descendant", () => {
+    const pruned = pruneExitedProcesses(buildProcessForest([node("1"), exited("2", "1"), exited("3", "2")]));
+    expect(keys(pruned)).toEqual(["1"]);
+  });
+
+  it("returns an empty forest when every process has exited", () => {
+    expect(pruneExitedProcesses(buildProcessForest([exited("1"), exited("2", "1")]))).toEqual([]);
+  });
+
+  it("does not modify the forest it was given", () => {
+    const forest = buildProcessForest([node("1"), exited("2", "1")]);
+    pruneExitedProcesses(forest);
+    expect(forest[0]!.children).toHaveLength(1);
+  });
+});
+
+describe("processLifetimeMs", () => {
+  it("runs to the exit time when there is one, else to the last time the process was seen", () => {
+    const base = node("1");
+    expect(processLifetimeMs({ ...base, exitedAt: "2026-10-01T09:00:05.000Z" })).toBe(5000);
+    expect(processLifetimeMs({ ...base, lastSeenAt: "2026-10-01T09:00:30.000Z" })).toBe(30000);
+  });
+});
+
+describe("formatProcessTimestamp", () => {
+  it("formats a timestamp as local YYYY-MM-DD HH:MM:SS", () => {
+    expect(formatProcessTimestamp(new Date(2026, 9, 1, 9, 5, 7).toISOString())).toBe("2026-10-01 09:05:07");
+  });
+
+  it("returns text that is not a date unchanged", () => {
+    expect(formatProcessTimestamp("not a time")).toBe("not a time");
+  });
+});
+
+describe("processSeries", () => {
+  it("returns one process's CPU and RSS in tick order", () => {
+    const series = processSeries(
+      [
+        { ...processSampleRows[0]!, key: "a", tick: 2, cpuPercent: 20, rssBytes: 200 },
+        { ...processSampleRows[0]!, key: "b", tick: 1, cpuPercent: 7, rssBytes: 70 },
+        { ...processSampleRows[0]!, key: "a", tick: 1, cpuPercent: 10, rssBytes: 100 },
+      ],
+      "a",
+    );
+    expect(series).toEqual({ cpu: [10, 20], rss: [100, 200] });
+  });
+
+  it("leaves unknown CPU samples out of the CPU series but keeps their RSS", () => {
+    const series = processSeries(
+      [
+        { ...processSampleRows[0]!, key: "a", tick: 1, cpuPercent: null, rssBytes: 100 },
+        { ...processSampleRows[0]!, key: "a", tick: 2, cpuPercent: 30, rssBytes: 200 },
+      ],
+      "a",
+    );
+    expect(series).toEqual({ cpu: [30], rss: [100, 200] });
+  });
+
+  it("is empty for a process with no samples", () => {
+    expect(processSeries(processSampleRows, "999:1")).toEqual({ cpu: [], rss: [] });
+  });
+});
+
+describe("formatCpuPercent", () => {
+  it.each([
+    [null, "\u2014"],
+    [undefined, "\u2014"],
+    [0, "0.0%"],
+    [123.456, "123.5%"],
+  ])("formats %s as %s", (value, expected) => {
+    expect(formatCpuPercent(value)).toBe(expected);
   });
 });
 

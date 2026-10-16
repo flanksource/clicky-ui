@@ -7,6 +7,7 @@ import { createContext, useContext } from "react";
 import type { RunMeta, SnapshotStatus, Test } from "./types";
 import type { TestFilters } from "./filterState";
 import type { TestNodeAdapterRegistry } from "./adapter";
+import type { FetchProcessMetrics } from "./process-metrics";
 
 export type TestRunnerContext = {
   /** The (already filtered, host-owned) test forest to render. */
@@ -47,6 +48,12 @@ export type TestRunnerContext = {
   onRerun?: ((node: Test) => void) | undefined;
   /** Optional — when absent, the stop affordance is hidden. */
   onStop?: ((node: Test) => void) | undefined;
+
+  /**
+   * Reads a live attempt's process by pid, polled every two seconds while the
+   * attempt runs. Absent: live attempts show only what the attempt recorded.
+   */
+  fetchProcessMetrics?: FetchProcessMetrics | undefined;
 
   /** Node adapters driving domain-specific rendering. */
   adapters: TestNodeAdapterRegistry;

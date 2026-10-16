@@ -24,6 +24,12 @@ export interface Test {
    * failure (a warned child never fails its parent). Distinct from `failed`.
    */
   warned?: boolean;
+  /**
+   * Never ran because the run stopped after an earlier failure — distinct from
+   * an intentional skip, which is `skipped` alone. An aborted node is
+   * normally also `skipped`; it counts once, as aborted.
+   */
+  aborted?: boolean;
   pending?: boolean;
   /**
    * Execution started but not yet finished — distinct from `pending`
@@ -71,6 +77,12 @@ export interface TestAttempt {
   cpu_percent?: number;
   rss?: number;
   goroutine_count?: number;
+  /**
+   * The pid, CPU and RSS belong to a process shared with other tests (every
+   * package of a unified `go test` batch has the same pid), not to this test
+   * alone, so a viewer should label them as the batch's.
+   */
+  shared_process?: boolean;
 }
 
 export interface TestSummary {
@@ -78,6 +90,8 @@ export interface TestSummary {
   Passed: number;
   Failed: number;
   Warned?: number;
+  /** Count of nodes that never ran because the run stopped after an earlier failure. */
+  Aborted?: number;
   Skipped: number;
   Pending: number;
   Running?: number;

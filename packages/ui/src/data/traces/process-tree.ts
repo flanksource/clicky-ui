@@ -20,7 +20,7 @@ export function buildProcessForest(rows: ProcessNodeRow[]): ProcessTreeNode[] {
   const nodes = new Map<string, ProcessTreeNode>();
   for (const row of rows) {
     if (nodes.has(row.key)) throw new Error(`process tree key "${row.key}" appears twice`);
-    nodes.set(row.key, { row, children: [], exited: row.status === "exited" || Boolean(row.exitedAt) });
+    nodes.set(row.key, { row, children: [], exited: isProcessExited(row) });
   }
 
   const roots: ProcessTreeNode[] = [];
@@ -39,6 +39,36 @@ export function buildProcessForest(rows: ProcessNodeRow[]): ProcessTreeNode[] {
   return roots;
 }
 
+/**
+ * Drops exited processes from a forest, keeping an exited process only while it
+ * still has a live descendant to hang off. Returns new nodes; the input is not
+ * modified.
+ */
+export function pruneExitedProcesses(roots: ProcessTreeNode[]): ProcessTreeNode[] {
+  return roots.flatMap((node) => {
+    const children = pruneExitedProcesses(node.children);
+    return node.exited && children.length === 0 ? [] : [{ ...node, children }];
+  });
+}
+
+/** How long the process lived: to its exit, else to the last time it was seen. */
+export function processLifetimeMs(row: ProcessNodeRow): number {
+  return Date.parse(row.exitedAt ?? row.lastSeenAt) - Date.parse(row.startedAt);
+}
+
+/** A trace timestamp as local `YYYY-MM-DD HH:MM:SS`; text that is not a date is returned unchanged. */
+export function formatProcessTimestamp(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+/** The process has exited: by its status, or because an exit time was recorded. */
+export function isProcessExited(row: ProcessNodeRow): boolean {
+  return row.status === "exited" || Boolean(row.exitedAt);
+}
+
 /** The forest depth-first, parents before children. */
 export function flattenForest(roots: ProcessTreeNode[]): ProcessTreeNode[] {
   const flat: ProcessTreeNode[] = [];
@@ -50,13 +80,26 @@ export function flattenForest(roots: ProcessTreeNode[]): ProcessTreeNode[] {
   return flat;
 }
 
-/** Each process's CPU % over its samples, in tick order. */
+/** A CPU % for display, "—" while it is still unknown. */
+export function formatCpuPercent(value: number | null | undefined): string {
+  return value == null ? "—" : `${value.toFixed(1)}%`;
+}
+
+function knownCpu(samples: ProcessSampleRow[]): number[] {
+  return samples.flatMap((sample) => (sample.cpuPercent == null ? [] : [sample.cpuPercent]));
+}
+
+/** Each process's known CPU % over its samples, in tick order. */
 export function cpuSeriesByKey(samples: ProcessSampleRow[]): Map<string, number[]> {
   const byKey = new Map<string, ProcessSampleRow[]>();
   for (const sample of samples) byKey.set(sample.key, [...(byKey.get(sample.key) ?? []), sample]);
-  return new Map(
-    [...byKey].map(([key, list]) => [key, list.sort((a, b) => a.tick - b.tick).map((sample) => sample.cpuPercent)]),
-  );
+  return new Map([...byKey].map(([key, list]) => [key, knownCpu(list.sort((a, b) => a.tick - b.tick))]));
+}
+
+/** One process's known CPU % and RSS bytes over its samples, in tick order. */
+export function processSeries(samples: ProcessSampleRow[], key: string): { cpu: number[]; rss: number[] } {
+  const own = samples.filter((sample) => sample.key === key).sort((a, b) => a.tick - b.tick);
+  return { cpu: knownCpu(own), rss: own.map((sample) => sample.rssBytes) };
 }
 
 /** SVG polyline points for `values` in a `width` x `height` box, zero at the bottom and the maximum at the top. */

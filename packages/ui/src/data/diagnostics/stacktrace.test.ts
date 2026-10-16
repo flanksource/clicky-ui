@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { countGoroutinesByState, parseGoroutineDump } from "./stacktrace";
+import type { StackRecord } from "../traces/types";
+import { countGoroutinesByState, goroutinesFromRecords, parseGoroutineDump } from "./stacktrace";
 
 const dump = `goroutine 1 [running]:
 main.main()
@@ -71,6 +72,70 @@ describe("parseGoroutineDump", () => {
     const [goroutine] = parseGoroutineDump(input);
     expect(goroutine.frames[0].file).toBe("C:\\src\\foo.go");
     expect(goroutine.frames[0].line).toBe(42);
+  });
+
+  describe("goroutinesFromRecords", () => {
+    const base = {
+      checkpointId: "c1",
+      takenAt: "2026-10-01T09:00:00.000Z",
+      reason: "timeout",
+      transport: "inprocess",
+      key: "1:0",
+      pid: 1,
+      format: "go" as const,
+      raw: "goroutine 17 [chan receive, 2 minutes]:",
+    };
+    const record: StackRecord = {
+      ...base,
+      goroutineId: 17,
+      state: "chan receive",
+      waitMinutes: 2,
+      lockedToThread: true,
+      frames: [
+        { func: "app/server.(*Server).serve", file: "/home/user/go/src/app/server/server.go", line: 118 },
+        { func: "runtime.gopark", file: "/usr/local/go1.22/src/runtime/proc.go", line: 400 },
+      ],
+      createdBy: { func: "app/server.New", file: "/home/user/go/src/app/server/server.go", line: 58 },
+    };
+
+    it("builds the same goroutine the text parser builds from the equivalent dump", () => {
+      const [fromRecord] = goroutinesFromRecords([record]);
+      const [fromText] = parseGoroutineDump(
+        `goroutine 17 [chan receive, 2 minutes, locked to thread]:
+app/server.(*Server).serve(0xc0001b2000)
+\t/home/user/go/src/app/server/server.go:118 +0xa5
+runtime.gopark(0x0)
+\t/usr/local/go1.22/src/runtime/proc.go:400 +0xce
+created by app/server.New
+\t/home/user/go/src/app/server/server.go:58 +0xe0
+`,
+      );
+      expect(fromRecord).toMatchObject({
+        id: fromText!.id,
+        state: fromText!.state,
+        rawState: fromText!.rawState,
+        userFrameCount: fromText!.userFrameCount,
+      });
+      expect(fromRecord!.frames.map((f) => [f.kind, f.runtime, f.location])).toEqual(
+        fromText!.frames.map((f) => [f.kind, f.runtime, f.location]),
+      );
+    });
+
+    it("keeps a method receiver in the display name and strips only the package path", () => {
+      const [goroutine] = goroutinesFromRecords([record]);
+      expect(goroutine!.frames.map((f) => f.displayName)).toEqual(["server.(*Server).serve", "runtime.gopark", "server.New"]);
+    });
+
+    it("carries the raw text and a searchable header", () => {
+      const [goroutine] = goroutinesFromRecords([record]);
+      expect(goroutine!.raw).toBe(base.raw);
+      expect(goroutine!.searchText).toContain("goroutine 17 [chan receive, 2 minutes, locked to thread]");
+    });
+
+    it("throws on a record that is not a Go goroutine", () => {
+      expect(() => goroutinesFromRecords([{ ...base, format: "native" }])).toThrow(/not a Go goroutine record/);
+      expect(() => goroutinesFromRecords([{ ...record, error: "boom" }])).toThrow(/error "boom"/);
+    });
   });
 
   it("handles long blank separators and malformed frame lines", () => {

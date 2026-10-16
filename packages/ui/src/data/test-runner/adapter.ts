@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import type { Test } from "./types";
 import type { TestRunnerContext } from "./context";
 import { mergeCopySections, type CopySections } from "./copy";
+import { testAttemptViews } from "./attempts";
 
 export type AdapterContext = {
   node: Test;
@@ -101,8 +102,15 @@ export class TestNodeAdapterRegistry {
     return this.firstWith(node, runner, (a) => !!a.nodeActions);
   }
 
+  /**
+   * Attempts for the header chooser: the first matching adapter's
+   * `detailAttempts`, else the node's own `attempts` (the built-in default,
+   * which always sits behind the registered adapters).
+   */
   resolveAttempts(node: Test, runner: TestRunnerContext): DetailAttempt[] {
-    return this.firstWith(node, runner, (a) => !!a.detailAttempts)?.detailAttempts?.({ node, runner }) ?? [];
+    const adapted = this.firstWith(node, runner, (a) => !!a.detailAttempts)?.detailAttempts?.({ node, runner });
+    if (adapted && adapted.length > 0) return adapted;
+    return testAttemptViews(node);
   }
 
   /** Merge `detailTabs` from every matching adapter, de-duplicated by tab id. */

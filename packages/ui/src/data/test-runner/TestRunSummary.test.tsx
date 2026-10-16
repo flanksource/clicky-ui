@@ -33,6 +33,50 @@ describe("TestRunSummary", () => {
     expect(screen.getByText("1 test")).toBeInTheDocument();
   });
 
+  it("counts aborted tests apart from skipped ones, so the chips add up to the total", () => {
+    const tests = [
+      { name: "a", passed: true },
+      { name: "after-failure", aborted: true, skipped: true },
+      { name: "intentional", skipped: true },
+    ];
+    render(<TestRunSummary tests={tests} done now={0} startTime={0} endTime={1000} />);
+    expect(screen.getByLabelText("1 aborted")).toHaveTextContent("1");
+    expect(screen.getByLabelText("1 skipped")).toHaveTextContent("1");
+  });
+
+  describe("run metadata", () => {
+    const meta = { sequence: 1 };
+
+    it.each([
+      ["compact", true],
+      ["default", false],
+    ])("shows a Timed out chip in the %s layout when the run timed out", (_name, compact) => {
+      render(<TestRunSummary tests={completedTests} done now={0} compact={compact} runMeta={{ ...meta, timed_out: true }} />);
+      expect(screen.getByText("Timed out")).toHaveAttribute("data-summary-run", "timed-out");
+    });
+
+    it("shows no Timed out chip for a run that did not time out", () => {
+      render(<TestRunSummary tests={completedTests} done now={0} runMeta={{ ...meta, timed_out: false }} />);
+      expect(screen.queryByText("Timed out")).not.toBeInTheDocument();
+    });
+
+    it("shows the exit code, and flags a non-zero one as a failure", () => {
+      const { rerender } = render(
+        <TestRunSummary tests={completedTests} done now={0} runMeta={{ ...meta, exit_code: 0 }} />,
+      );
+      expect(screen.getByTitle("Exit code 0")).toHaveTextContent("exit 0");
+      expect(screen.getByTitle("Exit code 0")).not.toHaveClass("text-red-600");
+      rerender(<TestRunSummary tests={completedTests} done now={0} runMeta={{ ...meta, exit_code: 124 }} />);
+      expect(screen.getByTitle("Exit code 124")).toHaveTextContent("exit 124");
+      expect(screen.getByTitle("Exit code 124")).toHaveClass("text-red-600");
+    });
+
+    it("shows no exit code while the run has none", () => {
+      render(<TestRunSummary tests={completedTests} done={false} now={0} runMeta={meta} />);
+      expect(screen.queryByText(/^exit /)).not.toBeInTheDocument();
+    });
+  });
+
   it("renders the same total in the default two-line layout", () => {
     render(<TestRunSummary tests={completedTests} done now={0} startTime={0} endTime={1000} />);
     expect(screen.getByText(/\d+ tests/)).toBeInTheDocument();

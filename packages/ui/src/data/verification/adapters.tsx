@@ -110,6 +110,7 @@ const OUTCOME_GLYPH: Record<TestOutcome, string> = {
   errored: "✗",
   timedout: "⏱",
   warned: "!",
+  aborted: "■",
   skipped: "-",
   pending: "○",
   running: "…",

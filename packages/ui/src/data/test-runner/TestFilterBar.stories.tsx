@@ -11,6 +11,7 @@ const COUNTS: StatusCounts = {
   passed: 4,
   failed: 1,
   warned: 0,
+  aborted: 0,
   skipped: 1,
   pending: 0,
   running: 0,

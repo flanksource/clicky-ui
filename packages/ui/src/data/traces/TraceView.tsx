@@ -2,21 +2,24 @@ import { useMemo, useState } from "react";
 import { cn } from "../../lib/utils";
 import { inferColumns } from "../data-table-utils";
 import { DataTable } from "../DataTable";
+import { GoProfileTraceView, StackTraceView } from "./ProcessRecordViews";
 import { ProcessTraceTree } from "./ProcessTraceTree";
 import { SqlTraceTable } from "./SqlTraceTable";
 import { TerminalCastPlayer } from "./TerminalCastPlayer";
 import { TraceHarView } from "./TraceHarView";
 import type {
+  GoProfileRecord,
   HttpExchangeRow,
   ProcessNodeRow,
   ProcessSampleRow,
   SqlStatementRow,
+  StackRecord,
   TerminalEvent,
   TraceRow,
 } from "./types";
 
 export type TraceViewProps = {
-  /** The record kind: `http`, `http_proxy`, `pg_proxy`, `sql_statements`, `terminal`, `process_tree`, or any other. */
+  /** The record kind: `http`, `http_proxy`, `pg_proxy`, `sql_statements`, `terminal`, `process_tree`, `goprof`, `stacks`, or any other. */
   kind: string;
   /** The kind's records, as its stream stores them. */
   rows: TraceRow[];
@@ -48,7 +51,9 @@ function ProcessTraceView({ rows, samples }: { rows: ProcessNodeRow[]; samples: 
 /**
  * Renders a trace kind's records with its dedicated viewer: HTTP exchanges in
  * a HAR panel, SQL statements in a table, a terminal session in a cast player,
- * a process tree as a tree. Any other kind gets a table over the row keys.
+ * a process tree as a tree, Go profiles as a top-functions profile view per
+ * process, stack dumps as one dump per checkpoint per process. Any other kind
+ * gets a table over the row keys.
  */
 export function TraceView({ kind, rows, samples, className }: TraceViewProps) {
   const body = (() => {
@@ -70,6 +75,14 @@ export function TraceView({ kind, rows, samples, className }: TraceViewProps) {
         requireField(kind, rows, "key");
         if (samples) requireField("process_samples", samples, "key");
         return <ProcessTraceView rows={rows as ProcessNodeRow[]} samples={samples as ProcessSampleRow[] | undefined} />;
+      case "goprof":
+        requireField(kind, rows, "key");
+        requireField(kind, rows, "checkpointId");
+        return <GoProfileTraceView rows={rows as GoProfileRecord[]} />;
+      case "stacks":
+        requireField(kind, rows, "key");
+        requireField(kind, rows, "checkpointId");
+        return <StackTraceView rows={rows as StackRecord[]} />;
       default:
         return <GenericTraceTable kind={kind} rows={rows} />;
     }
