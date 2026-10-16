@@ -73,7 +73,7 @@ const EXPECTATIONS: Record<string, SectionExpectation> = {
     expect(list?.classList.contains("pl-0")).toBe(true);
   },
   links: (root) => {
-    const links = textsOf(root, '[data-streamdown="link"]');
+    const links = textsOf(root, "a[href]");
     expect(links).toEqual([
       "inline link",
       "with a title",
