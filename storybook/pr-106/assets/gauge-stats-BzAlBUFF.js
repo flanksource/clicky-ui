@@ -1,0 +1,1 @@
+function a(t,u){if(!t||t.length===0)return null;let n=1/0,l=-1/0,f=0,r=0;for(const i of t){const e=u?u(i.value):i.value;e<n&&(n=e),e>l&&(l=e),f+=e,r=e}return{current:r,min:n,max:l,avg:f/t.length,count:t.length}}export{a as s};
