@@ -171,6 +171,7 @@ export {
 export * from "./icons";
 export { JsonView, type JsonViewProps } from "./data/JsonView";
 export { KeyValueList, type KeyValueListItem, type KeyValueListProps } from "./data/KeyValueList";
+export { SchemaReference, type SchemaReferenceProps } from "./data/SchemaReference";
 export {
   SchemaViewer,
   SchemaViewer as SchemaBrowser,
