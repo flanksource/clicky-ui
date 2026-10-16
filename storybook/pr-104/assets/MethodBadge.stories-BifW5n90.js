@@ -1,5 +1,0 @@
-import{j as r}from"./iframe-BpsZ2AnK.js";import{M as m}from"./MethodBadge-BzmCeXrS.js";import"./preload-helper-MsDOuF3K.js";import"./Badge-CbddDVTn.js";import"./utils-DW-IJACk.js";import"./badge-variants-BNgEarpT.js";import"./index-CPURVhFy.js";import"./Icon-nPi6h081.js";const g={title:"Data/MethodBadge",component:m,args:{method:"GET"},parameters:{docs:{description:{component:"HTTP method badge with method-specific tones. It normalizes method casing and renders through the shared Badge primitive."}}}},e={render:()=>r.jsx("div",{className:"flex flex-wrap items-center gap-2",children:["GET","POST","PUT","PATCH","DELETE","OPTIONS"].map(t=>r.jsx(m,{method:t},t))})};var o,a,s;e.parameters={...e.parameters,docs:{...(o=e.parameters)==null?void 0:o.docs,source:{originalSource:`{
-  render: () => <div className="flex flex-wrap items-center gap-2">
-      {["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].map(method => <MethodBadge key={method} method={method} />)}
-    </div>
-}`,...(s=(a=e.parameters)==null?void 0:a.docs)==null?void 0:s.source}}};const E=["AllMethods"];export{e as AllMethods,E as __namedExportsOrder,g as default};
