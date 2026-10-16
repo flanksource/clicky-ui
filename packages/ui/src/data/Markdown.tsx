@@ -7,6 +7,8 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "../lib/utils";
+import { ConfirmDialog } from "../overlay/ConfirmDialog";
+import { useRouter } from "../rpc/router";
 import { Callout, type CalloutProps } from "./Callout";
 import { CodeBlock } from "./CodeBlock";
 
@@ -52,6 +54,7 @@ type StreamdownComponent = ComponentType<{
   // raw tag, so this is an allowlist rather than raw-HTML passthrough.
   allowedTags?: Record<string, string[]> | undefined;
   components?: {
+    a?: ComponentType<MarkdownLinkProps>;
     code?: ComponentType<MarkdownCodeProps>;
     ul?: ComponentType<MarkdownElementProps>;
     ol?: ComponentType<MarkdownElementProps>;
@@ -182,7 +185,60 @@ function MarkdownTableCell({ className, style, children }: MarkdownElementProps)
   );
 }
 
+type MarkdownLinkProps = MarkdownElementProps & { href?: string; title?: string };
+
+// Streamdown renders every link as a button behind an "Open external link?"
+// prompt that always opens a new tab, so an in-app link such as `/connections`
+// left the app. Root-relative links route through the host's RouterAdapter and
+// hash links scroll in place; only external links keep the confirm prompt.
+function MarkdownLink({ href, title, className, children }: MarkdownLinkProps) {
+  const { renderLink } = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const linkClass = cn("wrap-anywhere font-medium text-primary underline", className);
+
+  if (!href) return <span className={className}>{children}</span>;
+  if (href.startsWith("#")) {
+    return (
+      <a href={href} title={title} className={linkClass}>
+        {children}
+      </a>
+    );
+  }
+  if (href.startsWith("/") && !href.startsWith("//")) {
+    return renderLink({ to: href, className: linkClass, children, ...(title ? { title } : {}) });
+  }
+  return (
+    <>
+      <a
+        href={href}
+        title={title}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={linkClass}
+        onClick={(event) => {
+          event.preventDefault();
+          setConfirming(true);
+        }}
+      >
+        {children}
+      </a>
+      <ConfirmDialog
+        open={confirming}
+        title="Open external link?"
+        message={<code className="break-all font-mono text-sm">{href}</code>}
+        confirmLabel="Open link"
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => {
+          setConfirming(false);
+          window.open(href, "_blank", "noopener,noreferrer");
+        }}
+      />
+    </>
+  );
+}
+
 const markdownComponents = {
+  a: MarkdownLink,
   code: MarkdownCode,
   ul: MarkdownList,
   ol: MarkdownOrderedList,
