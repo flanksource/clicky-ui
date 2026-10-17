@@ -56,6 +56,15 @@ describe("TestTreeNode message line", () => {
     expect(screen.getByText("Quality Check Required.")).toBeTruthy();
   });
 
+  // A skip is intentional (an `if:` gate that read false), not a warning: its
+  // name stays neutral grey, never the amber a warned row carries.
+  it("renders a skipped node's name neutral, not amber", () => {
+    renderRow({ name: "gated step", skipped: true, message: "if: x evaluated false" } as Test);
+    const name = screen.getByText("gated step");
+    expect(name.className).toContain("text-muted-foreground");
+    expect(name.className).not.toMatch(/amber|yellow/);
+  });
+
   it("does not render a message on a passed node", () => {
     renderRow({ name: "step", passed: true, message: "left over from a previous attempt" } as Test);
     expect(screen.queryByText("left over from a previous attempt")).toBeNull();
