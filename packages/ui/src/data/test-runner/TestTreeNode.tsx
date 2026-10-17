@@ -22,7 +22,7 @@ const NAME_TONE: Record<string, string> = {
   warned: "text-amber-600 dark:text-amber-400",
   aborted: "text-red-500 dark:text-red-300",
   running: "text-blue-600 dark:text-blue-400",
-  skipped: "text-yellow-700 dark:text-yellow-500",
+  skipped: "text-muted-foreground",
   pending: "text-muted-foreground",
   passed: "text-foreground",
 };
@@ -40,7 +40,7 @@ function CountBadges({ node }: { node: Test }) {
       {s.warned > 0 && <Badge tone="warning" variant="outline" size="xxs" count={s.warned} />}
       {s.timedout > 0 && <Badge tone="warning" variant="solid" size="xxs" count={s.timedout} />}
       {s.aborted > 0 && <Badge tone="danger" variant="soft" size="xxs" count={s.aborted} />}
-      {s.skipped > 0 && <Badge tone="warning" variant="soft" size="xxs" count={s.skipped} />}
+      {s.skipped > 0 && <Badge tone="neutral" variant="soft" size="xxs" count={s.skipped} />}
       {s.running > 0 && <Badge tone="info" variant="solid" size="xxs" count={s.running} />}
       {s.pending > 0 && <Badge tone="neutral" variant="soft" size="xxs" count={s.pending} />}
     </span>
