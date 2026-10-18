@@ -1,9 +1,18 @@
-import { autocompletion } from "@codemirror/autocomplete";
+import { autocompletion, completionKeymap } from "@codemirror/autocomplete";
 import { history, historyKeymap } from "@codemirror/commands";
 import { json } from "@codemirror/lang-json";
 import { sql } from "@codemirror/lang-sql";
+import {
+  defaultHighlightStyle,
+  syntaxHighlighting,
+} from "@codemirror/language";
 import type { Extension } from "@codemirror/state";
-import { EditorView, keymap } from "@codemirror/view";
+import {
+  EditorView,
+  highlightActiveLine,
+  keymap,
+  lineNumbers,
+} from "@codemirror/view";
 import {
   dialectFor,
   openSearchJSONCompletionSource,
@@ -55,6 +64,9 @@ export function queryBrowserEditorExtensions(
 ) {
   return [
     history(),
+    lineNumbers(),
+    highlightActiveLine(),
+    syntaxHighlighting(defaultHighlightStyle),
     keymap.of([
       {
         key: "Mod-Enter",
@@ -63,6 +75,7 @@ export function queryBrowserEditorExtensions(
           return true;
         },
       },
+      ...completionKeymap,
       ...historyKeymap,
     ]),
     EditorView.lineWrapping,
@@ -87,15 +100,18 @@ export function queryBrowserLanguageExtension(
   completion?: QueryBrowserCompletion,
 ): Extension {
   if (language === "sql") {
-    if (completion?.kind !== "sql") return sql();
-    return sql({
-      dialect: dialectFor(completion.dialect),
-      schema: sqlCompletionNamespace(completion.schemas),
-      upperCaseKeywords: true,
-      ...(completion.defaultSchema
-        ? { defaultSchema: completion.defaultSchema }
-        : {}),
-    });
+    if (completion?.kind !== "sql") return [sql(), autocompletion()];
+    return [
+      autocompletion(),
+      sql({
+        dialect: dialectFor(completion.dialect),
+        schema: sqlCompletionNamespace(completion.schemas),
+        upperCaseKeywords: true,
+        ...(completion.defaultSchema
+          ? { defaultSchema: completion.defaultSchema }
+          : {}),
+      }),
+    ];
   }
   if (language === "json") {
     if (completion?.kind !== "json-fields") return json();

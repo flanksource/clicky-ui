@@ -109,6 +109,8 @@ export type QueryBrowserProps = {
   title?: string | undefined;
   language?: QueryBrowserLanguage | undefined;
   initialQuery?: string | undefined;
+  /** Change after an explicit navigator Run action to execute the full seeded query once. */
+  runToken?: number | undefined;
   queryLabel?: string | undefined;
   allowEmptyQuery?: boolean | undefined;
   optionsSchema?: JsonSchemaObject | undefined;
@@ -117,6 +119,8 @@ export type QueryBrowserProps = {
   onQueryChange?: ((query: string) => void) | undefined;
   onOptionsChange?: ((options: Record<string, unknown>) => void) | undefined;
   navigator?: ReactNode | undefined;
+  /** Initial navigator width as a percentage; the splitter remains draggable. */
+  navigatorSplit?: number | undefined;
   execute: (request: QueryBrowserRequest) => Promise<QueryBrowserResult>;
   lookupFilterValues?: QueryBrowserFilterLookup | undefined;
   renderResults?: ((context: QueryBrowserResultContext) => ReactNode) | undefined;

@@ -41,6 +41,7 @@ export function QueryBrowser({
   title,
   language = "text",
   initialQuery = "",
+  runToken,
   queryLabel = "Query",
   allowEmptyQuery = false,
   optionsSchema,
@@ -49,6 +50,7 @@ export function QueryBrowser({
   onQueryChange,
   onOptionsChange,
   navigator,
+  navigatorSplit = 28,
   execute,
   lookupFilterValues,
   renderResults,
@@ -58,6 +60,7 @@ export function QueryBrowser({
   const editor = useRef<EditorView | null>(null);
   const languageConfig = useRef(new Compartment());
   const executeRef = useRef<() => void>(() => undefined);
+  const consumedRunToken = useRef(runToken);
   const onQueryChangeRef = useRef(onQueryChange);
   const [options, setOptions] = useState<Record<string, unknown>>(
     initialOptions ?? {},
@@ -265,6 +268,16 @@ export function QueryBrowser({
     executedFilters.current = {};
   }, [id]);
 
+  // Declared after the initialQuery sync so the editor already holds the seeded
+  // query; the cursor is collapsed so a stale selection cannot narrow the run.
+  useEffect(() => {
+    if (runToken === consumedRunToken.current) return;
+    consumedRunToken.current = runToken;
+    if (runToken == null) return;
+    editor.current?.dispatch({ selection: { anchor: 0 } });
+    executeRef.current();
+  }, [runToken]);
+
   const rows = result?.rows ?? [];
   const described = result?.columns ?? [];
   const columns = useMemo(
@@ -438,7 +451,7 @@ export function QueryBrowser({
   return (
     <div className={cn("h-[calc(100vh-15rem)] min-h-[32rem]", className)}>
       {navigator ? (
-        <SplitPane defaultSplit={28} left={navigator} right={workspace} />
+        <SplitPane defaultSplit={navigatorSplit} left={navigator} right={workspace} />
       ) : (
         workspace
       )}

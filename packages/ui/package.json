@@ -168,6 +168,7 @@
     "@codemirror/commands": "catalog:",
     "@codemirror/lang-json": "catalog:",
     "@codemirror/lang-sql": "catalog:",
+    "@codemirror/language": "catalog:",
     "@codemirror/state": "catalog:",
     "@codemirror/view": "catalog:",
     "@flanksource/icons": "1.0.63",
