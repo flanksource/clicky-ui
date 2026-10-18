@@ -56,12 +56,14 @@ export function CommentThread({
   onCreate,
   onReply,
   onUpdateStatus,
+  onClose,
   onDelete,
   onChecklistToggle,
   onMention,
 }: CommentThreadProps) {
   const listHandlers = buildThreadListHandlers(comments, config, {
     ...(onUpdateStatus ? { onUpdateStatus } : {}),
+    ...(onClose ? { onClose } : {}),
     ...(onDelete ? { onDelete } : {}),
     ...(onChecklistToggle ? { onChecklistToggle } : {}),
     ...(onReply ? { onReply } : {}),

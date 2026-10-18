@@ -58,6 +58,98 @@ describe("CommentCard", () => {
     expect(onUpdateStatus).toHaveBeenCalledWith("resolved");
   });
 
+  it("offers both Close and Resolve for an open root", () => {
+    const onClose = vi.fn();
+    const onUpdateStatus = vi.fn();
+    render(
+      <CommentCard
+        comment={root}
+        config={config}
+        defaultExpanded
+        onClose={onClose}
+        onUpdateStatus={onUpdateStatus}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Resolve", "Close"]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onUpdateStatus).not.toHaveBeenCalled();
+  });
+
+  it.each(["open", "in_progress", "resolved"])(
+    "closes a %s root from the expanded header",
+    (status) => {
+      const onClose = vi.fn();
+      const onUpdateStatus = vi.fn();
+      render(
+        <CommentCard
+          comment={{ ...root, status }}
+          config={config}
+          defaultExpanded
+          onClose={onClose}
+          onUpdateStatus={onUpdateStatus}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Close comment" }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onUpdateStatus).not.toHaveBeenCalled();
+    },
+  );
+
+  it("reopens a closed root from the expanded header", () => {
+    const onUpdateStatus = vi.fn();
+    render(
+      <CommentCard
+        comment={{ ...root, status: "closed" }}
+        config={config}
+        defaultExpanded
+        onUpdateStatus={onUpdateStatus}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Reopen comment" }));
+    expect(onUpdateStatus).toHaveBeenCalledWith("open");
+  });
+
+  it("omits the header shortcut for replies and when no lifecycle callback exists", () => {
+    const { rerender } = render(
+      <CommentCard
+        comment={{ ...root, parentId: "thread" }}
+        config={config}
+        defaultExpanded
+        onClose={vi.fn()}
+        onUpdateStatus={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Close comment" })).toBeNull();
+
+    rerender(<CommentCard comment={root} config={config} defaultExpanded />);
+    expect(screen.queryByRole("button", { name: "Close comment" })).toBeNull();
+  });
+
+  it("reports a close failure from the header", async () => {
+    render(
+      <CommentCard
+        comment={root}
+        config={config}
+        defaultExpanded
+        onClose={vi.fn().mockRejectedValue(new Error("close failed"))}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Close comment" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Couldn't close comment: close failed",
+      ),
+    );
+  });
+
   it("offers a human close action only for a resolved root", () => {
     const onClose = vi.fn();
     const onUpdateStatus = vi.fn();
@@ -121,6 +213,22 @@ describe("CommentCard", () => {
     expect(
       screen.queryByRole("button", { name: "Reply" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("closes an open root from the collapsed menu without expanding", () => {
+    const onClose = vi.fn();
+    render(<CommentCard comment={root} config={config} onClose={onClose} />);
+
+    expect(screen.queryByRole("button", { name: "Close comment" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Close" }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("comment-card")).toHaveAttribute(
+      "data-comment-id",
+      root.id,
+    );
+    expect(screen.queryByRole("button", { name: "Reply" })).toBeNull();
   });
 
   it("closes an open root when closed is the configured completion status", () => {
