@@ -4,7 +4,7 @@
 // appears as a tree row once its parent is selected — isn't asserted twice.
 
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import {
   emptyTestFilters,
   TestDetailPanel,
@@ -141,7 +141,7 @@ describe("verificationAdapters: fixture/CEL detail", () => {
     expect(screen.getByText("exit 2")).toBeInTheDocument();
   });
 
-  it("renders the provider-owned node.detail as JSON beneath the CEL block", () => {
+  it("renders the provider-owned node.detail as JSON under a collapsed Raw detail disclosure", () => {
     renderDetail({
       name: "run smoke test",
       failed: true,
@@ -149,8 +149,10 @@ describe("verificationAdapters: fixture/CEL detail", () => {
       detail: { changed_files: ["todos/runtime/lifecycle.go"] },
     });
 
-    expect(screen.getByText("Detail")).toBeInTheDocument();
-    expect(screen.getByText("changed_files")).toBeInTheDocument();
+    const raw = document.querySelector<HTMLDetailsElement>("[data-raw-detail]")!;
+    expect(raw.open).toBe(false);
+    expect(within(raw).getByText("Raw detail")).toBeInTheDocument();
+    expect(within(raw).getByText("changed_files")).toBeInTheDocument();
   });
 });
 

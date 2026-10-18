@@ -50,9 +50,13 @@ const checklistAdapter: TestNodeAdapter = {
 };
 
 // A typed step kind (services, todo, …) may report no command or CEL context at
-// all, so `detail.step` claims the node as well.
+// all, so `detail.step` claims the node as well. A "fixture" leaf is a step whose
+// result has not arrived yet (a live or background step): it carries only the
+// execution node, which FixtureDetail renders as a header. Fixture parents
+// (markdown tables, runner steps) have children and stay with the default body.
 function isFixtureNode(node: Test): boolean {
-  return node.context !== undefined || hasStepDetail(node.detail);
+  if (node.context !== undefined || hasStepDetail(node.detail)) return true;
+  return node.framework === "fixture" && (node.children?.length ?? 0) === 0;
 }
 
 // ── Copy sections for fixture steps (exec / query / table / test / lint) ───

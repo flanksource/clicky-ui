@@ -23,7 +23,18 @@ export type WaitPolicy = {
 export const WAIT_OUTCOMES = ["satisfied", "failed", "timeout"] as const;
 export type WaitOutcome = (typeof WAIT_OUTCOMES)[number];
 
-export type WaitDetail = { policy: WaitPolicy; outcome: WaitOutcome; durationMs: number; outputs?: unknown; error?: string; trace?: string };
+export type WaitDetail = {
+  policy: WaitPolicy;
+  outcome: WaitOutcome;
+  durationMs: number;
+  /** The CEL expression that decided the outcome: policy.failWhen when it fired, else policy.until. */
+  expression?: string;
+  /** Domain reason the wait ended unsatisfied; may span several lines. */
+  cause?: string;
+  outputs?: unknown;
+  error?: string;
+  trace?: string;
+};
 
 export type StepAttempt = { attempt: number; status: string; error?: string; durationMs?: number; result?: VerifyNode };
 
@@ -142,6 +153,8 @@ function readWait(value: unknown): WaitDetail {
     outcome: oneOf(wait.outcome, WAIT_OUTCOMES, "detail.wait.outcome"),
     durationMs: nonnegative(wait.durationMs, "detail.wait.durationMs"),
     ...(wait.outputs === undefined ? {} : { outputs: wait.outputs }),
+    ...optional(wait, "expression", (v) => str(v, "detail.wait.expression")),
+    ...optional(wait, "cause", (v) => str(v, "detail.wait.cause")),
     ...optional(wait, "error", (v) => str(v, "detail.wait.error")),
     ...optional(wait, "trace", (v) => str(v, "detail.wait.trace")),
   };
@@ -242,6 +255,70 @@ export function hasStepDetail(detail: unknown): boolean {
   return readStepDetail(detail).kind !== "none";
 }
 
+/** The fixtures.ExecutionNode fields gavel puts at the top of `node.detail`, shown as a header instead of raw JSON. */
+export type ExecutionHeader = {
+  kind?: string;
+  state?: string;
+  file?: string;
+  sectionPath?: string;
+  /** Zero-based row of the step within its section. */
+  rowIndex?: number;
+  line?: number;
+  startedAt?: string;
+  finishedAt?: string;
+  /** Nanoseconds. */
+  durationNs?: number;
+  error?: string;
+};
+
+const isString = (value: unknown): value is string => typeof value === "string";
+const isNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+
+/**
+ * Splits the ExecutionNode fields (name, kind, state, origin, started_at,
+ * finished_at, duration, error) off `detail` into a header, dropping the
+ * internal `key`. A field of an unexpected type is not consumed — it stays in
+ * `rest`, so it is visible in the raw block rather than silently hidden.
+ */
+export function splitExecutionDetail(detail: unknown): { header: ExecutionHeader; rest: unknown } {
+  if (!isRecord(detail)) return { header: {}, rest: detail };
+  const rest: Rec = { ...detail };
+  delete rest.key;
+  const take = <T>(key: string, guard: (value: unknown) => value is T): T | undefined => {
+    const value = rest[key];
+    if (!guard(value)) return undefined;
+    delete rest[key];
+    return value;
+  };
+  const header: ExecutionHeader = {};
+  const assign = <K extends keyof ExecutionHeader>(field: K, value: ExecutionHeader[K] | undefined) => {
+    if (value !== undefined) header[field] = value;
+  };
+  take("name", isString);
+  assign("kind", take("kind", isString));
+  assign("state", take("state", isString));
+  assign("startedAt", take("started_at", isString));
+  assign("finishedAt", take("finished_at", isString));
+  assign("durationNs", take("duration", isNumber));
+  assign("error", take("error", isString));
+  const origin = take("origin", isRecord);
+  if (origin) {
+    assign("file", isString(origin.file) ? origin.file : undefined);
+    assign("sectionPath", isString(origin.section_path) ? origin.section_path : undefined);
+    assign("rowIndex", isNumber(origin.row_index) ? origin.row_index : undefined);
+    assign("line", isNumber(origin.line) ? origin.line : undefined);
+  }
+  return { header, rest: Object.keys(rest).length > 0 ? rest : undefined };
+}
+
+export type WaitCondition = "until" | "failWhen";
+
+/** Which of the wait's two conditions decided its outcome. `expression` is authoritative; older payloads without it are inferred from the outcome. */
+export function waitDecidedBy(wait: WaitDetail): WaitCondition {
+  if (wait.expression !== undefined) return wait.expression === wait.policy.failWhen ? "failWhen" : "until";
+  return wait.outcome === "failed" && wait.policy.failWhen ? "failWhen" : "until";
+}
+
 /** `09:00:04` from an RFC 3339 timestamp, as written (no timezone conversion); anything else verbatim. */
 export function clockTime(at: string): string {
   return /T(\d{2}:\d{2}:\d{2})/.exec(at)?.[1] ?? at;
@@ -280,6 +357,8 @@ function waitCopy(wait: WaitDetail): BriefSection {
     `policy: ${policySummary(policy)}`,
     policy.until && `until: ${policy.until}`,
     policy.failWhen && `failWhen: ${policy.failWhen}`,
+    wait.expression && `decided by: ${wait.expression}`,
+    wait.cause && `cause: ${wait.cause}`,
     wait.error && `error: ${wait.error}`,
     wait.trace && `trace: ${wait.trace}`,
     wait.outputs !== undefined && `outputs: ${JSON.stringify(wait.outputs)}`,
