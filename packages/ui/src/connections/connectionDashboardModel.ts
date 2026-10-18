@@ -38,11 +38,15 @@ export type ConnectionDashboardItem = {
   health?: ConnectionHealth | null;
   profileCount: number;
   updatedAt: string;
+  /** A virtual or read-only connection: the service answers 405 to saving or deleting it. */
+  readOnly?: boolean;
 };
 
 export type ConnectionDashboardResponse = {
   connections: ConnectionDashboardItem[];
   generatedAt: string;
+  /** The service has no connection store, so nothing can be created. */
+  readOnly?: boolean;
 };
 
 export type ConnectionHealthResult = ConnectionHealth & {

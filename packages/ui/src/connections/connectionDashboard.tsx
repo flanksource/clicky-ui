@@ -1,15 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Button } from "../components/button";
 import { cn } from "../lib/utils";
 import {
-  CONNECTION_DASHBOARD_QUERY_KEY,
-  connectionDashboardUrl,
   groupConnectionDashboardLanes,
   type ConnectionDashboardItem,
-  type ConnectionDashboardResponse,
   type ConnectionLinkRenderer,
 } from "./connectionDashboardModel";
+import { useConnectionDashboard } from "./connectionDashboardQuery";
 import {
   ConnectionDashboardRow,
   ConnectionHealthLegend,
@@ -38,32 +35,13 @@ export function ConnectionDashboardSurface({
   requestUrl,
   renderConnectionLink,
 }: ConnectionDashboardSurfaceProps) {
-  const dashboardUrl = connectionDashboardUrl({
+  const dashboard = useConnectionDashboard({
     apiBase,
     ...(requestUrl ? { requestUrl } : {}),
   });
-  const dashboard = useQuery({
-    queryKey: [CONNECTION_DASHBOARD_QUERY_KEY, dashboardUrl],
-    queryFn: async () => {
-      const response = await fetch(dashboardUrl, {
-        headers: { Accept: "application/json" },
-      });
-      if (!response.ok) {
-        const message = (await response.text()).trim();
-        throw new Error(message || `Connection dashboard failed: ${response.status}`);
-      }
-      const payload = (await response.json()) as Partial<ConnectionDashboardResponse>;
-      if (!Array.isArray(payload.connections)) {
-        throw new Error("Connection dashboard response is missing connections");
-      }
-      return payload.connections;
-    },
-    staleTime: 10_000,
-    retry: 0,
-  });
 
   const { health, pending, error, seed, check } = useConnectionHealth(apiBase);
-  const connections = dashboard.data;
+  const connections = dashboard.data?.connections;
   useEffect(() => {
     if (connections) seed(connections);
   }, [connections, seed]);
