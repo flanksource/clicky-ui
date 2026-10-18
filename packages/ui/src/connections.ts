@@ -8,6 +8,8 @@
  * with its JSON Schema on `GET {apiBase}/connection`.
  *
  * - `ConnectionsPage` is the whole screen for a host without EntityExplorerApp.
+ *   A catalog the service reports `readOnly` hides Add Connection; a virtual or
+ *   read-only connection opens as a view carrying the host's `readOnlyHint`.
  * - An EntityExplorerApp host composes the parts instead:
  *   `createConnectionDashboardResultRenderer`, `createConnectionFormActions`
  *   and `connectionLoggingFormExtensions`.
@@ -18,9 +20,11 @@
 export * from "./connections/ConnectionsPage";
 export {
   connectionFormExtensions,
+  isReadOnlyConnection,
   type ConnectionFormExtensions,
 } from "./connections/connectionsPageModel";
 export * from "./connections/connectionDashboard";
+export * from "./connections/connectionDashboardQuery";
 export * from "./connections/connectionDashboardRow";
 export * from "./connections/connectionDashboardModel";
 export * from "./connections/connectionDashboardRenderer";

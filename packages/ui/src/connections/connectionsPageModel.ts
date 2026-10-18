@@ -48,6 +48,14 @@ export const updateConnectionAction: ResolvedOperation = {
 };
 
 /**
+ * A connection the service refuses to save or delete (405): a virtual one from
+ * a read-only provider such as a host's config file, or one flagged read-only.
+ */
+export function isReadOnlyConnection(connection: Record<string, unknown>): boolean {
+  return connection.virtual === true || connection.read_only === true;
+}
+
+/**
  * Only a plain left click selects in place; modified and middle clicks fall
  * through to the browser so "open in new tab" keeps working on the row's href.
  */

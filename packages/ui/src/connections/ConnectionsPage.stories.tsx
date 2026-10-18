@@ -18,6 +18,11 @@ function json(body: unknown, status = 200, contentType = "application/json"): Re
   });
 }
 
+const READ_ONLY_REFUSAL = {
+  code: "read_only",
+  message: "connections are read-only: no connection store is configured",
+};
+
 /**
  * The commons-db connections service, in memory: the dashboard, the schema,
  * one editable connection, test/resolve on drafts, and a delete that answers
@@ -83,11 +88,39 @@ const fakeConnectionsApi: typeof fetch = async (input, init) => {
   return new Response(`no fake route for ${method} ${url}`, { status: 404 });
 };
 
-const withFakeConnectionsApi: Decorator = (Story) => {
+/**
+ * The same service with no connection store, serving a host's config-file
+ * connections as virtual ones: every row is read-only and writes answer 405.
+ */
+const fakeReadOnlyConnectionsApi: typeof fetch = async (input, init) => {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const url = String(input);
+  if (method === "GET" && url === `${API_BASE}/connections/dashboard`) {
+    return json({
+      connections: connectionDashboardFixture.map((item) => ({ ...item, readOnly: true })),
+      generatedAt: new Date().toISOString(),
+      readOnly: true,
+    });
+  }
+  if (method === "GET" && url === `${API_BASE}/connection/cache-id`) {
+    return json({ ...cacheConnectionFixture, virtual: true, read_only: true });
+  }
+  if (
+    method === "PUT" ||
+    method === "DELETE" ||
+    (method === "POST" && url === `${API_BASE}/connection`)
+  ) {
+    return json(READ_ONLY_REFUSAL, 405);
+  }
+  return fakeConnectionsApi(input, init);
+};
+
+const withFakeConnectionsApi: Decorator = (Story, context) => {
+  const fake = context.parameters.readOnlyCatalog ? fakeReadOnlyConnectionsApi : fakeConnectionsApi;
   const original = useRef<typeof globalThis.fetch | undefined>(undefined);
-  if (globalThis.fetch !== fakeConnectionsApi) {
+  if (globalThis.fetch !== fake) {
     original.current = globalThis.fetch;
-    globalThis.fetch = fakeConnectionsApi;
+    globalThis.fetch = fake;
   }
   useEffect(
     () => () => {
@@ -134,7 +167,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "The connections screen for a host without EntityExplorerApp: namespace lanes with on-demand health, an Add Connection dialog over the served connection schema, and the same dialog editing the selected connection with Delete. Test / Resolve work on the unsaved draft.",
+          "The connections screen for a host without EntityExplorerApp: namespace lanes with on-demand health, an Add Connection dialog over the served connection schema, and the same dialog editing the selected connection with Delete. Test / Resolve work on the unsaved draft. A catalog without a connection store hides Add Connection, and a virtual connection opens as a view with the host's `readOnlyHint`.",
       },
     },
   },
@@ -168,5 +201,25 @@ export const DeleteConflict: Story = {
     await expect(
       await within(editor).findByText(/still referenced by database_modules_connection_id_fkey/),
     ).toBeInTheDocument();
+  },
+};
+
+export const ReadOnlyCatalog: Story = {
+  args: {
+    selected: "cache-id",
+    readOnlyHint: <a href="?section=environments">Edit in the environment config</a>,
+  },
+  parameters: { readOnlyCatalog: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    const view = await body.findByRole("dialog", { name: "View cache" });
+    await expect(
+      within(view).getByRole("link", { name: "Edit in the environment config" }),
+    ).toBeInTheDocument();
+    await expect(await within(view).findByRole("button", { name: "Test" })).toBeInTheDocument();
+    await expect(within(view).queryByRole("button", { name: "Save" })).toBeNull();
+    await expect(within(view).queryByRole("button", { name: "Delete" })).toBeNull();
+    await expect(canvas.queryByRole("button", { name: "Add Connection" })).toBeNull();
   },
 };

@@ -57,7 +57,7 @@ export type AppShellNavGroup = {
   /**
    * Keeps the group open regardless of stored state, so a deep-linked
    * destination can never hide under a folder the user collapsed earlier.
-   * Mirrors `Tree.revealSelected`: set it on the active item's ancestors.
+   * Set it on the active item's ancestors.
    */
   forceExpanded?: boolean;
   items: AppShellNavItem[];
