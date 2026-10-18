@@ -227,6 +227,27 @@ describe("QueryBrowser", () => {
     await waitFor(() => expect(onQueryChange).toHaveBeenCalledWith("SELECT 3"));
   });
 
+  it("runs the seeded query once per changed run token", async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    const props = { id: "db-run-token", execute };
+    const { rerender } = render(
+      <QueryBrowser {...props} initialQuery="SELECT 1" runToken={1} />,
+    );
+    expect(execute).not.toHaveBeenCalled();
+
+    rerender(<QueryBrowser {...props} initialQuery="SELECT 2" runToken={2} />);
+    await waitFor(() =>
+      expect(execute).toHaveBeenCalledWith({ query: "SELECT 2", options: {} }),
+    );
+
+    rerender(<QueryBrowser {...props} initialQuery="SELECT 3" runToken={2} />);
+    rerender(
+      <QueryBrowser {...props} initialQuery="SELECT 4" runToken={undefined} />,
+    );
+    await screen.findByText("0 rows");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
   describe("source-described filters", () => {
     const describedResult = {
       rows: [{ region: "us-east" }],
