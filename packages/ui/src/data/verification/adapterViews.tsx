@@ -6,8 +6,8 @@
 
 import type { ReactNode } from "react";
 import { JsonView } from "../JsonView";
-import { readStepDetail, type WaitDetail } from "./stepKind";
-import { MalformedStepDetail, StepKindSections } from "./stepKindViews";
+import { readStepDetail, splitExecutionDetail, waitDecidedBy, type WaitDetail } from "./stepKind";
+import { ExecutionHeaderView, FailureCallout, MalformedStepDetail, StepKindSections } from "./stepKindViews";
 import {
   Expectation,
   OutcomeIcon,
@@ -89,10 +89,13 @@ export function CelDetails({ node }: { node: Test }) {
   const actual = comparisonValue(hasCelGate, context?.actual);
   const hasComparison = expected !== undefined || actual !== undefined;
   if (!expression && Object.keys(vars).length === 0 && !hasComparison) return null;
+  const stepDetail = readStepDetail(node.detail);
+  const wait = stepDetail.kind === "step" ? stepDetail.step.wait : undefined;
+  const checkLabel = wait && wait.outcome !== "satisfied" ? waitDecidedBy(wait) : "expression";
   return (
     <Expectation
       check={expression}
-      checkLabel="expression"
+      checkLabel={checkLabel}
       vars={vars}
       expected={expected}
       actual={actual}
@@ -100,8 +103,22 @@ export function CelDetails({ node }: { node: Test }) {
   );
 }
 
-function rawStepDetail(rest: Record<string, unknown>): Record<string, unknown> | undefined {
-  return Object.keys(rest).length > 0 ? rest : undefined;
+// The texts explaining a failure, most specific first. A text already contained
+// in another (a wait cause that the result message embeds) is not repeated.
+function failureTexts(...candidates: (string | undefined)[]): string[] {
+  const texts = candidates.filter((text): text is string => !!text);
+  return texts.filter((text, i) => !texts.some((other, j) => j !== i && other.includes(text) && (other.length > text.length || j < i)));
+}
+
+function FailureMessage({ node, cause, error }: { node: Test; cause: string | undefined; error: string | undefined }) {
+  const texts = failureTexts(cause, node.message, error);
+  if (texts.length === 0) return null;
+  if (!(node.failed || node.timed_out || cause)) return <p className="whitespace-pre-wrap break-words text-sm">{texts.join("\n")}</p>;
+  return (
+    <FailureCallout>
+      {texts.map((text, i) => <div key={i} className={i > 0 ? "mt-1 text-xs opacity-90" : undefined}>{text}</div>)}
+    </FailureCallout>
+  );
 }
 
 export function FixtureDetail({ node, renderWait }: { node: Test; renderWait?: (wait: WaitDetail) => ReactNode }) {
@@ -109,13 +126,13 @@ export function FixtureDetail({ node, renderWait }: { node: Test; renderWait?: (
   const command = context?.command ?? node.command;
   const cwd = context?.cwd ?? node.work_dir;
   const stepDetail = readStepDetail(node.detail);
+  const { header, rest } = splitExecutionDetail(node.detail);
   // A typed step shows its own sections, so the raw block keeps only what they don't cover.
-  const rawDetail = stepDetail.kind === "step" ? rawStepDetail(stepDetail.step.rest) : node.detail;
+  const rawDetail = stepDetail.kind === "step" ? splitExecutionDetail(stepDetail.step.rest).rest : rest;
   return (
     <div className="space-y-4 p-density-4">
-      {node.message && (
-        <p className="whitespace-pre-wrap break-words text-sm">{node.message}</p>
-      )}
+      <ExecutionHeaderView header={header} {...(stepDetail.kind === "step" ? { stepKind: stepDetail.step.step.kind } : {})} />
+      <FailureMessage node={node} cause={stepDetail.kind === "step" ? stepDetail.step.wait?.cause : undefined} error={header.error} />
       {command && (
         <div className="min-w-0 space-y-1">
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Command</div>
@@ -137,10 +154,12 @@ export function FixtureDetail({ node, renderWait }: { node: Test; renderWait?: (
       {stepDetail.kind === "step" && <StepKindSections step={stepDetail.step} {...(renderWait ? { renderWait } : {})} />}
       {stepDetail.kind === "invalid" && <MalformedStepDetail error={stepDetail.error} />}
       {rawDetail != null && (
-        <div className="space-y-1">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Detail</div>
-          <JsonView data={rawDetail} />
-        </div>
+        <details className="text-muted-foreground" data-raw-detail="">
+          <summary className="cursor-pointer text-[10px] uppercase tracking-wide">Raw detail</summary>
+          <div className="mt-1 text-foreground">
+            <JsonView data={rawDetail} />
+          </div>
+        </details>
       )}
     </div>
   );

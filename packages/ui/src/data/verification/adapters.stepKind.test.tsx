@@ -75,11 +75,13 @@ describe("verificationAdapters: wait timeline", () => {
     expect(wait.getByText("todo.status in ['failed','ask']")).toBeInTheDocument();
   });
 
-  it("shows condition, elapsed time, outcome and final output on a single row", () => {
+  it("shows elapsed time on the summary row and marks only the deciding condition with the outcome", () => {
     renderDetail(planStep);
-    expect(document.querySelector("[data-wait-summary]")).toHaveTextContent(`Waittodo.status == 'review'3.1sSatisfied{"todo":{"status":"review"}}`);
+    expect(document.querySelector("[data-wait-summary]")).toHaveTextContent("Wait3.1s");
     expect(document.querySelector("[data-wait-observation]")).toBeNull();
-    expect(section("wait").getByText("Satisfied")).toBeInTheDocument();
+    expect(document.querySelector("[data-wait-output]")).toBeNull();
+    expect(document.querySelector("[data-wait-condition=until]")).toHaveTextContent("Satisfied");
+    expect(document.querySelector("[data-wait-condition=failWhen]")).not.toHaveTextContent("Satisfied");
   });
 
   it("keeps the schedule behind a closed disclosure", () => {
@@ -256,7 +258,7 @@ describe("verificationAdapters: step identity", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       'Malformed step detail: detail.wait.outcome must be one of satisfied, failed, timeout (got "stuck")',
     );
-    expect(screen.getByText("Detail")).toBeInTheDocument();
+    expect(screen.getByText("Raw detail")).toBeInTheDocument();
   });
 });
 
