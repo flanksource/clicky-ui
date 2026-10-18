@@ -12,6 +12,9 @@ const API_BASE = "/uir/api/v1";
 const CONFLICT_MESSAGE =
   'connection "cache" is still referenced by database_modules_connection_id_fkey; remove the dependent database modules first';
 
+const READ_ONLY_HINT = "Edit in the environment config";
+const READ_ONLY_HINT_HREF = "/settings?section=environments";
+
 type Route = (init: RequestInit | undefined) => Response;
 
 function json(body: unknown, init: { status?: number; contentType?: string } = {}): Response {
@@ -34,15 +37,34 @@ const baseRoutes: Record<string, Route> = {
   [`GET ${API_BASE}/connection/cache-id`]: () => json(cacheConnectionFixture),
 };
 
+const readOnlyCatalogRoutes: Record<string, Route> = {
+  ...baseRoutes,
+  [`GET ${API_BASE}/connections/dashboard`]: () =>
+    json({
+      connections: connectionDashboardFixture.map((item) => ({ ...item, readOnly: true })),
+      generatedAt: "2026-10-16T08:00:00Z",
+      readOnly: true,
+    }),
+};
+
+const virtualCacheRoutes: Record<string, Route> = {
+  ...baseRoutes,
+  [`GET ${API_BASE}/connection/cache-id`]: () =>
+    json({ ...cacheConnectionFixture, virtual: true, read_only: true }),
+};
+
 let requests: string[] = [];
+let bodies: Record<string, unknown> = {};
 
 function mockApi(routes: Record<string, Route>) {
   requests = [];
+  bodies = {};
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const key = `${(init?.method ?? "GET").toUpperCase()} ${String(input)}`;
       requests.push(key);
+      if (typeof init?.body === "string") bodies[key] = JSON.parse(init.body);
       const route = routes[key];
       if (!route) throw new Error(`unexpected request ${key}`);
       return route(init);
@@ -138,5 +160,69 @@ describe("ConnectionsPage", () => {
     fireEvent.click(within(confirm).getByRole("button", { name: "Delete" }));
 
     await waitFor(() => expect(onSelect).toHaveBeenCalledExactlyOnceWith(undefined));
+  });
+
+  it("keeps the writable editor free of the read-only hint", async () => {
+    renderPage({ selected: "cache-id", readOnlyHint: READ_ONLY_HINT });
+
+    const dialog = await screen.findByRole("dialog", { name: "Edit cache" });
+    expect(await within(dialog).findByRole("button", { name: "Save" })).toBeInTheDocument();
+    expect(within(dialog).queryByText(READ_ONLY_HINT)).not.toBeInTheDocument();
+  });
+
+  it("hides Add Connection when the dashboard reports a read-only catalog", async () => {
+    mockApi(readOnlyCatalogRoutes);
+    renderPage();
+
+    expect(await screen.findByText("warehouse")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add Connection" })).not.toBeInTheDocument();
+  });
+
+  it("opens a virtual connection as a view with the host hint and Test, without Save or Delete", async () => {
+    mockApi(virtualCacheRoutes);
+    renderPage({
+      selected: "cache-id",
+      readOnlyHint: <a href={READ_ONLY_HINT_HREF}>{READ_ONLY_HINT}</a>,
+    });
+
+    const dialog = await screen.findByRole("dialog", { name: "View cache" });
+    expect(await within(dialog).findByDisplayValue(cacheConnectionFixture.url)).toBeDisabled();
+    expect(within(dialog).queryByRole("tab", { name: "YAML" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: READ_ONLY_HINT })).toHaveAttribute(
+      "href",
+      READ_ONLY_HINT_HREF,
+    );
+    expect(within(dialog).getByRole("button", { name: "Test" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+  });
+
+  it("tests a virtual connection with its fetched value", async () => {
+    mockApi({
+      ...virtualCacheRoutes,
+      [`POST ${API_BASE}/connection/test`]: () =>
+        json({ ok: true, message: "TCP connect succeeded", url: cacheConnectionFixture.url }),
+    });
+    renderPage({ selected: "cache-id" });
+
+    const dialog = await screen.findByRole("dialog", { name: "View cache" });
+    fireEvent.click(await within(dialog).findByRole("button", { name: "Test" }));
+
+    await waitFor(() =>
+      expect(bodies[`POST ${API_BASE}/connection/test`]).toEqual({
+        ...cacheConnectionFixture,
+        virtual: true,
+        read_only: true,
+      }),
+    );
+  });
+
+  it("views every connection of a read-only catalog even when the connection carries no flag", async () => {
+    mockApi(readOnlyCatalogRoutes);
+    renderPage({ selected: "cache-id" });
+
+    const dialog = await screen.findByRole("dialog", { name: "View cache" });
+    expect(await within(dialog).findByRole("button", { name: "Test" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
 });
