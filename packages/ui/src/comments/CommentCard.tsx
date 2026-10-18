@@ -43,7 +43,7 @@ export type CommentCardProps = {
   renderBody?: (body: string) => ReactNode;
   /** Change this comment's status (roots only). */
   onUpdateStatus?: (status: string) => void | Promise<void>;
-  /** Close a resolved root comment. */
+  /** Close an active or resolved root comment. */
   onClose?: () => void | Promise<void>;
   /** Delete this comment. */
   onDelete?: () => void;
@@ -149,7 +149,7 @@ function CommentBody({
             },
           ]
         : []),
-      ...(stage === "resolved" && onClose && closed
+      ...((stage === "active" || stage === "resolved") && onClose && closed
         ? [
             {
               label: "Close",
@@ -202,6 +202,31 @@ function CommentBody({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
+          {!isReply &&
+            (stage === "active" || stage === "resolved") &&
+            onClose &&
+            closed && (
+              <button
+                type="button"
+                aria-label="Close comment"
+                title="Close comment"
+                onClick={() => void close()}
+                className="inline-flex rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Icon icon={UiCheck} className="text-sm" />
+              </button>
+            )}
+          {!isReply && stage === "closed" && onUpdateStatus && active && (
+            <button
+              type="button"
+              aria-label="Reopen comment"
+              title="Reopen comment"
+              onClick={() => void updateStatus(active.value)}
+              className="inline-flex rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Icon icon={UiRestart} className="text-sm" />
+            </button>
+          )}
           {menuItems.length > 0 && (
             <DropdownMenu
               align="right"
@@ -378,8 +403,10 @@ export function CommentCard(props: CommentCardProps) {
                         },
                       ]
                     : []),
-                  ...(resolveCommentStage(config, comment.status) ===
-                    "resolved" &&
+                  ...((resolveCommentStage(config, comment.status) ===
+                    "active" ||
+                    resolveCommentStage(config, comment.status) ===
+                      "resolved") &&
                   props.onClose &&
                   statusForCommentStage(config, "closed")
                     ? [

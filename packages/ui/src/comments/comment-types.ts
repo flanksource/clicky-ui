@@ -174,7 +174,7 @@ export type CommentCallbacks = {
   ) => void | Promise<void>;
   onReply?: (input: CommentReplyInput) => void | Promise<void>;
   onUpdateStatus?: (id: string, status: string) => void | Promise<void>;
-  /** Human-only transition from resolved to closed. */
+  /** Human-only transition from active or resolved to closed. */
   onClose?: (id: string) => void | Promise<void>;
   onUpdateRating?: (id: string, rating: CommentRating) => void | Promise<void>;
   onDelete?: (id: string) => void | Promise<void>;

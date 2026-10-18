@@ -124,8 +124,14 @@ export function closeComment(
   const { comment } = root(dir, id);
   const status = statusOf(comment);
   if (status === "closed") return comment;
-  if (status !== RESOLVED_STATUS) {
-    throw new CommentHttpError("only a resolved comment can be closed", 409);
+  if (
+    status !== RESOLVED_STATUS &&
+    !UNRESOLVED_STATUSES.includes(status as never)
+  ) {
+    throw new CommentHttpError(
+      `comment status "${status}" cannot be closed`,
+      409,
+    );
   }
   const now = new Date().toISOString();
   return patchComment(dir, id, {
