@@ -1,12 +1,12 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
 import { UiClose, UiCollapseAll, UiExpandAll, UiSearch } from "../icons";
-import { TreeNode, type TreeNodeProps } from "./TreeNode";
+import { TreeNode, type TreeKey, type TreeNodeProps } from "./TreeNode";
 
 export type TreeProps<T> = Omit<
   TreeNodeProps<T>,
-  "node" | "depth" | "expandAll" | "forcedOpenKeys"
+  "node" | "depth" | "expandAll" | "forcedOpenKeys" | "revealPath" | "revealOverrides" | "onRevealToggle"
 > & {
   /** Root nodes to render. */
   roots: T[];
@@ -58,52 +58,38 @@ export type TreeProps<T> = Omit<
    */
   getSearchText?: (node: T) => string;
   /**
-   * Force-open the ancestors of the `selected` node so it is always revealed,
-   * even when its branch was collapsed (a deep-link, a programmatic selection
-   * from outside the tree, or simply a folder the user never opened). While a
-   * node is selected its ancestors cannot be collapsed. Off by default; other
-   * nodes keep their normal expand state. Requires `selected` to be set.
+   * Reveal only the path to `selected` when the selection changes. Ancestors
+   * initially show the next path node; manual expansion and collapse then take
+   * precedence until another node is selected. Off by default.
    */
   revealSelected?: boolean;
 };
 
-// ancestorPathKeys returns the keys of every ancestor on the path from a root
-// down to `target` (excluding target itself — opening the ancestors is what
-// makes target render). Matches by getKey so it is robust to object identity
-// across roots rebuilds. Returns null when target is not found.
-function ancestorPathKeys<T>(
+function selectionPath<T>(
   roots: T[],
   getChildren: TreeProps<T>["getChildren"],
   getKey: TreeProps<T>["getKey"],
   target: T,
-): Set<string | number> | null {
+): Map<TreeKey, TreeKey | null> | null {
   const targetKey = getKey(target);
-  const path: (string | number)[] = [];
+  const path = new Map<TreeKey, TreeKey | null>();
   const visit = (node: T): boolean => {
-    if (getKey(node) === targetKey) return true;
+    if (getKey(node) === targetKey) {
+      path.set(targetKey, null);
+      return true;
+    }
     for (const child of getChildren(node) ?? []) {
       if (visit(child)) {
-        path.push(getKey(node));
+        path.set(getKey(node), getKey(child));
         return true;
       }
     }
     return false;
   };
   for (const root of roots) {
-    if (visit(root)) return path.length ? new Set(path) : null;
+    if (visit(root)) return path;
   }
   return null;
-}
-
-// mergeKeySets unions two optional key sets, preserving the null fast-path when
-// both are empty so consumers without a filter or reveal pass null downstream.
-function mergeKeySets(
-  a: Set<string | number> | null,
-  b: Set<string | number> | null,
-): Set<string | number> | null {
-  if (!a) return b;
-  if (!b) return a;
-  return new Set([...a, ...b]);
 }
 
 // Edge counting, search-text collection and filtering all walk the tree through
@@ -282,6 +268,18 @@ export function Tree<T>({
   const basePaddingPx = nodeProps.basePaddingPx ?? 8;
   const isControlled = onExpandAllChange !== undefined;
   const expandAll = isControlled ? (controlledExpandAll ?? null) : internalExpandAll;
+  const selectedKey = revealSelected && nodeProps.selected != null ? nodeProps.getKey(nodeProps.selected) : null;
+  const [revealInteraction, setRevealInteraction] = useState({
+    selectedKey: null as TreeKey | null,
+    overrides: new Map<TreeKey, boolean>(),
+    bulk: false,
+  });
+  const previousExpandAll = useRef(expandAll);
+  useEffect(() => {
+    if (previousExpandAll.current === expandAll) return;
+    previousExpandAll.current = expandAll;
+    setRevealInteraction({ selectedKey, overrides: new Map(), bulk: true });
+  }, [expandAll, selectedKey]);
   const totalEdges = useMemo(
     () => countTreeEdges(roots, nodeProps.getChildren),
     [roots, nodeProps.getChildren],
@@ -309,20 +307,15 @@ export function Tree<T>({
   );
   const treeRoots = filteredTree.roots;
   const filteredChildren = filteredTree.filteredChildren;
-  // Force-open the selected node's ancestors when revealSelected is set, unioned
-  // with the filter's own forced-open keys. Recomputed when the selection moves
-  // so the tree follows it without a remount.
-  const revealKeys = useMemo(
+  const revealPath = useMemo(
     () =>
       revealSelected && nodeProps.selected
-        ? ancestorPathKeys(roots, nodeProps.getChildren, nodeProps.getKey, nodeProps.selected)
+        ? selectionPath(roots, nodeProps.getChildren, nodeProps.getKey, nodeProps.selected)
         : null,
     [revealSelected, roots, nodeProps.getChildren, nodeProps.getKey, nodeProps.selected],
   );
-  const forcedOpenKeys = useMemo(
-    () => mergeKeySets(filteredTree.forcedOpenKeys, revealKeys),
-    [filteredTree.forcedOpenKeys, revealKeys],
-  );
+  const activeReveal = !activeFilter.trim() && !(revealInteraction.selectedKey === selectedKey && revealInteraction.bulk);
+  const revealOverrides = revealInteraction.selectedKey === selectedKey ? revealInteraction.overrides : null;
   const effectiveGetChildren = filteredChildren
     ? (node: T) => filteredChildren.get(nodeProps.getKey(node)) ?? []
     : nodeProps.getChildren;
@@ -335,6 +328,7 @@ export function Tree<T>({
   const showControlButtons = showControls && roots.length > 0;
   const showVirtualRow = showFilter || showControlButtons || actions != null;
   const setExpandAll = (next: boolean | null) => {
+    setRevealInteraction({ selectedKey, overrides: new Map(), bulk: true });
     if (isControlled) onExpandAllChange?.(next);
     else setInternalExpandAll(next);
   };
@@ -439,7 +433,14 @@ export function Tree<T>({
                 key={nodeProps.getKey(root)}
                 node={root}
                 expandAll={effectiveExpandAll}
-                forcedOpenKeys={forcedOpenKeys}
+                forcedOpenKeys={filteredTree.forcedOpenKeys}
+                revealPath={activeReveal ? revealPath : null}
+                revealOverrides={revealOverrides}
+                onRevealToggle={(key, open) => setRevealInteraction((current) => {
+                  const overrides = new Map(current.selectedKey === selectedKey ? current.overrides : []);
+                  overrides.set(key, open);
+                  return { selectedKey, overrides, bulk: false };
+                })}
                 getChildren={effectiveGetChildren}
               />
             ))}

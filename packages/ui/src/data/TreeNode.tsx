@@ -8,6 +8,7 @@ import { UiChevronDown, UiChevronRight } from "../icons";
 // chevron/spacer width and gap are not configurable. renderDetail's wrapper
 // adds this on top of the row's own paddingLeft so it lines up under the label.
 const ROW_CONTENT_OFFSET_PX = 18;
+export type TreeKey = string | number;
 
 export type TreeRowContext<T> = {
   node: T;
@@ -27,6 +28,9 @@ export type TreeNodeProps<T> = {
   depth?: number;
   expandAll?: boolean | null;
   forcedOpenKeys?: Set<string | number> | null;
+  revealPath?: Map<TreeKey, TreeKey | null> | null;
+  revealOverrides?: Map<TreeKey, boolean> | null;
+  onRevealToggle?: (key: TreeKey, open: boolean) => void;
   selected?: T | null;
   defaultOpen?: (node: T, depth: number) => boolean;
   getChildren: (node: T) => T[] | undefined;
@@ -87,6 +91,9 @@ export function TreeNode<T>({
   depth = 0,
   expandAll = null,
   forcedOpenKeys = null,
+  revealPath = null,
+  revealOverrides = null,
+  onRevealToggle,
   selected = null,
   defaultOpen,
   getChildren,
@@ -149,10 +156,13 @@ export function TreeNode<T>({
         : depth < 1;
   const [open, setOpen] = useState(initialOpen);
   const prevExpandAll = useRef(expandAll);
-  const isSelected = selected === node;
   const key = getKey(node);
+  const isSelected = selected != null && getKey(selected) === key;
   const isForcedOpen = forcedOpenKeys?.has(key) ?? false;
-  const isOpen = isForcedOpen || open;
+  const isOnRevealPath = revealPath?.has(key) ?? false;
+  const revealOverride = revealOverrides?.get(key);
+  const pathOnly = isOnRevealPath && revealOverride === undefined;
+  const isOpen = isForcedOpen || (pathOnly ? revealPath!.get(key) !== null : revealOverride ?? open);
 
   useEffect(() => {
     if (expandAll !== null && expandAll !== prevExpandAll.current && !skipExpandAll) {
@@ -203,6 +213,13 @@ export function TreeNode<T>({
 
   function toggle() {
     if (!expandable) return;
+    if (isOnRevealPath) {
+      if (!onRevealToggle) throw new Error("A revealed tree path requires onRevealToggle");
+      const next = pathOnly || !revealOverride;
+      if (next && lazyUnloaded) loadLazyChildren();
+      onRevealToggle(key, next);
+      return;
+    }
     setOpen((o) => {
       const next = !o;
       // Only fetch when transitioning into the open state, so collapsing a
@@ -236,7 +253,7 @@ export function TreeNode<T>({
         {expandable ? (
           <button
             type="button"
-            aria-label={isOpen ? "Collapse" : "Expand"}
+            aria-label={pathOnly ? "Show all children" : isOpen ? "Collapse" : "Expand"}
             // The caret only toggles expansion — stopPropagation keeps the row's
             // onClick (which selects) from firing, so expanding a node never
             // selects it.
@@ -246,7 +263,7 @@ export function TreeNode<T>({
             }}
             className="flex shrink-0 items-center text-muted-foreground"
           >
-            <Icon icon={isOpen ? UiChevronDown : UiChevronRight} className="text-xs w-3" />
+            <Icon icon={isOpen && !pathOnly ? UiChevronDown : UiChevronRight} className="text-xs w-3" />
           </button>
         ) : (
           <span className="w-3 shrink-0" aria-hidden />
@@ -274,13 +291,16 @@ export function TreeNode<T>({
       )}
       {isOpen && hasChildren && (
         <div role="group">
-          {children!.map((child) => (
+          {(pathOnly ? children!.filter((child) => getKey(child) === revealPath!.get(key)) : children!).map((child) => (
             <TreeNode
               key={getKey(child)}
               node={child}
               depth={depth + 1}
               expandAll={expandAll}
               forcedOpenKeys={forcedOpenKeys}
+              revealPath={revealPath}
+              revealOverrides={revealOverrides}
+              {...(onRevealToggle ? { onRevealToggle } : {})}
               selected={selected}
               getChildren={getChildren}
               getKey={getKey}

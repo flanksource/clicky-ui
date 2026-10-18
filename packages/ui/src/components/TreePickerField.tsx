@@ -44,8 +44,8 @@ export interface TreePickerFieldProps<T> {
   /** Highlights the selected node inside the open tree. */
   selected?: T | null;
   /**
-   * Force-opens the `selected` node's ancestors so the current value is always
-   * visible when the panel opens, however deep its branch. Requires `selected`.
+   * Initially reveals only the path to `selected` when the panel opens or the
+   * selection changes. Manual expansion and collapse then take precedence.
    */
   revealSelected?: boolean;
   /** Renders the tree's expand/collapse + filter toolbar. */
