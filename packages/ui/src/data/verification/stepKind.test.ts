@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clockTime, policySummary, readStepDetail, stepKindCopy, type StepDetail } from "./stepKind";
+import { clockTime, policySummary, readStepDetail, splitExecutionDetail, stepKindCopy, waitDecidedBy, type StepDetail } from "./stepKind";
 
 const STEP = { id: "plan", kind: "todo_prompt" };
 
@@ -137,5 +137,66 @@ describe("stepKindCopy", () => {
 
   it("is empty for a step that carries none of them", () => {
     expect(stepKindCopy(stepOf({ step: STEP }))).toEqual([]);
+  });
+});
+
+describe("wait expression and cause", () => {
+  const CAUSE = "aimock: no scenario rule matched this request\n  model: gpt-5";
+
+  it("reads the deciding expression and the multi-line cause", () => {
+    const { wait } = stepOf({ step: STEP, wait: { ...WAIT, outcome: "failed", expression: POLICY.failWhen, cause: CAUSE } });
+    expect(wait).toMatchObject({ expression: POLICY.failWhen, cause: CAUSE });
+  });
+
+  it("treats both as absent for an older payload", () => {
+    const { wait } = stepOf({ step: STEP, wait: WAIT });
+    expect(wait).not.toHaveProperty("expression");
+    expect(wait).not.toHaveProperty("cause");
+  });
+
+  it.each(["expression", "cause"])("reports a non-string %s by path", (field) => {
+    expect(readStepDetail({ step: STEP, wait: { ...WAIT, [field]: 3 } })).toEqual({
+      kind: "invalid",
+      error: `detail.wait.${field} must be a string`,
+    });
+  });
+
+  it.each([
+    { expression: POLICY.failWhen, outcome: "failed", decided: "failWhen" },
+    { expression: POLICY.until, outcome: "timeout", decided: "until" },
+    { expression: undefined, outcome: "failed", decided: "failWhen" },
+    { expression: undefined, outcome: "timeout", decided: "until" },
+    { expression: undefined, outcome: "satisfied", decided: "until" },
+  ])("names $decided as the deciding condition for $outcome with expression $expression", ({ expression, outcome, decided }) => {
+    const { wait } = stepOf({ step: STEP, wait: { ...WAIT, outcome, ...(expression ? { expression } : {}) } });
+    expect(waitDecidedBy(wait!)).toBe(decided);
+  });
+
+  it("adds the deciding expression and the cause to the brief", () => {
+    const body = stepKindCopy(stepOf({ step: STEP, wait: { ...WAIT, outcome: "failed", expression: POLICY.failWhen, cause: CAUSE } }))[0]!.body;
+    expect(body).toContain(`decided by: ${POLICY.failWhen}`);
+    expect(body).toContain(`cause: ${CAUSE}`);
+  });
+});
+
+describe("splitExecutionDetail", () => {
+  it("moves the execution node fields into the header and drops the internal key", () => {
+    expect(
+      splitExecutionDetail({
+        key: "internal", name: "watch", kind: "command", state: "passed",
+        origin: { file: "a.fixture.yaml", section_path: "s", kind: "step", row_index: 2 },
+        started_at: "2026-10-18T09:00:04Z", finished_at: "2026-10-18T09:00:08Z", duration: 4e9, error: "boom", extra: 1,
+      }),
+    ).toEqual({
+      header: {
+        kind: "command", state: "passed", file: "a.fixture.yaml", sectionPath: "s", rowIndex: 2,
+        startedAt: "2026-10-18T09:00:04Z", finishedAt: "2026-10-18T09:00:08Z", durationNs: 4e9, error: "boom",
+      },
+      rest: { extra: 1 },
+    });
+  });
+
+  it("leaves a field of the wrong type in the raw rest instead of hiding it", () => {
+    expect(splitExecutionDetail({ state: 3 })).toEqual({ header: {}, rest: { state: 3 } });
   });
 });

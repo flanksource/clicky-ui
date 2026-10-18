@@ -24,6 +24,8 @@ export {
   type TestRunnerContext,
 } from "./context";
 
+export { DetailTabSelectProvider, useSelectDetailTab } from "./detailTabContext";
+
 export {
   TestNodeAdapterRegistry,
   createTestRunnerRegistry,

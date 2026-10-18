@@ -190,6 +190,81 @@ export const TypedStepWithWait: Story = {
   },
 };
 
+const FIXTURE_ORIGIN = {
+  file: "pr/ui/testdata/todo-lifecycle/codex.fixture.yaml",
+  section_path: "todo lifecycle (codex cli, aimock)",
+  kind: "step",
+  row_index: 8,
+};
+
+/** A background step whose result has not reached the node yet: only the execution header is known. */
+export const ProgressOnlyFixtureStep: Story = {
+  render: () => {
+    const watch = {
+      name: "watch",
+      framework: "fixture",
+      passed: true,
+      detail: {
+        name: "watch",
+        kind: "command",
+        state: "passed",
+        origin: FIXTURE_ORIGIN,
+        started_at: "2026-10-18T09:00:04Z",
+        finished_at: "2026-10-18T09:00:08Z",
+        duration: 4_583_837_958,
+      },
+    };
+    return (
+      <div className="h-screen">
+        <VerificationResults report={report({ tests: [watch] })} selected={watch} onSelect={() => {}} />
+      </div>
+    );
+  },
+};
+
+/** A wait that ended on its failWhen condition: the cause leads, the deciding condition carries the outcome. */
+export const FailedWaitWithCause: Story = {
+  render: () => {
+    const failWhen = "run.state in ['failed', 'cancelled']";
+    const cause = "aimock: no scenario rule matched this request\n  model: gpt-5\n  last message: triage this todo";
+    const outputs = { run: { state: "failed", error: cause }, todo: { title: "greeting thing" } };
+    const triaged = {
+      name: "triaged",
+      framework: "fixture",
+      failed: true,
+      message: `${cause}\n(wait failWhen ${failWhen} is true)`,
+      context: { cel_expression: failWhen, cel_vars: { "run.state": "failed" } },
+      detail: {
+        step: { id: "triaged", kind: "todo" },
+        kind: "todo",
+        state: "failed",
+        origin: { ...FIXTURE_ORIGIN, row_index: 9 },
+        outputs,
+        wait: {
+          policy: {
+            until: "run.state == 'completed' && todo.title != 'greeting thing'",
+            failWhen,
+            interval: "1s",
+            backoff: { factor: 1.5, max: "5s" },
+            jitter: "20%",
+            timeout: "1m30s",
+          },
+          outcome: "failed",
+          durationMs: 19,
+          expression: failWhen,
+          cause,
+          outputs,
+        },
+      },
+    };
+    return (
+      <div className="h-screen">
+        <VerificationResults report={report({ passed: false, state: "failed", tests: [triaged] })} selected={triaged} onSelect={() => {}} />
+      </div>
+    );
+  },
+};
+
 export const Empty: Story = {
   render: () => (
     <div className="h-screen">
