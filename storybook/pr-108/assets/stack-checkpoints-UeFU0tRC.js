@@ -1,0 +1,1 @@
+function c(o,s){const n=new Map;for(const t of o)t.key===s&&n.set(t.checkpointId,[...n.get(t.checkpointId)??[],t]);return[...n].map(([t,e])=>{const[r]=e;return{checkpointId:t,takenAt:r.takenAt,reason:r.reason,transport:r.transport,failed:e.some(a=>a.error),records:e}}).sort((t,e)=>Date.parse(t.takenAt)-Date.parse(e.takenAt))}export{c as s};
