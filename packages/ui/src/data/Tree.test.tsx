@@ -238,51 +238,120 @@ describe("Tree", () => {
   });
 
   describe("revealSelected", () => {
-    // A deep collapsed tree whose leaf would be hidden under defaultOpen=false.
-    const leaf: Node = { id: "z", label: "z" };
+    const leaf: Node = { id: "z", label: "z", children: [{ id: "child", label: "child" }] };
     const makeDeepTree = (): Node[] => [
       {
         id: "r",
         label: "r",
-        children: [{ id: "x", label: "x", children: [{ id: "y", label: "y", children: [leaf] }] }],
+        children: [
+          { id: "x", label: "x", children: [{ id: "y", label: "y", children: [leaf, { id: "sibling", label: "sibling" }] }] },
+          { id: "other", label: "other" },
+        ],
       },
+      { id: "unrelated", label: "unrelated" },
     ];
 
-    it("force-opens the selected node's ancestors so a deep leaf is revealed", () => {
+    const props = {
+      getChildren: (node: Node) => node.children,
+      getKey: (node: Node) => node.id,
+      defaultOpen: () => false,
+      renderRow: ({ node }: { node: Node }) => <span>{node.label}</span>,
+      revealSelected: true,
+    };
+
+    it("shows only the selected path while retaining unrelated roots", () => {
       render(
         <Tree<Node>
+          {...props}
           roots={makeDeepTree()}
-          getChildren={(node) => node.children}
-          getKey={(node) => node.id}
           selected={leaf}
-          revealSelected
-          defaultOpen={() => false}
-          renderRow={({ node }) => <span>{node.label}</span>}
         />,
       );
 
-      // Despite defaultOpen=false, the selected leaf and its ancestors render.
       expect(screen.getByText("x")).toBeInTheDocument();
       expect(screen.getByText("y")).toBeInTheDocument();
       expect(screen.getByText("z")).toBeInTheDocument();
+      expect(screen.getByText("unrelated")).toBeInTheDocument();
+      expect(screen.queryByText("other")).toBeNull();
+      expect(screen.queryByText("sibling")).toBeNull();
+      expect(screen.queryByText("child")).toBeNull();
+      expect(screen.getByText("r").closest("[role=treeitem]")).toHaveAttribute("aria-expanded", "true");
     });
 
-    it("keeps the selected branch open when its ancestor's chevron is clicked", () => {
+    it("expands a path-only ancestor fully on first click, then collapses it", () => {
       render(
         <Tree<Node>
+          {...props}
           roots={makeDeepTree()}
-          getChildren={(node) => node.children}
-          getKey={(node) => node.id}
           selected={leaf}
-          revealSelected
-          defaultOpen={() => false}
-          renderRow={({ node }) => <span>{node.label}</span>}
         />,
       );
 
-      // The ancestor's collapse control is forced-open and cannot hide the leaf.
-      fireEvent.click(screen.getAllByRole("button", { name: "Collapse" })[0]);
+      const root = screen.getByText("r").closest("[role=treeitem]")!;
+      fireEvent.click(root.querySelector('button[aria-label="Show all children"]')!);
+      expect(screen.getByText("other")).toBeInTheDocument();
+      fireEvent.click(root.querySelector('button[aria-label="Collapse"]')!);
+      expect(screen.queryByText("z")).toBeNull();
+      expect(root).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("does not reveal again on a same-selection rerender, but reveals a new selection", () => {
+      const { rerender } = render(<Tree<Node> {...props} roots={makeDeepTree()} selected={leaf} />);
+      const root = screen.getByText("r").closest("[role=treeitem]")!;
+      fireEvent.click(root.querySelector('button[aria-label="Show all children"]')!);
+      fireEvent.click(root.querySelector('button[aria-label="Collapse"]')!);
+
+      rerender(<Tree<Node> {...props} roots={makeDeepTree()} selected={{ ...leaf }} />);
+      expect(screen.queryByText("z")).toBeNull();
+
+      rerender(<Tree<Node> {...props} roots={makeDeepTree()} selected={{ id: "sibling", label: "sibling" }} />);
+      expect(screen.getByText("sibling")).toBeInTheDocument();
+      expect(screen.queryByText("z")).toBeNull();
+    });
+
+    it("marks the selected row when its data was loaded as a different object", () => {
+      render(<Tree<Node> {...props} roots={makeDeepTree()} selected={{ ...leaf }} />);
+      expect(screen.getByText("z").closest("[role=treeitem]")).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("reveals the selected path when its branch arrives after the selection", () => {
+      const { rerender } = render(<Tree<Node> {...props} roots={[{ id: "r", label: "r" }]} selected={leaf} />);
+      expect(screen.queryByText("z")).toBeNull();
+      rerender(<Tree<Node> {...props} roots={makeDeepTree()} selected={leaf} />);
       expect(screen.getByText("z")).toBeInTheDocument();
+      expect(screen.queryByText("other")).toBeNull();
+    });
+
+    it("lets search show matching siblings without losing a manual collapse", () => {
+      render(<Tree<Node> {...props} roots={makeDeepTree()} selected={leaf} showSearch />);
+      const root = screen.getByText("r").closest("[role=treeitem]")!;
+      fireEvent.click(root.querySelector('button[aria-label="Show all children"]')!);
+      fireEvent.click(root.querySelector('button[aria-label="Collapse"]')!);
+      fireEvent.change(screen.getByLabelText("Filter tree nodes"), { target: { value: "other" } });
+      expect(screen.getByText("other")).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText("Filter tree nodes"), { target: { value: "" } });
+      expect(screen.queryByText("z")).toBeNull();
+    });
+
+    it("lets bulk controls override the selected path and reveals a new selection afterward", () => {
+      const { rerender } = render(<Tree<Node> {...props} roots={makeDeepTree()} selected={leaf} />);
+      fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
+      expect(screen.queryByText("x")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Expand all" }));
+      expect(screen.getByText("other")).toBeInTheDocument();
+      expect(screen.getByText("child")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
+      rerender(<Tree<Node> {...props} roots={makeDeepTree()} selected={{ id: "sibling", label: "sibling" }} />);
+      expect(screen.getByText("sibling")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
+      expect(screen.queryByText("sibling")).toBeNull();
+    });
+
+    it("honors a controlled bulk collapse after the selected path is shown", () => {
+      const onExpandAllChange = vi.fn();
+      const { rerender } = render(<Tree<Node> {...props} roots={makeDeepTree()} selected={leaf} expandAll={null} onExpandAllChange={onExpandAllChange} />);
+      rerender(<Tree<Node> {...props} roots={makeDeepTree()} selected={leaf} expandAll={false} onExpandAllChange={onExpandAllChange} />);
+      expect(screen.queryByText("x")).toBeNull();
     });
 
     it("does not reveal the selected node without revealSelected", () => {
