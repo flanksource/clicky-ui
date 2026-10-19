@@ -148,7 +148,7 @@ export function SegmentedControl<T extends string = string>({
                     : "border-dashed border-primary/60 text-foreground hover:bg-background/60"
                   : size === "lg"
                     ? "border-border bg-card text-muted-foreground hover:border-muted-foreground/40 hover:bg-card hover:text-foreground hover:shadow-sm"
-                    : "text-muted-foreground hover:border-border hover:bg-background/60 hover:text-foreground",
+                    : "text-foreground/80 hover:border-border hover:bg-background/60 hover:text-foreground",
               active && option.activeClassName,
             )}
           >

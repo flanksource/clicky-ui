@@ -1,6 +1,7 @@
 import type { HTMLAttributes, MouseEvent, ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Button, type ButtonProps } from "./button";
+import { Checkbox } from "./Checkbox";
 import {
   ListMenuSelectionContext,
   useListMenuSelectionContext,
@@ -107,9 +108,8 @@ export function ListMenuItem({
   const body =
     selectable && showCheckbox ? (
       <div className="flex items-start gap-2">
-        <input
-          type="checkbox"
-          className="mt-0.5 size-4 shrink-0 rounded border-input"
+        <Checkbox
+          className="mt-0.5"
           checked={rowSelected}
           aria-label={checkboxLabel}
           onClick={(event) => {
