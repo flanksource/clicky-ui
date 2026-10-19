@@ -1,4 +1,7 @@
+import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, waitFor, within } from "storybook/test";
+import { CodeDiff } from "../CodeDiff";
 import { GitChangedFilesSummary, GitCommitList, GitFileList, type GitCommitItem, type GitFileChangeItem } from "./GitChangeList";
 
 const commits: GitCommitItem[] = [
@@ -50,6 +53,115 @@ export const Commits: Story = {
       />
     </div>
   ),
+};
+
+type HistoryCommit = GitCommitItem & {
+  change: "added" | "modified" | "renamed";
+  previousPath?: string;
+  before: string;
+  after: string;
+};
+
+const history: HistoryCommit[] = [
+  {
+    sha: "9f8e7d6c5b4a39281706f5e4d3c2b1a098765432",
+    title: "Move AddRider under the Annuity plan",
+    authorName: "Dana Reviewer",
+    committedAt: "2026-10-12T09:30:00Z",
+    change: "renamed",
+    previousPath: "pr/Legacy/tr/AddRider",
+    before: "<Transaction>\n  <Rider>Basic</Rider>\n</Transaction>",
+    after: "<Transaction>\n  <Rider>Basic</Rider>\n</Transaction>",
+  },
+  {
+    sha: "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d",
+    title: "Raise the rider age limit",
+    body: "Underwriting asked for 75 instead of 70.",
+    authorName: "Alex Author",
+    committedAt: "2026-10-05T14:00:00Z",
+    change: "modified",
+    before: "<Transaction>\n  <MaxAge>70</MaxAge>\n</Transaction>",
+    after: "<Transaction>\n  <MaxAge>75</MaxAge>\n</Transaction>",
+  },
+  {
+    sha: "0f1e2d3c4b5a69788796a5b4c3d2e1f0a9b8c7d6",
+    title: "Add AddRider",
+    authorName: "Alex Author",
+    committedAt: "2026-09-28T08:15:00Z",
+    change: "added",
+    before: "",
+    after: "<Transaction>\n  <MaxAge>70</MaxAge>\n</Transaction>",
+  },
+];
+
+const CHANGE_TONE: Record<HistoryCommit["change"], string> = {
+  added: "bg-emerald-500/15 text-emerald-700",
+  modified: "bg-amber-500/15 text-amber-700",
+  renamed: "bg-sky-500/15 text-sky-700",
+};
+
+function SelectableHistory() {
+  const [selected, setSelected] = useState<string[]>([]);
+  const toggle = (commit: HistoryCommit) =>
+    setSelected((current) =>
+      current.includes(commit.sha)
+        ? current.filter((sha) => sha !== commit.sha)
+        : [...current, commit.sha].slice(-2),
+    );
+  return (
+    <div className="max-w-3xl space-y-2">
+      <p className="text-xs text-muted-foreground" data-testid="picked">
+        Picked: {selected.map((sha) => sha.slice(0, 7)).join(" → ") || "none"}
+      </p>
+      <GitCommitList
+        commits={history}
+        groupByDate={false}
+        selectedShas={selected}
+        onToggleSelect={toggle}
+        selectLabel={(commit) => `Pick ${commit.sha.slice(0, 7)} for comparison`}
+        renderBadges={(commit) => (
+          <span className={`rounded px-1.5 text-[10px] font-medium ${CHANGE_TONE[commit.change]}`}>
+            {commit.change}
+          </span>
+        )}
+        renderSubtitle={(commit) =>
+          commit.previousPath ? (
+            <div className="mt-1 font-mono text-[11px] text-muted-foreground">from {commit.previousPath}</div>
+          ) : null
+        }
+        renderExpanded={(commit) =>
+          commit.before === commit.after ? (
+            <p className="px-3 py-2 text-xs text-muted-foreground">Content unchanged; only the path moved.</p>
+          ) : (
+            <div className="px-3 py-2">
+              <CodeDiff original={commit.before} modified={commit.after} language="xml" />
+            </div>
+          )
+        }
+      />
+    </div>
+  );
+}
+
+export const SelectableWithBadgesAndCustomBody: Story = {
+  render: () => <SelectableHistory />,
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    await step("ticking two commits picks them without expanding either", async () => {
+      await userEvent.click(canvas.getByRole("checkbox", { name: "Pick 1a2b3c4 for comparison" }));
+      await userEvent.click(canvas.getByRole("checkbox", { name: "Pick 0f1e2d3 for comparison" }));
+      await expect(canvas.getByTestId("picked")).toHaveTextContent("Picked: 1a2b3c4 → 0f1e2d3");
+      await expect(canvas.queryAllByRole("button", { expanded: true })).toHaveLength(0);
+    });
+    await step("expanding a commit renders the host body instead of GitDiffPanel", async () => {
+      await userEvent.click(canvas.getByText("Raise the rider age limit"));
+      await waitFor(() =>
+        expect(canvasElement.querySelectorAll('[data-diff-line="add"]').length).toBeGreaterThan(0),
+      );
+      await expect(canvas.getByText("renamed")).toBeInTheDocument();
+      await expect(canvas.getByText("from pr/Legacy/tr/AddRider")).toBeInTheDocument();
+    });
+  },
 };
 
 export const Files: Story = {

@@ -27,6 +27,7 @@ import { SessionRowTokens } from "./SessionViewer.tokens";
 export function SessionRow({
   event,
   initialPrompt = false,
+  initialPromptSummary,
   last,
   defaultExpanded,
   showRowMetadata = false,
@@ -37,6 +38,7 @@ export function SessionRow({
 }: {
   event: SessionEvent;
   initialPrompt?: boolean;
+  initialPromptSummary?: string;
   last: boolean;
   defaultExpanded: boolean;
   showRowMetadata?: boolean;
@@ -44,14 +46,15 @@ export function SessionRow({
   showRaw?: boolean;
   renderMessageBadge?: ((event: SessionEvent) => ReactNode) | undefined;
   onPendingToolDecision?:
-  | ((decision: SessionToolDecision) => Promise<void> | void)
-  | undefined;
+    | ((decision: SessionToolDecision) => Promise<void> | void)
+    | undefined;
 }) {
   if (event.kind === "user") {
     return (
       <UserRow
         event={event}
         initialPrompt={initialPrompt}
+        {...(initialPromptSummary ? { initialPromptSummary } : {})}
         showRowMetadata={showRowMetadata}
         showRaw={showRaw}
       />
@@ -117,8 +120,8 @@ export function WaitGroupRow({
   showRaw?: boolean;
   renderMessageBadge?: ((event: SessionEvent) => ReactNode) | undefined;
   onPendingToolDecision?:
-  | ((decision: SessionToolDecision) => Promise<void> | void)
-  | undefined;
+    | ((decision: SessionToolDecision) => Promise<void> | void)
+    | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const visual = getSessionAction("Wait");
@@ -170,7 +173,9 @@ export function WaitGroupRow({
               )}
             />
           </button>
-          {showEstimatedToolCost && !open && <EstimatedToolCost events={group.events} />}
+          {showEstimatedToolCost && !open && (
+            <EstimatedToolCost events={group.events} />
+          )}
         </div>
         {showRowMetadata && (
           <EventMetadata
@@ -195,7 +200,9 @@ export function WaitGroupRow({
             ))}
           </ol>
         )}
-        {open && showEstimatedToolCost && <EstimatedToolCost events={group.events} detailed />}
+        {open && showEstimatedToolCost && (
+          <EstimatedToolCost events={group.events} detailed />
+        )}
       </div>
     </li>
   );
@@ -204,27 +211,64 @@ export function WaitGroupRow({
 function UserRow({
   event,
   initialPrompt,
+  initialPromptSummary,
   showRowMetadata,
   showRaw,
 }: {
   event: SessionEvent;
   initialPrompt: boolean;
+  initialPromptSummary?: string;
   showRowMetadata: boolean;
   showRaw: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const collapsed = initialPrompt && initialPromptSummary && !expanded;
   return (
     <li
       data-event-kind="user"
       className="relative flex justify-end pb-density-4 last:pb-0"
     >
-      <div className={cn("flex max-w-full items-start gap-density-2 @min-[48rem]/session-viewer:gap-density-3", !initialPrompt && "@min-[48rem]/session-viewer:max-w-[85%]")}>
+      <div
+        className={cn(
+          "flex max-w-full items-start gap-density-2 @min-[48rem]/session-viewer:gap-density-3",
+          !initialPrompt && "@min-[48rem]/session-viewer:max-w-[85%]",
+        )}
+      >
         <div className="min-w-0">
           <div className="mb-0.5 text-right text-xs font-medium text-muted-foreground">
             {initialPrompt ? "Initial prompt" : "You"}
           </div>
-          <div className="min-w-0 break-words rounded-lg bg-accent px-density-3 py-density-2 text-left text-sm leading-relaxed text-accent-foreground">
-            {event.file ? <MessageFilePart part={event.file} /> : event.text && <Markdown text={event.text} />}
-          </div>
+          {initialPrompt && initialPromptSummary ? (
+            <button
+              type="button"
+              aria-label={`Initial prompt · ${initialPromptSummary}`}
+              aria-expanded={expanded}
+              onClick={() => setExpanded((open) => !open)}
+              className="min-w-0 max-w-full break-words rounded-lg bg-accent px-density-3 py-density-2 text-left text-sm leading-relaxed text-accent-foreground hover:bg-accent/80"
+            >
+              <span className="flex items-start gap-2">
+                <span className="min-w-0 flex-1 font-medium">
+                  {initialPromptSummary}
+                </span>
+                <Icon
+                  icon={UiChevronDown}
+                  className={cn(
+                    "mt-0.5 size-3.5 shrink-0 transition-transform",
+                    expanded && "rotate-180",
+                  )}
+                />
+              </span>
+            </button>
+          ) : null}
+          {!collapsed && (
+            <div className="min-w-0 break-words rounded-lg bg-accent px-density-3 py-density-2 text-left text-sm leading-relaxed text-accent-foreground">
+              {event.file ? (
+                <MessageFilePart part={event.file} />
+              ) : (
+                event.text && <Markdown text={event.text} />
+              )}
+            </div>
+          )}
           {showRowMetadata && <EventMetadata event={event} align="right" />}
           <SessionRowTokens event={event} />
           {showRaw && event.raw !== undefined && (
@@ -327,8 +371,8 @@ function EventBody({
   showEstimatedToolCost: boolean;
   messageBadge?: ReactNode;
   onPendingToolDecision?:
-  | ((decision: SessionToolDecision) => Promise<void> | void)
-  | undefined;
+    | ((decision: SessionToolDecision) => Promise<void> | void)
+    | undefined;
 }) {
   if (event.kind === "tool")
     return (
