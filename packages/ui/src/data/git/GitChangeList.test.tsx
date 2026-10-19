@@ -67,6 +67,84 @@ describe("GitCommitList", () => {
   });
 });
 
+describe("GitCommitList slots", () => {
+  type HistoryCommit = GitCommitItem & { change: "added" | "renamed" };
+  const HISTORY: HistoryCommit[] = [
+    { ...COMMITS[0]!, change: "renamed" },
+    { ...COMMITS[1]!, change: "added" },
+  ];
+  const [renamed, added] = HISTORY as [HistoryCommit, HistoryCommit];
+  const shortOf = (commit: GitCommitItem) => commit.sha.slice(0, 7);
+
+  it("renders no checkboxes without onToggleSelect", () => {
+    render(<GitCommitList commits={HISTORY} groupByDate={false} />);
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+  });
+
+  it("checks the commits named by selectedShas and reports toggles without expanding", () => {
+    const onToggleSelect = vi.fn();
+    const loadDiff = vi.fn().mockResolvedValue({ diff: "" });
+    render(
+      <GitCommitList
+        commits={HISTORY}
+        groupByDate={false}
+        loadDiff={loadDiff}
+        selectedShas={[added.sha]}
+        onToggleSelect={onToggleSelect}
+      />,
+    );
+
+    const boxes = screen.getAllByRole("checkbox");
+    expect(boxes.map((box) => [box.getAttribute("aria-label"), (box as HTMLInputElement).checked])).toEqual([
+      [`Select commit ${shortOf(renamed)}`, false],
+      [`Select commit ${shortOf(added)}`, true],
+    ]);
+    expect(document.querySelector(`[data-commit="${added.sha}"]`)).toHaveAttribute("data-selected", "true");
+
+    fireEvent.click(boxes[0]!);
+    expect(onToggleSelect).toHaveBeenCalledExactlyOnceWith(renamed);
+    expect(loadDiff).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("button", { expanded: false })).toHaveLength(HISTORY.length);
+  });
+
+  it("names each checkbox with selectLabel when given", () => {
+    render(
+      <GitCommitList
+        commits={[renamed]}
+        groupByDate={false}
+        onToggleSelect={() => {}}
+        selectLabel={(commit) => `Pick ${commit.change} ${shortOf(commit)}`}
+      />,
+    );
+    expect(screen.getByRole("checkbox", { name: `Pick renamed ${shortOf(renamed)}` })).toBeInTheDocument();
+  });
+
+  it("renders badges beside each title and a subtitle under it, typed by the commit item", () => {
+    render(
+      <GitCommitList
+        commits={HISTORY}
+        groupByDate={false}
+        renderBadges={(commit) => <span data-testid="badge">{commit.change}</span>}
+        renderSubtitle={(commit) => (commit.change === "renamed" ? <span>moved across plans</span> : null)}
+      />,
+    );
+    expect(screen.getAllByTestId("badge").map((badge) => badge.textContent)).toEqual(["renamed", "added"]);
+    expect(screen.getAllByText("moved across plans")).toHaveLength(1);
+  });
+
+  it("renders renderExpanded in place of the diff panel, only once a row is expanded", () => {
+    const renderExpanded = vi.fn((commit: HistoryCommit) => <div>custom body {commit.change}</div>);
+    render(<GitCommitList commits={[renamed]} groupByDate={false} renderExpanded={renderExpanded} />);
+    expect(renderExpanded).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { expanded: false }));
+
+    expect(screen.getByText("custom body renamed")).toBeInTheDocument();
+    expect(screen.queryByText("No text diff available")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { expanded: true })).toBeInTheDocument();
+  });
+});
+
 describe("GitFileList", () => {
   it("loads a file diff when a file row is expanded", async () => {
     const loadDiff = vi.fn().mockResolvedValue({

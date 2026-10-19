@@ -65,7 +65,7 @@ describe("fixture execution header", () => {
     const header = within(query("[data-execution-header]")!);
     const file = header.getByText("codex.fixture.yaml");
     expect(file).toHaveAttribute("title", ORIGIN.file);
-    expect(header.getByText("step #9 · todo lifecycle (codex cli, aimock)")).toBeInTheDocument();
+    expect(header.getByText("step #8 · todo lifecycle (codex cli, aimock)")).toBeInTheDocument();
     expect(header.getByText("command")).toBeInTheDocument();
     expect(header.getByText("passed")).toBeInTheDocument();
     expect(header.getByText("09:00:04 → 09:00:08")).toBeInTheDocument();
