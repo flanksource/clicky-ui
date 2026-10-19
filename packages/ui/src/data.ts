@@ -209,7 +209,13 @@ export {
   type LogsTableRow,
 } from "./data/LogsTable";
 export { normalizeLogsTableRows } from "./data/logs-normalize";
-export { MatrixTable, type MatrixTableProps, type MatrixTableRow } from "./data/MatrixTable";
+export {
+  MatrixTable,
+  type MatrixTableColumn,
+  type MatrixTableGroupRow,
+  type MatrixTableProps,
+  type MatrixTableRow,
+} from "./data/MatrixTable";
 export { Callout, type CalloutProps } from "./data/Callout";
 export {
   assertCalloutValue,

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Slot } from "@radix-ui/react-slot";
 import {
   autoUpdate,
   flip,
@@ -68,7 +69,7 @@ export type DropdownMenuProps = {
   variant?: ButtonProps["variant"];
   /** Size forwarded to the default Button trigger. */
   size?: ButtonProps["size"];
-  /** Fully custom trigger. Receives no props; the menu wraps it with open state. */
+  /** Custom trigger element. Its root receives menu state and interaction props. */
   trigger?: ReactNode;
   /** Declarative menu items. Provide this or `children`, not both. */
   items?: DropdownMenuItem[];
@@ -192,7 +193,7 @@ function DropdownMenuRoot({
     <FloatingNode id={nodeId}>
       <div className={cn("relative inline-flex", className)}>
         {trigger ? (
-          <span
+          <Slot
             ref={refs.setReference}
             className="inline-flex"
             aria-haspopup="menu"
@@ -200,7 +201,7 @@ function DropdownMenuRoot({
             {...getReferenceProps()}
           >
             {trigger}
-          </span>
+          </Slot>
         ) : (
           <Button
             ref={refs.setReference as React.Ref<HTMLButtonElement>}

@@ -148,7 +148,11 @@ describe("DropdownMenu", () => {
         items={[{ label: "Profile", onSelect }]}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "menu" }));
+    const trigger = screen.getByRole("button", { name: "menu" });
+    expect(trigger).toHaveAttribute("aria-haspopup", "menu");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(screen.getByRole("menuitem", { name: "Profile" }));
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
