@@ -79,6 +79,65 @@ export const FailingWithCel: Story = {
   ),
 };
 
+/** A failed YAML step and a failed markdown block, each with the source lines gavel attaches as `detail.source`. */
+export const FailedStepWithSource: Story = {
+  render: () => (
+    <div className="h-screen">
+      <VerificationResults
+        report={report({
+          passed: false,
+          state: "failed",
+          reason: "2 of 3 checks failed",
+          tests: [
+            { name: "build", framework: "exec", passed: true, duration: 2_400_000_000 },
+            {
+              name: "render us-f5472",
+              framework: "exec",
+              failed: true,
+              duration: 9_300_000_000,
+              message: "expected exit code 0, got 1",
+              stderr: "render failed: CALC_RATE target must be numeric\n",
+              context: { command: "./xero-cli templates render us-f5472 --entity us", cwd: "/src/xero-cli", exit_code: 1 },
+              detail: {
+                step: { id: "us-f5472", kind: "exec" },
+                source: {
+                  file: "pkg/provider/demo/testdata/template-render.fixture.yaml",
+                  line: 123,
+                  end_line: 126,
+                  language: "yaml",
+                  text: [
+                    "  - id: us-f5472",
+                    "    kind: exec",
+                    "    exec: ./xero-cli",
+                    "    args: [templates, render, us-f5472, --entity, us]",
+                  ].join("\n"),
+                },
+              },
+            },
+            {
+              name: "markdown broken",
+              framework: "exec",
+              failed: true,
+              duration: 10_000_000,
+              message: "expected exit code 0, got 3",
+              context: { command: "bash -c 'exit 3'", exit_code: 3 },
+              detail: {
+                source: {
+                  file: "docs/checks.md",
+                  line: 6,
+                  end_line: 11,
+                  language: "markdown",
+                  text: "## command: markdown broken\n\n```bash\necho boom >&2\nexit 3\n```",
+                },
+              },
+            },
+          ],
+        })}
+      />
+    </div>
+  ),
+};
+
 export const RunningWithProgress: Story = {
   render: () => (
     <div className="h-screen">

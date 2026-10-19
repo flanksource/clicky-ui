@@ -88,6 +88,38 @@ describe("verificationAdapters: copy brief", () => {
     );
   });
 
+  it("failed step with source: its YAML follows the command, titled by file and line range", () => {
+    const node: Test = {
+      ...migrateExec,
+      stderr: undefined,
+      detail: { source: { file: "db.fixture.yaml", line: 4, end_line: 5, language: "yaml", text: "  - id: migrate\n    kind: exec" } },
+    };
+    expect(briefFor(node)).toEqual(
+      [
+        "# migrations apply cleanly",
+        "",
+        "- **Result:** failed",
+        "- **Tool:** exec",
+        "- **Duration:** 3.0s",
+        "",
+        "## Command",
+        "",
+        "```sh",
+        "$ gavel db migrate --dry-run",
+        "cwd: /src/todos",
+        "exit: 2",
+        "```",
+        "",
+        "## Source db.fixture.yaml:4-5",
+        "",
+        "```yaml",
+        "  - id: migrate",
+        "    kind: exec",
+        "```",
+      ].join("\n"),
+    );
+  });
+
   it("CEL query: the expression, its trace, its variables as JSON, and expected/actual", () => {
     const pendingQuery: Test = {
       name: "no plan is left without a revision",

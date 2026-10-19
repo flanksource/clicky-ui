@@ -7,7 +7,9 @@ import type { ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/button";
 import { Badge, type BadgeTone } from "../Badge";
+import { CodeBlock } from "../CodeBlock";
 import { JsonView } from "../JsonView";
+import type { StepSourceResult } from "./stepSource";
 import { formatTestDuration, useSelectDetailTab } from "../test-runner";
 import {
   clockTime,
@@ -109,7 +111,8 @@ function basename(path: string): string {
 }
 
 function stepPosition({ rowIndex, line }: ExecutionHeader): string | undefined {
-  if (rowIndex !== undefined) return `step #${rowIndex + 1}`;
+  // gavel numbers steps and table rows from 1.
+  if (rowIndex !== undefined) return `step #${rowIndex}`;
   return line !== undefined ? `line ${line}` : undefined;
 }
 
@@ -236,10 +239,44 @@ export function StepOutputs({ outputs }: { outputs: unknown }) {
 }
 
 /** Shown in place of the sections when `detail.step` is present but breaks the contract. */
-export function MalformedStepDetail({ error }: { error: string }) {
+// ── Source ──────────────────────────────────────────────────────────────────
+
+/** The YAML or markdown lines a failed step was written as, under its file and line range. */
+export function StepSourceSection({ result }: { result: StepSourceResult }) {
+  if (result.kind === "none") return null;
+  if (result.kind === "invalid") {
+    return (
+      <div data-step-source="">
+        <Section name="source" title="Source">
+          <MalformedNotice>Malformed source detail: {result.error}</MalformedNotice>
+        </Section>
+      </div>
+    );
+  }
+  const { source } = result;
+  const location = <span className="font-mono text-[11px] text-muted-foreground" title={source.file}>{basename(source.file)}:{source.line}-{source.endLine}</span>;
   return (
-    <div role="alert" className="rounded border border-red-500/60 bg-red-500/10 px-2 py-1 text-xs text-red-700 dark:text-red-400">
-      Malformed step detail: {error}
+    <div data-step-source="">
+      <Section name="source" title="Source" aside={location}>
+        {source.error ? (
+          <div className={cn("rounded border px-2 py-1 text-xs", ALERT_ROW)}>Source unavailable: {source.error}</div>
+        ) : (
+          <CodeBlock language={source.language} source={source.text ?? ""} copyable />
+        )}
+        {source.moreLines ? <div className="text-[11px] text-muted-foreground">… {source.moreLines} more lines</div> : null}
+      </Section>
     </div>
   );
+}
+
+function MalformedNotice({ children }: { children: ReactNode }) {
+  return (
+    <div role="alert" className="rounded border border-red-500/60 bg-red-500/10 px-2 py-1 text-xs text-red-700 dark:text-red-400">
+      {children}
+    </div>
+  );
+}
+
+export function MalformedStepDetail({ error }: { error: string }) {
+  return <MalformedNotice>Malformed step detail: {error}</MalformedNotice>;
 }

@@ -10,6 +10,7 @@ import { StepOutputs } from "./stepKindViews";
 import { verifyNodeTest } from "./verifyReportTests";
 import { UiTerminal } from "../../icons";
 import { hasStepDetail, readStepDetail, stepKindCopy, type WaitDetail } from "./stepKind";
+import { readStepSource, stepSourceCopy } from "./stepSource";
 import {
   createTestRunnerRegistry,
   outcomeFor,
@@ -154,10 +155,12 @@ function fixtureCopy(node: Test): CopySections {
   const context = node.context as FixtureContext | undefined;
   const command = context?.command ?? node.command;
   const stepDetail = readStepDetail(node.detail);
+  const source = readStepSource(node.detail);
   return {
     brief: [
       ...commandSection(node, context),
       ...assertionSection(node, context),
+      ...(source.kind === "source" ? stepSourceCopy(source.source) : []),
       ...(stepDetail.kind === "step" ? stepKindCopy(stepDetail.step) : []),
       ...resultsSection(node),
     ],

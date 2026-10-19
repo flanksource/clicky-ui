@@ -7,7 +7,8 @@
 import type { ReactNode } from "react";
 import { JsonView } from "../JsonView";
 import { readStepDetail, splitExecutionDetail, waitDecidedBy, type WaitDetail } from "./stepKind";
-import { ExecutionHeaderView, FailureCallout, MalformedStepDetail, StepKindSections } from "./stepKindViews";
+import { ExecutionHeaderView, FailureCallout, MalformedStepDetail, StepKindSections, StepSourceSection } from "./stepKindViews";
+import { readStepSource, withoutSource } from "./stepSource";
 import {
   Expectation,
   OutcomeIcon,
@@ -128,7 +129,7 @@ export function FixtureDetail({ node, renderWait }: { node: Test; renderWait?: (
   const stepDetail = readStepDetail(node.detail);
   const { header, rest } = splitExecutionDetail(node.detail);
   // A typed step shows its own sections, so the raw block keeps only what they don't cover.
-  const rawDetail = stepDetail.kind === "step" ? splitExecutionDetail(stepDetail.step.rest).rest : rest;
+  const rawDetail = withoutSource(stepDetail.kind === "step" ? splitExecutionDetail(stepDetail.step.rest).rest : rest);
   return (
     <div className="space-y-4 p-density-4">
       <ExecutionHeaderView header={header} {...(stepDetail.kind === "step" ? { stepKind: stepDetail.step.step.kind } : {})} />
@@ -151,6 +152,7 @@ export function FixtureDetail({ node, renderWait }: { node: Test; renderWait?: (
       )}
       <TestOutput node={node} />
       <CelDetails node={node} />
+      <StepSourceSection result={readStepSource(node.detail)} />
       {stepDetail.kind === "step" && <StepKindSections step={stepDetail.step} {...(renderWait ? { renderWait } : {})} />}
       {stepDetail.kind === "invalid" && <MalformedStepDetail error={stepDetail.error} />}
       {rawDetail != null && (
