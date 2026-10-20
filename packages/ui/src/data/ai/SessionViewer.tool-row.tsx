@@ -50,10 +50,21 @@ export function ToolBody({
     event.cwd,
   );
   const command = shellCommand(event.tool ?? "", event.toolInput);
-  const [open, setOpen] = useState(defaultExpanded);
-  const cost = showEstimatedToolCost ? <EstimatedToolCost events={[event]} /> : null;
-  const costFooter = showEstimatedToolCost ? <EstimatedToolCost events={[event]} detailed /> : null;
-  const hasDetail = event.toolResponse !== undefined || (command === undefined && event.toolInput !== undefined) || (showEstimatedToolCost && event.estimatedCost !== undefined);
+  const needsImmediateAttention =
+    event.tool === "AskUserQuestion" ||
+    event.approvalKind === "question" ||
+    (event.pending === true && hasApprovalBody(event.approvalRequest));
+  const [open, setOpen] = useState(defaultExpanded || needsImmediateAttention);
+  const cost = showEstimatedToolCost ? (
+    <EstimatedToolCost events={[event]} />
+  ) : null;
+  const costFooter = showEstimatedToolCost ? (
+    <EstimatedToolCost events={[event]} detailed />
+  ) : null;
+  const hasDetail =
+    event.toolResponse !== undefined ||
+    (command === undefined && event.toolInput !== undefined) ||
+    (showEstimatedToolCost && event.estimatedCost !== undefined);
 
   if (event.tool === "AskUserQuestion" || event.approvalKind === "question") {
     return (
@@ -63,6 +74,8 @@ export function ToolBody({
         onDecision={onPendingToolDecision}
         cost={cost}
         costFooter={costFooter}
+        open={open}
+        onToggle={() => setOpen((value) => !value)}
       />
     );
   }
@@ -71,18 +84,37 @@ export function ToolBody({
     return (
       <div className="not-prose">
         <div data-tool-header className="flex items-center gap-1.5">
-          <span className="shrink-0 font-medium text-foreground">
-            {visual.label}
-          </span>
-          <ApprovalBadge event={event} />
-          <span className="ml-auto">{cost}</span>
+          <button
+            type="button"
+            aria-label="Toggle approval details"
+            aria-expanded={open}
+            onClick={() => setOpen((value) => !value)}
+            className="flex min-w-0 flex-1 items-center gap-1.5 text-left hover:text-foreground"
+          >
+            <span className="shrink-0 font-medium text-foreground">
+              {visual.label}
+            </span>
+            <ApprovalBadge event={event} />
+            <span className="ml-auto">{cost}</span>
+            <Icon
+              icon={UiChevronDown}
+              className={cn(
+                "size-3 shrink-0 text-muted-foreground transition-transform",
+                open && "rotate-180",
+              )}
+            />
+          </button>
         </div>
-        <TypedApprovalBody
-          event={event}
-          request={event.approvalRequest}
-          onDecision={onPendingToolDecision}
-        />
-        {costFooter}
+        {open && (
+          <>
+            <TypedApprovalBody
+              event={event}
+              request={event.approvalRequest}
+              onDecision={onPendingToolDecision}
+            />
+            {costFooter}
+          </>
+        )}
       </div>
     );
   }
@@ -90,33 +122,49 @@ export function ToolBody({
   if (command !== undefined) {
     return (
       <div className="not-prose">
-        <div data-tool-header className="flex items-start gap-1.5">
+        <div
+          data-tool-header
+          role={hasDetail ? "button" : undefined}
+          tabIndex={hasDetail ? 0 : undefined}
+          aria-expanded={hasDetail ? open : undefined}
+          aria-label={hasDetail ? "Toggle response" : undefined}
+          onClick={hasDetail ? () => setOpen((value) => !value) : undefined}
+          onKeyDown={
+            hasDetail
+              ? (keyEvent) => {
+                  if (keyEvent.key === "Enter" || keyEvent.key === " ") {
+                    keyEvent.preventDefault();
+                    setOpen((value) => !value);
+                  }
+                }
+              : undefined
+          }
+          className={cn(
+            "flex items-start gap-1.5",
+            hasDetail &&
+              "cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          )}
+        >
           <div className="min-w-0 flex-1">
             <CodeBlock bare language="bash" source={command} />
           </div>
           <ApprovalBadge event={event} />
           {cost}
           {hasDetail && (
-            <button
-              type="button"
-              aria-expanded={open}
-              aria-label="Toggle response"
-              onClick={() => setOpen((value) => !value)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <Icon
-                icon={UiChevronDown}
-                className={cn(
-                  "size-3 shrink-0 transition-transform",
-                  open && "rotate-180",
-                )}
-              />
-            </button>
+            <Icon
+              icon={UiChevronDown}
+              className={cn(
+                "size-3 shrink-0 text-muted-foreground transition-transform",
+                open && "rotate-180",
+              )}
+            />
           )}
         </div>
         {open && hasDetail && (
           <div className="mt-1.5">
-            {event.toolResponse !== undefined && <ResponseBlock response={event.toolResponse} />}
+            {event.toolResponse !== undefined && (
+              <ResponseBlock response={event.toolResponse} />
+            )}
             {costFooter}
           </div>
         )}
@@ -183,7 +231,9 @@ export function ToolBody({
             />
           </button>
         ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-1.5">{header}</div>
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+            {header}
+          </div>
         )}
         {cost}
       </div>
@@ -223,11 +273,15 @@ function QuestionToolBody({
   onDecision,
   cost,
   costFooter,
+  open,
+  onToggle,
 }: {
   event: SessionEvent;
   visual: { label: string };
   cost: ReactNode;
   costFooter: ReactNode;
+  open: boolean;
+  onToggle: () => void;
   onDecision?:
     | ((decision: SessionToolDecision) => Promise<void> | void)
     | undefined;
@@ -245,50 +299,67 @@ function QuestionToolBody({
   return (
     <div className="not-prose">
       <div data-tool-header className="flex items-center gap-1.5">
-        <span className="shrink-0 font-medium text-foreground">
-          {visual.label}
-        </span>
-        <ApprovalBadge event={event} />
-        {summary && questions.length !== 1 && (
-          <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-            {summary}
+        <button
+          type="button"
+          aria-label="Toggle question details"
+          aria-expanded={open}
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-left hover:text-foreground"
+        >
+          <span className="shrink-0 font-medium text-foreground">
+            {visual.label}
           </span>
-        )}
-        <span className="ml-auto">{cost}</span>
+          <ApprovalBadge event={event} />
+          {summary && questions.length !== 1 && (
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+              {summary}
+            </span>
+          )}
+          <span className="ml-auto">{cost}</span>
+          <Icon
+            icon={UiChevronDown}
+            className={cn(
+              "size-3 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-180",
+            )}
+          />
+        </button>
       </div>
-      <div className="mt-1.5 space-y-1.5">
-        {questions.length > 0 ? (
-          questions.map((question, index) => (
-            <QuestionCard
-              key={`${question.id}-${index}`}
-              question={question}
-              index={index}
+      {open && (
+        <div className="mt-1.5 space-y-1.5">
+          {questions.length > 0 ? (
+            questions.map((question, index) => (
+              <QuestionCard
+                key={`${question.id}-${index}`}
+                question={question}
+                index={index}
+              />
+            ))
+          ) : event.toolInput ? (
+            <DetailBlock
+              language="json"
+              source={JSON.stringify(event.toolInput, null, 2)}
             />
-          ))
-        ) : event.toolInput ? (
-          <DetailBlock
-            language="json"
-            source={JSON.stringify(event.toolInput, null, 2)}
-          />
-        ) : null}
-        {event.toolResponse !== undefined && (
-          <div className="space-y-1">
-            <div className="text-[11px] font-medium uppercase text-muted-foreground">
-              Answer
+          ) : null}
+          {event.toolResponse !== undefined && (
+            <div className="space-y-1">
+              <div className="text-[11px] font-medium uppercase text-muted-foreground">
+                Answer
+              </div>
+              <ResponseBlock response={event.toolResponse} />
             </div>
-            <ResponseBlock response={event.toolResponse} />
-          </div>
-        )}
-        {event.pending && onDecision && (
-          <QuestionDecisionControls
-            event={event}
-            request={event.approvalRequest}
-            questions={questions}
-            onDecision={onDecision}
-          />
-        )}
-        {costFooter}
-      </div>
+          )}
+          {event.pending && onDecision && (
+            <QuestionDecisionControls
+              event={event}
+              request={event.approvalRequest}
+              questions={questions}
+              onDecision={onDecision}
+            />
+          )}
+          {costFooter}
+        </div>
+      )}
     </div>
   );
 }
