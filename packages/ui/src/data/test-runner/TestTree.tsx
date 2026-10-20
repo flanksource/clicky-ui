@@ -3,7 +3,7 @@ import { Tree } from "../Tree";
 import { cn } from "../../lib/utils";
 import type { Test } from "./types";
 import { useTestRunner } from "./context";
-import { hasFailed } from "./status";
+import { hasFailed, testStatus } from "./status";
 import { TestTreeNode } from "./TestTreeNode";
 
 const nodeKey = (() => {
@@ -46,6 +46,11 @@ export function TestTree({ className, actions }: { className?: string; actions?:
       searchLabel="Filter tests"
       getSearchText={(node) => `${node.name} ${node.framework ?? ""}`}
       renderRow={({ node, selected }) => <TestTreeNode node={node} selected={selected} />}
+      rowClass={(node, selected) => cn(
+        "hover:bg-accent",
+        testStatus(node) === "running" && "border-l-2 border-primary bg-primary/10 font-semibold hover:bg-primary/15",
+        selected && "border-l-2 border-primary bg-primary/20",
+      )}
       actions={actions}
     />
   );

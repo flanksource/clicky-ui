@@ -147,4 +147,27 @@ describe("FrameSourceWindow", () => {
     await waitFor(() => expect(mockHighlight).toHaveBeenCalled());
     expect(mockHighlight.mock.calls[0]?.[1]).toEqual({ lang: "go" });
   });
+
+  // A caller's source can make several calls worth pointing at, not one failing
+  // line: each marked line carries its annotation and the neutral highlight,
+  // and unmarked lines carry neither.
+  it("annotates each marked line and leaves the others plain", async () => {
+    const { container } = render(
+      <FrameSourceWindow
+        frame={{ sourceLines: ["<Math>", '<CallRule RULE="A"/>', "<Spacer/>", '<CallRule RULE="B"/>'], sourceStartLine: 10 }}
+        markers={[
+          { line: 11, content: <span>calls A</span> },
+          { line: 13, content: <span>calls B</span> },
+        ]}
+      />,
+    );
+    await waitFor(() => expect(mockHighlight).toHaveBeenCalled());
+    const rows = [...container.querySelectorAll("[data-source-line]")];
+    expect(rows.map((row) => [row.getAttribute("data-source-line"), row.getAttribute("data-marked"), row.querySelector("[data-source-marker]")?.textContent ?? null])).toEqual([
+      ["10", null, null],
+      ["11", "true", "calls A"],
+      ["12", null, null],
+      ["13", "true", "calls B"],
+    ]);
+  });
 });

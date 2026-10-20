@@ -96,6 +96,8 @@ type GitCommitListBaseProps<T extends GitCommitItem> = {
   onToggleSelect?: (commit: T) => void;
   /** Accessible name of a commit's checkbox. Defaults to `Select commit <short sha>`. */
   selectLabel?: (commit: T) => string;
+  /** Why a commit cannot be selected; its checkbox is then disabled with the reason as its tooltip. */
+  selectBlockReason?: (commit: T) => string | null | undefined;
   /** Inline badges rendered after the commit title. */
   renderBadges?: (commit: T) => ReactNode;
   /** An extra line rendered between the title and the author/time line. */
@@ -290,6 +292,7 @@ type CommitRowSlots<T extends GitCommitItem> = {
   renderSubtitle: ((commit: T) => ReactNode) | undefined;
   onToggleSelect: ((commit: T) => void) | undefined;
   selectLabel: ((commit: T) => string) | undefined;
+  selectBlockReason: ((commit: T) => string | null | undefined) | undefined;
   diffMaxHeightClassName: string | undefined;
 };
 
@@ -307,6 +310,7 @@ function CommitRow<T extends GitCommitItem>({
   const author = displayAuthor(commit);
   const canExpand = Boolean(loadDiff || renderExpanded || commit.body);
   const selectable = onToggleSelect !== undefined;
+  const selectBlocked = selectable ? slots.selectBlockReason?.(commit) || undefined : undefined;
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (!canExpand || !isActivationKey(event)) return;
@@ -322,9 +326,10 @@ function CommitRow<T extends GitCommitItem>({
     >
       <div className={cn("flex items-start transition-colors", canExpand && "hover:bg-muted/70")}>
         {selectable && (
-          <span className="flex shrink-0 pl-3 pt-3.5">
+          <span className="flex shrink-0 pl-3 pt-3.5" title={selectBlocked}>
             <Checkbox
               checked={selected}
+              disabled={Boolean(selectBlocked)}
               onChange={() => onToggleSelect(commit)}
               aria-label={slots.selectLabel ? slots.selectLabel(commit) : `Select commit ${shortSha(commit)}`}
             />
@@ -441,6 +446,7 @@ export function GitCommitList<T extends GitCommitItem = GitCommitItem>(
     renderSubtitle: props.renderSubtitle,
     onToggleSelect: props.onToggleSelect,
     selectLabel: props.selectLabel,
+    selectBlockReason: props.selectBlockReason,
     diffMaxHeightClassName: props.diffMaxHeightClassName,
   };
 

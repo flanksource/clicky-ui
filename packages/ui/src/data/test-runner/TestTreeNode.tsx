@@ -64,9 +64,8 @@ export function TestTreeNode({ node, selected }: { node: Test; selected: boolean
   const dur = node.duration || (hasChildren ? totalDuration(node) : 0);
   const canRerun = !!runner.onRerun && node.framework !== "task";
   const canStop = !!runner.onStop && !!node.can_stop && !!node.task_id;
-  // A verdict line under the name for rows that need explaining; green,
-  // running, and queued rows stay single-line.
-  const message = status && MESSAGE_STATUSES.has(status) ? (node.message ?? "").trim() : "";
+  const showMessage = status && (MESSAGE_STATUSES.has(status) || (node.framework === "task" && (status === "running" || status === "pending")));
+  const message = showMessage ? (node.message ?? "").trim() : "";
 
   return (
     <>

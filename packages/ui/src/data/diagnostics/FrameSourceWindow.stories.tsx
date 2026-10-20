@@ -50,3 +50,23 @@ export const ExplicitLineNumbers: Story = {
     },
   },
 };
+
+/** The calls a caller's source makes, each line marked and annotated, with no failing focal line. */
+export const Markers: Story = {
+  args: {
+    frame: {
+      sourceStartLine: 86,
+      sourceLanguage: "xml",
+      sourceLines: [
+        '<MathIF IF="MemberCountMV > 0">',
+        '  <MathVariable VARIABLENAME="ValidMV" TYPE="CALLRULE">ValidateExpressions</MathVariable>',
+        "</MathIF>",
+        '<MathVariable VARIABLENAME="PacketMV" TYPE="CALLRULE">TransactionBusinessRulePacket</MathVariable>',
+      ],
+    },
+    markers: [
+      { line: 87, content: <span className="rounded bg-red-500/10 px-1 text-red-700">calls ValidateExpressions · removed</span> },
+      { line: 89, content: <span className="rounded bg-muted px-1">calls TransactionBusinessRulePacket</span> },
+    ],
+  },
+};
