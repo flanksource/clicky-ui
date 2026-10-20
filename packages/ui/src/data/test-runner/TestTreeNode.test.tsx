@@ -41,6 +41,10 @@ describe("TestTreeNode count badges", () => {
 });
 
 describe("TestTreeNode message line", () => {
+  it.each([{ pending: true }, { running: true }])("shows preparation messages for an active task %o", (flags) => {
+    renderRow({ name: "Resolve schemas", framework: "task", message: "Waiting for Connect database", ...flags } as Test);
+    expect(screen.getByText("Waiting for Connect database")).toBeTruthy();
+  });
   it("renders a failed node's message under its name with the full text as the title", () => {
     renderRow({ name: "trace", failed: true, message: ROOT_CAUSE } as Test);
     const line = screen.getByText(ROOT_CAUSE);
