@@ -164,6 +164,40 @@ export const SelectableWithBadgesAndCustomBody: Story = {
   },
 };
 
+type PickCommit = GitCommitItem & { merge?: boolean };
+
+const picks: PickCommit[] = [
+  { sha: "1111111111111111111111111111111111111111", title: "ValidateBillGroup: reject empty groups", authorName: "Thandi", committedAt: "2026-10-17T08:00:00Z", changedFiles: 1 },
+  { sha: "2222222222222222222222222222222222222222", title: "Merge feature/dates", authorName: "bot", committedAt: "2026-10-17T09:00:00Z", merge: true },
+  { sha: "3333333333333333333333333333333333333333", title: "GroupLifeCover: default start", authorName: "Sipho", committedAt: "2026-10-17T10:00:00Z", changedFiles: 1 },
+];
+
+function PickableWithBlocked() {
+  const [selected, setSelected] = useState<string[]>([]);
+  return (
+    <div className="max-w-3xl">
+      <GitCommitList
+        commits={picks}
+        groupByDate={false}
+        selectedShas={selected}
+        onToggleSelect={(commit) =>
+          setSelected((current) => current.includes(commit.sha) ? current.filter((sha) => sha !== commit.sha) : [...current, commit.sha])}
+        selectBlockReason={(commit) => commit.merge ? "A merge commit cannot be cherry-picked; pick the commits it merges." : null}
+      />
+    </div>
+  );
+}
+
+export const SelectableWithBlockedCommit: Story = {
+  render: () => <PickableWithBlocked />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("checkbox", { name: "Select commit 2222222" })).toBeDisabled();
+    await userEvent.click(canvas.getByRole("checkbox", { name: "Select commit 1111111" }));
+    await expect(canvas.getByRole("checkbox", { name: "Select commit 1111111" })).toBeChecked();
+  },
+};
+
 export const Files: Story = {
   render: () => (
     <div className="max-w-3xl space-y-2">

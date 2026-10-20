@@ -107,6 +107,24 @@ describe("GitCommitList slots", () => {
     expect(screen.getAllByRole("button", { expanded: false })).toHaveLength(HISTORY.length);
   });
 
+  it("disables the checkbox of a commit selectBlockReason refuses, with the reason as its tooltip", () => {
+    const reason = "A merge commit cannot be cherry-picked";
+    render(
+      <GitCommitList
+        commits={HISTORY}
+        groupByDate={false}
+        onToggleSelect={() => {}}
+        selectBlockReason={(commit) => (commit.change === "added" ? reason : null)}
+      />,
+    );
+
+    const boxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
+    expect(boxes.map((box) => [box.disabled, box.closest("[title]")?.getAttribute("title") ?? null])).toEqual([
+      [false, null],
+      [true, reason],
+    ]);
+  });
+
   it("names each checkbox with selectLabel when given", () => {
     render(
       <GitCommitList
