@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { SessionRow } from "./SessionViewer.rows";
 import { normalizeSession, type SessionEvent } from "./SessionViewer.model";
@@ -84,6 +84,43 @@ describe("file session rows", () => {
     expect(screen.getByRole("img", { name: "scorecard.png" })).toHaveAttribute(
       "src",
       "/api/attachments/sha256:image",
+    );
+  });
+});
+
+describe("user session rows", () => {
+  it("shows the initial prompt without a filled bubble while keeping later user messages accented", () => {
+    const event = normalizeSession({
+      messages: [{ id: "prompt", role: "user", parts: [{ type: "text", text: "# Prompt detail" }] }],
+    })[0];
+    if (!event) throw new Error("expected a user event");
+
+    const { container } = render(
+      <ul>
+        <SessionRow
+          event={event}
+          initialPrompt
+          initialPromptSummary="PR feedback"
+          last
+          defaultExpanded={false}
+        />
+      </ul>,
+    );
+    const summary = screen.getByRole("button", { name: "Initial prompt · PR feedback" });
+    expect(summary).not.toHaveClass("bg-accent");
+
+    fireEvent.click(summary);
+    expect(container.querySelector('li[data-event-kind="user"] div.rounded-lg')).not.toHaveClass(
+      "bg-accent",
+    );
+
+    const { container: laterContainer } = render(
+      <ul>
+        <SessionRow event={event} last defaultExpanded={false} />
+      </ul>,
+    );
+    expect(laterContainer.querySelector('li[data-event-kind="user"] div.rounded-lg')).toHaveClass(
+      "bg-accent",
     );
   });
 });

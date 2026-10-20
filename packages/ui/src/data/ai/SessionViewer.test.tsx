@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { SessionViewer } from "./SessionViewer";
 import { SAMPLE_SESSION } from "./SessionViewer.fixtures";
@@ -8,7 +14,10 @@ const assistantLog = (count: number): SessionEntry[] =>
   Array.from({ length: count }, (_, i) => ({
     type: "assistant",
     uuid: `e${i}`,
-    message: { role: "assistant", content: [{ type: "text", text: `message ${i}` }] },
+    message: {
+      role: "assistant",
+      content: [{ type: "text", text: `message ${i}` }],
+    },
   }));
 
 describe("SessionViewer", () => {
@@ -21,15 +30,24 @@ describe("SessionViewer", () => {
             {
               id: "system",
               role: "system",
-              parts: [{ type: "text", text: "# AGENTS.md instructions\nAlways run focused tests." }],
+              parts: [
+                {
+                  type: "text",
+                  text: "# AGENTS.md instructions\nAlways run focused tests.",
+                },
+              ],
             },
           ],
         }}
       />,
     );
 
-    expect(container.querySelector('[data-event-kind="system"]')).toBeInTheDocument();
-    expect(container.querySelector('[data-event-kind="user"]')).not.toBeInTheDocument();
+    expect(
+      container.querySelector('[data-event-kind="system"]'),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-event-kind="user"]'),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /System/ }));
     expect(screen.getByText(/Always run focused tests/)).toBeInTheDocument();
   });
@@ -45,7 +63,9 @@ describe("SessionViewer", () => {
     expect(screen.queryByText("Read file")).not.toBeInTheDocument();
     expect(screen.queryByText("Write file")).not.toBeInTheDocument();
     // /repo/packages/… relativized against the tool_use cwd /repo.
-    expect(screen.getByText("packages/ui/src/data/Timeline.tsx")).toBeInTheDocument();
+    expect(
+      screen.getByText("packages/ui/src/data/Timeline.tsx"),
+    ).toBeInTheDocument();
   });
 
   it("inlines a shell command as a bare bash block without the Run command label", () => {
@@ -53,9 +73,69 @@ describe("SessionViewer", () => {
     expect(screen.queryByText("Run command")).not.toBeInTheDocument();
     // Visible without expanding, and without a CodeBlock language chip.
     expect(
-      screen.getByText("pnpm --filter @flanksource/clicky-ui test SessionViewer"),
+      screen.getByText(
+        "pnpm --filter @flanksource/clicky-ui test SessionViewer",
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByText("bash")).not.toBeInTheDocument();
+  });
+
+  it("expands a shell response when its command header is clicked or activated by keyboard", () => {
+    render(<SessionViewer session={SAMPLE_SESSION} />);
+    const command = screen.getByText(
+      "pnpm --filter @flanksource/clicky-ui test SessionViewer",
+    );
+    const header = screen.getByRole("button", { name: "Toggle response" });
+
+    expect(header).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(command);
+    expect(header).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/Tests: 8 passed/)).toBeInTheDocument();
+
+    fireEvent.keyDown(header, { key: "Enter" });
+    expect(header).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(/Tests: 8 passed/)).not.toBeInTheDocument();
+  });
+
+  it("toggles user and assistant message bodies from their headers", () => {
+    render(
+      <SessionViewer
+        showHeader={false}
+        session={{
+          messages: [
+            {
+              id: "prompt",
+              role: "user",
+              parts: [{ type: "text", text: "User body" }],
+            },
+            {
+              id: "reply",
+              role: "assistant",
+              parts: [{ type: "text", text: "Assistant body" }],
+            },
+          ],
+        }}
+      />,
+    );
+    const userHeader = screen.getByRole("button", {
+      name: "Toggle initial prompt message",
+    });
+    const assistantHeader = screen.getByRole("button", {
+      name: "Toggle assistant message",
+    });
+
+    expect(userHeader).toHaveAttribute("aria-expanded", "true");
+    expect(assistantHeader).toHaveAttribute("aria-expanded", "true");
+    expect(assistantHeader).toHaveTextContent("Agent");
+    fireEvent.click(userHeader);
+    fireEvent.click(assistantHeader);
+    expect(screen.queryByText("User body")).not.toBeInTheDocument();
+    expect(screen.queryByText("Assistant body")).not.toBeInTheDocument();
+
+    fireEvent.click(userHeader);
+    fireEvent.click(assistantHeader);
+    expect(screen.getByText("User body")).toBeInTheDocument();
+    expect(screen.getByText("Assistant body")).toBeInTheDocument();
   });
 
   it("renders tool input as inline name/value param hints on one line", () => {
@@ -102,11 +182,26 @@ describe("SessionViewer", () => {
 
     expect(screen.getByText("Ask user")).toBeInTheDocument();
     expect(screen.getByText("Scope")).toBeInTheDocument();
-    expect(screen.getByText("Which scope should the rule use?")).toBeInTheDocument();
+    expect(
+      screen.getByText("Which scope should the rule use?"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Project")).toBeInTheDocument();
     expect(screen.getByText("Current workspace")).toBeInTheDocument();
     expect(screen.getByText("Answer")).toBeInTheDocument();
     expect(screen.getByText("Scope: Project")).toBeInTheDocument();
+
+    const header = screen.getByRole("button", {
+      name: "Toggle question details",
+    });
+    expect(header).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(header);
+    expect(
+      screen.queryByText("Which scope should the rule use?"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(header);
+    expect(
+      screen.getByText("Which scope should the rule use?"),
+    ).toBeInTheDocument();
   });
 
   it("renders a pending question overlay and returns answers keyed by question id", async () => {
@@ -115,63 +210,133 @@ describe("SessionViewer", () => {
       <SessionViewer
         showHeader={false}
         session={[]}
-        pendingTools={[{
-          tool: "AskUserQuestion",
-          toolCallId: "ask-1",
-          input: { questions: [{ id: "scope", question: "Which scope?", options: [{ label: "Project", value: "project" }] }] },
-        }]}
+        pendingTools={[
+          {
+            tool: "AskUserQuestion",
+            toolCallId: "ask-1",
+            input: {
+              questions: [
+                {
+                  id: "scope",
+                  question: "Which scope?",
+                  options: [{ label: "Project", value: "project" }],
+                },
+              ],
+            },
+          },
+        ]}
         onPendingToolDecision={onDecision}
       />,
     );
 
     expect(screen.getByRole("button", { name: /Send answer/ })).toBeDisabled();
-    expect(screen.queryByLabelText("Which scope? additional details")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Which scope? additional details"),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("radio", { name: /Project/ }));
     fireEvent.click(screen.getByRole("button", { name: /Send answer/ }));
 
-    await waitFor(() => expect(onDecision).toHaveBeenCalledWith(expect.objectContaining({
-        allow: true,
-        answers: { scope: "project" },
-      })),
+    await waitFor(() =>
+      expect(onDecision).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allow: true,
+          answers: { scope: "project" },
+        }),
+      ),
     );
   });
 
   it("keeps duplicate question text separate and rejects without answers", async () => {
     const onDecision = vi.fn();
-    render(<SessionViewer showHeader={false} session={[]} pendingTools={[{
-      tool: "AskUserQuestion", toolCallId: "ask-2", input: { questions: [
-        { id: "first", question: "Choose a scope", options: [{ label: "Local" }] },
-        { id: "second", question: "Choose a scope", options: [{ label: "Global" }] },
-      ] },
-    }]} onPendingToolDecision={onDecision} />);
+    render(
+      <SessionViewer
+        showHeader={false}
+        session={[]}
+        pendingTools={[
+          {
+            tool: "AskUserQuestion",
+            toolCallId: "ask-2",
+            input: {
+              questions: [
+                {
+                  id: "first",
+                  question: "Choose a scope",
+                  options: [{ label: "Local" }],
+                },
+                {
+                  id: "second",
+                  question: "Choose a scope",
+                  options: [{ label: "Global" }],
+                },
+              ],
+            },
+          },
+        ]}
+        onPendingToolDecision={onDecision}
+      />,
+    );
 
     fireEvent.click(screen.getByRole("radio", { name: /Local/ }));
     expect(screen.getByRole("button", { name: /Send answer/ })).toBeDisabled();
     fireEvent.click(screen.getByRole("radio", { name: /Global/ }));
     fireEvent.click(screen.getByRole("button", { name: /Send answer/ }));
-    await waitFor(() => expect(onDecision).toHaveBeenCalledWith(expect.objectContaining({
-      allow: true, answers: { first: "Local", second: "Global" },
-    })));
+    await waitFor(() =>
+      expect(onDecision).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allow: true,
+          answers: { first: "Local", second: "Global" },
+        }),
+      ),
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /^Reject$/ }));
-    await waitFor(() => expect(onDecision).toHaveBeenLastCalledWith(expect.objectContaining({ allow: false })));
+    await waitFor(() =>
+      expect(onDecision).toHaveBeenLastCalledWith(
+        expect.objectContaining({ allow: false }),
+      ),
+    );
     expect(onDecision.mock.lastCall?.[0]).not.toHaveProperty("answers");
   });
 
   it("accepts a free text answer only when the question permits it", async () => {
     const onDecision = vi.fn();
-    render(<SessionViewer showHeader={false} session={[]} pendingTools={[{
-      tool: "AskUserQuestion", toolCallId: "ask-3", input: { questions: [{
-        id: "location", question: "Where should it go?", isOther: true,
-        options: [{ label: "Project" }],
-      }] },
-    }]} onPendingToolDecision={onDecision} />);
+    render(
+      <SessionViewer
+        showHeader={false}
+        session={[]}
+        pendingTools={[
+          {
+            tool: "AskUserQuestion",
+            toolCallId: "ask-3",
+            input: {
+              questions: [
+                {
+                  id: "location",
+                  question: "Where should it go?",
+                  isOther: true,
+                  options: [{ label: "Project" }],
+                },
+              ],
+            },
+          },
+        ]}
+        onPendingToolDecision={onDecision}
+      />,
+    );
 
-    fireEvent.change(screen.getByLabelText("Where should it go? other answer"), { target: { value: "Inline plan" } });
+    fireEvent.change(
+      screen.getByLabelText("Where should it go? other answer"),
+      { target: { value: "Inline plan" } },
+    );
     fireEvent.click(screen.getByRole("button", { name: /Send answer/ }));
-    await waitFor(() => expect(onDecision).toHaveBeenCalledWith(expect.objectContaining({
-      allow: true, answers: { location: "Inline plan" },
-    })));
+    await waitFor(() =>
+      expect(onDecision).toHaveBeenCalledWith(
+        expect.objectContaining({
+          allow: true,
+          answers: { location: "Inline plan" },
+        }),
+      ),
+    );
   });
 
   it("keeps permission decision errors on the pending tool row", async () => {
@@ -180,11 +345,15 @@ describe("SessionViewer", () => {
         showHeader={false}
         session={[]}
         pendingTools={[{ tool: "Bash", input: { command: "npm test" } }]}
-        onPendingToolDecision={async () => { throw new Error("approval expired"); }}
+        onPendingToolDecision={async () => {
+          throw new Error("approval expired");
+        }}
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /Allow/ }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("approval expired");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "approval expired",
+    );
   });
 
   it("shows approval status badges directly on tool rows", () => {
@@ -215,7 +384,11 @@ describe("SessionViewer", () => {
                   toolName: "WebFetch",
                   state: "approval-responded",
                   input: { url: "https://example.com" },
-                  approval: { id: "approval-2", approved: false, reason: "not needed" },
+                  approval: {
+                    id: "approval-2",
+                    approved: false,
+                    reason: "not needed",
+                  },
                 },
               ],
             },
@@ -237,8 +410,12 @@ describe("SessionViewer", () => {
     expect(writeRow.textContent).toContain("+3");
     expect(writeRow.textContent).not.toContain("content:");
 
-    fireEvent.click(within(writeRow).getByRole("button", { name: /SessionViewer\.tsx/ }));
-    expect(writeRow.textContent).toContain("+export function SessionViewer() {");
+    fireEvent.click(
+      within(writeRow).getByRole("button", { name: /SessionViewer\.tsx/ }),
+    );
+    expect(writeRow.textContent).toContain(
+      "+export function SessionViewer() {",
+    );
     // The diff replaces the tool-input JSON.
     expect(writeRow.textContent).not.toContain('"content":');
   });
@@ -248,7 +425,9 @@ describe("SessionViewer", () => {
     expect(screen.queryByText("Assistant")).not.toBeInTheDocument();
     expect(screen.queryByText("claude")).not.toBeInTheDocument();
     expect(
-      screen.getByText("I'll start by exploring the codebase, then add the component."),
+      screen.getByText(
+        "I'll start by exploring the codebase, then add the component.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -282,18 +461,28 @@ describe("SessionViewer", () => {
         },
       ],
     }));
-    const { container } = render(<SessionViewer session={{ messages: waits }} />);
+    const { container } = render(
+      <SessionViewer session={{ messages: waits }} />,
+    );
 
     expect(screen.getByText("3 actions")).toBeInTheDocument();
     expect(screen.getByText("Wait × 3")).toBeInTheDocument();
-    const group = container.querySelector('[data-event-group="wait"]') as HTMLElement;
+    const group = container.querySelector(
+      '[data-event-group="wait"]',
+    ) as HTMLElement;
     expect(group).toBeInTheDocument();
     expect(group.textContent).not.toContain("cell_id:");
 
-    fireEvent.click(within(group).getByRole("button", { name: "Expand Wait × 3" }));
+    fireEvent.click(
+      within(group).getByRole("button", { name: "Expand Wait × 3" }),
+    );
 
-    expect(within(group).getByRole("button", { name: "Collapse Wait × 3" })).toBeInTheDocument();
-    expect(group.querySelectorAll('li[data-event-kind="tool"]')).toHaveLength(3);
+    expect(
+      within(group).getByRole("button", { name: "Collapse Wait × 3" }),
+    ).toBeInTheDocument();
+    expect(group.querySelectorAll('li[data-event-kind="tool"]')).toHaveLength(
+      3,
+    );
     expect(group.textContent).toContain("cell_id: 214");
     expect(group.textContent).toContain("cell_id: 215");
     expect(group.textContent).toContain("cell_id: 216");
@@ -318,7 +507,11 @@ describe("SessionViewer", () => {
             agents: ["general-purpose"],
             skills: ["gavel-runner"],
           },
-          context: { usedTokens: 1500, windowTokens: 1_000_000, freePercent: 99 },
+          context: {
+            usedTokens: 1500,
+            windowTokens: 1_000_000,
+            freePercent: 99,
+          },
           budget: { used: 1.25, total: 5, remaining: 3.75 },
           events: [{ type: "last-prompt", scope: "session" }],
         }}
@@ -340,7 +533,13 @@ describe("SessionViewer", () => {
     render(
       <SessionViewer
         session={{
-          messages: [{ id: "m1", role: "assistant", parts: [{ type: "text", text: "done" }] }],
+          messages: [
+            {
+              id: "m1",
+              role: "assistant",
+              parts: [{ type: "text", text: "done" }],
+            },
+          ],
           budget: { used: 1.25, total: 5, remaining: 3.75 },
         }}
       />,
@@ -351,11 +550,17 @@ describe("SessionViewer", () => {
   it("renders a terminal API error entry", () => {
     render(<SessionViewer session={SAMPLE_SESSION} />);
     expect(screen.getByText("rate_limit (HTTP 429)")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Toggle error details" }),
+    );
+    expect(screen.queryByText("rate_limit (HTTP 429)")).not.toBeInTheDocument();
   });
 
   it("shows reasoning text inline as a one-line toggle that expands on click", () => {
     render(<SessionViewer session={SAMPLE_SESSION} />);
-    const reasoning = screen.getByRole("button", { name: /I should explore the repo/ });
+    const reasoning = screen.getByRole("button", {
+      name: /I should explore the repo/,
+    });
     expect(reasoning).toHaveAttribute("aria-expanded", "false");
     expect(reasoning.querySelector(".truncate")).not.toBeNull();
     fireEvent.click(reasoning);
@@ -379,18 +584,41 @@ describe("SessionViewer", () => {
       <SessionViewer
         session={{
           messages: [
-            { id: "encrypted", role: "assistant", parts: [{ type: "reasoning", text: "81 encrypted reasoning records over 17m54s (2026-07-16T11:15:04Z → 2026-07-16T11:32:58Z)" }] },
-            { id: "readable", role: "assistant", parts: [{ type: "reasoning", text: "I will inspect the parser first." }] },
+            {
+              id: "encrypted",
+              role: "assistant",
+              parts: [
+                {
+                  type: "reasoning",
+                  text: "81 encrypted reasoning records over 17m54s (2026-07-16T11:15:04Z → 2026-07-16T11:32:58Z)",
+                },
+              ],
+            },
+            {
+              id: "readable",
+              role: "assistant",
+              parts: [
+                { type: "reasoning", text: "I will inspect the parser first." },
+              ],
+            },
           ],
         }}
       />,
     );
 
-    expect(screen.getByText("I will inspect the parser first.")).toBeInTheDocument();
-    expect(screen.queryByText(/81 encrypted reasoning records/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText("I will inspect the parser first."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/81 encrypted reasoning records/),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Session options" }));
-    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Encrypted reasoning" }));
-    expect(screen.getByText(/81 encrypted reasoning records/)).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("menuitemcheckbox", { name: "Encrypted reasoning" }),
+    );
+    expect(
+      screen.getByText(/81 encrypted reasoning records/),
+    ).toBeInTheDocument();
   });
 
   it("expands a shell call's response behind the chevron", () => {
@@ -434,23 +662,35 @@ describe("SessionViewer", () => {
     const { container } = render(<SessionViewer session={SAMPLE_SESSION} />);
     const list = () => container.querySelector("ol") as HTMLElement;
     // Read + Grep are the "explore" category.
-    expect(within(list()).getByText("packages/ui/src/data/Timeline.tsx")).toBeInTheDocument();
+    expect(
+      within(list()).getByText("packages/ui/src/data/Timeline.tsx"),
+    ).toBeInTheDocument();
     expect(within(list()).getByText("Grep")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Session options" }));
     fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Explore" }));
 
-    expect(within(list()).queryByText("packages/ui/src/data/Timeline.tsx")).not.toBeInTheDocument();
+    expect(
+      within(list()).queryByText("packages/ui/src/data/Timeline.tsx"),
+    ).not.toBeInTheDocument();
     expect(within(list()).queryByText("Grep")).not.toBeInTheDocument();
     // A different category (execute / Bash) is untouched.
     expect(
-      within(list()).getByText("pnpm --filter @flanksource/clicky-ui test SessionViewer"),
+      within(list()).getByText(
+        "pnpm --filter @flanksource/clicky-ui test SessionViewer",
+      ),
     ).toBeInTheDocument();
   });
 
   it("mounts only the newest window of rows in scrollable mode", () => {
     const { container } = render(
-      <SessionViewer session={assistantLog(200)} scrollable windowSize={10} showHeader={false} showMenu={false} />,
+      <SessionViewer
+        session={assistantLog(200)}
+        scrollable
+        windowSize={10}
+        showHeader={false}
+        showMenu={false}
+      />,
     );
     const rows = container.querySelectorAll("[data-event-kind]");
     expect(rows).toHaveLength(10);
@@ -460,15 +700,30 @@ describe("SessionViewer", () => {
   });
 
   it("renders every row when not scrollable", () => {
-    const { container } = render(<SessionViewer session={assistantLog(30)} showHeader={false} showMenu={false} />);
+    const { container } = render(
+      <SessionViewer
+        session={assistantLog(30)}
+        showHeader={false}
+        showMenu={false}
+      />,
+    );
     expect(container.querySelectorAll("[data-event-kind]")).toHaveLength(30);
   });
 
   it("loads an older batch when scrolled near the top", () => {
     const { container } = render(
-      <SessionViewer session={assistantLog(300)} scrollable windowSize={20} batchSize={20} showHeader={false} showMenu={false} />,
+      <SessionViewer
+        session={assistantLog(300)}
+        scrollable
+        windowSize={20}
+        batchSize={20}
+        showHeader={false}
+        showMenu={false}
+      />,
     );
-    const scroller = container.querySelector("div.overflow-y-auto") as HTMLElement;
+    const scroller = container.querySelector(
+      "div.overflow-y-auto",
+    ) as HTMLElement;
     expect(container.querySelectorAll("[data-event-kind]")).toHaveLength(20);
     // An upward gesture at the top loads the next-older batch, keeping the total bounded.
     fireEvent.wheel(scroller, { deltaY: -100 });
@@ -476,45 +731,90 @@ describe("SessionViewer", () => {
     // The newest entries stay mounted; only older ones were prepended.
     expect(within(container).getByText("message 299")).toBeInTheDocument();
     expect(within(container).getByText("message 260")).toBeInTheDocument();
-    expect(within(container).queryByText("message 259")).not.toBeInTheDocument();
+    expect(
+      within(container).queryByText("message 259"),
+    ).not.toBeInTheDocument();
   });
 
   it("does not page older messages during the initial scroll to bottom", () => {
     const { container } = render(
-      <SessionViewer session={assistantLog(30)} scrollable windowSize={10} batchSize={10} showHeader={false} showMenu={false} />,
+      <SessionViewer
+        session={assistantLog(30)}
+        scrollable
+        windowSize={10}
+        batchSize={10}
+        showHeader={false}
+        showMenu={false}
+      />,
     );
-    const scroller = container.querySelector("div.overflow-y-auto") as HTMLElement;
-    Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 700 });
-    Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 200 });
+    const scroller = container.querySelector(
+      "div.overflow-y-auto",
+    ) as HTMLElement;
+    Object.defineProperty(scroller, "scrollHeight", {
+      configurable: true,
+      value: 700,
+    });
+    Object.defineProperty(scroller, "clientHeight", {
+      configurable: true,
+      value: 200,
+    });
 
     scroller.scrollTop = 500;
     fireEvent.scroll(scroller);
 
     expect(container.querySelectorAll("[data-event-kind]")).toHaveLength(10);
-    expect(screen.queryByRole("button", { name: "Scroll to bottom" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Scroll to bottom" }),
+    ).not.toBeInTheDocument();
   });
 
   it("pauses following after scrolling up until Scroll to bottom is clicked", () => {
     const { container, rerender } = render(
-      <SessionViewer session={assistantLog(30)} scrollable windowSize={10} batchSize={10} showHeader={false} showMenu={false} />,
+      <SessionViewer
+        session={assistantLog(30)}
+        scrollable
+        windowSize={10}
+        batchSize={10}
+        showHeader={false}
+        showMenu={false}
+      />,
     );
-    const scroller = container.querySelector("div.overflow-y-auto") as HTMLElement;
-    Object.defineProperty(scroller, "scrollHeight", { configurable: true, value: 1000 });
-    Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 200 });
+    const scroller = container.querySelector(
+      "div.overflow-y-auto",
+    ) as HTMLElement;
+    Object.defineProperty(scroller, "scrollHeight", {
+      configurable: true,
+      value: 1000,
+    });
+    Object.defineProperty(scroller, "clientHeight", {
+      configurable: true,
+      value: 200,
+    });
     expect(container.querySelectorAll("[data-event-kind]")).toHaveLength(10);
 
     scroller.scrollTop = 800;
     fireEvent.scroll(scroller);
     scroller.scrollTop = 700;
     fireEvent.scroll(scroller);
-    expect(screen.getByRole("button", { name: "Scroll to bottom" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Scroll to bottom" }),
+    ).toBeInTheDocument();
 
     scroller.scrollTop = 800;
     fireEvent.scroll(scroller);
-    expect(screen.getByRole("button", { name: "Scroll to bottom" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Scroll to bottom" }),
+    ).toBeInTheDocument();
 
     rerender(
-      <SessionViewer session={assistantLog(31)} scrollable windowSize={10} batchSize={10} showHeader={false} showMenu={false} />,
+      <SessionViewer
+        session={assistantLog(31)}
+        scrollable
+        windowSize={10}
+        batchSize={10}
+        showHeader={false}
+        showMenu={false}
+      />,
     );
     expect(scroller.scrollTop).toBe(800);
     expect(within(container).getByText("message 30")).toBeInTheDocument();
@@ -522,20 +822,33 @@ describe("SessionViewer", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Scroll to bottom" }));
     expect(scroller.scrollTop).toBe(1000);
-    expect(screen.queryByRole("button", { name: "Scroll to bottom" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Scroll to bottom" }),
+    ).not.toBeInTheDocument();
   });
 
   it("loads older messages on an upward wheel gesture when ten rows fit without scrolling", () => {
     const { container } = render(
-      <SessionViewer session={assistantLog(30)} scrollable windowSize={10} batchSize={10} showHeader={false} showMenu={false} />,
+      <SessionViewer
+        session={assistantLog(30)}
+        scrollable
+        windowSize={10}
+        batchSize={10}
+        showHeader={false}
+        showMenu={false}
+      />,
     );
-    const scroller = container.querySelector("div.overflow-y-auto") as HTMLElement;
+    const scroller = container.querySelector(
+      "div.overflow-y-auto",
+    ) as HTMLElement;
     expect(container.querySelectorAll("[data-event-kind]")).toHaveLength(10);
 
     fireEvent.wheel(scroller, { deltaY: -100 });
 
     expect(container.querySelectorAll("[data-event-kind]")).toHaveLength(20);
     expect(within(container).getByText("message 10")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Scroll to bottom" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Scroll to bottom" }),
+    ).toBeInTheDocument();
   });
 });

@@ -221,8 +221,7 @@ function UserRow({
   showRowMetadata: boolean;
   showRaw: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const collapsed = initialPrompt && initialPromptSummary && !expanded;
+  const [expanded, setExpanded] = useState(!initialPromptSummary);
   return (
     <li
       data-event-kind="user"
@@ -235,18 +234,18 @@ function UserRow({
         )}
       >
         <div className="min-w-0">
-          <div className="mb-0.5 text-right text-xs font-medium text-muted-foreground">
-            {initialPrompt ? "Initial prompt" : "You"}
-          </div>
           {initialPrompt && initialPromptSummary ? (
             <button
               type="button"
               aria-label={`Initial prompt · ${initialPromptSummary}`}
               aria-expanded={expanded}
               onClick={() => setExpanded((open) => !open)}
-              className="min-w-0 max-w-full break-words rounded-lg bg-accent px-density-3 py-density-2 text-left text-sm leading-relaxed text-accent-foreground hover:bg-accent/80"
+              className="block min-w-0 max-w-full text-right"
             >
-              <span className="flex items-start gap-2">
+              <span className="mb-0.5 block text-xs font-medium text-muted-foreground">
+                Initial prompt
+              </span>
+              <span className="flex items-start gap-2 break-words rounded-lg px-density-3 py-density-2 text-left text-sm leading-relaxed text-foreground hover:underline">
                 <span className="min-w-0 flex-1 font-medium">
                   {initialPromptSummary}
                 </span>
@@ -259,9 +258,37 @@ function UserRow({
                 />
               </span>
             </button>
-          ) : null}
-          {!collapsed && (
-            <div className="min-w-0 break-words rounded-lg bg-accent px-density-3 py-density-2 text-left text-sm leading-relaxed text-accent-foreground">
+          ) : (
+            <button
+              type="button"
+              aria-label={
+                initialPrompt
+                  ? "Toggle initial prompt message"
+                  : "Toggle user message"
+              }
+              aria-expanded={expanded}
+              onClick={() => setExpanded((open) => !open)}
+              className="mb-0.5 flex w-full items-center justify-end gap-1 text-right text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              {initialPrompt ? "Initial prompt" : "You"}
+              <Icon
+                icon={UiChevronDown}
+                className={cn(
+                  "size-3 shrink-0 transition-transform",
+                  expanded && "rotate-180",
+                )}
+              />
+            </button>
+          )}
+          {expanded && (
+            <div
+              className={cn(
+                "min-w-0 break-words rounded-lg px-density-3 py-density-2 text-left text-sm leading-relaxed",
+                initialPrompt
+                  ? "text-foreground"
+                  : "bg-accent text-accent-foreground",
+              )}
+            >
               {event.file ? (
                 <MessageFilePart part={event.file} />
               ) : (
@@ -397,13 +424,37 @@ function MessageBody({
   event: SessionEvent;
   badge?: ReactNode;
 }) {
+  const [expanded, setExpanded] = useState(true);
   return (
-    <div className="flex items-start gap-1.5">
-      {badge}
-      <div className="min-w-0 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-foreground">
-        {event.file && <MessageFilePart part={event.file} />}
-        {event.text && <Markdown text={event.text} />}
-      </div>
+    <div className="min-w-0">
+      <button
+        type="button"
+        aria-label="Toggle assistant message"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((open) => !open)}
+        className="mb-0.5 flex w-full min-w-0 items-center gap-1.5 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+      >
+        {badge}
+        <span className="shrink-0">Agent</span>
+        {!expanded && event.text && (
+          <span className="min-w-0 flex-1 truncate font-normal">
+            {event.text.split("\n", 1)[0]}…
+          </span>
+        )}
+        <Icon
+          icon={UiChevronDown}
+          className={cn(
+            "ml-auto size-3 shrink-0 transition-transform",
+            expanded && "rotate-180",
+          )}
+        />
+      </button>
+      {expanded && (
+        <div className="min-w-0 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-foreground">
+          {event.file && <MessageFilePart part={event.file} />}
+          {event.text && <Markdown text={event.text} />}
+        </div>
+      )}
     </div>
   );
 }
@@ -470,9 +521,30 @@ function ThinkingBody({ event }: { event: SessionEvent }) {
 }
 
 function ErrorBody({ event }: { event: SessionEvent }) {
+  const [open, setOpen] = useState(true);
   return (
-    <div className="rounded-md border border-rose-200 bg-rose-50 px-density-3 py-1.5 text-xs text-rose-700 [[data-theme=dark]_&]:border-rose-500/30 [[data-theme=dark]_&]:bg-rose-500/10 [[data-theme=dark]_&]:text-rose-300">
-      {event.text}
+    <div>
+      <button
+        type="button"
+        aria-label="Toggle error details"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="mb-1 flex w-full items-center gap-1 text-left text-xs font-medium text-rose-700 [[data-theme=dark]_&]:text-rose-300"
+      >
+        Error
+        <Icon
+          icon={UiChevronDown}
+          className={cn(
+            "ml-auto size-3 shrink-0 transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {open && (
+        <div className="rounded-md border border-rose-200 bg-rose-50 px-density-3 py-1.5 text-xs text-rose-700 [[data-theme=dark]_&]:border-rose-500/30 [[data-theme=dark]_&]:bg-rose-500/10 [[data-theme=dark]_&]:text-rose-300">
+          {event.text}
+        </div>
+      )}
     </div>
   );
 }
