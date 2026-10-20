@@ -24,24 +24,52 @@ describe("SessionInspector", () => {
   it("renders the initial prompt as readable markdown inside the user bubble", async () => {
     const { container } = render(
       <div className="h-[720px]">
-        <SessionInspector session={{
-          id: "prompt-session",
-          title: "Parser session",
-          initialPrompt: "# Review parser\n\n- inspect the source\n- run focused tests",
-          messages: [
-            { id: "first", role: "user", parts: [{ type: "text", text: "# Review parser\n\n- inspect the source\n- run focused tests" }] },
-            { id: "reply", role: "assistant", parts: [{ type: "text", text: "On it." }] },
-            { id: "followup", role: "user", parts: [{ type: "text", text: "Thanks" }] },
-          ],
-        }} />
+        <SessionInspector
+          session={{
+            id: "prompt-session",
+            title: "Parser session",
+            initialPrompt:
+              "# Review parser\n\n- inspect the source\n- run focused tests",
+            messages: [
+              {
+                id: "first",
+                role: "user",
+                parts: [
+                  {
+                    type: "text",
+                    text: "# Review parser\n\n- inspect the source\n- run focused tests",
+                  },
+                ],
+              },
+              {
+                id: "reply",
+                role: "assistant",
+                parts: [{ type: "text", text: "On it." }],
+              },
+              {
+                id: "followup",
+                role: "user",
+                parts: [{ type: "text", text: "Thanks" }],
+              },
+            ],
+          }}
+        />
       </div>,
     );
     const userRows = container.querySelectorAll('[data-event-kind="user"]');
     const initialPrompt = userRows[0] as HTMLElement;
 
-    expect(within(initialPrompt).getByText("Initial prompt")).toBeInTheDocument();
-    expect(await within(initialPrompt).findByRole("heading", { name: "Review parser" })).toBeInTheDocument();
-    expect(within(initialPrompt).getByRole("list")).toHaveTextContent("inspect the source");
+    expect(
+      within(initialPrompt).getByText("Initial prompt"),
+    ).toBeInTheDocument();
+    expect(
+      await within(initialPrompt).findByRole("heading", {
+        name: "Review parser",
+      }),
+    ).toBeInTheDocument();
+    expect(within(initialPrompt).getByRole("list")).toHaveTextContent(
+      "inspect the source",
+    );
     expect(userRows[1]).toHaveTextContent("You");
   });
 
@@ -142,18 +170,25 @@ describe("SessionInspector", () => {
   it("shows the full initial prompt as expandable markdown below a concise heading", async () => {
     render(
       <div className="h-[720px]">
-        <SessionInspector session={{
-          id: "header-prompt",
-          initialPrompt: "# Review parser\n\n- inspect the source\n- run focused tests",
-          messages: [],
-        }} />
+        <SessionInspector
+          session={{
+            id: "header-prompt",
+            initialPrompt:
+              "# Review parser\n\n- inspect the source\n- run focused tests",
+            messages: [],
+          }}
+        />
       </div>,
     );
 
     const banner = within(screen.getByRole("banner"));
-    expect(banner.getByRole("heading", { name: "Review parser" })).toBeInTheDocument();
+    expect(
+      banner.getByRole("heading", { name: "Review parser" }),
+    ).toBeInTheDocument();
     fireEvent.click(banner.getByText("Initial prompt"));
-    expect(await banner.findByRole("list")).toHaveTextContent("run focused tests");
+    expect(await banner.findByRole("list")).toHaveTextContent(
+      "run focused tests",
+    );
   });
 
   it("renders unknown effort values as neutral metadata", () => {
@@ -233,7 +268,15 @@ describe("SessionInspector", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Metadata" }));
     expect(screen.getByText("/repo/.claude/session.jsonl")).toBeInTheDocument();
     expect(screen.getAllByText("anthropic").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByText(/4 keys/));
+    const eventsSection = screen
+      .getByRole("heading", { name: "Events" })
+      .closest("section");
+    expect(eventsSection).not.toBeNull();
+    fireEvent.click(
+      within(eventsSection!)
+        .getAllByRole("button", { name: "Expand value" })
+        .at(-1)!,
+    );
     expect(document.body.textContent).toContain("memory_citation");
 
     fireEvent.click(screen.getByRole("tab", { name: "Raw" }));
@@ -267,7 +310,9 @@ describe("SessionInspector", () => {
       </div>,
     );
 
-    expect(screen.queryByRole("tab", { name: "Output" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("tab", { name: "Output" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Transcript" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -309,7 +354,9 @@ describe("SessionInspector", () => {
     const messageBadges = screen.getAllByTestId("message-turn-badge");
     expect(messageBadges).toHaveLength(3);
     expect(messageBadges[2]).toHaveTextContent("turn-3");
-    expect(messageBadges[2]?.parentElement).toHaveTextContent("third turn");
+    expect(
+      messageBadges[2]?.closest('[data-event-kind="assistant"]'),
+    ).toHaveTextContent("third turn");
     expect(messageBadges[2]).toHaveAttribute(
       "data-turn-color",
       badges[2]?.getAttribute("data-turn-color"),
