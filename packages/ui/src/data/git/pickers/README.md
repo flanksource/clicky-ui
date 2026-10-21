@@ -6,6 +6,8 @@ Menus prefer a 720px width while closed controls retain their layout width. Near
 
 Import the controls and types from `@flanksource/clicky-ui`. `GitPickersDemo.tsx` is a runnable client-backed example in Storybook under Data/GitPickers and in the kitchen sink under Git pickers.
 
+`GitSourcePicker` and `GitFilePicker` list repositories from every catalog connection in one Repository field, grouped by connection name. Selecting a repository selects its connection and qualified default branch together. Pinned Git connections emit an empty repository argument. Provider failures appear with a retry action while repositories from successful connections remain available. Set `branchesOnly` on `GitSourcePicker` to offer target branches without tags or custom commit refs.
+
 ```tsx
 const [value, setValue] = useState<GitFileValue>({
   connection: "example", repo: "acme/rules", ref: "refs/heads/main", path: "", sha: "",
