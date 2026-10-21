@@ -99,6 +99,19 @@ export function ComboboxMenu({
           const mode = tristate ? modes[option.value] : undefined;
           const showHeader =
             option.group != null && option.group !== filtered[index - 1]?.group;
+          const selectionIndicator = (
+            <span
+              data-slot="combobox-selection-indicator"
+              aria-hidden
+              className={cn(
+                "shrink-0 text-xs",
+                option.description && option.descriptionLayout !== "inline" && "mt-1",
+                selected ? "opacity-100" : "opacity-0",
+              )}
+            >
+              <Icon icon={UiCheck} />
+            </span>
+          );
           return (
             <Fragment key={option.value}>
               {showHeader && (
@@ -136,7 +149,8 @@ export function ComboboxMenu({
                   : {})}
                 onMouseEnter={() => onHighlight(index)}
                 className={cn(
-                  "flex cursor-pointer gap-2 rounded-sm px-2 py-1.5 text-sm",
+                  "flex cursor-pointer rounded-sm py-1.5 text-sm",
+                  multiple ? "gap-2 px-2" : "gap-1.5 px-1.5",
                   option.description && option.descriptionLayout !== "inline" ? "items-start" : "items-center",
                   index === highlighted && "bg-accent",
                   selected && !tristate && "font-medium",
@@ -170,14 +184,7 @@ export function ComboboxMenu({
                   </div>
                 ) : (
                   <>
-                    <Icon
-                      icon={UiCheck}
-                      className={cn(
-                        "shrink-0 text-xs",
-                        option.description && option.descriptionLayout !== "inline" && "mt-1",
-                        selected ? "opacity-100" : "opacity-0",
-                      )}
-                    />
+                    {multiple && selectionIndicator}
                     <LabelIcon
                       icon={option.icon}
                       className={cn(
@@ -194,6 +201,7 @@ export function ComboboxMenu({
                         {option.trailing}
                       </span>
                     )}
+                    {!multiple && selectionIndicator}
                   </>
                 )}
               </div>

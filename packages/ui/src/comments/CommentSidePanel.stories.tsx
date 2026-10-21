@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
 import { Button } from "../components/button";
 import { CommentProvider } from "./CommentProvider";
 import { CommentSidePanel } from "./CommentSidePanel";
@@ -70,3 +71,48 @@ function Demo() {
 }
 
 export const Default: Story = { render: () => <Demo /> };
+
+function ExternalDocumentDemo() {
+  const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
+  const [ready, setReady] = useState(false);
+  const { comments, callbacks } = useDemoCommentStore(sampleComments);
+  const elementFor = (anchor: string) =>
+    ready ? frame?.contentDocument?.getElementById(anchor) : null;
+  return (
+    <CommentProvider
+      comments={comments}
+      config={sampleConfig}
+      initialRailMode="all"
+      {...callbacks}
+      getAnchorTop={(anchor) =>
+        elementFor(anchor)?.getBoundingClientRect().top ?? null
+      }
+      onScrollToAnchor={(anchor, options) => {
+        const element = elementFor(anchor);
+        if (!element) return false;
+        element.scrollIntoView({
+          ...(options.behavior ? { behavior: options.behavior } : {}),
+          ...(options.block ? { block: options.block } : {}),
+        });
+        return true;
+      }}
+    >
+      <div className="flex gap-6">
+        <iframe
+          ref={setFrame}
+          title="Annotated document"
+          onLoad={() => setReady(true)}
+          className="h-80 min-w-0 flex-1 rounded-md border border-border"
+          srcDoc={
+            '<!doctype html><html lang="en"><head><title>Annotated document</title></head><body style="font:16px system-ui;padding:24px"><h1 id="summary">Summary</h1><p>Click a comment to scroll this independent document.</p><section style="margin-top:700px" id="details.row.3"><h2>Details · Row 3</h2></section></body></html>'
+          }
+        />
+        <CommentSidePanel focusedAlignment="flow" anchorLabels={anchorLabels} />
+      </div>
+    </CommentProvider>
+  );
+}
+
+export const ExternalDocument: Story = {
+  render: () => <ExternalDocumentDemo />,
+};

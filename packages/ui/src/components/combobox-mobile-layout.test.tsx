@@ -22,6 +22,20 @@ afterEach(() => {
 });
 
 describe("Combobox mobile menu layout", () => {
+  it("uses available desktop height and only flips when the content needs it", () => {
+    const input = {
+      anchor: { top: 700, bottom: 732, left: 20, width: 120 },
+      viewportWidth: 1920,
+      viewportHeight: 1080,
+      mobile: false,
+    };
+    expect(
+      calculateComboboxMenuPosition({ ...input, naturalHeight: 120 }),
+    ).toMatchObject({ top: 736, maxHeight: 336 });
+    expect(
+      calculateComboboxMenuPosition({ ...input, naturalHeight: 1000 }),
+    ).toMatchObject({ bottom: 384, maxHeight: 688 });
+  });
   it("renders an absolute menu in a fixed viewport layer with 16px insets", () => {
     vi.spyOn(window, "matchMedia").mockImplementation(
       (query) =>

@@ -52,16 +52,16 @@ export type SecretResource = { name: string; keys?: string[] };
 export type SecretKeySelectorProps = {
   value: SecretKeyValue | undefined;
   onChange: (next: SecretKeyValue | undefined) => void;
-  /** Loads the named keyed kind's resources (name + data key names). */
-  loadResources: (kind: SecretKind) => Promise<SecretResource[]>;
+  /** Optional catalog of names and keys; without it, references accept custom entry. */
+  loadResources?: (kind: SecretKind) => Promise<SecretResource[]>;
   /** Loads mid-masked previews for the named keyed resource's keys. */
-  loadKeyPreview: (kind: SecretKind, name: string) => Promise<KeyPreview[]>;
+  loadKeyPreview?: (kind: SecretKind, name: string) => Promise<KeyPreview[]>;
   /**
    * Loads the service-account names (no keys) for the "serviceaccount" source.
    * When omitted, that source's name field accepts freeform entry only.
    */
   loadServiceAccounts?: () => Promise<SecretResource[]>;
-  /** Loads metadata for the cascading 1Password vault, item, and field pickers. */
+  /** Optional metadata for cascading vault, item, and field pickers; otherwise accepts an op:// reference. */
   onePassword?: OnePasswordLoaders;
   /**
    * The sources offered in the picker, in order. Defaults to
@@ -74,13 +74,13 @@ export type SecretKeySelectorProps = {
    * inline "Value" source, leaving Secret/ConfigMap. Ignored when `sources` is
    * given.
    */
-  allowLiteral?: boolean;
+  allowLiteral?: boolean | undefined;
   /**
    * When true, a chosen name absent from the loaded resources, or a key absent
    * from the chosen keyed resource's keys, is flagged invalid (once the load
    * settles). The onepassword and literal sources are never strict-flagged.
    */
-  strict?: boolean;
+  strict?: boolean | undefined;
   className?: string;
 };
 
@@ -104,10 +104,14 @@ export function SecretKeySelector({
   strict = false,
   className,
 }: SecretKeySelectorProps) {
-  const sourceList = useMemo<SecretValueSource[]>(
-    () => sources ?? (allowLiteral ? DEFAULT_SOURCES : ["secret", "configmap"]),
-    [sources, allowLiteral],
-  );
+  const selectedSource = value?.kind;
+  const sourceList = useMemo<SecretValueSource[]>(() => {
+    const choices: SecretValueSource[] =
+      sources ?? (allowLiteral ? DEFAULT_SOURCES : ["secret", "configmap"]);
+    return selectedSource && !choices.includes(selectedSource)
+      ? [selectedSource, ...choices]
+      : choices;
+  }, [sources, allowLiteral, selectedSource]);
 
   const source: SecretValueSource = value?.kind ?? sourceList[0] ?? "secret";
   const isKeyed =
@@ -134,11 +138,12 @@ export function SecretKeySelector({
   // Load the name list for keyed kinds (secret/configmap/helm) and, when a
   // loader is supplied, for the serviceaccount source. Other sources list nothing.
   useEffect(() => {
-    const loader = isKeyed
-      ? () => loadResources(refKind)
-      : isServiceAccount && loadServiceAccounts
-        ? loadServiceAccounts
-        : null;
+    const loader =
+      isKeyed && loadResources
+        ? () => loadResources(refKind)
+        : isServiceAccount && loadServiceAccounts
+          ? loadServiceAccounts
+          : null;
     if (!loader) {
       setResources([]);
       return;
@@ -154,7 +159,7 @@ export function SecretKeySelector({
   }, [loadResources, loadServiceAccounts, refKind, isKeyed, isServiceAccount]);
 
   useEffect(() => {
-    if (!isKeyed || !selectedName) {
+    if (!isKeyed || !selectedName || !loadKeyPreview) {
       setPreviews([]);
       return;
     }
@@ -186,7 +191,8 @@ export function SecretKeySelector({
   // key is invalid when, with a resolved resource, it isn't one of that
   // resource's keys. Only names from a listed source are checked (a
   // serviceaccount source with no loader lists nothing, so it never flags).
-  const listsNames = isKeyed || (isServiceAccount && !!loadServiceAccounts);
+  const listsNames =
+    (isKeyed && !!loadResources) || (isServiceAccount && !!loadServiceAccounts);
   const nameInvalid =
     strict &&
     listsNames &&
@@ -288,28 +294,25 @@ export function SecretKeySelector({
             ariaLabel="Static value"
           />
         ) : isOnePassword ? (
-          (() => {
-            if (!onePassword) {
-              throw new Error(
-                "SecretKeySelector onepassword source requires onePassword loaders",
-              );
-            }
-            return (
-              <div className={VALUE_FIELD} data-slot="secret-onepassword-field">
-                <OnePasswordSelector
-                  value={opRef}
-                  onChange={setOpRef}
-                  {...onePassword}
-                  allowCustomValue
-                />
-              </div>
-            );
-          })()
+          onePassword ? (
+            <div className={VALUE_FIELD} data-slot="secret-onepassword-field">
+              <OnePasswordSelector
+                value={opRef}
+                onChange={setOpRef}
+                {...onePassword}
+                allowCustomValue
+              />
+            </div>
+          ) : (
+            <TextField
+              value={opRef}
+              onChange={setOpRef}
+              placeholder="op://vault/item/field"
+              ariaLabel="1Password reference"
+            />
+          )
         ) : isServiceAccount ? (
-          <div
-            className={VALUE_FIELD}
-            data-slot="secret-serviceaccount-field"
-          >
+          <div className={VALUE_FIELD} data-slot="secret-serviceaccount-field">
             <Combobox
               options={nameOptions}
               value={selectedName}
@@ -329,10 +332,7 @@ export function SecretKeySelector({
             )}
             data-slot="secret-reference-fields"
           >
-            <div
-              className={RESOURCE_FIELD}
-              data-slot="secret-resource-field"
-            >
+            <div className={RESOURCE_FIELD} data-slot="secret-resource-field">
               <Combobox
                 options={nameOptions}
                 value={selectedName}
