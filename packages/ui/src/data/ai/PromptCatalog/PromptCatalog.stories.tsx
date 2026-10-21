@@ -123,13 +123,13 @@ const ENTRIES: PromptCatalogEntry[] = [
     defaultRaw: COMMIT_DEFAULT,
     effective: {
       model: "claude-haiku-4-5",
-      backend: "claude-agent",
+      mode: "agent",
       modelSource: "operation",
     },
     provenance: {
       model: "user-home",
       body: "prompt default",
-      backend: "ai base",
+      mode: "ai base",
     },
     layers: [
       { ...HOME, source: "inline", fields: ["model"] },
@@ -153,7 +153,7 @@ const ENTRIES: PromptCatalogEntry[] = [
     defaultRaw: TODOS_RUN_DEFAULT,
     effective: {
       model: "claude-opus-4-6",
-      backend: "claude-agent",
+      mode: "agent",
       effort: "high",
       modelSource: "operation",
     },
@@ -188,7 +188,7 @@ const ENTRIES: PromptCatalogEntry[] = [
     defaultRaw: LINT_DEFAULT,
     effective: {
       model: "claude-sonnet-4-6",
-      backend: "claude-agent",
+      mode: "agent",
       modelSource: "prompt default",
     },
     provenance: { model: "prompt default", body: "prompt default" },
@@ -206,7 +206,7 @@ const ENTRIES: PromptCatalogEntry[] = [
     version: "1122334455667788",
     body: SECURITY_INLINE,
     variables: ["body"],
-    effective: { model: "gpt-5", backend: "openai", modelSource: "ai base" },
+    effective: { model: "gpt-5", mode: "api", modelSource: "ai base" },
     provenance: { body: "git-root", model: "ai base" },
     layers: [
       { ...HOME, editable: false, scope: undefined },

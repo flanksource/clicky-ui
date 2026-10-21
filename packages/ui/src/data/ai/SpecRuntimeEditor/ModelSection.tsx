@@ -11,12 +11,9 @@ import { IconButton } from "../../../components";
 import { cn } from "../../../lib/utils";
 import {
   UiAdd,
-  UiCoins,
-  UiCurrencyDollar,
   UiFingerprint,
   UiRepeat,
   UiSparkles,
-  UiTimer,
   UiTrash,
 } from "../../../icons";
 import type {
@@ -27,22 +24,16 @@ import { ProviderStatusPanel } from "../../runtime/ProviderStatusPanel";
 import { RuntimeBar } from "../../runtime/RuntimeBar";
 import {
   SUPPORT_ALL_RUNTIME_FIELDS,
-  runtimeFieldSupport,
   type RuntimeFieldSupport,
 } from "../../runtime/runtime-field-support";
 import {
   SPEC_RUNTIME_FAMILIES,
   firstMode,
   modeOptionFor,
-  runtimeModeError,
-  runtimeModeFromModel,
-  runtimeModelError,
   type SpecRuntimeFamily,
 } from "../../runtime/runtime-mode";
-import { familyForModel } from "../../../lib/runtime-family";
-import { CheckboxField, NumberField, SpecField, SpecInput } from "./fields";
-import type { SpecRuntimeHostField } from "./types";
-import { withBudgetValue, withOptionalRoot, withRoot } from "./update";
+import { CheckboxField, SpecField, SpecInput } from "./fields";
+import { withOptionalRoot, withRoot } from "./update";
 
 type FallbackDraftPatch = {
   model?: string | undefined;
@@ -54,110 +45,14 @@ type FallbackDraftPatch = {
 };
 
 export function ModelSection({
-  value,
-  onChange,
   models,
-  families,
-  effectiveMode,
-  effectiveModel,
-  hostFields = [],
+  families = SPEC_RUNTIME_FAMILIES,
 }: {
-  value: AISpecRuntimeValue;
-  onChange: (value: AISpecRuntimeValue) => void;
   models: ChatModel[];
   families?: SpecRuntimeFamily[] | undefined;
-  effectiveMode?: string | undefined;
-  effectiveModel?: string | undefined;
-  hostFields?: readonly SpecRuntimeHostField[] | undefined;
 }) {
-  const runtimeFamilies = families?.length ? families : SPEC_RUNTIME_FAMILIES;
-  const selectedFamily = familyForModel(
-    runtimeFamilies,
-    models,
-    value.model || effectiveModel,
-  );
-  const specMode =
-    runtimeModeFromModel(value.model) ||
-    value.mode?.trim() ||
-    effectiveMode?.trim() ||
-    firstMode(runtimeFamilies[0] ?? SPEC_RUNTIME_FAMILIES[0]!).id;
-  const supports =
-    (runtimeModelError(value.model || effectiveModel) ??
-    runtimeModeError(runtimeFamilies, specMode, selectedFamily?.id))
-      ? SUPPORT_ALL_RUNTIME_FIELDS
-      : runtimeFieldSupport(runtimeFamilies, specMode, selectedFamily?.id);
-  // The bar owns family, mode, model and effort — including the free-text model
-  // entry for families the catalog does not describe.
   return (
-    <div className="grid gap-density-2">
-      {!hostFields.includes("runtime") && (
-        <RuntimeBar
-          value={value}
-          onChange={onChange}
-          models={models}
-          effectiveMode={effectiveMode}
-          effectiveModel={effectiveModel}
-          showModel={supports("model")}
-          showEffort={supports("effort")}
-          families={runtimeFamilies}
-        />
-      )}
-      <div className="grid grid-cols-2 gap-density-2 md:grid-cols-4">
-        {supports("budget.cost") && !hostFields.includes("budget.cost") && (
-          <NumberField
-            label="Max cost (USD)"
-            value={value.budget?.cost}
-            onChange={(cost) => onChange(withBudgetValue(value, "cost", cost))}
-            icon={UiCurrencyDollar}
-            min={0}
-            step={0.01}
-          />
-        )}
-        <NumberField
-          label="Max tokens"
-          value={value.budget?.maxTokens}
-          onChange={(maxTokens) =>
-            onChange(withBudgetValue(value, "maxTokens", maxTokens))
-          }
-          icon={UiCoins}
-          min={0}
-          step={1}
-          integer
-        />
-        {supports("budget.maxTurns") && (
-          <NumberField
-            label="Max turns"
-            value={value.budget?.maxTurns}
-            onChange={(maxTurns) =>
-              onChange(withBudgetValue(value, "maxTurns", maxTurns))
-            }
-            icon={UiRepeat}
-            min={0}
-            max={100}
-            step={1}
-            integer
-          />
-        )}
-        {!hostFields.includes("budget.timeout") && (
-          <SpecField label="Timeout">
-            <SpecInput
-              value={value.budget?.timeout}
-              onChange={(timeout) =>
-                onChange(withBudgetValue(value, "timeout", timeout))
-              }
-              placeholder="30m"
-              icon={UiTimer}
-              mono
-            />
-          </SpecField>
-        )}
-      </div>
-      <ProviderStatusPanel
-        models={models}
-        families={runtimeFamilies}
-        defaultCollapsed
-      />
-    </div>
+    <ProviderStatusPanel models={models} families={families} defaultCollapsed />
   );
 }
 
@@ -167,12 +62,14 @@ export function ModelAdvanced({
   models = [],
   families,
   supports = SUPPORT_ALL_RUNTIME_FIELDS,
+  variant = "run",
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
   models?: ChatModel[] | undefined;
   families?: SpecRuntimeFamily[] | undefined;
   supports?: RuntimeFieldSupport | undefined;
+  variant?: "run" | "preset" | undefined;
 }) {
   return (
     <div className="grid gap-density-2">
@@ -182,7 +79,7 @@ export function ModelAdvanced({
         models={models}
         {...(families ? { families } : {})}
       />
-      {supports("sessionId") && (
+      {variant === "preset" && supports("sessionId") && (
         <SpecField label="Session ID">
           <SpecInput
             value={value.sessionId}

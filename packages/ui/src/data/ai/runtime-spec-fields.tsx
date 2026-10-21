@@ -13,11 +13,13 @@ import { UNSPECIFIED_LABEL, unspecifiedHint } from "../runtime/unspecified";
 import { permissionField } from "./PromptRunEditor/runtimeActions";
 import type {
   AISpecRuntimeValue,
+  AISpecRuntimeCommit,
   SpecCommitPhase,
   SpecWorktreeMode,
 } from "./SpecRuntimeEditor.model";
 import {
   commitPhase,
+  commitPhaseFromEntry,
   withCommitPhase,
   withWorktree,
   withWorktreeMode,
@@ -42,6 +44,8 @@ export function runtimeSpecFields({
   models = [],
   effectiveMode,
   effectiveModel,
+  variant = "run",
+  inheritedCommits,
 }: {
   value: AISpecRuntimeValue;
   onChange: (next: AISpecRuntimeValue) => void;
@@ -49,6 +53,8 @@ export function runtimeSpecFields({
   models?: ChatModel[];
   effectiveMode?: string | undefined;
   effectiveModel?: string | undefined;
+  variant?: "run" | "preset" | undefined;
+  inheritedCommits?: AISpecRuntimeCommit[] | undefined;
 }): RuntimeBarAction[] {
   const permission = permissionField({
     spec: value,
@@ -60,17 +66,19 @@ export function runtimeSpecFields({
   });
   return [
     ...(permission ? [{ ...permission, label: "Permission mode" }] : []),
-    sourceField({ value, onChange }),
-    commitField({ value, onChange }),
+    sourceField({ value, onChange, variant }),
+    commitField({ value, onChange, inheritedCommits }),
   ];
 }
 
 function sourceField({
   value,
   onChange,
+  variant,
 }: {
   value: AISpecRuntimeValue;
   onChange: (next: AISpecRuntimeValue) => void;
+  variant: "run" | "preset";
 }): RuntimeBarAction {
   const mode = value.setup?.checkout?.worktree?.mode;
   const label =
@@ -92,7 +100,7 @@ function sourceField({
         <span className={SEGMENT_CAPTION_CLASS}>{label}</span>
       </>
     ),
-    ...(mode === "existing" || mode === "new"
+    ...(variant !== "preset" && (mode === "existing" || mode === "new")
       ? {
           header: (
             <div className="grid gap-1">
@@ -138,21 +146,29 @@ function sourceField({
 function commitField({
   value,
   onChange,
+  inheritedCommits,
 }: {
   value: AISpecRuntimeValue;
   onChange: (next: AISpecRuntimeValue) => void;
+  inheritedCommits?: AISpecRuntimeCommit[] | undefined;
 }): RuntimeBarAction {
   const isSet = value.workflow?.commits !== undefined;
-  const phase = commitPhase(value);
-  const label = isSet
-    ? COMMIT_OPTIONS.find((option) => option.value === phase)!.label
-    : UNSPECIFIED_LABEL;
+  const inherited = !isSet && inheritedCommits !== undefined;
+  const phase = inherited
+    ? inheritedCommits[0]
+      ? commitPhaseFromEntry(inheritedCommits[0])
+      : "none"
+    : commitPhase(value);
+  const label =
+    isSet || inherited
+      ? COMMIT_OPTIONS.find((option) => option.value === phase)!.label
+      : UNSPECIFIED_LABEL;
   return {
     id: "workflow.commits",
     label: "Commit",
-    title: `Commit — ${label}`,
+    title: `Commit — ${label}${inherited ? " (inherited)" : ""}`,
     icon: UiGitCommit,
-    isSet,
+    isSet: isSet || inherited,
     caption: (
       <>
         <span className={SEGMENT_KEY_CLASS}>Commit</span>
@@ -160,7 +176,10 @@ function commitField({
           icon={UiGitCommit}
           className="size-4 shrink-0 text-muted-foreground"
         />
-        <span className={SEGMENT_CAPTION_CLASS}>{label}</span>
+        <span className={SEGMENT_CAPTION_CLASS}>
+          {label}
+          {inherited ? " (inherited)" : ""}
+        </span>
       </>
     ),
     items: [

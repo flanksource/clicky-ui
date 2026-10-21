@@ -8,7 +8,11 @@ import type {
 } from "../../components/SecretKeySelector";
 import type { ChatModel } from "../chat/types";
 import type { SpecRuntimeFamily } from "../runtime/runtime-mode";
-import { SpecRuntimeEditor } from "./SpecRuntimeEditor";
+import {
+  SpecRuntimeEditor,
+  type SpecRuntimeEditorProps,
+} from "./SpecRuntimeEditor";
+import { SpecRuntimeBar } from "./SpecRuntimeBar";
 import type { AISpecRuntimeValue } from "./SpecRuntimeEditor.model";
 
 const RESOURCES: Record<SecretKind, SecretResource[]> = {
@@ -86,23 +90,30 @@ function policyRadio(tool: string, mode: string) {
   ).getByRole("radio", { name: mode });
 }
 
-function openPermissionsAdvanced() {
-  fireEvent.click(
-    within(screen.getByLabelText("Permissions")).getByRole("button", {
-      name: /Advanced/,
-    }),
+function RuntimeEditor(props: SpecRuntimeEditorProps) {
+  return (
+    <SpecRuntimeEditor
+      {...props}
+      beforeSections={
+        <SpecRuntimeBar
+          value={props.value}
+          onChange={props.onChange}
+          models={props.models}
+          families={props.families}
+          effectiveMode={props.effectiveMode}
+          effectiveModel={props.effectiveModel}
+          readOnly={props.readOnly}
+          variant={props.variant}
+        />
+      }
+    />
   );
 }
 
-function commitPhaseSelect() {
-  return within(screen.getByRole("region", { name: "Commit" })).getByRole(
-    "combobox",
-  );
-}
-
-function chooseCommitPhase(name: string) {
-  fireEvent.focus(commitPhaseSelect());
-  fireEvent.mouseDown(screen.getByRole("option", { name }));
+async function chooseBarField(field: string, name: string) {
+  fireEvent.click(screen.getByRole("button", { name: "Runtime options" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: field }));
+  fireEvent.click(await screen.findByRole("menuitem", { name, exact: true }));
 }
 
 function openModelAdvanced() {
@@ -113,7 +124,7 @@ function openModelAdvanced() {
   );
 }
 
-describe("SpecRuntimeEditor", () => {
+describe("runtime bar and detailed editor", () => {
   it("keeps legacy runtime values editable and marks them as invalid model configuration", () => {
     const canonicalFamilies: SpecRuntimeFamily[] = [
       {
@@ -128,7 +139,7 @@ describe("SpecRuntimeEditor", () => {
     ];
 
     render(
-      <SpecRuntimeEditor
+      <RuntimeEditor
         value={{ model: "haiku", mode: "anthropic" }}
         onChange={vi.fn()}
         families={canonicalFamilies}
@@ -148,7 +159,7 @@ describe("SpecRuntimeEditor", () => {
 
   it("rejects legacy provider prefixes in compact model values", () => {
     render(
-      <SpecRuntimeEditor
+      <RuntimeEditor
         value={{ model: "anthropic:haiku", mode: "agent" }}
         onChange={vi.fn()}
         sections={["model", "prompt"]}
@@ -172,7 +183,7 @@ describe("SpecRuntimeEditor", () => {
     const onChange = vi.fn();
 
     render(
-      <SpecRuntimeEditor
+      <RuntimeEditor
         value={value}
         onChange={onChange}
         secretSelector={{ loadResources, loadKeyPreview }}
@@ -199,9 +210,9 @@ describe("SpecRuntimeEditor", () => {
     expect(screen.getByText("Environment variables")).toBeInTheDocument();
     expect(screen.getByText("Git checkout")).toBeInTheDocument();
     expect(screen.getByText("Verify fixture")).toBeInTheDocument();
-    // The commit phase select is the section's always-present control; the
-    // message and dry-run fields belong to a policy that does not exist yet.
-    expect(commitPhaseSelect()).toHaveValue("Never");
+    expect(
+      screen.queryByRole("combobox", { name: "Commit" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Commit message")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /CAPTAIN_MODE.*demo/ }));
@@ -217,7 +228,7 @@ describe("SpecRuntimeEditor", () => {
     });
   });
 
-  it("reveals workspace fields per mode and clears dependent values on switches", () => {
+  it("reveals workspace fields per mode and clears dependent values on bar switches", async () => {
     const initialValue: AISpecRuntimeValue = {
       setup: {
         checkout: {
@@ -237,7 +248,7 @@ describe("SpecRuntimeEditor", () => {
 
     function Host() {
       const [value, setValue] = useState(initialValue);
-      return <SpecRuntimeEditor value={value} onChange={setValue} />;
+      return <RuntimeEditor value={value} onChange={setValue} />;
     }
 
     render(<Host />);
@@ -254,32 +265,32 @@ describe("SpecRuntimeEditor", () => {
     fireEvent.click(within(checkoutGroup()).getByText("Remote"));
     expect(screen.getByLabelText("Git URL")).toHaveValue("");
 
-    const worktreeGroup = () =>
-      screen.getByRole("radiogroup", { name: "Worktree mode" });
-    fireEvent.click(within(worktreeGroup()).getByText("Existing"));
+    await chooseBarField("Source", "Existing worktree");
     expect(screen.queryByText("Worktree prefix")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Worktree path")).toHaveValue(
+    fireEvent.click(screen.getByTitle("Source — Existing worktree"));
+    expect(await screen.findByLabelText("Worktree path")).toHaveValue(
       ".shell/worktrees/runtime",
     );
-    fireEvent.click(within(worktreeGroup()).getByText("None"));
-    expect(screen.queryByText("Worktree path")).not.toBeInTheDocument();
-    fireEvent.click(within(worktreeGroup()).getByText("New"));
-    expect(screen.getByLabelText("Worktree path")).toHaveValue("");
+    fireEvent.keyDown(document, { key: "Escape" });
+    await chooseBarField("Source", "HEAD");
+    expect(screen.queryByLabelText("Worktree path")).not.toBeInTheDocument();
+    await chooseBarField("Source", "New worktree");
+    fireEvent.click(screen.getByTitle("Source — New worktree"));
+    expect(await screen.findByLabelText("Worktree path")).toHaveValue("");
+    fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.getByLabelText("Keep worktree")).not.toBeChecked();
     expect(screen.getByLabelText("Report changes since")).toHaveValue(
       "origin/main",
     );
   });
 
-  // The commit phase is what makes per-turn commits reachable at all, and
-  // "Never" has to mean an absent policy rather than a lingering config.
-  it("edits a commit policy through the phase select and drops it on Never", () => {
+  it("edits a commit policy through the bar and explicitly clears it on Never", async () => {
     const onChange = vi.fn();
 
     function Host() {
       const [value, setValue] = useState<AISpecRuntimeValue>({});
       return (
-        <SpecRuntimeEditor
+        <RuntimeEditor
           value={value}
           onChange={(next) => {
             onChange(next);
@@ -291,7 +302,7 @@ describe("SpecRuntimeEditor", () => {
 
     render(<Host />);
 
-    chooseCommitPhase("Every turn");
+    await chooseBarField("Commit", "Every turn");
     expect(onChange).toHaveBeenLastCalledWith({
       workflow: { commits: [{ on: "turn" }] },
     });
@@ -305,14 +316,14 @@ describe("SpecRuntimeEditor", () => {
       },
     });
 
-    chooseCommitPhase("Never");
+    await chooseBarField("Commit", "Never");
     expect(onChange).toHaveBeenLastCalledWith({ workflow: { commits: [] } });
     expect(screen.queryByLabelText("Commit message")).not.toBeInTheDocument();
   });
 
   it("moves prompt schema into advanced without source and metadata controls", () => {
     render(
-      <SpecRuntimeEditor
+      <RuntimeEditor
         value={
           {
             prompt: {
@@ -355,7 +366,7 @@ describe("SpecRuntimeEditor", () => {
         fallbacks: [{ model: "openai/gpt-4o", effort: "low" }],
       });
       return (
-        <SpecRuntimeEditor
+        <RuntimeEditor
           value={value}
           onChange={setValue}
           models={SAMPLE_MODELS}
@@ -371,23 +382,18 @@ describe("SpecRuntimeEditor", () => {
 
     expect(
       within(modelSection).getByRole("button", {
-        name: /Advanced · fallbacks, session, caching/,
+        name: /Advanced · fallbacks, caching/,
       }),
     ).toHaveAttribute("aria-expanded", "true");
     expect(
       within(modelSection).getByText("Fallback models"),
     ).toBeInTheDocument();
     expect(
-      within(modelSection).getByPlaceholderText("session UUID"),
-    ).toBeInTheDocument();
+      within(modelSection).queryByPlaceholderText("session UUID"),
+    ).not.toBeInTheDocument();
     expect(
       within(modelSection).getByText("Disable prompt caching"),
     ).toBeInTheDocument();
-    expect(
-      within(modelSection)
-        .getByPlaceholderText("session UUID")
-        .closest('[class~="md:grid-cols-2"]'),
-    ).toBeNull();
 
     expect(within(modelSection).getByText("GPT-4o")).toBeInTheDocument();
     const gpt4oRow = within(modelSection).getByRole("button", {
@@ -442,9 +448,7 @@ describe("SpecRuntimeEditor", () => {
     expect(within(bar).getByTitle("Runtime mode — API")).toHaveTextContent(
       "API",
     );
-    expect(
-      within(bar).getByTitle("Model — unspecified"),
-    ).toBeInTheDocument();
+    expect(within(bar).getByTitle("Model — unspecified")).toBeInTheDocument();
     // The bar is the whole editor — temperature is no longer part of it.
     expect(
       within(picker).queryByLabelText("Temperature"),
@@ -507,7 +511,7 @@ describe("SpecRuntimeEditor", () => {
     function Host() {
       const [value, setValue] = useState(initialValue);
       return (
-        <SpecRuntimeEditor
+        <RuntimeEditor
           value={value}
           onChange={setValue}
           tools={SAMPLE_TOOLS}
@@ -522,8 +526,6 @@ describe("SpecRuntimeEditor", () => {
     }
 
     render(<Host />);
-
-    openPermissionsAdvanced();
 
     expect(policyRadio("Read", "Auto")).toBeChecked();
     expect(policyRadio("Write", "Deny")).toBeChecked();
@@ -550,16 +552,11 @@ describe("SpecRuntimeEditor", () => {
         permissions: { tools: { Read: "auto", Write: "deny", Bash: "deny" } },
       });
       return (
-        <SpecRuntimeEditor
-          value={value}
-          onChange={setValue}
-          tools={SAMPLE_TOOLS}
-        />
+        <RuntimeEditor value={value} onChange={setValue} tools={SAMPLE_TOOLS} />
       );
     }
 
     render(<Host />);
-    openPermissionsAdvanced();
 
     expect(
       screen.getByRole("radiogroup", { name: "Read policy" }),
@@ -578,7 +575,7 @@ describe("SpecRuntimeEditor", () => {
     ).toBeInTheDocument();
   });
 
-  it("changes the permission posture and clears it via Unspecified", () => {
+  it("changes the permission posture through the bar and clears it via Unspecified", async () => {
     function Host() {
       const [value, setValue] = useState<AISpecRuntimeValue>({
         mode: "agent",
@@ -586,7 +583,7 @@ describe("SpecRuntimeEditor", () => {
       });
       return (
         <>
-          <SpecRuntimeEditor
+          <RuntimeEditor
             value={value}
             onChange={setValue}
             tools={SAMPLE_TOOLS}
@@ -601,27 +598,22 @@ describe("SpecRuntimeEditor", () => {
 
     render(<Host />);
 
-    const posture = () =>
-      screen.getByRole("radiogroup", { name: "Permission posture" });
+    expect(screen.getByTitle("Permission posture — Plan")).toBeInTheDocument();
+    fireEvent.click(screen.getByTitle("Permission posture — Plan"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^-/ }));
     expect(
-      within(posture()).getByRole("radio", { name: "Plan" }),
-    ).toHaveAttribute("aria-checked", "true");
-
-    // Choosing Unspecified deletes permissions.mode outright.
-    fireEvent.click(
-      within(posture()).getByRole("radio", { name: "-" }),
-    );
+      screen.queryByTitle("Permission posture — Plan"),
+    ).not.toBeInTheDocument();
     expect(
-      within(posture()).getByRole("radio", { name: "-" }),
-    ).toHaveAttribute("aria-checked", "true");
-    expect(
-      JSON.parse(screen.getByLabelText("Permissions value").textContent ?? "{}"),
+      JSON.parse(
+        screen.getByLabelText("Permissions value").textContent ?? "{}",
+      ),
     ).not.toHaveProperty("mode");
   });
 
   it("shows the target chip in the header", () => {
     render(
-      <SpecRuntimeEditor
+      <RuntimeEditor
         value={{
           setup: {
             checkout: {
@@ -641,7 +633,7 @@ describe("SpecRuntimeEditor", () => {
   it("renders an ordered read-only prompt document presentation", () => {
     const onChange = vi.fn();
     render(
-      <SpecRuntimeEditor
+      <RuntimeEditor
         value={{
           prompt: {
             user: '{{role "system"}}\nBe concise.\n{{role "user"}}\n{{body}}',
@@ -673,7 +665,7 @@ describe("SpecRuntimeEditor", () => {
 
   it("keeps captain execution identity out of runtime profiles", () => {
     render(
-      <SpecRuntimeEditor
+      <RuntimeEditor
         value={{ mode: "agent" }}
         onChange={() => {}}
         families={[
@@ -740,7 +732,7 @@ describe("SpecRuntimeEditor", () => {
 
   it("hides the footer without callbacks and wires save/cancel when provided", () => {
     const { rerender } = render(
-      <SpecRuntimeEditor value={{}} onChange={() => {}} />,
+      <RuntimeEditor value={{}} onChange={() => {}} />,
     );
     expect(
       screen.queryByRole("button", { name: /Save & run/ }),
@@ -750,7 +742,7 @@ describe("SpecRuntimeEditor", () => {
     const onSave = vi.fn();
     const onCancel = vi.fn();
     rerender(
-      <SpecRuntimeEditor
+      <RuntimeEditor
         value={{}}
         onChange={() => {}}
         onSave={onSave}
@@ -770,7 +762,7 @@ describe("SpecRuntimeEditor", () => {
   it("renders the CLI flags section from a cliOptions schema", () => {
     const onChange = vi.fn();
     render(
-      <SpecRuntimeEditor
+      <RuntimeEditor
         value={{ cliArgs: { profile: "dev" } }}
         onChange={onChange}
         cliOptions={{
@@ -798,7 +790,7 @@ describe("SpecRuntimeEditor", () => {
       const [value, setValue] = useState<AISpecRuntimeValue>({
         mode: "cli",
       });
-      return <SpecRuntimeEditor value={value} onChange={setValue} />;
+      return <RuntimeEditor value={value} onChange={setValue} />;
     }
 
     render(<Host />);
@@ -820,22 +812,22 @@ describe("SpecRuntimeEditor", () => {
   });
 
   it("collapses a section when its heading toggle is clicked", () => {
-    render(<SpecRuntimeEditor value={{}} onChange={() => {}} />);
+    render(<RuntimeEditor value={{}} onChange={() => {}} />);
 
     const section = screen.getByRole("region", { name: "Model" });
     expect(
-      within(section).getByRole("group", { name: "Runtime" }),
+      within(section).getByRole("button", { name: /Advanced/ }),
     ).toBeInTheDocument();
 
     fireEvent.click(within(section).getByRole("button", { name: /Model/ }));
     expect(
-      within(section).queryByRole("group", { name: "Runtime" }),
+      within(section).queryByRole("button", { name: /Advanced/ }),
     ).not.toBeInTheDocument();
   });
 
-  it("shows provider status below the model budget and collapses it by default", () => {
+  it("shows provider status below the runtime bar and collapses it by default", () => {
     render(
-      <SpecRuntimeEditor
+      <RuntimeEditor
         value={{ mode: "agent" }}
         onChange={() => {}}
         models={[
@@ -870,13 +862,13 @@ describe("SpecRuntimeEditor", () => {
     );
 
     const modelSection = screen.getByRole("region", { name: "Model" });
-    const maxCost = within(modelSection).getByLabelText("Max cost (USD)");
+    const bar = screen.getByRole("group", { name: "Runtime" });
     const providerStatus = within(modelSection).getByRole("button", {
       name: "Provider status, 1 issue",
     });
     expect(providerStatus).toHaveAttribute("aria-expanded", "false");
     expect(
-      maxCost.compareDocumentPosition(providerStatus) &
+      bar.compareDocumentPosition(providerStatus) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
@@ -890,7 +882,7 @@ describe("SpecRuntimeEditor", () => {
 
   it("preset variant shows Unspecified for model, effort, and permission mode", () => {
     render(
-      <SpecRuntimeEditor
+      <RuntimeEditor
         value={{}}
         onChange={vi.fn()}
         models={SAMPLE_MODELS}
@@ -901,17 +893,13 @@ describe("SpecRuntimeEditor", () => {
       />,
     );
 
-    const modelSection = screen.getByRole("region", { name: "Model" });
+    const bar = screen.getByRole("group", { name: "Runtime" });
+    expect(within(bar).getByTitle("Model — unspecified")).toBeInTheDocument();
     expect(
-      within(modelSection).getByTitle("Model — unspecified"),
+      screen.queryByRole("radiogroup", { name: "Permission posture" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(bar).getByRole("button", { name: "Runtime options" }),
     ).toBeInTheDocument();
-    // The model and reasoning-effort segments both read "-" (Unspecified).
-    expect(within(modelSection).getAllByText("-")).toHaveLength(2);
-
-    expect(
-      within(
-        screen.getByRole("radiogroup", { name: "Permission posture" }),
-      ).getByRole("radio", { name: "-" }),
-    ).toHaveAttribute("aria-checked", "true");
   });
 });

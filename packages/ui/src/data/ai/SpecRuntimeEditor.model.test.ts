@@ -321,7 +321,7 @@ describe("buildAISpecRuntimePayload", () => {
     ).toThrow('permissions.mode "bogus" is invalid');
   });
 
-  it("omits empty setup and local workflow sections", () => {
+  it("omits empty setup and verify fields while preserving explicit Never", () => {
     expect(
       buildAISpecRuntimePayload({
         setup: {
@@ -341,7 +341,7 @@ describe("buildAISpecRuntimePayload", () => {
           commits: [],
         },
       }),
-    ).toEqual({});
+    ).toEqual({ spec: { workflow: { commits: [] } } });
   });
 
   it("emits the verify and commit workflow into the spec", () => {

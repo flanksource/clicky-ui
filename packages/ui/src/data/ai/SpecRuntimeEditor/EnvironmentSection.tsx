@@ -1,6 +1,6 @@
 import { SecretKeySelector } from "../../../components/SecretKeySelector";
 import { AccordionList } from "../../../components/AccordionList";
-import { UiBraces, UiFileText, UiKey } from "../../../icons";
+import { UiBraces, UiFileText } from "../../../icons";
 import type {
   AISpecRuntimeEnvVar,
   AISpecRuntimeValue,
@@ -93,38 +93,14 @@ function EnvVarRows({
               mono
             />
             <div className="min-w-0">
-              {secretSelector ? (
-                <SecretKeySelector
-                  value={secretValueFromEnvVar(row)}
-                  onChange={(next) =>
-                    updateRow(envVarFromSecretValue(row.name ?? "", next))
-                  }
-                  loadResources={secretSelector.loadResources}
-                  loadKeyPreview={secretSelector.loadKeyPreview}
-                  {...(secretSelector.allowLiteral !== undefined
-                    ? { allowLiteral: secretSelector.allowLiteral }
-                    : {})}
-                  {...(secretSelector.strict !== undefined
-                    ? { strict: secretSelector.strict }
-                    : {})}
-                  className="min-w-0 flex-wrap text-xs"
-                />
-              ) : (
-                <SpecInput
-                  value={
-                    typeof row.valueFrom === "string"
-                      ? row.valueFrom
-                      : row.value
-                  }
-                  onChange={(next) =>
-                    updateRow({ ...row, value: next, valueFrom: "" })
-                  }
-                  placeholder="secret://name/key"
-                  ariaLabel="Environment variable value"
-                  icon={UiKey}
-                  mono
-                />
-              )}
+              <SecretKeySelector
+                value={secretValueFromEnvVar(row)}
+                onChange={(next) =>
+                  updateRow(envVarFromSecretValue(row.name ?? "", next))
+                }
+                {...secretSelector}
+                className="min-w-0 flex-wrap text-xs"
+              />
             </div>
           </div>
         )}

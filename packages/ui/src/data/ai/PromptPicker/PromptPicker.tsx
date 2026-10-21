@@ -7,6 +7,7 @@ import { Modal } from "../../../overlay/Modal";
 import { providerIcon, type ProviderGlyph } from "../../chat/provider-icons";
 import type { ChatModel } from "../../chat/types";
 import { SpecRuntimeEditor } from "../SpecRuntimeEditor";
+import { SpecRuntimeBar } from "../SpecRuntimeBar";
 import type { SpecSectionId } from "../SpecRuntimeEditor/types";
 import type { AISpecRuntimeValue } from "../SpecRuntimeEditor.model";
 import {
@@ -84,7 +85,7 @@ const DefaultModelIcon: ProviderGlyph = ({ className }) => (
 // "-agent" — which no longer exist.
 function runtimeModeMatchesShortcut(
   mode: { id: string },
-  shortcut: string
+  shortcut: string,
 ): boolean {
   return mode.id === shortcut;
 }
@@ -92,7 +93,7 @@ function runtimeModeMatchesShortcut(
 function resolveModelShortcut(
   detail: PromptSpecDetail,
   models: ChatModel[] | undefined,
-  families: SpecRuntimeFamily[] | undefined
+  families: SpecRuntimeFamily[] | undefined,
 ): PromptSpecDetail {
   if (!isValidPromptSpecDetail(detail)) return detail;
   const value = detail.spec.model;
@@ -106,7 +107,7 @@ function resolveModelShortcut(
   const runtimeFamilies = families ?? SPEC_RUNTIME_FAMILIES;
   if (
     !runtimeFamilies.some((family) =>
-      family.modes.some((item) => runtimeModeMatchesShortcut(item, mode))
+      family.modes.some((item) => runtimeModeMatchesShortcut(item, mode)),
     )
   ) {
     return detail;
@@ -139,13 +140,13 @@ function resolveModelShortcut(
 function modelForShortcut(
   value: string,
   alias: string,
-  models: ChatModel[]
+  models: ChatModel[],
 ): ChatModel {
   const normalizedAlias = alias.toLowerCase();
   const exact = models.filter((model) =>
     [model.id, model.label].some(
-      (candidate) => candidate.toLowerCase() === normalizedAlias
-    )
+      (candidate) => candidate.toLowerCase() === normalizedAlias,
+    ),
   );
   const matches = exact.length
     ? exact
@@ -155,13 +156,13 @@ function modelForShortcut(
             .toLowerCase()
             .split(/[\s/_.-]+/)
             .filter(Boolean)
-            .at(-1) === normalizedAlias
+            .at(-1) === normalizedAlias,
       );
   if (matches.length === 1) return matches[0]!;
   throw new Error(
     `model shortcut ${JSON.stringify(value)} matched ${
       matches.length
-    } catalog models`
+    } catalog models`,
   );
 }
 
@@ -169,7 +170,7 @@ function modeForShortcut(
   value: string,
   mode: string,
   model: ChatModel,
-  families: SpecRuntimeFamily[]
+  families: SpecRuntimeFamily[],
 ): string {
   const modes = new Set(
     families.flatMap((family) =>
@@ -177,14 +178,14 @@ function modeForShortcut(
         .filter(
           (item) =>
             runtimeModeMatchesShortcut(item, mode) &&
-            family.provider === model.provider
+            family.provider === model.provider,
         )
-        .map((item) => item.id)
-    )
+        .map((item) => item.id),
+    ),
   );
   if (modes.size === 1) return [...modes][0]!;
   throw new Error(
-    `model shortcut ${JSON.stringify(value)} matched ${modes.size} runtime modes`
+    `model shortcut ${JSON.stringify(value)} matched ${modes.size} runtime modes`,
   );
 }
 
@@ -237,7 +238,7 @@ export function PromptPickerField({
       onChange(
         next.source === "file"
           ? { file: next.path ?? "" }
-          : { inline: next.raw }
+          : { inline: next.raw },
       );
     }
     setEditing(false);
@@ -253,7 +254,7 @@ export function PromptPickerField({
           "flex h-9 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md border border-border bg-background px-2 text-left text-sm transition-colors",
           "hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           "disabled:cursor-not-allowed disabled:opacity-60",
-          shownError && "border-destructive/40 text-destructive"
+          shownError && "border-destructive/40 text-destructive",
         )}
         title={shownError || rowTitle}
         aria-label={`Edit prompt ${title}`}
@@ -312,14 +313,14 @@ export function SpecEditorDialog({
   sources = DEFAULT_SOURCES,
 }: SpecEditorDialogProps) {
   const [value, setValue] = useState<AISpecRuntimeValue>(() =>
-    specToPromptRuntimeValue(detail.spec, detail.body)
+    specToPromptRuntimeValue(detail.spec, detail.body),
   );
   const selectedSource = detail.source === "file" ? "file" : "inline";
   const initialSource = sources.includes(selectedSource)
     ? selectedSource
     : sources[0];
   const sourceOptions = SOURCE_OPTIONS.filter((option) =>
-    sources.includes(option.id)
+    sources.includes(option.id),
   );
   const [source, setSource] = useState<PromptSource>(initialSource);
   const [path, setPath] = useState(detail.path ?? "");
@@ -457,6 +458,15 @@ export function SpecEditorDialog({
           families={families}
           sections={sections}
           showHeader={false}
+          beforeSections={
+            <SpecRuntimeBar
+              value={value}
+              onChange={setValue}
+              models={models}
+              families={families}
+              sections={sections}
+            />
+          }
         />
       </div>
     </Modal>
@@ -465,7 +475,7 @@ export function SpecEditorDialog({
 
 function modelDisplay(
   detail: PromptSpecDetail | null,
-  models: ChatModel[] | undefined
+  models: ChatModel[] | undefined,
 ): { label: string; icon: ProviderGlyph } {
   const modelValue = detail?.spec?.model;
   const modelID =
@@ -473,7 +483,7 @@ function modelDisplay(
       ? modelValue.trim()
       : "";
   const matched = models?.find(
-    (model) => model.id === modelID || model.label === modelID
+    (model) => model.id === modelID || model.label === modelID,
   );
   const provider = matched?.provider ?? inferProvider(modelID);
   return {

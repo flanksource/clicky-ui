@@ -1,6 +1,7 @@
 import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
 import type { RuntimePreset } from "../runtime-profile";
 import { SpecRuntimeEditor } from "../SpecRuntimeEditor";
+import { SpecRuntimeBar } from "../SpecRuntimeBar";
 import type {
   SpecRuntimeSandboxCatalog,
   SpecRuntimeSecretSelectorConfig,
@@ -67,6 +68,15 @@ export function ProfileSpecEditor({
         sections={PROFILE_SECTIONS}
         defaultCollapsedSections={PROFILE_SECTIONS}
         showHeader={false}
+        beforeSections={
+          <SpecRuntimeBar
+            value={value}
+            onChange={onChange}
+            families={families}
+            effectiveMode={effectiveMode}
+            effectiveModel={effectiveModel}
+          />
+        }
       />
     </div>
   );

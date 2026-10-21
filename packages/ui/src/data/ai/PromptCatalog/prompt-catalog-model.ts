@@ -92,11 +92,11 @@ export function sourceLabel(source: PromptCatalogSource | "default"): string {
 }
 
 // runtimeSummary renders the effective model as one line (`claude-opus-4-6 ·
-// claude-agent · high`), or the reason there is none.
+// agent · high`), or the reason there is none.
 export function runtimeSummary(runtime: PromptCatalogRuntime): string {
   if (runtime.error) return runtime.error;
   if (!runtime.model) return `inherited at run time (${runtime.modelSource})`;
-  return [runtime.model, runtime.backend, runtime.effort]
+  return [runtime.model, runtime.mode, runtime.effort]
     .filter(Boolean)
     .join(" · ");
 }
