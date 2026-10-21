@@ -1,5 +1,4 @@
 export const COMBOBOX_MENU_MAX_WIDTH_PX = 400;
-export const COMBOBOX_MENU_MAX_HEIGHT_PX = 256;
 export const COMBOBOX_MOBILE_QUERY = "(max-width: 639px)";
 
 const COMBOBOX_MENU_EDGE_INSET_PX = 8;
@@ -76,7 +75,9 @@ export function calculateComboboxMenuPosition({
     anchor.top - COMBOBOX_MENU_ANCHOR_GAP_PX - COMBOBOX_MENU_EDGE_INSET_PX,
   );
   const openUp =
-    spaceBelow < COMBOBOX_MENU_MAX_HEIGHT_PX && spaceAbove > spaceBelow;
+    naturalHeight != null &&
+    naturalHeight > spaceBelow &&
+    spaceAbove > spaceBelow;
   const preferred = preferredWidth === undefined ? undefined : Math.min(Math.max(anchor.width, preferredWidth), Math.max(0, viewportWidth - COMBOBOX_MENU_EDGE_INSET_PX * 2));
   return menuPosition({
     strategy: "desktop",
@@ -92,10 +93,7 @@ export function calculateComboboxMenuPosition({
         viewportWidth - anchor.left - COMBOBOX_MENU_EDGE_INSET_PX,
       ),
     ),
-    maxHeight: Math.min(
-      COMBOBOX_MENU_MAX_HEIGHT_PX,
-      openUp ? spaceAbove : spaceBelow,
-    ),
+    maxHeight: openUp ? spaceAbove : spaceBelow,
   });
 }
 
