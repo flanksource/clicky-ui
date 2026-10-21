@@ -11,6 +11,7 @@ import {
 } from "vite";
 
 import { playgroundComments } from "./plugins/comments-server";
+import { playgroundBookmarklet } from "./plugins/bookmarklet-server";
 import { playgroundMarkdown } from "./plugins/markdown-vite-plugin";
 import { playgroundSources } from "./plugins/sources-server";
 import { playgroundRuntimeProfiles } from "./plugins/runtime-profiles-server";
@@ -79,6 +80,7 @@ export default defineConfig({
     tailwindcss(),
     playgroundMarkdown({ sourceRoot: resolve(root, "src") }),
     playgroundComments({ dir: playgroundDataDir }),
+    playgroundBookmarklet({ root, dir: playgroundDataDir }),
     playgroundRuntimeProfiles({
       permissionsURL:
         "http://localhost:9020/api/captain/ai/permissions/catalog",
@@ -131,6 +133,10 @@ export default defineConfig({
       {
         find: /^@flanksource\/clicky-ui\/utils$/,
         replacement: resolve(uiSrc, "utils.ts"),
+      },
+      {
+        find: /^@flanksource\/clicky-ui\/data$/,
+        replacement: resolve(uiSrc, "data.ts"),
       },
       {
         find: /^@flanksource\/clicky-ui\/expressions\/playground$/,

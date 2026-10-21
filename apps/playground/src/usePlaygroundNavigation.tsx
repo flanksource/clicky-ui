@@ -17,9 +17,13 @@ import {
 } from "@flanksource/clicky-ui/icons";
 
 import { countOpenCommentsByPage } from "./comments/counts";
-import { PLAYGROUND_COMMENT_CONFIG, type PageComment } from "./comments/useComments";
+import {
+  PLAYGROUND_COMMENT_CONFIG,
+  type PageComment,
+} from "./comments/useComments";
 import type { PageAction } from "./editor/PageManagement";
 import { buildPlaygroundNavSections } from "./navigation";
+import { useExternalCatalog } from "./bookmarklet/external-catalog";
 import {
   getMetaVersion,
   pageMeta,
@@ -60,20 +64,22 @@ export function usePlaygroundNavigation({
     getMetaVersion,
     getMetaVersion,
   );
+  const external = useExternalCatalog();
   const openCommentCounts = useMemo(
     () => countOpenCommentsByPage(allComments, PLAYGROUND_COMMENT_CONFIG),
     [allComments],
   );
 
   return useMemo(
-    () =>
-      buildPlaygroundNavSections(pages(), folders, {
+    () => [
+      ...buildPlaygroundNavSections(pages(), folders, {
         activeSlug: active?.slug,
         query,
         pageHref,
         drag,
         metaFor: pageMeta,
-        badgeFor: (entry) => commentBadge(openCommentCounts.get(entry.slug) ?? 0),
+        badgeFor: (entry) =>
+          commentBadge(openCommentCounts.get(entry.slug) ?? 0),
         folderBadgeFor: (_folder, folderPages) =>
           commentBadge(
             folderPages.reduce(
@@ -133,6 +139,22 @@ export function usePlaygroundNavigation({
           },
         ],
       }),
+      {
+        label: "External pages",
+        items: external.pages
+          .filter((page) =>
+            `${page.title} ${page.urls.join(" ")}`
+              .toLowerCase()
+              .includes(query.toLowerCase()),
+          )
+          .map((page) => ({
+            key: page.id,
+            label: page.title,
+            to: pageHref(page.id),
+            badge: commentBadge(openCommentCounts.get(page.id) ?? 0),
+          })),
+      },
+    ],
     [
       active?.slug,
       actionsDisabled,
@@ -140,6 +162,7 @@ export function usePlaygroundNavigation({
       drag,
       folders,
       metaVersion,
+      external.pages,
       openCommentCounts,
       pageHref,
       query,

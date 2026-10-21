@@ -11,6 +11,7 @@ import {
 
 import { PLAYGROUND_COMMENT_CONFIG, useComments } from "./comments/useComments";
 import { PlaygroundShell } from "./PlaygroundShell";
+import { ExternalWorkspace } from "./bookmarklet/ExternalWorkspace";
 import {
   PAGES,
   fallbackPageSlug,
@@ -35,7 +36,9 @@ export function App() {
       );
       return {
         ...parsed,
-        page: findPage(parsed.page)?.slug ?? fallbackPageSlug(pages()) ?? "",
+        page: parsed.page.startsWith("external:")
+          ? parsed.page
+          : (findPage(parsed.page)?.slug ?? fallbackPageSlug(pages()) ?? ""),
       };
     },
     build: buildPlaygroundRoute,
@@ -55,7 +58,8 @@ export function App() {
   useEffect(() => preloadMeta(PAGES), []);
 
   const active = findPage(route.page);
-  const comments = useComments(active?.slug ?? "", contentRef);
+  const isExternal = route.page.startsWith("external:");
+  const comments = useComments(route.page, contentRef, { poll: isExternal });
   const standardRoute = (
     page: string,
     view: PlaygroundRoute["view"] = route.view,
@@ -69,45 +73,66 @@ export function App() {
             comments={comments.comments}
             config={PLAYGROUND_COMMENT_CONFIG}
             resolveAnchor={strictAnchorResolver}
-            onCreate={comments.create}
+            {...(!isExternal ? { onCreate: comments.create } : {})}
             onReply={comments.reply}
             onUpdateStatus={comments.updateStatus}
             onClose={comments.close}
             onUpdateRating={comments.updateRating}
             onDelete={comments.remove}
           >
-            <PlaygroundShell
-              active={active}
-              allComments={comments.allComments}
-              contentRef={contentRef}
-              query={query}
-              onQueryChange={setQuery}
-              commentsError={comments.error}
-              view={route.view}
-              annotations={route.annotations}
-              {...(route.review ? { review: route.review } : {})}
-              {...(route.comment ? { selectedCommentId: route.comment } : {})}
-              pageHref={(slug) => buildPlaygroundRoute(standardRoute(slug))}
-              onViewChange={(view) =>
-                navigateRoute(standardRoute(route.page, view))
-              }
-              onAnnotationsChange={(annotations) =>
-                navigateRoute({ ...route, annotations })
-              }
-              onNavigate={(slug) => navigateRoute(standardRoute(slug ?? ""))}
-              onReviewNavigate={(page, comment) =>
-                navigateRoute({
-                  page,
-                  annotations: route.annotations,
-                  view: "preview",
-                  review: "resolved",
-                  ...(comment ? { comment } : {}),
-                })
-              }
-              onReviewExit={() => navigateRoute(standardRoute(route.page))}
-              onCommentAndReopen={comments.commentAndReopen}
-              onPrepareCommentSelection={comments.prepareSelection}
-            />
+            {isExternal ? (
+              <ExternalWorkspace
+                id={route.page}
+                comments={comments.allComments}
+                error={comments.error}
+                review={route.review === "resolved"}
+                {...(route.comment ? { selectedId: route.comment } : {})}
+                onReopen={comments.commentAndReopen}
+                navigate={(page, comment) =>
+                  navigateRoute({
+                    page,
+                    view: "preview",
+                    annotations: route.annotations,
+                    ...(comment
+                      ? { review: "resolved" as const, comment }
+                      : {}),
+                  })
+                }
+              />
+            ) : (
+              <PlaygroundShell
+                active={active}
+                allComments={comments.allComments}
+                contentRef={contentRef}
+                query={query}
+                onQueryChange={setQuery}
+                commentsError={comments.error}
+                view={route.view}
+                annotations={route.annotations}
+                {...(route.review ? { review: route.review } : {})}
+                {...(route.comment ? { selectedCommentId: route.comment } : {})}
+                pageHref={(slug) => buildPlaygroundRoute(standardRoute(slug))}
+                onViewChange={(view) =>
+                  navigateRoute(standardRoute(route.page, view))
+                }
+                onAnnotationsChange={(annotations) =>
+                  navigateRoute({ ...route, annotations })
+                }
+                onNavigate={(slug) => navigateRoute(standardRoute(slug ?? ""))}
+                onReviewNavigate={(page, comment) =>
+                  navigateRoute({
+                    page,
+                    annotations: route.annotations,
+                    view: "preview",
+                    review: "resolved",
+                    ...(comment ? { comment } : {}),
+                  })
+                }
+                onReviewExit={() => navigateRoute(standardRoute(route.page))}
+                onCommentAndReopen={comments.commentAndReopen}
+                onPrepareCommentSelection={comments.prepareSelection}
+              />
+            )}
           </CommentProvider>
         </RouterProvider>
       </DensityProvider>
