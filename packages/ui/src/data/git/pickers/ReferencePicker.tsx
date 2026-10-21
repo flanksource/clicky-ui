@@ -17,7 +17,12 @@ export function ReferencePicker<T>({ label, plural, option, custom, ...props }: 
 }) {
   const id = useId();
   const data = usePickerItems(props);
-  const options = data.items.map((item) => ({ ...option(item), ...(props.optionTrailing ? { trailing: props.optionTrailing(item) } : {}) }));
+  const options = data.items.map((item) => {
+    const choice = option(item);
+    return { ...choice, descriptionLayout: "inline" as const,
+      title: [choice.title ?? choice.label, choice.description].filter(Boolean).join("\n"),
+      ...(props.optionTrailing ? { trailing: props.optionTrailing(item) } : {}) };
+  });
   const selected = options.find((item) => item.value === props.value);
   const error = props.error ?? data.error;
   const loading = props.loading || data.loading;
@@ -25,6 +30,7 @@ export function ReferencePicker<T>({ label, plural, option, custom, ...props }: 
     <label htmlFor={id} className="block text-sm font-medium text-foreground">{label}</label>
     {props.help && <p id={`${id}-help`} className="text-xs text-muted-foreground">{props.help}</p>}
     <Combobox id={id} ariaLabel={label} value={props.value} options={options}
+      menuWidth={720}
       onChange={(value) => props.onChange(value, data.items.find((item) => option(item).value === value))}
       allowCustomValue={Boolean(custom)} {...(custom ? { onNew: custom } : {})}
       placeholder={props.placeholder ?? `Search ${plural}…`} loading={loading} disabled={props.disabled ?? false}

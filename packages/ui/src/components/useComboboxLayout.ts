@@ -27,11 +27,12 @@ export function useComboboxLabelWidth(
   return width;
 }
 
-export function useComboboxMenuPosition(
-  open: boolean,
-  anchorRef: RefObject<HTMLDivElement | null>,
-  listRef: RefObject<HTMLDivElement | null>,
-): ComboboxMenuPosition | null {
+export function useComboboxMenuPosition({ open, anchorRef, listRef, menuWidth }: {
+  open: boolean;
+  anchorRef: RefObject<HTMLDivElement | null>;
+  listRef: RefObject<HTMLDivElement | null>;
+  menuWidth?: number;
+}): ComboboxMenuPosition | null {
   const [position, setPosition] = useState<ComboboxMenuPosition | null>(null);
   const update = useCallback(() => {
     const anchor = anchorRef.current;
@@ -41,6 +42,7 @@ export function useComboboxMenuPosition(
       viewportWidth: window.innerWidth,
       viewportHeight: window.innerHeight,
       mobile: mediaMatches(COMBOBOX_MOBILE_QUERY),
+      ...(menuWidth !== undefined ? { preferredWidth: menuWidth } : {}),
       ...(listRef.current
         ? { naturalHeight: listRef.current.scrollHeight }
         : {}),
@@ -48,7 +50,7 @@ export function useComboboxMenuPosition(
     setPosition((current) =>
       sameComboboxMenuPosition(current, next) ? current : next,
     );
-  }, [anchorRef, listRef, open]);
+  }, [anchorRef, listRef, open, menuWidth]);
 
   useLayoutEffect(() => {
     if (!open) {
