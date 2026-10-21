@@ -55,10 +55,13 @@ function renderSection(
     commentActionUrls,
   }: CommentMarkdownOptions,
 ): string[] {
+  const capturedUrl = page.startsWith("external:")
+    ? comments.find((comment) => comment.element?.pageUrl)?.element?.pageUrl
+    : undefined;
   const out = [
     `## Playground feedback — ${page.split("/").at(-1) ?? page}`,
-    `- URL: ${pageUrl(page)}`,
-    `- source: \`${pagePath(page)}\``,
+    `- URL: ${capturedUrl ?? pageUrl(page)}`,
+    `- source: \`${capturedUrl ?? pagePath(page)}\``,
     "",
   ];
 
@@ -113,6 +116,8 @@ function renderSection(
     const element = elementByComment.get(root.id);
     if (element) {
       out.push("");
+      if (element.pageUrl)
+        out.push(`**Captured page:** ${element.pageUrl}`, "");
       if (element.componentName) {
         out.push(`**Component:** \`<${element.componentName}>\``, "");
       }

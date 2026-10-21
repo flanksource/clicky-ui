@@ -14,7 +14,8 @@ const SAFE_ID = /^[A-Za-z][\w-]*$/;
 const ROOT_ANCHOR = ":scope";
 const MAX_LABEL_TEXT = 60;
 const OVERLAY_SEPARATOR = " >> ";
-const OVERLAY_ANCHOR = /^\[role="dialog"\]\[aria-label="((?:[^"\\]|\\.)*)"\] >> /;
+const OVERLAY_ANCHOR =
+  /^\[role="dialog"\]\[aria-label="((?:[^"\\]|\\.)*)"\] >> /;
 
 function childIndex(parent: Element, child: Element): number {
   return Array.prototype.indexOf.call(parent.children, child) + 1;
@@ -41,7 +42,9 @@ export function cssPath(target: Element, root: Element): string {
     }
     const parent: Element | null = node.parentElement;
     if (!parent) break;
-    segments.unshift(`${node.tagName.toLowerCase()}:nth-child(${childIndex(parent, node)})`);
+    segments.unshift(
+      `${node.tagName.toLowerCase()}:nth-child(${childIndex(parent, node)})`,
+    );
     node = parent;
   }
 
@@ -55,7 +58,10 @@ export function cssPath(target: Element, root: Element): string {
  * an element inside a titled dialog is keyed on that dialog's `aria-label`
  * followed by a path within it. Anything else is not commentable (null).
  */
-export function commentAnchor(target: Element, content: Element): string | null {
+export function commentAnchor(
+  target: Element,
+  content: Element,
+): string | null {
   if (content.contains(target)) return cssPath(target, content);
   const dialog = target.closest('[role="dialog"][aria-label]');
   const label = dialog?.getAttribute("aria-label");
@@ -84,7 +90,8 @@ export function resolveAnchor(root: Element, anchor: string): Element | null {
 
 function query(root: ParentNode, selector: string): Element | null {
   try {
-    return root.querySelector(selector);
+    const matches = root.querySelectorAll(selector);
+    return matches.length === 1 ? (matches[0] ?? null) : null;
   } catch {
     // A selector stored against an older DOM can be unparseable. Treating that
     // as an orphan is the visible, domain-meaningful outcome — the sidebar says
@@ -105,12 +112,17 @@ export function describeElement(element: Element): string {
 
   const text = (element.textContent ?? "").replace(/\s+/g, " ").trim();
   if (text === "") return head;
-  const clipped = text.length > MAX_LABEL_TEXT ? `${text.slice(0, MAX_LABEL_TEXT)}…` : text;
+  const clipped =
+    text.length > MAX_LABEL_TEXT ? `${text.slice(0, MAX_LABEL_TEXT)}…` : text;
   return `${head} "${clipped}"`;
 }
 
 /** Re-expresses a viewport rect in the scrollable coordinate space of `root`. */
-export function boxWithin(target: Box, root: Box, scroll: { left: number; top: number }): Box {
+export function boxWithin(
+  target: Box,
+  root: Box,
+  scroll: { left: number; top: number },
+): Box {
   return {
     left: target.left - root.left + scroll.left,
     top: target.top - root.top + scroll.top,
@@ -121,8 +133,12 @@ export function boxWithin(target: Box, root: Box, scroll: { left: number; top: n
 
 /** DOM wrapper around `boxWithin` for a live element. */
 export function elementBoxWithin(element: Element, root: HTMLElement): Box {
-  return boxWithin(element.getBoundingClientRect(), root.getBoundingClientRect(), {
-    left: root.scrollLeft,
-    top: root.scrollTop,
-  });
+  return boxWithin(
+    element.getBoundingClientRect(),
+    root.getBoundingClientRect(),
+    {
+      left: root.scrollLeft,
+      top: root.scrollTop,
+    },
+  );
 }
