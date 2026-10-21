@@ -320,6 +320,7 @@ export {
   type RuntimeBarValue,
 } from "../runtime/RuntimeBar";
 export { runtimeSpecFields } from "./runtime-spec-fields";
+export { SpecRuntimeBar, type SpecRuntimeBarProps } from "./SpecRuntimeBar";
 export {
   useRuntimePresetMenu,
   type RuntimePresetMenuOptions,

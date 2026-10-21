@@ -28,7 +28,7 @@ const commit: PromptCatalogEntry = {
   version: "0c9f6601ed6035f3",
   effective: {
     model: "claude-haiku",
-    backend: "claude-agent",
+    mode: "agent",
     modelSource: "operation",
   },
   provenance: { model: "user-home", body: "prompt default" },
@@ -65,7 +65,7 @@ describe("PromptCatalogTable", () => {
 
     expect(screen.getByText("Commit message")).toBeInTheDocument();
     expect(screen.getByText("commit.message")).toBeInTheDocument();
-    expect(screen.getByText("claude-haiku · claude-agent")).toBeInTheDocument();
+    expect(screen.getByText("claude-haiku · agent")).toBeInTheDocument();
     expect(
       screen.getByText("model ← Home (~/.gavel.yaml)"),
     ).toBeInTheDocument();

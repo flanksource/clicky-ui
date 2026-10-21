@@ -11,11 +11,9 @@ import {
 } from "../../../icons";
 import {
   SPEC_CLONE_MODES,
-  SPEC_WORKTREE_MODES,
   type AISpecRuntimeValue,
   type SpecCheckoutMode,
   type SpecCloneMode,
-  type SpecWorktreeMode,
 } from "../SpecRuntimeEditor.model";
 import { secretValueFromString, stringFromSecretValue } from "./env-model";
 import {
@@ -33,7 +31,6 @@ import {
   withCheckoutMode,
   withSetup,
   withWorktree,
-  withWorktreeMode,
   worktreeMode,
 } from "./update";
 import {
@@ -46,11 +43,6 @@ const CHECKOUT_OPTIONS: Array<{ id: SpecCheckoutMode; label: string }> = [
   { id: "remote", label: "Remote" },
   { id: "local", label: "Local" },
 ];
-const WORKTREE_OPTIONS: Array<{ id: SpecWorktreeMode; label: string }> =
-  SPEC_WORKTREE_MODES.map((mode) => ({
-    id: mode,
-    label: mode === "none" ? "None" : mode === "new" ? "New" : "Existing",
-  }));
 export function WorkspaceSection({
   value,
   onChange,
@@ -101,15 +93,6 @@ export function WorkspaceSection({
           </div>
         </div>
         <div className="space-y-density-2">
-          <SpecField label="Worktree behavior">
-            <SegmentedControl
-              aria-label="Worktree mode"
-              size="sm"
-              value={worktree}
-              onChange={(mode) => onChange(withWorktreeMode(value, mode))}
-              options={WORKTREE_OPTIONS}
-            />
-          </SpecField>
           <div className="grid gap-density-2 md:grid-cols-2">
             <SpecField label="Uncommitted files" composite>
               <SpecSelect
@@ -273,15 +256,6 @@ export function WorkspaceSection({
       </div>
 
       <div className="space-y-density-2">
-        <SpecField label="Worktree">
-          <SegmentedControl
-            aria-label="Worktree mode"
-            size="sm"
-            value={worktree}
-            onChange={(mode) => onChange(withWorktreeMode(value, mode))}
-            options={WORKTREE_OPTIONS}
-          />
-        </SpecField>
         {worktree !== "none" && (
           <>
             <div className="grid gap-density-2 md:grid-cols-3">
@@ -310,14 +284,6 @@ export function WorkspaceSection({
                   </SpecField>
                 </>
               )}
-              <SpecField label="Worktree path">
-                <SpecInput
-                  value={value.setup?.checkout?.worktree?.path}
-                  onChange={(path) => onChange(withWorktree(value, { path }))}
-                  icon={UiFolder}
-                  mono
-                />
-              </SpecField>
             </div>
             {worktree === "new" && (
               <div className="grid gap-density-2 sm:grid-cols-[minmax(10rem,16rem)]">

@@ -111,7 +111,7 @@ describe("RuntimeBar", () => {
 
     expect(screen.getByRole("listbox").parentElement).toHaveStyle({
       maxWidth: "400px",
-      maxHeight: "256px",
+      maxHeight: `${window.innerHeight - 12}px`,
     });
   });
 

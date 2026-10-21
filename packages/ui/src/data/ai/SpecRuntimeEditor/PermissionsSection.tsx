@@ -1,12 +1,4 @@
-import { type AISpecRuntimeValue } from "../SpecRuntimeEditor.model";
 import {
-  SPEC_RUNTIME_FAMILIES,
-  type RuntimeSpecSchema,
-  type SpecRuntimeFamily,
-} from "../../runtime/runtime-mode";
-import { PermissionModeField } from "./PermissionModeField";
-import {
-  publishedPermissionModes,
   type PermissionDomain,
   type PermissionListEntry,
   type PermissionListMode,
@@ -18,33 +10,6 @@ import {
 } from "../../runtime/runtime-field-support";
 
 export function PermissionsSection({
-  value,
-  onChange,
-  families = SPEC_RUNTIME_FAMILIES,
-  schema,
-  effectiveMode,
-}: {
-  value: AISpecRuntimeValue;
-  onChange: (value: AISpecRuntimeValue) => void;
-  families?: SpecRuntimeFamily[] | undefined;
-  /** Runtime schema used to narrow the published `permissions.mode` enum. */
-  schema?: RuntimeSpecSchema | undefined;
-  effectiveMode?: string | undefined;
-}) {
-  return (
-    <div className="grid gap-density-3">
-      <PermissionModeField
-        value={value}
-        onChange={onChange}
-        families={families}
-        availableModes={publishedPermissionModes(schema)}
-        effectiveMode={effectiveMode}
-      />
-    </div>
-  );
-}
-
-export function PermissionsAdvanced({
   entries,
   onApplyEntries,
   onAddEntry,

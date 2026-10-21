@@ -3,11 +3,20 @@ import { describe, expect, it, vi } from "vitest";
 import { PermissionsSection } from "./PermissionsSection";
 
 describe("PermissionsSection", () => {
-  it("renders the permission posture", () => {
-    render(<PermissionsSection value={{ mode: "agent" }} onChange={vi.fn()} />);
+  it("keeps permission policies editable without a posture selector", () => {
+    render(
+      <PermissionsSection
+        entries={[]}
+        onApplyEntries={vi.fn()}
+        onAddEntry={vi.fn()}
+      />,
+    );
 
     expect(
-      screen.getByRole("radiogroup", { name: "Permission posture" }),
+      screen.queryByRole("radiogroup", { name: "Permission posture" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("No tools, MCP servers, or plugins configured"),
     ).toBeInTheDocument();
   });
 });

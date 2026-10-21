@@ -5,13 +5,11 @@ import type {
   SecretKind,
   SecretResource,
 } from "../../components/SecretKeySelector";
-import type { JsonSchemaObject } from "../../components/json-schema-form-types";
-import { JsonSchemaForm } from "../../components/JsonSchemaForm";
 import captainPromptSchema from "../../generated/storybook/captain-prompt.schema.json";
 import { MOCK_MODELS } from "../chat/Chat.fixtures";
 import type { ToolMeta } from "../chat/types";
 import { SpecRuntimeEditor } from "./SpecRuntimeEditor";
-import { ModelSection } from "./SpecRuntimeEditor/ModelSection";
+import { SpecRuntimeBar } from "./SpecRuntimeBar";
 import {
   buildAISpecRuntimePayload,
   type AISpecRuntimeCommit,
@@ -346,6 +344,14 @@ function SpecRuntimeEditorStory({
       value={value}
       onChange={setValue}
       models={MOCK_MODELS}
+      beforeSections={
+        <SpecRuntimeBar
+          value={value}
+          onChange={setValue}
+          models={MOCK_MODELS}
+          inheritedCommits={inheritedCommits}
+        />
+      }
       tools={SAMPLE_TOOLS}
       permissionCatalog={PERMISSION_CATALOG}
       secretSelector={{ loadResources, loadKeyPreview, strict: true }}
@@ -384,7 +390,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Full-page runtime spec editor: live summary rail with scrollspy nav and run-budget card, and stacked sections for model, prompt, workspace, permissions, environment, verification, commit, and per-backend CLI flags.",
+          "Detailed runtime settings composed with a RuntimeBar for identity, effort, permissions, cost, timeout, source, and commit timing.",
       },
     },
   },
@@ -420,197 +426,4 @@ export const EmptyWithInheritedCommit: Story = {
       inheritedCommits={[{ on: "run", stage: "worktree", gates: "full" }]}
     />
   ),
-};
-
-// Match the SpecField label chrome (text-xs, normal weight, muted) — JsonSchemaForm
-// labels default to text-sm/font-medium/foreground.
-const SCHEMA_LABEL = "text-xs font-normal text-muted-foreground";
-
-// The Model section expressed purely as JSON schema + presentation x-* extensions.
-// A consumer (captain) would author this; the library renders it. Enum VALUES are
-// the display strings here so the segmented/combobox labels read cleanly (the
-// x-enum-labels "Label (code)" form suits dropdowns, not compact toggles).
-// `then` below is the JSON Schema 2020-12 conditional keyword, not a Promise
-// thenable, so unicorn/no-thenable is a false positive on these schema literals.
-/* eslint-disable unicorn/no-thenable */
-const MODEL_SECTION_SCHEMA: JsonSchemaObject = {
-  type: "object",
-  "x-columns": 12,
-  "x-classes": "gap-2",
-  "x-order": [
-    "mode",
-    "model",
-    "effort",
-    "temperature",
-    "cost",
-    "maxTokens",
-    "maxTurns",
-    "timeout",
-  ],
-  properties: {
-    mode: {
-      type: "string",
-      title: "Mode",
-      enum: ["cmux", "CLI", "SDK", "API"],
-      "x-enum-icons": {
-        cmux: "columns",
-        CLI: "terminal",
-        SDK: "package",
-        API: "cloud",
-      },
-      "x-enum-display": "segmented",
-      "x-col-span": 12,
-      "x-label-classes": SCHEMA_LABEL,
-    },
-    // Base (Claude runtimes): a searchable model dropdown with provider icons. The
-    // if/then below swaps the option set for the Codex (cmux) runtime.
-    model: {
-      type: "string",
-      title: "Model",
-      enum: ["Claude Sonnet 4.5", "Claude Opus 4.1"],
-      "x-enum-icons": {
-        "Claude Sonnet 4.5": "anthropic",
-        "Claude Opus 4.1": "anthropic",
-      },
-      "x-enum-display": "combobox",
-      "x-input-classes": "border-border",
-      "x-col-span": 4,
-      "x-label-classes": SCHEMA_LABEL,
-    },
-    effort: {
-      type: "string",
-      title: "Effort",
-      enum: ["None", "Low", "Medium", "High", "Xhigh"],
-      "x-col-span": 4,
-      "x-label-classes": SCHEMA_LABEL,
-    },
-    temperature: {
-      type: "number",
-      title: "Temperature",
-      minimum: 0,
-      maximum: 2,
-      multipleOf: 0.1,
-      "x-input-prefix-icon": "thermometer",
-      "x-input-classes": "border-border",
-      "x-col-span": 4,
-      "x-label-classes": SCHEMA_LABEL,
-    },
-    cost: {
-      type: "number",
-      title: "Max cost (USD)",
-      minimum: 0,
-      multipleOf: 0.01,
-      "x-input-prefix-icon": "currency-dollar",
-      "x-input-classes": "border-border",
-      "x-col-span": 3,
-      "x-label-classes": SCHEMA_LABEL,
-    },
-    maxTokens: {
-      type: "integer",
-      title: "Max tokens",
-      minimum: 0,
-      maximum: 64000,
-      multipleOf: 1,
-      "x-number-display": "slider",
-      "x-col-span": 3,
-      "x-label-classes": SCHEMA_LABEL,
-    },
-    maxTurns: {
-      type: "integer",
-      title: "Max turns",
-      minimum: 0,
-      maximum: 100,
-      multipleOf: 1,
-      "x-input-prefix-icon": "repeat",
-      "x-input-classes": "border-border",
-      "x-col-span": 3,
-      "x-label-classes": SCHEMA_LABEL,
-    },
-    timeout: {
-      type: "string",
-      title: "Timeout",
-      enum: ["2m", "15m", "30m", "1h", "2h", "4h", "8h", "12h"],
-      default: "4h",
-      "x-input-prefix-icon": "timer",
-      "x-input-classes": "border-border",
-      "x-col-span": 3,
-      "x-label-classes": SCHEMA_LABEL,
-    },
-  },
-  allOf: [
-    {
-      // Codex (cmux) exposes a different model catalog than the Claude runtimes.
-      if: { properties: { mode: { const: "cmux" } } },
-      then: {
-        properties: {
-          model: {
-            type: "string",
-            title: "Model",
-            enum: ["GPT-4o", "o4-mini"],
-            "x-enum-icons": { "GPT-4o": "openai", "o4-mini": "openai" },
-            "x-enum-display": "combobox",
-            "x-input-classes": "border-border",
-            "x-col-span": 4,
-            "x-label-classes": SCHEMA_LABEL,
-          },
-        },
-      },
-    },
-  ],
-};
-/* eslint-enable unicorn/no-thenable */
-
-function ModelSectionParityStory() {
-  const [real, setReal] = useState<AISpecRuntimeValue>({
-    backend: "cli",
-    model: "anthropic/claude-sonnet-4-5",
-    effort: "medium",
-    temperature: 0.2,
-    budget: { cost: 0.5, maxTokens: 8000, maxTurns: 6, timeout: "4h" },
-  });
-  const [schemaValue, setSchemaValue] = useState<Record<string, unknown>>({
-    mode: "CLI",
-    model: "Claude Sonnet 4.5",
-    effort: "Medium",
-    temperature: 0.2,
-    cost: 0.5,
-    maxTokens: 8000,
-    maxTurns: 6,
-    timeout: "4h",
-  });
-  return (
-    <div className="grid gap-8 bg-background xl:grid-cols-2">
-      <section className="min-w-0">
-        <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Hand-built ModelSection
-        </h4>
-        <ModelSection value={real} onChange={setReal} models={MOCK_MODELS} />
-      </section>
-      <section className="min-w-0">
-        <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          JsonSchemaForm (schema-driven)
-        </h4>
-        <JsonSchemaForm
-          schema={MODEL_SECTION_SCHEMA}
-          value={schemaValue}
-          onChange={setSchemaValue}
-          size="md"
-          showPreferencesMenu={false}
-        />
-      </section>
-    </div>
-  );
-}
-
-export const ModelSectionFromSchema: Story = {
-  render: () => <ModelSectionParityStory />,
-  parameters: {
-    layout: "padded",
-    docs: {
-      description: {
-        story:
-          'The Model section rendered two ways: left is the hand-built `ModelSection`, which now leads with the single-line `RuntimeBar` (family/mode/model/effort as four menu segments) instead of stacked fields; right is a pure JSON schema fed to `JsonSchemaForm` using the presentation `x-*` extensions (`x-columns`/`x-col-span` for the 3- and 4-across rows, `x-enum-display: "segmented"` with `x-enum-icons` for Mode, `x-input-prefix-icon` on the inputs, and `x-input-classes`/`x-label-classes`/`x-classes` to match the editor\'s border, mono, label, and 8px-gap chrome). Model is a searchable dropdown whose options carry provider icons (shown in the closed field too) and change with the selected runtime — switch Mode to **cmux** and the model catalog swaps to Codex/OpenAI via a JSON-schema `if`/`then`. Numeric fields declare `multipleOf` so they render as real `<input type="number">` controls; **Max tokens** uses `x-number-display: "slider"` for a progress slider, and **Timeout** is an `enum` dropdown (2m…12h, default 4h). Proof that captain can own the schema. (Residuals: Mode renders at the same `md` size as the other controls rather than the editor\'s `sm`, and a ~2px prefix-icon offset.)',
-      },
-    },
-  },
 };

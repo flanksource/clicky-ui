@@ -46,7 +46,7 @@ export interface PromptCatalogLayer {
 // layer supplied its name.
 export interface PromptCatalogRuntime {
   model?: string | undefined;
-  backend?: string | undefined;
+  mode?: string | undefined;
   effort?: string | undefined;
   fallbacks?: string[] | undefined;
   modelSource: string;
@@ -88,7 +88,7 @@ export interface PromptRenderResult {
   user: string;
   system?: string | undefined;
   model?: string | undefined;
-  backend?: string | undefined;
+  mode?: string | undefined;
 }
 
 // PromptPageAdapter is what a host supplies to make the page operate on its
