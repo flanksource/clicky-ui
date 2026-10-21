@@ -253,7 +253,7 @@ function buildField(
     instancePath,
   };
   ({ label, value } = applyPostExtensions(
-    field,
+    valueCtx.readOnly ? { ...field, readOnly: true } : field,
     { label, value },
     ctx.post,
     postCtx,

@@ -52,7 +52,7 @@ function ScrollProbe({ scrollTo }: { scrollTo: ReturnType<typeof vi.fn> }) {
           scrollTo: { configurable: true, value: scrollTo },
         });
         container.getBoundingClientRect = () =>
-          ({ top: 50, height: 400 }) as DOMRect;
+          ({ top: 50, height: 400 } as DOMRect);
         ctx.contentRef.current = container;
       }}
     >
@@ -60,7 +60,7 @@ function ScrollProbe({ scrollTo }: { scrollTo: ReturnType<typeof vi.fn> }) {
         ref={(anchor) => {
           if (!anchor) return;
           anchor.getBoundingClientRect = () =>
-            ({ top: 250, height: 40 }) as DOMRect;
+            ({ top: 250, height: 40 } as DOMRect);
           ctx.registerAnchor("row.1", anchor);
         }}
       />
@@ -81,7 +81,7 @@ function ScrollProbe({ scrollTo }: { scrollTo: ReturnType<typeof vi.fn> }) {
         data-result="unset"
         onClick={(event) => {
           event.currentTarget.dataset.result = String(
-            ctx.scrollToAnchor("row.9"),
+            ctx.scrollToAnchor("row.9")
           );
         }}
       />
@@ -132,11 +132,81 @@ const AnchorActionsProbe = memo(function AnchorActionsProbe({
 });
 
 describe("CommentProvider", () => {
+  it.each([0, null])(
+    "reports external anchor geometry %s without a local document",
+    (top) => {
+      const geometry = vi.fn(() => top);
+      function Probe() {
+        const context = useCommentContext();
+        return (
+          <output data-testid="external-top">
+            {String(context.getAnchorTop("heading"))}
+          </output>
+        );
+      }
+      render(
+        <CommentProvider
+          comments={comments}
+          config={config}
+          getAnchorTop={geometry}
+        >
+          <Probe />
+        </CommentProvider>
+      );
+      expect(screen.getByTestId("external-top")).toHaveTextContent(String(top));
+      expect(geometry).toHaveBeenCalledWith("heading");
+    }
+  );
+  it.each([true, false])(
+    "returns the external navigation result %s without scrolling local content",
+    (found) => {
+      const localScroll = vi.fn();
+      const navigate = vi.fn(() => found);
+      const view = render(
+        <CommentProvider
+          comments={comments}
+          config={config}
+          onScrollToAnchor={navigate}
+        >
+          <ScrollProbe scrollTo={localScroll} />
+        </CommentProvider>
+      );
+      fireEvent.click(screen.getByTestId("scroll-anchor"));
+      expect(navigate).toHaveBeenCalledWith("row.1", {
+        behavior: "smooth",
+        block: "start",
+        offset: 12,
+      });
+      expect(localScroll).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByTestId("scroll-missing"));
+      expect(screen.getByTestId("scroll-missing")).toHaveAttribute(
+        "data-result",
+        String(found)
+      );
+      const replacement = vi.fn(() => !found);
+      view.rerender(
+        <CommentProvider
+          comments={comments}
+          config={config}
+          onScrollToAnchor={replacement}
+        >
+          <ScrollProbe scrollTo={localScroll} />
+        </CommentProvider>
+      );
+      fireEvent.click(screen.getByTestId("scroll-missing"));
+      expect(replacement).toHaveBeenCalledWith("row.9", {});
+      expect(screen.getByTestId("scroll-missing")).toHaveAttribute(
+        "data-result",
+        String(!found)
+      );
+    }
+  );
+
   it("derives per-anchor counts from the comment list", () => {
     render(
       <CommentProvider comments={comments} config={config}>
         <CountsProbe />
-      </CommentProvider>,
+      </CommentProvider>
     );
     expect(screen.getByTestId("counts")).toHaveTextContent("1/1");
   });
@@ -156,7 +226,7 @@ describe("CommentProvider", () => {
         resolveAnchor={strictAnchorResolver}
       >
         <ScrollProbe scrollTo={scrollTo} />
-      </CommentProvider>,
+      </CommentProvider>
     );
 
     fireEvent.click(screen.getByTestId("scroll-anchor"));
@@ -164,7 +234,7 @@ describe("CommentProvider", () => {
     fireEvent.click(screen.getByTestId("scroll-missing"));
     expect(screen.getByTestId("scroll-missing")).toHaveAttribute(
       "data-result",
-      "false",
+      "false"
     );
   });
 
@@ -177,7 +247,7 @@ describe("CommentProvider", () => {
         onRailModeChange={onRailModeChange}
       >
         <RailProbe />
-      </CommentProvider>,
+      </CommentProvider>
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Focus" }));
@@ -208,10 +278,12 @@ describe("CommentProvider", () => {
       <CommentProvider comments={[first]} config={config}>
         <AnchorProbe anchor="row.1" onRender={firstAnchorRender} />
         <AnchorProbe anchor="row.2" onRender={secondAnchorRender} />
-      </CommentProvider>,
+      </CommentProvider>
     );
     await waitFor(() => {
-      expect(screen.getByTestId("anchor-row.1")).toHaveTextContent("1/inactive");
+      expect(screen.getByTestId("anchor-row.1")).toHaveTextContent(
+        "1/inactive"
+      );
     });
     firstAnchorRender.mockClear();
     secondAnchorRender.mockClear();
@@ -220,11 +292,13 @@ describe("CommentProvider", () => {
       <CommentProvider comments={[first, second]} config={config}>
         <AnchorProbe anchor="row.1" onRender={firstAnchorRender} />
         <AnchorProbe anchor="row.2" onRender={secondAnchorRender} />
-      </CommentProvider>,
+      </CommentProvider>
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("anchor-row.2")).toHaveTextContent("1/inactive");
+      expect(screen.getByTestId("anchor-row.2")).toHaveTextContent(
+        "1/inactive"
+      );
     });
     expect(firstAnchorRender).not.toHaveBeenCalled();
     expect(secondAnchorRender).toHaveBeenCalledTimes(1);
@@ -240,7 +314,7 @@ describe("CommentProvider", () => {
         resolveAnchor={(anchor) => anchor}
       >
         <AnchorActionsProbe onRender={onRender} />
-      </CommentProvider>,
+      </CommentProvider>
     );
     onRender.mockClear();
 
@@ -252,7 +326,7 @@ describe("CommentProvider", () => {
         resolveAnchor={(anchor) => anchor}
       >
         <AnchorActionsProbe onRender={onRender} />
-      </CommentProvider>,
+      </CommentProvider>
     );
 
     expect(onRender).not.toHaveBeenCalled();
@@ -262,7 +336,7 @@ describe("CommentProvider", () => {
 describe("anchor resolvers", () => {
   it("strict resolver never walks ancestors or falls back to the document", () => {
     expect(strictAnchorResolver("row.1", ["row.1", DOCUMENT_ANCHOR])).toBe(
-      "row.1",
+      "row.1"
     );
     expect(strictAnchorResolver("row.9", [DOCUMENT_ANCHOR])).toBeNull();
   });
@@ -270,7 +344,7 @@ describe("anchor resolvers", () => {
   it("exact resolver matches a key or falls back to the document anchor", () => {
     expect(exactAnchorResolver("row.1", ["row.1"])).toBe("row.1");
     expect(exactAnchorResolver("row.9", [DOCUMENT_ANCHOR])).toBe(
-      DOCUMENT_ANCHOR,
+      DOCUMENT_ANCHOR
     );
     expect(exactAnchorResolver("row.9", ["row.1"])).toBeNull();
   });
@@ -279,7 +353,7 @@ describe("anchor resolvers", () => {
     expect(dottedAnchorResolver("a.b.c", ["a.b"])).toBe("a.b");
     expect(dottedAnchorResolver("a.b.c", ["a"])).toBe("a");
     expect(dottedAnchorResolver("a.b.c", [DOCUMENT_ANCHOR])).toBe(
-      DOCUMENT_ANCHOR,
+      DOCUMENT_ANCHOR
     );
   });
 });

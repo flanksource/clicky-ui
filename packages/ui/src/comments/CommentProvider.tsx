@@ -36,6 +36,13 @@ export type CommentProviderProps = CommentCallbacks & {
   resolveAnchor?: AnchorResolver;
   /** Reports rail actions so a host can synchronize external visibility state. */
   onRailModeChange?: (mode: CommentRailMode) => void;
+  /** Delegate navigation when the annotated document lives outside this frame. */
+  onScrollToAnchor?: (
+    anchor: CommentAnchor,
+    options: CommentScrollOptions
+  ) => boolean;
+  /** Report anchor geometry supplied by an external document. Null means unavailable. */
+  getAnchorTop?: (anchor: CommentAnchor) => number | null;
   /**
    * Rail mode on mount. Use "all" where the host already decided the rail is
    * visible, so the reader is not asked to open it a second time.
@@ -55,6 +62,8 @@ export function CommentProvider({
   config,
   resolveAnchor = exactAnchorResolver,
   onRailModeChange,
+  onScrollToAnchor,
+  getAnchorTop: externalAnchorTop,
   onCreate,
   onReply,
   onUpdateStatus,
@@ -67,13 +76,16 @@ export function CommentProvider({
 }: CommentProviderProps) {
   const [railMode, setRailMode] = useState<CommentRailMode>(initialRailMode);
   const [focusedAnchor, setFocusedAnchor] = useState<CommentAnchor | null>(
-    null,
+    null
   );
   const [highlightAnchor, setHighlightAnchor] = useState<CommentAnchor | null>(
-    null,
+    null
   );
   const railModeRef = useRef<CommentRailMode>(initialRailMode);
   const onRailModeChangeRef = useRef(onRailModeChange);
+  const onScrollToAnchorRef = useRef(onScrollToAnchor);
+  const externalAnchorTopRef = useRef(externalAnchorTop);
+  externalAnchorTopRef.current = externalAnchorTop;
   const resolveAnchorRef = useRef(resolveAnchor);
   const anchorEls = useRef<Record<string, HTMLElement>>({});
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -84,8 +96,9 @@ export function CommentProvider({
 
   useLayoutEffect(() => {
     onRailModeChangeRef.current = onRailModeChange;
+    onScrollToAnchorRef.current = onScrollToAnchor;
     resolveAnchorRef.current = resolveAnchor;
-  }, [onRailModeChange, resolveAnchor]);
+  }, [onRailModeChange, onScrollToAnchor, externalAnchorTop, resolveAnchor]);
 
   const focusAnchor = useCallback((anchor: CommentAnchor) => {
     setFocusedAnchor(anchor);
@@ -116,18 +129,20 @@ export function CommentProvider({
       const registered = anchorEls.current[anchor];
       if (registered && registered !== el) {
         throw new Error(
-          `Comment anchor "${anchor}" is registered by multiple elements`,
+          `Comment anchor "${anchor}" is registered by multiple elements`
         );
       }
       anchorEls.current[anchor] = el;
     },
-    [],
+    []
   );
 
   const getAnchorTop = useCallback((anchor: CommentAnchor): number | null => {
+    if (externalAnchorTopRef.current)
+      return externalAnchorTopRef.current(anchor);
     const resolved = resolveAnchorRef.current(
       anchor,
-      Object.keys(anchorEls.current),
+      Object.keys(anchorEls.current)
     );
     const el = resolved ? anchorEls.current[resolved] : null;
     const container = contentRef.current;
@@ -139,9 +154,11 @@ export function CommentProvider({
 
   const scrollToAnchor = useCallback(
     (anchor: CommentAnchor, options: CommentScrollOptions = {}): boolean => {
+      if (onScrollToAnchorRef.current)
+        return onScrollToAnchorRef.current(anchor, options);
       const resolved = resolveAnchorRef.current(
         anchor,
-        Object.keys(anchorEls.current),
+        Object.keys(anchorEls.current)
       );
       const el = resolved ? anchorEls.current[resolved] : null;
       const container = contentRef.current;
@@ -164,7 +181,7 @@ export function CommentProvider({
       });
       return true;
     },
-    [],
+    []
   );
 
   // A focused rail with no anchor selected has nothing to show.
@@ -192,7 +209,7 @@ export function CommentProvider({
       onDelete,
       onChecklistToggle,
       onMention,
-    ],
+    ]
   );
 
   useLayoutEffect(() => {
@@ -240,7 +257,7 @@ export function CommentProvider({
       getAnchorTop,
       scrollToAnchor,
       highlightAnchor,
-    ],
+    ]
   );
 
   return (
