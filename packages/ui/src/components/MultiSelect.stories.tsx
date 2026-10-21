@@ -96,3 +96,18 @@ export const Default: Story = {};
 export const Playground: Story = {
   render: (args) => <MultiSelectPlayground {...args} />,
 };
+
+export const Faceted: Story = {
+  render: (args) => <MultiSelectPlayground {...args} />,
+  args: {
+    placeholder: "Columns",
+    value: ["operators"],
+    facets: [{ key: "change", label: "Change", labels: { changed: "Changed", unchanged: "No changes", added: "Added column", removed: "Removed column" } }],
+    options: [
+      { value: "operators", label: "Operators", facets: { change: "changed" } },
+      { value: "reviewers", label: "Reviewers", facets: { change: "unchanged" } },
+      { value: "new", label: "New", facets: { change: "added" } },
+      { value: "retired", label: "Retired", facets: { change: "removed" } },
+    ],
+  },
+};
