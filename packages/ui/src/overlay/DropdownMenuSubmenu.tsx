@@ -25,7 +25,11 @@ import {
 } from "@floating-ui/react";
 import { Icon, type StaticIconComponent } from "../data/Icon";
 import { UiChevronRight } from "../icons";
-import { MENU_POPOVER_CLASS, MenuContext } from "./dropdownMenuContext";
+import {
+  MENU_POPOVER_CLASS,
+  MenuContext,
+  menuViewportSize,
+} from "./dropdownMenuContext";
 import { useEscapeLayer, useFloatingZIndex } from "./modalStack";
 import type { DropdownMenuItem } from "./DropdownMenu";
 import { cn } from "../lib/utils";
@@ -127,6 +131,7 @@ function MenuSubmenu({ item }: { item: DropdownMenuItem }) {
       offset({ mainAxis: 0, alignmentAxis: -4 }),
       flip({ padding: 8 }),
       shift({ padding: 8, crossAxis: true }),
+      menuViewportSize,
     ],
     whileElementsMounted: autoUpdate,
   });
