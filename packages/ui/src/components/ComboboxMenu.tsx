@@ -137,7 +137,7 @@ export function ComboboxMenu({
                 onMouseEnter={() => onHighlight(index)}
                 className={cn(
                   "flex cursor-pointer gap-2 rounded-sm px-2 py-1.5 text-sm",
-                  option.description ? "items-start" : "items-center",
+                  option.description && option.descriptionLayout !== "inline" ? "items-start" : "items-center",
                   index === highlighted && "bg-accent",
                   selected && !tristate && "font-medium",
                   option.disabled && "cursor-not-allowed opacity-50",
@@ -174,7 +174,7 @@ export function ComboboxMenu({
                       icon={UiCheck}
                       className={cn(
                         "shrink-0 text-xs",
-                        option.description && "mt-1",
+                        option.description && option.descriptionLayout !== "inline" && "mt-1",
                         selected ? "opacity-100" : "opacity-0",
                       )}
                     />
@@ -182,7 +182,7 @@ export function ComboboxMenu({
                       icon={option.icon}
                       className={cn(
                         "text-sm text-muted-foreground",
-                        option.description && "mt-1",
+                        option.description && option.descriptionLayout !== "inline" && "mt-1",
                       )}
                     />
                     <ComboboxOptionText option={option} />
@@ -252,20 +252,22 @@ export function ComboboxMenu({
 
 function ComboboxOptionText({ option }: { option: ComboboxOption }) {
   return (
-    <span className="min-w-0 flex-1">
-      <span className="block truncate">{option.label}</span>
-      <ComboboxOptionDescription description={option.description} />
+    <span data-slot="combobox-option-text" className={cn("min-w-0 flex-1", option.descriptionLayout === "inline" && "flex items-center gap-2")}>
+      <span className="block min-w-0 truncate">{option.label}</span>
+      <ComboboxOptionDescription description={option.description} inline={option.descriptionLayout === "inline"} />
     </span>
   );
 }
 
 function ComboboxOptionDescription({
   description,
+  inline = false,
 }: {
   description: string | undefined;
+  inline?: boolean;
 }) {
   return description ? (
-    <span className="mt-0.5 block whitespace-pre-line text-xs font-normal leading-4 text-muted-foreground">
+    <span className={cn("text-xs font-normal leading-4 text-muted-foreground", inline ? "min-w-0 max-w-[55%] shrink-0 truncate" : "mt-0.5 block whitespace-pre-line")}>
       {description}
     </span>
   ) : null;

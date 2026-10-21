@@ -8,6 +8,8 @@ export type ComboboxOption = {
   label: string;
   /** Secondary text rendered below the label and included in local filtering. */
   description?: string;
+  /** Places metadata beside the label on a single line rather than below it. */
+  descriptionLayout?: "stacked" | "inline";
   /**
    * Node pinned to the right edge of the option row — a rendered preview of
    * what the choice produces, a count, a badge. Keeps the row single-line, so
@@ -97,6 +99,8 @@ type ComboboxBaseProps = {
   size?: FormSize;
   /** Classes applied to the root wrapper. */
   className?: string;
+  /** Preferred popup width in pixels, constrained to the viewport. The control keeps its own width. */
+  menuWidth?: number;
   /** Shows a loading indicator when options are being fetched. */
   loading?: boolean;
   /**
