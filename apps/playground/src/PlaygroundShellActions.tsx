@@ -10,6 +10,8 @@ import { UiCode2, UiComment, UiFileText } from "@flanksource/clicky-ui/icons";
 import { NewPageMenu, type PageAction } from "./editor/PageManagement";
 import { PlaygroundViewActions } from "./PlaygroundViewActions";
 import type { AnnotationVisibility, PlaygroundView } from "./route";
+import { BookmarkletInstall } from "./bookmarklet/BookmarkletInstall";
+import { PlaygroundAgentInstructions } from "./PlaygroundAgentInstructions";
 
 export type PlaygroundShellActionsProps = {
   view: PlaygroundView;
@@ -39,6 +41,8 @@ export type PlaygroundShellActionsProps = {
 export function PlaygroundShellActions(props: PlaygroundShellActionsProps) {
   return (
     <>
+      <PlaygroundAgentInstructions />
+      <BookmarkletInstall />
       <PlaygroundViewActions
         view={props.view}
         annotations={props.annotations}
