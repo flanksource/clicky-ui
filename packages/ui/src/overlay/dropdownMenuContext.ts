@@ -1,9 +1,16 @@
 import { createContext } from "react";
-import type { UseInteractionsReturn } from "@floating-ui/react";
+import { size, type UseInteractionsReturn } from "@floating-ui/react";
 
 // Shared popover shell class so the root menu and every flyout submenu match.
 export const MENU_POPOVER_CLASS =
-  "min-w-[8rem] rounded-md border border-border bg-popover py-1 shadow-md";
+  "min-w-[8rem] overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md";
+
+export const menuViewportSize = size({
+  padding: 8,
+  apply({ availableHeight, elements }) {
+    elements.floating.style.maxHeight = `${Math.max(0, availableHeight)}px`;
+  },
+});
 
 /**
  * Bridges a menu level to its item components: leaves and submenu triggers pull

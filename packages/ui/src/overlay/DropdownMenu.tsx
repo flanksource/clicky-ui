@@ -23,7 +23,11 @@ import { cn } from "../lib/utils";
 import { Button, type ButtonProps } from "../components/button";
 import { Icon, type StaticIconComponent } from "../data/Icon";
 import { UiChevronDown } from "../icons";
-import { MENU_POPOVER_CLASS, MenuContext } from "./dropdownMenuContext";
+import {
+  MENU_POPOVER_CLASS,
+  MenuContext,
+  menuViewportSize,
+} from "./dropdownMenuContext";
 import { MenuItemList } from "./DropdownMenuSubmenu";
 import { useEscapeLayer, useFloatingZIndex } from "./modalStack";
 
@@ -147,7 +151,12 @@ function DropdownMenuRoot({
     whileElementsMounted: autoUpdate,
     // offset(4) ≈ the previous mt-1; flip opens upward at the bottom edge and
     // shift slides the menu back on-screen at the horizontal edges.
-    middleware: [offset(4), flip({ padding: 8 }), shift({ padding: 8 })],
+    middleware: [
+      offset(4),
+      flip({ padding: 8 }),
+      shift({ padding: 8 }),
+      menuViewportSize,
+    ],
   });
 
   const click = useClick(context);

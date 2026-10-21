@@ -1,4 +1,11 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+  waitFor,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { DropdownMenu } from "./DropdownMenu";
@@ -11,6 +18,44 @@ const items = (onSelect = vi.fn()) => [
 ];
 
 describe("DropdownMenu", () => {
+  it("bounds root and submenu heights to the viewport", async () => {
+    const viewportHeight = 400;
+    const height = vi
+      .spyOn(document.documentElement, "clientHeight", "get")
+      .mockReturnValue(viewportHeight);
+    const width = vi
+      .spyOn(document.documentElement, "clientWidth", "get")
+      .mockReturnValue(1024);
+    try {
+      render(
+        <DropdownMenu
+          label="Choices"
+          items={[
+            {
+              label: "Nested",
+              onSelect: vi.fn(),
+              children: Array.from({ length: 40 }, (_, index) => ({
+                label: `Choice ${index + 1}`,
+                onSelect: vi.fn(),
+              })),
+            },
+          ]}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Choices" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Nested" }));
+      await waitFor(() => {
+        for (const menu of screen.getAllByRole("menu")) {
+          expect(parseFloat(menu.style.maxHeight)).toBeGreaterThan(0);
+          expect(parseFloat(menu.style.maxHeight)).toBeLessThan(viewportHeight);
+          expect(menu).toHaveClass("overflow-y-auto");
+        }
+      });
+    } finally {
+      height.mockRestore();
+      width.mockRestore();
+    }
+  });
   it("is closed until the trigger is clicked", () => {
     render(<DropdownMenu label="Download" items={items()} />);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
