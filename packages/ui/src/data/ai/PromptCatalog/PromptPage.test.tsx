@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 import type {
   PromptSpecDetail,
   PromptSpecSavePayload,
@@ -17,30 +18,33 @@ vi.mock("../SpecRuntimeEditor", () => ({
     value,
     onChange,
     sections,
-    effectiveBackend,
+    effectiveMode,
     effectiveModel,
     readOnly,
     promptVariant,
     defaultCollapsedSections,
+    beforeSections,
   }: {
     value: AISpecRuntimeValue;
     onChange: (value: AISpecRuntimeValue) => void;
     sections?: readonly string[] | undefined;
-    effectiveBackend?: string | undefined;
+    effectiveMode?: string | undefined;
     effectiveModel?: string | undefined;
     readOnly?: boolean | undefined;
     promptVariant?: string | undefined;
     defaultCollapsedSections?: readonly string[] | undefined;
+    beforeSections?: ReactNode;
   }) => (
     <div
       data-testid="spec-runtime-editor"
       data-sections={sections?.join(",")}
-      data-effective-backend={effectiveBackend}
+      data-effective-mode={effectiveMode}
       data-effective-model={effectiveModel}
       data-read-only={String(Boolean(readOnly))}
       data-prompt-variant={promptVariant}
       data-collapsed-sections={defaultCollapsedSections?.join(",")}
     >
+      {beforeSections}
       {sections?.includes("prompt") ? (
         <>
           <textarea
@@ -127,7 +131,7 @@ const entry: PromptCatalogEntry = {
   defaultRaw: DEFAULT_RAW,
   effective: {
     model: "claude-haiku",
-    backend: "claude-agent",
+    mode: "agent",
     modelSource: "operation",
   },
   provenance: { model: "user-home", body: "prompt default" },
@@ -216,6 +220,68 @@ async function renderPage(
 }
 
 describe("PromptPage", () => {
+  it("saves runtime bar edits and previews the same draft without losing stored settings", async () => {
+    const adapter = makeAdapter();
+    const stored = {
+      model: "claude-haiku",
+      mode: "agent",
+      budget: { maxTokens: 12000, maxTurns: 8 },
+      permissions: { mode: "auto", tools: { Read: "allow" } },
+      workflow: { commits: [] },
+    };
+    adapter.loadDetail.mockResolvedValueOnce({
+      ...detailFor(home),
+      spec: stored,
+    });
+    await renderPage(adapter);
+
+    fireEvent.click(screen.getByRole("button", { name: "Runtime options" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Timeout" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "1h" }));
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Diff vs default" }));
+    expect(screen.getByTestId("code-diff")).toHaveTextContent("timeout: 1h");
+    expect(screen.getByTestId("code-diff")).toHaveTextContent("commits: []");
+    fireEvent.click(screen.getByRole("tab", { name: "Preview" }));
+    fireEvent.click(screen.getByRole("button", { name: "Render" }));
+    await waitFor(() =>
+      expect(adapter.render).toHaveBeenCalledWith(entry, {
+        raw: expect.stringContaining("timeout: 1h"),
+        variables: { diff: "" },
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(adapter.saveDetail).toHaveBeenCalledWith(entry, home, {
+        source: "inline",
+        path: undefined,
+        baseRaw: HOME_RAW,
+        body: "Write {{diff}}.",
+        spec: { ...stored, budget: { ...stored.budget, timeout: "1h" } },
+      }),
+    );
+  });
+
+  it("keeps malformed prompts repairable in Raw without a runtime bar", async () => {
+    const adapter = makeAdapter();
+    adapter.loadDetail.mockResolvedValueOnce({
+      id: entry.id,
+      source: "file",
+      raw: "---\nmode: [broken\n---\nbody",
+      parseError: "invalid YAML",
+    });
+    await renderPage(adapter);
+    expect(screen.getByLabelText("Prompt source")).toHaveValue(
+      "---\nmode: [broken\n---\nbody",
+    );
+    expect(
+      screen.queryByRole("group", { name: "Prompt runtime" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("invalid YAML");
+  });
+
   it("loads the effective layer and shows where the prompt runs from", async () => {
     const adapter = makeAdapter();
     await renderPage(adapter);
@@ -241,8 +307,8 @@ describe("PromptPage", () => {
       "prompt,model,permissions,environment,cli",
     );
     expect(screen.getByTestId("spec-runtime-editor")).toHaveAttribute(
-      "data-effective-backend",
-      "claude-agent",
+      "data-effective-mode",
+      "agent",
     );
     expect(screen.getByTestId("spec-runtime-editor")).toHaveAttribute(
       "data-prompt-variant",

@@ -93,7 +93,10 @@ describe("SpecRuntimeEditor field support", () => {
       />,
     );
 
-    expect(screen.getByRole("group", { name: "Runtime" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Model" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "Runtime" }),
+    ).not.toBeInTheDocument();
   });
 
   it("projects the runtime schema onto the existing field editors", () => {
@@ -222,12 +225,6 @@ describe("SpecRuntimeEditor field support", () => {
       ),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(
-      within(screen.getByRole("region", { name: "Permissions" })).getByRole(
-        "button",
-        { name: /Advanced/ },
-      ),
-    );
     expect(
       within(screen.getByRole("region", { name: "Permissions" })).getByText(
         "Review",

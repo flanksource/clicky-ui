@@ -6,6 +6,7 @@ import { UiEdit, UiFileCode } from "../../../icons";
 import type { ChatModel } from "../../chat/types";
 import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
 import { SpecRuntimeEditor } from "../SpecRuntimeEditor";
+import { SpecRuntimeBar } from "../SpecRuntimeBar";
 import type { SpecSectionId } from "../SpecRuntimeEditor/types";
 import {
   isValidPromptSpecDetail,
@@ -47,7 +48,7 @@ export type PromptPageEditorProps = {
   readOnly: boolean;
   models?: ChatModel[] | undefined;
   families?: SpecRuntimeFamily[] | undefined;
-  effectiveBackend?: string | undefined;
+  effectiveMode?: string | undefined;
   effectiveModel?: string | undefined;
 };
 
@@ -58,7 +59,7 @@ export function PromptPageEditor({
   readOnly,
   models,
   families,
-  effectiveBackend,
+  effectiveMode,
   effectiveModel,
 }: PromptPageEditorProps) {
   const dirty = isDraftDirty(draft, detail);
@@ -115,8 +116,21 @@ export function PromptPageEditor({
           onChange={(value) => onChange({ ...draft, value })}
           models={models}
           families={families}
-          {...(effectiveBackend ? { effectiveBackend } : {})}
+          effectiveMode={effectiveMode}
           {...(effectiveModel ? { effectiveModel } : {})}
+          beforeSections={
+            <SpecRuntimeBar
+              value={draft.value}
+              onChange={(value) => onChange({ ...draft, value })}
+              models={models}
+              families={families}
+              effectiveMode={effectiveMode}
+              effectiveModel={effectiveModel}
+              readOnly={readOnly}
+              ariaLabel="Prompt runtime"
+              className="mb-density-4"
+            />
+          }
           sections={SECTIONS}
           defaultCollapsedSections={COLLAPSED_SECTIONS}
           promptVariant="document"

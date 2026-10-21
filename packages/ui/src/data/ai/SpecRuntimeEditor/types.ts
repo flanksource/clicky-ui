@@ -105,7 +105,7 @@ export const SPEC_RUNTIME_SECTIONS: SpecSectionMeta[] = [
   {
     id: "model",
     label: "Model",
-    hint: "Which model runs, how it reasons, what it loads, and its budget ceiling.",
+    hint: "Fallback models, caching, memory, skills, and provider readiness.",
     icon: UiRobotAi,
     iconClassName: "text-indigo-500",
   },
@@ -169,9 +169,6 @@ export const SPEC_RUNTIME_SECTIONS: SpecSectionMeta[] = [
   },
 ];
 
-/** Model-section fields a host renders beside the editor, so the section omits them. */
-export type SpecRuntimeHostField = "runtime" | "budget.timeout" | "budget.cost";
-
 /**
  * A tab in the editor's tabbed layout. It either groups spec sections (hidden
  * when the selected runtime filters all of them out) or carries a host-owned
@@ -186,14 +183,29 @@ export type SpecRuntimeTab = {
 };
 
 export const SPEC_RUNTIME_TABS: SpecRuntimeTab[] = [
-  { id: "system", label: "System Prompt", icon: UiFileText, sections: ["prompt"] },
+  {
+    id: "system",
+    label: "System Prompt",
+    icon: UiFileText,
+    sections: ["prompt"],
+  },
   {
     id: "environment",
     label: "Environment",
     icon: UiBraces,
     sections: ["workspace", "sandbox", "environment"],
   },
-  { id: "permissions", label: "Permissions", icon: UiShield, sections: ["permissions"] },
+  {
+    id: "permissions",
+    label: "Permissions",
+    icon: UiShield,
+    sections: ["permissions"],
+  },
   { id: "model", label: "Model", icon: UiRobotAi, sections: ["model", "cli"] },
-  { id: "workflow", label: "Workflow", icon: UiSealCheck, sections: ["verify", "commit"] },
+  {
+    id: "workflow",
+    label: "Workflow",
+    icon: UiSealCheck,
+    sections: ["verify", "commit"],
+  },
 ];

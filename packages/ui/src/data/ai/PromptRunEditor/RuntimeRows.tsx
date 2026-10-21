@@ -4,6 +4,8 @@ import { UiAdd, UiTrash } from "../../../icons";
 import { Icon } from "../../Icon";
 import type { ChatModel } from "../../chat/types";
 import { RuntimeBar } from "../../runtime/RuntimeBar";
+import { budgetField, timeoutField } from "../../runtime/RuntimeBar.fields";
+import { withBudgetLimit } from "../../runtime/RuntimeBar.limits";
 import {
   RuntimeBarActions,
   type RuntimeBarActionsProps,
@@ -76,6 +78,26 @@ export function RuntimeRows({
   }
 
   const rows = runtimeRows(value);
+  const spec = value.spec ?? {};
+  const sharedActions: RuntimeBarActionsProps = {
+    ...actions,
+    fields: [
+      ...(actions?.fields ?? []),
+      budgetField({
+        value: spec.budget?.cost,
+        onChange: (cost) =>
+          onChange({ ...value, spec: withBudgetLimit(spec, "cost", cost) }),
+      }),
+      timeoutField({
+        value: spec.budget?.timeout,
+        onChange: (timeout) =>
+          onChange({
+            ...value,
+            spec: withBudgetLimit(spec, "timeout", timeout),
+          }),
+      }),
+    ],
+  };
   return (
     <div ref={ref} className="grid grid-cols-1 gap-density-2">
       {rows.map((runtime, index) => (
@@ -120,7 +142,7 @@ export function RuntimeRows({
         </div>
       ))}
       {/* Spec-level, so it sits beside the rows rather than repeating in each. */}
-      {actions && <RuntimeBarActions {...actions} inline={wider} standalone />}
+      <RuntimeBarActions {...sharedActions} inline={wider} standalone />
       <Button
         size="sm"
         variant="outline"

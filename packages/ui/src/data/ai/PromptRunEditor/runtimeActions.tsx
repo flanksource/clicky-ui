@@ -39,9 +39,8 @@ const PERMISSION_GROUP = "Permission posture";
 const PRESETS_GROUP = "Presets";
 
 /**
- * The `permissions.mode` field as a runtime-bar action. Narrowing, aliasing and
- * labelling follow `PermissionModeField` exactly, so the bar and the spec
- * modal never disagree about which postures a runtime publishes.
+ * The `permissions.mode` runtime-bar action uses the runtime schema to narrow
+ * postures and provider capabilities to label and collapse aliases.
  *
  * Undefined when the resolved runtime publishes no postures (schema
  * `enum: null`) and the spec holds none either — there is nothing to edit.
@@ -92,7 +91,7 @@ export function permissionField({
 
   const runtimeLabel = runtime
     ? `${family?.label ?? specMode} ${runtime.label}`
-    : specMode ?? "the current runtime";
+    : (specMode ?? "the current runtime");
   const currentVisual = current
     ? permissionModeVisual(family?.id, current)
     : undefined;
