@@ -25,6 +25,7 @@ export type CommentScreenshotCapture =
     };
 
 export type CommentElementContext = {
+  pageUrl?: string;
   componentName?: string;
   source: string;
   html: string;

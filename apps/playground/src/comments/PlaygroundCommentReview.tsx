@@ -16,6 +16,7 @@ import {
 } from "@flanksource/clicky-ui/icons";
 
 import { findPage, pageTitle, pages } from "../registry";
+import { externalPage } from "../bookmarklet/external-catalog";
 import { CommentCapture } from "./CommentCapture";
 import type { PageComment } from "./useComments";
 
@@ -110,7 +111,7 @@ export function PlaygroundCommentReview({
   return (
     <aside
       aria-label="Resolved comment review"
-      className="flex h-full w-[380px] flex-col"
+      className="flex h-full w-full max-w-[380px] flex-col"
     >
       <header className="space-y-2 border-b border-border pb-density-3">
         <div className="flex items-center gap-2">
@@ -165,7 +166,7 @@ export function PlaygroundCommentReview({
               <p className="font-medium text-foreground">
                 {findPage(selected.page)
                   ? pageTitle(findPage(selected.page)!)
-                  : selected.page}
+                  : (externalPage(selected.page)?.title ?? selected.page)}
               </p>
               <p
                 className="mt-0.5 truncate text-muted-foreground"
