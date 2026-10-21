@@ -11,10 +11,10 @@ const branch = { name: "feature/eligibility/check-dependent-benefits", sha, auth
 describe("controlled Git pickers", () => {
   it("retries a failed connection catalog without losing the controlled source", async () => {
     const connections = vi.fn().mockRejectedValueOnce(new Error("Catalog unavailable")).mockResolvedValueOnce([{ name: "host", type: "git" }]);
-    const client: GitPickerClient = { connections, repositories: vi.fn(), refs: vi.fn().mockResolvedValue({ branches: [], tags: [] }), files: vi.fn() };
+    const client: GitPickerClient = { connections, repositories: vi.fn().mockResolvedValue([{ name: "rules", fullName: "acme/rules" }]), refs: vi.fn().mockResolvedValue({ branches: [], tags: [] }), files: vi.fn() };
     render(<GitSourcePicker client={client} value={{ connection: "host", repo: "", ref: "main" }} onChange={vi.fn()} />);
     expect(await screen.findByRole("alert")).toHaveTextContent("Catalog unavailable");
-    fireEvent.click(screen.getByRole("button", { name: "Retry connections" }));
+    fireEvent.click(screen.getByRole("button", { name: "Retry repositories" }));
     await waitFor(() => expect(connections).toHaveBeenCalledTimes(2));
     expect(await screen.findByRole("combobox", { name: "Git ref" })).toHaveValue("main");
   });
