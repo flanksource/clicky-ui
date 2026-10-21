@@ -2,6 +2,8 @@
 
 Controlled Git connection, repository, branch, ref, commit, pipeline, execution and file controls use the shared Combobox. Branch values remain qualified (`refs/heads/main`), commit values retain the full SHA, and selected commits display their short SHA with author and date metadata. The OIPA iconography reference pickers provide the visual baseline.
 
+Menus prefer a 720px width while closed controls retain their layout width. Near a viewport edge, menus shift and shrink to stay visible; mobile menus use the available viewport width. Names and metadata share a single row, with full details available in the option tooltip. Metadata remains searchable. The underlying Combobox exposes `menuWidth` for a preferred popup width and per-option `descriptionLayout: "inline"` for this presentation; its default description layout remains stacked.
+
 Import the controls and types from `@flanksource/clicky-ui`. `GitPickersDemo.tsx` is a runnable client-backed example in Storybook under Data/GitPickers and in the kitchen sink under Git pickers.
 
 ```tsx
