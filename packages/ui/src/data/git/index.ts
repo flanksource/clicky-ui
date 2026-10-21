@@ -13,3 +13,7 @@ export {
   type GitFileListProps,
 } from "./GitChangeList";
 export { formatGitCommitDateHeader } from "./git-dates";
+export * from "./pickers/types";
+export * from "./pickers/GitPickers";
+export * from "./pickers/GitSourcePicker";
+export * from "./pickers/GitFilePicker";
