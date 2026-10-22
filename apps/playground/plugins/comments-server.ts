@@ -165,7 +165,31 @@ function requireAuthor(body: Record<string, unknown>): StoredAuthor {
   if (kind !== undefined && kind !== "user" && kind !== "agent") {
     throw new Error('"author.kind" must be "user" or "agent"');
   }
-  return { name, ...(kind === undefined ? {} : { kind }) };
+  const via = optionalAuthorText(candidate, "via");
+  const sessionId = optionalAuthorText(candidate, "sessionId");
+  const cost = candidate["cost"];
+  if (cost !== undefined && (typeof cost !== "number" || !Number.isFinite(cost) || cost < 0)) {
+    throw new Error('"author.cost" must be a non-negative number of USD');
+  }
+  return {
+    name,
+    ...(kind === undefined ? {} : { kind }),
+    ...(via === undefined ? {} : { via }),
+    ...(sessionId === undefined ? {} : { sessionId }),
+    ...(cost === undefined ? {} : { cost }),
+  };
+}
+
+function optionalAuthorText(
+  author: Record<string, unknown>,
+  key: "via" | "sessionId",
+): string | undefined {
+  const value = author[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(`"author.${key}" must be a non-empty string when present`);
+  }
+  return value;
 }
 
 function optionalText(

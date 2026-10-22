@@ -9,9 +9,9 @@ import {
   type DropdownMenuItem,
   type PathTreeNode,
 } from "@flanksource/clicky-ui";
-import type { ReactNode } from "react";
 
 import { humanizeSlug, type PageEntry, type PageMeta } from "./registry";
+import { matchesActivity, type PageActivity, type SidebarFilter, type SidebarSort } from "./sidebar-activity";
 
 type NavNodeValue =
   | { kind: "folder"; path: string }
@@ -20,9 +20,12 @@ type NavNodeValue =
 type BuildNavOptions = {
   activeSlug: string | undefined;
   query: string;
+  activity?: Map<string, PageActivity>;
+  sort?: SidebarSort;
+  filters?: SidebarFilter[];
   metaFor: (entry: PageEntry) => PageMeta | undefined;
-  badgeFor?: (entry: PageEntry) => ReactNode;
-  folderBadgeFor?: (folder: string, pages: readonly PageEntry[]) => ReactNode;
+  badgeFor?: (entry: PageEntry) => AppShellNavItem["badge"];
+  folderBadgeFor?: (folder: string, pages: readonly PageEntry[]) => AppShellNavGroup["badge"];
   contextMenuForPage?: (entry: PageEntry) => DropdownMenuItem[];
   contextMenuForFolder?: (folder: string) => DropdownMenuItem[];
   pageHref?: (slug: string) => string;
@@ -50,6 +53,9 @@ function filterValues(
   options: BuildNavOptions,
 ): NavNodeValue[] {
   const needle = options.query.trim().toLowerCase();
+  const filters = options.filters ?? [];
+  entries = entries.filter((entry) => matchesActivity(options.activity?.get(entry.slug), filters, Date.now()));
+  if (filters.length) folders = folders.filter((folder) => entries.some((entry) => isWithin(entry.slug, folder)));
   if (!needle) {
     return [
       ...folders.map((path): NavNodeValue => ({ kind: "folder", path })),
@@ -124,6 +130,11 @@ function compareNodes(options: BuildNavOptions) {
     right: PathTreeNode<NavNodeValue>,
   ) => {
     if (isFolder(left) !== isFolder(right)) return isFolder(left) ? -1 : 1;
+    if (options.sort && options.sort !== "none") {
+      const rank = (node: PathTreeNode<NavNodeValue>) => Math.max(0, ...descendantPages(node).map((page) => options.activity?.get(page.slug)?.[options.sort as "updated" | "commented" | "resolved"] ?? 0));
+      const difference = rank(right) - rank(left);
+      if (difference) return difference;
+    }
     return (
       nodeOrder(left, options) - nodeOrder(right, options) ||
       left.label.localeCompare(right.label)
@@ -140,6 +151,7 @@ function navItem(
   return {
     key: page.slug,
     label: meta?.title ?? page.title,
+    searchText: [meta?.title ?? page.title, page.slug, meta?.description ?? ""].join(" "),
     active: page.slug === options.activeSlug,
     to: options.pageHref?.(page.slug) ?? `?page=${encodeURIComponent(page.slug)}`,
     icon: meta?.icon ?? UiFileCode,

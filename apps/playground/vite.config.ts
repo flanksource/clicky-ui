@@ -12,8 +12,10 @@ import {
 
 import { playgroundComments } from "./plugins/comments-server";
 import { playgroundBookmarklet } from "./plugins/bookmarklet-server";
+import { playgroundExports } from "./plugins/exports-server";
 import { playgroundMarkdown } from "./plugins/markdown-vite-plugin";
 import { playgroundSources } from "./plugins/sources-server";
+import { playgroundPageActivity } from "./plugins/page-activity";
 import { playgroundRuntimeProfiles } from "./plugins/runtime-profiles-server";
 
 const root = dirname(fileURLToPath(import.meta.url));
@@ -79,8 +81,10 @@ export default defineConfig({
     react(),
     tailwindcss(),
     playgroundMarkdown({ sourceRoot: resolve(root, "src") }),
+    playgroundPageActivity(resolve(root, "src/pages")),
     playgroundComments({ dir: playgroundDataDir }),
     playgroundBookmarklet({ root, dir: playgroundDataDir }),
+    playgroundExports({ dir: playgroundDataDir }),
     playgroundRuntimeProfiles({
       permissionsURL:
         "http://localhost:9020/api/captain/ai/permissions/catalog",
@@ -172,6 +176,13 @@ export default defineConfig({
     },
   },
   server: {
+    proxy: {
+      "/oipa-api": {
+        target: localEnv.PLAYGROUND_OIPA_URL ?? "http://localhost:8020",
+        changeOrigin: true,
+        rewrite: (path) => path.slice("/oipa-api".length),
+      },
+    },
     // Watch source changes without updating the open browser page.
     hmr: false,
     // Bind every interface so the playground is reachable from other devices
