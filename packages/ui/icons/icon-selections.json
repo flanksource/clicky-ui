@@ -1,6 +1,14 @@
 {
   "rows": [
     {
+      "consumerName": "azure-repos",
+      "group": "git-source-control",
+      "status": "NEW",
+      "outline": "incumbent",
+      "filled": null,
+      "note": "Official Microsoft Azure Repos artwork from MicrosoftDocs/azure-devops-docs docs/media/index/DevOpsIconRepos96.svg"
+    },
+    {
       "consumerName": "chevron-down",
       "group": "ui-controls",
       "status": "NEW",
