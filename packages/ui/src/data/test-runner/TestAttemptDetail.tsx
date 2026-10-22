@@ -85,6 +85,13 @@ function useLiveProcessMetrics(
  */
 export function TestAttemptDetail({ attempt, fetchProcessMetrics }: TestAttemptDetailProps) {
   const live = isAttemptLive(attempt);
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (!live || !attempt.started) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [live, attempt.started]);
+  const duration = live && attempt.started ? Math.max(0, now - Date.parse(attempt.started)) * 1e6 : attempt.duration;
   const { state, polling } = useLiveProcessMetrics(attempt.pid, live, fetchProcessMetrics);
   const recorded: ProcessMetrics = {
     ...(attempt.pid !== undefined ? { pid: attempt.pid } : {}),
@@ -93,6 +100,7 @@ export function TestAttemptDetail({ attempt, fetchProcessMetrics }: TestAttemptD
   };
   const shown = live && state.metrics ? state.metrics : recorded;
   const pid = shown.pid ?? attempt.pid;
+  const status = live ? (state.note === "process exited" ? "exited" : shown.status ?? "running") : "exited";
   const hasAny = (pid ?? 0) > 0 || shown.cpu_percent !== undefined || shown.rss !== undefined;
 
   return (
@@ -122,6 +130,7 @@ export function TestAttemptDetail({ attempt, fetchProcessMetrics }: TestAttemptD
         ) : (
           <div className="grid grid-cols-2 gap-density-1 md:grid-cols-4">
             {pid !== undefined && pid > 0 && <MetricTile label="PID" value={String(pid)} />}
+            <MetricTile label="Status" value={status} />
             <MetricTile
               label="CPU"
               value={shown.cpu_percent !== undefined ? `${shown.cpu_percent.toFixed(1)}%` : "—"}
@@ -131,8 +140,8 @@ export function TestAttemptDetail({ attempt, fetchProcessMetrics }: TestAttemptD
             />
             <MetricTile label="RSS" value={shown.rss !== undefined && shown.rss > 0 ? formatBytes(shown.rss) : "—"} />
             {shown.open_files !== undefined && <MetricTile label="FDs" value={String(shown.open_files)} />}
-            {attempt.duration !== undefined && attempt.duration > 0 && (
-              <MetricTile label="Duration" value={formatTestDuration(attempt.duration)} />
+            {duration !== undefined && duration > 0 && (
+              <MetricTile label="Duration" value={formatTestDuration(duration)} />
             )}
             {attempt.exit_code !== undefined && (
               <MetricTile label="Exit" value={String(attempt.exit_code)} tone={attempt.exit_code === 0 ? "success" : "danger"} />
