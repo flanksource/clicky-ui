@@ -4,7 +4,13 @@ A scratch surface for one-page TSX artifacts — try a layout, show it to someon
 
 Where `apps/kitchen-sink` is a curated catalog of shipped components (every demo hand-registered in `demo-catalog.tsx`), the playground has **no registration step at all**.
 
-The default `?page=flanksource` route is the canonical Flanksource design-system hub. Its tracked foundation and pattern pages document colors, type, spacing, icons, tones, page anatomy, collections, forms with preview, object arrays, and feedback states using the actual shared components.
+The root URL opens the **Comments** dashboard, showing unresolved threads across artifact and external pages. Its shared FilterBar filters by status, projects, pages, author, or screenshot availability; search comment text and sort using the list's **Sort by** control. Projects follow the first page-path segment; external captures belong to **External pages**. Projects and pages support multiple include/exclude selections: included values match any choice within that filter, exclusions take precedence, and both filters must match. Options include pages with no comments yet so they can be selected for watching. Filters, search, and sorting persist in `comments.*` URL parameters, including repeated `comments.project` / `comments.page` inclusions and their `.exclude` parameters. Each comment uses two rows: the author avatar, page, status, timestamps and actions above a large screenshot and comment body. Screenshot previews expand on hover or keyboard focus and link to the full capture. Row icons open the page, reopen, resolve, close, or delete a thread; deletion confirms before removing the thread, replies, and capture. **Comments** in the sidebar returns to the dashboard.
+
+**Copy for LLM** copies the current matching threads, replies, source context, screenshots, and instructions for watching the filtered set. Its split-button menu offers **Copy for Claude** and **Copy for Codex** with the corresponding agent attribution. The copied Node reader uses the dashboard's own filter function to select live comments; the instructions poll every ten seconds, keep watching an empty queue, recheck status before editing and resolving, reply with verification evidence before resolving, and leave human closing/reopening decisions untouched. Copy remains available for an empty filtered set so a watcher can wait for its first comment.
+
+Screenshot previews automatically trim uniform light, dark, or transparent margins and faint panel borders, retaining padding around the content. Cropping applies to the preview and hover expansion; the full-capture link opens the original file. Inline mini-threads show the latest two replies, with older replies available to expand. Comments and replies refresh every five seconds while the page is visible.
+
+The `?page=flanksource` route is the canonical Flanksource design-system hub. Its tracked foundation and pattern pages document colors, type, spacing, icons, tones, page anatomy, collections, forms with preview, object arrays, and feedback states using the actual shared components.
 
 ```bash
 pnpm run dev:playground     # http://localhost:5274
@@ -100,6 +106,12 @@ Anchor labels (`button.btn.primary "Approve"`) are read from the live DOM, so th
 Each root comment menu offers **Close** alongside **Resolve** for active comments, and **Reopen** for closed comments. Expanded root cards also show a tick to close directly or a reopen icon in the header. Copy serializes the whole thread with its page, component/source, HTML, replies, screenshot link, and reply/resolve URLs. Maximise opens that same thread with **Thread** and rendered **Markdown** tabs, so the exact copied Markdown can be reviewed first.
 
 Sidebar pages with feedback show their open root-comment count in a badge. Replies and resolved or closed comments do not increase the badge.
+
+The AppShell sidebar renders its folders and pages through Clicky Tree, including search, expand/collapse controls, page/folder context menus and page drag-and-drop. **Sort by** offers **None** (the configured page order), **Updated** (page source-file modification time), **Commented** (latest root comment or reply), and **Resolved** (latest currently resolved thread). Date sorts put the newest activity first and retain the folder hierarchy. Folder order follows the newest matching descendant.
+
+**Open** includes pages with open or in-progress threads; **Resolved** includes pages with threads waiting for human review. Selecting both matches either status. **Recently updated** restricts those results to page files changed within seven days. Closed threads are separate from resolved threads. External captures have no local source-file timestamp, so they do not match Recently updated. Filters remain available when no pages match, and **Reset view** clears search, sorting and filters.
+
+Sidebar settings persist in `sidebar.sort`, `sidebar.filters`, and `sidebar.q` URL parameters, including navigation between artifact and external pages and browser history. Development refreshes source-file dates and comment activity while the page is visible; built artifacts retain source-file dates from their build. `GET /__playground/page-activity` exposes development page timestamps without source content.
 
 If an anchored element disappears (you edited the artifact), the note is _kept_ and flagged as an orphan in a banner and in the rail — never silently dropped or moved.
 

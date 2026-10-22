@@ -17,6 +17,7 @@
     "@flanksource/icons": "catalog:",
     "@iconify/react": "catalog:",
     "@tanstack/react-query": "catalog:",
+    "modern-screenshot": "catalog:",
     "monaco-editor": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",

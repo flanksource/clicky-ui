@@ -15,8 +15,9 @@ import {
  * Vite's config bundler, where the package aliases do not apply.
  */
 export type JsonProperty = {
-  type: "string" | "boolean" | "object";
+  type: "string" | "number" | "boolean" | "object";
   description: string;
+  minimum?: number;
   enum?: string[];
   default?: string | boolean;
   properties?: Record<string, JsonProperty>;
@@ -56,13 +57,26 @@ const ACTIVE_STATUS_VALUES = [...UNRESOLVED_STATUSES];
 const AUTHOR: JsonProperty = {
   type: "object",
   description:
-    'Who is writing. Agents should identify themselves, e.g. {"name":"Claude","kind":"agent"}.',
+    'Who is writing. Agents should identify themselves, e.g. {"name":"Claude","kind":"agent"}. When posting another agent\'s review, name that agent and set via to yourself, e.g. {"name":"gpt-6.1-sol","kind":"agent","via":"Claude","sessionId":"…","cost":0.42}.',
   properties: {
     name: { type: "string", description: "Display name shown on the comment." },
     kind: {
       type: "string",
       description: "Renders an agent glyph instead of a user avatar.",
       enum: ["user", "agent"],
+    },
+    via: {
+      type: "string",
+      description: "The agent that posted on name's behalf, when another agent produced the text.",
+    },
+    sessionId: {
+      type: "string",
+      description: "Session ID of the agent run that produced the text.",
+    },
+    cost: {
+      type: "number",
+      description: "AI response cost in USD for producing the text.",
+      minimum: 0,
     },
   },
   required: ["name"],

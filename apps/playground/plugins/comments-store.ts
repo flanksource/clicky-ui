@@ -36,6 +36,12 @@ export type StoredAuthor = {
   id?: string;
   name: string;
   kind?: "user" | "agent";
+  /** The agent that posted on `name`'s behalf, when another agent wrote the text. */
+  via?: string;
+  /** The session that produced the text, so the run can be inspected later. */
+  sessionId?: string;
+  /** AI response cost in USD for producing the text. */
+  cost?: number;
 };
 
 export type StoredComment = {

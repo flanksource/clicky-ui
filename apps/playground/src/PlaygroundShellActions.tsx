@@ -43,39 +43,43 @@ export function PlaygroundShellActions(props: PlaygroundShellActionsProps) {
     <>
       <PlaygroundAgentInstructions />
       <BookmarkletInstall />
-      <PlaygroundViewActions
-        view={props.view}
-        annotations={props.annotations}
-        copyDisabled={props.copyDisabled}
-        copied={props.pageMarkdownCopied}
-        onViewChange={props.onViewChange}
-        onAnnotationsChange={props.onAnnotationsChange}
-        onCopy={props.onCopyPage}
-      />
+      {props.active && (
+        <PlaygroundViewActions
+          view={props.view}
+          annotations={props.annotations}
+          copyDisabled={props.copyDisabled}
+          copied={props.pageMarkdownCopied}
+          onViewChange={props.onViewChange}
+          onAnnotationsChange={props.onAnnotationsChange}
+          onCopy={props.onCopyPage}
+        />
+      )}
       <NewPageMenu
         disabled={props.filesystemActionsDisabled}
         disabledReason={props.filesystemActionsDisabledReason}
         onSelect={props.onNewPage}
       />
-      <button
-        type="button"
-        onClick={props.onToggleEditing}
-        aria-pressed={props.editing}
-        disabled={!props.active}
-        title="Edit this artifact's source"
-        className={cn(
-          "inline-flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-40",
-          props.editing
-            ? "border-primary bg-primary text-primary-foreground"
-            : "border-border bg-background text-muted-foreground hover:text-foreground",
-        )}
-      >
-        <UiCode2 className="size-3.5" />
-        Edit
-        {props.sourceDirty && (
-          <span className="size-1.5 rounded-full bg-amber-500" />
-        )}
-      </button>
+      {props.active && (
+        <button
+          type="button"
+          onClick={props.onToggleEditing}
+          aria-pressed={props.editing}
+          disabled={!props.active}
+          title="Edit this artifact's source"
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-40",
+            props.editing
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-background text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <UiCode2 className="size-3.5" />
+          Edit
+          {props.sourceDirty && (
+            <span className="size-1.5 rounded-full bg-amber-500" />
+          )}
+        </button>
+      )}
       {props.view === "preview" && (
         <>
           <button
@@ -96,7 +100,8 @@ export function PlaygroundShellActions(props: PlaygroundShellActionsProps) {
           <button
             type="button"
             onClick={props.onCommentWholePage}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+            disabled={!props.active}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40"
           >
             <UiFileText className="size-3.5" />
             Comment on page

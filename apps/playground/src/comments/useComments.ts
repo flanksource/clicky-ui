@@ -87,6 +87,7 @@ export async function fetchComments(
 export type PlaygroundComments = {
   comments: PlaygroundComment[];
   allComments: PageComment[];
+  loading: boolean;
   /** Surfaced as a banner — a broken backend must never look like "no comments". */
   error: string | null;
   create: (input: CommentCreateInput, actionId?: string) => Promise<void>;
@@ -122,6 +123,7 @@ export function useComments(
   pageRef.current = page;
   const [comments, setComments] = useState<PlaygroundComment[]>([]);
   const [allComments, setAllComments] = useState<PageComment[]>([]);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
   const preparedSelection = useRef<{
     page: string;
@@ -158,7 +160,7 @@ export function useComments(
     if (!enabled) return;
     try {
       const [pageComments, everyComment] = await Promise.all([
-        fetchComments({ page }),
+        page === "" ? Promise.resolve([]) : fetchComments({ page }),
         fetchComments(),
       ]);
       if (pageRef.current !== page) return;
@@ -168,6 +170,8 @@ export function useComments(
     } catch (cause) {
       if (pageRef.current !== page) return;
       setError(describeError(cause));
+    } finally {
+      if (pageRef.current === page) setLoading(false);
     }
   }, [page, enabled]);
 
@@ -385,10 +389,11 @@ export function useComments(
 
   const remove = useCallback(
     (id: string) =>
-      mutate(() =>
-        request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, {
+      mutate(
+        () => request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, {
           method: "DELETE",
         }),
+        { rethrow: true },
       ),
     [mutate],
   );
@@ -396,6 +401,7 @@ export function useComments(
   return {
     comments,
     allComments,
+    loading,
     error,
     create,
     prepareSelection,

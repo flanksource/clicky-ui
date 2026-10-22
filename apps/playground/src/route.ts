@@ -44,7 +44,14 @@ export function parsePlaygroundRoute(
 }
 
 export function buildPlaygroundRoute(route: PlaygroundRoute): string {
-  const params = new URLSearchParams({ page: route.page });
+  const current = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
+  const params = current.get("page") === route.page ? current : new URLSearchParams();
+  for (const key of ["sidebar.sort", "sidebar.filters", "sidebar.q"]) {
+    const value = current.get(key);
+    if (value !== null) params.set(key, value);
+  }
+  for (const key of ["page", "view", "annotations", "review", "comment"]) params.delete(key);
+  params.set("page", route.page);
   if (route.view !== "preview") params.set("view", route.view);
   if (route.annotations !== "visible")
     params.set("annotations", route.annotations);
