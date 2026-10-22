@@ -8,14 +8,18 @@ import {
 } from "react";
 import {
   Button,
+  DropdownMenu,
   InputField,
   Modal,
   useCommentContext,
   type Comment,
   type CommentReviewDecision,
+  type DropdownMenuItem,
 } from "@flanksource/clicky-ui";
 import {
   UiCheck,
+  UiCopy,
+  UiDownload,
   UiEdit,
   UiTrash,
   UiClose,
@@ -26,6 +30,16 @@ import {
   resolveAnchor,
   type Box,
 } from "../comments/dom-anchor";
+import { writeClipboard } from "../comments/clipboard";
+import {
+  copyElement,
+  downloadElement,
+  publishElement,
+  reviewContent,
+  type ExportFormat,
+} from "./export";
+
+const EXPORT_FORMATS: ExportFormat[] = ["svg", "png", "html"];
 
 const SOURCES_ROUTE = "/__playground/sources";
 const REVIEW_ID = /^[A-Za-z][A-Za-z0-9:_-]*$/;
@@ -270,6 +284,37 @@ export function ReviewProvider({
     }
   };
 
+  const exportItems = (id: string, element: HTMLElement): DropdownMenuItem[] => {
+    const title = `${page.replace(/[^A-Za-z0-9_-]+/g, "-")}-${id.replace(/:/g, "-")}`;
+    const run = (action: Promise<void>) => {
+      setError("");
+      action.catch((cause: unknown) =>
+        setError(cause instanceof Error ? cause.message : String(cause)),
+      );
+    };
+    return [
+      ...EXPORT_FORMATS.map((format) => ({
+        group: "Copy",
+        label: format.toUpperCase(),
+        icon: UiCopy,
+        onSelect: () => run(copyElement(element, format, title)),
+      })),
+      ...EXPORT_FORMATS.map((format) => ({
+        group: "Copy link",
+        label: format.toUpperCase(),
+        icon: UiCopy,
+        onSelect: () =>
+          run(writeClipboard(publishElement(element, format, title))),
+      })),
+      ...EXPORT_FORMATS.map((format) => ({
+        group: "Download",
+        label: format.toUpperCase(),
+        icon: UiDownload,
+        onSelect: () => run(downloadElement(element, format, title)),
+      })),
+    ];
+  };
+
   const latest = useRef({
     mark,
     approve,
@@ -365,7 +410,7 @@ export function ReviewProvider({
           className="pointer-events-none absolute inset-0 z-20"
           aria-label="Review controls"
         >
-          {items.map(({ id, box }) => {
+          {items.map(({ id, element, box }) => {
             const decision = latestDecision(context.comments, id);
             return (
               <div
@@ -411,6 +456,20 @@ export function ReviewProvider({
                 >
                   <UiEdit className="size-3.5" />
                 </button>
+                <DropdownMenu
+                  align="right"
+                  menuLabel={`Export ${id}`}
+                  items={exportItems(id, reviewContent(element))}
+                  trigger={
+                    <button
+                      type="button"
+                      aria-label={`Export ${id}`}
+                      title="Copy or download as SVG, PNG or HTML"
+                    >
+                      <UiDownload className="size-3.5" />
+                    </button>
+                  }
+                />
                 <button
                   type="button"
                   aria-label={`Delete ${id}`}

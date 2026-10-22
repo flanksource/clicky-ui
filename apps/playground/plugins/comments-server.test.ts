@@ -125,4 +125,44 @@ describe("playground comment lifecycle API", () => {
       "open",
     ]);
   });
+
+  async function postReply(author: Record<string, unknown>) {
+    return fetch(`${baseUrl}/__playground/comments/${comment.id}/replies`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body: "Review findings", author }),
+    });
+  }
+
+  it("keeps the relaying agent, session and cost of a delegated reply", async () => {
+    writeAll(dir, { sample: [comment] });
+    const delegated = {
+      name: "gpt-6.1-sol",
+      kind: "agent",
+      via: "Claude",
+      sessionId: "019a3f2e-session",
+      cost: 0.42,
+    };
+
+    const response = await postReply(delegated);
+
+    expect(response.status).toBe(201);
+    const reply = (await response.json()) as StoredComment;
+    expect(reply.author).toEqual(delegated);
+    expect(readAll(dir).sample?.[1]?.author).toEqual(delegated);
+  });
+
+  it.each([
+    ["an empty via", { via: " " }],
+    ["a non-string session id", { sessionId: 42 }],
+    ["a negative cost", { cost: -0.01 }],
+    ["a cost given as text", { cost: "0.42" }],
+  ])("rejects a reply author with %s", async (_label, attribution) => {
+    writeAll(dir, { sample: [comment] });
+
+    const response = await postReply({ ...agent, ...attribution });
+
+    expect(response.status).toBe(400);
+    expect(readAll(dir).sample).toEqual([comment]);
+  });
 });

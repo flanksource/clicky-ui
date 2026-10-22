@@ -13,10 +13,17 @@ import { PlaygroundCommentReview } from "../comments/PlaygroundCommentReview";
 import { useFeedbackCopy } from "../comments/useFeedbackCopy";
 import { resolvedReviewQueue } from "../comments/PlaygroundCommentReview";
 import type { PageComment } from "../comments/useComments";
+import { usePlaygroundNavigation } from "../usePlaygroundNavigation";
+import { usePageFolders } from "../editor/usePageFolders";
+import { useSidebarState } from "../sidebar-state";
+import { usePageActivity } from "../sidebar-activity";
+import { PlaygroundSidebarControls } from "../PlaygroundSidebarControls";
 
 export function ExternalWorkspace({
   id,
+  pageHref,
   comments,
+  commentsLoading,
   error,
   review,
   selectedId,
@@ -24,7 +31,9 @@ export function ExternalWorkspace({
   onReopen,
 }: {
   id: string;
+  pageHref: (slug: string) => string;
   comments: PageComment[];
+  commentsLoading: boolean;
   error: string | null;
   review: boolean;
   selectedId?: string;
@@ -32,6 +41,15 @@ export function ExternalWorkspace({
   onReopen: (id: string, body: string) => Promise<void>;
 }) {
   const catalog = useExternalCatalog();
+  const [sidebar, setSidebar] = useSidebarState();
+  const activity = usePageActivity();
+  const folders = usePageFolders();
+  const sections = usePlaygroundNavigation({ activeSlug: id, allComments: comments,
+    query: sidebar.query, onQueryChange: (query) => setSidebar({ query }), sort: sidebar.sort, filters: sidebar.filters, updates: activity.updates, loading: commentsLoading,
+    folders: folders.folders, pageHref, actionsDisabled: true, disabledReason: "Open an artifact page to manage its source",
+    drag: { canDrag: () => false, onDrop: () => { throw new Error("Page dragging is unavailable from an external page"); } },
+    setPageAction: () => { throw new Error("Source actions are unavailable from an external page"); },
+  });
   const page = catalog.pages.find((entry) => entry.id === id);
   const ctx = useCommentContext();
   const feedback = useFeedbackCopy({
@@ -47,6 +65,9 @@ export function ExternalWorkspace({
       brand="Playground · External pages"
       contentClassName="overflow-hidden"
       contentWidth="full"
+      sidebarWidth={300}
+      collapsedStorageKey="playground:sidebar:collapsed"
+      sidebarHeader={<PlaygroundSidebarControls state={sidebar} onChange={setSidebar} error={activity.error ?? folders.error} />}
       actions={
         <>
           <PlaygroundAgentInstructions />
@@ -71,23 +92,7 @@ export function ExternalWorkspace({
           </Button>
         </>
       }
-      navSections={[
-        {
-          label: "Playground",
-          items: [
-            { key: "welcome", label: "Artifact pages", to: "?page=welcome" },
-          ],
-        },
-        {
-          label: "External pages",
-          items: catalog.pages.map((entry) => ({
-            key: entry.id,
-            label: entry.title,
-            active: entry.id === id,
-            to: `?page=${encodeURIComponent(entry.id)}`,
-          })),
-        },
-      ]}
+      navSections={sections}
     >
       <div className="flex h-full min-h-0 flex-col overflow-auto lg:flex-row lg:overflow-hidden">
         <section className="flex min-h-[60dvh] min-w-0 flex-1 shrink-0 flex-col gap-4 overflow-auto p-4 lg:min-h-0">

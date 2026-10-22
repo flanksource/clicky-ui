@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import {
   CommentProvider,
   DensityProvider,
@@ -32,11 +32,11 @@ export function App() {
     parse: (_pathname, search) => {
       const parsed = parsePlaygroundRoute(
         search,
-        fallbackPageSlug(pages()) ?? "",
+        "",
       );
       return {
         ...parsed,
-        page: parsed.page.startsWith("external:")
+        page: parsed.page === "" || parsed.page.startsWith("external:")
           ? parsed.page
           : (findPage(parsed.page)?.slug ?? fallbackPageSlug(pages()) ?? ""),
       };
@@ -47,7 +47,6 @@ export function App() {
   // Browser adapter renders nav items as client-side <a> links; clicking pushes
   // history + dispatches popstate, which useHistoryRoute above re-parses.
   const router = useBrowserRouter();
-  const [query, setQuery] = useState("");
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Nav labels start from the filename and settle once each `meta` has loaded;
@@ -59,7 +58,7 @@ export function App() {
 
   const active = findPage(route.page);
   const isExternal = route.page.startsWith("external:");
-  const comments = useComments(route.page, contentRef, { poll: isExternal });
+  const comments = useComments(route.page, contentRef, { poll: true });
   const standardRoute = (
     page: string,
     view: PlaygroundRoute["view"] = route.view,
@@ -83,7 +82,9 @@ export function App() {
             {isExternal ? (
               <ExternalWorkspace
                 id={route.page}
+                pageHref={(slug) => buildPlaygroundRoute(standardRoute(slug))}
                 comments={comments.allComments}
+                commentsLoading={comments.loading}
                 error={comments.error}
                 review={route.review === "resolved"}
                 {...(route.comment ? { selectedId: route.comment } : {})}
@@ -104,9 +105,8 @@ export function App() {
                 active={active}
                 allComments={comments.allComments}
                 contentRef={contentRef}
-                query={query}
-                onQueryChange={setQuery}
                 commentsError={comments.error}
+                commentsLoading={comments.loading}
                 view={route.view}
                 annotations={route.annotations}
                 {...(route.review ? { review: route.review } : {})}
