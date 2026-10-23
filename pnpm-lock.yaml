@@ -10,8 +10,8 @@ catalogs:
       specifier: ^3.0.201
       version: 3.0.201
     '@chromatic-com/storybook':
-      specifier: ^5.2.1
-      version: 5.2.1
+      specifier: ^5.6.0
+      version: 5.6.0
     '@codemirror/autocomplete':
       specifier: ^6.20.3
       version: 6.20.3
@@ -54,6 +54,9 @@ catalogs:
     '@mdxeditor/editor':
       specifier: ^4.0.4
       version: 4.0.4
+    '@medv/finder':
+      specifier: ^4.0.2
+      version: 4.0.2
     '@monaco-editor/react':
       specifier: ^4.7.0
       version: 4.7.0
@@ -120,6 +123,12 @@ catalogs:
     country-flag-icons:
       specifier: ^1.6.20
       version: 1.6.20
+    css.escape:
+      specifier: ^1.5.1
+      version: 1.5.1
+    dom-accessibility-api:
+      specifier: ^0.6.3
+      version: 0.6.3
     jotai:
       specifier: ^2.20.1
       version: 2.20.1
@@ -190,6 +199,8 @@ overrides:
   brace-expansion: ^5.0.6
   fast-uri: ^3.1.2
   ws: ^8.21.0
+
+packageExtensionsChecksum: sha256-TDNSQ0tVyMBnnhnXR4DRvdrlXlYQJ2cnAjkU0PvTgrE=
 
 importers:
 
@@ -304,9 +315,15 @@ importers:
       '@iconify/react':
         specifier: 'catalog:'
         version: 6.0.2(react@18.3.1)
+      '@medv/finder':
+        specifier: 'catalog:'
+        version: 4.0.2
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.99.2(react@18.3.1)
+      dom-accessibility-api:
+        specifier: 'catalog:'
+        version: 0.6.3
       modern-screenshot:
         specifier: 'catalog:'
         version: 4.7.0
@@ -344,6 +361,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: 'catalog:'
         version: 6.1.2(vite@8.3.5(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.8.3))
+      css.escape:
+        specifier: 'catalog:'
+        version: 1.5.1
       jsdom:
         specifier: 'catalog:'
         version: 26.1.0(supports-color@8.1.1)
@@ -377,7 +397,7 @@ importers:
     devDependencies:
       '@chromatic-com/storybook':
         specifier: 'catalog:'
-        version: 5.2.1(storybook@10.6.3(@types/react@19.2.17)(prettier@3.8.3)(react@18.3.1))
+        version: 5.6.0(storybook@10.6.3(@types/react@19.2.17)(prettier@3.8.3)(react@18.3.1))
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1
@@ -411,6 +431,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.5(@vitest/browser@5.0.5)(vitest@5.0.5)
+      jsdom:
+        specifier: 'catalog:'
+        version: 26.1.0(supports-color@8.1.1)
       playwright:
         specifier: ^1.61.0
         version: 1.61.0
@@ -497,7 +520,7 @@ importers:
         version: 2.1.1
       country-flag-icons:
         specifier: 'catalog:'
-        version: 1.6.20
+        version: 1.6.20(react@18.3.1)
       dompurify:
         specifier: ^3.4.11
         version: 3.4.11
@@ -538,6 +561,9 @@ importers:
       '@oxlint/plugins':
         specifier: 'catalog:'
         version: 1.68.0
+      '@storybook/addon-vitest':
+        specifier: 'catalog:'
+        version: 10.6.3(@vitest/browser-playwright@5.0.5)(@vitest/browser@5.0.5)(react@18.3.1)(storybook@10.6.3(@types/react@19.2.17)(prettier@3.8.3)(react@18.3.1))(vitest@5.0.5)
       '@storybook/react-vite':
         specifier: 'catalog:'
         version: 10.6.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(rollup@4.60.2)(storybook@10.6.3(@types/react@19.2.17)(prettier@3.8.3)(react@18.3.1))(supports-color@8.1.1)(typescript@5.9.3)(vite@8.3.5(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.8.3))
@@ -763,11 +789,11 @@ packages:
   '@chevrotain/types@11.1.2':
     resolution: {integrity: sha512-U+HFai5+zmJCkK86QsaJtoITlboZHBqrVketcO2ROv865xfCMSFpELQoz1GkX5GzME8pTa+3kbKrZHQtI0gdbw==}
 
-  '@chromatic-com/storybook@5.2.1':
-    resolution: {integrity: sha512-z6I7NJk/0VngA64y5TNYaB4Hc2X8+90n4op6lBt9PvWk5TmIlFLDqdX33rlrwbNRkkYijVgA/wO04rVYXi5Mlg==}
+  '@chromatic-com/storybook@5.6.0':
+    resolution: {integrity: sha512-Z7YMtr9DVwegQeWcBeQaiK5dLcAvgpX53Qr/eGGYTyAEqTb1meUr5VQNq1wmst0Lj+gT6lQEco0PuFfUuf3jzA==}
     engines: {node: '>=20.0.0', yarn: '>=1.22.18'}
     peerDependencies:
-      storybook: ^0.0.0-0 || ^10.1.0 || ^10.1.0-0 || ^10.2.0-0 || ^10.3.0-0 || ^10.4.0-0 || ^10.5.0-0 || ^10.6.0-0
+      storybook: ^0.0.0-0 || ^10.1.0 || ^10.1.0-0 || ^10.2.0-0 || ^10.3.0-0 || ^10.4.0-0 || ^10.5.0-0 || ^10.6.0-0 || ^11.0.0-0
 
   '@codemirror/autocomplete@6.20.3':
     resolution: {integrity: sha512-tlosUqb+3BbxCxZdu4tKeRghPFC+QM7q4X5YhKV2eCmPG+1r2F3f4AaSz5sCrFqUtX4Jh20VFTKecl16MgiV9g==}
@@ -1815,6 +1841,9 @@ packages:
     peerDependencies:
       react: '>= 18 || >= 19'
       react-dom: '>= 18 || >= 19'
+
+  '@medv/finder@4.0.2':
+    resolution: {integrity: sha512-RraNY9SCcx4KZV0Dh6BEW6XEW2swkqYca74pkFFRw6hHItSHiy+O/xMnpbofjYbzXj0tSpBGthUF1hHTsr3vIQ==}
 
   '@mermaid-js/parser@1.1.1':
     resolution: {integrity: sha512-VuHdsYMK1bT6X2JbcAaWAhugTRvRBRyuZgd+c22swUeI9g/ntaxF7CY7dYarhZovofCbUNO0G7JesfmNtjYOCw==}
@@ -3899,8 +3928,9 @@ packages:
     resolution: {integrity: sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw==}
     engines: {node: '>= 20.19.0'}
 
-  chromatic@16.10.0:
-    resolution: {integrity: sha512-nFsztmnu7rFiGafUJgXvLUNpqmRylz92eNvzBoJNTKKQj4EQUyxznwnfpf1dTs7hXtWD8JwcH92jADydaHA1sw==}
+  chromatic@18.13.2:
+    resolution: {integrity: sha512-bUd236+LocDIFt8nBtgS05kSnn1JyauX693GaZMhZQeTq203ZUXBOCj4mEshDIfn+orLWIqKve5B+bQQCwy1Kw==}
+    engines: {node: '>=22.0.0'}
     hasBin: true
     peerDependencies:
       '@chromatic-com/cypress': ^0.*.* || ^1.0.0
@@ -4012,6 +4042,11 @@ packages:
 
   country-flag-icons@1.6.20:
     resolution: {integrity: sha512-py8JiEKzjhYw6HPJ0L7SxLgCYim36UPRTZX43/kqGueUCZLSvnrqAiwW8HtQibur7mdkFQUkjOgdK+o/9FBtaw==}
+    peerDependencies:
+      react: '*'
+    peerDependenciesMeta:
+      react:
+        optional: true
 
   crelt@1.0.7:
     resolution: {integrity: sha512-aK6BbWfhf4U/wCcLHKPJl/xa6VkVstRaPywWtMKGwuOLc/wZTyQYuoxgvZnNsBvv7Kg3YTBQYYBCggcviQczuA==}
@@ -6970,10 +7005,10 @@ snapshots:
 
   '@chevrotain/types@11.1.2': {}
 
-  '@chromatic-com/storybook@5.2.1(storybook@10.6.3(@types/react@19.2.17)(prettier@3.8.3)(react@18.3.1))':
+  '@chromatic-com/storybook@5.6.0(storybook@10.6.3(@types/react@19.2.17)(prettier@3.8.3)(react@18.3.1))':
     dependencies:
       '@neoconfetti/react': 1.0.0
-      chromatic: 16.10.0
+      chromatic: 18.13.2
       jsonfile: 6.2.0
       storybook: 10.6.3(@types/react@19.2.17)(prettier@3.8.3)(react@18.3.1)
       strip-ansi: 7.2.0
@@ -7576,7 +7611,7 @@ snapshots:
       '@tanstack/react-virtual': 3.14.10(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       class-variance-authority: 0.7.1
       clsx: 2.1.1
-      country-flag-icons: 1.6.20
+      country-flag-icons: 1.6.20(react@18.3.1)
       dompurify: 3.4.11
       jotai: 2.20.1(@babel/core@7.29.0(supports-color@8.1.1))(@babel/template@7.28.6)(@types/react@19.2.17)(react@18.3.1)
       monaco-editor: 0.55.1
@@ -8190,6 +8225,8 @@ snapshots:
     dependencies:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
+
+  '@medv/finder@4.0.2': {}
 
   '@mermaid-js/parser@1.1.1':
     dependencies:
@@ -10133,7 +10170,7 @@ snapshots:
     dependencies:
       readdirp: 5.1.1
 
-  chromatic@16.10.0:
+  chromatic@18.13.2:
     dependencies:
       semver: 7.7.4
 
@@ -10212,7 +10249,9 @@ snapshots:
     dependencies:
       layout-base: 2.0.1
 
-  country-flag-icons@1.6.20: {}
+  country-flag-icons@1.6.20(react@18.3.1):
+    optionalDependencies:
+      react: 18.3.1
 
   crelt@1.0.7: {}
 
