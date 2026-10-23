@@ -15,7 +15,6 @@ export { AVATAR_PALETTE, fnv1a32, paletteClass } from "./lib/palette";
 export { SIZE_TOKENS, resolveSize, type SizeToken } from "./lib/size";
 export {
   calculateComboboxMenuPosition,
-  COMBOBOX_MENU_MAX_HEIGHT_PX,
   COMBOBOX_MENU_MAX_WIDTH_PX,
   COMBOBOX_MOBILE_QUERY,
   type ComboboxMenuPosition,

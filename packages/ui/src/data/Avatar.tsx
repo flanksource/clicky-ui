@@ -1,4 +1,4 @@
-import type { CSSProperties, SyntheticEvent } from "react";
+import { useState, type CSSProperties, type SyntheticEvent } from "react";
 import { cn } from "../lib/utils";
 import { fnv1a32 } from "../lib/palette";
 import { resolveSize, type SizeToken } from "../lib/size";
@@ -174,6 +174,7 @@ export function Avatar({
   onError,
   className,
 }: AvatarProps) {
+  const [failedSrc, setFailedSrc] = useState<string>();
   const density = useDensityValue();
   const px = resolveSize(size, density);
   const effectiveRounded = rounded ?? (kind === "group" ? "md" : "full");
@@ -205,7 +206,7 @@ export function Avatar({
     return 600;
   };
 
-  const content = src ? (
+  const content = src && src !== failedSrc ? (
     <img
       src={src}
       alt={alt}
@@ -218,7 +219,10 @@ export function Avatar({
       className={cn(base, "bg-muted object-cover", className)}
       style={frameStyle}
       loading="lazy"
-      onError={onError}
+      onError={(event) => {
+        setFailedSrc(src);
+        onError?.(event);
+      }}
     />
   ) : (
     <span

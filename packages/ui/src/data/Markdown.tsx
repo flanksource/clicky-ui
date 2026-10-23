@@ -4,6 +4,7 @@ import {
   useState,
   type ComponentType,
   type CSSProperties,
+  type HTMLAttributes,
   type ReactNode,
 } from "react";
 import { cn } from "../lib/utils";
@@ -46,6 +47,36 @@ type MarkdownElementProps = {
   node?: unknown;
 };
 
+type MarkdownHeadingTag = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+type MarkdownHeadingProps = HTMLAttributes<HTMLHeadingElement> & { node?: unknown };
+
+const headingClasses: Record<MarkdownHeadingTag, string> = {
+  h1: "mt-4 mb-2 text-lg font-semibold",
+  h2: "mt-3 mb-1.5 text-base font-semibold",
+  h3: "mt-3 mb-1 text-sm font-semibold",
+  h4: "mt-2 mb-1 text-sm font-semibold",
+  h5: "mt-2 mb-1 text-sm font-medium",
+  h6: "mt-2 mb-1 text-sm font-medium",
+};
+
+function MarkdownHeading({
+  as: Tag,
+  className,
+  children,
+  node: _node,
+  ...props
+}: MarkdownHeadingProps & { as: MarkdownHeadingTag }) {
+  return (
+    <Tag
+      className={cn(headingClasses[Tag], className)}
+      data-streamdown={`heading-${Tag.slice(1)}`}
+      {...props}
+    >
+      {children}
+    </Tag>
+  );
+}
+
 type StreamdownComponent = ComponentType<{
   children: string;
   className?: string | undefined;
@@ -54,6 +85,12 @@ type StreamdownComponent = ComponentType<{
   // raw tag, so this is an allowlist rather than raw-HTML passthrough.
   allowedTags?: Record<string, string[]> | undefined;
   components?: {
+    h1?: ComponentType<MarkdownHeadingProps>;
+    h2?: ComponentType<MarkdownHeadingProps>;
+    h3?: ComponentType<MarkdownHeadingProps>;
+    h4?: ComponentType<MarkdownHeadingProps>;
+    h5?: ComponentType<MarkdownHeadingProps>;
+    h6?: ComponentType<MarkdownHeadingProps>;
     a?: ComponentType<MarkdownLinkProps>;
     code?: ComponentType<MarkdownCodeProps>;
     ul?: ComponentType<MarkdownElementProps>;
@@ -238,6 +275,12 @@ function MarkdownLink({ href, title, className, children }: MarkdownLinkProps) {
 }
 
 const markdownComponents = {
+  h1: (props: MarkdownHeadingProps) => <MarkdownHeading as="h1" {...props} />,
+  h2: (props: MarkdownHeadingProps) => <MarkdownHeading as="h2" {...props} />,
+  h3: (props: MarkdownHeadingProps) => <MarkdownHeading as="h3" {...props} />,
+  h4: (props: MarkdownHeadingProps) => <MarkdownHeading as="h4" {...props} />,
+  h5: (props: MarkdownHeadingProps) => <MarkdownHeading as="h5" {...props} />,
+  h6: (props: MarkdownHeadingProps) => <MarkdownHeading as="h6" {...props} />,
   a: MarkdownLink,
   code: MarkdownCode,
   ul: MarkdownList,

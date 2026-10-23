@@ -65,6 +65,10 @@ export type CodeDiffProps = CodeDiffInput & {
   language?: string | undefined;
   /** Unified (single column) or split (side-by-side). Defaults to `unified`. */
   view?: CodeDiffView | undefined;
+  /** Names the original (left) side; unified view prefixes it with a minus. */
+  originalLabel?: ReactNode;
+  /** Names the modified (right) side; unified view prefixes it with a plus. */
+  modifiedLabel?: ReactNode;
   /** Show old/new line-number gutters. Defaults to `true`. */
   showLineNumbers?: boolean | undefined;
   /** Render only the rows — no border, background, or language header. */
@@ -98,7 +102,7 @@ const MARKER: Record<DiffLineType, string> = { context: "", add: "+", remove: "-
 
 export function CodeDiff(props: CodeDiffProps) {
   const { language, view: viewProp = "unified", showLineNumbers = true, bare = false, className } = props;
-  const { unified, original, modified, onLineAction, lineWidgets } = props;
+  const { unified, original, modified, originalLabel, modifiedLabel, onLineAction, lineWidgets } = props;
   const annotations: LineAnnotations = { onLineAction, lineWidgets };
 
   // `view` prop seeds the default; the header toggle then owns it.
@@ -187,6 +191,12 @@ export function CodeDiff(props: CodeDiffProps) {
           options={DIFF_VIEW_OPTIONS}
         />
       </div>
+      {originalLabel != null || modifiedLabel != null ? (
+        <div className={cn("border-b border-border text-xs font-medium", view === "split" ? "grid grid-cols-2 divide-x divide-border" : "flex flex-wrap gap-x-4")}>
+          <div data-diff-side="original" className="min-w-0 break-words px-3 py-1.5">{view === "unified" ? "− " : null}{originalLabel}</div>
+          <div data-diff-side="modified" className="min-w-0 break-words px-3 py-1.5">{view === "unified" ? "+ " : null}{modifiedLabel}</div>
+        </div>
+      ) : null}
       <div className="overflow-x-auto font-mono text-xs leading-relaxed">{rows}</div>
     </div>
   );
@@ -378,7 +388,7 @@ function SplitCell({
   showLineNumbers: boolean;
   onLineAction: LineAnnotations["onLineAction"];
 }) {
-  if (!resolved) return <div className="min-w-0 flex-1" />;
+  if (!resolved) return <div className="min-w-0 flex-1 basis-0" />;
   const { line } = resolved;
   const active =
     (side === "old" && line.type === "remove") || (side === "new" && line.type === "add");
@@ -386,15 +396,17 @@ function SplitCell({
   const number = side === "old" ? line.oldNumber : line.newNumber;
   const tokens = side === "old" ? resolved.oldTokens : resolved.newTokens;
   return (
+    // Equal, shrinkable halves whose code wraps: with `whitespace-pre` a long
+    // line painted past its half and over the other side in a narrow container.
     <div
-      className={cn("group flex min-w-0 flex-1", active && ROW_TINT[line.type])}
+      className={cn("group flex min-w-0 flex-1 basis-0", active && ROW_TINT[line.type])}
       data-diff-line={type}
     >
       {showLineNumbers && (
         <Gutter value={number} line={line} side={side} actionSide={side} onLineAction={onLineAction} />
       )}
       <Marker type={type} />
-      <code className="min-w-0 whitespace-pre pl-1 pr-3">
+      <code className="min-w-0 flex-1 whitespace-pre-wrap pl-1 pr-3 [overflow-wrap:anywhere]">
         <HighlightedTokens tokens={tokens} content={line.content} />
       </code>
     </div>

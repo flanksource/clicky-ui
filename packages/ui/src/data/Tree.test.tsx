@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { Tree } from "./Tree";
 
@@ -127,14 +128,15 @@ describe("Tree", () => {
     expect(screen.getByLabelText("Filter tree nodes")).toBeInTheDocument();
   });
 
-  it("renders the filter as the first row inside the tree and uses icon-only controls", () => {
+  it("keeps filter controls before the semantic tree and uses icon-only controls", () => {
     renderTree(makeLargeTree());
 
     const tree = screen.getByRole("tree");
     const filter = screen.getByLabelText("Filter tree nodes");
     const root = screen.getByText("root");
 
-    expect(tree).toContainElement(filter);
+    expect(tree).not.toContainElement(filter);
+    expect(tree).not.toContainElement(screen.getByRole("button", { name: "Expand all" }));
     expect(filter.compareDocumentPosition(root) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     const expandButton = screen.getByRole("button", { name: "Expand all" });
@@ -352,6 +354,39 @@ describe("Tree", () => {
       const { rerender } = render(<Tree<Node> {...props} roots={makeDeepTree()} selected={leaf} expandAll={null} onExpandAllChange={onExpandAllChange} />);
       rerender(<Tree<Node> {...props} roots={makeDeepTree()} selected={leaf} expandAll={false} onExpandAllChange={onExpandAllChange} />);
       expect(screen.queryByText("x")).toBeNull();
+    });
+
+    function SelectableTree({ initial, navigateTo }: { initial: Node; navigateTo: Node }) {
+      const [selected, setSelected] = useState<Node>(initial);
+      return (
+        <>
+          <button type="button" onClick={() => setSelected(navigateTo)}>navigate</button>
+          <Tree<Node> {...props} roots={makeDeepTree()} selected={selected} onSelect={setSelected} />
+        </>
+      );
+    }
+
+    it("keeps the visible expansion when a row is selected by clicking it", () => {
+      render(<SelectableTree initial={leaf} navigateTo={leaf} />);
+      const root = screen.getByText("r").closest("[role=treeitem]")!;
+      fireEvent.click(root.querySelector('button[aria-label="Show all children"]')!);
+      fireEvent.click(screen.getByText("other"));
+
+      expect(screen.getByText("other").closest("[role=treeitem]")).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByText("x")).toBeInTheDocument();
+      expect(screen.getByText("z")).toBeInTheDocument();
+    });
+
+    it("reveals an external navigation that follows an in-tree click", () => {
+      render(<SelectableTree initial={leaf} navigateTo={{ id: "sibling", label: "sibling" }} />);
+      const root = screen.getByText("r").closest("[role=treeitem]")!;
+      fireEvent.click(root.querySelector('button[aria-label="Show all children"]')!);
+      fireEvent.click(screen.getByText("other"));
+      fireEvent.click(screen.getByRole("button", { name: "navigate" }));
+
+      expect(screen.getByText("sibling").closest("[role=treeitem]")).toHaveAttribute("aria-selected", "true");
+      expect(screen.queryByText("other")).toBeNull();
+      expect(screen.queryByText("z")).toBeNull();
     });
 
     it("does not reveal the selected node without revealSelected", () => {

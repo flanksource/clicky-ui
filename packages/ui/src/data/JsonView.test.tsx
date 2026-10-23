@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { DensityContext, type Density } from "../hooks/use-density";
 import { JsonView } from "./JsonView";
@@ -20,14 +20,25 @@ describe("JsonView", () => {
     expect(container.textContent).toContain("}");
   });
 
-  it("shows collapsed summary at depths beyond defaultOpenDepth", () => {
-    render(<JsonView data={{ a: { b: { c: 1 } } }} defaultOpenDepth={1} />);
-    expect(
-      within(screen.getByRole("button", { name: "Expand a" })).getByText(
-        /1 key/,
-      ),
-    ).toBeInTheDocument();
-  });
+  it.each(["yaml", "json"] as const)(
+    "omits object key counts while keeping collapsed %s objects identifiable",
+    (format) => {
+      const { container } = render(
+        <JsonView
+          data={{ a: { b: 1 }, tags: ["first", "second"] }}
+          defaultOpenDepth={1}
+          format={format}
+        />,
+      );
+      expect(container).not.toHaveTextContent(/\d+ keys?/);
+      expect(
+        screen.getByRole("button", { name: "Expand a" }),
+      ).toHaveTextContent(format === "yaml" ? "a: Object" : "a: {…}");
+      expect(
+        screen.getByRole("button", { name: "Expand tags" }),
+      ).toHaveTextContent("2 items");
+    },
+  );
 
   it("uses singular grammar for a collapsed one-item array", () => {
     render(<JsonView data={{ values: ["only"] }} defaultOpenDepth={1} />);

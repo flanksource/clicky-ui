@@ -33,6 +33,10 @@ export type TreeNodeProps<T> = {
   onRevealToggle?: (key: TreeKey, open: boolean) => void;
   selected?: T | null;
   defaultOpen?: (node: T, depth: number) => boolean;
+  /** Controlled expansion, shared between tree instances. Requires onExpandedChange. */
+  getExpanded?: (node: T) => boolean;
+  /** Receives user and bulk expansion changes for controlled trees. */
+  onExpandedChange?: (node: T, expanded: boolean) => void;
   getChildren: (node: T) => T[] | undefined;
   getKey: (node: T) => string | number;
   getAriaLabel?: (node: T) => string;
@@ -96,6 +100,8 @@ export function TreeNode<T>({
   onRevealToggle,
   selected = null,
   defaultOpen,
+  getExpanded,
+  onExpandedChange,
   getChildren,
   getKey,
   getAriaLabel,
@@ -110,6 +116,7 @@ export function TreeNode<T>({
   hasMoreChildren,
   loadChildren,
 }: TreeNodeProps<T>) {
+  if (getExpanded && !onExpandedChange) throw new Error("Controlled tree expansion requires onExpandedChange");
   // Lazily-fetched children take precedence over the synchronous ones once a
   // load has resolved; until then `loadedChildren` is null and we fall back to
   // getChildren. A node can be "lazy" (hasMoreChildren) with no sync children.
@@ -155,21 +162,23 @@ export function TreeNode<T>({
         ? defaultOpen(node, depth)
         : depth < 1;
   const [open, setOpen] = useState(initialOpen);
-  const prevExpandAll = useRef(expandAll);
+  const prevExpandAll = useRef(getExpanded ? null : expandAll);
   const key = getKey(node);
   const isSelected = selected != null && getKey(selected) === key;
   const isForcedOpen = forcedOpenKeys?.has(key) ?? false;
   const isOnRevealPath = revealPath?.has(key) ?? false;
   const revealOverride = revealOverrides?.get(key);
   const pathOnly = isOnRevealPath && revealOverride === undefined;
-  const isOpen = isForcedOpen || (pathOnly ? revealPath!.get(key) !== null : revealOverride ?? open);
+  const ownOpen = getExpanded ? getExpanded(node) : open;
+  const isOpen = isForcedOpen || (pathOnly ? revealPath!.get(key) !== null : revealOverride ?? ownOpen);
 
   useEffect(() => {
     if (expandAll !== null && expandAll !== prevExpandAll.current && !skipExpandAll) {
-      setOpen(expandAll);
+      if (getExpanded) onExpandedChange!(node, expandAll);
+      else setOpen(expandAll);
     }
     prevExpandAll.current = expandAll;
-  }, [expandAll, skipExpandAll]);
+  }, [expandAll, skipExpandAll, getExpanded, onExpandedChange, node]);
 
   // Guards a lazy fetch so a node loads its children at most once per mount and
   // a resolution arriving after the node was reused (key changed) is ignored.
@@ -220,13 +229,10 @@ export function TreeNode<T>({
       onRevealToggle(key, next);
       return;
     }
-    setOpen((o) => {
-      const next = !o;
-      // Only fetch when transitioning into the open state, so collapsing a
-      // not-yet-loaded (e.g. previously-failed) lazy node never triggers a load.
-      if (next && lazyUnloaded) loadLazyChildren();
-      return next;
-    });
+    const next = !ownOpen;
+    if (next && lazyUnloaded) loadLazyChildren();
+    if (getExpanded) onExpandedChange!(node, next);
+    else setOpen(next);
   }
 
   const defaultRowBg = isSelected ? "bg-primary/10 border-l-2 border-primary" : "hover:bg-accent";
@@ -308,6 +314,8 @@ export function TreeNode<T>({
               indentPx={indentPx}
               basePaddingPx={basePaddingPx}
               {...(defaultOpen ? { defaultOpen } : {})}
+              {...(getExpanded ? { getExpanded } : {})}
+              {...(onExpandedChange ? { onExpandedChange } : {})}
               {...(renderDetail ? { renderDetail } : {})}
               {...(renderAfterChildren ? { renderAfterChildren } : {})}
               {...(getAriaLabel ? { getAriaLabel } : {})}

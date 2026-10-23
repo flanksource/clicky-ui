@@ -49,7 +49,7 @@ export function Checkbox({
   return (
     <label className={cn("inline-flex cursor-pointer items-center gap-density-2", className)}>
       {input}
-      <span className="text-sm text-foreground">{label}</span>
+      <span className="text-sm">{label}</span>
     </label>
   );
 }

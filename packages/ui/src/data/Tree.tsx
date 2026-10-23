@@ -58,9 +58,10 @@ export type TreeProps<T> = Omit<
    */
   getSearchText?: (node: T) => string;
   /**
-   * Reveal only the path to `selected` when the selection changes. Ancestors
-   * initially show the next path node; manual expansion and collapse then take
-   * precedence until another node is selected. Off by default.
+   * Reveal only the path to `selected` when it changes from outside the tree
+   * (initial mount or navigation). Ancestors initially show the next path node;
+   * manual expansion and collapse then take precedence until the next external
+   * selection. Selecting a row by clicking it never re-reveals. Off by default.
    */
   revealSelected?: boolean;
 };
@@ -69,9 +70,8 @@ function selectionPath<T>(
   roots: T[],
   getChildren: TreeProps<T>["getChildren"],
   getKey: TreeProps<T>["getKey"],
-  target: T,
+  targetKey: TreeKey,
 ): Map<TreeKey, TreeKey | null> | null {
-  const targetKey = getKey(target);
   const path = new Map<TreeKey, TreeKey | null>();
   const visit = (node: T): boolean => {
     if (getKey(node) === targetKey) {
@@ -269,6 +269,14 @@ export function Tree<T>({
   const isControlled = onExpandAllChange !== undefined;
   const expandAll = isControlled ? (controlledExpandAll ?? null) : internalExpandAll;
   const selectedKey = revealSelected && nodeProps.selected != null ? nodeProps.getKey(nodeProps.selected) : null;
+  // revealKey drives the path reveal; it follows selectedKey except when the
+  // selection came from clicking a row in this tree.
+  const [reveal, setReveal] = useState({ selectedKey, revealKey: selectedKey, clickedKey: null as TreeKey | null });
+  if (reveal.selectedKey !== selectedKey) {
+    const fromTree = selectedKey !== null && selectedKey === reveal.clickedKey;
+    setReveal({ selectedKey, revealKey: fromTree ? reveal.revealKey : selectedKey, clickedKey: null });
+  }
+  const revealKey = reveal.revealKey;
   const [revealInteraction, setRevealInteraction] = useState({
     selectedKey: null as TreeKey | null,
     overrides: new Map<TreeKey, boolean>(),
@@ -278,8 +286,8 @@ export function Tree<T>({
   useEffect(() => {
     if (previousExpandAll.current === expandAll) return;
     previousExpandAll.current = expandAll;
-    setRevealInteraction({ selectedKey, overrides: new Map(), bulk: true });
-  }, [expandAll, selectedKey]);
+    setRevealInteraction({ selectedKey: revealKey, overrides: new Map(), bulk: true });
+  }, [expandAll, revealKey]);
   const totalEdges = useMemo(
     () => countTreeEdges(roots, nodeProps.getChildren),
     [roots, nodeProps.getChildren],
@@ -309,13 +317,20 @@ export function Tree<T>({
   const filteredChildren = filteredTree.filteredChildren;
   const revealPath = useMemo(
     () =>
-      revealSelected && nodeProps.selected
-        ? selectionPath(roots, nodeProps.getChildren, nodeProps.getKey, nodeProps.selected)
+      revealSelected && revealKey !== null
+        ? selectionPath(roots, nodeProps.getChildren, nodeProps.getKey, revealKey)
         : null,
-    [revealSelected, roots, nodeProps.getChildren, nodeProps.getKey, nodeProps.selected],
+    [revealSelected, roots, nodeProps.getChildren, nodeProps.getKey, revealKey],
   );
-  const activeReveal = !activeFilter.trim() && !(revealInteraction.selectedKey === selectedKey && revealInteraction.bulk);
-  const revealOverrides = revealInteraction.selectedKey === selectedKey ? revealInteraction.overrides : null;
+  const activeReveal = !activeFilter.trim() && !(revealInteraction.selectedKey === revealKey && revealInteraction.bulk);
+  const revealOverrides = revealInteraction.selectedKey === revealKey ? revealInteraction.overrides : null;
+  const onSelect = nodeProps.onSelect;
+  const selectFromTree = onSelect
+    ? (node: T) => {
+        setReveal((current) => ({ ...current, clickedKey: nodeProps.getKey(node) }));
+        onSelect(node);
+      }
+    : undefined;
   const effectiveGetChildren = filteredChildren
     ? (node: T) => filteredChildren.get(nodeProps.getKey(node)) ?? []
     : nodeProps.getChildren;
@@ -328,7 +343,7 @@ export function Tree<T>({
   const showControlButtons = showControls && roots.length > 0;
   const showVirtualRow = showFilter || showControlButtons || actions != null;
   const setExpandAll = (next: boolean | null) => {
-    setRevealInteraction({ selectedKey, overrides: new Map(), bulk: true });
+    setRevealInteraction({ selectedKey: revealKey, overrides: new Map(), bulk: true });
     if (isControlled) onExpandAllChange?.(next);
     else setInternalExpandAll(next);
   };
@@ -337,11 +352,7 @@ export function Tree<T>({
 
   return (
     <div className={cn("flex flex-col min-h-0", className)}>
-      <div
-        role="tree"
-        aria-label={ariaLabel}
-        className="min-h-0 flex-1 overflow-auto"
-      >
+      <div className="min-h-0 flex-1 overflow-auto">
         {showVirtualRow && (
           <div
             role="presentation"
@@ -426,10 +437,11 @@ export function Tree<T>({
         {treeRoots.length === 0 ? (
           (effectiveEmpty ?? null)
         ) : (
-          <>
+          <div role="tree" aria-label={ariaLabel}>
             {treeRoots.map((root) => (
               <TreeNode<T>
                 {...nodeProps}
+                {...(selectFromTree ? { onSelect: selectFromTree } : {})}
                 key={nodeProps.getKey(root)}
                 node={root}
                 expandAll={effectiveExpandAll}
@@ -437,14 +449,14 @@ export function Tree<T>({
                 revealPath={activeReveal ? revealPath : null}
                 revealOverrides={revealOverrides}
                 onRevealToggle={(key, open) => setRevealInteraction((current) => {
-                  const overrides = new Map(current.selectedKey === selectedKey ? current.overrides : []);
+                  const overrides = new Map(current.selectedKey === revealKey ? current.overrides : []);
                   overrides.set(key, open);
-                  return { selectedKey, overrides, bulk: false };
+                  return { selectedKey: revealKey, overrides, bulk: false };
                 })}
                 getChildren={effectiveGetChildren}
               />
             ))}
-          </>
+          </div>
         )}
       </div>
     </div>
