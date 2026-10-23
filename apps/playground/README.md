@@ -4,7 +4,7 @@ A scratch surface for one-page TSX artifacts — try a layout, show it to someon
 
 Where `apps/kitchen-sink` is a curated catalog of shipped components (every demo hand-registered in `demo-catalog.tsx`), the playground has **no registration step at all**.
 
-The root URL opens the **Comments** dashboard, showing unresolved threads across artifact and external pages. Its shared FilterBar filters by status, projects, pages, author, or screenshot availability; search comment text and sort using the list's **Sort by** control. Projects follow the first page-path segment; external captures belong to **External pages**. Projects and pages support multiple include/exclude selections: included values match any choice within that filter, exclusions take precedence, and both filters must match. Options include pages with no comments yet so they can be selected for watching. Filters, search, and sorting persist in `comments.*` URL parameters, including repeated `comments.project` / `comments.page` inclusions and their `.exclude` parameters. Each comment uses two rows: the author avatar, page, status, timestamps and actions above a large screenshot and comment body. Screenshot previews expand on hover or keyboard focus and link to the full capture. Row icons open the page, reopen, resolve, close, or delete a thread; deletion confirms before removing the thread, replies, and capture. **Comments** in the sidebar returns to the dashboard.
+The root URL opens the **Comments** dashboard, showing unresolved threads across artifact and external pages. Its shared FilterBar filters by status, projects, pages, author, assignee, or screenshot availability; search comment text and sort using the list's **Sort by** control. Projects follow the first page-path segment; external captures belong to **External pages**. Projects and pages support multiple include/exclude selections: included values match any choice within that filter, exclusions take precedence, and both filters must match. Options include pages with no comments yet so they can be selected for watching. Filters, search, and sorting persist in `comments.*` URL parameters, including repeated `comments.project` / `comments.page` inclusions and their `.exclude` parameters. Each comment uses two rows: the author avatar, page, status, timestamps and actions above a large screenshot and comment body. Screenshot previews expand on hover or keyboard focus and link to the full capture. Each row shows who holds a thread ("Assigned to …"), and the table has an **Assignee** column plus an **Assignee** filter (everyone, **Unassigned**, or a person or agent; persisted as `comments.assignee`). Row icons open the page, acknowledge it, assign it to a person or agent, reopen, resolve, close, or delete a thread; deletion confirms before removing the thread, replies, and capture. **Comments** in the sidebar returns to the dashboard.
 
 **Copy for LLM** copies the current matching threads, replies, source context, screenshots, and instructions for watching the filtered set. Its split-button menu offers **Copy for Claude** and **Copy for Codex** with the corresponding agent attribution. The copied Node reader uses the dashboard's own filter function to select live comments; the instructions poll every ten seconds, keep watching an empty queue, recheck status before editing and resolving, reply with verification evidence before resolving, and leave human closing/reopening decisions untouched. Copy remains available for an empty filtered set so a watcher can wait for its first comment.
 
@@ -87,7 +87,7 @@ Two complementary tools:
 <section data-review-id="review-summary-row">Summary row</section>
 ```
 
-Comments can move through **open → resolved → closed**, or a human can close an open or in-progress thread directly. An agent or human can resolve work after implementing it; the resolved review queue remains available for a separate approval step. Only a human can close or reopen a thread. **Review resolved** opens the global queue, stores the selected thread in `?review=resolved&comment=<id>`, navigates across artifact pages, and advances after **Close & next** or a feedback reply through **Comment & reopen**. The regular rail keeps Open, Resolved, and Closed as separate views.
+Comments move through **open → in progress → resolved → closed**. **Acknowledge** claims an open thread: it becomes in progress with the claimant as its assignee, shown as "Assigned to Claude" on the status chip. A human or an agent can acknowledge; an agent cannot take a thread another holder has, but a human can take over from anyone. A human can also **Assign…** an open or in-progress thread to a configured person or agent, or unassign it to return it to open; the assignee still acknowledges when they start. Resolving keeps the assignee on record, and reopening clears the assignee and acknowledgement along with the close attribution. A human can close an open or in-progress thread directly. An agent or human can resolve work after implementing it; the resolved review queue remains available for a separate approval step. Only a human can close, reopen, or assign a thread. The agent workflow is read, acknowledge, implement, reply, resolve. **Review resolved** opens the global queue, stores the selected thread in `?review=resolved&comment=<id>`, navigates across artifact pages, and advances after **Close & next** or a feedback reply through **Comment & reopen**. The regular rail keeps Open, Resolved, and Closed as separate views.
 
 Comments can carry a positive or negative rating, with or without text. `BestPractice` and `ReviewVariant` in `src/review/ReviewComponents.tsx` build on that same store: each requires a stable fragment id, exposes a permalink, and renders aggregate rating controls. Variants additionally require an explicit discard handler.
 
@@ -101,7 +101,7 @@ Comments can carry a positive or negative rating, with or without text. `BestPra
 | _Copy all open comments_          | unresolved notes from **every** page                      |
 | _Copy all comments_               | every note from every page, resolved included             |
 
-Anchor labels (`button.btn.primary "Approve"`) are read from the live DOM, so they only exist for the page you are looking at; cross-page actions fall back to the raw CSS path for the heading. New comments include their persisted React component/source path, HTML snapshot, and screenshot result when requested. Every copied root also includes absolute `POST` URLs for adding a reply and marking the thread resolved.
+Anchor labels (`button.btn.primary "Approve"`) are read from the live DOM, so they only exist for the page you are looking at; cross-page actions fall back to the raw CSS path for the heading. New comments include their persisted React component/source path, HTML snapshot, and screenshot result when requested. Every copied root also includes absolute `POST` URLs for acknowledging it, adding a reply and marking the thread resolved, plus its assignee while someone holds it.
 
 Each root comment menu offers **Close** alongside **Resolve** for active comments, and **Reopen** for closed comments. Expanded root cards also show a tick to close directly or a reopen icon in the header. Copy serializes the whole thread with its page, component/source, HTML, replies, screenshot link, and reply/resolve URLs. Maximise opens that same thread with **Thread** and rendered **Markdown** tabs, so the exact copied Markdown can be reviewed first.
 
@@ -130,20 +130,26 @@ curl -s localhost:5274/__playground/comments/schema | jq '.tools[] | {name, desc
 | `GET`    | `/__playground/comments`              | —                                                                   | List; `?page=`, `?status=` (repeat or comma-separate), `?unresolved=true`         |
 | `POST`   | `/__playground/comments`              | `{page, author, body?, rating?, reviewDecision?, anchor?, element}` | Start a thread or a human review decision with component and HTML context         |
 | `POST`   | `/__playground/comments/{id}/replies` | `{body, author}`                                                    | Reply — page and anchor inherited from the root                                   |
+| `POST`   | `/__playground/comments/{id}/acknowledge` | `{author}`                                                      | Claim an open thread: move it to in progress with `author` as assignee; `409` if another agent holds it or it is resolved/closed |
+| `POST`   | `/__playground/comments/{id}/assign`  | `{author:{name,kind:"user"}, assignee:{name,kind?}\|null}`          | Human only: hand an open or in-progress thread to `assignee`, or `null` to unassign and return it to open |
+| `POST`   | `/__playground/comments/{id}/agent-run` | `{author:{name,kind:"user"}, runtime?:{spec:{model,…}, presets?}}` | Human only: send the thread into the shared agent session (see below); `runtime` is required only when no session is live |
 | `POST`   | `/__playground/comments/{id}/resolve` | `{}`                                                                | Move an open or in-progress thread to resolved                                    |
 | `POST`   | `/__playground/comments/{id}/close`   | `{author:{name,kind:"user"}}`                                       | Human close: move open, in-progress, or resolved to closed and record attribution |
 | `POST`   | `/__playground/comments/{id}/reopen`  | `{author:{name,kind:"user"}, body?}`                                | Human review: optionally reply, then return resolved or closed feedback to open   |
-| `PATCH`  | `/__playground/comments/{id}`         | `{body?, status?, rating?}`                                         | Edit text/rating or move between active work statuses                             |
+| `PATCH`  | `/__playground/comments/{id}`         | `{body?, rating?}`                                                  | Edit text or rating; a `status` field is rejected with `400`                      |
 | `DELETE` | `/__playground/comments/{id}`         | —                                                                   | Remove, cascading to replies                                                      |
 
-Statuses are `open`, `in_progress`, `resolved`, `closed`; the first two are active work. Close and reopen reject non-user actors and invalid stage transitions. The machine-readable tool schema intentionally omits those human-only operations. Ratings are `positive` or `negative`. Every new root's `element` is `{componentName?, source, html, screenshot?}`; `html` is capped at 4 KB and optional `screenshot` is either `{status:"captured", dataUrl:"data:image/png;base64,…"}` or `{status:"unavailable", reason:"unsupported"|"cancelled"|"failed"}`. Invalid or missing context is a 400. A missing `author` also fails because identity is never inferred, so an agent's reply cannot show up as "You". Every comment is addressed by id alone; only `POST /__playground/comments` needs a page.
+Statuses are `open`, `in_progress`, `resolved`, `closed`; the first two are active work. `in_progress` is reached only through acknowledge or assign, never by editing `status`. A root being worked on carries `assignee`, `acknowledgedBy` and `acknowledgedAt` (an assigned thread has no acknowledgement until its assignee acknowledges); older `comments.json` files without these fields still load. Repeating acknowledge as the holder changes nothing. Close, reopen and assign reject non-user actors and invalid stage transitions. The machine-readable tool schema lists `acknowledge_comment` but intentionally omits the human-only close, reopen and assign operations. Ratings are `positive` or `negative`. Every new root's `element` is `{componentName?, source, html, screenshot?}`; `html` is capped at 4 KB and optional `screenshot` is either `{status:"captured", dataUrl:"data:image/png;base64,…"}` or `{status:"unavailable", reason:"unsupported"|"cancelled"|"failed"}`. Invalid or missing context is a 400. A missing `author` also fails because identity is never inferred, so an agent's reply cannot show up as "You". Every comment is addressed by id alone; only `POST /__playground/comments` needs a page.
 
 ```bash
 # What still needs doing, and where
 curl -s 'localhost:5274/__playground/comments?unresolved=true' \
   | jq -r '.comments[] | select(.parentId == null) | "\(.page)\t\(.id)\t\(.body)"'
 
-# Answer a note, then close it out
+# Claim a note, answer it, then close it out
+curl -s -XPOST localhost:5274/__playground/comments/$ID/acknowledge \
+  -H 'content-type: application/json' \
+  -d '{"author":{"name":"Claude","kind":"agent"}}'
 curl -s -XPOST localhost:5274/__playground/comments/$ID/replies \
   -H 'content-type: application/json' \
   -d '{"body":"Fixed in `PricingTable.tsx`.","author":{"name":"Claude","kind":"agent"}}'
@@ -151,6 +157,42 @@ curl -s -XPOST localhost:5274/__playground/comments/$ID/resolve
 ```
 
 Replies land one level deep: replying to a reply attaches to the thread root, matching how the rail renders threads.
+
+### Run agent: captain sessions, shared or per page
+
+**Run agent** (a comment's **Assign…** menu, or the dashboard row's Assign menu) hands a thread to an agent without copying anything. Settings and sessions are recorded in `.playground/agent-sessions.json`:
+
+```json
+{
+  "settings": { "autoRun": false, "grouping": "shared", "runtime": { "spec": { "model": "…" } } },
+  "sessions": [{ "runId": "…", "sessionId": "…", "page": null, "runtime": {}, "startedAt": "…", "state": "running" }]
+}
+```
+
+`state` is `running`, `ended`, `stopped` or `failed`. The **Agent sessions** panel (toolbar) edits the settings:
+
+- **Sessions: Shared | Per page** (`grouping`). `shared` keeps one session for every page (`page: null`); `page` gives each page its own session (`page: "<page id>"`), primed to handle only that page's threads. Switching leaves existing sessions alone; they stay listed until stopped or forgotten.
+- **Auto-run new comments** (`autoRun`). Every new top-level comment by a human (not review decisions) is sent to its session right after it is stored, exactly as if **Run agent** had been chosen, starting the session if none is live. A failed hand-off shows on the thread as `agentRun.state: "error"` and is logged. Turning it on requires a runtime.
+- **Runtime** (`runtime`). Every new or replacement session starts with it; running sessions keep theirs. The first **Run agent** without one asks for it (captain's agent-SDK runtimes, through the `RuntimeProfilePicker`).
+
+How a thread reaches its session:
+
+- With no live session for the thread's page (or the shared one), the server starts one with `POST <captain>/api/v1/prompt/run`. The prompt is a draft: the playground skill is the system prompt, the thread is the first message, and the agent runs in the repository root with edit/Bash tools allowed.
+- Every later thread for that session is sent as a new message into the same run (`POST <captain>/api/captain/prompt/runs/{runId}/message`).
+- The server checks the session against captain before each use. If it finished, failed, was stopped, or captain forgot it (a restart), the next thread starts a replacement with the configured runtime.
+- Before sending, the server hands the thread to the agent: it assigns the thread to the session's agent author `{name: <model>, kind:"agent", via:"playground", sessionId}` (a human action, so it can take a thread over) and acknowledges as that author. The message tells the agent its author name, so it must not acknowledge again and must reply and resolve as that author. Completion comes from the agent's own reply and resolve; the server posts no summary.
+- A handed-off root stores `agentRun: {sessionId?, requestedAt, state, error?}`, where `state` is `queued` (the agent was busy), `sent`, `done` (the thread was resolved) or `error` (the hand-off failed; `error` says why, and `sessionId` is absent when no session was started). Several roots can share one `sessionId`. Reopening a thread clears it. The thread shows a "Sent to agent session · state" chip that opens the **Agent sessions** panel on that session: a list of every session (page, state, model, **Stop**, **Forget**) and, for the selected one, a live `SessionTail` with an **Inspect** toggle for the full `SessionInspector`.
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `GET`  | `/__playground/agent-sessions` | `{settings, sessions}` — running sessions verified against captain first |
+| `PUT`  | `/__playground/agent-sessions/settings` | Patch `{autoRun?, grouping?, runtime?}`; `400` on unknown fields or bad values, `409` for `autoRun: true` without a runtime |
+| `DELETE` | `/__playground/agent-sessions/sessions/{runId}` | Stop the session if it is running and forget it (the panel's **Forget**); the next thread for it starts a new one |
+| `GET`  | `/__playground/agent-runs/runs/{runId}` and `.../stream` | Proxy to captain's run snapshot and SSE stream |
+| `POST` | `/__playground/agent-runs/runs/{runId}/stop` | Proxy to captain's stop; the stored session becomes `stopped` |
+| `GET`  | `/__playground/agent-runs/sessions/{sessionId}` (`?follow=1` for SSE) | Proxy to captain's session transcript, streamed unbuffered; the contract `SessionTail` and `SessionInspector` read |
+
+Captain is `http://localhost:9020` (`captain serve`), the same base the runtime-profile routes use. If it cannot be reached the route answers `502` naming that URL; there is no fallback. Register `playgroundAgentRuns` before `playgroundComments` (as `vite.config.ts` does): the comments middleware answers every other `/__playground/comments/*` path with `405`. Both share one `createAgentRuns(...)` instance; auto-run is wired as `playgroundComments({dir, onCreated: agentRuns.autoRunComment})`.
 
 ## How it fits together
 
@@ -164,6 +206,7 @@ Replies land one level deep: replying to a reply attaches to the thread root, ma
 | Comment persistence              | `plugins/comments-store.ts`, `plugins/comments-server.ts`            |
 | Persisted element context        | `plugins/comments-model.ts`, `src/comments/element-context.ts`       |
 | Comment API tool schema          | `plugins/comments-schema.ts`                                         |
+| Shared agent session (captain)   | `plugins/agent-runs-server.ts`, `plugins/captain-client.ts`, `src/agent-runs/` |
 | Feedback → markdown for an agent | `src/comments/markdown.ts`                                           |
 | Routable review components       | `src/review/ReviewComponents.tsx`                                    |
 | Source editing                   | `src/editor/`, `plugins/pages-store.ts`, `plugins/sources-server.ts` |

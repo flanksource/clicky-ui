@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `apps/kitchen-sink` — a **React**-hosted demo app covering the complete component catalog. Dev on **:5273**.
 - `e2e` — Playwright tests that run against the kitchen-sink.
 
-Toolchain: Vite (build) + Vitest (unit + storybook tests) + Storybook + Playwright + oxlint. Node `>=22.12`, pnpm `10.33` (use `corepack enable`). Dependency versions are pinned via the pnpm **catalog** in `pnpm-workspace.yaml` (`catalog:` entries) — add/bump shared deps there, not per-package.
+Toolchain: Vite (build) + Vitest (unit + storybook tests) + Storybook + Playwright + oxlint. Node `>=22.12`, pnpm `11.22.0` (pinned via `packageManager`; use `corepack enable`). Installs link through pnpm's **global virtual store** (`enableGlobalVirtualStore: true`, store at the user-level `storeDir`); a package importing something it doesn't declare needs a `packageExtensions` entry. Dependency versions are pinned via the pnpm **catalog** in `pnpm-workspace.yaml` (`catalog:` entries) — add/bump shared deps there, not per-package.
 
 ## Commands
 
@@ -171,7 +171,7 @@ concepts leak in).
 Three distinct layers — match the layer to the change:
 
 1. **Unit (vitest, jsdom)** — colocated `*.test.ts(x)` next to source in `packages/ui/src/`. For pure logic and component rendering. Setup: `src/test/setup.ts`.
-2. **Storybook play tests** — `*.stories.tsx` with a `play` function using `storybook/test` (`expect`/`userEvent`/`within`). These run in a **real headless chromium** via `@storybook/addon-vitest`. Use for interaction/behavior. Stories use `satisfies Meta<typeof X>` and a `title` of `"Category/Name"`.
+2. **Storybook play tests** — `*.stories.tsx` with a `play` function using `storybook/test` (`expect`/`userEvent`/`within`). They run via `@storybook/addon-vitest` in two vitest projects (`apps/storybook/vitest.config.ts`, `maxWorkers: 2`, `pool: 'vmThreads'`; `.storybook/vitest.jsdom-setup.tsx` unmounts each file's last story — a marked WORKAROUND): `storybook` runs every story in **jsdom**; stories tagged `tags: ["browser"]` (story- or meta-level) run instead in `storybook-browser`, a **real headless chromium**. Tag a story `browser` only when it needs what jsdom lacks — layout/measurement (virtualization, overflow, `scrollingElement`), computed styles from the stylesheet, viewport media queries, `DataTransfer`, or editors that commit after teardown. Use for interaction/behavior. Stories use `satisfies Meta<typeof X>` and a `title` of `"Category/Name"`.
 3. **E2E (Playwright)** — `e2e/tests/`, against the running kitchen-sink (`:5273`). Defaults to system Chrome (`channel: "chrome"`, no `playwright install` needed); set `E2E_ALL_BROWSERS=1` for firefox/webkit.
 
 New components conventionally ship all three artifacts where relevant: `Component.tsx`, `Component.test.tsx`, `Component.stories.tsx`, and a demo in `apps/kitchen-sink/src/demos/`.
