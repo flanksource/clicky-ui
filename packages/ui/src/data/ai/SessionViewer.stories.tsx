@@ -297,7 +297,7 @@ export const ApprovalStatuses: Story = {
 
     await step("keeps the underlying request visible", async () => {
       await expect(canvasElement.querySelector("ol")?.textContent).toContain("pnpm test -- --runInBand");
-      await expect(canvas.getByText("https://prod.example.com/config")).toBeInTheDocument();
+      await expect(canvas.getAllByText("https://prod.example.com/config").length).toBeGreaterThan(0);
     });
   },
 };
@@ -305,6 +305,7 @@ export const ApprovalStatuses: Story = {
 /** A self-contained dark override: paints `data-theme="dark"` on its own root
  *  (which also carries the background) regardless of the surrounding page theme. */
 export const DarkThemed: Story = {
+  tags: ["browser"],
   args: {
     session: SAMPLE_SESSION,
     defaultTheme: "dark",
@@ -328,6 +329,7 @@ export const DarkThemed: Story = {
 };
 
 export const MenuFiltersAndAlignment: Story = {
+  tags: ["browser"],
   args: { session: SAMPLE_SESSION },
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);

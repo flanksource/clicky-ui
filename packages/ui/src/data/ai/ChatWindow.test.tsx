@@ -350,7 +350,7 @@ describe("ChatWindow", () => {
     expect(screen.getByTitle(/^Runtime mode — /)).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Model" })).toBeDisabled();
     fireEvent.click(
-      screen.getByRole("button", {
+      await screen.findByRole("button", {
         name: "Fork conversation into a new window",
       }),
     );
@@ -444,8 +444,10 @@ describe("ChatWindow", () => {
     await waitFor(() =>
       expect(screen.getByText("Source question")).toBeInTheDocument(),
     );
+    // The header learns the hydrated message count after the messages render,
+    // so the fork button is only enabled (and renamed) a commit later.
     fireEvent.click(
-      screen.getByRole("button", {
+      await screen.findByRole("button", {
         name: "Fork conversation into a new window",
       }),
     );
