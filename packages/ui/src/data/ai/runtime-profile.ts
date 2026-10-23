@@ -21,6 +21,8 @@ export type RuntimePreset = {
   name: string;
   description?: string;
   scope: RuntimeProfileScope;
+  /** Layers merge in ascending order, then scope; omitted order is zero. */
+  order?: number;
   spec: RuntimePresetSpec;
   /** Reserved for nested preset resolution; authoring UI is intentionally deferred. */
   presets?: string[];
@@ -45,6 +47,7 @@ export type RuntimeResolutionLayer = {
   name: string;
   description?: string;
   scope: RuntimeProfileScope;
+  order?: number;
   source: RuntimeResolutionLayerSource;
   spec: AISpecRuntimeSpec;
   constraints: RuntimeProfileConstraints;

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TreeNode } from "./TreeNode";
+import { useState } from "react";
 
 type Node = { id: string; label: string; children?: Node[]; lazy?: boolean };
 
@@ -26,6 +27,24 @@ function renderTree(props: Partial<Parameters<typeof TreeNode<Node>>[0]> = {}) {
 }
 
 describe("TreeNode", () => {
+  it("shares controlled expansion between two trees, including nested nodes", () => {
+    function ControlledTrees() {
+      const [expanded, setExpanded] = useState(new Set(["root"]));
+      return <>{["desktop", "mobile"].map((name) => <TreeNode key={name} node={tree}
+        getKey={(node) => node.id} getChildren={(node) => node.children}
+        getExpanded={(node) => expanded.has(node.id)}
+        onExpandedChange={(node, open) => setExpanded((previous) => {
+          const next = new Set(previous);
+          if (open) next.add(node.id); else next.delete(node.id);
+          return next;
+        })} renderRow={({ node }) => <span>{name}:{node.label}</span>} />)}</>;
+    }
+    render(<ControlledTrees />);
+    fireEvent.click(screen.getByText("mobile:a"));
+    expect(screen.getByText("desktop:a1")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("desktop:root"));
+    expect(screen.queryByText("mobile:a")).toBeNull();
+  });
   it("renders root and first-level children by default (defaultOpen: depth < 1)", () => {
     renderTree();
     expect(screen.getByText("root")).toBeInTheDocument();

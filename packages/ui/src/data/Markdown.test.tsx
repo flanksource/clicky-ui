@@ -61,6 +61,29 @@ describe("Markdown links", () => {
   });
 });
 
+describe("Markdown headings", () => {
+  it("keeps headings within the message typography scale", async () => {
+    render(
+      <Markdown
+        text={["# Title", "## Section", "### Detail", "#### Note", "##### Minor", "###### Aside"].join(
+          "\n\n",
+        )}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Title" })).toHaveClass("text-lg");
+    expect(screen.getByRole("heading", { level: 2, name: "Section" })).toHaveClass("text-base");
+    expect(screen.getByRole("heading", { level: 2, name: "Section" })).toHaveAttribute(
+      "data-streamdown",
+      "heading-2",
+    );
+    expect(screen.getByRole("heading", { level: 3, name: "Detail" })).toHaveClass("text-sm");
+    expect(screen.getByRole("heading", { level: 4, name: "Note" })).toHaveClass("text-sm");
+    expect(screen.getByRole("heading", { level: 5, name: "Minor" })).toHaveClass("text-sm");
+    expect(screen.getByRole("heading", { level: 6, name: "Aside" })).toHaveClass("text-sm");
+  });
+});
+
 describe("Markdown code blocks", () => {
   it("renders a fenced block with the library CodeBlock, not Streamdown's default", async () => {
     const { container } = render(<Markdown text={"```yaml\ntimeout: 300\n```"} />);

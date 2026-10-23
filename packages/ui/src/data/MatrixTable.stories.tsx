@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect } from "storybook/test";
 import { MatrixTable } from "./MatrixTable";
 import { StatusDot } from "./cells/StatusDot";
 
@@ -78,6 +79,59 @@ export const AngledHeadersWithBackground: Story = {
     corner: "Scope",
     headerClassName: "bg-background",
     maxHeight: 420,
+  },
+};
+
+const SIDES = [
+  { name: "qa", accent: "#0ea5e9" },
+  { name: "uat", accent: "#f59e0b" },
+  { name: "prod", accent: "#e11d48" },
+  { name: "main", accent: undefined },
+];
+
+const variant = (letter: string) => (
+  <span className="inline-flex h-6 min-w-9 items-center justify-center rounded-md bg-muted px-1.5 text-xs font-semibold ring-1 ring-inset ring-border">
+    {letter}
+  </span>
+);
+
+export const GroupedRowsAndColumnTints: Story = {
+  args: {
+    density: "compact",
+    corner: "Entity",
+    maxHeight: 360,
+    headerClassName: "bg-muted/50",
+    columns: SIDES.map((side) => ({
+      header: side.name,
+      title: `side ${side.name}`,
+      ...(side.accent
+        ? {
+            headerStyle: { boxShadow: `inset 0 3px 0 ${side.accent}` },
+            cellStyle: { backgroundColor: `color-mix(in srgb, ${side.accent} 6%, transparent)` },
+          }
+        : {}),
+    })),
+    rows: [
+      { type: "group", key: "product:annuity", label: "Annuity" },
+      { type: "group", key: "plan:annuity", label: "Annuity Plan", depth: 1 },
+      { key: "add-rider", label: "AddRider", depth: 2, cells: ["A", "A", "B", "A"].map(variant) },
+      { key: "withdrawal", label: "Withdrawal", depth: 2, cells: ["A", "A", "A", "A"].map(variant) },
+      { type: "group", key: "product:life", label: "Group Life" },
+      { type: "group", key: "plan:gl", label: "GL", depth: 1 },
+      { key: "enroll", label: "GroupLifeEnrollment with a deliberately long label", depth: 2, cells: ["A", "B", "C", "A"].map(variant) },
+    ],
+  },
+  play: async ({ canvasElement }) => {
+    const groups = canvasElement.querySelectorAll("tr[data-matrix-group]");
+    await expect(groups).toHaveLength(4);
+    const product = groups[0]?.querySelector("th");
+    await expect(product).toHaveAttribute("colspan", String(SIDES.length + 1));
+    // A group band spans the full table width, not just the label column.
+    const table = canvasElement.querySelector("table");
+    await expect(product?.getBoundingClientRect().width).toBeCloseTo(
+      table?.getBoundingClientRect().width ?? 0,
+      0,
+    );
   },
 };
 

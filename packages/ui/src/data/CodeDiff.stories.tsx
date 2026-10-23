@@ -96,6 +96,20 @@ export const Split: Story = {
   },
 };
 
+export const DatabaseDefinitions: Story = {
+  args: {
+    language: "sql",
+    view: "split",
+    originalLabel: "acme_dev",
+    modifiedLabel: "acme_qa",
+    original: "CREATE PROCEDURE dbo.Calculate AS SELECT 1;",
+    modified: "CREATE PROCEDURE dbo.Calculate AS SELECT 2;",
+  },
+  parameters: {
+    docs: { description: { story: "Use originalLabel and modifiedLabel to name the compared sources. Split view aligns them over their respective columns; unified view identifies them with minus and plus markers. Labels are omitted in bare mode." } },
+  },
+};
+
 export const FromUnifiedString: Story = {
   args: {
     language: "typescript",
@@ -213,4 +227,38 @@ export const InlineComments: Story = {
 
 export const InlineCommentsSplit: Story = {
   args: { ...InlineComments.args, view: "split" },
+};
+
+const XML_BEFORE = `<Transaction>
+  <Field name="AddRiderEffectiveDateCalculationOverrideForLegacyPlansAndSchemes" type="DATE" default="SystemDate" required="true"/>
+  <MaxAge>70</MaxAge>
+</Transaction>`;
+
+const XML_AFTER = `<Transaction>
+  <Field name="AddRiderEffectiveDateCalculationOverrideForLegacyPlansAndSchemes" type="DATE" default="PolicyEffectiveDate" required="true"/>
+  <MaxAge>75</MaxAge>
+</Transaction>`;
+
+// Split view in a narrow container: each half wraps its own long lines, so a
+// line never paints across the divider into the other side.
+export const SplitLongLinesNarrow: Story = {
+  args: { language: "xml", view: "split", original: XML_BEFORE, modified: XML_AFTER },
+  decorators: [(Story) => <div style={{ width: 420 }}><Story /></div>],
+  play: async ({ canvasElement }) => {
+    await waitFor(() => {
+      expect(canvasElement.querySelectorAll("[data-diff-line]").length).toBeGreaterThan(0);
+    });
+    const rows = [...canvasElement.querySelectorAll("[data-diff-line]")]
+      .map((cell) => cell.parentElement)
+      .filter((row, index, all): row is HTMLElement => row !== null && all.indexOf(row) === index);
+    for (const row of rows) {
+      const [left, right] = [...row.querySelectorAll<HTMLElement>("[data-diff-line]")];
+      if (!left || !right) throw new Error("split row without two cells");
+      const leftCode = left.querySelector("code");
+      if (!leftCode) throw new Error("split cell without code");
+      expect(leftCode.getBoundingClientRect().right).toBeLessThanOrEqual(right.getBoundingClientRect().left + 0.5);
+      expect(left.scrollWidth).toBeLessThanOrEqual(left.clientWidth);
+      expect(right.scrollWidth).toBeLessThanOrEqual(right.clientWidth);
+    }
+  },
 };

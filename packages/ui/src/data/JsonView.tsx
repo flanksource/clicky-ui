@@ -25,12 +25,11 @@ export type JsonViewProps = JsonViewOptions &
   );
 
 const DENSITY_CLASSES: Record<Density, string> = {
-  compact:
-    "text-xs leading-4 [--json-view-indent:0.75rem] [--json-view-row-space:0px]",
+  compact: "leading-4 [--json-view-indent:0.75rem] [--json-view-row-space:0px]",
   comfortable:
-    "text-sm leading-5 [--json-view-indent:1rem] [--json-view-row-space:1px]",
+    "leading-5 [--json-view-indent:1rem] [--json-view-row-space:1px]",
   spacious:
-    "text-base leading-6 [--json-view-indent:1.25rem] [--json-view-row-space:2px]",
+    "leading-6 [--json-view-indent:1.25rem] [--json-view-row-space:2px]",
 };
 
 export function JsonView({
@@ -53,7 +52,7 @@ export function JsonView({
       data-format={format}
       data-density={activeDensity}
       className={cn(
-        "font-mono whitespace-pre-wrap break-words",
+        "font-mono text-density-base whitespace-pre-wrap break-words",
         DENSITY_CLASSES[activeDensity],
       )}
     >
@@ -112,7 +111,9 @@ function JsonViewNode({
     );
   }
   const [openB, closeB] = isArray ? ["[", "]"] : ["{", "}"];
-  const summary = `${entries.length} ${isArray ? (entries.length === 1 ? "item" : "items") : entries.length === 1 ? "key" : "keys"}`;
+  const summary = isArray
+    ? `${entries.length} ${entries.length === 1 ? "item" : "items"}`
+    : "Object";
   return (
     <div>
       <Button
@@ -136,7 +137,9 @@ function JsonViewNode({
             {format === "json"
               ? open
                 ? openB
-                : `${openB} ${summary} ${closeB}`
+                : isArray
+                  ? `${openB} ${summary} ${closeB}`
+                  : `${openB}…${closeB}`
               : !open || (name === undefined && !sequenceItem)
                 ? summary
                 : null}

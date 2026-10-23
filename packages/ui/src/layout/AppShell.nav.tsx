@@ -4,6 +4,7 @@ import { cn } from "../lib/utils";
 import { ContextMenu } from "../overlay/ContextMenu";
 import type { RenderLink } from "../rpc/EndpointList";
 import { useRouter } from "../rpc/router";
+import { NavTree } from "./AppShell.nav.tree";
 import type {
   AppShellNavGroup,
   AppShellNavItem,
@@ -88,6 +89,9 @@ function NavSection({
             {section.label}
           </div>
         ))}
+      {section.variant === "tree" && !collapsed ? <NavTree section={section} groupState={groupState} dragState={dragState}
+        renderItem={(item, options) => <NavItemRow item={item} collapsed={false} renderLink={renderLink}
+          {...(options.drag ? { dragState } : {})} {...(onNavigate ? { onNavigate } : {})} />} /> : <>
       {section.variant !== "tree" &&
         section.items?.map((item) => (
           <NavItemRow
@@ -118,7 +122,6 @@ function NavSection({
           <NavGroupRows
             key={group.key}
             group={group}
-            variant={section.variant ?? "list"}
             renderLink={renderLink}
             groupState={groupState}
             dragState={dragState}
@@ -137,6 +140,7 @@ function NavSection({
             {...(onNavigate ? { onNavigate } : {})}
           />
         ))}
+      </>}
     </div>
   );
 }
@@ -153,14 +157,12 @@ function flattenGroup(group: AppShellNavGroup): AppShellNavItem[] {
 
 function NavGroupRows({
   group,
-  variant,
   renderLink,
   groupState,
   dragState,
   onNavigate,
 }: {
   group: AppShellNavGroup;
-  variant: "list" | "tree";
   renderLink: RenderLink;
   groupState: GroupState;
   dragState: NavDragState;
@@ -288,9 +290,7 @@ function NavGroupRows({
             aria-expanded={!collapsed}
             className={cn(
               "flex items-center gap-2.5 rounded-md px-density-2 py-1.5 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              variant === "tree"
-                ? "text-[13px] text-sidebar-foreground"
-                : "text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/55",
+              "text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/55",
               folderDrag && NAV_DRAG_ROW_CLASS,
             )}
             {...folderDrag}
@@ -311,8 +311,7 @@ function NavGroupRows({
       )}
       {!collapsed && (
         <div className="ml-2 mt-0.5 flex flex-col gap-0.5 border-l border-sidebar-border pl-2">
-          {variant !== "tree" &&
-            group.items.map((item) => (
+          {group.items.map((item) => (
               <NavItemRow
                 key={item.key}
                 item={item}
@@ -326,24 +325,12 @@ function NavGroupRows({
             <NavGroupRows
               key={child.key}
               group={child}
-              variant={variant}
               renderLink={renderLink}
               groupState={groupState}
               dragState={dragState}
               {...(onNavigate ? { onNavigate } : {})}
             />
           ))}
-          {variant === "tree" &&
-            group.items.map((item) => (
-              <NavItemRow
-                key={item.key}
-                item={item}
-                collapsed={false}
-                renderLink={renderLink}
-                dragState={dragState}
-                {...(onNavigate ? { onNavigate } : {})}
-              />
-            ))}
         </div>
       )}
     </div>

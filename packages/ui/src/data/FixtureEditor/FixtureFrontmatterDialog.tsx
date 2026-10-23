@@ -6,6 +6,7 @@ import { UiCheck, UiFileCode } from "../../icons";
 import { Badge } from "../Badge";
 import { Icon } from "../Icon";
 import { SpecRuntimeEditor } from "../ai/SpecRuntimeEditor";
+import { SpecRuntimeBar } from "../ai/SpecRuntimeBar";
 import type { SpecSectionId } from "../ai/SpecRuntimeEditor/types";
 import type {
   FixtureEditorSize,
@@ -66,12 +67,14 @@ export function FixtureFrontmatterDialog({
 }: FixtureFrontmatterDialogProps) {
   const parsed = useMemo(() => parseFixtureFrontmatter(markdown), [markdown]);
   const initialState = useMemo(
-    () => (parsed.ok ? fixtureFrontmatterState(parsed.frontmatter) : EMPTY_STATE),
+    () =>
+      parsed.ok ? fixtureFrontmatterState(parsed.frontmatter) : EMPTY_STATE,
     [parsed],
   );
   const isVerification = options?.mode === "verification";
   const initialVerificationModelMode = useMemo<VerificationModelMode>(
-    () => (hasRuntimeModelOverride(initialState.runtime) ? "different" : "same"),
+    () =>
+      hasRuntimeModelOverride(initialState.runtime) ? "different" : "same",
     [initialState.runtime],
   );
   const [draft, setDraft] = useState<FixtureFrontmatterState>(initialState);
@@ -88,8 +91,7 @@ export function FixtureFrontmatterDialog({
 
   const dirty = parsed.ok
     ? JSON.stringify(draft) !== JSON.stringify(initialState) ||
-      (isVerification &&
-        verificationModelMode !== initialVerificationModelMode)
+      (isVerification && verificationModelMode !== initialVerificationModelMode)
     : rawDraft !== parsed.raw;
 
   const save = () => {
@@ -153,7 +155,9 @@ export function FixtureFrontmatterDialog({
         <div className="min-h-0">
           <SpecRuntimeEditor
             value={draft.runtime}
-            onChange={(runtime) => setDraft((current) => ({ ...current, runtime }))}
+            onChange={(runtime) =>
+              setDraft((current) => ({ ...current, runtime }))
+            }
             models={options?.models}
             families={options?.families}
             tools={options?.tools}
@@ -162,9 +166,22 @@ export function FixtureFrontmatterDialog({
             cliOptions={options?.cliOptions}
             sections={sections}
             showHeader={false}
-            {...(verificationModelSelector
-              ? { beforeSections: verificationModelSelector }
-              : {})}
+            beforeSections={
+              <div className="space-y-density-3">
+                {verificationModelSelector}
+                {sections.includes("model") && (
+                  <SpecRuntimeBar
+                    value={draft.runtime}
+                    onChange={(runtime) =>
+                      setDraft((current) => ({ ...current, runtime }))
+                    }
+                    models={options?.models}
+                    families={options?.families}
+                    sections={sections}
+                  />
+                )}
+              </div>
+            }
             defaultCollapsedSections={
               isVerification ? COLLAPSED_VERIFICATION_SECTIONS : undefined
             }
@@ -173,10 +190,17 @@ export function FixtureFrontmatterDialog({
       ) : (
         <div className="grid gap-3">
           <div className="flex items-center gap-2">
-            <Badge variant="status" status="error" size="xs" clickToCopy={false}>
+            <Badge
+              variant="status"
+              status="error"
+              size="xs"
+              clickToCopy={false}
+            >
               YAML error
             </Badge>
-            <span className="text-xs text-muted-foreground">{parsed.error}</span>
+            <span className="text-xs text-muted-foreground">
+              {parsed.error}
+            </span>
           </div>
           <label className="grid gap-2 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
@@ -200,11 +224,11 @@ export function FixtureFrontmatterDialog({
 function hasRuntimeModelOverride(value: FixtureFrontmatterState["runtime"]) {
   return Boolean(
     value.model ||
-      value.mode ||
-      value.id ||
-      value.effort ||
-      value.temperature != null ||
-      value.noCache ||
-      value.budget,
+    value.mode ||
+    value.id ||
+    value.effort ||
+    value.temperature != null ||
+    value.noCache ||
+    value.budget,
   );
 }
