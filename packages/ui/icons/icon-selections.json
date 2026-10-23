@@ -2361,6 +2361,30 @@
       "note": ""
     },
     {
+      "consumerName": "browser",
+      "group": "infrastructure",
+      "status": "NEW",
+      "outline": "ph:browser-light",
+      "filled": "ph:browser-fill",
+      "note": ""
+    },
+    {
+      "consumerName": "shopping-cart",
+      "group": "commerce",
+      "status": "NEW",
+      "outline": "ph:shopping-cart-light",
+      "filled": "ph:shopping-cart-fill",
+      "note": ""
+    },
+    {
+      "consumerName": "credit-card",
+      "group": "commerce",
+      "status": "NEW",
+      "outline": "ph:credit-card-light",
+      "filled": "ph:credit-card-fill",
+      "note": ""
+    },
+    {
       "consumerName": "cloud-download",
       "group": "infrastructure",
       "status": "EXISTS",
