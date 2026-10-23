@@ -79,6 +79,65 @@ export const FailingWithCel: Story = {
   ),
 };
 
+/** A failed YAML step and a failed markdown block, each with the source lines gavel attaches as `detail.source`. */
+export const FailedStepWithSource: Story = {
+  render: () => (
+    <div className="h-screen">
+      <VerificationResults
+        report={report({
+          passed: false,
+          state: "failed",
+          reason: "2 of 3 checks failed",
+          tests: [
+            { name: "build", framework: "exec", passed: true, duration: 2_400_000_000 },
+            {
+              name: "render us-f5472",
+              framework: "exec",
+              failed: true,
+              duration: 9_300_000_000,
+              message: "expected exit code 0, got 1",
+              stderr: "render failed: CALC_RATE target must be numeric\n",
+              context: { command: "./xero-cli templates render us-f5472 --entity us", cwd: "/src/xero-cli", exit_code: 1 },
+              detail: {
+                step: { id: "us-f5472", kind: "exec" },
+                source: {
+                  file: "pkg/provider/demo/testdata/template-render.fixture.yaml",
+                  line: 123,
+                  end_line: 126,
+                  language: "yaml",
+                  text: [
+                    "  - id: us-f5472",
+                    "    kind: exec",
+                    "    exec: ./xero-cli",
+                    "    args: [templates, render, us-f5472, --entity, us]",
+                  ].join("\n"),
+                },
+              },
+            },
+            {
+              name: "markdown broken",
+              framework: "exec",
+              failed: true,
+              duration: 10_000_000,
+              message: "expected exit code 0, got 3",
+              context: { command: "bash -c 'exit 3'", exit_code: 3 },
+              detail: {
+                source: {
+                  file: "docs/checks.md",
+                  line: 6,
+                  end_line: 11,
+                  language: "markdown",
+                  text: "## command: markdown broken\n\n```bash\necho boom >&2\nexit 3\n```",
+                },
+              },
+            },
+          ],
+        })}
+      />
+    </div>
+  ),
+};
+
 export const RunningWithProgress: Story = {
   render: () => (
     <div className="h-screen">
@@ -185,6 +244,81 @@ export const TypedStepWithWait: Story = {
           selected={selected}
           onSelect={() => {}}
         />
+      </div>
+    );
+  },
+};
+
+const FIXTURE_ORIGIN = {
+  file: "pr/ui/testdata/todo-lifecycle/codex.fixture.yaml",
+  section_path: "todo lifecycle (codex cli, aimock)",
+  kind: "step",
+  row_index: 8,
+};
+
+/** A background step whose result has not reached the node yet: only the execution header is known. */
+export const ProgressOnlyFixtureStep: Story = {
+  render: () => {
+    const watch = {
+      name: "watch",
+      framework: "fixture",
+      passed: true,
+      detail: {
+        name: "watch",
+        kind: "command",
+        state: "passed",
+        origin: FIXTURE_ORIGIN,
+        started_at: "2026-10-18T09:00:04Z",
+        finished_at: "2026-10-18T09:00:08Z",
+        duration: 4_583_837_958,
+      },
+    };
+    return (
+      <div className="h-screen">
+        <VerificationResults report={report({ tests: [watch] })} selected={watch} onSelect={() => {}} />
+      </div>
+    );
+  },
+};
+
+/** A wait that ended on its failWhen condition: the cause leads, the deciding condition carries the outcome. */
+export const FailedWaitWithCause: Story = {
+  render: () => {
+    const failWhen = "run.state in ['failed', 'cancelled']";
+    const cause = "aimock: no scenario rule matched this request\n  model: gpt-5\n  last message: triage this todo";
+    const outputs = { run: { state: "failed", error: cause }, todo: { title: "greeting thing" } };
+    const triaged = {
+      name: "triaged",
+      framework: "fixture",
+      failed: true,
+      message: `${cause}\n(wait failWhen ${failWhen} is true)`,
+      context: { cel_expression: failWhen, cel_vars: { "run.state": "failed" } },
+      detail: {
+        step: { id: "triaged", kind: "todo" },
+        kind: "todo",
+        state: "failed",
+        origin: { ...FIXTURE_ORIGIN, row_index: 9 },
+        outputs,
+        wait: {
+          policy: {
+            until: "run.state == 'completed' && todo.title != 'greeting thing'",
+            failWhen,
+            interval: "1s",
+            backoff: { factor: 1.5, max: "5s" },
+            jitter: "20%",
+            timeout: "1m30s",
+          },
+          outcome: "failed",
+          durationMs: 19,
+          expression: failWhen,
+          cause,
+          outputs,
+        },
+      },
+    };
+    return (
+      <div className="h-screen">
+        <VerificationResults report={report({ passed: false, state: "failed", tests: [triaged] })} selected={triaged} onSelect={() => {}} />
       </div>
     );
   },

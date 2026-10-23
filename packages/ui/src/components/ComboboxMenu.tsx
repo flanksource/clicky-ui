@@ -99,6 +99,19 @@ export function ComboboxMenu({
           const mode = tristate ? modes[option.value] : undefined;
           const showHeader =
             option.group != null && option.group !== filtered[index - 1]?.group;
+          const selectionIndicator = (
+            <span
+              data-slot="combobox-selection-indicator"
+              aria-hidden
+              className={cn(
+                "shrink-0 text-xs",
+                option.description && option.descriptionLayout !== "inline" && "mt-1",
+                selected ? "opacity-100" : "opacity-0",
+              )}
+            >
+              <Icon icon={UiCheck} />
+            </span>
+          );
           return (
             <Fragment key={option.value}>
               {showHeader && (
@@ -136,8 +149,9 @@ export function ComboboxMenu({
                   : {})}
                 onMouseEnter={() => onHighlight(index)}
                 className={cn(
-                  "flex cursor-pointer gap-2 rounded-sm px-2 py-1.5 text-sm",
-                  option.description ? "items-start" : "items-center",
+                  "flex cursor-pointer rounded-sm py-1.5 text-sm",
+                  multiple ? "gap-2 px-2" : "gap-1.5 px-1.5",
+                  option.description && option.descriptionLayout !== "inline" ? "items-start" : "items-center",
                   index === highlighted && "bg-accent",
                   selected && !tristate && "font-medium",
                   option.disabled && "cursor-not-allowed opacity-50",
@@ -170,19 +184,12 @@ export function ComboboxMenu({
                   </div>
                 ) : (
                   <>
-                    <Icon
-                      icon={UiCheck}
-                      className={cn(
-                        "shrink-0 text-xs",
-                        option.description && "mt-1",
-                        selected ? "opacity-100" : "opacity-0",
-                      )}
-                    />
+                    {multiple && selectionIndicator}
                     <LabelIcon
                       icon={option.icon}
                       className={cn(
                         "text-sm text-muted-foreground",
-                        option.description && "mt-1",
+                        option.description && option.descriptionLayout !== "inline" && "mt-1",
                       )}
                     />
                     <ComboboxOptionText option={option} />
@@ -194,6 +201,7 @@ export function ComboboxMenu({
                         {option.trailing}
                       </span>
                     )}
+                    {!multiple && selectionIndicator}
                   </>
                 )}
               </div>
@@ -252,20 +260,22 @@ export function ComboboxMenu({
 
 function ComboboxOptionText({ option }: { option: ComboboxOption }) {
   return (
-    <span className="min-w-0 flex-1">
-      <span className="block truncate">{option.label}</span>
-      <ComboboxOptionDescription description={option.description} />
+    <span data-slot="combobox-option-text" className={cn("min-w-0 flex-1", option.descriptionLayout === "inline" && "flex items-center gap-2")}>
+      <span className="block min-w-0 truncate">{option.label}</span>
+      <ComboboxOptionDescription description={option.description} inline={option.descriptionLayout === "inline"} />
     </span>
   );
 }
 
 function ComboboxOptionDescription({
   description,
+  inline = false,
 }: {
   description: string | undefined;
+  inline?: boolean;
 }) {
   return description ? (
-    <span className="mt-0.5 block whitespace-pre-line text-xs font-normal leading-4 text-muted-foreground">
+    <span className={cn("text-xs font-normal leading-4 text-muted-foreground", inline ? "min-w-0 max-w-[55%] shrink-0 truncate" : "mt-0.5 block whitespace-pre-line")}>
       {description}
     </span>
   ) : null;

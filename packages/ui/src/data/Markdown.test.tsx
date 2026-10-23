@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 // Keep the Shiki dynamic imports out of jsdom: with highlighting stubbed to
@@ -10,6 +10,79 @@ vi.mock("./code-highlight", () => ({
 }));
 
 import { Markdown } from "./Markdown";
+import { RouterProvider } from "../rpc/RouterProvider";
+import type { RouterAdapter } from "../rpc/router";
+
+describe("Markdown links", () => {
+  const routedAdapter = (navigate: (to: string) => void): RouterAdapter => ({
+    pathname: "/",
+    navigate,
+    renderLink: ({ to, className, children }) => (
+      <a
+        href={to}
+        className={className}
+        onClick={(event) => {
+          event.preventDefault();
+          navigate(to);
+        }}
+      >
+        {children}
+      </a>
+    ),
+  });
+
+  it("routes a root-relative link through the host router without a confirm prompt", async () => {
+    const navigate = vi.fn();
+    render(
+      <RouterProvider adapter={routedAdapter(navigate)}>
+        <Markdown text={"Open [Connections](/connections) first."} />
+      </RouterProvider>,
+    );
+
+    const link = await screen.findByRole("link", { name: "Connections" });
+    expect(link).toHaveAttribute("href", "/connections");
+    fireEvent.click(link);
+    expect(navigate).toHaveBeenCalledWith("/connections");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("asks before opening an external link in a new tab", async () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    render(<Markdown text={"See [the docs](https://example.com/guide)."} />);
+
+    const link = await screen.findByRole("link", { name: "the docs" });
+    expect(link).toHaveAttribute("href", "https://example.com/guide");
+    fireEvent.click(link);
+    expect(open).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open link" }));
+    expect(open).toHaveBeenCalledWith("https://example.com/guide", "_blank", "noopener,noreferrer");
+    open.mockRestore();
+  });
+});
+
+describe("Markdown headings", () => {
+  it("keeps headings within the message typography scale", async () => {
+    render(
+      <Markdown
+        text={["# Title", "## Section", "### Detail", "#### Note", "##### Minor", "###### Aside"].join(
+          "\n\n",
+        )}
+      />,
+    );
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Title" })).toHaveClass("text-lg");
+    expect(screen.getByRole("heading", { level: 2, name: "Section" })).toHaveClass("text-base");
+    expect(screen.getByRole("heading", { level: 2, name: "Section" })).toHaveAttribute(
+      "data-streamdown",
+      "heading-2",
+    );
+    expect(screen.getByRole("heading", { level: 3, name: "Detail" })).toHaveClass("text-sm");
+    expect(screen.getByRole("heading", { level: 4, name: "Note" })).toHaveClass("text-sm");
+    expect(screen.getByRole("heading", { level: 5, name: "Minor" })).toHaveClass("text-sm");
+    expect(screen.getByRole("heading", { level: 6, name: "Aside" })).toHaveClass("text-sm");
+  });
+});
 
 describe("Markdown code blocks", () => {
   it("renders a fenced block with the library CodeBlock, not Streamdown's default", async () => {

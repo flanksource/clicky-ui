@@ -1,10 +1,19 @@
-import { render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Avatar } from "./Avatar";
 import { AvatarBadge } from "./AvatarBadge";
 import { UiCheck } from "../icons";
 
 describe("Avatar", () => {
+  it("shows initials after an image fails and attempts a new source", () => {
+    const onError = vi.fn();
+    const { rerender } = render(<Avatar alt="Ada Example" src="https://example.com/protected.png" size="md" onError={onError} />);
+    fireEvent.error(screen.getByRole("img", { name: "Ada Example" }));
+    expect(screen.getByRole("img", { name: "Ada Example" })).toHaveTextContent("AE");
+    expect(onError).toHaveBeenCalledOnce();
+    rerender(<Avatar alt="Ada Example" src="https://example.com/public.png" size="md" />);
+    expect(screen.getByRole("img", { name: "Ada Example" })).toHaveAttribute("src", "https://example.com/public.png");
+  });
   afterEach(() => {
     document.documentElement.removeAttribute("data-density");
   });

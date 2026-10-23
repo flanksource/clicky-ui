@@ -4,13 +4,21 @@ A scratch surface for one-page TSX artifacts — try a layout, show it to someon
 
 Where `apps/kitchen-sink` is a curated catalog of shipped components (every demo hand-registered in `demo-catalog.tsx`), the playground has **no registration step at all**.
 
-The default `?page=flanksource` route is the canonical Flanksource design-system hub. Its tracked foundation and pattern pages document colors, type, spacing, icons, tones, page anatomy, collections, forms with preview, object arrays, and feedback states using the actual shared components.
+The root URL opens the **Comments** dashboard, showing unresolved threads across artifact and external pages. Its shared FilterBar filters by status, projects, pages, author, or screenshot availability; search comment text and sort using the list's **Sort by** control. Projects follow the first page-path segment; external captures belong to **External pages**. Projects and pages support multiple include/exclude selections: included values match any choice within that filter, exclusions take precedence, and both filters must match. Options include pages with no comments yet so they can be selected for watching. Filters, search, and sorting persist in `comments.*` URL parameters, including repeated `comments.project` / `comments.page` inclusions and their `.exclude` parameters. Each comment uses two rows: the author avatar, page, status, timestamps and actions above a large screenshot and comment body. Screenshot previews expand on hover or keyboard focus and link to the full capture. Row icons open the page, reopen, resolve, close, or delete a thread; deletion confirms before removing the thread, replies, and capture. **Comments** in the sidebar returns to the dashboard.
+
+**Copy for LLM** copies the current matching threads, replies, source context, screenshots, and instructions for watching the filtered set. Its split-button menu offers **Copy for Claude** and **Copy for Codex** with the corresponding agent attribution. The copied Node reader uses the dashboard's own filter function to select live comments; the instructions poll every ten seconds, keep watching an empty queue, recheck status before editing and resolving, reply with verification evidence before resolving, and leave human closing/reopening decisions untouched. Copy remains available for an empty filtered set so a watcher can wait for its first comment.
+
+Screenshot previews automatically trim uniform light, dark, or transparent margins and faint panel borders, retaining padding around the content. Cropping applies to the preview and hover expansion; the full-capture link opens the original file. Inline mini-threads show the latest two replies, with older replies available to expand. Comments and replies refresh every five seconds while the page is visible.
+
+The `?page=flanksource` route is the canonical Flanksource design-system hub. Its tracked foundation and pattern pages document colors, type, spacing, icons, tones, page anatomy, collections, forms with preview, object arrays, and feedback states using the actual shared components.
 
 ```bash
 pnpm run dev:playground     # http://localhost:5274
 ```
 
 ## Adding an artifact
+
+For coding agents, open **Agent instructions** in the toolbar. **Copy playground instructions** copies the current page URL, feedback API schema address, and the playground workflow. **Copy skill installation instructions** copies a prompt that asks your agent to save the reusable `clicky-ui-playground` skill in your workspace. Both use the canonical [playground skill](../../.agents/skills/clicky-ui-playground/SKILL.md), including page creation, shared component usage, browser verification, and feedback handling.
 
 Either choose **New → New page** in the toolbar (pick a folder, filename, and title), or create a file under `src/pages/` with a default export in your own editor:
 
@@ -47,11 +55,25 @@ Filesystem operations go through `plugins/sources-server.ts` and are confined to
 
 ## Verification cookbook
 
-Open [Every step kind, every state](http://localhost:5274/?page=gavel%2Ftest-results-cookbook&recipe=step-kinds&tab=result) after starting `pnpm run dev:playground`. Select a step in the tree, then use **Detail** to inspect execution or **Outputs** for its final structured result.
+Open [Every step kind, every state](http://localhost:5274/?page=gavel%2Ftest-results-cookbook&recipe=step-kinds&tab=result) after starting `pnpm run dev:playground`. This is an illustrative native Gavel result with checklist verdicts as a fixture step, a structured summary, and step attempts. Select a step in the tree, then use **Detail** to inspect execution, **Outputs** for its structured result, or **JSON** for the raw selected step result. JSON remains available when a step has no Outputs and follows the selected attempt.
 
-The step-kinds recipe uses the compact wait summary: condition, actual elapsed badge, outcome and final-output preview, with complete values in Outputs. The attempt selector lives in the detail header and is hidden for a single attempt. Choose the retried launch to compare refused and successful attempts; execution, wait, Outputs and Copy details follow that selection. `step=<node name>&attempt=1` preserves the selected step and attempt across reloads. The Data tab contains only final wait summaries, including nested service readiness waits.
+The step-kinds recipe uses the compact wait summary: condition, actual elapsed badge, outcome and final-output preview, with complete values in Outputs. The step-attempt selector lives in the detail header and appears for the retried launch; execution, wait, Outputs and Copy details follow the selected attempt. `step=<node name>&attempt=1` preserves that selection across reloads. [Full run attempts](http://localhost:5274/?page=gavel%2Ftest-results-cookbook&recipe=step-kinds-retry-history&tab=result) has a separate run selector, saved in `runAttempt`, and a summary for each full attempt. The Data tab shows the complete proposed result, including both attempt levels.
+
+The Captain verifier envelope remains under **Captain verifier envelope** for comparison. The **Recorded Gavel runs** recipes show small, labeled projections of four distinct snapshots: the October 15 watcher fixture, the October 18 terminal-ask fixture and Ginkgo test run, and an xero-cli template render benchmark. The xero-cli recipe shows eight representative steps from a 41-step run, with source totals, a benchmark summary, redacted SQL samples, resource metrics, trace references, outputs, and projected JSON. Its saved step attempts and the recorded Ginkgo attempts are initial attempts, not a retry history.
 
 ## Feedback
+
+### Bookmarklet for external pages and local files
+
+Local `file://` HTML documents are supported alongside HTTP(S) pages. Open the file in your browser and activate the same bookmarklet. Comments are associated with the full file host/path and URL fragment; moving or renaming a file creates a different identity. The playground must be running to load the script and comment rail. The bridge uses the file document's opaque message origin with parent-window and session checks.
+
+Start the playground with `pnpm run dev:playground`, open **Bookmarklet** in the toolbar, and drag **Playground grabber** to your bookmarks bar. **Copy bookmarklet** provides the same `javascript:` URL for manual bookmark installation. Activate the bookmark on an HTTP(S) page, then choose **Select element** or **Comment on page** in its injected rail. Comments, replies, resolution, human closing and reopening use the same persisted store and API as artifact feedback. React source context is included when available; plain HTML captures retain the actual document URL, selector and HTML. Screenshot comments use the selected page's existing optional capture flow.
+
+External pages are grouped by origin, path and URL fragment. The first URL creates a comment set. A new query variant offers **Merge** into an existing set or **New comment set**; that association is remembered, with query keys sorted and repeated-value order preserved. Merge associates the URL without deleting or moving threads. The rail follows SPA URLs, preserves mounted drafts by comment set, refreshes every five seconds while visible and on focus, and restores pins on reactivation. Missing or ambiguous anchors remain unavailable with their comments retained.
+
+The playground sidebar lists **External pages** with the original HTML in a sandboxed preview beside captured feedback and resolved threads. HTTP(S) pages load directly and remain subject to their site's framing policy. Registered local `.html`/`.htm` documents load through `GET /__playground/external-pages/html?page=<external-id>&url=<encoded-file-url>`; this serves only the exact file associated with that set, with no arbitrary-path access or sibling asset serving. Local previews support self-contained HTML with inline styles, scripts and embedded assets. Open the original-page link and reactivate the bookmarklet to inspect live anchors or create new captures. Full navigation requires reactivation; repeated activation focuses the existing grabber, and **Close** removes the injected UI and restores existing React Grab settings. The playground must stay reachable. Development and `pnpm --filter playground preview` both serve the loader and storage APIs; build assets with `pnpm --filter playground build` before preview.
+
+This is a bookmarklet, so page CSP can block its script or iframe, and browsers may require local-network permission when reaching a local playground from an HTTPS site. Browser internal pages, cross-origin iframe contents and closed shadow roots are outside v1 support. No browser policy is bypassed. The injected host exchanges validated, session-bound messages with a playground-origin iframe; that frame makes same-origin storage requests. Catalog metadata lives in `.playground/external-pages.json`, alongside `comments.json` and screenshots. The loader is `GET /__playground/bookmarklet.js`; `GET /__playground/external-pages` lists sets, `GET /__playground/external-pages?url=<encoded-url>` resolves an association and returns compatible candidates, and `POST /__playground/external-pages` accepts `{url,title,mergeInto?}` to create or associate a set. Comment requests use the returned `external:<uuid>` page key and include the captured `element.pageUrl`.
 
 Two complementary tools:
 
@@ -65,7 +87,7 @@ Two complementary tools:
 <section data-review-id="review-summary-row">Summary row</section>
 ```
 
-Comments move through **open → resolved → closed**. An agent or human resolves work after implementing it; only a human can close the resolved thread after review. **Review resolved** opens the global queue, stores the selected thread in `?review=resolved&comment=<id>`, navigates across artifact pages, and advances after **Close & next** or a feedback reply through **Comment & reopen**. The regular rail keeps Open, Resolved, and Closed as separate views.
+Comments can move through **open → resolved → closed**, or a human can close an open or in-progress thread directly. An agent or human can resolve work after implementing it; the resolved review queue remains available for a separate approval step. Only a human can close or reopen a thread. **Review resolved** opens the global queue, stores the selected thread in `?review=resolved&comment=<id>`, navigates across artifact pages, and advances after **Close & next** or a feedback reply through **Comment & reopen**. The regular rail keeps Open, Resolved, and Closed as separate views.
 
 Comments can carry a positive or negative rating, with or without text. `BestPractice` and `ReviewVariant` in `src/review/ReviewComponents.tsx` build on that same store: each requires a stable fragment id, exposes a permalink, and renders aggregate rating controls. Variants additionally require an explicit discard handler.
 
@@ -81,9 +103,15 @@ Comments can carry a positive or negative rating, with or without text. `BestPra
 
 Anchor labels (`button.btn.primary "Approve"`) are read from the live DOM, so they only exist for the page you are looking at; cross-page actions fall back to the raw CSS path for the heading. New comments include their persisted React component/source path, HTML snapshot, and screenshot result when requested. Every copied root also includes absolute `POST` URLs for adding a reply and marking the thread resolved.
 
-Each root comment menu is ordered **Delete**, **Resolve** (or **Reopen**), **Copy**, **Maximise**. Copy serializes the whole thread with its page, component/source, HTML, replies, screenshot link, and reply/resolve URLs. Maximise opens that same thread with **Thread** and rendered **Markdown** tabs, so the exact copied Markdown can be reviewed first.
+Each root comment menu offers **Close** alongside **Resolve** for active comments, and **Reopen** for closed comments. Expanded root cards also show a tick to close directly or a reopen icon in the header. Copy serializes the whole thread with its page, component/source, HTML, replies, screenshot link, and reply/resolve URLs. Maximise opens that same thread with **Thread** and rendered **Markdown** tabs, so the exact copied Markdown can be reviewed first.
 
 Sidebar pages with feedback show their open root-comment count in a badge. Replies and resolved or closed comments do not increase the badge.
+
+The AppShell sidebar renders its folders and pages through Clicky Tree, including search, expand/collapse controls, page/folder context menus and page drag-and-drop. **Sort by** offers **None** (the configured page order), **Updated** (page source-file modification time), **Commented** (latest root comment or reply), and **Resolved** (latest currently resolved thread). Date sorts put the newest activity first and retain the folder hierarchy. Folder order follows the newest matching descendant.
+
+**Open** includes pages with open or in-progress threads; **Resolved** includes pages with threads waiting for human review. Selecting both matches either status. **Recently updated** restricts those results to page files changed within seven days. Closed threads are separate from resolved threads. External captures have no local source-file timestamp, so they do not match Recently updated. Filters remain available when no pages match, and **Reset view** clears search, sorting and filters.
+
+Sidebar settings persist in `sidebar.sort`, `sidebar.filters`, and `sidebar.q` URL parameters, including navigation between artifact and external pages and browser history. Development refreshes source-file dates and comment activity while the page is visible; built artifacts retain source-file dates from their build. `GET /__playground/page-activity` exposes development page timestamps without source content.
 
 If an anchored element disappears (you edited the artifact), the note is _kept_ and flagged as an orphan in a banner and in the rail — never silently dropped or moved.
 
@@ -97,16 +125,16 @@ The same comments are a REST API, so a coding agent can read feedback, act on it
 curl -s localhost:5274/__playground/comments/schema | jq '.tools[] | {name, description}'
 ```
 
-| Method   | Path                                  | Body                                                                | Purpose                                                                         |
-| -------- | ------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `GET`    | `/__playground/comments`              | —                                                                   | List; `?page=`, `?status=` (repeat or comma-separate), `?unresolved=true`       |
-| `POST`   | `/__playground/comments`              | `{page, author, body?, rating?, reviewDecision?, anchor?, element}` | Start a thread or a human review decision with component and HTML context       |
-| `POST`   | `/__playground/comments/{id}/replies` | `{body, author}`                                                    | Reply — page and anchor inherited from the root                                 |
-| `POST`   | `/__playground/comments/{id}/resolve` | `{}`                                                                | Move an open or in-progress thread to resolved                                  |
-| `POST`   | `/__playground/comments/{id}/close`   | `{author:{name,kind:"user"}}`                                       | Human approval: move resolved to closed and record attribution                  |
-| `POST`   | `/__playground/comments/{id}/reopen`  | `{author:{name,kind:"user"}, body?}`                                | Human review: optionally reply, then return resolved or closed feedback to open |
-| `PATCH`  | `/__playground/comments/{id}`         | `{body?, status?, rating?}`                                         | Edit text/rating or move between active work statuses                           |
-| `DELETE` | `/__playground/comments/{id}`         | —                                                                   | Remove, cascading to replies                                                    |
+| Method   | Path                                  | Body                                                                | Purpose                                                                           |
+| -------- | ------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `GET`    | `/__playground/comments`              | —                                                                   | List; `?page=`, `?status=` (repeat or comma-separate), `?unresolved=true`         |
+| `POST`   | `/__playground/comments`              | `{page, author, body?, rating?, reviewDecision?, anchor?, element}` | Start a thread or a human review decision with component and HTML context         |
+| `POST`   | `/__playground/comments/{id}/replies` | `{body, author}`                                                    | Reply — page and anchor inherited from the root                                   |
+| `POST`   | `/__playground/comments/{id}/resolve` | `{}`                                                                | Move an open or in-progress thread to resolved                                    |
+| `POST`   | `/__playground/comments/{id}/close`   | `{author:{name,kind:"user"}}`                                       | Human close: move open, in-progress, or resolved to closed and record attribution |
+| `POST`   | `/__playground/comments/{id}/reopen`  | `{author:{name,kind:"user"}, body?}`                                | Human review: optionally reply, then return resolved or closed feedback to open   |
+| `PATCH`  | `/__playground/comments/{id}`         | `{body?, status?, rating?}`                                         | Edit text/rating or move between active work statuses                             |
+| `DELETE` | `/__playground/comments/{id}`         | —                                                                   | Remove, cascading to replies                                                      |
 
 Statuses are `open`, `in_progress`, `resolved`, `closed`; the first two are active work. Close and reopen reject non-user actors and invalid stage transitions. The machine-readable tool schema intentionally omits those human-only operations. Ratings are `positive` or `negative`. Every new root's `element` is `{componentName?, source, html, screenshot?}`; `html` is capped at 4 KB and optional `screenshot` is either `{status:"captured", dataUrl:"data:image/png;base64,…"}` or `{status:"unavailable", reason:"unsupported"|"cancelled"|"failed"}`. Invalid or missing context is a 400. A missing `author` also fails because identity is never inferred, so an agent's reply cannot show up as "You". Every comment is addressed by id alone; only `POST /__playground/comments` needs a page.
 

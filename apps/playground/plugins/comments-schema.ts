@@ -15,8 +15,9 @@ import {
  * Vite's config bundler, where the package aliases do not apply.
  */
 export type JsonProperty = {
-  type: "string" | "boolean" | "object";
+  type: "string" | "number" | "boolean" | "object";
   description: string;
+  minimum?: number;
   enum?: string[];
   default?: string | boolean;
   properties?: Record<string, JsonProperty>;
@@ -56,13 +57,26 @@ const ACTIVE_STATUS_VALUES = [...UNRESOLVED_STATUSES];
 const AUTHOR: JsonProperty = {
   type: "object",
   description:
-    'Who is writing. Agents should identify themselves, e.g. {"name":"Claude","kind":"agent"}.',
+    'Who is writing. Agents should identify themselves, e.g. {"name":"Claude","kind":"agent"}. When posting another agent\'s review, name that agent and set via to yourself, e.g. {"name":"gpt-6.1-sol","kind":"agent","via":"Claude","sessionId":"…","cost":0.42}.',
   properties: {
     name: { type: "string", description: "Display name shown on the comment." },
     kind: {
       type: "string",
       description: "Renders an agent glyph instead of a user avatar.",
       enum: ["user", "agent"],
+    },
+    via: {
+      type: "string",
+      description: "The agent that posted on name's behalf, when another agent produced the text.",
+    },
+    sessionId: {
+      type: "string",
+      description: "Session ID of the agent run that produced the text.",
+    },
+    cost: {
+      type: "number",
+      description: "AI response cost in USD for producing the text.",
+      minimum: 0,
     },
   },
   required: ["name"],
@@ -96,13 +110,19 @@ const ELEMENT: JsonProperty = {
   description:
     "Captured component path and HTML. Required for every new root, including page-level comments. Screenshot capture is optional.",
   properties: {
+    pageUrl: {
+      type: "string",
+      description:
+        "Original HTTP(S) or file document URL for an external-page capture.",
+    },
     componentName: {
       type: "string",
       description: "Nearest React component display name, when available.",
     },
     source: {
       type: "string",
-      description: "React component stack, or the direct source location.",
+      description:
+        "React component stack, direct source location, or document URL for a DOM capture.",
     },
     html: {
       type: "string",
@@ -151,7 +171,7 @@ export const COMMENT_TOOLS: CommentTool[] = [
         page: {
           type: "string",
           description:
-            'Restrict to one page slug, e.g. "welcome" or "flanksource/foundations/tones".',
+            "Restrict to an artifact slug or registered external:<uuid> comment-set key.",
         },
         status: {
           type: "string",
@@ -180,7 +200,8 @@ export const COMMENT_TOOLS: CommentTool[] = [
       properties: {
         page: {
           type: "string",
-          description: "Page slug the comment belongs to.",
+          description:
+            "Artifact slug or registered external:<uuid> key. External captures must include their associated element.pageUrl.",
         },
         body: BODY,
         rating: RATING,
@@ -255,6 +276,56 @@ export const COMMENT_TOOLS: CommentTool[] = [
         rating: RATING,
       },
       required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "list_external_pages",
+    label: "List external pages",
+    description:
+      "List bookmarklet comment sets. With url, return its remembered association and compatible sets for the same origin, path and URL fragment.",
+    method: "GET",
+    path: "/__playground/external-pages",
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description:
+            "Optional HTTP(S) or file document URL to resolve, including query parameters and URL fragment.",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "associate_external_page",
+    label: "Associate external page",
+    description:
+      "Create a comment set for a URL, or associate a new query variant with mergeInto. Use an existing association when present; ask the human to choose Merge or New for unfamiliar query variants.",
+    method: "POST",
+    path: "/__playground/external-pages",
+    annotations: { idempotentHint: true },
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description:
+            "HTTP(S) or file document URL without embedded credentials.",
+        },
+        title: {
+          type: "string",
+          description: "Human-readable document title.",
+        },
+        mergeInto: {
+          type: "string",
+          description:
+            "Existing external:<uuid> key for the same origin, path and URL fragment; omit to create a new set.",
+        },
+      },
+      required: ["url", "title"],
       additionalProperties: false,
     },
   },

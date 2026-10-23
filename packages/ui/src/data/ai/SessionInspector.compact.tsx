@@ -39,7 +39,7 @@ export function CompactSessionInspectorToolbar({
       <div
         role="tablist"
         aria-label="Session detail view"
-        className="flex min-w-0 flex-1 items-stretch overflow-hidden px-0.5 @min-[48rem]:px-2"
+        className="flex min-w-0 flex-1 items-stretch overflow-hidden px-0.5 @min-[60rem]:px-2"
       >
         {tabs.map((tab) => (
           <TabButton
@@ -51,14 +51,14 @@ export function CompactSessionInspectorToolbar({
             variant="underline"
             {...(tab.count === undefined ? {} : { count: tab.count })}
             {...(tab.countColor ? { countColor: tab.countColor } : {})}
-            className={`h-full shrink-0 px-1 py-0 text-[11px] [&_svg]:size-3.5 [&_svg]:text-muted-foreground @min-[48rem]:px-2.5 ${
-              activeTab === tab.id ? "" : "@max-[48rem]:hidden"
+            className={`h-full shrink-0 px-1 py-0 text-[11px] [&_svg]:size-3.5 [&_svg]:text-muted-foreground @min-[60rem]:px-2.5 ${
+              activeTab === tab.id ? "" : "@max-[60rem]:hidden"
             }`}
           />
         ))}
         <DropdownMenu
           align="left"
-          className="shrink-0 @min-[48rem]:hidden"
+          className="shrink-0 @min-[60rem]:hidden"
           menuLabel="More session tabs"
           items={tabs
             .filter((tab) => tab.id !== activeTab)
@@ -84,7 +84,7 @@ export function CompactSessionInspectorToolbar({
       <div
         role="group"
         aria-label="Session controls"
-        className="ml-auto flex shrink-0 items-center gap-1 border-l border-border bg-card pl-1 pr-2 @min-[48rem]:gap-2 @min-[48rem]:px-3"
+        className="ml-auto flex shrink-0 items-center gap-1 border-l border-border bg-card pl-1 pr-2 @min-[60rem]:gap-2 @min-[60rem]:px-3"
       >
         {metadata ? (
           <div className="shrink-0">

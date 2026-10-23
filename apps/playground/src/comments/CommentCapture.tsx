@@ -37,6 +37,16 @@ export function CommentCapture({
         <summary className="cursor-pointer font-medium text-foreground">
           Capture context
         </summary>
+        {element.pageUrl && (
+          <a
+            className="mt-2 block break-all text-primary underline"
+            href={element.pageUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {element.pageUrl}
+          </a>
+        )}
         {element.componentName && (
           <p className="mt-2 text-muted-foreground">
             Component: &lt;{element.componentName}&gt;

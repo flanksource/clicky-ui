@@ -41,7 +41,7 @@ export function captureElementHtml(element: Element): string {
 export async function captureElementContext(
   element: Element,
   fallbackSource?: string,
-): Promise<CommentElementContext> {
+): Promise<Omit<CommentElementContext, "screenshot">> {
   const html = captureElementHtml(element);
   const api = window.__REACT_GRAB__;
   if (!api) {
@@ -53,7 +53,11 @@ export async function captureElementContext(
   const directSource = await api
     .getSource(element)
     .then(sourceLocation, () => "");
-  const source = await resolveStack(api, element, directSource || fallbackSource || "");
+  const source = await resolveStack(
+    api,
+    element,
+    directSource || fallbackSource || "",
+  );
   if (!source) {
     throw new Error(
       "React Grab could not resolve source context for the selected element",

@@ -171,6 +171,7 @@ export {
 export * from "./icons";
 export { JsonView, type JsonViewProps } from "./data/JsonView";
 export { KeyValueList, type KeyValueListItem, type KeyValueListProps } from "./data/KeyValueList";
+export { SchemaReference, type SchemaReferenceProps } from "./data/SchemaReference";
 export {
   SchemaViewer,
   SchemaViewer as SchemaBrowser,
@@ -208,7 +209,13 @@ export {
   type LogsTableRow,
 } from "./data/LogsTable";
 export { normalizeLogsTableRows } from "./data/logs-normalize";
-export { MatrixTable, type MatrixTableProps, type MatrixTableRow } from "./data/MatrixTable";
+export {
+  MatrixTable,
+  type MatrixTableColumn,
+  type MatrixTableGroupRow,
+  type MatrixTableProps,
+  type MatrixTableRow,
+} from "./data/MatrixTable";
 export { Callout, type CalloutProps } from "./data/Callout";
 export {
   assertCalloutValue,
@@ -387,6 +394,13 @@ export { TreeNode, type TreeNodeProps, type TreeRowContext } from "./data/TreeNo
 export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHeader";
 export { Timeline, type TimelineItem, type TimelineProps } from "./data/Timeline";
 export * from "./data/git";
+export {
+  CompactRecord,
+  CompactRecordList,
+  type CompactRecordListProps,
+  type CompactRecordProps,
+  type CompactRecordStatus,
+} from "./data/CompactRecord";
 export * from "./data/test-runner";
 export * from "./data/lint";
 export * from "./data/verification";

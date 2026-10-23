@@ -35,6 +35,8 @@ import {
   type StoredComment,
 } from "./comments-store";
 import { recordReviewDecision } from "./review-decisions";
+import { readExternalPages } from "./external-pages-store";
+import { externalUrl } from "../src/bookmarklet/model";
 
 export const COMMENTS_ROUTE = "/__playground/comments";
 
@@ -93,7 +95,7 @@ export function matchRoute(
   return undefined;
 }
 
-async function readJsonBody(
+export async function readJsonBody(
   req: IncomingMessage,
 ): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
@@ -124,7 +126,11 @@ async function readJsonBody(
   return parsed as Record<string, unknown>;
 }
 
-function sendJson(res: ServerResponse, status: number, payload: unknown): void {
+export function sendJson(
+  res: ServerResponse,
+  status: number,
+  payload: unknown,
+): void {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
@@ -159,7 +165,31 @@ function requireAuthor(body: Record<string, unknown>): StoredAuthor {
   if (kind !== undefined && kind !== "user" && kind !== "agent") {
     throw new Error('"author.kind" must be "user" or "agent"');
   }
-  return { name, ...(kind === undefined ? {} : { kind }) };
+  const via = optionalAuthorText(candidate, "via");
+  const sessionId = optionalAuthorText(candidate, "sessionId");
+  const cost = candidate["cost"];
+  if (cost !== undefined && (typeof cost !== "number" || !Number.isFinite(cost) || cost < 0)) {
+    throw new Error('"author.cost" must be a non-negative number of USD');
+  }
+  return {
+    name,
+    ...(kind === undefined ? {} : { kind }),
+    ...(via === undefined ? {} : { via }),
+    ...(sessionId === undefined ? {} : { sessionId }),
+    ...(cost === undefined ? {} : { cost }),
+  };
+}
+
+function optionalAuthorText(
+  author: Record<string, unknown>,
+  key: "via" | "sessionId",
+): string | undefined {
+  const value = author[key];
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(`"author.${key}" must be a non-empty string when present`);
+  }
+  return value;
 }
 
 function optionalText(
@@ -280,6 +310,19 @@ function handle(
         };
         try {
           const page = assertPage(body["page"]);
+          if (page.startsWith("external:")) {
+            const target = readExternalPages(dir).find(
+              (entry) => entry.id === page,
+            );
+            if (
+              !element.pageUrl ||
+              !target?.urls.includes(externalUrl(element.pageUrl).url)
+            ) {
+              throw new Error(
+                "External comment capture URL must belong to its registered comment set",
+              );
+            }
+          }
           if (stored.reviewDecision) {
             const data = readAll(dir);
             data[page] = recordReviewDecision(data[page] ?? [], stored);

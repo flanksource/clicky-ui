@@ -41,6 +41,10 @@ describe("TestTreeNode count badges", () => {
 });
 
 describe("TestTreeNode message line", () => {
+  it.each([{ pending: true }, { running: true }])("shows preparation messages for an active task %o", (flags) => {
+    renderRow({ name: "Resolve schemas", framework: "task", message: "Waiting for Connect database", ...flags } as Test);
+    expect(screen.getByText("Waiting for Connect database")).toBeTruthy();
+  });
   it("renders a failed node's message under its name with the full text as the title", () => {
     renderRow({ name: "trace", failed: true, message: ROOT_CAUSE } as Test);
     const line = screen.getByText(ROOT_CAUSE);
@@ -54,6 +58,15 @@ describe("TestTreeNode message line", () => {
   ])("renders the message on a %s node", (_status, flags) => {
     renderRow({ name: "step", message: "Quality Check Required.", ...flags } as Test);
     expect(screen.getByText("Quality Check Required.")).toBeTruthy();
+  });
+
+  // A skip is intentional (an `if:` gate that read false), not a warning: its
+  // name stays neutral grey, never the amber a warned row carries.
+  it("renders a skipped node's name neutral, not amber", () => {
+    renderRow({ name: "gated step", skipped: true, message: "if: x evaluated false" } as Test);
+    const name = screen.getByText("gated step");
+    expect(name.className).toContain("text-muted-foreground");
+    expect(name.className).not.toMatch(/amber|yellow/);
   });
 
   it("does not render a message on a passed node", () => {

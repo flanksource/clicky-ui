@@ -4,9 +4,12 @@ import {
   useState,
   type ComponentType,
   type CSSProperties,
+  type HTMLAttributes,
   type ReactNode,
 } from "react";
 import { cn } from "../lib/utils";
+import { ConfirmDialog } from "../overlay/ConfirmDialog";
+import { useRouter } from "../rpc/router";
 import { Callout, type CalloutProps } from "./Callout";
 import { CodeBlock } from "./CodeBlock";
 
@@ -44,6 +47,36 @@ type MarkdownElementProps = {
   node?: unknown;
 };
 
+type MarkdownHeadingTag = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+type MarkdownHeadingProps = HTMLAttributes<HTMLHeadingElement> & { node?: unknown };
+
+const headingClasses: Record<MarkdownHeadingTag, string> = {
+  h1: "mt-4 mb-2 text-lg font-semibold",
+  h2: "mt-3 mb-1.5 text-base font-semibold",
+  h3: "mt-3 mb-1 text-sm font-semibold",
+  h4: "mt-2 mb-1 text-sm font-semibold",
+  h5: "mt-2 mb-1 text-sm font-medium",
+  h6: "mt-2 mb-1 text-sm font-medium",
+};
+
+function MarkdownHeading({
+  as: Tag,
+  className,
+  children,
+  node: _node,
+  ...props
+}: MarkdownHeadingProps & { as: MarkdownHeadingTag }) {
+  return (
+    <Tag
+      className={cn(headingClasses[Tag], className)}
+      data-streamdown={`heading-${Tag.slice(1)}`}
+      {...props}
+    >
+      {children}
+    </Tag>
+  );
+}
+
 type StreamdownComponent = ComponentType<{
   children: string;
   className?: string | undefined;
@@ -52,6 +85,13 @@ type StreamdownComponent = ComponentType<{
   // raw tag, so this is an allowlist rather than raw-HTML passthrough.
   allowedTags?: Record<string, string[]> | undefined;
   components?: {
+    h1?: ComponentType<MarkdownHeadingProps>;
+    h2?: ComponentType<MarkdownHeadingProps>;
+    h3?: ComponentType<MarkdownHeadingProps>;
+    h4?: ComponentType<MarkdownHeadingProps>;
+    h5?: ComponentType<MarkdownHeadingProps>;
+    h6?: ComponentType<MarkdownHeadingProps>;
+    a?: ComponentType<MarkdownLinkProps>;
     code?: ComponentType<MarkdownCodeProps>;
     ul?: ComponentType<MarkdownElementProps>;
     ol?: ComponentType<MarkdownElementProps>;
@@ -182,7 +222,66 @@ function MarkdownTableCell({ className, style, children }: MarkdownElementProps)
   );
 }
 
+type MarkdownLinkProps = MarkdownElementProps & { href?: string; title?: string };
+
+// Streamdown renders every link as a button behind an "Open external link?"
+// prompt that always opens a new tab, so an in-app link such as `/connections`
+// left the app. Root-relative links route through the host's RouterAdapter and
+// hash links scroll in place; only external links keep the confirm prompt.
+function MarkdownLink({ href, title, className, children }: MarkdownLinkProps) {
+  const { renderLink } = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const linkClass = cn("wrap-anywhere font-medium text-primary underline", className);
+
+  if (!href) return <span className={className}>{children}</span>;
+  if (href.startsWith("#")) {
+    return (
+      <a href={href} title={title} className={linkClass}>
+        {children}
+      </a>
+    );
+  }
+  if (href.startsWith("/") && !href.startsWith("//")) {
+    return renderLink({ to: href, className: linkClass, children, ...(title ? { title } : {}) });
+  }
+  return (
+    <>
+      <a
+        href={href}
+        title={title}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={linkClass}
+        onClick={(event) => {
+          event.preventDefault();
+          setConfirming(true);
+        }}
+      >
+        {children}
+      </a>
+      <ConfirmDialog
+        open={confirming}
+        title="Open external link?"
+        message={<code className="break-all font-mono text-sm">{href}</code>}
+        confirmLabel="Open link"
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => {
+          setConfirming(false);
+          window.open(href, "_blank", "noopener,noreferrer");
+        }}
+      />
+    </>
+  );
+}
+
 const markdownComponents = {
+  h1: (props: MarkdownHeadingProps) => <MarkdownHeading as="h1" {...props} />,
+  h2: (props: MarkdownHeadingProps) => <MarkdownHeading as="h2" {...props} />,
+  h3: (props: MarkdownHeadingProps) => <MarkdownHeading as="h3" {...props} />,
+  h4: (props: MarkdownHeadingProps) => <MarkdownHeading as="h4" {...props} />,
+  h5: (props: MarkdownHeadingProps) => <MarkdownHeading as="h5" {...props} />,
+  h6: (props: MarkdownHeadingProps) => <MarkdownHeading as="h6" {...props} />,
+  a: MarkdownLink,
   code: MarkdownCode,
   ul: MarkdownList,
   ol: MarkdownOrderedList,

@@ -59,6 +59,12 @@ function Form() {
 }
 
 describe("createSecretFormExtensions", () => {
+  it("leaves read-only credential controls without editable source selectors", () => {
+    const extensions = createSecretFormExtensions({ loaders });
+    render(<JsonSchemaForm schema={schema} value={{ password: "secret://credentials/password" }} readOnly post={extensions.post} />);
+    expect(screen.queryByRole("combobox", { name: "Secret value source" })).not.toBeInTheDocument();
+  });
+
   it.each([
     ["Value", "textbox", "Static value", undefined],
     ["ConfigMap", "placeholder", "Select configmap…", "configmap-resource"],

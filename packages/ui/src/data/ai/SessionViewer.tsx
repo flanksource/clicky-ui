@@ -30,14 +30,22 @@ import {
   type SessionThemeOverride,
 } from "./SessionViewerMenu";
 import { useSessionScroll } from "./use-session-scroll";
-import type {
-  ApprovalDecisionFields,
-  ApprovalKind,
-  ApprovalRequest,
-} from "./approval-request";
+import {
+  mergePendingTools,
+  type SessionPendingTool,
+} from "./SessionViewer.pending-tools";
+import type { ApprovalDecisionFields } from "./approval-request";
 import type { SessionTokenSizer } from "./session-token-sizing";
-import { SessionTokenContext, useSessionTokenSizing } from "./use-session-token-sizing";
-export type { SessionTokenSizer, SessionTokenSize, SessionTokenSizingRequest, SessionTokenSizingResult } from "./session-token-sizing";
+import {
+  SessionTokenContext,
+  useSessionTokenSizing,
+} from "./use-session-token-sizing";
+export type {
+  SessionTokenSizer,
+  SessionTokenSize,
+  SessionTokenSizingRequest,
+  SessionTokenSizingResult,
+} from "./session-token-sizing";
 
 export type {
   SessionEntry,
@@ -46,19 +54,7 @@ export type {
   SessionActionMeta,
 } from "./SessionViewer.model";
 export type { SessionThemeOverride } from "./SessionViewerMenu";
-
-export interface SessionPendingTool {
-  tool: string;
-  input?: Record<string, unknown>;
-  toolCallId?: string;
-  approvalId?: string;
-  sessionId?: string;
-  /** What kind of approval this is. Absent means an untyped tool approval, which
-   *  renders as Allow / Reject. */
-  kind?: ApprovalKind;
-  /** The typed approval request; drives the per-kind controls. */
-  request?: ApprovalRequest;
-}
+export type { SessionPendingTool } from "./SessionViewer.pending-tools";
 
 /** A decision on one pending tool. `allow`/`message`/`answers` are the original
  *  fields; `interrupt`, `scope`, `grants` and `content` are set only for a typed
@@ -70,7 +66,6 @@ export interface SessionToolDecision extends ApprovalDecisionFields {
 }
 
 export interface SessionViewerProps {
-
   /** Explicit menu actions only; never invoked automatically when a transcript loads. */
   sizeTokens?: SessionTokenSizer;
   /** A captain session: parsed `SessionEntry[]` or raw log text (JSON / JSONL). */
@@ -105,6 +100,10 @@ export interface SessionViewerProps {
    *  consumers keep rendering the whole log in normal page flow. Requires a
    *  height-bounded parent. */
   scrollable?: boolean;
+  /** Optional short title that collapses the first user prompt until opened. */
+  initialPromptSummary?: string;
+  /** Place transcript navigation in a persistent toolbar. Defaults to floating. */
+  scrollControls?: "floating" | "toolbar";
   /** Rows rendered on first paint in `scrollable` mode. Defaults to 60. */
   windowSize?: number;
   /** Rows added each time older content loads in `scrollable` mode. Defaults to 40. */
@@ -161,6 +160,8 @@ export function SessionViewer({
   defaultDensity,
   defaultTheme,
   scrollable = false,
+  initialPromptSummary,
+  scrollControls = "floating",
   windowSize = 60,
   batchSize = 40,
   scrollResetKey,
@@ -223,14 +224,24 @@ export function SessionViewer({
   };
   const items = displayItems.filter((item) => {
     const event = isSessionEventGroup(item) ? item.representative : item;
-    return (showEncryptedReasoning || !isEncryptedReasoning(event)) && isEventVisible(event, visibility);
+    return (
+      (showEncryptedReasoning || !isEncryptedReasoning(event)) &&
+      isEventVisible(event, visibility)
+    );
   });
   const firstUserEventId = allEvents.find((event) => event.kind === "user")?.id;
 
   // Reset the window when the underlying session changes, not on filter toggles —
   // so hiding a category doesn't yank the reader back to the bottom.
   const resetKey = scrollResetKey ?? allEvents[0]?.id ?? "";
-  const { scrollRef, contentRef, startIndex, following, resumeFollowing } = useSessionScroll({
+  const {
+    scrollRef,
+    contentRef,
+    startIndex,
+    following,
+    jumpToStart,
+    resumeFollowing,
+  } = useSessionScroll({
     total: items.length,
     enabled: scrollable,
     windowSize,
@@ -283,10 +294,20 @@ export function SessionViewer({
       hasThinking={hasThinking}
       hasEncryptedReasoning={hasEncryptedReasoning}
       showEncryptedReasoning={showEncryptedReasoning}
-      onToggleEncryptedReasoning={() => setShowEncryptedReasoning((shown) => !shown)}
+      onToggleEncryptedReasoning={() =>
+        setShowEncryptedReasoning((shown) => !shown)
+      }
       showEstimatedToolCost={showEstimatedToolCost}
-      onToggleEstimatedToolCost={() => setShowEstimatedToolCost((shown) => !shown)}
-      {...(tokenSizing.estimateAll ? { onEstimateTokens: tokenSizing.estimateAll, onCalculateMissingTokens: tokenSizing.calculateMissing, estimatingTokens: tokenSizing.pending } : {})}
+      onToggleEstimatedToolCost={() =>
+        setShowEstimatedToolCost((shown) => !shown)
+      }
+      {...(tokenSizing.estimateAll
+        ? {
+            onEstimateTokens: tokenSizing.estimateAll,
+            onCalculateMissingTokens: tokenSizing.calculateMissing,
+            estimatingTokens: tokenSizing.pending,
+          }
+        : {})}
     />
   ) : null;
   // When a host supplies `menuContainer`, the menu is portaled into it (e.g. the
@@ -321,6 +342,9 @@ export function SessionViewer({
               key={item.id}
               event={item}
               initialPrompt={item.id === firstUserEventId}
+              {...(item.id === firstUserEventId && initialPromptSummary
+                ? { initialPromptSummary }
+                : {})}
               showEstimatedToolCost={showEstimatedToolCost}
               last={last}
               defaultExpanded={defaultExpanded}
@@ -344,137 +368,114 @@ export function SessionViewer({
       {...dataAttrs}
     >
       <SessionTokenContext.Provider value={tokenSizing.context}>
-      <DensityValueProvider density={effectiveDensity}>
-        {menu && menuContainer && createPortal(menu, menuContainer)}
-        {(showHeader || headerActions || inlineMenu) && (
-          <div
-            data-session-viewer-header
-            className={cn(
-              "flex min-w-0 flex-wrap items-center justify-between gap-x-density-3 gap-y-density-2",
-              scrollable
-                ? "shrink-0 border-b border-border px-density-3 py-density-2 @min-[48rem]/session-viewer:px-density-4"
-                : "mb-density-3",
-            )}
-          >
-            {showHeader && (
-              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-density-3 gap-y-1 text-xs text-muted-foreground">
-                {summary.model && (
-                  <span className="inline-flex items-center gap-1 font-medium text-foreground">
-                    <Icon icon={UiRobotAi} className="size-3.5" />
-                    {summary.model}
-                  </span>
-                )}
-                <span>{summary.toolCount} actions</span>
-                <span>{summary.messageCount} messages</span>
-                {metadata && (
-                  <SessionMetadataBadges
-                    metadata={metadata}
-                    showContextMeter={showContextMeter}
-                  />
-                )}
-              </div>
-            )}
-            {(headerActions || inlineMenu) && (
-              <div
-                role="group"
-                aria-label="Session viewer actions"
-                className="ml-auto flex min-w-0 shrink-0 items-center gap-density-2"
-              >
-                {headerActions}
-                {inlineMenu && menu}
-              </div>
-            )}
-          </div>
-        )}
+        <DensityValueProvider density={effectiveDensity}>
+          {menu && menuContainer && createPortal(menu, menuContainer)}
+          {(showHeader || headerActions || inlineMenu) && (
+            <div
+              data-session-viewer-header
+              className={cn(
+                "flex min-w-0 flex-wrap items-center justify-between gap-x-density-3 gap-y-density-2",
+                scrollable
+                  ? "shrink-0 border-b border-border px-density-3 py-density-2 @min-[48rem]/session-viewer:px-density-4"
+                  : "mb-density-3",
+              )}
+            >
+              {showHeader && (
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-density-3 gap-y-1 text-xs text-muted-foreground">
+                  {summary.model && (
+                    <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                      <Icon icon={UiRobotAi} className="size-3.5" />
+                      {summary.model}
+                    </span>
+                  )}
+                  <span>{summary.toolCount} actions</span>
+                  <span>{summary.messageCount} messages</span>
+                  {metadata && (
+                    <SessionMetadataBadges
+                      metadata={metadata}
+                      showContextMeter={showContextMeter}
+                    />
+                  )}
+                </div>
+              )}
+              {(headerActions || inlineMenu) && (
+                <div
+                  role="group"
+                  aria-label="Session viewer actions"
+                  className="ml-auto flex min-w-0 shrink-0 items-center gap-density-2"
+                >
+                  {headerActions}
+                  {inlineMenu && menu}
+                </div>
+              )}
+            </div>
+          )}
 
-        {scrollable ? (
-          <div className="relative min-h-0 flex-1">
-            <div ref={scrollRef} className="h-full overflow-y-auto">
-              <div
-                ref={contentRef}
-                data-session-viewer-content
-                className="p-density-3 @min-[48rem]/session-viewer:p-density-4"
-              >
-                {loadingOlder ? (
-                  <p role="status" className="pb-density-2 text-center text-xs text-muted-foreground">
-                    Loading earlier messages…
-                  </p>
-                ) : null}
-                {list}
+          {scrollable && scrollControls === "toolbar" && (
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-density-3 py-1.5 text-xs">
+              <span className="text-muted-foreground">Oldest → newest</span>
+              <div className="flex items-center gap-1">
+                {firstUserEventId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={jumpToStart}
+                    className="h-7 px-2 text-xs"
+                  >
+                    Initial prompt
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={resumeFollowing}
+                  className="h-7 gap-1 px-2 text-xs"
+                >
+                  <Icon icon={UiArrowDown} className="size-3.5" />
+                  Latest
+                </Button>
               </div>
             </div>
-            {!following && (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={resumeFollowing}
-                className="absolute bottom-density-3 left-1/2 -translate-x-1/2 shadow-md"
-              >
-                <Icon icon={UiArrowDown} className="size-4" />
-                Scroll to bottom
-              </Button>
-            )}
-          </div>
-        ) : (
-          list
-        )}
-      </DensityValueProvider>
+          )}
+          {scrollable ? (
+            <div className="relative min-h-0 flex-1">
+              <div ref={scrollRef} className="h-full overflow-y-auto">
+                <div
+                  ref={contentRef}
+                  data-session-viewer-content
+                  className="p-density-3 @min-[48rem]/session-viewer:p-density-4"
+                >
+                  {loadingOlder ? (
+                    <p
+                      role="status"
+                      className="pb-density-2 text-center text-xs text-muted-foreground"
+                    >
+                      Loading earlier messages…
+                    </p>
+                  ) : null}
+                  {list}
+                </div>
+              </div>
+              {scrollControls === "floating" && !following && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={resumeFollowing}
+                  className="absolute bottom-density-3 left-1/2 -translate-x-1/2 shadow-md"
+                >
+                  <Icon icon={UiArrowDown} className="size-4" />
+                  Scroll to bottom
+                </Button>
+              )}
+            </div>
+          ) : (
+            list
+          )}
+        </DensityValueProvider>
       </SessionTokenContext.Provider>
     </div>
   );
-}
-
-function mergePendingTools(
-  events: SessionEvent[],
-  pendingTools: readonly SessionPendingTool[],
-): SessionEvent[] {
-  const merged = [...events];
-  for (const [index, pending] of pendingTools.entries()) {
-    const matches = merged.filter(
-      (event) =>
-        event.kind === "tool" &&
-        ((pending.toolCallId && event.toolCallId === pending.toolCallId) ||
-          (pending.approvalId && event.approvalId === pending.approvalId) ||
-          (pending.sessionId &&
-            event.sessionId === pending.sessionId &&
-            event.tool === pending.tool)),
-    );
-    const match = matches.length === 1 ? matches[0] : undefined;
-    if (match) {
-      Object.assign(match, {
-        pending: true,
-        toolInput: pending.input ?? match.toolInput,
-        toolCallId: pending.toolCallId ?? match.toolCallId,
-        approvalId: pending.approvalId ?? match.approvalId,
-        sessionId: pending.sessionId ?? match.sessionId,
-        ...approvalFields(pending),
-      });
-    } else {
-      merged.push({
-        id: `pending-${
-          pending.approvalId ?? pending.toolCallId ?? `${pending.tool}-${index}`
-        }`,
-        kind: "tool",
-        tool: pending.tool,
-        ...(pending.input ? { toolInput: pending.input } : {}),
-        ...(pending.toolCallId ? { toolCallId: pending.toolCallId } : {}),
-        ...(pending.approvalId ? { approvalId: pending.approvalId } : {}),
-        ...(pending.sessionId ? { sessionId: pending.sessionId } : {}),
-        ...approvalFields(pending),
-        pending: true,
-      });
-    }
-  }
-  return merged;
-}
-
-function approvalFields(
-  pending: SessionPendingTool,
-): Pick<SessionEvent, "approvalKind" | "approvalRequest"> {
-  const kind = pending.kind ?? pending.request?.kind;
-  return {
-    ...(kind ? { approvalKind: kind } : {}),
-    ...(pending.request ? { approvalRequest: pending.request } : {}),
-  };
 }

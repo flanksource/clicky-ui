@@ -92,10 +92,10 @@ export function PromptPagePreview({
           {result.model ? (
             <p className="text-xs text-muted-foreground">
               model <span className="font-mono">{result.model}</span>
-              {result.backend ? (
+              {result.mode ? (
                 <>
                   {" "}
-                  · backend <span className="font-mono">{result.backend}</span>
+                  · mode <span className="font-mono">{result.mode}</span>
                 </>
               ) : null}
             </p>

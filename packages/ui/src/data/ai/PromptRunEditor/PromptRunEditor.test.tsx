@@ -192,7 +192,7 @@ describe("PromptRunEditor", () => {
     expect(currentValue()).toEqual(VALUE);
   });
 
-  it("edits the shared timeout from the single-model runtime bar only", () => {
+  it("keeps timeout shared when switching from single to multi-model bars", () => {
     render(<Harness initial={VALUE} />);
 
     fireEvent.click(
@@ -210,7 +210,7 @@ describe("PromptRunEditor", () => {
 
     fireEvent.click(screen.getByRole("radio", { name: "Multi-model" }));
 
-    expect(screen.queryByTitle(/^Timeout/)).not.toBeInTheDocument();
+    expect(screen.getAllByTitle(/^Timeout/)).toHaveLength(1);
   });
 
   it("renders no profile picker or recent runtimes unless the host supplies them", () => {
@@ -439,7 +439,14 @@ describe("PromptRunEditor", () => {
       expect(screen.getByRole("textbox", { name: "User prompt" })).toHaveValue(
         "Review {{company}}",
       );
-      expect(kebabItems()).toEqual(["Effort", "Budget", "Timeout"]);
+      expect(kebabItems()).toEqual([
+        "Effort",
+        "Permission mode",
+        "Source",
+        "Commit",
+        "Budget",
+        "Timeout",
+      ]);
       fireEvent.keyDown(document, { key: "Escape" });
       expect(
         screen.queryByTitle(/^Permission posture/),
@@ -464,20 +471,9 @@ describe("PromptRunEditor", () => {
       });
     });
 
-    it.each([
-      {
-        mode: "Single model",
-        fields: ["Max tokens", "Max turns"],
-        omitted: ["Max cost (USD)", "Timeout"],
-      },
-      {
-        mode: "Multi-model",
-        fields: ["Max cost (USD)", "Max tokens", "Max turns", "Timeout"],
-        omitted: [],
-      },
-    ])(
-      "keeps the $mode runtime bar out of the model tab and shows only the budget it does not own",
-      ({ mode, fields, omitted }) => {
+    it.each(["Single model", "Multi-model"])(
+      "keeps primary controls and token/turn limits out of the model tab in %s mode",
+      (mode) => {
         render(<Harness initial={VALUE} specTabs={SPEC_RUNTIME_TABS} />);
 
         fireEvent.click(screen.getByRole("radio", { name: mode }));
@@ -487,8 +483,12 @@ describe("PromptRunEditor", () => {
         expect(
           within(model).queryByRole("group", { name: "Runtime" }),
         ).not.toBeInTheDocument();
-        for (const field of fields) expect(model).toHaveTextContent(field);
-        for (const field of omitted)
+        for (const field of [
+          "Max cost (USD)",
+          "Timeout",
+          "Max tokens",
+          "Max turns",
+        ])
           expect(within(model).queryByText(field)).not.toBeInTheDocument();
       },
     );

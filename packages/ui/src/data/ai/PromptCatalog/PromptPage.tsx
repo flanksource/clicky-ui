@@ -289,8 +289,8 @@ export function PromptPage({
           readOnly={readOnly}
           models={models}
           families={families}
-          {...(entry.effective.backend
-            ? { effectiveBackend: entry.effective.backend }
+          {...(entry.effective.mode
+            ? { effectiveMode: entry.effective.mode }
             : {})}
           {...(entry.effective.model
             ? { effectiveModel: entry.effective.model }

@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 
 // Progressive windowing for the SessionViewer log. A recorded session runs to
 // thousands of rows (many with syntax-highlighted code blocks), so rendering the
@@ -18,11 +25,19 @@ export function windowSlice<T>(
 ): { items: T[]; startIndex: number; hasMore: boolean } {
   const clamped = Math.max(0, Math.min(visibleCount, items.length));
   const startIndex = items.length - clamped;
-  return { items: items.slice(startIndex), startIndex, hasMore: startIndex > 0 };
+  return {
+    items: items.slice(startIndex),
+    startIndex,
+    hasMore: startIndex > 0,
+  };
 }
 
 /** Grow the window by `batchSize`, never past `total`. */
-export function nextVisibleCount(current: number, batchSize: number, total: number): number {
+export function nextVisibleCount(
+  current: number,
+  batchSize: number,
+  total: number,
+): number {
   return Math.min(current + Math.max(1, batchSize), total);
 }
 
@@ -31,7 +46,9 @@ export function isPinnedToBottom(
   metrics: { scrollTop: number; scrollHeight: number; clientHeight: number },
   threshold: number,
 ): boolean {
-  return metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight <= threshold;
+  return (
+    metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight <= threshold
+  );
 }
 
 /** True when the scroll position sits within `threshold` px of the top. */
@@ -70,10 +87,13 @@ export interface SessionScrollState {
   startIndex: number;
   hasMore: boolean;
   following: boolean;
+  jumpToStart: () => void;
   resumeFollowing: () => void;
 }
 
-export function useSessionScroll(options: SessionScrollOptions): SessionScrollState {
+export function useSessionScroll(
+  options: SessionScrollOptions,
+): SessionScrollState {
   const { total, enabled, windowSize, batchSize, resetKey } = options;
   const bottomThreshold = options.bottomThreshold ?? 64;
   const topThreshold = options.topThreshold ?? 600;
@@ -83,6 +103,7 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
   const followingRef = useRef(true);
   const lastScrollTopRef = useRef(0);
   const anchorHeightRef = useRef<number | null>(null);
+  const scrollStartPendingRef = useRef(false);
   const scrollBottomPendingRef = useRef(true);
   const loadingOlderRef = useRef(false);
   const firstKey = options.firstKey;
@@ -97,8 +118,17 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
   // A prepend grows the window during render, so the commit that mounts the
   // older rows is the one whose layout effect restores the reader's position.
   const [tracked, setTracked] = useState({ resetKey, total, firstKey });
-  if (tracked.resetKey !== resetKey || tracked.total !== total || tracked.firstKey !== firstKey) {
-    if (enabled && tracked.resetKey === resetKey && tracked.firstKey !== firstKey && total > tracked.total) {
+  if (
+    tracked.resetKey !== resetKey ||
+    tracked.total !== total ||
+    tracked.firstKey !== firstKey
+  ) {
+    if (
+      enabled &&
+      tracked.resetKey === resetKey &&
+      tracked.firstKey !== firstKey &&
+      total > tracked.total
+    ) {
       prependedRef.current = true;
       setVisibleCount((count) => count + total - tracked.total);
     }
@@ -119,10 +149,25 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
   }, []);
 
   const resumeFollowing = useCallback(() => {
+    scrollStartPendingRef.current = false;
     followingRef.current = true;
     setFollowing(true);
     scrollToBottom();
   }, [scrollToBottom]);
+
+  const jumpToStart = useCallback(() => {
+    followingRef.current = false;
+    setFollowing(false);
+    anchorHeightRef.current = null;
+    scrollBottomPendingRef.current = false;
+    if (hasMoreRef.current) {
+      scrollStartPendingRef.current = true;
+      setVisibleCount(total);
+    } else if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+      lastScrollTopRef.current = 0;
+    }
+  }, [total]);
 
   // Prepend an older batch, latching until the layout effect settles the prepend so
   // rapid scroll events don't stack multiple batches at once.
@@ -144,6 +189,7 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
     followingRef.current = true;
     setFollowing(true);
     loadingOlderRef.current = false;
+    scrollStartPendingRef.current = false;
     scrollBottomPendingRef.current = true;
   }, [enabled, resetKey, windowSize]);
 
@@ -166,7 +212,11 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!enabled || !el) return;
-    if (scrollBottomPendingRef.current) {
+    if (scrollStartPendingRef.current) {
+      scrollStartPendingRef.current = false;
+      el.scrollTop = 0;
+      lastScrollTopRef.current = 0;
+    } else if (scrollBottomPendingRef.current) {
       scrollBottomPendingRef.current = false;
       anchorHeightRef.current = null;
       scrollToBottom();
@@ -229,5 +279,13 @@ export function useSessionScroll(options: SessionScrollOptions): SessionScrollSt
     return () => observer.disconnect();
   }, [enabled, scrollToBottom]);
 
-  return { scrollRef, contentRef, startIndex, hasMore, following, resumeFollowing };
+  return {
+    scrollRef,
+    contentRef,
+    startIndex,
+    hasMore,
+    following,
+    jumpToStart,
+    resumeFollowing,
+  };
 }

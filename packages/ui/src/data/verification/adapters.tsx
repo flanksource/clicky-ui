@@ -10,6 +10,7 @@ import { StepOutputs } from "./stepKindViews";
 import { verifyNodeTest } from "./verifyReportTests";
 import { UiTerminal } from "../../icons";
 import { hasStepDetail, readStepDetail, stepKindCopy, type WaitDetail } from "./stepKind";
+import { readStepSource, stepSourceCopy } from "./stepSource";
 import {
   createTestRunnerRegistry,
   outcomeFor,
@@ -50,9 +51,13 @@ const checklistAdapter: TestNodeAdapter = {
 };
 
 // A typed step kind (services, todo, …) may report no command or CEL context at
-// all, so `detail.step` claims the node as well.
+// all, so `detail.step` claims the node as well. A "fixture" leaf is a step whose
+// result has not arrived yet (a live or background step): it carries only the
+// execution node, which FixtureDetail renders as a header. Fixture parents
+// (markdown tables, runner steps) have children and stay with the default body.
 function isFixtureNode(node: Test): boolean {
-  return node.context !== undefined || hasStepDetail(node.detail);
+  if (node.context !== undefined || hasStepDetail(node.detail)) return true;
+  return node.framework === "fixture" && (node.children?.length ?? 0) === 0;
 }
 
 // ── Copy sections for fixture steps (exec / query / table / test / lint) ───
@@ -150,10 +155,12 @@ function fixtureCopy(node: Test): CopySections {
   const context = node.context as FixtureContext | undefined;
   const command = context?.command ?? node.command;
   const stepDetail = readStepDetail(node.detail);
+  const source = readStepSource(node.detail);
   return {
     brief: [
       ...commandSection(node, context),
       ...assertionSection(node, context),
+      ...(source.kind === "source" ? stepSourceCopy(source.source) : []),
       ...(stepDetail.kind === "step" ? stepKindCopy(stepDetail.step) : []),
       ...resultsSection(node),
     ],

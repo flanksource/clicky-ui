@@ -2314,6 +2314,23 @@ function DataTableInner<T extends Record<string, unknown>>({
     // Density changes cell padding, so it changes the natural widths too.
   }, [virtualOptions, visibleColumnKeysSignature, rowSelection, density, renderCard]);
 
+  // Expanded-row detail spans every column, so on a table wider than its
+  // container it would wrap at the table's width and scroll sideways with the
+  // columns. Publishing the visible width lets it pin to what the reader sees.
+  useEffect(() => {
+    if (!scrollElement) return;
+    const measure = () =>
+      scrollElement.style.setProperty(
+        "--dt-viewport-w",
+        `${scrollElement.clientWidth}px`,
+      );
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(scrollElement);
+    return () => observer.disconnect();
+  }, [scrollElement]);
+
   // The virtualizer needs the scroll element during render, before a ref would
   // be attached — hence the state-backed setter — while callers may also have
   // asked for the same node via `scrollContainerRef`. Feed both.
@@ -2575,10 +2592,8 @@ function DataTableInner<T extends Record<string, unknown>>({
             <table
               className={cn(
                 renderCard ? "w-full text-left text-sm" : "w-max min-w-full text-left text-sm",
-                // Only once the widths are pinned: switching to fixed layout
-                // before there is anything to fix them to would collapse every
-                // column to an equal share.
-                Object.keys(pinnedColumnWidths).length > 0
+                // Cards own one bounded column; tabular views pin widths after measurement.
+                renderCard || Object.keys(pinnedColumnWidths).length > 0
                   ? "table-fixed"
                   : "table-auto",
               )}
@@ -2798,7 +2813,10 @@ function DataTableInner<T extends Record<string, unknown>>({
                             colSpan={tableColumnCount}
                             className="bg-muted/40 p-density-3"
                           >
-                            <div className="w-0 min-w-full overflow-x-auto rounded-md border border-border bg-background p-density-3">
+                            <div
+                              data-testid="data-table-expansion"
+                              className="sticky left-density-3 w-[calc(var(--dt-viewport-w)-2*var(--spacing-density-3))] overflow-x-auto rounded-md border border-border bg-background p-density-3"
+                            >
                               {item.content}
                             </div>
                           </td>

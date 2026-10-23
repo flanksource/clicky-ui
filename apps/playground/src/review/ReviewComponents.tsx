@@ -238,7 +238,7 @@ export function ReviewVariant({
       >
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         <div className="overflow-x-auto rounded-lg border border-border bg-card p-density-4">
-          {children}
+          <div data-review-content>{children}</div>
         </div>
       </section>
     );
@@ -273,7 +273,7 @@ export function ReviewVariant({
             : "border-border",
         )}
       >
-        {children}
+        <div data-review-content>{children}</div>
       </div>
     </section>
   );

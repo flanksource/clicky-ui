@@ -420,11 +420,11 @@ function compactVerify(
 
 // Presence in the list is what turns committing on, so an empty stanza survives
 // compaction: `commits: [{}]` reads as "one commit at the end of the run with
-// every default". Committing nothing is an absent list, not a stanza of falses.
+// every default". An absent list inherits; an explicit empty list disables commits.
 function compactCommits(
   value: AISpecRuntimeCommit[] | undefined,
 ): AISpecRuntimeCommit[] | undefined {
-  if (!value?.length) return undefined;
+  if (value === undefined) return undefined;
   return value.map(compactCommit);
 }
 

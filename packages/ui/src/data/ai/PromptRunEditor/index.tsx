@@ -24,7 +24,6 @@ import {
 import type { SpecRuntimeSandboxCreateConfig } from "../SandboxCreateWizard.model";
 import type { SpecRuntimeCLIOptions } from "../SpecRuntimeEditor/CLIArgsSection";
 import type {
-  SpecRuntimeHostField,
   SpecRuntimeSandboxCatalog,
   SpecRuntimeSecretSelectorConfig,
   SpecRuntimeTab,
@@ -137,13 +136,6 @@ const MODEL_MODES: { id: PromptRunModelMode; label: string }[] = [
   { id: "multi", label: "Multi-model" },
 ];
 
-// The single-model bar owns the run's timeout and max cost; the model tab only
-// repeats limits that no bar shows.
-const HOST_FIELDS: Record<PromptRunModelMode, SpecRuntimeHostField[]> = {
-  single: ["runtime", "budget.timeout", "budget.cost"],
-  multi: ["runtime"],
-};
-
 // The inline "prompt + variables + runtime" composer shared by captain's prompt
 // workbench and gavel's todo run dialog. It edits Captain's complete prompt-run
 // request without making hosts project that contract into editor-specific state.
@@ -221,24 +213,22 @@ export function PromptRunEditor({
     },
   });
   const barActions: RuntimeBarActionsProps = {
-    fields: specTabs
-      ? []
-      : runtimeSpecFields({
-          value: spec,
-          families,
-          models,
-          effectiveMode: runRuntime.mode,
-          effectiveModel: runRuntime.model,
-          onChange: (next) => onChange({ ...value, spec: next }),
-        }).filter((field) => {
-          const section =
-            field.id === "permissions.mode"
-              ? "permissions"
-              : field.id === "workflow.commits"
-              ? "commit"
-              : "workspace";
-          return !specSections || specSections.includes(section);
-        }),
+    fields: runtimeSpecFields({
+      value: spec,
+      families,
+      models,
+      effectiveMode: runRuntime.mode,
+      effectiveModel: runRuntime.model,
+      onChange: (next) => onChange({ ...value, spec: next }),
+    }).filter((field) => {
+      const section =
+        field.id === "permissions.mode"
+          ? "permissions"
+          : field.id === "workflow.commits"
+            ? "commit"
+            : "workspace";
+      return !specSections || specSections.includes(section);
+    }),
     menu: [
       ...(presets !== undefined || onCreatePreset ? presetMenu.menu : []),
       ...(specTabs
@@ -331,7 +321,6 @@ export function PromptRunEditor({
             ...specTabs,
           ]}
           showHeader={false}
-          hostFields={HOST_FIELDS[modelMode]}
           promptVariant="system"
         />
       ) : (

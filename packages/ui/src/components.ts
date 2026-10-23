@@ -64,6 +64,7 @@ export {
 export { nextTriState, type TriState } from "./components/tri-state";
 export { SearchInput, type SearchInputProps } from "./components/SearchInput";
 export { Switch, type SwitchProps } from "./components/Switch";
+export { Checkbox, type CheckboxProps } from "./components/Checkbox";
 export {
   ScheduleEditor,
   type ScheduleEditorProps,

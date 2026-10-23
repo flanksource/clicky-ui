@@ -18,6 +18,7 @@ type CaptureMediaDevices = MediaDevices & {
 let retainedDisplayStream: MediaStream | undefined;
 let pendingDisplayStream: Promise<MediaStream> | undefined;
 let captureHandle: string | undefined;
+let captureVersion = 0;
 const CAPTURE_TIMEOUT_MS = 10_000;
 
 function stopStream(stream: MediaStream): void {
@@ -91,7 +92,14 @@ function requestDisplayStream(): Promise<MediaStream> {
   retainedDisplayStream = undefined;
   if (pendingDisplayStream) return pendingDisplayStream;
 
-  const request = requestNewDisplayStream().then(retainDisplayStream);
+  const version = captureVersion;
+  const request = requestNewDisplayStream().then((stream) => {
+    if (version !== captureVersion) {
+      stopStream(stream);
+      throw new Error("Screenshot capture session was closed");
+    }
+    return retainDisplayStream(stream);
+  });
   pendingDisplayStream = request;
   void request.then(
     () => {
@@ -102,6 +110,13 @@ function requestDisplayStream(): Promise<MediaStream> {
     },
   );
   return request;
+}
+
+export function releaseScreenshotCapture(): void {
+  captureVersion++;
+  if (retainedDisplayStream) stopStream(retainedDisplayStream);
+  retainedDisplayStream = undefined;
+  pendingDisplayStream = undefined;
 }
 
 function nextPaint(): Promise<void> {

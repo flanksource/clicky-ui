@@ -27,6 +27,7 @@ import { SessionRowTokens } from "./SessionViewer.tokens";
 export function SessionRow({
   event,
   initialPrompt = false,
+  initialPromptSummary,
   last,
   defaultExpanded,
   showRowMetadata = false,
@@ -37,6 +38,7 @@ export function SessionRow({
 }: {
   event: SessionEvent;
   initialPrompt?: boolean;
+  initialPromptSummary?: string;
   last: boolean;
   defaultExpanded: boolean;
   showRowMetadata?: boolean;
@@ -44,14 +46,15 @@ export function SessionRow({
   showRaw?: boolean;
   renderMessageBadge?: ((event: SessionEvent) => ReactNode) | undefined;
   onPendingToolDecision?:
-  | ((decision: SessionToolDecision) => Promise<void> | void)
-  | undefined;
+    | ((decision: SessionToolDecision) => Promise<void> | void)
+    | undefined;
 }) {
   if (event.kind === "user") {
     return (
       <UserRow
         event={event}
         initialPrompt={initialPrompt}
+        {...(initialPromptSummary ? { initialPromptSummary } : {})}
         showRowMetadata={showRowMetadata}
         showRaw={showRaw}
       />
@@ -117,8 +120,8 @@ export function WaitGroupRow({
   showRaw?: boolean;
   renderMessageBadge?: ((event: SessionEvent) => ReactNode) | undefined;
   onPendingToolDecision?:
-  | ((decision: SessionToolDecision) => Promise<void> | void)
-  | undefined;
+    | ((decision: SessionToolDecision) => Promise<void> | void)
+    | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const visual = getSessionAction("Wait");
@@ -170,7 +173,9 @@ export function WaitGroupRow({
               )}
             />
           </button>
-          {showEstimatedToolCost && !open && <EstimatedToolCost events={group.events} />}
+          {showEstimatedToolCost && !open && (
+            <EstimatedToolCost events={group.events} />
+          )}
         </div>
         {showRowMetadata && (
           <EventMetadata
@@ -195,7 +200,9 @@ export function WaitGroupRow({
             ))}
           </ol>
         )}
-        {open && showEstimatedToolCost && <EstimatedToolCost events={group.events} detailed />}
+        {open && showEstimatedToolCost && (
+          <EstimatedToolCost events={group.events} detailed />
+        )}
       </div>
     </li>
   );
@@ -204,27 +211,91 @@ export function WaitGroupRow({
 function UserRow({
   event,
   initialPrompt,
+  initialPromptSummary,
   showRowMetadata,
   showRaw,
 }: {
   event: SessionEvent;
   initialPrompt: boolean;
+  initialPromptSummary?: string;
   showRowMetadata: boolean;
   showRaw: boolean;
 }) {
+  const [expanded, setExpanded] = useState(!initialPromptSummary);
   return (
     <li
       data-event-kind="user"
       className="relative flex justify-end pb-density-4 last:pb-0"
     >
-      <div className={cn("flex max-w-full items-start gap-density-2 @min-[48rem]/session-viewer:gap-density-3", !initialPrompt && "@min-[48rem]/session-viewer:max-w-[85%]")}>
+      <div
+        className={cn(
+          "flex max-w-full items-start gap-density-2 @min-[48rem]/session-viewer:gap-density-3",
+          !initialPrompt && "@min-[48rem]/session-viewer:max-w-[85%]",
+        )}
+      >
         <div className="min-w-0">
-          <div className="mb-0.5 text-right text-xs font-medium text-muted-foreground">
-            {initialPrompt ? "Initial prompt" : "You"}
-          </div>
-          <div className="min-w-0 break-words rounded-lg bg-accent px-density-3 py-density-2 text-left text-sm leading-relaxed text-accent-foreground">
-            {event.file ? <MessageFilePart part={event.file} /> : event.text && <Markdown text={event.text} />}
-          </div>
+          {initialPrompt && initialPromptSummary ? (
+            <button
+              type="button"
+              aria-label={`Initial prompt · ${initialPromptSummary}`}
+              aria-expanded={expanded}
+              onClick={() => setExpanded((open) => !open)}
+              className="block min-w-0 max-w-full text-right"
+            >
+              <span className="mb-0.5 block text-xs font-medium text-muted-foreground">
+                Initial prompt
+              </span>
+              <span className="flex items-start gap-2 break-words rounded-lg px-density-3 py-density-2 text-left text-sm leading-relaxed text-foreground hover:underline">
+                <span className="min-w-0 flex-1 font-medium">
+                  {initialPromptSummary}
+                </span>
+                <Icon
+                  icon={UiChevronDown}
+                  className={cn(
+                    "mt-0.5 size-3.5 shrink-0 transition-transform",
+                    expanded && "rotate-180",
+                  )}
+                />
+              </span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              aria-label={
+                initialPrompt
+                  ? "Toggle initial prompt message"
+                  : "Toggle user message"
+              }
+              aria-expanded={expanded}
+              onClick={() => setExpanded((open) => !open)}
+              className="mb-0.5 flex w-full items-center justify-end gap-1 text-right text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              {initialPrompt ? "Initial prompt" : "You"}
+              <Icon
+                icon={UiChevronDown}
+                className={cn(
+                  "size-3 shrink-0 transition-transform",
+                  expanded && "rotate-180",
+                )}
+              />
+            </button>
+          )}
+          {expanded && (
+            <div
+              className={cn(
+                "min-w-0 break-words rounded-lg px-density-3 py-density-2 text-left text-sm leading-relaxed",
+                initialPrompt
+                  ? "text-foreground"
+                  : "bg-accent text-accent-foreground",
+              )}
+            >
+              {event.file ? (
+                <MessageFilePart part={event.file} />
+              ) : (
+                event.text && <Markdown text={event.text} />
+              )}
+            </div>
+          )}
           {showRowMetadata && <EventMetadata event={event} align="right" />}
           <SessionRowTokens event={event} />
           {showRaw && event.raw !== undefined && (
@@ -327,8 +398,8 @@ function EventBody({
   showEstimatedToolCost: boolean;
   messageBadge?: ReactNode;
   onPendingToolDecision?:
-  | ((decision: SessionToolDecision) => Promise<void> | void)
-  | undefined;
+    | ((decision: SessionToolDecision) => Promise<void> | void)
+    | undefined;
 }) {
   if (event.kind === "tool")
     return (
@@ -353,13 +424,37 @@ function MessageBody({
   event: SessionEvent;
   badge?: ReactNode;
 }) {
+  const [expanded, setExpanded] = useState(true);
   return (
-    <div className="flex items-start gap-1.5">
-      {badge}
-      <div className="min-w-0 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-foreground">
-        {event.file && <MessageFilePart part={event.file} />}
-        {event.text && <Markdown text={event.text} />}
-      </div>
+    <div className="min-w-0">
+      <button
+        type="button"
+        aria-label="Toggle assistant message"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((open) => !open)}
+        className="mb-0.5 flex w-full min-w-0 items-center gap-1.5 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+      >
+        {badge}
+        <span className="shrink-0">Agent</span>
+        {!expanded && event.text && (
+          <span className="min-w-0 flex-1 truncate font-normal">
+            {event.text.split("\n", 1)[0]}…
+          </span>
+        )}
+        <Icon
+          icon={UiChevronDown}
+          className={cn(
+            "ml-auto size-3 shrink-0 transition-transform",
+            expanded && "rotate-180",
+          )}
+        />
+      </button>
+      {expanded && (
+        <div className="min-w-0 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-foreground">
+          {event.file && <MessageFilePart part={event.file} />}
+          {event.text && <Markdown text={event.text} />}
+        </div>
+      )}
     </div>
   );
 }
@@ -426,9 +521,30 @@ function ThinkingBody({ event }: { event: SessionEvent }) {
 }
 
 function ErrorBody({ event }: { event: SessionEvent }) {
+  const [open, setOpen] = useState(true);
   return (
-    <div className="rounded-md border border-rose-200 bg-rose-50 px-density-3 py-1.5 text-xs text-rose-700 [[data-theme=dark]_&]:border-rose-500/30 [[data-theme=dark]_&]:bg-rose-500/10 [[data-theme=dark]_&]:text-rose-300">
-      {event.text}
+    <div>
+      <button
+        type="button"
+        aria-label="Toggle error details"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="mb-1 flex w-full items-center gap-1 text-left text-xs font-medium text-rose-700 [[data-theme=dark]_&]:text-rose-300"
+      >
+        Error
+        <Icon
+          icon={UiChevronDown}
+          className={cn(
+            "ml-auto size-3 shrink-0 transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {open && (
+        <div className="rounded-md border border-rose-200 bg-rose-50 px-density-3 py-1.5 text-xs text-rose-700 [[data-theme=dark]_&]:border-rose-500/30 [[data-theme=dark]_&]:bg-rose-500/10 [[data-theme=dark]_&]:text-rose-300">
+          {event.text}
+        </div>
+      )}
     </div>
   );
 }

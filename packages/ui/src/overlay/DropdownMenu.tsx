@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Slot } from "@radix-ui/react-slot";
 import {
   autoUpdate,
   flip,
@@ -22,7 +23,11 @@ import { cn } from "../lib/utils";
 import { Button, type ButtonProps } from "../components/button";
 import { Icon, type StaticIconComponent } from "../data/Icon";
 import { UiChevronDown } from "../icons";
-import { MENU_POPOVER_CLASS, MenuContext } from "./dropdownMenuContext";
+import {
+  MENU_POPOVER_CLASS,
+  MenuContext,
+  menuViewportSize,
+} from "./dropdownMenuContext";
 import { MenuItemList } from "./DropdownMenuSubmenu";
 import { useEscapeLayer, useFloatingZIndex } from "./modalStack";
 
@@ -68,7 +73,7 @@ export type DropdownMenuProps = {
   variant?: ButtonProps["variant"];
   /** Size forwarded to the default Button trigger. */
   size?: ButtonProps["size"];
-  /** Fully custom trigger. Receives no props; the menu wraps it with open state. */
+  /** Custom trigger element. Its root receives menu state and interaction props. */
   trigger?: ReactNode;
   /** Declarative menu items. Provide this or `children`, not both. */
   items?: DropdownMenuItem[];
@@ -146,7 +151,12 @@ function DropdownMenuRoot({
     whileElementsMounted: autoUpdate,
     // offset(4) ≈ the previous mt-1; flip opens upward at the bottom edge and
     // shift slides the menu back on-screen at the horizontal edges.
-    middleware: [offset(4), flip({ padding: 8 }), shift({ padding: 8 })],
+    middleware: [
+      offset(4),
+      flip({ padding: 8 }),
+      shift({ padding: 8 }),
+      menuViewportSize,
+    ],
   });
 
   const click = useClick(context);
@@ -192,7 +202,7 @@ function DropdownMenuRoot({
     <FloatingNode id={nodeId}>
       <div className={cn("relative inline-flex", className)}>
         {trigger ? (
-          <span
+          <Slot
             ref={refs.setReference}
             className="inline-flex"
             aria-haspopup="menu"
@@ -200,7 +210,7 @@ function DropdownMenuRoot({
             {...getReferenceProps()}
           >
             {trigger}
-          </span>
+          </Slot>
         ) : (
           <Button
             ref={refs.setReference as React.Ref<HTMLButtonElement>}

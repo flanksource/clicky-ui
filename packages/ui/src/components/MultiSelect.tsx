@@ -13,6 +13,7 @@ import {
   useRole,
 } from "@floating-ui/react";
 import { Button } from "./button";
+import { Select } from "./select";
 import { cn } from "../lib/utils";
 import { Icon, type LabelIconSpec } from "../data/Icon";
 import { UiChevronDown, UiChevronUp } from "../icons";
@@ -39,6 +40,8 @@ export type MultiSelectOption = {
    * rather than this component drawing it itself.
    */
   count?: number;
+  /** Facet values used to filter the available choices without changing selection. */
+  facets?: Record<string, string>;
 };
 
 export type MultiSelectProps = {
@@ -62,6 +65,8 @@ export type MultiSelectProps = {
   triggerClassName?: string;
   /** Classes applied to the popover menu. */
   menuClassName?: string;
+  /** Named facets displayed above the choices, with counts computed from all options. */
+  facets?: { key: string; label: string; labels?: Record<string, string> }[];
 };
 
 export function MultiSelect({
@@ -74,8 +79,11 @@ export function MultiSelect({
   className,
   triggerClassName,
   menuClassName,
+  facets = [],
 }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
+  const [facetValues, setFacetValues] = useState<Record<string, string>>({});
+  const filtered = options.filter((option) => facets.every((facet) => !facetValues[facet.key] || option.facets?.[facet.key] === facetValues[facet.key]));
 
   // Portaled (floating-ui) so the menu escapes `overflow` clipping from
   // scroll-container ancestors, matching Combobox/DropdownMenu.
@@ -165,8 +173,25 @@ export function MultiSelect({
               Clear all
             </button>
           </div>
+          {facets.length > 0 && <div className="space-y-2 border-b border-border px-2 pb-2">
+            {facets.map((facet) => {
+              const counts = new Map<string, number>();
+              for (const option of options) {
+                const value = option.facets?.[facet.key];
+                if (value !== undefined) counts.set(value, (counts.get(value) ?? 0) + 1);
+              }
+              return <div key={facet.key} className="space-y-1">
+                <span className="text-xs font-medium">{facet.label}</span>
+                <Select aria-label={facet.label} value={facetValues[facet.key] ?? ""}
+                  onChange={(event) => setFacetValues((previous) => ({ ...previous, [facet.key]: event.target.value }))}
+                  options={[{ value: "", label: `All (${options.length})` }, ...[...counts].map(([value, count]) => ({ value, label: `${facet.labels?.[value] ?? value} (${count})` }))]} />
+              </div>;
+            })}
+            <Button type="button" variant="ghost" size="sm" onClick={() => onChange([...new Set([...value, ...filtered.filter((option) => !option.disabled).map((option) => option.value)])])}>Select all shown</Button>
+          </div>}
           <div className="max-h-64 overflow-auto">
-            {options.map((option) => {
+            {filtered.length === 0 && <p role="status" className="px-2 py-3 text-sm text-muted-foreground">No matching options</p>}
+            {filtered.map((option) => {
               const checked = value.includes(option.value);
               return (
                 <label

@@ -46,7 +46,7 @@ function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
+export async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (
     !(response.headers.get("content-type") ?? "").includes("application/json")
@@ -87,6 +87,7 @@ export async function fetchComments(
 export type PlaygroundComments = {
   comments: PlaygroundComment[];
   allComments: PageComment[];
+  loading: boolean;
   /** Surfaced as a banner — a broken backend must never look like "no comments". */
   error: string | null;
   create: (input: CommentCreateInput, actionId?: string) => Promise<void>;
@@ -106,9 +107,23 @@ export type PlaygroundComments = {
 export function useComments(
   page: string,
   contentRef: RefObject<HTMLDivElement | null>,
+  options: {
+    enabled?: boolean;
+    poll?: boolean;
+    capture?: (
+      input: CommentCreateInput,
+      actionId: string,
+    ) => Promise<CommentElementCaptureContext>;
+  } = {},
 ): PlaygroundComments {
+  const captureRef = useRef(options.capture);
+  captureRef.current = options.capture;
+  const enabled = options.enabled !== false;
+  const pageRef = useRef(page);
+  pageRef.current = page;
   const [comments, setComments] = useState<PlaygroundComment[]>([]);
   const [allComments, setAllComments] = useState<PageComment[]>([]);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
   const preparedSelection = useRef<{
     page: string;
@@ -142,24 +157,42 @@ export function useComments(
   );
 
   const refresh = useCallback(async () => {
+    if (!enabled) return;
     try {
       const [pageComments, everyComment] = await Promise.all([
-        fetchComments({ page }),
+        page === "" ? Promise.resolve([]) : fetchComments({ page }),
         fetchComments(),
       ]);
+      if (pageRef.current !== page) return;
       setComments(pageComments);
       setAllComments(everyComment);
       setError(null);
     } catch (cause) {
+      if (pageRef.current !== page) return;
       setError(describeError(cause));
+    } finally {
+      if (pageRef.current === page) setLoading(false);
     }
-  }, [page]);
+  }, [page, enabled]);
 
   useEffect(() => {
     setComments([]);
     preparedSelection.current = null;
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!enabled || !options.poll) return;
+    const update = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    const timer = window.setInterval(update, 5000);
+    window.addEventListener("focus", update);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", update);
+    };
+  }, [enabled, options.poll, refresh]);
 
   const mutate = useCallback(
     async (
@@ -196,6 +229,18 @@ export function useComments(
             throw new Error(
               `Unknown comment create action ${JSON.stringify(actionId)}`,
             );
+          }
+          if (captureRef.current) {
+            const element = await captureRef.current(input, actionId);
+            await post(COMMENTS_ROUTE, {
+              page,
+              body: input.body,
+              author: PLAYGROUND_COMMENT_AUTHOR,
+              anchor: input.anchor ?? null,
+              ...(input.rating ? { rating: input.rating } : {}),
+              element,
+            });
+            return;
           }
           const anchor = input.anchor ?? null;
           const content = contentRef.current;
@@ -344,10 +389,11 @@ export function useComments(
 
   const remove = useCallback(
     (id: string) =>
-      mutate(() =>
-        request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, {
+      mutate(
+        () => request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, {
           method: "DELETE",
         }),
+        { rethrow: true },
       ),
     [mutate],
   );
@@ -355,6 +401,7 @@ export function useComments(
   return {
     comments,
     allComments,
+    loading,
     error,
     create,
     prepareSelection,

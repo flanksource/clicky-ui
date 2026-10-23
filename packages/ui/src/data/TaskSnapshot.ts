@@ -87,6 +87,8 @@ export interface TaskExecDetails {
 }
 
 export interface TaskSnapshot {
+  /** Stable identities of tasks that must finish before this task starts. */
+  dependencyIds?: string[];
   id: string;
   name: string;
   /** "task" or "group". */

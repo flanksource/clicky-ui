@@ -14,7 +14,7 @@ import { EnvironmentAdvanced, EnvironmentSection } from "./EnvironmentSection";
 import { Footer } from "./Footer";
 import { ModelContextAdvanced } from "./ModelContextAdvanced";
 import { ModelAdvanced, ModelSection } from "./ModelSection";
-import { PermissionsAdvanced, PermissionsSection } from "./PermissionsSection";
+import { PermissionsSection } from "./PermissionsSection";
 import { PromptAdvanced, PromptSection } from "./PromptSection";
 import { Rail } from "./Rail";
 import { SandboxSection } from "./SandboxSection";
@@ -32,7 +32,6 @@ import { summarizeTarget } from "./summaries";
 import {
   SPEC_RUNTIME_SECTIONS,
   type SpecRuntimeSandboxCatalog,
-  type SpecRuntimeHostField,
   type SpecRuntimeSecretSelectorConfig,
   type SpecRuntimeTab,
   type SpecSectionId,
@@ -62,7 +61,6 @@ export type {
   SpecRuntimeSandboxBackend,
   SpecRuntimeSandboxCatalog,
   SpecRuntimeSandboxKind,
-  SpecRuntimeHostField,
   SpecRuntimeSecretSelectorConfig,
   SpecRuntimeTab,
 } from "./types";
@@ -77,7 +75,7 @@ export type SpecRuntimeEditorProps = {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
   models?: ChatModel[] | undefined;
-  /** Provider families for the two-axis Family → Mode picker in the model section. */
+  /** Runtime catalog used to determine which detailed fields are supported. */
   families?: SpecRuntimeFamily[] | undefined;
   /** Resolved mode used to validate posture when this editable layer inherits it. */
   effectiveMode?: string | undefined;
@@ -101,8 +99,6 @@ export type SpecRuntimeEditorProps = {
   /** Controlled active tab id; falls back to the first visible tab when filtered out. */
   activeTab?: string | undefined;
   onActiveTabChange?: ((id: string) => void) | undefined;
-  /** Model fields the host renders beside the editor; the Model section omits them. */
-  hostFields?: readonly SpecRuntimeHostField[] | undefined;
   /**
    * `document` presents prompt.user as a complete .prompt body; `system` omits
    * prompt.user for hosts that edit it in their own composer.
@@ -121,9 +117,8 @@ export type SpecRuntimeEditorProps = {
   defaultCollapsedSections?: readonly SpecSectionId[] | undefined;
   /**
    * Commit stanza(s) inherited from a lower spec layer (e.g. the lifecycle
-   * step's own workflow), shown in the Commit section as the current
-   * selection — clearly marked inherited — only while the operator has not
-   * set `value.workflow.commits` at all.
+   * step's own workflow). Determines whether commit message details apply
+   * while the editable layer has no explicit policy.
    */
   inheritedCommits?: AISpecRuntimeCommit[] | undefined;
   /** Restrict task-owned fields when editing a reusable preset fragment. */
@@ -137,7 +132,7 @@ export type SpecRuntimeEditorProps = {
 };
 
 const ADVANCED_HINTS: Partial<Record<SpecSectionId, string>> = {
-  model: "fallbacks, session, caching, memory, skills",
+  model: "fallbacks, caching, memory, skills",
   prompt: "schema",
   permissions: "tools, MCP, plugins",
   environment: "dotenv files",
@@ -169,7 +164,6 @@ export function SpecRuntimeEditor({
   tabs,
   activeTab,
   onActiveTabChange,
-  hostFields,
   promptVariant = "runtime",
   readOnly = false,
   className,
@@ -241,17 +235,20 @@ export function SpecRuntimeEditor({
       supports(`permissions.${entry.domain}`),
   );
   const hasPermissionSection =
-    supports("permissions.mode") ||
     (skillsSection === "permissions" && supports("permissions.skills")) ||
     (["tools", "mcp", "plugins"] as const).some((domain) =>
       supports(`permissions.${domain}`),
     );
 
   if (tabs && sectionFilter) {
-    throw new Error("SpecRuntimeEditor: pass either sections or tabs, not both");
+    throw new Error(
+      "SpecRuntimeEditor: pass either sections or tabs, not both",
+    );
   }
   const requestedSections = useMemo(() => {
-    const ids = tabs ? tabs.flatMap((tab) => tab.sections ?? []) : sectionFilter;
+    const ids = tabs
+      ? tabs.flatMap((tab) => tab.sections ?? [])
+      : sectionFilter;
     if (!ids) return SPEC_RUNTIME_SECTIONS;
     return ids.map((id) => {
       const section = SPEC_RUNTIME_SECTIONS.find(
@@ -294,17 +291,7 @@ export function SpecRuntimeEditor({
   const sectionBody = (id: SpecSectionId): ReactNode => {
     switch (id) {
       case "model":
-        return (
-          <ModelSection
-            value={value}
-            onChange={commitChange}
-            models={models}
-            effectiveMode={effectiveMode}
-            effectiveModel={effectiveModel}
-            families={runtimeFamilies}
-            {...(hostFields ? { hostFields } : {})}
-          />
-        );
+        return <ModelSection models={models} families={runtimeFamilies} />;
       case "prompt":
         return (
           <PromptSection
@@ -335,15 +322,15 @@ export function SpecRuntimeEditor({
           />
         ) : null;
       case "permissions":
-        return supports("permissions") ? (
+        return (
           <PermissionsSection
-            value={value}
-            onChange={commitChange}
-            families={runtimeFamilies}
-            {...(runtimeSchema ? { schema: runtimeSchema } : {})}
-            effectiveMode={effectiveMode}
+            entries={permissionEntries}
+            onApplyEntries={applyEntries}
+            onAddEntry={addEntry}
+            includeSkills={skillsSection === "permissions"}
+            supports={supports}
           />
-        ) : null;
+        );
       case "environment":
         return (
           <EnvironmentSection
@@ -388,6 +375,7 @@ export function SpecRuntimeEditor({
         return (
           <div className="grid gap-density-3">
             <ModelAdvanced
+              variant={variant}
               value={value}
               onChange={commitChange}
               models={models}
@@ -409,16 +397,6 @@ export function SpecRuntimeEditor({
         return supports("prompt.schema") ? (
           <PromptAdvanced value={value} onChange={commitChange} />
         ) : undefined;
-      case "permissions":
-        return (
-          <PermissionsAdvanced
-            entries={permissionEntries}
-            onApplyEntries={applyEntries}
-            onAddEntry={addEntry}
-            includeSkills={skillsSection === "permissions"}
-            supports={supports}
-          />
-        );
       case "environment":
         return variant === "run" ? (
           <EnvironmentAdvanced value={value} onChange={commitChange} />
@@ -481,8 +459,8 @@ export function SpecRuntimeEditor({
             role="alert"
             className="mb-density-3 rounded-md border border-destructive/40 bg-destructive/10 px-density-3 py-density-2 text-sm text-destructive"
           >
-            {runtimeError} Select a valid mode below or switch to Raw to repair
-            the prompt source.
+            {runtimeError} Select a valid mode in the runtime bar or switch to
+            Raw to repair the prompt source.
           </div>
         ) : null}
         {beforeSections}
@@ -492,11 +470,15 @@ export function SpecRuntimeEditor({
             sections={sections}
             activeTab={activeTab}
             onActiveTabChange={onActiveTabChange}
-            renderSection={(section, { bare }) => sectionCard(section, { bare })}
+            renderSection={(section, { bare }) =>
+              sectionCard(section, { bare })
+            }
           />
         ) : (
           sections.map((section, index) =>
-            sectionCard(section, { number: String(index + 1).padStart(2, "0") }),
+            sectionCard(section, {
+              number: String(index + 1).padStart(2, "0"),
+            }),
           )
         )}
       </div>

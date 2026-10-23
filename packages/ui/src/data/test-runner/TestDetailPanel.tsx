@@ -20,6 +20,7 @@ import {
 } from "../../icons";
 import type { Test } from "./types";
 import { useTestRunner } from "./context";
+import { DetailTabSelectProvider } from "./detailTabContext";
 import { buildNodeBrief, buildNodeJson, type CopyItem } from "./copy";
 import { formatTestDuration, outcomeFor, sum } from "./status";
 import { toolKeyFor } from "./marks";
@@ -226,9 +227,13 @@ export function TestDetailPanel() {
   const tabs = runner.adapters.resolveTabs(node, runner);
   const ownsScroll = runner.adapters.ownsScroll(node, runner);
 
-  const body = detailAdapter?.renderDetail
-    ? detailAdapter.renderDetail({ node, runner })
-    : <DefaultDetailBody node={node} />;
+  const body = (
+    <DetailTabSelectProvider value={setActiveTab}>
+      {detailAdapter?.renderDetail
+        ? detailAdapter.renderDetail({ node, runner })
+        : <DefaultDetailBody node={node} />}
+    </DetailTabSelectProvider>
+  );
   const actions = actionAdapter?.nodeActions?.({ node: selected, runner });
 
   // A size container, so log blocks can cap themselves at a share of the pane (cqh).

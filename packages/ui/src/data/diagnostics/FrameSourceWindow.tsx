@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { highlightToLines, type HighlightedLine } from "../code-highlight";
 import { HighlightedTokens } from "../HighlightedTokens";
@@ -20,9 +20,16 @@ export function FrameSourceWindow({
   frame,
   className,
   focalTone = "error",
+  markers,
 }: {
   frame: FrameSource;
   className?: string;
+  /**
+   * Lines to point at besides the focal one, each with an annotation painted
+   * under its code — e.g. the calls a caller's source makes. A marked line
+   * takes the neutral highlight.
+   */
+  markers?: { line: number; content: ReactNode }[];
   /**
    * Styling for the focal line. `"error"` (the default, so existing callers
    * render unchanged) is the red highlight meaning "this line failed".
@@ -59,10 +66,10 @@ export function FrameSourceWindow({
 
   if (lines.length === 0) return null;
 
+  const neutralClassName = "bg-primary/10 font-semibold text-foreground";
   const focalClassName =
-    focalTone === "neutral"
-      ? "bg-primary/10 font-semibold text-foreground"
-      : "bg-red-500/10 font-semibold text-red-800 dark:text-red-300";
+    focalTone === "neutral" ? neutralClassName : "bg-red-500/10 font-semibold text-red-800 dark:text-red-300";
+  const markerAt = new Map(markers?.map((marker) => [marker.line, marker.content]));
 
   return (
     <div
@@ -75,21 +82,30 @@ export function FrameSourceWindow({
         const lineNumber = numbers?.[i] ?? start + i;
         const known = numbers === undefined || lineNumber > 0;
         const isFocal = known && lineNumber === focal;
+        const marker = known ? markerAt.get(lineNumber) : undefined;
         return (
           <div
             key={`${lineNumber}-${i}`}
+            data-source-line={known ? lineNumber : undefined}
+            data-marked={marker === undefined ? undefined : "true"}
             className={[
               "grid min-w-max grid-cols-[3.5rem_minmax(24rem,1fr)] gap-3 px-2",
-              isFocal ? focalClassName : "text-foreground",
+              isFocal ? focalClassName : marker !== undefined ? neutralClassName : "text-foreground",
             ].join(" ")}
           >
             <span className="select-none text-right text-muted-foreground">
-              {isFocal ? ">" : ""}
+              {isFocal || marker !== undefined ? ">" : ""}
               {known ? lineNumber : ""}
             </span>
             <code className="whitespace-pre">
               {source ? <HighlightedTokens tokens={tokens?.[i]} content={source} /> : " "}
             </code>
+            {/* Under the line rather than after it: a long line would push it past the window's scroll edge. */}
+            {marker !== undefined ? (
+              <span data-source-marker className="col-start-2 -mt-0.5 mb-0.5 font-sans font-normal">
+                {marker}
+              </span>
+            ) : null}
           </div>
         );
       })}

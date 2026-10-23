@@ -6,6 +6,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { externalUrl } from "../src/bookmarklet/model";
 
 import {
   COMMENT_ELEMENT_HTML_LIMIT,
@@ -35,6 +36,12 @@ export type StoredAuthor = {
   id?: string;
   name: string;
   kind?: "user" | "agent";
+  /** The agent that posted on `name`'s behalf, when another agent wrote the text. */
+  via?: string;
+  /** The session that produced the text, so the run can be inspected later. */
+  sessionId?: string;
+  /** AI response cost in USD for producing the text. */
+  cost?: number;
 };
 
 export type StoredComment = {
@@ -183,6 +190,7 @@ export function assertElementContext(input: unknown): CommentElementContext {
   const candidate = input as Record<string, unknown>;
   const allowedFields = new Set([
     "componentName",
+    "pageUrl",
     "source",
     "html",
     "screenshot",
@@ -196,6 +204,12 @@ export function assertElementContext(input: unknown): CommentElementContext {
     );
   }
   const source = candidate["source"];
+  if (candidate["pageUrl"] !== undefined) {
+    if (typeof candidate["pageUrl"] !== "string") {
+      throw new Error("comment element pageUrl must be a URL string");
+    }
+    externalUrl(candidate["pageUrl"]);
+  }
   const html = candidate["html"];
   if (typeof source !== "string" || source === "") {
     throw new Error("comment element source must be a non-empty string");

@@ -19,6 +19,8 @@ import { contentWidthClassName, type ContentWidth } from "./content-width";
 // scrolls independently via a resizable SplitPane).
 
 export type AppShellNavItem = {
+  /** Additional searchable text for a tree destination. */
+  searchText?: string;
   /** Stable key; also the React key. */
   key: string;
   /** Visible label (hidden when the rail is collapsed). */
@@ -57,7 +59,7 @@ export type AppShellNavGroup = {
   /**
    * Keeps the group open regardless of stored state, so a deep-linked
    * destination can never hide under a folder the user collapsed earlier.
-   * Mirrors `Tree.revealSelected`: set it on the active item's ancestors.
+   * Set it on the active item's ancestors.
    */
   forceExpanded?: boolean;
   items: AppShellNavItem[];
@@ -77,6 +79,10 @@ export type AppShellNavGroup = {
 };
 
 export type AppShellNavSection = {
+  /** Show a loading message instead of an empty tree while data is being fetched. */
+  loading?: boolean;
+  /** Optional controlled search for tree navigation. */
+  search?: { value: string; onChange: (value: string) => void; label?: string };
   /** Section heading; collapses to a divider when the rail is collapsed. */
   label?: string;
   items?: AppShellNavItem[];
@@ -312,6 +318,7 @@ export function AppShell(props: AppShellProps) {
       {hasSidebar && (
         <aside
           data-slot="app-shell-sidebar"
+          data-collapsed={collapsed}
           style={{ width: railWidth }}
           className={cn(
             "hidden shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 md:flex",

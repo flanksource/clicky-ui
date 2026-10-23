@@ -4,6 +4,7 @@ import {
   type RuntimePresetSpec,
 } from "../runtime-profile";
 import { SpecRuntimeEditor } from "../SpecRuntimeEditor";
+import { SpecRuntimeBar } from "../SpecRuntimeBar";
 import type {
   SpecRuntimeSandboxCatalog,
   SpecRuntimeSecretSelectorConfig,
@@ -31,6 +32,14 @@ export function PresetSpecEditor({
       {...(secretSelector ? { secretSelector } : {})}
       variant="preset"
       showHeader={false}
+      beforeSections={
+        <SpecRuntimeBar
+          value={value}
+          onChange={(spec) => onChange(projectRuntimePresetSpec(spec))}
+          families={families}
+          variant="preset"
+        />
+      }
     />
   );
 }

@@ -14,6 +14,7 @@ import {
   UiRemove,
 } from "../../icons";
 import type { IconComponent } from "../../icons/types";
+import { Checkbox } from "../../components/Checkbox";
 import { CodeDiff, type DiffLineTarget, type DiffLineWidget } from "../CodeDiff";
 import { languageFromPath } from "../code-highlight";
 import { dateKey, formatFallbackTime, formatGitCommitDateHeader } from "./git-dates";
@@ -82,15 +83,37 @@ export type GitDiffPanelProps = {
   lineWidgets?: DiffLineWidget[];
 };
 
-export type GitCommitListProps = {
-  commits: GitCommitItem[];
-  loadDiff?: GitDiffLoader<GitCommitItem>;
+type GitCommitListBaseProps<T extends GitCommitItem> = {
+  commits: T[];
   renderTime?: (iso: string) => ReactNode;
   groupByDate?: boolean;
   emptyLabel?: string;
   className?: string;
   diffMaxHeightClassName?: string;
+  /** SHAs whose leading checkbox is checked. Only read when `onToggleSelect` is set. */
+  selectedShas?: string[];
+  /** Renders a leading checkbox per commit; called with the commit whose box was toggled. */
+  onToggleSelect?: (commit: T) => void;
+  /** Accessible name of a commit's checkbox. Defaults to `Select commit <short sha>`. */
+  selectLabel?: (commit: T) => string;
+  /** Why a commit cannot be selected; its checkbox is then disabled with the reason as its tooltip. */
+  selectBlockReason?: (commit: T) => string | null | undefined;
+  /** Inline badges rendered after the commit title. */
+  renderBadges?: (commit: T) => ReactNode;
+  /** An extra line rendered between the title and the author/time line. */
+  renderSubtitle?: (commit: T) => ReactNode;
 };
+
+// The expanded body is either the lazily loaded unified diff (`loadDiff` →
+// `GitDiffPanel`) or a host-rendered node (`renderExpanded`), never both.
+// `renderExpanded` is only called while the row is expanded, so a host
+// component it returns can fetch on mount.
+type GitCommitListBody<T extends GitCommitItem> =
+  | { loadDiff?: GitDiffLoader<T>; renderExpanded?: never }
+  | { renderExpanded: (commit: T) => ReactNode; loadDiff?: never };
+
+export type GitCommitListProps<T extends GitCommitItem = GitCommitItem> =
+  GitCommitListBaseProps<T> & GitCommitListBody<T>;
 
 export type GitFileListProps = {
   files: GitFileChangeItem[];
@@ -100,10 +123,10 @@ export type GitFileListProps = {
   diffMaxHeightClassName?: string;
 };
 
-type CommitGroup = {
+type CommitGroup<T extends GitCommitItem> = {
   key: string;
   label: string;
-  commits: GitCommitItem[];
+  commits: T[];
 };
 
 const DIFF_INITIAL_STATE: DiffState = {
@@ -122,9 +145,9 @@ function isActivationKey(event: KeyboardEvent<HTMLDivElement>): boolean {
   return event.key === "Enter" || event.key === " ";
 }
 
-function groupCommits(commits: GitCommitItem[], enabled: boolean): CommitGroup[] {
+function groupCommits<T extends GitCommitItem>(commits: T[], enabled: boolean): CommitGroup<T>[] {
   if (!enabled) return [{ key: "all", label: "", commits }];
-  const groups: CommitGroup[] = [];
+  const groups: CommitGroup<T>[] = [];
   const indexByKey = new Map<string, number>();
   for (const commit of commits) {
     const key = dateKey(commit.committedAt);
@@ -259,20 +282,35 @@ export function GitDiffPanel({
   );
 }
 
-function CommitRow({
+// Every optional CommitRow input, resolved once by GitCommitList so the row
+// receives a single object instead of a dozen conditional spreads.
+type CommitRowSlots<T extends GitCommitItem> = {
+  loadDiff: GitDiffLoader<T> | undefined;
+  renderExpanded: ((commit: T) => ReactNode) | undefined;
+  renderTime: ((iso: string) => ReactNode) | undefined;
+  renderBadges: ((commit: T) => ReactNode) | undefined;
+  renderSubtitle: ((commit: T) => ReactNode) | undefined;
+  onToggleSelect: ((commit: T) => void) | undefined;
+  selectLabel: ((commit: T) => string) | undefined;
+  selectBlockReason: ((commit: T) => string | null | undefined) | undefined;
+  diffMaxHeightClassName: string | undefined;
+};
+
+function CommitRow<T extends GitCommitItem>({
   commit,
-  loadDiff,
-  renderTime,
-  diffMaxHeightClassName,
+  selected,
+  slots,
 }: {
-  commit: GitCommitItem;
-  loadDiff?: GitDiffLoader<GitCommitItem>;
-  renderTime?: (iso: string) => ReactNode;
-  diffMaxHeightClassName?: string;
+  commit: T;
+  selected: boolean;
+  slots: CommitRowSlots<T>;
 }) {
+  const { loadDiff, renderExpanded, renderTime, renderBadges, renderSubtitle, onToggleSelect } = slots;
   const [expanded, diffState, toggle] = useLazyDiff(commit, loadDiff);
   const author = displayAuthor(commit);
-  const canExpand = Boolean(loadDiff || commit.body);
+  const canExpand = Boolean(loadDiff || renderExpanded || commit.body);
+  const selectable = onToggleSelect !== undefined;
+  const selectBlocked = selectable ? slots.selectBlockReason?.(commit) || undefined : undefined;
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (!canExpand || !isActivationKey(event)) return;
@@ -281,66 +319,88 @@ function CommitRow({
   }
 
   return (
-    <div>
-      <div
-        role={canExpand ? "button" : undefined}
-        tabIndex={canExpand ? 0 : undefined}
-        className={cn(
-          "flex min-h-14 items-start gap-2 px-3 py-2 text-xs transition-colors",
-          canExpand && "cursor-pointer hover:bg-muted/70",
-        )}
-        onClick={canExpand ? toggle : undefined}
-        onKeyDown={canExpand ? onKeyDown : undefined}
-      >
-        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-          <UiGitCommit className="h-3.5 w-3.5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-medium text-foreground" title={commit.title}>
-            {commit.title}
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-muted-foreground">
-            {commit.authorAvatarUrl && (
-              <AvatarImage src={commit.authorAvatarUrl} alt={author || "Commit author"} />
-            )}
-            {author && <span>{author}</span>}
-            {commit.committedAt && (
-              <>
-                <span aria-hidden>·</span>
-                <span className="inline-flex items-center gap-1">
-                  <UiClock className="h-3 w-3" />
-                  {renderTime ? renderTime(commit.committedAt) : formatFallbackTime(commit.committedAt)}
-                </span>
-              </>
-            )}
-            {statText(commit.additions, commit.deletions)}
-            {(commit.changedFiles ?? 0) > 0 && (
-              <>
-                <span aria-hidden>·</span>
-                <span>{commit.changedFiles} files</span>
-              </>
-            )}
-          </div>
-        </div>
-        {commit.href ? (
-          <a
-            href={commit.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-0.5 inline-flex shrink-0 items-center gap-1 font-mono text-cyan-600 hover:underline"
-            onClick={event => event.stopPropagation()}
-          >
-            {shortSha(commit)}
-            <UiLinkExternal className="h-3 w-3" />
-          </a>
-        ) : (
-          <span className="mt-0.5 shrink-0 font-mono text-cyan-600">{shortSha(commit)}</span>
-        )}
-        {canExpand && (
-          <span className="mt-1 shrink-0">
-            <Chevron expanded={expanded} />
+    <div
+      data-commit={commit.sha}
+      data-selected={selectable ? String(selected) : undefined}
+      className={cn(selectable && selected && "bg-primary/5")}
+    >
+      <div className={cn("flex items-start transition-colors", canExpand && "hover:bg-muted/70")}>
+        {selectable && (
+          <span className="flex shrink-0 pl-3 pt-3.5" title={selectBlocked}>
+            <Checkbox
+              checked={selected}
+              disabled={Boolean(selectBlocked)}
+              onChange={() => onToggleSelect(commit)}
+              aria-label={slots.selectLabel ? slots.selectLabel(commit) : `Select commit ${shortSha(commit)}`}
+            />
           </span>
         )}
+        <div
+          role={canExpand ? "button" : undefined}
+          tabIndex={canExpand ? 0 : undefined}
+          aria-expanded={canExpand ? expanded : undefined}
+          className={cn(
+            "flex min-h-14 min-w-0 flex-1 items-start gap-2 py-2 pr-3 text-xs",
+            selectable ? "pl-2" : "pl-3",
+            canExpand && "cursor-pointer",
+          )}
+          onClick={canExpand ? toggle : undefined}
+          onKeyDown={canExpand ? onKeyDown : undefined}
+        >
+          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <UiGitCommit className="h-3.5 w-3.5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              <span className="min-w-0 truncate font-medium text-foreground" title={commit.title}>
+                {commit.title}
+              </span>
+              {renderBadges?.(commit)}
+            </div>
+            {renderSubtitle?.(commit)}
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-muted-foreground">
+              {commit.authorAvatarUrl && (
+                <AvatarImage src={commit.authorAvatarUrl} alt={author || "Commit author"} />
+              )}
+              {author && <span>{author}</span>}
+              {commit.committedAt && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span className="inline-flex items-center gap-1">
+                    <UiClock className="h-3 w-3" />
+                    {renderTime ? renderTime(commit.committedAt) : formatFallbackTime(commit.committedAt)}
+                  </span>
+                </>
+              )}
+              {statText(commit.additions, commit.deletions)}
+              {(commit.changedFiles ?? 0) > 0 && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>{commit.changedFiles} files</span>
+                </>
+              )}
+            </div>
+          </div>
+          {commit.href ? (
+            <a
+              href={commit.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-0.5 inline-flex shrink-0 items-center gap-1 font-mono text-cyan-600 hover:underline"
+              onClick={event => event.stopPropagation()}
+            >
+              {shortSha(commit)}
+              <UiLinkExternal className="h-3 w-3" />
+            </a>
+          ) : (
+            <span className="mt-0.5 shrink-0 font-mono text-cyan-600">{shortSha(commit)}</span>
+          )}
+          {canExpand && (
+            <span className="mt-1 shrink-0">
+              <Chevron expanded={expanded} />
+            </span>
+          )}
+        </div>
       </div>
       {expanded && (
         <div className="border-t border-border bg-secondary/50">
@@ -349,30 +409,46 @@ function CommitRow({
               {commit.body}
             </pre>
           )}
-          {loadDiff && (
-            <GitDiffPanel
-              loading={diffState.loading}
-              payload={diffState.payload}
-              error={diffState.error}
-              {...(diffMaxHeightClassName ? { maxHeightClassName: diffMaxHeightClassName } : {})}
-            />
-          )}
+          {renderExpanded
+            ? renderExpanded(commit)
+            : loadDiff && (
+                <GitDiffPanel
+                  loading={diffState.loading}
+                  payload={diffState.payload}
+                  error={diffState.error}
+                  {...(slots.diffMaxHeightClassName
+                    ? { maxHeightClassName: slots.diffMaxHeightClassName }
+                    : {})}
+                />
+              )}
         </div>
       )}
     </div>
   );
 }
 
-export function GitCommitList({
-  commits,
-  loadDiff,
-  renderTime,
-  groupByDate = true,
-  emptyLabel = "No commits found",
-  className,
-  diffMaxHeightClassName,
-}: GitCommitListProps) {
+export function GitCommitList<T extends GitCommitItem = GitCommitItem>(
+  props: GitCommitListProps<T>,
+) {
+  const {
+    commits,
+    groupByDate = true,
+    emptyLabel = "No commits found",
+    className,
+    selectedShas,
+  } = props;
   const groups = useMemo(() => groupCommits(commits, groupByDate), [commits, groupByDate]);
+  const slots: CommitRowSlots<T> = {
+    loadDiff: props.loadDiff,
+    renderExpanded: props.renderExpanded,
+    renderTime: props.renderTime,
+    renderBadges: props.renderBadges,
+    renderSubtitle: props.renderSubtitle,
+    onToggleSelect: props.onToggleSelect,
+    selectLabel: props.selectLabel,
+    selectBlockReason: props.selectBlockReason,
+    diffMaxHeightClassName: props.diffMaxHeightClassName,
+  };
 
   if (commits.length === 0) {
     return <div className={cn("py-4 text-xs text-muted-foreground", className)}>{emptyLabel}</div>;
@@ -392,9 +468,8 @@ export function GitCommitList({
               <CommitRow
                 key={commit.id || commit.sha}
                 commit={commit}
-                {...(loadDiff ? { loadDiff } : {})}
-                {...(renderTime ? { renderTime } : {})}
-                {...(diffMaxHeightClassName ? { diffMaxHeightClassName } : {})}
+                selected={selectedShas?.includes(commit.sha) ?? false}
+                slots={slots}
               />
             ))}
           </div>

@@ -8,6 +8,7 @@ import { BadgeDemo } from "./demos/BadgeDemo";
 import { SymbolBadgeDemo } from "./demos/SymbolBadgeDemo";
 import { AvatarDemo } from "./demos/AvatarDemo";
 import { FormFieldsDemo } from "./demos/FormFieldsDemo";
+import { GitPickersDemo } from "./demos/GitPickersDemo";
 import { JsonSchemaFormListenersDemo } from "./demos/listeners/JsonSchemaFormListenersDemo";
 import { JsonSchemaFormAnnotationsDemo } from "./demos/JsonSchemaFormAnnotationsDemo";
 import { JSONPathFieldDemo } from "./demos/JSONPathFieldDemo";
@@ -342,6 +343,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         id: "data-table",
         label: "DataTable",
         component: DataTableDemo,
+        icon: UiTable,
+      },
+      {
+        id: "git-pickers",
+        label: "Git pickers",
+        component: GitPickersDemo,
         icon: UiTable,
       },
       {

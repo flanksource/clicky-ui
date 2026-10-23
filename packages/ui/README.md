@@ -29,6 +29,34 @@ export function App() {
 }
 ```
 
+## Runtime settings
+
+Compose `SpecRuntimeBar` with the detailed `SpecRuntimeEditor` from `@flanksource/clicky-ui/ai`. The bar owns mode, model, effort, permission posture, cost, timeout, source/worktree, and commit timing. The detailed editor provides prompt, fallback, tool-policy, environment, checkout, and workflow details. Token and turn limit inputs are omitted; existing values survive edits and serialization.
+
+Session ID is editable only with `variant="preset"`. Environment variables always use `SecretKeySelector` for source, resource name, and key. Supply `secretSelector` catalog loaders to offer resource and key suggestions; without a catalog, users enter reference names and keys directly. Literal values remain a separate source. Shared comboboxes and dropdown menus expand to the available viewport height and scroll when their options exceed it.
+
+```tsx
+import { useState } from "react";
+import {
+  SpecRuntimeBar,
+  SpecRuntimeEditor,
+  type AISpecRuntimeValue,
+} from "@flanksource/clicky-ui/ai";
+
+export function RuntimeSettings() {
+  const [value, setValue] = useState<AISpecRuntimeValue>({ mode: "agent" });
+  return (
+    <SpecRuntimeEditor
+      value={value}
+      onChange={setValue}
+      beforeSections={<SpecRuntimeBar value={value} onChange={setValue} />}
+    />
+  );
+}
+```
+
+Pass the host's `models` and `families` catalogs to both components. `effectiveMode` and `effectiveModel` describe inherited identity without copying it into the draft. Set `readOnly` on both components for protected layers. `inheritedCommits` supplies the lower layer's commit policy; an explicit empty commit list selects Never. `variant="preset"` omits task-owned worktree paths, and `sections` restricts bar actions for hosts such as verification-only editors. Use `PromptRunEditor` for a run composer with single/multi-model runtime bars and shared limits.
+
 ## Verification details
 
 `VerificationResults` renders typed fixture steps through `verificationAdapters()`. **Detail** explains execution: commands, assertions, a compact wait summary, events and exported variables. **Outputs** contains the selected attempt's final structured result, including `null` and empty objects. The header's attempt selector appears for multiple attempts and defaults to the latest; selecting an attempt switches its execution, wait, Outputs and Copy details together, while the tree and run totals retain the step's overall verdict. Reports without stored historical evidence say so when that attempt is selected.
@@ -46,7 +74,9 @@ import {
 
 const adapters = verificationAdapters({
   renderWait: (wait) => (
-    <p>{wait.outcome}: {wait.durationMs}ms</p>
+    <p>
+      {wait.outcome}: {wait.durationMs}ms
+    </p>
   ),
 });
 
@@ -65,14 +95,19 @@ The optional `renderWait` callback receives the parsed final `WaitDetail`. Omitt
 import { Properties } from "@flanksource/clicky-ui/data";
 
 export function RuntimeProperties() {
-  return <Properties keyRef="runtime" items={[
-    { key: "memory", value: 1048576, type: "bytes" },
-    { key: "uptime", value: 90000, type: "duration", unit: "ms" },
-    { key: "load", value: 0.25, type: "number", unit: "percentunit" },
-    { key: "enabled", value: false, type: "boolean" },
-    { key: "started", value: 1704067200000, type: "date" },
-    { key: "config", value: '{"enabled":true}', type: "json" },
-  ]} />;
+  return (
+    <Properties
+      keyRef="runtime"
+      items={[
+        { key: "memory", value: 1048576, type: "bytes" },
+        { key: "uptime", value: 90000, type: "duration", unit: "ms" },
+        { key: "load", value: 0.25, type: "number", unit: "percentunit" },
+        { key: "enabled", value: false, type: "boolean" },
+        { key: "started", value: 1704067200000, type: "date" },
+        { key: "config", value: '{"enabled":true}', type: "json" },
+      ]}
+    />
+  );
 }
 ```
 
@@ -272,13 +307,19 @@ Both hooks persist their choice to `localStorage` under `clicky-ui-theme` / `cli
 Browsers cap HTTP/1.1 at six connections per host, shared across tabs, so an app that opens one native `EventSource` per topic can starve its own fetches. `createEventHub` returns an `EventSourceFactory` that multiplexes every stream the hooks open (`useTaskRun`, `usePrompts`, `useLogTail`, ...) over one real connection to a server events endpoint (such as clicky's `sse.Hub`). Wrap the tree in `EventSourceProvider` once:
 
 ```tsx
-import { EventSourceProvider, createEventHub } from "@flanksource/clicky-ui/hooks";
+import {
+  EventSourceProvider,
+  createEventHub,
+} from "@flanksource/clicky-ui/hooks";
 
 // Create the hub once at module scope so every render shares one connection.
 // `buildId` is the build the page was served with (e.g. from a <meta> tag);
 // when the server's hello reports a different build the page reloads once.
 // Omit it (or pass null) to never reload.
-const eventHub = createEventHub({ buildId: document.querySelector<HTMLMetaElement>('meta[name="app-build"]')?.content });
+const eventHub = createEventHub({
+  buildId: document.querySelector<HTMLMetaElement>('meta[name="app-build"]')
+    ?.content,
+});
 
 root.render(
   <EventSourceProvider value={eventHub}>
@@ -350,6 +391,31 @@ arbitrary z-index, hand-rolled inline styles, hardcoded colors / raw theme
 storage access, and icons imported from unapproved libraries or faked with
 emoji. See [`oxlint-plugins/README.md`](./oxlint-plugins/README.md) for the full
 guide.
+
+## Comments in an external document
+
+`CommentProvider` accepts `onScrollToAnchor(anchor, options)` and `getAnchorTop(anchor)` for hosts whose annotated document lives outside the rail's frame. `onScrollToAnchor` must return whether the anchor is available and navigation was dispatched; `getAnchorTop` returns its current viewport offset, or `null` when unavailable. Supplying a navigation delegate replaces local DOM scrolling. Without these callbacks the provider retains its registered-element behavior. Use `CommentSidePanel` with `focusedAlignment="flow"` for a detached rail, and synchronize selection and highlighting through `useCommentContext`.
+
+```tsx
+<CommentProvider
+  comments={comments}
+  config={config}
+  initialRailMode="all"
+  getAnchorTop={(anchor) => documentAnchors.get(anchor)?.top ?? null}
+  onScrollToAnchor={(anchor, options) => {
+    if (!documentAnchors.has(anchor)) return false;
+    annotatedWindow.postMessage(
+      { type: "scroll", anchor, options },
+      annotatedOrigin,
+    );
+    return true;
+  }}
+>
+  <CommentSidePanel focusedAlignment="flow" />
+</CommentProvider>
+```
+
+The host owns message validation, comment persistence and mutation callbacks. See the playground bookmarklet for an origin-checked bridge and an external-page review surface.
 
 ## License
 

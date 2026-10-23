@@ -116,6 +116,7 @@ describe("statusToneFor / outcomeFor", () => {
   it("map leaf verdicts to semantic tones", () => {
     expect(statusToneFor(leaf("x", { passed: true }))).toBe("success");
     expect(statusToneFor(leaf("x", { failed: true }))).toBe("danger");
+    expect(statusToneFor(leaf("x", { skipped: true }))).toBe("neutral");
   });
 
   it("rolls a container with a failing descendant up to danger", () => {

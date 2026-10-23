@@ -14,6 +14,8 @@ import {
   useCommentContext,
   useFloatingZIndex,
 } from "@flanksource/clicky-ui";
+import { UiComment } from "@flanksource/clicky-ui/icons";
+import { CommentDashboard } from "./comments/CommentDashboard";
 
 import {
   CommentOverlay,
@@ -30,13 +32,13 @@ import { usePageMoveDrag } from "./editor/usePageMoveDrag";
 import { useSource } from "./editor/useSource";
 import { MarkdownPage } from "./markdown/MarkdownPage";
 import { usePageGuidance } from "./markdown/usePageGuidance";
-import {
-  EmptyPlayground,
-  PlaygroundBanner as Banner,
-} from "./PlaygroundShellParts";
+import { PlaygroundBanner as Banner } from "./PlaygroundShellParts";
 import { PlaygroundBodyHeader } from "./PlaygroundBodyHeader";
 import { PlaygroundShellActions } from "./PlaygroundShellActions";
 import { ReviewProvider } from "./review/ReviewProvider";
+import { PlaygroundSidebarControls } from "./PlaygroundSidebarControls";
+import { useSidebarState } from "./sidebar-state";
+import { usePageActivity } from "./sidebar-activity";
 
 // Monaco is several megabytes and only ever needed once someone opens the
 // editor, so it must not sit in the entry chunk.
@@ -81,9 +83,8 @@ export type PlaygroundShellProps = {
   active: PageEntry | undefined;
   allComments: PageComment[];
   contentRef: RefObject<HTMLDivElement | null>;
-  query: string;
-  onQueryChange: (next: string) => void;
   commentsError: string | null;
+  commentsLoading: boolean;
   view: PlaygroundView;
   annotations: AnnotationVisibility;
   review?: "resolved";
@@ -107,9 +108,8 @@ export function PlaygroundShell({
   active,
   allComments,
   contentRef,
-  query,
-  onQueryChange,
   commentsError,
+  commentsLoading,
   view,
   annotations,
   review,
@@ -124,6 +124,8 @@ export function PlaygroundShell({
   onPrepareCommentSelection,
 }: PlaygroundShellProps) {
   const ctx = useCommentContext();
+  const [sidebar, setSidebar] = useSidebarState();
+  const activity = usePageActivity();
   const [editing, setEditing] = useState(false);
   const [pageAction, setPageAction] = useState<PageActionState | null>(null);
   const source = useSource(active?.slug, editing);
@@ -148,9 +150,14 @@ export function PlaygroundShell({
   });
 
   const navSections = usePlaygroundNavigation({
-    active,
+    activeSlug: active?.slug,
     allComments,
-    query,
+    query: sidebar.query,
+    onQueryChange: (query) => setSidebar({ query }),
+    sort: sidebar.sort,
+    filters: sidebar.filters,
+    updates: activity.updates,
+    loading: commentsLoading,
     folders: pageFolders.folders,
     pageHref,
     actionsDisabled: filesystemActionsDisabled,
@@ -213,7 +220,8 @@ export function PlaygroundShell({
   const activeMeta = active ? pageMeta(active) : undefined;
   const pageGuidance = usePageGuidance(active, activeTitle);
   const railVisible =
-    view === "preview" &&
+    Boolean(active) && view === "preview" &&
+    (annotations === "visible" || review === "resolved") &&
     (review === "resolved" ||
       ctx.railMode !== "closed" ||
       ctx.comments.length > 0);
@@ -239,17 +247,8 @@ export function PlaygroundShell({
           </span>
         </>
       }
-      search={
-        <input
-          value={query}
-          onChange={(event) =>
-            onQueryChange((event.target as HTMLInputElement).value)
-          }
-          placeholder="Filter artifacts…"
-          aria-label="Filter artifacts"
-          className="w-full rounded-md border border-border bg-muted px-3 py-1.5 text-sm outline-none focus:border-ring"
-        />
-      }
+      sidebarHeader={<PlaygroundSidebarControls state={sidebar} onChange={setSidebar} error={activity.error} />}
+      sidebarWidth={300}
       actions={
         <>
           {activeMeta?.appShellActions}
@@ -291,7 +290,7 @@ export function PlaygroundShell({
           />
         </>
       }
-      navSections={navSections}
+      navSections={[{ items: [{ key: "comments", label: "Comments", icon: UiComment, to: pageHref(""), active: !active }] }, ...navSections]}
       collapsedStorageKey="playground:sidebar:collapsed"
       contentClassName="overflow-hidden"
       contentWidth="full"
@@ -324,7 +323,7 @@ export function PlaygroundShell({
         ) : undefined
       }
     >
-      <div className="flex h-full min-h-0">
+      {!active ? <CommentDashboard comments={allComments} loading={commentsLoading} error={commentsError} pageHref={pageHref} /> : <div className="flex h-full min-h-0 flex-col md:flex-row">
         <div
           ref={attachScrollRef}
           className="relative min-w-0 flex-1 overflow-auto"
@@ -358,7 +357,7 @@ export function PlaygroundShell({
                   Page Markdown was not copied — {pageGuidance.copyError}
                 </Banner>
               )}
-              {view === "preview" && orphans.length > 0 && (
+              {view === "preview" && annotations === "visible" && orphans.length > 0 && (
                 <Banner tone="warning">
                   {orphans.length} comment anchor
                   {orphans.length === 1
@@ -384,11 +383,11 @@ export function PlaygroundShell({
                   </AnnotationVisibilityProvider>
                 </Suspense>
               ) : (
-                <EmptyPlayground />
+                null
               )}
             </div>
 
-            {view === "preview" && (
+            {view === "preview" && annotations === "visible" && (
               <>
                 <CommentOverlay
                   pins={pins}
@@ -412,7 +411,7 @@ export function PlaygroundShell({
         {railVisible && (
           <div
             data-comment-rail
-            className="relative shrink-0 overflow-y-auto border-l border-border bg-background p-density-3"
+            className="relative max-h-60 shrink-0 overflow-y-auto border-t border-border bg-background p-density-3 md:max-h-none md:border-l md:border-t-0"
             {...(railOverDialog ? { style: { zIndex: floatingZIndex } } : {})}
           >
             {review === "resolved" ? (
@@ -463,7 +462,7 @@ export function PlaygroundShell({
             )}
           </div>
         )}
-      </div>
+      </div>}
       <PageManagementDialogs
         action={pageAction?.action ?? null}
         active={actionPage}

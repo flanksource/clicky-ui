@@ -47,6 +47,7 @@ export function createSecretFormExtensions(
   options: SecretFormExtensionOptions,
 ): { post: PostExtension[] } {
   const post: PostExtension = (field, nodes, context) => {
+    if (field.readOnly) return nodes;
     const component = field.schema["x-clicky-component"];
     if (
       component !== "k8s-secret-selector" &&

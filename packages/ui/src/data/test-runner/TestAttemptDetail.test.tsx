@@ -81,6 +81,14 @@ describe("TestAttemptDetail", () => {
 
     const reading = (cpu: number): ProcessMetrics => ({ pid: 4242, cpu_percent: cpu, rss: 8 * 1024 * 1024, open_files: 12 });
 
+    it("advances elapsed time locally while an unchanged snapshot stays cached", async () => {
+      vi.setSystemTime(new Date("2026-10-22T10:00:00Z"));
+      render(<TestAttemptDetail attempt={{ ...live, started: "2026-10-22T09:59:59Z" }} />);
+      expect(value("Duration")).toBe("1.0s");
+      await act(() => vi.advanceTimersByTimeAsync(2000));
+      expect(value("Duration")).toBe("3.0s");
+    });
+
     it("reads once immediately, then every two seconds, showing the latest reading", async () => {
       const fetchProcessMetrics = vi.fn().mockResolvedValueOnce(reading(10)).mockResolvedValue(reading(55));
       render(<TestAttemptDetail attempt={live} fetchProcessMetrics={fetchProcessMetrics} />);
@@ -88,6 +96,7 @@ describe("TestAttemptDetail", () => {
       expect(fetchProcessMetrics).toHaveBeenCalledTimes(1);
       expect(fetchProcessMetrics).toHaveBeenCalledWith(4242);
       expect(value("CPU")).toBe("10.0%");
+      expect(value("Status")).toBe("running");
       expect(value("FDs")).toBe("12");
 
       await act(() => vi.advanceTimersByTimeAsync(1999));

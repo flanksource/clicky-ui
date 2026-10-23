@@ -46,13 +46,13 @@ function entry(
     body: "Write a commit message for {{diff}}.",
     effective: {
       model: "claude-sonnet-4-6",
-      backend: "claude-agent",
+      mode: "agent",
       modelSource: "operation",
     },
     provenance: {
       model: "user-home",
       body: "prompt default",
-      backend: "ai base",
+      mode: "ai base",
     },
     layers: [home, gitRoot, project],
     ...overrides,
@@ -91,9 +91,7 @@ describe("prompt catalog model", () => {
   });
 
   it("summarises runtime and provenance for the table", () => {
-    expect(runtimeSummary(entry().effective)).toBe(
-      "claude-sonnet-4-6 · claude-agent",
-    );
+    expect(runtimeSummary(entry().effective)).toBe("claude-sonnet-4-6 · agent");
     expect(runtimeSummary({ modelSource: "runtime" })).toBe(
       "inherited at run time (runtime)",
     );

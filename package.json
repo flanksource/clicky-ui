@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "ready": "pnpm run check && pnpm run test && pnpm run build",
+    "doctor": "vitest doctor",
     "dev:docs": "pnpm --filter docs dev",
     "dev:storybook": "pnpm --filter storybook dev",
     "dev:kitchensink": "pnpm --filter kitchen-sink dev",
