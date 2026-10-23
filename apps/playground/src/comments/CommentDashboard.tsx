@@ -57,6 +57,11 @@ export function CommentDashboard({
       label: "Author",
       accessor: (comment) => comment.author?.name ?? "Anonymous",
     },
+    {
+      key: "assignee",
+      label: "Assignee",
+      accessor: (comment) => comment.assignee?.name ?? "Unassigned",
+    },
     { key: "createdAt", label: "Created", kind: "timestamp" },
     {
       key: "updatedAt",
@@ -106,6 +111,7 @@ export function CommentDashboard({
                 pages: {},
                 projects: {},
                 author: "",
+                assignee: "",
                 screenshots: "all",
                 query: "",
                 sort: { key: "updatedAt", dir: "desc" },

@@ -1,12 +1,15 @@
+// Relative imports, not the `@flanksource/clicky-ui/comments` alias: the
+// playground's Vite plugins build the same thread markdown for agent runs, and
+// the plugin bundle cannot resolve that alias.
+import { DOCUMENT_ANCHOR } from "../../../../packages/ui/src/comments/comment-types";
 import {
-  DOCUMENT_ANCHOR,
   buildReplyMap,
   getRoots,
   sortReplies,
-} from "@flanksource/clicky-ui/comments";
+} from "../../../../packages/ui/src/comments/comment-utils";
 
+import { tallyAnchors } from "./anchor-tally";
 import type { PageComment, PlaygroundComment } from "./useComments";
-import { tallyAnchors } from "./useDomAnchors";
 
 /** One page's notes. A cross-page copy passes several; the toolbar passes one. */
 export type CommentPageSection = {
@@ -21,6 +24,7 @@ export type CommentMarkdownOptions = {
   screenshotUrl?: (url: string) => string;
   commentActionUrls?: (commentId: string) => {
     reply: string;
+    acknowledge: string;
     resolve: string;
   };
 };
@@ -93,12 +97,22 @@ function renderSection(
     );
     if (!isDocument) out.push(`- anchor: \`${anchor}\``);
     out.push(`- status: ${root.status ?? "open"}`);
+    if (root.assignee) {
+      out.push(
+        `- assignee: ${root.assignee.name} (${root.assignee.kind ?? "user"}, ${
+          root.acknowledgedAt
+            ? `acknowledged ${root.acknowledgedAt}`
+            : "not yet acknowledged"
+        })`,
+      );
+    }
     if (root.rating) out.push(`- rating: ${root.rating}`);
     if (root.reviewDecision)
       out.push(`- review decision: ${root.reviewDecision}`);
     const actionUrls = commentActionUrls?.(root.id);
     if (actionUrls) {
       out.push(
+        `- acknowledge before starting: \`POST ${actionUrls.acknowledge}\``,
         `- add comment: \`POST ${actionUrls.reply}\``,
         `- mark resolved: \`POST ${actionUrls.resolve}\``,
       );
