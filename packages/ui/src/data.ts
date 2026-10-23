@@ -394,6 +394,13 @@ export { TreeNode, type TreeNodeProps, type TreeRowContext } from "./data/TreeNo
 export { TreeGroupHeader, type TreeGroupHeaderProps } from "./data/TreeGroupHeader";
 export { Timeline, type TimelineItem, type TimelineProps } from "./data/Timeline";
 export * from "./data/git";
+export {
+  CompactRecord,
+  CompactRecordList,
+  type CompactRecordListProps,
+  type CompactRecordProps,
+  type CompactRecordStatus,
+} from "./data/CompactRecord";
 export * from "./data/test-runner";
 export * from "./data/lint";
 export * from "./data/verification";

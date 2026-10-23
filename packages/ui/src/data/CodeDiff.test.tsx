@@ -75,6 +75,38 @@ describe("CodeDiff split view", () => {
     });
     expect(diffLineText(container)).toEqual(["1a", "1a", "2-b", "2+B"]);
   });
+
+  // jsdom has no layout, so this pins the CSS contract the Storybook
+  // `SplitLongLinesNarrow` play test measures in a real browser: each half is
+  // an equal, shrinkable flex basis whose code wraps, so a long line can no
+  // longer paint across the divider into the other side.
+  it("wraps long lines inside their own column instead of overflowing into the other", async () => {
+    const longLine = `<Field name="${"VeryLongAttributeValue".repeat(12)}"/>`;
+    const { container } = render(
+      <CodeDiff view="split" original={longLine} modified={`${longLine} `} />,
+    );
+    await waitFor(() => expect(container.querySelectorAll("[data-diff-line]")).toHaveLength(2));
+
+    const cells = [...container.querySelectorAll<HTMLElement>("[data-diff-line]")];
+    expect(cells.map((cell) => ["min-w-0", "flex-1", "basis-0"].every((c) => cell.classList.contains(c)))).toEqual([
+      true,
+      true,
+    ]);
+    const codes = cells.map((cell) => cell.querySelector("code")!);
+    expect(codes.map((code) => [code.classList.contains("whitespace-pre-wrap"), code.classList.contains("[overflow-wrap:anywhere]"), code.classList.contains("whitespace-pre")])).toEqual([
+      [true, true, false],
+      [true, true, false],
+    ]);
+  });
+});
+
+describe("CodeDiff unified long lines", () => {
+  it("keeps each unified row on one line so the whole diff scrolls horizontally", async () => {
+    const { container } = render(<CodeDiff original={"a".repeat(300)} modified={"b".repeat(300)} />);
+    await waitFor(() => expect(container.querySelectorAll("[data-diff-line]")).toHaveLength(2));
+    const codes = [...container.querySelectorAll("[data-diff-line] code")];
+    expect(codes.map((code) => code.classList.contains("whitespace-pre"))).toEqual([true, true]);
+  });
 });
 
 describe("CodeDiff multi-file", () => {
@@ -122,6 +154,18 @@ describe("CodeDiff multi-file", () => {
 });
 
 describe("CodeDiff view toggle", () => {
+  it("keeps original and modified labels in order when switching views", async () => {
+    const { container } = render(
+      <CodeDiff original="SELECT 1" modified="SELECT 2" originalLabel="reference-db" modifiedLabel="target-db" view="split" />,
+    );
+    const labels = () => [...container.querySelectorAll("[data-diff-side]")].map((label) => [label.getAttribute("data-diff-side"), label.textContent]);
+    expect(labels()).toEqual([["original", "reference-db"], ["modified", "target-db"]]);
+    expect(container.querySelector('[data-diff-side="original"]')?.parentElement).toHaveClass("grid-cols-2");
+    fireEvent.click(screen.getByRole("radio", { name: /unified/i }));
+    expect(labels()).toEqual([["original", "− reference-db"], ["modified", "+ target-db"]]);
+    await waitFor(() => expect(diffLineTypes(container)).toEqual(["remove", "add"]));
+  });
+
   it("renders a Unified/Split toggle that switches the layout in place", async () => {
     const { container } = render(
       <CodeDiff language="typescript" original={"a\nb"} modified={"a\nB"} />,

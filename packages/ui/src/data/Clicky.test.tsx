@@ -602,7 +602,7 @@ describe("Clicky", () => {
 
     render(<Clicky data={clickyDocument} />);
 
-    const collapsed = screen.getByText(/2 keys/);
+    const collapsed = screen.getByRole("button", { name: "Expand value" });
     expect(screen.queryByText("enabled")).not.toBeInTheDocument();
     fireEvent.click(collapsed);
     expect(screen.getByText("enabled")).toBeInTheDocument();
