@@ -18,6 +18,7 @@ import { TestDetailPanel } from "./TestDetailPanel";
 import { TestRunSummary } from "./TestRunSummary";
 import { TestFilterBar } from "./TestFilterBar";
 import type { FetchProcessMetrics } from "./process-metrics";
+import type { OpenFileTarget } from "../OpenInFilesLink";
 
 export type TestRunnerProps = {
   tests: Test[];
@@ -53,6 +54,11 @@ export type TestRunnerProps = {
   onExpandAllChange: (next: boolean | null) => void;
   onRerun?: (node: Test) => void;
   onStop?: (node: Test) => void;
+  /**
+   * Called with a test's file, work dir and line when the reader asks to open
+   * it in the host's annotated file view. Omit to hide the "Open in Files" link.
+   */
+  onOpenFile?: (target: OpenFileTarget) => void;
 
   /**
    * Reads a live attempt's process (CPU, RSS, open files) by pid. The detail
@@ -128,6 +134,7 @@ export function TestRunner({
   onExpandAllChange,
   onRerun,
   onStop,
+  onOpenFile,
   fetchProcessMetrics,
   adapters,
   title,
@@ -161,6 +168,7 @@ export function TestRunner({
       onExpandAllChange,
       onRerun,
       onStop,
+      onOpenFile,
       fetchProcessMetrics,
       adapters: registry,
     }),
@@ -183,6 +191,7 @@ export function TestRunner({
       onExpandAllChange,
       onRerun,
       onStop,
+      onOpenFile,
       fetchProcessMetrics,
       registry,
     ],

@@ -5,6 +5,11 @@ import type { LintNode, LintSeverity, LinterResult, Violation } from "./types";
 
 const SEVERITY_RANK: Record<LintSeverity, number> = { info: 1, warning: 2, error: 3 };
 
+/** Orders severities: info < warning < error. */
+export function severityRank(severity: LintSeverity): number {
+  return SEVERITY_RANK[severity];
+}
+
 /** A violation without a severity is an error, as on the wire. */
 export function severityOf(violation: Violation): LintSeverity {
   return violation.severity ?? "error";
@@ -19,9 +24,14 @@ export function worstSeverity(violations: readonly Violation[] | undefined): Lin
   return worst;
 }
 
-/** Whether the linter itself failed to run (as opposed to reporting findings). */
+/** Whether the linter is still queued or running: it has no verdict yet. */
+export function isLinterInFlight(result: LinterResult): boolean {
+  return result.status !== undefined;
+}
+
+/** Whether the linter itself failed to run (as opposed to reporting findings or still being in flight). */
 export function isLinterErrored(result: LinterResult): boolean {
-  return !result.skipped && (Boolean(result.error) || Boolean(result.timed_out));
+  return !result.skipped && !isLinterInFlight(result) && (Boolean(result.error) || Boolean(result.timed_out));
 }
 
 /** Why a linter failed: its error text, or "timed out" when it only carries the flag. */
@@ -29,11 +39,11 @@ export function linterErrorMessage(result: LinterResult): string {
   return result.error || "timed out";
 }
 
-/** Linters that reported violations or failed to run, sorted by name. */
+/** Linters that reported violations, failed to run or are still in flight, sorted by name. */
 export function collectLintLinters(results: readonly LinterResult[]): string[] {
   const names = new Set<string>();
   for (const r of results) {
-    if ((r.violations ?? []).length > 0 || isLinterErrored(r)) names.add(r.linter);
+    if ((r.violations ?? []).length > 0 || isLinterErrored(r) || isLinterInFlight(r)) names.add(r.linter);
   }
   return Array.from(names).sort();
 }

@@ -8,6 +8,7 @@ import type { RunMeta, SnapshotStatus, Test } from "./types";
 import type { TestFilters } from "./filterState";
 import type { TestNodeAdapterRegistry } from "./adapter";
 import type { FetchProcessMetrics } from "./process-metrics";
+import type { OpenFileTarget } from "../OpenInFilesLink";
 
 export type TestRunnerContext = {
   /** The (already filtered, host-owned) test forest to render. */
@@ -48,6 +49,8 @@ export type TestRunnerContext = {
   onRerun?: ((node: Test) => void) | undefined;
   /** Optional — when absent, the stop affordance is hidden. */
   onStop?: ((node: Test) => void) | undefined;
+  /** Optional — when absent, the "Open in Files" link is hidden. */
+  onOpenFile?: ((target: OpenFileTarget) => void) | undefined;
 
   /**
    * Reads a live attempt's process by pid, polled every two seconds while the

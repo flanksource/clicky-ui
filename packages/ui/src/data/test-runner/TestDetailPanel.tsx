@@ -8,6 +8,8 @@ import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
 import { cn } from "../../lib/utils";
 import { JsonView } from "../JsonView";
 import { TabButton } from "../TabButton";
+import { OpenInFilesLink } from "../OpenInFilesLink";
+import { relPath } from "../lint/paths";
 import {
   UiCheck,
   UiClass,
@@ -154,6 +156,17 @@ function DetailHeader({ node, actionNode, actions, attemptChooser }: { node: Tes
         >
           {location}
         </span>
+      )}
+      {node.file && runner.onOpenFile && (
+        <OpenInFilesLink
+          className="shrink-0"
+          onOpenFile={runner.onOpenFile}
+          target={{
+            file: relPath(node.file, node.work_dir)!,
+            ...(node.work_dir ? { workDir: node.work_dir } : {}),
+            ...(node.line ? { line: node.line } : {}),
+          }}
+        />
       )}
       <div className="ml-auto flex shrink-0 items-center gap-1">
         {attemptChooser}
