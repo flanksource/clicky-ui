@@ -61,6 +61,10 @@ import { PropertyValuePreview } from "./json-schema-form-property-preview";
 import { propertyControlSize } from "./json-schema-form-properties-size";
 import { matchesFieldFilter } from "./json-schema-form-filter";
 import { Combobox } from "./Combobox";
+import { UnionControl } from "./json-schema-form-union";
+import { JsonControl } from "./json-schema-form-json";
+import { FormHelp } from "./json-schema-form-help-links";
+import { hasFormHelp } from "./json-schema-form-help-model";
 
 // This module is the top of the json-schema-form graph: it imports the control
 // components and dispatches into them, while container controls recurse back in
@@ -91,6 +95,10 @@ export function renderValueControl(field: FieldControl, ctx: RenderContext): Rea
   const readOnly = ctx.readOnly || field.readOnly === true;
   const size = ctx.size;
   switch (field.kind) {
+    case "union":
+      return <UnionControl field={field} fieldId={fieldId} ctx={ctx} />;
+    case "json":
+      return <JsonControl field={field} fieldId={fieldId} readOnly={readOnly} />;
     case "enum":
       return <EnumControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
     case "lookup":
@@ -336,7 +344,7 @@ export function renderFieldRow(
         }
         size={ctx.size}
         helpDisplay={built.help}
-        {...(field.helper ? { helper: field.helper } : {})}
+        {...(hasFormHelp(field) ? { helper: <FormHelp field={field} /> } : {})}
       >
         <FieldErrorText
           id={fieldErrorId(built.fieldId)}
@@ -365,8 +373,8 @@ export function renderFieldRow(
       {/* Without this the `?` silently disappears for relabelled rows (array
           items), taking the description with it — FieldWrapper has already
           dropped the paragraph by then. */}
-      {built.help === "hover" && field.helper && (
-        <HelpHint label={opts.labelOverride} helper={field.helper} />
+      {built.help === "hover" && hasFormHelp(field) && (
+        <HelpHint label={opts.labelOverride} helper={<FormHelp field={field} />} />
       )}
     </span>
   ) : (
@@ -385,7 +393,7 @@ export function renderFieldRow(
       label={label}
       value={built.value}
       {...(field.colSpan === "full" ? { maxWidth: "none" } : {})}
-      {...(field.helper && built.help !== "hover" ? { helper: field.helper } : {})}
+      {...(hasFormHelp(field) && built.help !== "hover" ? { helper: <FormHelp field={field} /> } : {})}
       {...(err ? { error: err } : {})}
     />
   );

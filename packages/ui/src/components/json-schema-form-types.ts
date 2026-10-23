@@ -236,6 +236,8 @@ export interface JsonSchemaObject extends JsonSchemaProperty {
 }
 
 export type FieldControlKind =
+  | "union"
+  | "json"
   | "string"
   | "number"
   | "boolean"
@@ -353,6 +355,7 @@ export interface JsonSchemaHelpBlock {
   source?: string;
   section?: string;
   body?: string;
+  links?: Array<{ label: string; href: string }>;
 }
 
 // FieldControl is the resolved, render-ready descriptor for one property. The

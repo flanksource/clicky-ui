@@ -70,6 +70,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const RadioDefaultUnset: Story = {
+  tags: ["browser"],
   play: async ({ canvasElement, step }) => {
     const canvas = within(canvasElement);
     const insert = canvas.getByRole("radio", { name: "insert" });
