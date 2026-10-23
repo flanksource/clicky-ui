@@ -103,6 +103,7 @@ export default defineConfig({
     playgroundBookmarklet({ root, dir: playgroundDataDir }),
     playgroundExports({ dir: playgroundDataDir }),
     playgroundRuntimeProfiles({
+      modelsURL: "http://localhost:9020/api/chat/models",
       permissionsURL:
         "http://localhost:9020/api/captain/ai/permissions/catalog",
       runtimesURL: "http://localhost:9020/api/chat/runtimes",
