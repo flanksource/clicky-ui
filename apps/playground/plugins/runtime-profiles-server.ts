@@ -6,6 +6,7 @@ import type {
 } from "../../../packages/ui/src/data/ai/runtime-profile";
 import { normalizeToolCatalog } from "../../../packages/ui/src/data/ai/ChatWindow.tool-catalog";
 import {
+  loadRuntimeProfileModelCatalog,
   loadRuntimeProfilePermissionCatalog,
   loadRuntimeProfileRuntimeCatalog,
 } from "./runtime-profiles-catalog";
@@ -15,6 +16,8 @@ export const RUNTIME_PROFILES_RUNTIMES_ROUTE =
   "/__playground/runtime-profiles/runtimes";
 export const RUNTIME_PROFILES_PERMISSIONS_ROUTE =
   "/__playground/runtime-profiles/permissions";
+export const RUNTIME_PROFILES_MODELS_ROUTE =
+  "/__playground/runtime-profiles/models";
 
 export async function resolveRuntimeProfileFromCaptain(
   resolveURL: string,
@@ -65,10 +68,12 @@ function normalizeResolution(value: unknown): ResolvedRuntimeProfile {
 }
 
 export function playgroundRuntimeProfiles({
+  modelsURL,
   permissionsURL,
   resolveURL,
   runtimesURL,
 }: {
+  modelsURL: string;
   permissionsURL: string;
   resolveURL: string;
   runtimesURL: string;
@@ -110,6 +115,23 @@ export function playgroundRuntimeProfiles({
           })();
         },
       );
+      server.middlewares.use(RUNTIME_PROFILES_MODELS_ROUTE, (request, response) => {
+        void (async () => {
+          try {
+            if (request.method !== "GET") {
+              sendJson(response, 405, {
+                error: `GET ${RUNTIME_PROFILES_MODELS_ROUTE} is required`,
+              });
+              return;
+            }
+            sendJson(response, 200, await loadRuntimeProfileModelCatalog(modelsURL));
+          } catch (error) {
+            const message = `Unable to load Captain models from ${modelsURL}: ${errorMessage(error)}`;
+            server.config.logger.error(`[runtime-profiles] ${message}`);
+            sendJson(response, 502, { error: message });
+          }
+        })();
+      });
       server.middlewares.use(
         RUNTIME_PROFILES_PERMISSIONS_ROUTE,
         (request, response) => {

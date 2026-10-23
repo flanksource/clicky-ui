@@ -173,7 +173,7 @@ Replies land one level deep: replying to a reply attaches to the thread root, ma
 
 - **Sessions: Shared | Per page** (`grouping`). `shared` keeps one session for every page (`page: null`); `page` gives each page its own session (`page: "<page id>"`), primed to handle only that page's threads. Switching leaves existing sessions alone; they stay listed until stopped or forgotten.
 - **Auto-run new comments** (`autoRun`). Every new top-level comment by a human (not review decisions) is sent to its session right after it is stored, exactly as if **Run agent** had been chosen, starting the session if none is live. A failed hand-off shows on the thread as `agentRun.state: "error"` and is logged. Turning it on requires a runtime.
-- **Runtime** (`runtime`). Every new or replacement session starts with it; running sessions keep theirs. The first **Run agent** without one asks for it (captain's agent-SDK runtimes, through the `RuntimeProfilePicker`).
+- **Runtime** (`runtime`). Every new or replacement session starts with it; running sessions keep theirs. The first **Run agent** without one asks for it, and **Change…** edits it, through clicky-ui's `SpecRuntimeBar` limited to captain's available agent-mode runtimes (`/__playground/runtime-profiles/runtimes`) and their models (`/__playground/runtime-profiles/models`, proxying captain's `/api/chat/models`).
 
 How a thread reaches its session:
 

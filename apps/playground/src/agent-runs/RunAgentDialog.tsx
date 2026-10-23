@@ -1,19 +1,20 @@
 import { useEffect, useState } from "react";
-import { Button, Field, InputField, Modal } from "@flanksource/clicky-ui";
+import { Button, Modal } from "@flanksource/clicky-ui";
 import {
-  RuntimeProfilePicker,
-  mergeRuntimeSpec,
-  useRuntimeProfilePicker,
-  type AIPromptRunValue,
-  type RuntimeProfile,
+  SpecRuntimeBar,
+  compactAISpecRuntime,
+  familiesFromRuntimeCatalog,
+  type AISpecRuntimeValue,
+  type SpecRuntimeFamily,
 } from "@flanksource/clicky-ui/ai";
+import type { ChatModel } from "@flanksource/clicky-ui/chat";
 
 import type { AgentSessionGrouping, AgentSessionRuntime } from "./agent-runs-api";
 import {
-  agentRuntimeProfiles,
+  agentRuntimeCatalog,
+  fetchModelCatalog,
   fetchRuntimeCatalog,
-  resolveRuntimeProfile,
-} from "./runtime-profiles";
+} from "./runtime-catalog";
 
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
@@ -39,8 +40,21 @@ function intro(mode: RunAgentDialogMode, grouping: AgentSessionGrouping): string
     : "No agent session is running. This starts the playground's one shared session; later comments are sent into it.";
 }
 
+type Catalog = { families: SpecRuntimeFamily[]; models: ChatModel[] };
+
+/** The configured runtime when it is still offered, else the first agent runtime's default. */
+function initialValue(
+  families: SpecRuntimeFamily[],
+  current: AgentSessionRuntime | undefined,
+): AISpecRuntimeValue {
+  if (current) return current.spec as AISpecRuntimeValue;
+  const mode = families[0]?.modes[0];
+  return { mode: "agent", ...(mode?.defaultModel ? { model: mode.defaultModel } : {}) };
+}
+
 function RuntimeChooser({
-  profiles,
+  catalog,
+  current,
   mode,
   grouping,
   busy,
@@ -48,7 +62,8 @@ function RuntimeChooser({
   onRun,
   onCancel,
 }: {
-  profiles: RuntimeProfile[];
+  catalog: Catalog;
+  current: AgentSessionRuntime | undefined;
   mode: RunAgentDialogMode;
   grouping: AgentSessionGrouping;
   busy: boolean;
@@ -56,35 +71,24 @@ function RuntimeChooser({
   onRun: (runtime: AgentSessionRuntime) => void;
   onCancel: () => void;
 }) {
-  const [value, setValue] = useState<AIPromptRunValue>(() =>
-    profiles[0] ? { runtimeProfile: profiles[0].id } : {},
+  const [value, setValue] = useState<AISpecRuntimeValue>(() =>
+    initialValue(catalog.families, current),
   );
-  const controller = useRuntimeProfilePicker({
-    value,
-    onChange: setValue,
-    profiles,
-    presets: [],
-    onResolveProfile: resolveRuntimeProfile,
-  });
-  const spec = mergeRuntimeSpec(controller.state.draft?.spec ?? {}, value.spec ?? {});
-  const model = spec.model?.trim() ?? "";
+  const spec = compactAISpecRuntime(value);
+  const model = spec.model;
 
   return (
     <div className="space-y-4 text-sm">
       <p className="text-muted-foreground">{intro(mode, grouping)}</p>
-      <RuntimeProfilePicker controller={controller} profiles={profiles} presets={[]} />
-      <Field label="Model" htmlFor="agent-run-model">
-        <InputField
-          id="agent-run-model"
-          value={model}
-          onChange={(next) =>
-            setValue((current) => ({
-              ...current,
-              spec: { ...current.spec, model: next },
-            }))
-          }
-        />
-      </Field>
+      {/* Permissions, workspace and commit settings come from the session prompt, so only the model row is offered. */}
+      <SpecRuntimeBar
+        value={value}
+        onChange={setValue}
+        models={catalog.models}
+        families={catalog.families}
+        sections={["model"]}
+        ariaLabel="Agent runtime"
+      />
       {error && (
         <p role="alert" className="text-xs text-destructive">
           {error}
@@ -95,13 +99,10 @@ function RuntimeChooser({
           Cancel
         </Button>
         <Button
-          disabled={busy || model === ""}
-          onClick={() =>
-            onRun({
-              spec: { ...spec, model },
-              ...(value.presets?.length ? { presets: value.presets } : {}),
-            })
-          }
+          disabled={busy || !model}
+          onClick={() => {
+            if (model) onRun({ spec: { ...spec, model } });
+          }}
         >
           {busy ? COPY[mode].busy : COPY[mode].submit}
         </Button>
@@ -111,13 +112,14 @@ function RuntimeChooser({
 }
 
 /**
- * Chooses the runtime new agent sessions start with. Captain's runtime
- * catalog (through the playground's runtime-profile routes) feeds the picker.
+ * Chooses the runtime new agent sessions start with, through clicky-ui's
+ * runtime bar fed by captain's agent-mode runtimes and model catalog.
  */
 export function RunAgentDialog({
   open,
   mode,
   grouping,
+  current,
   error,
   busy,
   onRun,
@@ -126,41 +128,52 @@ export function RunAgentDialog({
   open: boolean;
   mode: RunAgentDialogMode;
   grouping: AgentSessionGrouping;
+  /** The configured runtime, preselected when present. */
+  current: AgentSessionRuntime | undefined;
   error: string | null;
   busy: boolean;
   onRun: (runtime: AgentSessionRuntime) => void;
   onClose: () => void;
 }) {
-  const [profiles, setProfiles] = useState<RuntimeProfile[] | null>(null);
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setProfiles(null);
+    setCatalog(null);
     setLoadError(null);
-    fetchRuntimeCatalog().then(
-      (catalog) => setProfiles(agentRuntimeProfiles(catalog)),
+    Promise.all([fetchRuntimeCatalog(), fetchModelCatalog()]).then(
+      ([runtimes, models]) => {
+        const agents = agentRuntimeCatalog(runtimes);
+        setCatalog({
+          // familiesFromRuntimeCatalog falls back to built-in families for an
+          // empty list, so an empty agent catalog must stay empty here.
+          families: agents.length ? familiesFromRuntimeCatalog(agents) : [],
+          models,
+        });
+      },
       (cause: unknown) => setLoadError(describeError(cause)),
     );
   }, [open]);
 
   return (
-    <Modal open={open} onClose={onClose} title={COPY[mode].title} size="md">
+    <Modal open={open} onClose={onClose} title={COPY[mode].title} size="lg">
       {loadError ? (
         <p role="alert" className="text-sm text-destructive">
           {loadError}
         </p>
-      ) : profiles === null ? (
+      ) : catalog === null ? (
         <p role="status" className="text-sm text-muted-foreground">
           Loading runtimes from captain…
         </p>
-      ) : profiles.length === 0 ? (
+      ) : catalog.families.length === 0 ? (
         <p role="alert" className="text-sm text-destructive">
           Captain reports no available agent runtime.
         </p>
       ) : (
         <RuntimeChooser
-          profiles={profiles}
+          catalog={catalog}
+          current={current}
           mode={mode}
           grouping={grouping}
           busy={busy}
