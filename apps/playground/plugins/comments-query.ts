@@ -6,14 +6,13 @@ import {
   type ListedComment,
   type StoredComment,
 } from "./comments-store";
+import { IMPLICIT_STATUS } from "./comments-statuses";
 
 export type CommentFilter = {
   page?: string;
   /** Matched against thread roots; a matching root brings its replies. */
   statuses?: readonly string[];
 };
-
-const IMPLICIT_STATUS = "open";
 
 export function parseCommentFilter(params: URLSearchParams): CommentFilter {
   const filter: CommentFilter = {};

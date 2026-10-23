@@ -5,7 +5,8 @@ import type { Connect, Logger, Plugin } from "vite";
 import { COMMENT_TOOLS } from "./comments-schema";
 import {
   CommentHttpError,
-  assertActiveStatusTransition,
+  acknowledgeComment,
+  assignComment,
   closeComment,
   reopenComment,
   resolveComment,
@@ -46,6 +47,8 @@ export type CommentRoute =
   | "screenshot"
   | "create"
   | "reply"
+  | "acknowledge"
+  | "assign"
   | "resolve"
   | "close"
   | "reopen"
@@ -85,6 +88,8 @@ export function matchRoute(
 
   if (segments.length === 2 && method === "POST") {
     if (second === "replies") return { route: "reply", id: first };
+    if (second === "acknowledge") return { route: "acknowledge", id: first };
+    if (second === "assign") return { route: "assign", id: first };
     if (second === "resolve") return { route: "resolve", id: first };
     if (second === "close") return { route: "close", id: first };
     if (second === "reopen") return { route: "reopen", id: first };
@@ -150,26 +155,29 @@ function requireText(body: Record<string, unknown>, key: string): string {
  * agent wrote it is worse than a 400 naming the missing field.
  */
 function requireAuthor(body: Record<string, unknown>): StoredAuthor {
-  const author = body["author"];
-  if (author === null || typeof author !== "object" || Array.isArray(author)) {
+  return parseAuthor(body["author"], "author");
+}
+
+function parseAuthor(value: unknown, field: "author" | "assignee"): StoredAuthor {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(
-      '"author" is required, e.g. {"name":"Claude","kind":"agent"}',
+      `"${field}" is required, e.g. {"name":"Claude","kind":"agent"}`,
     );
   }
-  const candidate = author as Record<string, unknown>;
+  const candidate = value as Record<string, unknown>;
   const name = candidate["name"];
   if (typeof name !== "string" || name.trim() === "") {
-    throw new Error('"author.name" is required and must be a non-empty string');
+    throw new Error(`"${field}.name" is required and must be a non-empty string`);
   }
   const kind = candidate["kind"];
   if (kind !== undefined && kind !== "user" && kind !== "agent") {
-    throw new Error('"author.kind" must be "user" or "agent"');
+    throw new Error(`"${field}.kind" must be "user" or "agent"`);
   }
-  const via = optionalAuthorText(candidate, "via");
-  const sessionId = optionalAuthorText(candidate, "sessionId");
+  const via = optionalAuthorText(candidate, "via", field);
+  const sessionId = optionalAuthorText(candidate, "sessionId", field);
   const cost = candidate["cost"];
   if (cost !== undefined && (typeof cost !== "number" || !Number.isFinite(cost) || cost < 0)) {
-    throw new Error('"author.cost" must be a non-negative number of USD');
+    throw new Error(`"${field}.cost" must be a non-negative number of USD`);
   }
   return {
     name,
@@ -183,13 +191,26 @@ function requireAuthor(body: Record<string, unknown>): StoredAuthor {
 function optionalAuthorText(
   author: Record<string, unknown>,
   key: "via" | "sessionId",
+  field: string,
 ): string | undefined {
   const value = author[key];
   if (value === undefined) return undefined;
   if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`"author.${key}" must be a non-empty string when present`);
+    throw new Error(`"${field}.${key}" must be a non-empty string when present`);
   }
   return value;
+}
+
+/** `null` clears the assignee; omitting the field is a caller bug, not a clear. */
+function requireAssignee(body: Record<string, unknown>): StoredAuthor | null {
+  if (!("assignee" in body)) {
+    throw new Error(
+      '"assignee" is required: an object like {"name":"Claude","kind":"agent"}, or null to unassign',
+    );
+  }
+  return body["assignee"] === null
+    ? null
+    : parseAuthor(body["assignee"], "assignee");
 }
 
 function optionalText(
@@ -252,10 +273,25 @@ function persistElementContext(
   }
 }
 
+/** A root just stored by `POST /__playground/comments` (not a review decision). */
+export type CommentCreatedEvent = {
+  page: string;
+  comment: StoredComment;
+  /** The playground origin the comment was posted to, e.g. `http://localhost:5801`. */
+  origin: string;
+};
+
+export type PlaygroundCommentsOptions = {
+  dir: string;
+  /** Runs after a root is stored and answered; a rejection is logged. */
+  onCreated?: (event: CommentCreatedEvent) => Promise<void>;
+};
+
 function handle(
   dir: string,
   req: IncomingMessage,
   res: ServerResponse,
+  created: (event: CommentCreatedEvent) => void,
 ): Promise<void> | void {
   const url = new URL(req.url ?? "/", "http://playground.local");
   const matched = matchRoute(req.method ?? "", url.pathname);
@@ -329,7 +365,11 @@ function handle(
             writeAll(dir, data);
             sendJson(res, 201, data[page].at(-1));
           } else {
-            sendJson(res, 201, addComment(dir, page, stored));
+            const host = req.headers.host;
+            if (!host) throw new Error("request has no Host header");
+            const saved = addComment(dir, page, stored);
+            sendJson(res, 201, saved);
+            created({ page, comment: saved, origin: `http://${host}` });
           }
         } catch (cause) {
           const removal = stageScreenshotRemoval(dir, [stored]);
@@ -345,6 +385,22 @@ function handle(
           res,
           201,
           addReply(dir, id, draft(body, requireText(body, "body"))),
+        );
+      });
+
+    case "acknowledge":
+      return readJsonBody(req).then((body) => {
+        assertOnlyFields(body, ["author"]);
+        sendJson(res, 200, acknowledgeComment(dir, id, requireAuthor(body)));
+      });
+
+    case "assign":
+      return readJsonBody(req).then((body) => {
+        assertOnlyFields(body, ["author", "assignee"]);
+        sendJson(
+          res,
+          200,
+          assignComment(dir, id, requireAuthor(body), requireAssignee(body)),
         );
       });
 
@@ -386,24 +442,21 @@ function handle(
 
     case "update":
       return readJsonBody(req).then((body) => {
-        assertOnlyFields(body, ["body", "status", "rating"]);
+        // Status is not editable here: acknowledge, assign, resolve, close and
+        // reopen are the only ways to move a thread between stages.
+        assertOnlyFields(body, ["body", "rating"]);
         // A non-string field is a caller bug, not an omission: naming it in a
         // 400 (as every other route does) beats a 200 that silently wrote
         // nothing but `updatedAt`.
         const nextBody = optionalText(body, "body");
-        const nextStatus = optionalText(body, "status");
         const nextRating = optionalText(body, "rating");
         const patch: CommentPatch = {
           ...(nextBody === undefined ? {} : { body: nextBody }),
-          ...(nextStatus === undefined ? {} : { status: nextStatus }),
           ...(nextRating === undefined
             ? {}
             : { rating: assertRating(nextRating) }),
           updatedAt: new Date().toISOString(),
         };
-        if (nextStatus !== undefined) {
-          assertActiveStatusTransition(dir, id, nextStatus);
-        }
         sendJson(res, 200, patchComment(dir, id, patch));
       });
 
@@ -419,22 +472,14 @@ function handle(
  * available to agents. Human-only lifecycle routes remain UI-owned.
  * The middleware runs in both Vite development and local build preview.
  */
-export function playgroundComments(options: { dir: string }): Plugin {
+export function playgroundComments(options: PlaygroundCommentsOptions): Plugin {
   return {
     name: "playground-comments",
     configureServer(server) {
-      registerCommentsMiddleware(
-        server.middlewares,
-        server.config.logger,
-        options.dir,
-      );
+      registerCommentsMiddleware(server.middlewares, server.config.logger, options);
     },
     configurePreviewServer(server) {
-      registerCommentsMiddleware(
-        server.middlewares,
-        server.config.logger,
-        options.dir,
-      );
+      registerCommentsMiddleware(server.middlewares, server.config.logger, options);
     },
   };
 }
@@ -442,12 +487,20 @@ export function playgroundComments(options: { dir: string }): Plugin {
 function registerCommentsMiddleware(
   middlewares: Connect.Server,
   logger: Logger,
-  dir: string,
+  { dir, onCreated }: PlaygroundCommentsOptions,
 ) {
+  const created = (event: CommentCreatedEvent) => {
+    onCreated?.(event).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(
+        `[playground-comments] onCreated for comment ${event.comment.id} failed: ${message}`,
+      );
+    });
+  };
   middlewares.use(COMMENTS_ROUTE, (req, res, next) => {
     void (async () => {
       try {
-        await handle(dir, req, res);
+        await handle(dir, req, res, created);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         logger.error(`[playground-comments] ${req.method} failed: ${message}`);
