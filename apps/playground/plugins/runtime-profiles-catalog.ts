@@ -2,6 +2,7 @@ import type {
   AISpecRuntimePermissionCatalog,
   AISpecRuntimePermissionCatalogItem,
 } from "../../../packages/ui/src/data/ai/SpecRuntimeEditor.model";
+import type { ChatModel } from "../../../packages/ui/src/data/chat/types";
 import type {
   RuntimeCatalogFamily,
   RuntimePermissionCapabilities,
@@ -25,6 +26,30 @@ export async function loadRuntimeProfileRuntimeCatalog(
   }
   const document: unknown = await response.json();
   return assertRuntimeCatalog(document);
+}
+
+export async function loadRuntimeProfileModelCatalog(
+  modelsURL: string,
+): Promise<ChatModel[]> {
+  const response = await fetch(modelsURL);
+  if (!response.ok) {
+    throw new Error(
+      `Captain model catalog request failed with ${response.status} ${response.statusText}`,
+    );
+  }
+  const value: unknown = await response.json();
+  if (!Array.isArray(value)) {
+    throw new Error("Captain model catalog must be an array");
+  }
+  for (const [index, candidate] of value.entries()) {
+    if (!isRecord(candidate)) {
+      throw new Error(`model at index ${index} must be an object`);
+    }
+    const id = requiredString(candidate.id, `model at index ${index} id`);
+    requiredString(candidate.provider, `model "${id}" provider`);
+    requiredString(candidate.label, `model "${id}" label`);
+  }
+  return value as ChatModel[];
 }
 
 export async function loadRuntimeProfilePermissionCatalog(
