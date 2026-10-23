@@ -78,9 +78,11 @@ export {
   buildPathTree,
   foldersFirst,
   isPathTreeFolder,
+  matchesTreeSelection,
   splitPath,
   type BuildPathTreeOptions,
   type PathTreeNode,
+  type TreeSelection,
 } from "./lib/path-tree";
 export {
   CLICKY_COLUMN_FORMAT_OPTIONS,

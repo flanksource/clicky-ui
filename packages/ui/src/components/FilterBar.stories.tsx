@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState, type ReactNode } from "react";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import { Icon } from "../data/Icon";
+import { matchesTreeSelection } from "../lib/path-tree";
 import { UiCloud, UiDatabase, UiNamespace, UiServer, UiTag } from "../icons";
 import {
   FilterBar,
@@ -8,6 +10,7 @@ import {
   type FilterBarFilter,
   type FilterBarNumberValue,
   type FilterBarProps,
+  type FilterTreeNode,
 } from "./FilterBar";
 import {
   applyFilterExtensions,
@@ -146,6 +149,67 @@ function FilterBarShowcase(overrides: FilterBarShowcaseProps = {}) {
 
 function FilterBarPlayground(args: FilterBarShowcaseProps) {
   return <FilterBarShowcase {...args} />;
+}
+
+const PAGE_TREE: FilterTreeNode[] = [
+  {
+    key: "acme",
+    label: "Acme",
+    children: [
+      {
+        key: "acme/billing",
+        label: "Billing",
+        children: [
+          { key: "acme/billing/invoices", label: "Invoices" },
+          { key: "acme/billing/payments", label: "Payments" },
+        ],
+      },
+      { key: "acme/support", label: "Support" },
+    ],
+  },
+  {
+    key: "globex",
+    label: "Globex",
+    children: [{ key: "globex/overview", label: "Overview" }],
+  },
+];
+
+function TreeFilterShowcase() {
+  const [pages, setPages] = useState<Record<string, "include" | "exclude">>({
+    acme: "include",
+    "acme/billing/payments": "exclude",
+  });
+  const sample = [
+    "acme/billing/invoices",
+    "acme/billing/payments",
+    "acme/support",
+    "globex/overview",
+  ];
+  return (
+    <div className="space-y-3">
+      <FilterBar
+        filters={[
+          {
+            key: "pages",
+            kind: "tree",
+            label: "Pages",
+            value: pages,
+            nodes: PAGE_TREE,
+            onChange: setPages,
+          },
+        ]}
+      />
+      <ul className="text-xs" aria-label="Matching pages">
+        {sample
+          .filter((path) => matchesTreeSelection(path, pages))
+          .map((path) => (
+            <li key={path} className="font-mono">
+              {path}
+            </li>
+          ))}
+      </ul>
+    </div>
+  );
 }
 
 const meta = {
@@ -357,6 +421,50 @@ export const LookupIconsWithPlaceholder: Story = {
           "Same icon-stamping extension, but each lookup also carries a `placeholder`. While a field is empty the placeholder shows as ghost text next to the icon; selecting a value hides the placeholder and shows the chosen option instead (here **Cluster** is pre-selected to contrast with the empty fields).",
       },
     },
+  },
+};
+
+export const TreeFilter: Story = {
+  render: () => <TreeFilterShowcase />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "A `tree` filter picks hierarchical values with include/exclude on folders and leaves. A key on a folder stands for everything beneath it; `matchesTreeSelection(path, value)` applies that rule (the deepest selected ancestor-or-self wins), so **Payments** is carved out of the included **Acme** folder. The panel stays open across selections and opens already expanded to whatever is selected.",
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const matches = () =>
+      canvas
+        .getAllByRole("listitem")
+        .map((item) => item.textContent);
+    await expect(matches()).toEqual([
+      "acme/billing/invoices",
+      "acme/support",
+    ]);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Pages" }));
+    const body = within(document.body);
+    // Opens expanded down to the excluded Payments leaf.
+    await expect(await body.findByText("Payments")).toBeInTheDocument();
+
+    // Neutralise the Acme include; the remaining Payments exclude now governs alone.
+    const acmeInclude = (
+      await body.findByRole("button", { name: "Acme" })
+    ).querySelector('[data-tristate-region="include"]');
+    await userEvent.click(acmeInclude as Element);
+
+    await waitFor(() =>
+      expect(matches()).toEqual([
+        "acme/billing/invoices",
+        "acme/support",
+        "globex/overview",
+      ]),
+    );
+    // closeOnSelect is false: the tree is still open.
+    await expect(body.getByRole("tree")).toBeInTheDocument();
   },
 };
 
