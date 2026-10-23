@@ -1,6 +1,12 @@
 export * from "./comments/comment-types";
 export * from "./comments/comment-utils";
 export {
+  assignTargetItems,
+  assignmentMenuItems,
+  type CommentActionRunner,
+  type CommentAssignmentOptions,
+} from "./comments/comment-assign";
+export {
   resolveCommentStage,
   selectCommentThreadsByStage,
   statusForCommentStage,

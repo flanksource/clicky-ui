@@ -302,6 +302,11 @@ export function matchMentionsInBody(
 export type ThreadListHandlers = {
   onUpdateStatus?: (id: string, status: string) => void | Promise<void>;
   onClose?: (id: string) => void | Promise<void>;
+  onAcknowledge?: (id: string) => void | Promise<void>;
+  onAssign?: (
+    id: string,
+    assignee: CommentAuthor | null,
+  ) => void | Promise<void>;
   onChecklistToggle?: (id: string, index: number) => void;
   onDelete?: (id: string) => void;
   onReply?: (parent: Comment, body: string) => void | Promise<void>;
@@ -321,6 +326,8 @@ export function buildThreadListHandlers(
   const handlers: ThreadListHandlers = {};
   if (cb.onUpdateStatus) handlers.onUpdateStatus = cb.onUpdateStatus;
   if (cb.onClose) handlers.onClose = cb.onClose;
+  if (cb.onAcknowledge) handlers.onAcknowledge = cb.onAcknowledge;
+  if (cb.onAssign) handlers.onAssign = cb.onAssign;
   if (cb.onDelete) handlers.onDelete = cb.onDelete;
   if (cb.onChecklistToggle) {
     const toggle = cb.onChecklistToggle;
