@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
-import { DOCUMENT_ANCHOR, type Comment } from "@flanksource/clicky-ui/comments";
+import { isUnresolved } from "@flanksource/clicky-ui/comments";
 
+import type { CommentLocator } from "../../plugins/comments-model";
+import { tallyAnchors } from "./anchor-tally";
 import {
   describeElement,
   elementBoxWithin,
+  legacyLocators,
   overlayLabel,
   resolveAnchor,
+  resolveComment,
   type Box,
+  type CommentMatch,
 } from "./dom-anchor";
+import {
+  PLAYGROUND_COMMENT_CONFIG,
+  type PlaygroundComment,
+} from "./useComments";
 
 export type AnchorPin = {
   anchor: string;
@@ -15,40 +24,65 @@ export type AnchorPin = {
   index: number;
   box: Box;
   count: number;
+  /** Found by a fallback locator rather than the stored anchor. */
+  moved: boolean;
+};
+
+export type AnchorOrphan = {
+  anchor: string;
+  /** Whether any comment on the anchor still needs attention. */
+  unresolved: boolean;
 };
 
 export type DomAnchors = {
   pins: AnchorPin[];
   /** Pins inside open dialogs, with viewport (not scroll-container) boxes. */
   overlayPins: AnchorPin[];
-  /** Anchors whose element is no longer in the page. */
-  orphans: string[];
+  /** Anchors that neither the anchor nor any locator can find on the page. */
+  orphans: AnchorOrphan[];
   labels: Record<string, string>;
   recompute: () => void;
 };
 
-export type AnchorTally = { anchor: string; count: number; first: string };
+const legacyCache = new Map<string, CommentLocator[]>();
 
-/** Root comments grouped by anchor, ordered by when the anchor was first used. */
-export function tallyAnchors(comments: Comment[]): AnchorTally[] {
-  const tallies = new Map<string, AnchorTally>();
-  for (const comment of comments) {
-    if (comment.parentId) continue; // replies share their root's pin
-    const anchor = comment.anchor ?? DOCUMENT_ANCHOR;
-    if (anchor === DOCUMENT_ANCHOR) continue;
-
-    const existing = tallies.get(anchor);
-    if (!existing) {
-      tallies.set(anchor, { anchor, count: 1, first: comment.createdAt });
-      continue;
-    }
-    existing.count += 1;
-    if (comment.createdAt < existing.first) existing.first = comment.createdAt;
-  }
-  return [...tallies.values()].sort(
-    (a, b) => a.first.localeCompare(b.first) || a.anchor.localeCompare(b.anchor),
-  );
+/** Locators of the comment that first used `anchor`, derived from its HTML when it predates them. */
+function locatorsFor(
+  comments: PlaygroundComment[],
+  anchor: string,
+): CommentLocator[] {
+  const first = comments
+    .filter((comment) => !comment.parentId && comment.anchor === anchor)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+  const element = first?.element;
+  if (!element) return [];
+  if (element.locators) return element.locators;
+  const cached = legacyCache.get(element.html);
+  if (cached) return cached;
+  const derived = legacyLocators(element.html);
+  legacyCache.set(element.html, derived);
+  return derived;
 }
+
+/** Rail label: how the element was found when that was not the stored anchor. */
+function matchLabel(match: CommentMatch): string {
+  const described = describeElement(match.element);
+  const { matchedBy, conflict } = match;
+  if (matchedBy === "anchor") {
+    return conflict ? `Locators disagree — ${described}` : described;
+  }
+  const how =
+    matchedBy.kind === "css"
+      ? "matched by its saved selector"
+      : matchedBy.kind === "role"
+        ? "matched by role and name"
+        : matchedBy.heading
+          ? `found under “${matchedBy.heading.text}”`
+          : "matched by text";
+  return `Moved — ${how}${conflict ? ", locators disagree" : ""}: ${described}`;
+}
+
+export { tallyAnchors, type AnchorTally } from "./anchor-tally";
 
 function samePins(a: AnchorPin[], b: AnchorPin[]): boolean {
   return (
@@ -59,6 +93,7 @@ function samePins(a: AnchorPin[], b: AnchorPin[]): boolean {
         other !== undefined &&
         pin.anchor === other.anchor &&
         pin.count === other.count &&
+        pin.moved === other.moved &&
         pin.box.left === other.box.left &&
         pin.box.top === other.box.top &&
         pin.box.width === other.box.width &&
@@ -68,8 +103,15 @@ function samePins(a: AnchorPin[], b: AnchorPin[]): boolean {
   );
 }
 
-function sameList(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((value, index) => value === b[index]);
+function sameOrphans(a: AnchorOrphan[], b: AnchorOrphan[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every(
+      (orphan, index) =>
+        orphan.anchor === b[index]?.anchor &&
+        orphan.unresolved === b[index]?.unresolved,
+    )
+  );
 }
 
 export type DomAnchorRefs = {
@@ -80,23 +122,24 @@ export type DomAnchorRefs = {
 };
 
 /**
- * Resolves each stored anchor back to a live element, registers it with the
- * `CommentProvider` (so the rail can align and scroll to it) and reports pin
- * geometry. Anchors that no longer resolve surface as `orphans` rather than
- * disappearing.
+ * Resolves each stored anchor back to a live element — through the anchor and
+ * the comment's stored locators — registers it with the `CommentProvider` (so
+ * the rail can align and scroll to it) and reports pin geometry. A fallback
+ * match is labelled as moved; anchors nothing can find surface as `orphans`
+ * rather than disappearing.
  *
  * The pin overlay must render *outside* `contentRef` — it is a sibling in the
  * scroll container — so that drawing pins cannot retrigger the observer.
  */
 export function useDomAnchors(
   refs: DomAnchorRefs,
-  comments: Comment[],
+  comments: PlaygroundComment[],
   registerAnchor: (anchor: string, el: HTMLElement | null) => void,
 ): DomAnchors {
   const { scrollRef, contentRef } = refs;
   const [pins, setPins] = useState<AnchorPin[]>([]);
   const [overlayPins, setOverlayPins] = useState<AnchorPin[]>([]);
-  const [orphans, setOrphans] = useState<string[]>([]);
+  const [orphans, setOrphans] = useState<AnchorOrphan[]>([]);
   const [labels, setLabels] = useState<Record<string, string>>({});
   const registeredRef = useRef<string[]>([]);
   const frameRef = useRef<number | null>(null);
@@ -111,21 +154,35 @@ export function useDomAnchors(
 
     const nextPins: AnchorPin[] = [];
     const nextOverlayPins: AnchorPin[] = [];
-    const nextOrphans: string[] = [];
+    const nextOrphans: AnchorOrphan[] = [];
     const nextLabels: Record<string, string> = {};
 
     tallyAnchors(comments).forEach((tally, position) => {
-      const element = resolveAnchor(content, tally.anchor);
       const dialog = overlayLabel(tally.anchor);
+      // Dialog anchors carry no locators: their portal is outside the artifact.
+      const match =
+        dialog === null
+          ? resolveComment(content, tally.anchor, locatorsFor(comments, tally.anchor))
+          : null;
+      const element = match ? match.element : resolveAnchor(content, tally.anchor);
       if (!(element instanceof HTMLElement)) {
         // A closed dialog is expected, not a broken anchor.
-        if (dialog === null) nextOrphans.push(tally.anchor);
-        else nextLabels[tally.anchor] = `In dialog “${dialog}” (closed)`;
+        if (dialog === null) {
+          nextOrphans.push({
+            anchor: tally.anchor,
+            unresolved: comments.some(
+              (comment) =>
+                !comment.parentId &&
+                comment.anchor === tally.anchor &&
+                isUnresolved(PLAYGROUND_COMMENT_CONFIG, comment.status),
+            ),
+          });
+        } else nextLabels[tally.anchor] = `In dialog “${dialog}” (closed)`;
         return;
       }
       registerAnchor(tally.anchor, element);
       registeredRef.current.push(tally.anchor);
-      nextLabels[tally.anchor] = describeElement(element);
+      nextLabels[tally.anchor] = match ? matchLabel(match) : describeElement(element);
       const { left, top, width, height } = element.getBoundingClientRect();
       (dialog === null ? nextPins : nextOverlayPins).push({
         anchor: tally.anchor,
@@ -135,6 +192,7 @@ export function useDomAnchors(
             ? elementBoxWithin(element, scroll)
             : { left, top, width, height },
         count: tally.count,
+        moved: match !== null && match.matchedBy !== "anchor",
       });
     });
 
@@ -142,7 +200,7 @@ export function useDomAnchors(
     setOverlayPins((current) =>
       samePins(current, nextOverlayPins) ? current : nextOverlayPins,
     );
-    setOrphans((current) => (sameList(current, nextOrphans) ? current : nextOrphans));
+    setOrphans((current) => (sameOrphans(current, nextOrphans) ? current : nextOrphans));
     setLabels((current) => {
       const keys = Object.keys(nextLabels);
       const unchanged =
