@@ -121,6 +121,43 @@ export const markdownlintClean: LinterResult = {
   violations: [],
 };
 
+/** A prompt run queued behind the concurrency limit: nothing launched yet. */
+export const promptPending: LinterResult = {
+  linter: "review:pkg/server",
+  work_dir: WORK_DIR,
+  status: "pending",
+  violations: [],
+};
+
+/** A prompt run in flight: the agent has already reported one finding. */
+export const promptRunning: LinterResult = {
+  linter: "review:models/violation.go",
+  work_dir: WORK_DIR,
+  status: "running",
+  run_id: "run-7f3a",
+  violations: [
+    {
+      file: `${WORK_DIR}/models/violation.go`,
+      line: 14,
+      severity: "warning",
+      rule: { method: "naming" },
+      message: "Field `EndCol` should be named `EndColumn` to match the wire format",
+    },
+  ],
+};
+
+/** Prompt runs that finished (no status): the run id stays for the transcript. */
+export const promptFinished: LinterResult = {
+  linter: "review:cmd/gavel/main.go",
+  work_dir: WORK_DIR,
+  run_id: "run-2c10",
+  success: true,
+  duration: 38_000_000_000,
+  violations: [],
+};
+
+export const inFlightLintResults: LinterResult[] = [promptPending, promptRunning, promptFinished];
+
 export const allLintResults: LinterResult[] = [
   golangci,
   eslint,

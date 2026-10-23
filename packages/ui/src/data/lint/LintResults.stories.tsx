@@ -2,7 +2,8 @@ import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
 import { Button } from "../../components/button";
-import { LintResults } from "./LintResults";
+import { LintResults, type LintResultsProps } from "./LintResults";
+import { buildLintTree } from "./grouping";
 import { emptyLintFilters, type LintAction, type LintFilters, type LintGrouping, type LinterResult } from "./types";
 import {
   allLintResults,
@@ -10,6 +11,8 @@ import {
   eslint,
   golangci,
   markdownlintClean,
+  promptPending,
+  promptRunning,
   pyrightFailed,
   valeSkipped,
 } from "./LintResults.fixtures";
@@ -37,12 +40,14 @@ function Harness({
   filters: initialFilters = emptyLintFilters(),
   selected: initialSelected = null,
   withIgnore = false,
+  renderRun,
 }: {
   results?: LinterResult[];
   grouping?: LintGrouping;
   filters?: LintFilters;
   selected?: string | null;
   withIgnore?: boolean;
+  renderRun?: LintResultsProps["renderRun"];
 }) {
   const [grouping, setGrouping] = useState<LintGrouping>(initialGrouping);
   const [filters, setFilters] = useState<LintFilters>(initialFilters);
@@ -76,6 +81,7 @@ function Harness({
           </Button>
         }
         {...(withIgnore ? { onIgnore, ignoreBusy: busy } : {})}
+        {...(renderRun ? { renderRun } : {})}
       />
       {applied && (
         <pre data-testid="applied-ignore" className="border-t border-border bg-muted p-2 font-mono text-xs">
@@ -188,4 +194,52 @@ export const IgnoreActions: Story = {
 
 export const IgnoreOnFolder: Story = {
   render: () => <Harness results={[golangci]} withIgnore grouping="linter-file" selected="golangci-lint/pkg" />,
+};
+
+/** Route path of the linter root for `linter`, as the host would keep it in its URL. */
+function linterRoute(results: LinterResult[], linter: string): string {
+  const root = buildLintTree({ results, grouping: "linter-rule-file", filters: emptyLintFilters() }).find(
+    (node) => node.linterName === linter,
+  );
+  if (!root) throw new Error(`no tree node for linter ${linter}`);
+  return root.route_path;
+}
+
+const IN_FLIGHT = [golangci, promptPending, promptRunning];
+
+/** A queued run shows a muted clock and a running one a spinner with its violations so far; neither reads as a pass or a failure. */
+export const PromptRunsInFlight: Story = {
+  render: () => <Harness results={IN_FLIGHT} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("img", { name: "Pending" })).toBeInTheDocument();
+    await expect(canvas.getByRole("img", { name: "Running" })).toBeInTheDocument();
+  },
+};
+
+export const PendingLinterDetail: Story = {
+  render: () => <Harness results={IN_FLIGHT} selected={linterRoute(IN_FLIGHT, promptPending.linter)} />,
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByText("pending")).toBeInTheDocument();
+  },
+};
+
+/** The host decides what `renderRun` shows; here a stand-in for a live session transcript. */
+export const RunningLinterWithRunView: Story = {
+  render: () => (
+    <Harness
+      results={IN_FLIGHT}
+      selected={linterRoute(IN_FLIGHT, promptRunning.linter)}
+      renderRun={(result) => (
+        <div className="rounded border border-border bg-muted/40 p-3 font-mono text-xs">
+          following run {result.run_id}
+        </div>
+      )}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("running")).toBeInTheDocument();
+    await expect(canvas.getByText("following run run-7f3a")).toBeInTheDocument();
+  },
 };

@@ -1,3 +1,4 @@
+/// <reference types="vitest/jsdom" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createEventHub } from "./event-hub";
 import type { EventSourceFactory, EventSourceLike } from "./event-source";
@@ -439,21 +440,22 @@ describe("createEventHub build-mismatch reload", () => {
   });
 
   it("reloads the window by default on a mismatch", async () => {
-    const originalLocation = Object.getOwnPropertyDescriptor(window, "location")!;
-    const reload = vi.fn();
-    Object.defineProperty(window, "location", {
-      value: { ...window.location, reload },
-      writable: true,
-      configurable: true,
-    });
+    // jsdom's location and location.reload are unforgeable (non-configurable),
+    // so the real reload runs: jsdom reports the navigation it doesn't
+    // implement as a jsdomError on its virtual console.
+    const navigations: string[] = [];
+    const onJsdomError = (error: Error) => {
+      if (error.message.startsWith("Not implemented: navigation")) navigations.push(error.message);
+    };
+    jsdom.virtualConsole.on("jsdomError", onJsdomError);
     try {
       const open = createEventHub({ buildId: "build-a" });
       open("/api/prs/stream");
       FakeRealEventSource.instances[0].emit("__hello", helloPayload("conn-1", "build-b"));
       await flush();
-      expect(reload).toHaveBeenCalledTimes(1);
+      expect(navigations).toHaveLength(1);
     } finally {
-      Object.defineProperty(window, "location", originalLocation);
+      jsdom.virtualConsole.off("jsdomError", onJsdomError);
     }
   });
 
