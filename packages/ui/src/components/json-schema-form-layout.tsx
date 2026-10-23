@@ -11,6 +11,8 @@ import type {
   HelpDisplay,
 } from "./json-schema-form-types";
 import { DEFAULT_COLUMN_MIN_WIDTH } from "./json-schema-form-utils";
+import { FormHelp } from "./json-schema-form-help-links";
+import { hasFormHelp } from "./json-schema-form-help-model";
 import {
   controlMinHeightClass,
   fieldInnerGapClass,
@@ -215,8 +217,8 @@ export function FieldLabel({
           {field.badge}
         </span>
       )}
-      {helpDisplay === "hover" && field.helper && (
-        <HelpHint label={field.label} helper={field.helper} />
+      {helpDisplay === "hover" && hasFormHelp(field) && (
+        <HelpHint label={field.label} helper={<FormHelp field={field} />} />
       )}
     </label>
   );
@@ -225,7 +227,7 @@ export function FieldLabel({
 // HelpHint is the `?` affordance that replaces a permanent description
 // paragraph. HoverCard opens on focus as well as hover, so the text stays
 // reachable from the keyboard rather than being mouse-only.
-export function HelpHint({ label, helper }: { label: string; helper: string }) {
+export function HelpHint({ label, helper }: { label: string; helper: ReactNode }) {
   return (
     <HoverCard
       placement="top"
@@ -260,7 +262,7 @@ export function SectionHeading({
   size: FormSize;
   helpDisplay?: HelpDisplay;
 }) {
-  const { required, badge, helper, labelIcon } = field;
+  const { required, badge, labelIcon } = field;
   return (
     <span className={cn("flex min-w-0 items-center gap-2", labelSizeClass[size])}>
       <LabelIcon
@@ -274,7 +276,7 @@ export function SectionHeading({
           {badge}
         </span>
       )}
-      {helpDisplay === "hover" && helper && <HelpHint label={label} helper={helper} />}
+      {helpDisplay === "hover" && hasFormHelp(field) && <HelpHint label={label} helper={<FormHelp field={field} />} />}
     </span>
   );
 }
@@ -304,7 +306,7 @@ export function ObjectSection({
 }: {
   heading: ReactNode;
   size: FormSize;
-  helper?: string;
+  helper?: ReactNode;
   helpDisplay?: HelpDisplay;
   children: ReactNode;
 }) {

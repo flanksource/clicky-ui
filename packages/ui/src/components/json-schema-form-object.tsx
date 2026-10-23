@@ -186,7 +186,7 @@ export function StringMapControl({
         key,
         prop: valueSchema,
         required: false,
-        value: map[key] ?? "",
+        value: map[key],
         onChange: (next) => setEntry(key, next),
         instancePath: appendInstancePath(ctx.instancePath, key),
       },
@@ -247,8 +247,7 @@ export function StringMapControl({
         !properties && fieldInnerGapClass[childCtx.size],
       )}
     >
-      {knownKeys.map((key) =>
-        properties ? (
+      {knownKeys.map((key) => (
           <div key={`known-${key}`} className="contents">
             {ctx.render.renderFieldRow(
               {
@@ -264,27 +263,7 @@ export function StringMapControl({
               childCtx,
             )}
           </div>
-        ) : (
-          <div
-            key={`known-${key}`}
-            className="grid grid-cols-[10rem_1fr] items-center gap-2"
-          >
-            <label
-              htmlFor={fieldInputId(
-                appendInstancePath(ctx.instancePath, key),
-                childCtx.idPrefix,
-              )}
-              className="truncate text-xs text-muted-foreground"
-              title={key}
-            >
-              {key}
-            </label>
-            <div className="min-w-0">
-              {valueControlFor(key, known[key] ?? { type: "string" })}
-            </div>
-          </div>
-        ),
-      )}
+        ))}
       {extraKeys.map((key) => {
         const keyControl = ctx.presentation ? (
           <span
