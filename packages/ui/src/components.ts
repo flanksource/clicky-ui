@@ -105,6 +105,7 @@ export {
   type RangeSliderProps,
   type RangeSliderValue,
 } from "./components/RangeSlider";
+export { Slider, type SliderProps } from "./components/Slider";
 export {
   FilterBar,
   FilterBarFilterPanel,
@@ -130,7 +131,9 @@ export {
   type FilterBarSearchProps,
   type FilterBarSelectMultiFilter,
   type FilterBarTextFilter,
+  type FilterBarTreeFilter,
   type FilterBarWorkloadFilter,
+  type FilterTreeNode,
   TriStateMultiSelect,
   type TriStateMultiSelectProps,
 } from "./components/FilterBar";
