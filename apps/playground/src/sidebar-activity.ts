@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import updatedAtBuild from "virtual:playground-page-activity";
+import { isUnresolvedStatus } from "../plugins/comments-statuses";
 import type { PageComment } from "./comments/useComments";
 
 export type SidebarSort = "none" | "updated" | "commented" | "resolved";
@@ -28,7 +29,7 @@ export function activityByPage(comments: readonly PageComment[], updates: Record
     const activity = get(comment.page);
     activity.commented = Math.max(activity.commented, timestamp(comment.createdAt));
     if (comment.parentId) continue;
-    if (comment.status === "open" || comment.status === "in_progress") activity.openCount++;
+    if (isUnresolvedStatus(comment.status)) activity.openCount++;
     if (comment.status === "resolved") {
       activity.resolvedCount++;
       activity.resolved = Math.max(activity.resolved, timestamp(comment.updatedAt ?? comment.createdAt));

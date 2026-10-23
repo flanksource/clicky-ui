@@ -2,6 +2,7 @@ import {
   Suspense,
   lazy,
   useCallback,
+  useMemo,
   useState,
   type ComponentType,
   type LazyExoticComponent,
@@ -48,6 +49,7 @@ const SourceEditor = lazy(() =>
   })),
 );
 import { useFeedbackCopy } from "./comments/useFeedbackCopy";
+import { useAgentRuns } from "./agent-runs/AgentRunsProvider";
 import {
   type PageComment,
   type PlaygroundComments,
@@ -124,6 +126,7 @@ export function PlaygroundShell({
   onPrepareCommentSelection,
 }: PlaygroundShellProps) {
   const ctx = useCommentContext();
+  const agentRuns = useAgentRuns();
   const [sidebar, setSidebar] = useSidebarState();
   const activity = usePageActivity();
   const [editing, setEditing] = useState(false);
@@ -137,11 +140,21 @@ export function PlaygroundShell({
       ? "Save or revert the source before changing pages"
       : undefined;
 
+  // The provider's comments are typed without the element context the
+  // locators live in; the same page's comments from the API carry it.
+  const pageComments = useMemo(
+    () =>
+      view === "preview" && active
+        ? allComments.filter((comment) => comment.page === active.slug)
+        : [],
+    [active, allComments, view],
+  );
   const { pins, overlayPins, orphans, labels } = useDomAnchors(
     { scrollRef: ctx.contentRef, contentRef },
-    view === "preview" ? ctx.comments : [],
+    pageComments,
     ctx.registerAnchor,
   );
+  const unresolvedOrphans = orphans.filter((orphan) => orphan.unresolved).length;
 
   const pageMove = usePageMoveDrag({
     disabled: filesystemActionsDisabled,
@@ -357,10 +370,10 @@ export function PlaygroundShell({
                   Page Markdown was not copied — {pageGuidance.copyError}
                 </Banner>
               )}
-              {view === "preview" && annotations === "visible" && orphans.length > 0 && (
+              {view === "preview" && annotations === "visible" && unresolvedOrphans > 0 && (
                 <Banner tone="warning">
-                  {orphans.length} comment anchor
-                  {orphans.length === 1
+                  {unresolvedOrphans} open comment
+                  {unresolvedOrphans === 1
                     ? " no longer matches"
                     : "s no longer match"}{" "}
                   an element on this page. The notes are kept and listed as
@@ -455,8 +468,12 @@ export function PlaygroundShell({
                   { id: "screenshot", label: "Post with screenshot" },
                 ]}
                 threadToMarkdown={feedback.threadToMarkdown}
+                extraAssignItems={agentRuns.extraAssignItems}
                 renderRootDetails={(comment) => (
-                  <CommentCapture comment={comment} />
+                  <>
+                    <CommentCapture comment={comment} />
+                    {agentRuns.renderRunDetails(comment)}
+                  </>
                 )}
               />
             )}
