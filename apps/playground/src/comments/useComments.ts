@@ -9,18 +9,20 @@ import {
   DEFAULT_COMMENT_STATUSES,
   DOCUMENT_ANCHOR,
   type Comment,
+  type CommentAuthor,
   type CommentConfig,
   type CommentCreateInput,
   type CommentRating,
   type CommentReplyInput,
 } from "@flanksource/clicky-ui/comments";
 
+import type { AgentSessionRuntime } from "../../plugins/agent-session-store";
 import type {
   CommentElementCaptureContext,
   CommentElementContext,
   CommentScreenshotCapture,
 } from "../../plugins/comments-model";
-import { resolveAnchor } from "./dom-anchor";
+import { overlayLabel, resolveAnchor } from "./dom-anchor";
 import { captureElementContext, captureElementHtml } from "./element-context";
 import { captureScreenshot } from "./screenshot";
 
@@ -32,8 +34,20 @@ export const PLAYGROUND_COMMENT_AUTHOR = {
   kind: "user",
 } as const;
 
+/**
+ * Who a thread can be handed to. Agent names match the `author.name` the
+ * copied instructions tell each agent to use, so an agent acknowledging its own
+ * hand-off is recognised as the assignee rather than as a competing claim.
+ */
+export const PLAYGROUND_ASSIGNEES: NonNullable<CommentConfig["assignees"]> = [
+  { id: "you", name: PLAYGROUND_COMMENT_AUTHOR.name, kind: "user" },
+  { id: "claude", name: "Claude", kind: "agent" },
+  { id: "codex", name: "Codex", kind: "agent" },
+];
+
 export const PLAYGROUND_COMMENT_CONFIG: CommentConfig = {
   statuses: DEFAULT_COMMENT_STATUSES,
+  assignees: PLAYGROUND_ASSIGNEES,
 };
 
 /** A comment as the API returns it: tagged with the page it was left on. */
@@ -41,6 +55,18 @@ export type PlaygroundComment = Comment & {
   element?: CommentElementContext;
 };
 export type PageComment = PlaygroundComment & { page: string };
+
+/**
+ * The root an anchor's locators are computed against. Dialog anchors get none:
+ * their element lives in a portal outside the artifact and is usually closed
+ * when the page is reloaded, so only the anchor itself can find it.
+ */
+function locatorRoot(
+  anchor: string,
+  content: Element | null,
+): { root?: Element } {
+  return content && overlayLabel(anchor) === null ? { root: content } : {};
+}
 
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
@@ -98,7 +124,16 @@ export type PlaygroundComments = {
   ) => void;
   reply: (input: CommentReplyInput) => Promise<void>;
   updateStatus: (id: string, status: string) => Promise<void>;
+  /** Claim a thread for the current user. */
+  acknowledge: (id: string) => Promise<void>;
+  /** Hand a thread to `assignee`, or clear the hand-off with `null`. */
+  assign: (id: string, assignee: CommentAuthor | null) => Promise<void>;
   close: (id: string) => Promise<void>;
+  /**
+   * Send a thread to the shared agent session. `runtime` is required only when
+   * no session is live, in which case it starts one.
+   */
+  runAgent: (id: string, runtime?: AgentSessionRuntime) => Promise<void>;
   commentAndReopen: (id: string, body: string) => Promise<void>;
   updateRating: (id: string, rating: CommentRating) => Promise<void>;
   remove: (id: string) => Promise<void>;
@@ -143,17 +178,17 @@ export function useComments(
         page,
         anchor,
         target,
-        context: captureElementContext(
-          target,
-          `apps/playground/src/pages/${page}.tsx`,
-        ).then(
+        context: captureElementContext(target, {
+          fallbackSource: `apps/playground/src/pages/${page}.tsx`,
+          ...locatorRoot(anchor, contentRef.current),
+        }).then(
           (value) => ({ status: "fulfilled" as const, value }),
           (reason: unknown) => ({ status: "rejected" as const, reason }),
         ),
         ...(screenshot ? { screenshot } : {}),
       };
     },
-    [page],
+    [contentRef, page],
   );
 
   const refresh = useCallback(async () => {
@@ -279,10 +314,10 @@ export function useComments(
                   source: `apps/playground/src/pages/${page}.tsx`,
                   html: captureElementHtml(target),
                 })
-              : captureElementContext(
-                  target,
-                  `apps/playground/src/pages/${page}.tsx`,
-                );
+              : captureElementContext(target, {
+                  fallbackSource: `apps/playground/src/pages/${page}.tsx`,
+                  ...locatorRoot(anchor, content),
+                });
           const capturedContext = await context;
           const capturedScreenshot = await screenshot;
           const element: CommentElementCaptureContext = {
@@ -339,12 +374,41 @@ export function useComments(
               author: PLAYGROUND_COMMENT_AUTHOR,
             });
           }
-          return request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status }),
-          });
+          throw new Error(
+            `Status ${JSON.stringify(status)} cannot be set directly; use acknowledge, assign, resolve or reopen`,
+          );
         },
+        { rethrow: true },
+      ),
+    [mutate, post],
+  );
+
+  const acknowledge = useCallback(
+    (id: string) =>
+      mutate(
+        () =>
+          post(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}/acknowledge`, {
+            author: PLAYGROUND_COMMENT_AUTHOR,
+          }),
+        { rethrow: true },
+      ),
+    [mutate, post],
+  );
+
+  const assign = useCallback(
+    (id: string, assignee: CommentAuthor | null) =>
+      mutate(
+        () =>
+          post(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}/assign`, {
+            author: PLAYGROUND_COMMENT_AUTHOR,
+            assignee:
+              assignee === null
+                ? null
+                : {
+                    name: assignee.name,
+                    ...(assignee.kind ? { kind: assignee.kind } : {}),
+                  },
+          }),
         { rethrow: true },
       ),
     [mutate, post],
@@ -356,6 +420,19 @@ export function useComments(
         () =>
           post(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}/close`, {
             author: PLAYGROUND_COMMENT_AUTHOR,
+          }),
+        { rethrow: true },
+      ),
+    [mutate, post],
+  );
+
+  const runAgent = useCallback(
+    (id: string, runtime?: AgentSessionRuntime) =>
+      mutate(
+        () =>
+          post(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}/agent-run`, {
+            author: PLAYGROUND_COMMENT_AUTHOR,
+            ...(runtime ? { runtime } : {}),
           }),
         { rethrow: true },
       ),
@@ -407,7 +484,10 @@ export function useComments(
     prepareSelection,
     reply,
     updateStatus,
+    acknowledge,
+    assign,
     close,
+    runAgent,
     commentAndReopen,
     updateRating,
     remove,

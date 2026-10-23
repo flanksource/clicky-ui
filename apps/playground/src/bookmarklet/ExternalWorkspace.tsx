@@ -6,6 +6,10 @@ import {
 } from "@flanksource/clicky-ui";
 import { BookmarkletInstall } from "./BookmarkletInstall";
 import { PlaygroundAgentInstructions } from "../PlaygroundAgentInstructions";
+import {
+  AgentSessionButton,
+  useAgentRuns,
+} from "../agent-runs/AgentRunsProvider";
 import { useExternalCatalog } from "./external-catalog";
 import { ExternalPreview } from "./ExternalPreview";
 import { CommentCapture } from "../comments/CommentCapture";
@@ -52,6 +56,7 @@ export function ExternalWorkspace({
   });
   const page = catalog.pages.find((entry) => entry.id === id);
   const ctx = useCommentContext();
+  const agentRuns = useAgentRuns();
   const feedback = useFeedbackCopy({
     active: undefined,
     external: page,
@@ -71,6 +76,7 @@ export function ExternalWorkspace({
       actions={
         <>
           <PlaygroundAgentInstructions />
+          <AgentSessionButton />
           <BookmarkletInstall />
           <Button
             size="sm"
@@ -190,8 +196,12 @@ export function ExternalWorkspace({
               className="!w-full"
               formatAnchorLabel={(anchor) => anchor}
               threadToMarkdown={feedback.threadToMarkdown}
+              extraAssignItems={agentRuns.extraAssignItems}
               renderRootDetails={(comment) => (
-                <CommentCapture comment={comment} />
+                <>
+                  <CommentCapture comment={comment} />
+                  {agentRuns.renderRunDetails(comment)}
+                </>
               )}
             />
           )}
