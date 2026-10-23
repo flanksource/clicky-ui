@@ -3,9 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { LintResults, type LintResultsProps } from "./LintResults";
 import { emptyLintFilters, type LintAction, type LintFilters, type LintGrouping, type LinterResult } from "./types";
-import { allLintResults, eslint, golangci, pyrightFailed } from "./LintResults.fixtures";
+import { allLintResults, betterleaks, eslint, golangci, pyrightFailed } from "./LintResults.fixtures";
 
-type HarnessProps = Partial<Pick<LintResultsProps, "onIgnore" | "ignoreBusy" | "title" | "headerSlot">> & {
+type HarnessProps = Partial<Pick<LintResultsProps, "onIgnore" | "ignoreBusy" | "title" | "headerSlot" | "onOpenFile">> & {
   results?: LinterResult[];
   initialGrouping?: LintGrouping;
   initialFilters?: LintFilters;
@@ -245,6 +245,32 @@ describe("LintResults", () => {
     it("omits the title when null", () => {
       render(<Harness title={null} />);
       expect(screen.queryByText("Lint Results")).toBeNull();
+    });
+  });
+
+  describe("Open in Files", () => {
+    const SELECTED_FILE = "golangci-lint/errcheck/pkg-server-handler-go";
+
+    it("hands the host each violation's file, work dir and line", () => {
+      const onOpenFile = vi.fn();
+      render(<Harness onOpenFile={onOpenFile} initialSelected={SELECTED_FILE} />);
+
+      const links = screen.getAllByRole("button", { name: "Open in Files" });
+      expect(links).toHaveLength(2);
+      fireEvent.click(links[1]!);
+
+      expect(onOpenFile).toHaveBeenCalledWith({ file: "pkg/server/handler.go", workDir: "/repo/gavel", line: 88 });
+    });
+
+    it("is absent unless the host supplies onOpenFile", () => {
+      render(<Harness initialSelected={SELECTED_FILE} />);
+      expect(screen.queryByRole("button", { name: "Open in Files" })).toBeNull();
+    });
+
+    it("is absent for a violation that names no file", () => {
+      render(<Harness onOpenFile={vi.fn()} results={[betterleaks]} initialSelected="betterleaks/generic-api-key" />);
+      expect(screen.getByText("Potential API key found in git history")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Open in Files" })).toBeNull();
     });
   });
 

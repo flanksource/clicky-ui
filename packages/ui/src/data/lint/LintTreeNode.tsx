@@ -1,8 +1,8 @@
 import { Icon } from "../Icon";
 import { Badge } from "../Badge";
 import { cn } from "../../lib/utils";
-import { UiFileCode, UiFolder, UiTag, UiWrench } from "../../icons";
-import { LintSeverityIcon, ToolIcon } from "../test-runner/MarkIcons";
+import { UiClock, UiFileCode, UiFolder, UiTag, UiWrench } from "../../icons";
+import { LintSeverityIcon, OutcomeIcon, ToolIcon } from "../test-runner/MarkIcons";
 import { toolMark } from "../test-runner/marks";
 import { lintNodeCount, lintNodeSeverity } from "./stats";
 import type { LintNode, LintSeverity } from "./types";
@@ -15,6 +15,10 @@ const COUNT_TONE = { error: "danger", warning: "warning", info: "info" } as cons
 function NodeIcon({ node }: { node: LintNode }) {
   switch (node.kind) {
     case "linter":
+      if (node.linter?.status === "running") return <OutcomeIcon outcome="running" />;
+      if (node.linter?.status === "pending") {
+        return <Icon icon={UiClock} title="Pending" className="shrink-0 text-muted-foreground" />;
+      }
       return toolMark(node.linterName) ? (
         <ToolIcon tool={node.linterName} />
       ) : (
@@ -45,7 +49,7 @@ export function LintTreeNode({ node, selected }: { node: LintNode; selected: boo
           "min-w-0 truncate",
           selected ? "font-semibold" : "font-medium",
           node.kind === "linter-error" ? "text-red-600 dark:text-red-400" : "text-foreground",
-          node.skipped && "text-muted-foreground",
+          (node.skipped || (node.kind === "linter" && node.linter?.status === "pending")) && "text-muted-foreground",
         )}
         title={node.name}
       >

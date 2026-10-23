@@ -5,8 +5,9 @@ import { SplitPane } from "../../layout/SplitPane";
 import { useContainerWiderThan } from "../../hooks/use-container-width";
 import { cn } from "../../lib/utils";
 import { UiArrowLeft, UiListChecks } from "../../icons";
+import type { OpenFileTarget } from "../OpenInFilesLink";
 import { LintSeverityIcon } from "../test-runner/MarkIcons";
-import { LintDetailPanel } from "./LintDetail";
+import { LintDetailPanel, type LintDetailPanelProps } from "./LintDetail";
 import { LintFilterBar } from "./LintFilterBar";
 import { LintTreeNode } from "./LintTreeNode";
 import { buildLintTree, findLintNode } from "./grouping";
@@ -33,6 +34,13 @@ export type LintResultsProps = {
   onIgnore?: (action: LintAction) => void | Promise<void>;
   /** Disables the ignore buttons while the host applies an action. */
   ignoreBusy?: boolean;
+  /**
+   * Called with a violation's file, work dir and line when the reader asks to
+   * open it in the host's annotated file view. Omit to hide the "Open in Files" links.
+   */
+  onOpenFile?: (target: OpenFileTarget) => void;
+  /** Renders the prompt run behind a linter in its detail pane (see LintDetailPanelProps.renderRun). */
+  renderRun?: LintDetailPanelProps["renderRun"];
   /** Actions at the right end of the header bar (e.g. re-run, export). */
   headerSlot?: ReactNode;
   /** Header title. Defaults to a "Lint Results" heading; pass `null` for none. */
@@ -90,6 +98,8 @@ export function LintResults({
   onExpandAllChange,
   onIgnore,
   ignoreBusy,
+  onOpenFile,
+  renderRun,
   headerSlot,
   title,
   defaultSplit = 45,
@@ -130,7 +140,14 @@ export function LintResults({
     />
   );
   const detailPane = (
-    <LintDetailPanel node={selectedNode} results={results} onIgnore={onIgnore} ignoreBusy={ignoreBusy} />
+    <LintDetailPanel
+      node={selectedNode}
+      results={results}
+      onIgnore={onIgnore}
+      ignoreBusy={ignoreBusy}
+      onOpenFile={onOpenFile}
+      renderRun={renderRun}
+    />
   );
   const showHeader = title !== null || results.length > 0 || headerSlot != null;
 

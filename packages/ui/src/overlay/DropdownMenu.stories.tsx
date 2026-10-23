@@ -74,6 +74,7 @@ export const CustomContent: Story = {
 };
 
 export const OpensModal: Story = {
+  tags: ["browser"],
   parameters: {
     docs: {
       description: {
