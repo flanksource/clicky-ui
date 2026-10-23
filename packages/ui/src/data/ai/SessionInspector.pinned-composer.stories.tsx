@@ -30,7 +30,7 @@ const LONG_SESSION = {
 const meta = {
   title: "AI/SessionInspector/Pinned composer",
   component: SessionInspector,
-  tags: ["autodocs"],
+  tags: ["autodocs", "browser"],
   parameters: {
     layout: "fullscreen",
     viewport: { defaultViewport: "mobile1" },
