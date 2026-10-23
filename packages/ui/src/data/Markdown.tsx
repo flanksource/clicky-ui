@@ -1,10 +1,13 @@
 import {
+  cloneElement,
   isValidElement,
   useEffect,
+  useMemo,
   useState,
   type ComponentType,
   type CSSProperties,
   type HTMLAttributes,
+  type ReactElement,
   type ReactNode,
 } from "react";
 import { cn } from "../lib/utils";
@@ -12,6 +15,7 @@ import { ConfirmDialog } from "../overlay/ConfirmDialog";
 import { useRouter } from "../rpc/router";
 import { Callout, type CalloutProps } from "./Callout";
 import { CodeBlock } from "./CodeBlock";
+import { rehypeSourceBlocks, sourceAttributes, type SourceAttributes } from "./markdown-source-blocks";
 
 export type MarkdownProps = {
   /** Markdown source text. */
@@ -27,11 +31,19 @@ export type MarkdownProps = {
    * turn on wherever callouts are wanted.
    */
   callouts?: boolean | undefined;
+  /**
+   * Stamp each top-level block with `data-source-start` / `data-source-end`, the
+   * 1-based line range of `text` it renders, so a host can anchor annotations
+   * to source lines. The document renders as one static block (no streaming),
+   * which keeps the line numbers absolute; Streamdown's default sanitising
+   * stays in place. Cannot be combined with `callouts`.
+   */
+  sourceBlocks?: boolean | undefined;
 };
 
 // Streamdown routes a fenced code block to the `code` override with a `data-block`
 // marker (injected by its default `pre` handler); inline code arrives without it.
-type MarkdownCodeProps = {
+type MarkdownCodeProps = SourceAttributes & {
   className?: string;
   children?: ReactNode;
   "data-block"?: string;
@@ -39,8 +51,9 @@ type MarkdownCodeProps = {
 
 // Every override also receives the source `node`, which is not a DOM attribute —
 // each one drops it rather than spreading it onto the element. `style` carries
-// the per-column alignment GFM puts on table cells.
-type MarkdownElementProps = {
+// the per-column alignment GFM puts on table cells. `data-source-*` is the one
+// pair of extra attributes forwarded, so `sourceBlocks` anchors survive.
+type MarkdownElementProps = SourceAttributes & {
   className?: string;
   children?: ReactNode;
   style?: CSSProperties;
@@ -81,10 +94,18 @@ type StreamdownComponent = ComponentType<{
   children: string;
   className?: string | undefined;
   parseIncompleteMarkdown?: boolean | undefined;
+  // "static" parses the whole document as one block instead of streaming it in
+  // blocks, so hast positions are relative to the document.
+  mode?: "static" | "streaming" | undefined;
+  rehypePlugins?: readonly unknown[] | undefined;
   // Tag name -> the attribute names it may carry. Streamdown drops every other
   // raw tag, so this is an allowlist rather than raw-HTML passthrough.
   allowedTags?: Record<string, string[]> | undefined;
   components?: {
+    pre?: ComponentType<{ children?: ReactNode; node?: unknown } & SourceAttributes>;
+    p?: ComponentType<MarkdownElementProps>;
+    blockquote?: ComponentType<MarkdownElementProps>;
+    hr?: ComponentType<MarkdownElementProps>;
     h1?: ComponentType<MarkdownHeadingProps>;
     h2?: ComponentType<MarkdownHeadingProps>;
     h3?: ComponentType<MarkdownHeadingProps>;
@@ -106,15 +127,24 @@ type StreamdownComponent = ComponentType<{
   };
 }>;
 
-let loadPromise: Promise<StreamdownComponent | null> | null = null;
+type StreamdownModule = {
+  Streamdown: StreamdownComponent;
+  /** Streamdown's own raw -> sanitize -> harden rehype chain, in that order. */
+  defaultRehypePlugins: Record<string, unknown>;
+};
+
+let loadPromise: Promise<StreamdownModule | null> | null = null;
 
 // Streamdown is an optional peer dependency (like marked/shiki). It is loaded on
 // demand so the core library does not force it on consumers; while it loads (or
 // if it is absent) we fall back to preformatted text.
-function loadStreamdown(): Promise<StreamdownComponent | null> {
+function loadStreamdown(): Promise<StreamdownModule | null> {
   if (!loadPromise) {
     loadPromise = import("streamdown")
-      .then((m) => m.Streamdown as unknown as StreamdownComponent)
+      .then((m) => ({
+        Streamdown: m.Streamdown as unknown as StreamdownComponent,
+        defaultRehypePlugins: m.defaultRehypePlugins,
+      }))
       .catch((err) => {
         console.warn("clicky-ui: streamdown not available; rendering markdown as plain text", err);
         return null;
@@ -145,7 +175,7 @@ function MarkdownCode({ className, children, ...rest }: MarkdownCodeProps) {
   }
   const language = /language-([\w-]+)/.exec(className ?? "")?.[1];
   const source = nodeText(children).replace(/\n$/, "");
-  return (
+  const block = (
     <CodeBlock
       source={source}
       language={language}
@@ -155,6 +185,19 @@ function MarkdownCode({ className, children, ...rest }: MarkdownCodeProps) {
       themeToggle
     />
   );
+  const anchors = sourceAttributes(rest);
+  return Object.keys(anchors).length > 0 ? <div {...anchors}>{block}</div> : block;
+}
+
+// Streamdown's default `pre` unwraps to its `code` child, marking it as a block.
+// The source range is stamped on the `pre`, so it is carried over to that child.
+function MarkdownPre({ children, ...props }: { children?: ReactNode; node?: unknown } & SourceAttributes) {
+  return isValidElement(children)
+    ? cloneElement(children as ReactElement<Record<string, unknown>>, {
+        "data-block": "true",
+        ...sourceAttributes(props),
+      })
+    : children;
 }
 
 // Streamdown indents nested lists with `[li_&]:pl-6`, an arbitrary-variant class
@@ -163,19 +206,24 @@ function MarkdownCode({ className, children, ...rest }: MarkdownCodeProps) {
 // the marker and the indent ship from this library's own source. Markers sit
 // outside the padding so each level steps in cleanly. Task lists drop both: the
 // checkbox is the marker.
-function MarkdownList({ className, children }: MarkdownElementProps) {
+function MarkdownList({ className, children, ...props }: MarkdownElementProps) {
   const isTaskList = className?.includes("contains-task-list");
   return (
     <ul
       className={cn("whitespace-normal", isTaskList ? "list-none pl-0" : "list-disc pl-6", className)}
+      {...sourceAttributes(props)}
     >
       {children}
     </ul>
   );
 }
 
-function MarkdownOrderedList({ className, children }: MarkdownElementProps) {
-  return <ol className={cn("list-decimal whitespace-normal pl-6", className)}>{children}</ol>;
+function MarkdownOrderedList({ className, children, ...props }: MarkdownElementProps) {
+  return (
+    <ol className={cn("list-decimal whitespace-normal pl-6", className)} {...sourceAttributes(props)}>
+      {children}
+    </ol>
+  );
 }
 
 // Streamdown wraps tables in a `bg-sidebar` card with its own copy/download/
@@ -184,9 +232,12 @@ function MarkdownOrderedList({ className, children }: MarkdownElementProps) {
 // class the consumer's Tailwind never sees. Own the whole table instead, styled
 // like DataTable: a bordered scroll container so wide tables scroll rather than
 // overflow the page.
-function MarkdownTable({ className, children }: MarkdownElementProps) {
+function MarkdownTable({ className, children, ...props }: MarkdownElementProps) {
   return (
-    <div className="not-prose my-4 max-w-full overflow-x-auto rounded-md border border-border">
+    <div
+      className="not-prose my-4 max-w-full overflow-x-auto rounded-md border border-border"
+      {...sourceAttributes(props)}
+    >
       <table className={cn("w-max min-w-full table-auto text-left text-sm", className)}>
         {children}
       </table>
@@ -282,6 +333,7 @@ const markdownComponents = {
   h5: (props: MarkdownHeadingProps) => <MarkdownHeading as="h5" {...props} />,
   h6: (props: MarkdownHeadingProps) => <MarkdownHeading as="h6" {...props} />,
   a: MarkdownLink,
+  pre: MarkdownPre,
   code: MarkdownCode,
   ul: MarkdownList,
   ol: MarkdownOrderedList,
@@ -323,32 +375,52 @@ const CALLOUT_ALLOWED_TAGS = {
  *  blocks render via the library CodeBlock, and lists and tables are styled
  *  here rather than by Streamdown. Falls back to preformatted text until
  *  Streamdown loads or when it is not installed. */
-export function Markdown({ text, className, callouts = false }: MarkdownProps) {
-  const [Streamdown, setStreamdown] = useState<StreamdownComponent | null>(null);
+export function Markdown({ text, className, callouts = false, sourceBlocks = false }: MarkdownProps) {
+  if (sourceBlocks && callouts) {
+    throw new Error(
+      "Markdown: sourceBlocks and callouts cannot be combined; callouts replaces the sanitiser schema that sourceBlocks keeps",
+    );
+  }
+  const [streamdown, setStreamdown] = useState<StreamdownModule | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    loadStreamdown().then((comp) => {
-      if (!cancelled) setStreamdown(() => comp);
+    loadStreamdown().then((loaded) => {
+      if (!cancelled) setStreamdown(loaded);
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (!Streamdown) {
+  // Streamdown's own chain (raw, sanitize, harden) followed by the stamping
+  // plugin. Appending, rather than replacing, keeps the document sanitised, and
+  // running last lets the attributes survive the sanitiser.
+  const sourceRehypePlugins = useMemo(
+    () => (streamdown ? [...Object.values(streamdown.defaultRehypePlugins), rehypeSourceBlocks] : undefined),
+    [streamdown],
+  );
+
+  if (!streamdown) {
     return <pre className={cn("whitespace-pre-wrap text-sm", className)}>{text}</pre>;
   }
+  const { Streamdown } = streamdown;
 
   return (
     <div className={cn("prose prose-sm max-w-none dark:prose-invert", className)}>
-      <Streamdown
-        parseIncompleteMarkdown
-        components={callouts ? calloutComponents : markdownComponents}
-        allowedTags={callouts ? CALLOUT_ALLOWED_TAGS : undefined}
-      >
-        {text}
-      </Streamdown>
+      {sourceBlocks ? (
+        <Streamdown mode="static" components={markdownComponents} rehypePlugins={sourceRehypePlugins}>
+          {text}
+        </Streamdown>
+      ) : (
+        <Streamdown
+          parseIncompleteMarkdown
+          components={callouts ? calloutComponents : markdownComponents}
+          allowedTags={callouts ? CALLOUT_ALLOWED_TAGS : undefined}
+        >
+          {text}
+        </Streamdown>
+      )}
     </div>
   );
 }

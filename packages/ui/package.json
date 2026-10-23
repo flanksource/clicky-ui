@@ -98,6 +98,11 @@
       "import": "./dist/monaco-schema.js",
       "require": "./dist/monaco-schema.cjs"
     },
+    "./file-findings": {
+      "types": "./dist/file-findings.d.ts",
+      "import": "./dist/file-findings.js",
+      "require": "./dist/file-findings.cjs"
+    },
     "./expressions": {
       "types": "./dist/expressions.d.ts",
       "import": "./dist/expressions.js",
@@ -194,6 +199,7 @@
     "@iconify/utils": "catalog:",
     "@mdxeditor/editor": "catalog:",
     "@oxlint/plugins": "catalog:",
+    "@storybook/addon-vitest": "catalog:",
     "@storybook/react-vite": "catalog:",
     "@tailwindcss/cli": "^4.3.3",
     "@tanstack/react-query": "^5.66.8",
