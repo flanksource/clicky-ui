@@ -9,6 +9,7 @@ import {
   useHistoryRoute,
 } from "@flanksource/clicky-ui";
 
+import { AgentRunsProvider } from "./agent-runs/AgentRunsProvider";
 import { PLAYGROUND_COMMENT_CONFIG, useComments } from "./comments/useComments";
 import { PlaygroundShell } from "./PlaygroundShell";
 import { ExternalWorkspace } from "./bookmarklet/ExternalWorkspace";
@@ -76,9 +77,12 @@ export function App() {
             onReply={comments.reply}
             onUpdateStatus={comments.updateStatus}
             onClose={comments.close}
+            onAcknowledge={comments.acknowledge}
+            onAssign={comments.assign}
             onUpdateRating={comments.updateRating}
             onDelete={comments.remove}
           >
+            <AgentRunsProvider runAgent={comments.runAgent}>
             {isExternal ? (
               <ExternalWorkspace
                 id={route.page}
@@ -133,6 +137,7 @@ export function App() {
                 onPrepareCommentSelection={comments.prepareSelection}
               />
             )}
+            </AgentRunsProvider>
           </CommentProvider>
         </RouterProvider>
       </DensityProvider>

@@ -12,6 +12,7 @@ import { PlaygroundViewActions } from "./PlaygroundViewActions";
 import type { AnnotationVisibility, PlaygroundView } from "./route";
 import { BookmarkletInstall } from "./bookmarklet/BookmarkletInstall";
 import { PlaygroundAgentInstructions } from "./PlaygroundAgentInstructions";
+import { AgentSessionButton } from "./agent-runs/AgentRunsProvider";
 
 export type PlaygroundShellActionsProps = {
   view: PlaygroundView;
@@ -42,6 +43,7 @@ export function PlaygroundShellActions(props: PlaygroundShellActionsProps) {
   return (
     <>
       <PlaygroundAgentInstructions />
+      <AgentSessionButton />
       <BookmarkletInstall />
       {props.active && (
         <PlaygroundViewActions

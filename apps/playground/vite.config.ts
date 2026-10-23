@@ -10,6 +10,10 @@ import {
   type Alias,
 } from "vite";
 
+import {
+  createAgentRuns,
+  playgroundAgentRuns,
+} from "./plugins/agent-runs-server";
 import { playgroundComments } from "./plugins/comments-server";
 import { playgroundBookmarklet } from "./plugins/bookmarklet-server";
 import { playgroundExports } from "./plugins/exports-server";
@@ -76,13 +80,26 @@ const externalAliases: Alias[] = envList("PLAYGROUND_EXTERNAL_ALIASES").map(
   },
 );
 
+const agentRuns = createAgentRuns({
+  dir: playgroundDataDir,
+  captainURL: "http://localhost:9020",
+  cwd: workspaceRoot,
+  skillPath: resolve(workspaceRoot, ".agents/skills/clicky-ui-playground/SKILL.md"),
+});
+
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
     playgroundMarkdown({ sourceRoot: resolve(root, "src") }),
     playgroundPageActivity(resolve(root, "src/pages")),
-    playgroundComments({ dir: playgroundDataDir }),
+    // Before playgroundComments: that middleware answers every other
+    // /__playground/comments/* path (including /:id/agent-run) with a 405.
+    playgroundAgentRuns(agentRuns),
+    playgroundComments({
+      dir: playgroundDataDir,
+      onCreated: agentRuns.autoRunComment,
+    }),
     playgroundBookmarklet({ root, dir: playgroundDataDir }),
     playgroundExports({ dir: playgroundDataDir }),
     playgroundRuntimeProfiles({
@@ -163,6 +180,8 @@ export default defineConfig({
     // The React artifact tests render through @testing-library, and the shared
     // setup stubs window.matchMedia — both need a DOM.
     environment: "jsdom",
+    pool: "vmThreads",
+    maxWorkers: 2,
     setupFiles: ["./src/test/setup.ts"],
     server: {
       deps: {
