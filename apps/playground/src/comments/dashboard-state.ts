@@ -2,16 +2,26 @@ import {
   useHistoryRoute,
   type FilterBarMultiFilterMode,
 } from "@flanksource/clicky-ui";
+import { COMMENT_STATUSES } from "../../plugins/comments-statuses";
 
 export type DashboardState = {
   status: string;
   projects: Record<string, FilterBarMultiFilterMode>;
+  /** Pages tree selection: a page slug, a folder path, or the external root. */
   pages: Record<string, FilterBarMultiFilterMode>;
   author: string;
+  /** An assignee name, `UNASSIGNED`, or "" for everyone. */
+  assignee: string;
   screenshots: string;
   query: string;
   sort: { key: string; dir: "asc" | "desc" } | null;
 };
+
+const STATUS_FILTERS: readonly string[] = [
+  "unresolved",
+  "all",
+  ...COMMENT_STATUSES,
+];
 
 function parseSelections(
   params: URLSearchParams,
@@ -38,16 +48,7 @@ function parse(_path: string, search: string): DashboardState {
   const screenshots = params.get("comments.screenshots") ?? "all";
   const key = params.get("comments.sort") ?? "updatedAt";
   const dir = params.get("comments.dir") ?? "desc";
-  if (
-    ![
-      "unresolved",
-      "all",
-      "open",
-      "in_progress",
-      "resolved",
-      "closed",
-    ].includes(status)
-  )
+  if (!STATUS_FILTERS.includes(status))
     throw new Error(`Invalid comment status filter: ${status}`);
   if (!["all", "captured", "missing"].includes(screenshots))
     throw new Error(`Invalid screenshot filter: ${screenshots}`);
@@ -58,6 +59,7 @@ function parse(_path: string, search: string): DashboardState {
       "page",
       "status",
       "author",
+      "assignee",
       "createdAt",
       "updatedAt",
     ].includes(key)
@@ -71,6 +73,7 @@ function parse(_path: string, search: string): DashboardState {
     projects: parseSelections(params, "project"),
     pages: parseSelections(params, "page"),
     author: params.get("comments.author") ?? "",
+    assignee: params.get("comments.assignee") ?? "",
     query: params.get("comments.q") ?? "",
     sort: key === "none" ? null : { key, dir },
   };
@@ -85,6 +88,7 @@ function build(state: DashboardState): string {
     "project",
     "project.exclude",
     "author",
+    "assignee",
     "screenshots",
     "q",
     "sort",
@@ -94,6 +98,7 @@ function build(state: DashboardState): string {
   for (const [key, value] of Object.entries({
     status: state.status,
     author: state.author,
+    assignee: state.assignee,
     screenshots: state.screenshots,
     q: state.query,
     sort: state.sort?.key ?? "none",
