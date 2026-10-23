@@ -1,4 +1,5 @@
 import * as matchers from "@testing-library/jest-dom/matchers";
+import * as webStreams from "node:stream/web";
 import { expect } from "vitest";
 
 expect.extend(matchers);
@@ -39,6 +40,14 @@ if (typeof window !== "undefined" && !("ResizeObserver" in window)) {
   }
   window.ResizeObserver = NoopResizeObserver;
   globalThis.ResizeObserver = NoopResizeObserver;
+}
+
+// jsdom implements no Web Streams. Under the forks pool jsdom sits on Node's
+// global object and inherits them, but under vmThreads the context only gets
+// jsdom's globals — and the ai SDK (eventsource-parser) builds a
+// TransformStream at import time. Node's implementation is the real one.
+for (const name of ["ReadableStream", "WritableStream", "TransformStream", "TextDecoderStream", "TextEncoderStream"] as const) {
+  if (!(name in globalThis)) Object.defineProperty(globalThis, name, { configurable: true, writable: true, value: webStreams[name] });
 }
 
 if (typeof window !== "undefined" && !window.matchMedia) {

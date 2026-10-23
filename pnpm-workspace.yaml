@@ -2,6 +2,10 @@ packages:
   - packages/*
   - apps/*
   - e2e
+# Link every package through the global virtual store. Sibling workspaces (e.g.
+# gavel/testrunner/ui) include packages/ui as a workspace project, so a shared
+# store keeps their installs from repointing packages/ui/node_modules.
+enableGlobalVirtualStore: true
 allowBuilds:
   "@parcel/watcher": true
   esbuild: true
@@ -10,7 +14,7 @@ allowBuilds:
 
 catalog:
   "@ai-sdk/react": ^3.0.201
-  "@chromatic-com/storybook": ^5.2.1
+  "@chromatic-com/storybook": ^5.6.0
   "@codemirror/autocomplete": ^6.20.3
   "@codemirror/commands": ^6.10.4
   "@codemirror/lang-json": ^6.0.2
@@ -47,10 +51,11 @@ catalog:
   "@shikijs/langs": ^1.24.0
   "@shikijs/themes": ^1.24.0
   "@shikijs/transformers": ^1.24.0
-  "@storybook/addon-docs": 10.3.5
+  "@storybook/addon-docs": 10.6.3
   "@storybook/addon-vitest": 10.6.3
-  "@storybook/react": 10.3.5
+  "@storybook/react": 10.6.3
   "@storybook/react-vite": 10.6.3
+  "@medv/finder": ^4.0.2
   "@tailwindcss/forms": ^0.5.9
   "@tailwindcss/vite": ^4.3.3
   "@tanstack/react-query": ^5.66.8
@@ -67,6 +72,8 @@ catalog:
   clsx: ^2.1.1
   cmdk: ^1.0.4
   country-flag-icons: ^1.6.20
+  css.escape: ^1.5.1
+  dom-accessibility-api: ^0.6.3
   dompurify: ^3.4.11
   jotai: ^2.20.1
   jsonc-parser: 3.3.1
@@ -84,7 +91,7 @@ catalog:
   serve: ^14.2.6
   shiki: ^1.24.0
   sonner: ^1.7.1
-  storybook: 10.3.5
+  storybook: 10.6.3
   tailwind-merge: ^3.6.0
   tailwindcss: ^4.3.3
   ts-morph: ^28.0.0
@@ -94,6 +101,7 @@ catalog:
   vitest: ^5.0.5
   yaml: ^2.8.3
   '@vitest/browser': 5.0.5
+  '@vitest/browser-playwright': 5.0.5
   '@vitest/coverage-v8': 5.0.5
 
 catalogMode: prefer
@@ -104,3 +112,14 @@ overrides:
   brace-expansion: ^5.0.6
   fast-uri: ^3.1.2
   ws: ^8.21.0
+
+# The global virtual store links each package in isolation, so undeclared
+# imports no longer resolve through hoisting.
+packageExtensions:
+  # country-flag-icons/react/* imports react but declares no dependency on it.
+  country-flag-icons:
+    peerDependencies:
+      react: "*"
+    peerDependenciesMeta:
+      react:
+        optional: true

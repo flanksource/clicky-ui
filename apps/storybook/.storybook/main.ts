@@ -68,6 +68,7 @@ const config: StorybookConfig = {
       "@flanksource/clicky-ui > @codemirror/commands",
       "@flanksource/clicky-ui > @codemirror/lang-json",
       "@flanksource/clicky-ui > @codemirror/lang-sql",
+      "@flanksource/clicky-ui > @codemirror/language",
       "@flanksource/clicky-ui > @codemirror/state",
       "@flanksource/clicky-ui > @codemirror/view",
       "@flanksource/clicky-ui > @monaco-editor/react",

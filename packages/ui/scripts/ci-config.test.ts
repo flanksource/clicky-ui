@@ -2,7 +2,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
-import { loadConfigFromFile } from "vite";
 
 const root = new URL("../../../", import.meta.url);
 const workflow: {
@@ -52,12 +51,17 @@ describe("CI suite isolation", () => {
   });
 
   it("runs Storybook browser tests with system Chrome", async () => {
-    const config = await loadConfigFromFile(
-      { command: "serve", mode: "test" },
-      new URL("apps/storybook/vitest.config.ts", root).pathname,
+    // Imported directly rather than through Vite's loadConfigFromFile: its
+    // loaders hand plugin objects to rolldown's native binding (rejected inside
+    // a vmThreads worker's vm realm) or need module.registerHooks (unavailable
+    // under Vitest). The config only needs to be evaluated, not bundled.
+    const { default: config } = await import("../../../apps/storybook/vitest.config.ts");
+    const browserProject = config.test.projects.find(
+      (project: { test: { name: string } }) => project.test.name === "storybook-browser",
     );
-    expect(config?.config.test.projects[0].test.browser.instances).toEqual([
-      { browser: "chromium", launch: { channel: "chrome" } },
-    ]);
+    expect(browserProject.test.browser).toMatchObject({
+      provider: { name: "playwright", options: { launchOptions: { channel: "chrome" } } },
+      instances: [{ browser: "chromium" }],
+    });
   });
 });

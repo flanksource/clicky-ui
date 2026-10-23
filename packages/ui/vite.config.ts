@@ -23,6 +23,7 @@ const entry = {
   rpc: resolve(__dirname, "src/rpc.ts"),
   monaco: resolve(__dirname, "src/monaco.ts"),
   "monaco-schema": resolve(__dirname, "src/monaco-schema.ts"),
+  "file-findings": resolve(__dirname, "src/file-findings.ts"),
   expressions: resolve(__dirname, "src/expressions.ts"),
   "expressions/playground": resolve(__dirname, "src/expressions/playground.ts"),
   profiles: resolve(__dirname, "src/profiles.ts"),
