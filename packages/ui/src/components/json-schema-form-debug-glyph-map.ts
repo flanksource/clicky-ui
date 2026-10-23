@@ -76,6 +76,8 @@ export const GROUP_GLYPH: Record<KeywordGroup, DebugGlyphPair> = {
 };
 
 export const KIND_GLYPH: Record<FieldControlKind, DebugGlyphPair> = {
+  union: pair(UiSelect),
+  json: pair(UiFileCode),
   string: pair(UiString),
   textarea: pair(UiText),
   markdown: pair(UiFileCode),

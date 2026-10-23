@@ -277,7 +277,15 @@
       "properties": {
         "source": { "description": "Where the help text came from (e.g. a CLI command).", "type": "string" },
         "section": { "description": "The section of the source it was taken from.", "type": "string" },
-        "body": { "description": "Help text, appended to `description` in the rendered helper text.", "type": "string" }
+        "body": { "description": "Help text, appended to `description` in the rendered helper text.", "type": "string" },
+        "links": {
+          "description": "Documentation links shown with inline and hover help. Only absolute HTTP and HTTPS URLs are supported.",
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["label", "href"],
+            "properties": { "label": { "type": "string", "minLength": 1 }, "href": { "type": "string", "pattern": "^https?://" } }
+          }
+        }
       },
       "examples": [{ "body": "Must be unique within the namespace." }]
     },
