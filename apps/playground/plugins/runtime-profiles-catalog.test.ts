@@ -1,8 +1,58 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  loadRuntimeProfileModelCatalog,
   loadRuntimeProfilePermissionCatalog,
   loadRuntimeProfileRuntimeCatalog,
 } from "./runtime-profiles-catalog";
+
+describe("loadRuntimeProfileModelCatalog", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const respond = (body: unknown, ok = true) =>
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok,
+        status: ok ? 200 : 503,
+        statusText: ok ? "OK" : "Service Unavailable",
+        json: () => Promise.resolve(body),
+      }),
+    );
+
+  it("returns Captain's model rows unchanged", async () => {
+    const models = [
+      {
+        id: "claude-sonnet-5-5",
+        provider: "anthropic",
+        label: "Claude Sonnet 5.5",
+        reasoning: true,
+        runtime: { model: "claude-sonnet-5-5", mode: "agent" },
+      },
+    ];
+    respond(models);
+    await expect(
+      loadRuntimeProfileModelCatalog("http://captain/api/chat/models"),
+    ).resolves.toEqual(models);
+  });
+
+  it.each([
+    [{ models: [] }, "must be an array"],
+    [[{ provider: "anthropic", label: "x" }], "model at index 0 id"],
+    [[{ id: "m", label: "x" }], 'model "m" provider'],
+  ])("rejects a malformed catalog %#", async (body, message) => {
+    respond(body);
+    await expect(
+      loadRuntimeProfileModelCatalog("http://captain/api/chat/models"),
+    ).rejects.toThrow(message);
+  });
+
+  it("names the failed status", async () => {
+    respond({}, false);
+    await expect(
+      loadRuntimeProfileModelCatalog("http://captain/api/chat/models"),
+    ).rejects.toThrow("503 Service Unavailable");
+  });
+});
 
 const permissions = { modes: {}, toolPolicies: {}, resources: {} };
 const schema = {

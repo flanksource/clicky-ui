@@ -275,6 +275,7 @@ export function AgentRunsProvider({
         open={target !== null}
         mode={target?.mode ?? "run"}
         grouping={data?.settings.grouping ?? "shared"}
+        current={data?.settings.runtime}
         error={dialogError}
         busy={starting}
         onClose={() => setTarget(null)}
