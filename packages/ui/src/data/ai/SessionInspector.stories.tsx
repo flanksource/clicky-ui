@@ -183,6 +183,7 @@ export const Mobile: Story = {
 };
 
 export const CompactMobileComposer: Story = {
+  tags: ["browser"],
   args: {
     layout: "compact",
     session: {
