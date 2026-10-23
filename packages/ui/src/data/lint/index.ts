@@ -13,6 +13,7 @@ export {
   countLintByLinter,
   countLintBySeverity,
   isLinterErrored,
+  isLinterInFlight,
   lintNodeCount,
   lintNodeSeverity,
   totalLintViolations,
@@ -37,5 +38,6 @@ export {
   type LintNode,
   type LintNodeKind,
   type LinterResult,
+  type LinterStatus,
   type Violation,
 } from "./types";

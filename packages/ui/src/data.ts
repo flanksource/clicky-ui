@@ -418,6 +418,7 @@ export {
   type CompactRecordProps,
   type CompactRecordStatus,
 } from "./data/CompactRecord";
+export { OpenInFilesLink, type OpenFileTarget, type OpenInFilesLinkProps } from "./data/OpenInFilesLink";
 export * from "./data/test-runner";
 export * from "./data/lint";
 export * from "./data/verification";

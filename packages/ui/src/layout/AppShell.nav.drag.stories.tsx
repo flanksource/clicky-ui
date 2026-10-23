@@ -93,6 +93,7 @@ function DraggableNavBody() {
 }
 
 export const DragPagesBetweenFolders: Story = {
+  tags: ["browser"],
   render: () => {
     const router = useMemoryRouter("/welcome");
     return (

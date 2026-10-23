@@ -13,6 +13,8 @@ export interface Test {
   message?: string;
   file?: string;
   line?: number;
+  /** Last line of the test's source range, when the framework reports one. */
+  end_line?: number;
   framework?: string;
   /** Duration in nanoseconds. */
   duration?: number;

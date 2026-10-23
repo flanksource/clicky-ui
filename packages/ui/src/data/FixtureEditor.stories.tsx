@@ -97,6 +97,7 @@ const sampleFixture = [
 const meta: Meta<typeof FixtureEditor> = {
   title: "Data/FixtureEditor",
   component: FixtureEditor,
+  tags: ["browser"],
   args: {
     value: sampleFixture,
     schemas,
