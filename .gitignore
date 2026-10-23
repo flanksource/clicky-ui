@@ -54,3 +54,4 @@ hack/
 .grite/
 packages/ui/src/generated/storybook/
 /.new
+/apps/playground/.facet/
