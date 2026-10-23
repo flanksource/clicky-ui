@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { cn } from "../lib/utils";
+import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { CommentComposer } from "./CommentComposer";
 import { CommentThreadList } from "./CommentThreadList";
 import { buildThreadListHandlers } from "./comment-utils";
@@ -31,6 +32,8 @@ export type CommentThreadProps = CommentCallbacks & {
   renderRootDetails?: (comment: Comment) => ReactNode;
   renderBody?: (body: string) => ReactNode;
   threadToMarkdown?: (thread: readonly Comment[]) => string;
+  /** Caller-owned entries appended to each root's "Assign…" submenu. */
+  extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
 };
 
 /**
@@ -53,10 +56,13 @@ export function CommentThread({
   renderRootDetails,
   renderBody,
   threadToMarkdown,
+  extraAssignItems,
   onCreate,
   onReply,
   onUpdateStatus,
   onClose,
+  onAcknowledge,
+  onAssign,
   onDelete,
   onChecklistToggle,
   onMention,
@@ -64,6 +70,8 @@ export function CommentThread({
   const listHandlers = buildThreadListHandlers(comments, config, {
     ...(onUpdateStatus ? { onUpdateStatus } : {}),
     ...(onClose ? { onClose } : {}),
+    ...(onAcknowledge ? { onAcknowledge } : {}),
+    ...(onAssign ? { onAssign } : {}),
     ...(onDelete ? { onDelete } : {}),
     ...(onChecklistToggle ? { onChecklistToggle } : {}),
     ...(onReply ? { onReply } : {}),
@@ -81,6 +89,7 @@ export function CommentThread({
         {...(renderRootDetails ? { renderRootDetails } : {})}
         {...(renderBody ? { renderBody } : {})}
         {...(threadToMarkdown ? { threadToMarkdown } : {})}
+        {...(extraAssignItems ? { extraAssignItems } : {})}
         {...listHandlers}
       />
       {!hideComposer && onCreate && (

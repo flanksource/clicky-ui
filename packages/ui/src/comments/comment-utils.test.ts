@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   applyCommentFilters,
   authorDisplayName,
   buildReplyMap,
+  buildThreadListHandlers,
   commentCountForPrefix,
   defaultStatusValue,
   deriveAnchorCounts,
@@ -315,5 +316,24 @@ describe("status helpers", () => {
   it("names an author with an Unknown fallback", () => {
     expect(authorDisplayName({ name: "Ada" })).toBe("Ada");
     expect(authorDisplayName(null)).toBe("Unknown");
+  });
+});
+
+describe("buildThreadListHandlers", () => {
+  it("passes the acknowledge and assign callbacks through untouched", () => {
+    const onAcknowledge = vi.fn();
+    const onAssign = vi.fn();
+
+    const handlers = buildThreadListHandlers([], config, {
+      onAcknowledge,
+      onAssign,
+    });
+
+    expect(handlers.onAcknowledge).toBe(onAcknowledge);
+    expect(handlers.onAssign).toBe(onAssign);
+  });
+
+  it("leaves them undefined when the host supplies neither", () => {
+    expect(buildThreadListHandlers([], config, {})).toEqual({});
   });
 });
