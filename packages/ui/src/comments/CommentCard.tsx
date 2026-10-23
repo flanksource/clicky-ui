@@ -25,12 +25,16 @@ import {
   StatusChip,
 } from "./CommentCardParts";
 import { CommentMarkdown } from "./CommentMarkdown";
+import {
+  assignmentMenuItems,
+  type CommentActionRunner,
+} from "./comment-assign";
 import { authorDisplayName, truncatePlain } from "./comment-utils";
 import {
   resolveCommentStage,
   statusForCommentStage,
 } from "../lib/comment-stage";
-import type { Comment, CommentConfig } from "./comment-types";
+import type { Comment, CommentAuthor, CommentConfig } from "./comment-types";
 
 export type CommentCardProps = {
   comment: Comment;
@@ -45,6 +49,15 @@ export type CommentCardProps = {
   onUpdateStatus?: (status: string) => void | Promise<void>;
   /** Close an active or resolved root comment. */
   onClose?: () => void | Promise<void>;
+  /** Claim an unassigned active root for the current user or agent. */
+  onAcknowledge?: () => void | Promise<void>;
+  /** Hand an active root to an assignee, or clear it with `null`. */
+  onAssign?: (assignee: CommentAuthor | null) => void | Promise<void>;
+  /**
+   * Caller-owned entries appended to the "Assign…" submenu, such as a run-agent
+   * action. Computed per comment so they can reflect its state.
+   */
+  extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
   /** Delete this comment. */
   onDelete?: () => void;
   /** Copy this comment's whole thread in the caller's canonical format. */
@@ -88,18 +101,51 @@ function actionMenuItems(
   return items;
 }
 
-function CommentBody({
-  comment,
-  config,
-  renderBody,
-  onUpdateStatus,
-  onClose,
-  onDelete,
-  onCopy,
-  onReply,
-  onChecklistToggle,
-  onMaximize,
-}: CommentCardProps) {
+/** A runner for {@link assignmentMenuItems} that shows a failure through `setError`. */
+function reportingRunner(setError: (message: string) => void): CommentActionRunner {
+  return (verb, action) => {
+    setError("");
+    void (async () => {
+      try {
+        await action();
+      } catch (cause) {
+        setError(
+          `Couldn't ${verb} comment: ${cause instanceof Error ? cause.message : "Unexpected error"}`,
+        );
+      }
+    })();
+  };
+}
+
+/** The Acknowledge and Assign… entries for a root; none for replies. */
+function rootAssignmentItems(
+  props: CommentCardProps,
+  run: CommentActionRunner,
+): DropdownMenuItem[] {
+  const { comment, config, onAcknowledge, onAssign, extraAssignItems } = props;
+  return assignmentMenuItems({
+    comment,
+    config,
+    run,
+    ...(onAcknowledge ? { onAcknowledge } : {}),
+    ...(onAssign ? { onAssign } : {}),
+    ...(extraAssignItems ? { extraAssignItems } : {}),
+  });
+}
+
+function CommentBody(props: CommentCardProps) {
+  const {
+    comment,
+    config,
+    renderBody,
+    onUpdateStatus,
+    onClose,
+    onDelete,
+    onCopy,
+    onReply,
+    onChecklistToggle,
+    onMaximize,
+  } = props;
   const [actionError, setActionError] = useState("");
   const isReply = Boolean(comment.parentId);
   const date = parseTimestamp(comment.createdAt);
@@ -140,6 +186,7 @@ function CommentBody({
   const menuItems = actionMenuItems(isReply, {
     ...(onDelete ? { onDelete } : {}),
     statusActions: [
+      ...rootAssignmentItems(props, reportingRunner(setActionError)),
       ...(stage === "active" && onUpdateStatus && resolved
         ? [
             {
@@ -391,6 +438,10 @@ export function CommentCard(props: CommentCardProps) {
               items={actionMenuItems(isReply, {
                 ...(props.onDelete ? { onDelete: props.onDelete } : {}),
                 statusActions: [
+                  ...rootAssignmentItems(
+                    props,
+                    reportingRunner(setCollapsedActionError),
+                  ),
                   ...(resolveCommentStage(config, comment.status) ===
                     "active" &&
                   props.onUpdateStatus &&

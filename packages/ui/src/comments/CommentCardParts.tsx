@@ -1,6 +1,6 @@
 import { Badge } from "../data/Badge";
 import { cn } from "../lib/utils";
-import { UiThumbsDown, UiThumbsUp } from "../icons";
+import { UiRobotAi, UiThumbsDown, UiThumbsUp } from "../icons";
 import {
   resolveFacetOption,
   resolveStatusConfig,
@@ -67,21 +67,30 @@ export function StatusChip({
 }) {
   const status = resolveStatusConfig(config, comment.status);
   if (!status) return null;
-  const closedBy =
-    resolveCommentStage(config, comment.status) === "closed"
-      ? comment.closedBy
+  const stage = resolveCommentStage(config, comment.status);
+  const closedBy = stage === "closed" ? comment.closedBy : undefined;
+  const assignee = stage === "active" ? comment.assignee : undefined;
+  const icon = assignee?.kind === "agent" ? UiRobotAi : status.icon;
+  const title = assignee
+    ? comment.acknowledgedAt
+      ? `Acknowledged ${new Date(comment.acknowledgedAt).toLocaleString()}`
+      : "Assigned, not yet acknowledged"
+    : comment.closedAt
+      ? new Date(comment.closedAt).toLocaleString()
       : undefined;
   return (
     <Badge
       variant="soft"
       tone={toneToBadgeTone(status.tone)}
       size="xs"
-      {...(status.icon ? { icon: status.icon } : {})}
-      {...(comment.closedAt
-        ? { title: new Date(comment.closedAt).toLocaleString() }
-        : {})}
+      {...(icon ? { icon } : {})}
+      {...(title ? { title } : {})}
     >
-      {closedBy ? `Closed by ${closedBy.name}` : status.label}
+      {assignee
+        ? `Assigned to ${assignee.name}`
+        : closedBy
+          ? `Closed by ${closedBy.name}`
+          : status.label}
     </Badge>
   );
 }
