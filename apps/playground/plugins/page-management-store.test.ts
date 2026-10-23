@@ -279,6 +279,39 @@ describe("page management", () => {
     );
   });
 
+  it("rebases import.meta.glob patterns and the keys that index their results", () => {
+    createSource(
+      pagesDir,
+      "gavel/brand",
+      [
+        'const ART = import.meta.glob<string>("./_brand/assets/*.svg", { query: "?raw", eager: true });',
+        'const MORE = import.meta.glob(["./_brand/icons/*.svg", "!./_brand/icons/draft-*.svg"]);',
+        "const svgOf = (name: string) => ART[`./_brand/assets/${name}.svg`];",
+        'export const logo = ART["./_brand/assets/logo.svg"];',
+        'export const unrelated = "./_other/logo.svg";',
+      ].join("\n"),
+    );
+
+    expect(
+      movePage({
+        sourceRoot: pagesDir,
+        pagesDir,
+        commentsDir,
+        slug: "gavel/brand",
+        nextSlug: "flanksource/brand",
+      }).updatedReferences,
+    ).toBe(5);
+    expect(readSource(pagesDir, "flanksource/brand")).toBe(
+      [
+        'const ART = import.meta.glob<string>("../gavel/_brand/assets/*.svg", { query: "?raw", eager: true });',
+        'const MORE = import.meta.glob(["../gavel/_brand/icons/*.svg", "!../gavel/_brand/icons/draft-*.svg"]);',
+        "const svgOf = (name: string) => ART[`../gavel/_brand/assets/${name}.svg`];",
+        'export const logo = ART["../gavel/_brand/assets/logo.svg"];',
+        'export const unrelated = "./_other/logo.svg";',
+      ].join("\n"),
+    );
+  });
+
   it("rolls back the page and rewritten references when a write fails", () => {
     createSource(pagesDir, "review", SOURCE);
     const consumer = join(pagesDir, "consumer.ts");
