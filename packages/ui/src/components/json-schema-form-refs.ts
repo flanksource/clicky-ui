@@ -19,10 +19,9 @@ export function rehydrateRefs(schema: JsonSchemaObject): JsonSchemaObject {
 
   const resolveRef = (ref: string): JsonSchemaProperty | undefined => {
     if (cache.has(ref)) return cache.get(ref);
-    // A ref already on the resolution stack is a cycle: break it with a
-    // permissive stub rather than building a self-referential object graph.
+    // A cycle ends structural expansion with a typed JSON editor.
     if (resolving.has(ref))
-      return { type: "object", description: "↻ recursive schema" };
+      return { format: "json", description: "↻ recursive schema" };
     const target = resolveLocalPointer(document, ref);
     if (!isSchemaObject(target)) {
       unresolved = true;
