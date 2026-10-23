@@ -47,6 +47,11 @@ import {
   type FilterBarMultiFilter,
 } from "./filter-bar-multi";
 import {
+  TreeFilterField,
+  type FilterBarTreeFilter,
+  type FilterTreeNode,
+} from "./filter-bar-tree";
+import {
   clearFilterBarFilter,
   dateRangeFilterProps,
   isFilterBarFilterActive,
@@ -57,6 +62,7 @@ export {
   type TriStateMultiSelectProps,
 } from "./filter-bar-multi";
 export type { FilterBarMultiFilter, FilterBarMultiFilterMode };
+export type { FilterBarTreeFilter, FilterTreeNode };
 import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { formatDateTimeRelative } from "../data/cells/timestamp-format";
 import {
@@ -377,6 +383,7 @@ export type FilterBarFilter = (
   | FilterBarLookupFilter
   | FilterBarLookupMultiFilter
   | FilterBarMultiFilter
+  | FilterBarTreeFilter
   | FilterBarNestedMultiFilter
   | FilterBarWorkloadFilter
   | FilterBarSelectMultiFilter
@@ -836,6 +843,7 @@ function FilterBarFilterPanelContent({
       {filter.kind === "multi" && (
         <MultiFilterPanel filter={filter} chrome={chrome} />
       )}
+      {filter.kind === "tree" && <TreeFilterField filter={filter} grow />}
       {filter.kind === "nested-multi" && (
         <NestedMultiFilterPanel filter={filter} chrome={chrome} />
       )}
@@ -874,6 +882,10 @@ function renderFilterField(filter: FilterBarFilter, grow: boolean) {
 
   if (filter.kind === "multi") {
     return <MultiFilterField filter={filter} grow={grow} />;
+  }
+
+  if (filter.kind === "tree") {
+    return <TreeFilterField filter={filter} grow={grow} />;
   }
 
   if (filter.kind === "nested-multi") {
@@ -1235,6 +1247,9 @@ function FilterBarKeyValueControl({ filter }: { filter: FilterBarFilter }) {
   }
   if (filter.kind === "multi") {
     return <MultiFilterField filter={filter} grow />;
+  }
+  if (filter.kind === "tree") {
+    return <TreeFilterField filter={filter} grow />;
   }
   if (filter.kind === "nested-multi") {
     return <NestedMultiFilterField filter={filter} grow />;
@@ -3168,6 +3183,14 @@ function filterWithStagedValue(
         onChange(next),
     };
   }
+  if (filter.kind === "tree") {
+    return {
+      ...filter,
+      value: isMultiFilterValue(value) ? value : {},
+      onChange: (next: Record<string, FilterBarMultiFilterMode>) =>
+        onChange(next),
+    };
+  }
   if (filter.kind === "nested-multi") {
     return {
       ...filter,
@@ -3301,7 +3324,7 @@ function estimateFilterWidth(filter: FilterBarFilter) {
     return Math.max(88, filter.label.length * 8 + 40);
   // Multi renders as a combobox field (min-w-[11rem] ≈ 176px); nested keeps
   // its compact trigger button.
-  if (filter.kind === "multi") return 176;
+  if (filter.kind === "multi" || filter.kind === "tree") return 176;
   if (filter.kind === "nested-multi") return 136;
   if (filter.kind === "workload") return 224;
   if (filter.kind === "number" || filter.kind === "duration") return 152;
