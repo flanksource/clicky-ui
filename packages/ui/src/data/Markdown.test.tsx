@@ -110,6 +110,102 @@ describe("Markdown code blocks", () => {
   });
 });
 
+// Line numbers are 1-based and absolute in the source passed to <Markdown>.
+const SOURCE_BLOCKS_DOC = [
+  "# Title", // 1
+  "", // 2
+  "A paragraph", // 3
+  "that spans two lines.", // 4
+  "", // 5
+  "- first", // 6
+  "- second", // 7
+  "", // 8
+  "```go", // 9
+  "package main", // 10
+  "```", // 11
+  "", // 12
+  "| a | b |", // 13
+  "| - | - |", // 14
+  "| 1 | 2 |", // 15
+  "", // 16
+  "1. one", // 17
+  "2. two", // 18
+  "", // 19
+  "> quoted", // 20
+].join("\n");
+
+function sourceRanges(container: HTMLElement): Array<[string, string, string]> {
+  return Array.from(container.querySelectorAll<HTMLElement>("[data-source-start]")).map((el) => [
+    el.dataset.sourceStart!,
+    el.dataset.sourceEnd!,
+    el.tagName.toLowerCase(),
+  ]);
+}
+
+describe("Markdown sourceBlocks", () => {
+  it("stamps each top-level block with its absolute source line range", async () => {
+    const { container } = render(<Markdown sourceBlocks text={SOURCE_BLOCKS_DOC} />);
+
+    await waitFor(() => {
+      expect(container.querySelector("table")).not.toBeNull();
+    });
+    expect(sourceRanges(container)).toEqual([
+      ["1", "1", "h1"],
+      ["3", "4", "p"],
+      ["6", "7", "ul"],
+      ["9", "11", "div"],
+      ["13", "15", "div"],
+      ["17", "18", "ol"],
+      ["20", "20", "blockquote"],
+    ]);
+  });
+
+  it("keeps positions absolute when the document is long enough for streaming to split it into blocks", async () => {
+    const filler = Array.from({ length: 40 }, (_, i) => `Paragraph ${i}.`).join("\n\n");
+    const { container } = render(<Markdown sourceBlocks text={`${filler}\n\n# Last`} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { level: 1, name: "Last" })).toBeInTheDocument();
+    });
+    const heading = screen.getByRole("heading", { level: 1, name: "Last" });
+    // 40 paragraphs on lines 1,3,...,79 and a blank line 80 put the heading on line 81.
+    expect(heading.dataset.sourceStart).toBe("81");
+    expect(heading.dataset.sourceEnd).toBe("81");
+    expect(container.querySelectorAll("[data-source-start]")).toHaveLength(41);
+  });
+
+  it("does not stamp anything when sourceBlocks is off", async () => {
+    const { container } = render(<Markdown text={SOURCE_BLOCKS_DOC} />);
+
+    await waitFor(() => {
+      expect(container.querySelector("table")).not.toBeNull();
+    });
+    expect(container.querySelector("[data-source-start]")).toBeNull();
+  });
+
+  it("keeps sanitising the document", async () => {
+    const { container } = render(
+      <Markdown sourceBlocks text={'<script>window.pwned = 1</script>\n\n<p onclick="pwned()">click</p>'} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("click")).toBeInTheDocument();
+    });
+    expect(container.querySelector("script")).toBeNull();
+    expect(screen.getByText("click")).not.toHaveAttribute("onclick");
+  });
+
+  it("refuses to combine with callouts, whose sanitiser schema it would replace", () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    // jsdom reports an error thrown during render as an uncaught window error.
+    const swallow = (event: ErrorEvent) => event.preventDefault();
+    window.addEventListener("error", swallow);
+    expect(() => render(<Markdown sourceBlocks callouts text="x" />)).toThrow(/sourceBlocks.*callouts/);
+    window.removeEventListener("error", swallow);
+    errors.mockRestore();
+  });
+});
+
 const CALLOUT_SOURCE = [
   '<CalloutBox variant="caution" badge="BCR-08" label="Gap" source="Policy Owner">',
   "",
