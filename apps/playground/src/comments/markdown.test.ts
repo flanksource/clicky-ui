@@ -99,6 +99,72 @@ describe("commentsToMarkdown", () => {
     expect(markdown).toContain("- rating: negative");
   });
 
+  it("lists the reply, acknowledge and resolve URLs in workflow order", () => {
+    const markdown = commentsToMarkdown(
+      page("welcome", [
+        comment({ id: "c 1", createdAt: "2026-01-01T00:00:00.000Z" }),
+      ]),
+      {
+        ...MARKDOWN_OPTIONS,
+        commentActionUrls: (id) => ({
+          reply: `http://x/comments/${id}/replies`,
+          acknowledge: `http://x/comments/${id}/acknowledge`,
+          resolve: `http://x/comments/${id}/resolve`,
+        }),
+      },
+    );
+
+    expect(markdown).toContain(
+      [
+        "- status: open",
+        "- acknowledge before starting: `POST http://x/comments/c 1/acknowledge`",
+        "- add comment: `POST http://x/comments/c 1/replies`",
+        "- mark resolved: `POST http://x/comments/c 1/resolve`",
+      ].join("\n"),
+    );
+  });
+
+  it.each([
+    [
+      "an acknowledged agent",
+      {
+        assignee: { name: "Claude", kind: "agent" as const },
+        acknowledgedAt: "2026-01-01T00:05:00.000Z",
+      },
+      "- assignee: Claude (agent, acknowledged 2026-01-01T00:05:00.000Z)",
+    ],
+    [
+      "an assigned user who has not acknowledged",
+      { assignee: { name: "Bo", kind: "user" as const } },
+      "- assignee: Bo (user, not yet acknowledged)",
+    ],
+  ])("names the assignee for %s", (_label, fields, line) => {
+    const markdown = commentsToMarkdown(
+      page("welcome", [
+        comment({
+          id: "c1",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          status: "in_progress",
+          ...fields,
+        }),
+      ]),
+      MARKDOWN_OPTIONS,
+    );
+
+    expect(markdown).toContain(`- status: in_progress\n${line}\n`);
+  });
+
+  it("omits the assignee line when nobody holds the thread", () => {
+    const markdown = commentsToMarkdown(
+      page("welcome", [
+        comment({ id: "c1", createdAt: "2026-01-01T00:00:00.000Z" }),
+      ]),
+      MARKDOWN_OPTIONS,
+    );
+
+    expect(markdown).not.toContain("assignee");
+  });
+
   it("includes the captured React component, source stack, and HTML", () => {
     const rich = comment({
       id: "c1",

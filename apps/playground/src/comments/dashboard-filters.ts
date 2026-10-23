@@ -1,4 +1,9 @@
-import type { FilterBarFilter } from "@flanksource/clicky-ui";
+import {
+  buildPathTree,
+  type FilterBarFilter,
+  type FilterTreeNode,
+  type PathTreeNode,
+} from "@flanksource/clicky-ui";
 import { externalPage } from "../bookmarklet/external-catalog";
 import {
   findPage,
@@ -6,9 +11,71 @@ import {
   pageTitle,
   pages as playgroundPages,
 } from "../registry";
-import { commentProject } from "./dashboard-model";
+import {
+  EXTERNAL_PAGES_ROOT,
+  UNASSIGNED,
+  commentPageTreePath,
+  commentProject,
+} from "./dashboard-model";
 import type { DashboardState } from "./dashboard-state";
-import { PLAYGROUND_COMMENT_CONFIG, type PageComment } from "./useComments";
+import {
+  PLAYGROUND_ASSIGNEES,
+  PLAYGROUND_COMMENT_CONFIG,
+  type PageComment,
+} from "./useComments";
+
+type PageTreeEntry = { treeKey: string; slug: string | undefined };
+
+function pageLabel(slug: string): string {
+  const page = findPage(slug);
+  return page ? pageTitle(page) : (externalPage(slug)?.title ?? slug);
+}
+
+function pageTreeNode(node: PathTreeNode<PageTreeEntry>): FilterTreeNode {
+  const children = node.children.map(pageTreeNode).sort(compareTreeNodes);
+  const slug = node.items.find((entry) => entry.slug)?.slug;
+  const label = slug
+    ? pageLabel(slug)
+    : node.key === EXTERNAL_PAGES_ROOT
+      ? "External pages"
+      : children.length > 0
+        ? humanizeSlug(node.label)
+        : node.key;
+  return {
+    key: node.key,
+    label,
+    ...(slug ? { description: slug } : {}),
+    ...(children.length > 0 ? { children } : {}),
+  };
+}
+
+function compareTreeNodes(left: FilterTreeNode, right: FilterTreeNode): number {
+  const leftIsFolder = (left.children?.length ?? 0) > 0;
+  const rightIsFolder = (right.children?.length ?? 0) > 0;
+  if (leftIsFolder !== rightIsFolder) return leftIsFolder ? -1 : 1;
+  return left.label.localeCompare(right.label);
+}
+
+/**
+ * Folders come from the slug hierarchy, external pages sit under one synthetic
+ * root, and keys in the current selection that match no page still get a node
+ * so a stale URL value stays visible and removable.
+ */
+export function pageTreeNodes(
+  slugs: readonly string[],
+  selectedKeys: readonly string[],
+): FilterTreeNode[] {
+  const known = new Set(slugs.map(commentPageTreePath));
+  const entries: PageTreeEntry[] = [
+    ...slugs.map((slug) => ({ treeKey: commentPageTreePath(slug), slug })),
+    ...selectedKeys
+      .filter((key) => !known.has(key))
+      .map((treeKey) => ({ treeKey, slug: undefined })),
+  ];
+  return buildPathTree(entries, (entry) => entry.treeKey.split("/"))
+    .map(pageTreeNode)
+    .sort(compareTreeNodes);
+}
 
 export function dashboardFilters({
   comments,
@@ -28,7 +95,6 @@ export function dashboardFilters({
       ...comments
         .filter((comment) => !comment.parentId)
         .map((comment) => comment.page),
-      ...Object.keys(state.pages),
     ]),
   ];
   const projects = [
@@ -41,6 +107,18 @@ export function dashboardFilters({
         .map((comment) => comment.author?.name)
         .filter((name): name is string => name !== undefined),
     ),
+  ].sort();
+  const assignees = [
+    ...new Set([
+      ...PLAYGROUND_ASSIGNEES.map((assignee) => assignee.name),
+      ...comments
+        .filter((comment) => !comment.parentId)
+        .map((comment) => comment.assignee?.name)
+        .filter((name): name is string => name !== undefined),
+      ...(state.assignee && state.assignee !== UNASSIGNED
+        ? [state.assignee]
+        : []),
+    ]),
   ].sort();
   return [
     {
@@ -70,28 +148,20 @@ export function dashboardFilters({
       options: projects.map((value) => ({
         value,
         label:
-          value === "__external__" ? "External pages" : humanizeSlug(value),
+          value === EXTERNAL_PAGES_ROOT
+            ? "External pages"
+            : humanizeSlug(value),
       })),
     },
     {
       key: "page",
-      kind: "multi",
+      kind: "tree",
       label: "Pages",
       value: state.pages,
       onChange: (pages) => onChange({ pages }),
-      description: "Include any selected page; exclusions take precedence.",
-      options: pages
-        .map((value) => {
-          const page = findPage(value);
-          return {
-            value,
-            label: page
-              ? pageTitle(page)
-              : (externalPage(value)?.title ?? value),
-            description: value,
-          };
-        })
-        .sort((left, right) => left.label.localeCompare(right.label)),
+      description:
+        "Include or exclude pages and whole folders; the deepest selection wins.",
+      nodes: pageTreeNodes(pages, Object.keys(state.pages)),
     },
     {
       key: "author",
@@ -102,6 +172,18 @@ export function dashboardFilters({
       options: [
         { value: "", label: "All authors" },
         ...authors.map((value) => ({ value, label: value })),
+      ],
+    },
+    {
+      key: "assignee",
+      kind: "enum",
+      label: "Assignee",
+      value: state.assignee,
+      onChange: (assignee) => onChange({ assignee }),
+      options: [
+        { value: "", label: "All assignees" },
+        { value: UNASSIGNED, label: "Unassigned" },
+        ...assignees.map((value) => ({ value, label: value })),
       ],
     },
     {

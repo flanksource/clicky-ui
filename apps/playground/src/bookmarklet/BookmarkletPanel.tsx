@@ -256,6 +256,8 @@ function SessionRail({
       onReply={comments.reply}
       onUpdateStatus={comments.updateStatus}
       onClose={comments.close}
+      onAcknowledge={comments.acknowledge}
+      onAssign={comments.assign}
       onDelete={comments.remove}
       onUpdateRating={comments.updateRating}
       onScrollToAnchor={navigate}
@@ -336,6 +338,7 @@ function RailContents({
       screenshotUrl: (url) => new URL(url, location.origin).href,
       commentActionUrls: (id) => ({
         reply: `${location.origin}/__playground/comments/${encodeURIComponent(id)}/replies`,
+        acknowledge: `${location.origin}/__playground/comments/${encodeURIComponent(id)}/acknowledge`,
         resolve: `${location.origin}/__playground/comments/${encodeURIComponent(id)}/resolve`,
       }),
     });
