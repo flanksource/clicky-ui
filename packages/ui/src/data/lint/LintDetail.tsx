@@ -12,12 +12,17 @@ import {
   violationIgnoreAction,
 } from "./actions";
 import { isLinterErrored, lintNodeCount, severityOf } from "./stats";
+import { OpenInFilesLink, type OpenFileTarget } from "../OpenInFilesLink";
 import type { LintAction, LintNode, LinterResult, Violation } from "./types";
 
-type IgnoreProps = {
+type HostActionProps = {
   onIgnore?: ((action: LintAction) => void | Promise<void>) | undefined;
   ignoreBusy?: boolean | undefined;
+  /** Adds an "Open in Files" link to each violation that names a file. */
+  onOpenFile?: ((target: OpenFileTarget) => void) | undefined;
 };
+
+type RenderRun = (result: LinterResult) => ReactNode;
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -79,7 +84,7 @@ function IgnoreButton({
   );
 }
 
-function ActionList({ actions, onIgnore, ignoreBusy }: IgnoreProps & { actions: LintAction[] }) {
+function ActionList({ actions, onIgnore, ignoreBusy }: HostActionProps & { actions: LintAction[] }) {
   if (!onIgnore || actions.length === 0) return null;
   return (
     <Section title="Actions">
@@ -110,7 +115,8 @@ function ViolationCard({
   showFile,
   onIgnore,
   ignoreBusy,
-}: IgnoreProps & {
+  onOpenFile,
+}: HostActionProps & {
   violation: Violation;
   linter: string;
   /** The file an ignore rule targets; empty when the violation has none. */
@@ -128,6 +134,12 @@ function ViolationCard({
           <div className="flex flex-wrap items-center gap-2 font-mono text-xs text-muted-foreground">
             <span>{violationLocation(violation, Boolean(showFile))}</span>
             {rule && <span className="text-foreground">[{rule}]</span>}
+            {onOpenFile && file && (
+              <OpenInFilesLink
+                target={{ file, ...(workDir ? { workDir } : {}), ...(violation.line ? { line: violation.line } : {}) }}
+                onOpenFile={onOpenFile}
+              />
+            )}
           </div>
           {violation.message && (
             <div className="mt-0.5 whitespace-pre-wrap text-sm">{violation.message}</div>
@@ -170,14 +182,17 @@ function formatLinterCommand(result: LinterResult): string {
   return result.command ? [result.command, ...(result.args ?? [])].map(shellQuote).join(" ") : "";
 }
 
+function resultStatusLabel(result: LinterResult): [label: string, tone: string] {
+  if (result.status === "pending") return ["pending", "text-muted-foreground"];
+  if (result.status === "running") return ["running", "text-blue-600 dark:text-blue-400"];
+  if (result.skipped) return ["skipped", "text-muted-foreground"];
+  if (result.timed_out) return ["timed out", "text-amber-600 dark:text-amber-400"];
+  if (isLinterErrored(result)) return ["failed", "text-red-600 dark:text-red-400"];
+  return ["ran", "text-emerald-600 dark:text-emerald-400"];
+}
+
 function ResultStatus({ result }: { result: LinterResult }) {
-  const [label, tone] = result.skipped
-    ? ["skipped", "text-muted-foreground"]
-    : result.timed_out
-      ? ["timed out", "text-amber-600 dark:text-amber-400"]
-      : isLinterErrored(result)
-        ? ["failed", "text-red-600 dark:text-red-400"]
-        : ["ran", "text-emerald-600 dark:text-emerald-400"];
+  const [label, tone] = resultStatusLabel(result);
   const count = (result.violations ?? []).length;
   return (
     <div className="flex flex-wrap gap-3 text-sm">
@@ -238,13 +253,20 @@ function NoFileViolations({
   );
 }
 
-function LinterDetail({ node, actions, ...ignore }: IgnoreProps & { node: LintNode; actions: LintAction[] }) {
+function LinterDetail({
+  node,
+  actions,
+  renderRun,
+  ...ignore
+}: HostActionProps & { node: LintNode; actions: LintAction[]; renderRun?: RenderRun | undefined }) {
   const result = node.linter;
   const linter = node.linterName ?? result?.linter ?? "";
   const workDir = node.work_dir ?? result?.work_dir ?? "";
+  const run = result && renderRun?.(result);
   return (
     <>
       {result && <ResultDetails result={result} workDir={workDir} />}
+      {run && <Section title="Run">{run}</Section>}
       <ActionList actions={actions} {...ignore} />
       {result?.error && (
         <Section title="Error">
@@ -283,7 +305,7 @@ function FolderDetail({
   results,
   actions,
   ...ignore
-}: IgnoreProps & { node: LintNode; results: readonly LinterResult[]; actions: LintAction[] }) {
+}: HostActionProps & { node: LintNode; results: readonly LinterResult[]; actions: LintAction[] }) {
   const stats = node.ruleName
     ? []
     : collectFolderLintStats(node, results).filter((s) => !node.linterName || s.linter === node.linterName);
@@ -328,7 +350,7 @@ function FolderDetail({
   );
 }
 
-function FileDetail({ node, actions, ...ignore }: IgnoreProps & { node: LintNode; actions: LintAction[] }) {
+function FileDetail({ node, actions, ...ignore }: HostActionProps & { node: LintNode; actions: LintAction[] }) {
   const violations = node.violations ?? [];
   return (
     <>
@@ -361,7 +383,7 @@ function FileDetail({ node, actions, ...ignore }: IgnoreProps & { node: LintNode
   );
 }
 
-function RuleDetail({ node, actions, ...ignore }: IgnoreProps & { node: LintNode; actions: LintAction[] }) {
+function RuleDetail({ node, actions, ...ignore }: HostActionProps & { node: LintNode; actions: LintAction[] }) {
   const violations = node.violations ?? [];
   const linter = node.linterName ?? "";
   const workDir = node.work_dir ?? "";
@@ -435,8 +457,14 @@ function DetailHeader({ node }: { node: LintNode }) {
   );
 }
 
-export type LintDetailPanelProps = IgnoreProps & {
+export type LintDetailPanelProps = HostActionProps & {
   node: LintNode | null;
+  /**
+   * Host-rendered view of the prompt run behind a linter (e.g. its live session),
+   * shown in the linter detail. Called for every linter result; return nothing for
+   * results without a run. Lets the lint bundle stay free of the AI bundle.
+   */
+  renderRun?: RenderRun | undefined;
   /** All results, for the folder summary and for folder-scoped ignore actions. */
   results: readonly LinterResult[];
 };
@@ -445,7 +473,7 @@ export type LintDetailPanelProps = IgnoreProps & {
  * The right pane for a lint node: what it covers, the findings beneath it and,
  * when the host provides `onIgnore`, the ignore actions that fit its scope.
  */
-export function LintDetailPanel({ node, results, onIgnore, ignoreBusy }: LintDetailPanelProps) {
+export function LintDetailPanel({ node, results, onIgnore, ignoreBusy, onOpenFile, renderRun }: LintDetailPanelProps) {
   if (!node) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -456,13 +484,13 @@ export function LintDetailPanel({ node, results, onIgnore, ignoreBusy }: LintDet
       </div>
     );
   }
-  const ignore = { onIgnore, ignoreBusy };
+  const ignore = { onIgnore, ignoreBusy, onOpenFile };
   const actions = lintNodeActions(node, results);
   return (
     <div className="flex h-full min-h-0 flex-col">
       <DetailHeader node={node} />
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-density-4">
-        {node.kind === "linter" && <LinterDetail node={node} actions={actions} {...ignore} />}
+        {node.kind === "linter" && <LinterDetail node={node} actions={actions} renderRun={renderRun} {...ignore} />}
         {node.kind === "linter-error" && <LinterErrorDetail node={node} />}
         {node.kind === "lint-folder" && <FolderDetail node={node} results={results} actions={actions} {...ignore} />}
         {node.kind === "lint-file" && <FileDetail node={node} actions={actions} {...ignore} />}

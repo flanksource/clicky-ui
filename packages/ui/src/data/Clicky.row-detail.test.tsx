@@ -146,7 +146,7 @@ describe("ClickyTable renderRowDetail", () => {
     // wrapper, its intrinsic width becomes the expansion <td>'s width,
     // which is also the table's width — every other column gets pushed
     // off-screen. The wrapper must absorb that overflow internally instead.
-    const { container } = render(
+    render(
       <ClickyTable
         columns={columns}
         rows={[
@@ -165,9 +165,12 @@ describe("ClickyTable renderRowDetail", () => {
 
     fireEvent.click(screen.getByText("First widget"));
 
-    const wrapper = container.querySelector("td .rounded-md.border.bg-background");
-    expect(wrapper).not.toBeNull();
-    expect(wrapper).toHaveClass("w-0", "min-w-full", "overflow-x-auto");
+    // The detail is pinned to the scroll container's visible width and
+    // scrolls its own overflow, so its content can't widen the table.
+    const wrapper = screen.getByTestId("data-table-expansion");
+    expect(wrapper.closest("td")).not.toBeNull();
+    expect(wrapper).toHaveClass("sticky", "overflow-x-auto");
+    expect(wrapper.className).toMatch(/\bw-\[calc\(var\(--dt-viewport-w\)/);
   });
 
   it("opens the detail in a dialog when detailStyle is 'dialog'", () => {

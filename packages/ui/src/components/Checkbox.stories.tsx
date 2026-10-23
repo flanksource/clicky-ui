@@ -46,6 +46,7 @@ export const Disabled: Story = {
 };
 
 export const Toggles: Story = {
+  tags: ["browser"],
   args: { checked: false, onChange: () => {} },
   render: () => <Demo label="Notify me" />,
   play: async ({ canvasElement, step }) => {

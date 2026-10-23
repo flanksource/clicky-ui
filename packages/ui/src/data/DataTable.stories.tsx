@@ -1586,6 +1586,7 @@ function scroller(canvasElement: HTMLElement): HTMLElement {
 }
 
 export const Virtualized: Story = {
+  tags: ["browser"],
   render: () => (
     <DataTable
       data={manyPeople}
@@ -1636,6 +1637,7 @@ export const Virtualized: Story = {
 };
 
 export const VirtualizedKeepsRowsWhenDataIsRebuilt: Story = {
+  tags: ["browser"],
   render: function Render() {
     const [, force] = useState(0);
     return (

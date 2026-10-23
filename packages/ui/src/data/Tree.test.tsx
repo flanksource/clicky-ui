@@ -280,6 +280,35 @@ describe("Tree", () => {
       expect(screen.getByText("r").closest("[role=treeitem]")).toHaveAttribute("aria-expanded", "true");
     });
 
+    it("keeps a selected non-leaf node open per defaultOpen and shows all its children, while ancestors stay path-only", () => {
+      const selectedBranch = makeDeepTree()[0]!.children![0]!.children![0]!;
+      render(
+        <Tree<Node>
+          {...props}
+          defaultOpen={(node) => node.id === "y"}
+          roots={makeDeepTree()}
+          selected={selectedBranch}
+        />,
+      );
+
+      expect(screen.getByText("y").closest("[role=treeitem]")).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByText("z")).toBeInTheDocument();
+      expect(screen.getByText("sibling")).toBeInTheDocument();
+      expect(screen.getByText("r").closest("[role=treeitem]")).toHaveAttribute("aria-expanded", "true");
+      expect(screen.queryByText("other")).toBeNull();
+    });
+
+    it("leaves a selected non-leaf node collapsed when defaultOpen is false, and lets it toggle", () => {
+      render(<Tree<Node> {...props} roots={makeDeepTree()} selected={leaf} />);
+
+      const selected = screen.getByText("z").closest<HTMLElement>("[role=treeitem]")!;
+      expect(selected).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByText("child")).toBeNull();
+      fireEvent.click(selected.querySelector('button[aria-label="Expand"]')!);
+      expect(selected).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByText("child")).toBeInTheDocument();
+    });
+
     it("expands a path-only ancestor fully on first click, then collapses it", () => {
       render(
         <Tree<Node>

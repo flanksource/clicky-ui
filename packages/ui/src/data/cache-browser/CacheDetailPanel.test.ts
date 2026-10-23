@@ -8,23 +8,16 @@ afterEach(() => {
 
 describe("downloadJson", () => {
   const stubBlobUrls = () => {
-    const createObjectURL = vi.fn(() => "blob:stub");
+    const createObjectURL = vi.fn((_blob: Blob) => "blob:stub");
     const revokeObjectURL = vi.fn();
     // jsdom doesn't implement object URLs.
     Object.assign(URL, { createObjectURL, revokeObjectURL });
     return { createObjectURL, revokeObjectURL };
   };
 
-  it("serializes the detail as pretty JSON and triggers an anchor download", () => {
+  it("serializes the detail as pretty JSON and triggers an anchor download", async () => {
     const { createObjectURL, revokeObjectURL } = stubBlobUrls();
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-    const parts: BlobPart[] = [];
-    let blobType = "";
-    vi.spyOn(globalThis, "Blob").mockImplementation((p, opts) => {
-      parts.push(...(p ?? []));
-      blobType = opts?.type ?? "";
-      return {} as Blob;
-    });
 
     const detail: CacheKeyDetail = {
       key: "tx:abc",
@@ -35,9 +28,16 @@ describe("downloadJson", () => {
     };
     downloadJson(detail.key, detail);
 
-    expect(blobType).toBe("application/json");
-    expect(parts).toEqual([JSON.stringify(detail, null, 2)]);
     expect(createObjectURL).toHaveBeenCalledOnce();
+    const blob = createObjectURL.mock.calls[0]![0] as Blob;
+    expect(blob.type).toBe("application/json");
+    // jsdom's Blob has no text(); FileReader is its read path.
+    const text = await new Promise<unknown>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsText(blob);
+    });
+    expect(text).toBe(JSON.stringify(detail, null, 2));
     expect(click).toHaveBeenCalledOnce();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:stub");
   });

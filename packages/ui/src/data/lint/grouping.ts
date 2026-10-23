@@ -11,7 +11,7 @@
 import { matchesFilterState } from "../test-runner/filterState";
 import { slugify } from "../test-runner/routePath";
 import { collapsedPathSegments, decorateLintFile, normalizeLintPath, relPath } from "./paths";
-import { isLinterErrored, linterErrorMessage, severityOf, worstSeverity } from "./stats";
+import { isLinterErrored, isLinterInFlight, linterErrorMessage, severityOf, worstSeverity } from "./stats";
 import type {
   LintFilters,
   LintGrouping,
@@ -492,6 +492,38 @@ function withLinterErrors(roots: Draft[], results: readonly LinterResult[], filt
   return [...others, ...sortedKeys(linters).map((name) => linters.get(name)!)];
 }
 
+function linterNamesIn(nodes: readonly Draft[], into = new Set<string>()): Set<string> {
+  for (const node of nodes) {
+    if (node.kind === "linter" && node.linterName) into.add(node.linterName);
+    linterNamesIn(node.children ?? [], into);
+  }
+  return into;
+}
+
+/**
+ * Linters still queued or running appear in every grouping even before they
+ * report a violation, and have no verdict (`passed` stays false) until they finish.
+ */
+function withInFlightLinters(roots: Draft[], results: readonly LinterResult[], filters: LintFilters): Draft[] {
+  const present = linterNamesIn(roots);
+  const missing = new Map<string, LinterResult>();
+  for (const r of results) {
+    if (isLinterInFlight(r) && matchesFilterState(r.linter, filters.linter) && !present.has(r.linter)) {
+      missing.set(r.linter, r);
+    }
+  }
+  const markPending = (nodes: Draft[]): Draft[] =>
+    nodes.map((node) => {
+      const children = node.children ? markPending(node.children) : undefined;
+      const inFlight = node.kind === "linter" && node.linter !== undefined && isLinterInFlight(node.linter);
+      return { ...node, ...(children ? { children } : {}), ...(inFlight ? { passed: false } : {}) };
+    });
+  if (missing.size === 0) return markPending(roots);
+  const added = Array.from(missing.values()).map((r) => linterNode(r.linter, r, []));
+  const linters = new Map([...roots.filter((n) => n.kind === "linter"), ...added].map((n) => [n.name, n]));
+  return markPending([...roots.filter((n) => n.kind !== "linter"), ...sortedKeys(linters).map((k) => linters.get(k)!)]);
+}
+
 // ---------------------------------------------------------------------------
 // Collapsing, route paths, lookup
 
@@ -501,12 +533,18 @@ function joinChainNames(parent: string, child: string): string {
   return p && c ? `${p} > ${c}` : p || c;
 }
 
-/** Folds a folder that has a single child into that child: `pkg > sub > a.go`. */
-function collapseFolderChains(nodes: Draft[]): Draft[] {
+/**
+ * Folds a folder (a node of `folderKind`) that has a single child into that
+ * child: `pkg > sub > a.go`. Generic so other path trees can reuse it.
+ */
+export function collapseFolderChains<N extends { name: string; kind: string; children?: N[] | undefined }>(
+  nodes: N[],
+  folderKind: N["kind"],
+): N[] {
   return nodes.map((node) => {
     if (!node.children || node.children.length === 0) return node;
-    const children = collapseFolderChains(node.children);
-    if (children.length === 1 && node.kind === "lint-folder") {
+    const children = collapseFolderChains(node.children, folderKind);
+    if (children.length === 1 && node.kind === folderKind) {
       const [child] = children;
       return { ...child!, name: joinChainNames(node.name, child!.name) };
     }
@@ -551,9 +589,13 @@ export function buildLintTree({
   grouping: LintGrouping;
   filters: LintFilters;
 }): LintNode[] {
-  const grouped = withLinterErrors(GROUPERS[grouping](results, filters), results, filters);
+  const grouped = withInFlightLinters(
+    withLinterErrors(GROUPERS[grouping](results, filters), results, filters),
+    results,
+    filters,
+  );
   // Summary keeps its linter -> rule -> file branches as built.
-  return annotateRoutePaths(grouping === "summary" ? grouped : collapseFolderChains(grouped));
+  return annotateRoutePaths(grouping === "summary" ? grouped : collapseFolderChains(grouped, "lint-folder"));
 }
 
 /** Depth-first lookup of the node whose route_path equals `path`, or null. */

@@ -37,12 +37,14 @@ describe("DataTable horizontal overflow", () => {
   });
 
   it("points to clipped columns and replaces the prompt with edge fades after scrolling", () => {
-    let resize: ResizeObserverCallback | undefined;
+    // DataTable runs several observers (overflow cue, viewport width); a real
+    // resize notifies all of them.
+    const observers: ResizeObserverCallback[] = [];
     vi.stubGlobal(
       "ResizeObserver",
       class {
         constructor(callback: ResizeObserverCallback) {
-          resize = callback;
+          observers.push(callback);
         }
         observe() {}
         disconnect() {}
@@ -63,7 +65,7 @@ describe("DataTable horizontal overflow", () => {
       scrollWidth: { configurable: true, value: 900 },
       scrollLeft: { configurable: true, writable: true, value: 0 },
     });
-    act(() => resize?.([], {} as ResizeObserver));
+    act(() => observers.forEach((notify) => notify([], {} as ResizeObserver)));
 
     expect(screen.getByText("More columns")).toBeInTheDocument();
     expect(screen.getByTestId("data-table-overflow-right")).toBeInTheDocument();

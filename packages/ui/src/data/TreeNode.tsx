@@ -166,11 +166,14 @@ export function TreeNode<T>({
   const key = getKey(node);
   const isSelected = selected != null && getKey(selected) === key;
   const isForcedOpen = forcedOpenKeys?.has(key) ?? false;
-  const isOnRevealPath = revealPath?.has(key) ?? false;
+  // The reveal path maps each strict ancestor of the selection to its next path
+  // node and the selection itself to null. Only strict ancestors are forced open
+  // and narrowed to the path; the selection keeps its normal open state.
+  const isOnRevealPath = (revealPath?.get(key) ?? null) !== null;
   const revealOverride = revealOverrides?.get(key);
   const pathOnly = isOnRevealPath && revealOverride === undefined;
   const ownOpen = getExpanded ? getExpanded(node) : open;
-  const isOpen = isForcedOpen || (pathOnly ? revealPath!.get(key) !== null : revealOverride ?? ownOpen);
+  const isOpen = isForcedOpen || pathOnly || (revealOverride ?? ownOpen);
 
   useEffect(() => {
     if (expandAll !== null && expandAll !== prevExpandAll.current && !skipExpandAll) {

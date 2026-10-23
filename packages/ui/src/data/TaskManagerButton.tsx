@@ -1,4 +1,6 @@
+import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { resourceSummary, taskTransportConnected, type ResourceSummary } from "./task-resource-summary";
+import { cn } from "../lib/utils";
 import { useResourceClock } from "../hooks/use-resource-clock";
 import { Button } from "../components/button";
 import { UiActivity, UiListChecks, UiMemoryStick } from "../icons";
@@ -135,10 +137,14 @@ function RecentTasksDropdown({
   );
 }
 
-function TaskTrigger({ active, resources }: { active: number; resources?: ResourceSummary }) {
+type TaskTriggerProps = { active: number; resources?: ResourceSummary } & ButtonHTMLAttributes<HTMLButtonElement>;
+
+// DropdownMenu merges its open state and interaction props onto the trigger's
+// root, so the trigger must forward them (and the ref) to its Button.
+const TaskTrigger = forwardRef<HTMLButtonElement, TaskTriggerProps>(function TaskTrigger({ active, resources, className, ...props }, ref) {
   const label = `Tasks (${active} active)`;
   return (
-    <Button type="button" variant="ghost" size={resources ? "sm" : "icon"} aria-label={label} title={label} className="relative gap-1.5">
+    <Button ref={ref} {...props} type="button" variant="ghost" size={resources ? "sm" : "icon"} aria-label={label} title={label} className={cn("relative gap-1.5", className)}>
       <UiListChecks className={active > 0 ? "animate-pulse" : undefined} />
       {resources?.state === "unavailable" ? <span className="text-xs text-muted-foreground">Resources unavailable</span> : resources ? (
         <span className="flex items-center gap-1.5 text-xs" title={`Sampled ${new Date(resources.sampledAt).toLocaleTimeString()}; CPU 100% equals one core`}>
@@ -149,4 +155,4 @@ function TaskTrigger({ active, resources }: { active: number; resources?: Resour
       ) : null}
     </Button>
   );
-}
+});

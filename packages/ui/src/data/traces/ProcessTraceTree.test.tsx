@@ -73,6 +73,13 @@ describe("ProcessTraceTree", () => {
     expect(itemOf("4")).toHaveAttribute("aria-selected", "true");
   });
 
+  it("keeps a selected root process open with its exited child visible", () => {
+    const nodes: ProcessNodeRow[] = [processNodeRows[0]!, { ...processNodeRows[2]!, parentKey: "100:1" }];
+    render(<ProcessTraceTree nodes={nodes} selectedKey="100:1" onSelect={() => {}} />);
+    expect(itemOf("100:1")).toHaveAttribute("aria-expanded", "true");
+    expect(processRow("102:101")).toHaveAttribute("data-exited", "true");
+  });
+
   it("draws a CPU sparkline for processes that have samples", () => {
     render(<ProcessTraceTree nodes={processNodeRows} samples={processSampleRows} onSelect={() => {}} />);
     expect(within(processRow("101:100")).getByRole("img", { name: "CPU % over 12 samples" })).toBeInTheDocument();

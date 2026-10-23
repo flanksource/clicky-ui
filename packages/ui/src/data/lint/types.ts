@@ -14,6 +14,10 @@ export type Violation = {
   raw_file?: string | undefined;
   line?: number;
   column?: number;
+  /** Last line of the flagged range, when the linter reports one. */
+  end_line?: number;
+  /** Column just past the flagged range on `end_line`, when reported. */
+  end_column?: number;
   message?: string;
   source?: string;
   rule?: {
@@ -48,7 +52,16 @@ export type LinterResult = {
   error?: string;
   file_count?: number;
   rule_count?: number;
+  /**
+   * Set while the linter is in flight: `pending` (queued, not launched) or
+   * `running`. Absent once it has finished, so a finished result never carries it.
+   */
+  status?: LinterStatus;
+  /** The prompt run that produced (or is producing) this result, for hosts that can follow it. */
+  run_id?: string;
 };
+
+export type LinterStatus = "pending" | "running";
 
 export type LintGrouping = "linter-rule-file" | "linter-file" | "file-linter-rule" | "summary";
 
