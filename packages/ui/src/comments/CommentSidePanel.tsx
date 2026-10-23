@@ -9,6 +9,7 @@ import {
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiComment } from "../icons";
+import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { CommentThread } from "./CommentThread";
 import { CommentThreadList } from "./CommentThreadList";
 import {
@@ -47,6 +48,11 @@ export type CommentSidePanelProps = {
   threadToMarkdown?: (thread: readonly Comment[]) => string;
   renderRootDetails?: (comment: Comment) => ReactNode;
   createActions?: readonly CommentCreateAction[];
+  /**
+   * Entries appended to each root's "Assign…" submenu — the seam for host
+   * actions that start from an assignment, such as running an agent.
+   */
+  extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
 };
 
 function defaultAnchorLabel(anchor: CommentAnchor): string {
@@ -147,6 +153,7 @@ function AllComments({
   emptyLabel,
   threadToMarkdown,
   renderRootDetails,
+  extraAssignItems,
 }: {
   ctx: CommentContextValue;
   comments: Comment[];
@@ -154,6 +161,7 @@ function AllComments({
   emptyLabel: string;
   threadToMarkdown?: (thread: readonly Comment[]) => string;
   renderRootDetails?: (comment: Comment) => ReactNode;
+  extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
 }) {
   const ordered = useMemo(() => {
     const anchorOrder = new Map(orderedAnchors(ctx).map((a, i) => [a, i]));
@@ -223,6 +231,7 @@ function AllComments({
         })}
         {...handlers}
         {...(renderRootDetails ? { renderRootDetails } : {})}
+        {...(extraAssignItems ? { extraAssignItems } : {})}
         {...(threadToMarkdown ? { threadToMarkdown } : {})}
       />
     </div>
@@ -238,6 +247,7 @@ function FocusedComments({
   threadToMarkdown,
   renderRootDetails,
   createActions,
+  extraAssignItems,
 }: {
   ctx: CommentContextValue;
   comments: Comment[];
@@ -247,6 +257,7 @@ function FocusedComments({
   threadToMarkdown?: (thread: readonly Comment[]) => string;
   renderRootDetails?: (comment: Comment) => ReactNode;
   createActions?: readonly CommentCreateAction[];
+  extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
 }) {
   const comments = selectAnchorThreads(visible, anchor);
   const hasComments = comments.length > 0;
@@ -272,6 +283,7 @@ function FocusedComments({
         {...ctx.callbacks}
         {...(renderRootDetails ? { renderRootDetails } : {})}
         {...(createActions ? { createActions } : {})}
+        {...(extraAssignItems ? { extraAssignItems } : {})}
         {...(threadToMarkdown ? { threadToMarkdown } : {})}
       />
     </div>
@@ -432,6 +444,9 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
           {...(props.renderRootDetails
             ? { renderRootDetails: props.renderRootDetails }
             : {})}
+          {...(props.extraAssignItems
+            ? { extraAssignItems: props.extraAssignItems }
+            : {})}
         />
       ) : ctx.railMode === "focused" && ctx.focusedAnchor ? (
         <div
@@ -454,6 +469,9 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
               : {})}
             {...(props.renderRootDetails
               ? { renderRootDetails: props.renderRootDetails }
+              : {})}
+            {...(props.extraAssignItems
+              ? { extraAssignItems: props.extraAssignItems }
               : {})}
           />
         </div>

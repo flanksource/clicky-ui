@@ -370,6 +370,269 @@ describe("CommentCard", () => {
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
+  describe("acknowledge and assign", () => {
+    const claude = { id: "claude", name: "Claude", kind: "agent" as const };
+    const codex = { id: "codex", name: "Codex", kind: "agent" as const };
+    const you = { id: "you", name: "You", kind: "user" as const };
+    const assignable: CommentConfig = {
+      statuses: DEFAULT_COMMENT_STATUSES,
+      assignees: [you, claude, codex],
+    };
+    const held: Comment = {
+      ...root,
+      status: "in_progress",
+      assignee: { name: "Claude", kind: "agent" },
+      acknowledgedBy: { name: "Claude", kind: "agent" },
+      acknowledgedAt: "2026-01-02T00:00:00.000Z",
+    };
+    const menuLabels = () =>
+      screen.getAllByRole("menuitem").map((item) => item.textContent);
+
+    it("shows who holds an in-progress root on its status chip", () => {
+      render(<CommentCard comment={held} config={config} defaultExpanded />);
+
+      expect(screen.getByText("Assigned to Claude")).toBeVisible();
+      expect(screen.queryByText("In progress")).toBeNull();
+    });
+
+    it.each([
+      ["a user", { name: "Bo", kind: "user" as const }],
+      ["an agent", { name: "Claude", kind: "agent" as const }],
+    ])("names the assignee on the chip when %s holds it", (_kind, assignee) => {
+      render(
+        <CommentCard
+          comment={{ ...held, assignee }}
+          config={config}
+          defaultExpanded
+        />,
+      );
+
+      expect(screen.getByText(`Assigned to ${assignee.name}`)).toBeVisible();
+    });
+
+    it("falls back to the plain status once the root is resolved", () => {
+      render(
+        <CommentCard
+          comment={{ ...held, status: "resolved" }}
+          config={config}
+          defaultExpanded
+        />,
+      );
+
+      expect(screen.getByText("Resolved")).toBeVisible();
+      expect(screen.queryByText("Assigned to Claude")).toBeNull();
+    });
+
+    it.each([
+      ["expanded", true],
+      ["collapsed", false],
+    ])("acknowledges an open root from the %s menu", (_mode, expanded) => {
+      const onAcknowledge = vi.fn();
+      render(
+        <CommentCard
+          comment={root}
+          config={config}
+          defaultExpanded={expanded}
+          onAcknowledge={onAcknowledge}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Acknowledge" }));
+
+      expect(onAcknowledge).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ["held by someone", held],
+      ["resolved", { ...root, status: "resolved" }],
+      ["closed", { ...root, status: "closed" }],
+    ])("does not offer Acknowledge on a root that is %s", (_why, comment) => {
+      render(
+        <CommentCard
+          comment={comment}
+          config={config}
+          defaultExpanded
+          onAcknowledge={vi.fn()}
+          onUpdateStatus={vi.fn()}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+      expect(screen.queryByRole("menuitem", { name: "Acknowledge" })).toBeNull();
+    });
+
+    it("never offers Acknowledge or Assign on a reply", () => {
+      render(
+        <CommentCard
+          comment={{ ...root, parentId: "thread" }}
+          config={assignable}
+          defaultExpanded
+          onAcknowledge={vi.fn()}
+          onAssign={vi.fn()}
+          onCopy={vi.fn()}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+      expect(menuLabels()).toEqual(["Copy"]);
+    });
+
+    it("assigns to a configured person or agent from the Assign submenu", () => {
+      const onAssign = vi.fn();
+      render(
+        <CommentCard
+          comment={root}
+          config={assignable}
+          defaultExpanded
+          onAssign={onAssign}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Assign…" }));
+      expect(menuLabels()).toEqual(["Assign…", "You", "Claude", "Codex"]);
+      fireEvent.click(screen.getByRole("menuitem", { name: "Codex" }));
+
+      expect(onAssign).toHaveBeenCalledWith(codex);
+    });
+
+    it("disables the current assignee and offers Unassign", () => {
+      const onAssign = vi.fn();
+      render(
+        <CommentCard
+          comment={held}
+          config={assignable}
+          defaultExpanded
+          onAssign={onAssign}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Assign…" }));
+
+      expect(screen.getByRole("menuitem", { name: "Claude" })).toBeDisabled();
+      expect(screen.getByRole("menuitem", { name: "Codex" })).toBeEnabled();
+      fireEvent.click(screen.getByRole("menuitem", { name: "Unassign" }));
+      expect(onAssign).toHaveBeenCalledWith(null);
+    });
+
+    it("omits Assign when nothing can be assigned and nothing extends it", () => {
+      render(
+        <CommentCard
+          comment={root}
+          config={config}
+          defaultExpanded
+          onAssign={vi.fn()}
+          onUpdateStatus={vi.fn()}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+      expect(menuLabels()).toEqual(["Resolve"]);
+    });
+
+    it("appends the caller's extra items to the Assign submenu", () => {
+      const runAgent = vi.fn();
+      const extraAssignItems = vi.fn((comment: Comment) => [
+        { label: `Run agent on ${comment.id}`, onSelect: runAgent },
+      ]);
+      render(
+        <CommentCard
+          comment={root}
+          config={assignable}
+          defaultExpanded
+          onAssign={vi.fn()}
+          extraAssignItems={extraAssignItems}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Assign…" }));
+      expect(menuLabels()).toEqual([
+        "Assign…",
+        "You",
+        "Claude",
+        "Codex",
+        "Run agent on r1",
+      ]);
+      fireEvent.click(
+        screen.getByRole("menuitem", { name: "Run agent on r1" }),
+      );
+
+      expect(runAgent).toHaveBeenCalledTimes(1);
+    });
+
+    it("offers the extra items alone when no assignment callback exists", () => {
+      render(
+        <CommentCard
+          comment={root}
+          config={config}
+          defaultExpanded
+          extraAssignItems={() => [{ label: "Run agent", onSelect: vi.fn() }]}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Assign…" }));
+      expect(menuLabels()).toEqual(["Assign…", "Run agent"]);
+    });
+
+    it("orders the root actions Delete, Acknowledge, Assign, Resolve, Copy, Maximise", () => {
+      render(
+        <CommentCard
+          comment={root}
+          config={assignable}
+          defaultExpanded
+          onDelete={vi.fn()}
+          onAcknowledge={vi.fn()}
+          onAssign={vi.fn()}
+          onUpdateStatus={vi.fn()}
+          onCopy={vi.fn()}
+          onMaximize={vi.fn()}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+      expect(menuLabels()).toEqual([
+        "Delete",
+        "Acknowledge",
+        "Assign…",
+        "Resolve",
+        "Copy",
+        "Maximise",
+      ]);
+    });
+
+    it.each([
+      ["acknowledge", "Acknowledge", { onAcknowledge: "x" }],
+      ["assign", "Claude", { onAssign: "x" }],
+    ])("reports a failed %s", async (verb, item, which) => {
+      const failure = vi.fn().mockRejectedValue(new Error("held elsewhere"));
+      render(
+        <CommentCard
+          comment={root}
+          config={assignable}
+          defaultExpanded
+          {...("onAcknowledge" in which ? { onAcknowledge: failure } : {})}
+          {...("onAssign" in which ? { onAssign: failure } : {})}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+      if (verb === "assign") {
+        fireEvent.click(screen.getByRole("menuitem", { name: "Assign…" }));
+      }
+      fireEvent.click(screen.getByRole("menuitem", { name: item }));
+
+      await waitFor(() =>
+        expect(screen.getByRole("alert")).toHaveTextContent(
+          `Couldn't ${verb} comment: held elsewhere`,
+        ),
+      );
+    });
+  });
+
   it("toggles a checklist item", () => {
     const onChecklistToggle = vi.fn();
     const withChecklist: Comment = {

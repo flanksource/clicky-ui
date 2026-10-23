@@ -95,6 +95,12 @@ export type CommentAuthor = {
   avatar?: string;
   /** Glyph override for `kind: "agent"` authors. */
   icon?: string | StaticIconComponent;
+  /** The agent that posted on `name`'s behalf, when another agent wrote the text. */
+  via?: string;
+  /** The session that produced the text, so the run can be inspected later. */
+  sessionId?: string;
+  /** AI response cost in USD for producing the text. */
+  cost?: number;
 };
 
 /**
@@ -113,6 +119,22 @@ export type CommentReviewDecision =
 
 /** Anchor key reserved for document-level (un-anchored) comments. */
 export const DOCUMENT_ANCHOR = "__document__";
+
+export type CommentAgentRunState = "queued" | "sent" | "done" | "error";
+
+/**
+ * A root handed to an agent session. Hosts may share one session between many
+ * roots; the library only carries the record so a host can render it.
+ */
+export type CommentAgentRun = {
+  /** Absent when the hand-off failed before a session existed. */
+  sessionId?: string;
+  /** ISO-8601 time the hand-off was requested. */
+  requestedAt: string;
+  state: CommentAgentRunState;
+  /** Why the hand-off failed; present only when `state` is `error`. */
+  error?: string;
+};
 
 /** A single comment. Replies set `parentId`; roots leave it null. */
 export type Comment = {
@@ -137,6 +159,14 @@ export type Comment = {
   closedAt?: string;
   /** Human who closed the comment. */
   closedBy?: CommentAuthor;
+  /** Who holds the thread while it is being worked on; roots only. */
+  assignee?: CommentAuthor;
+  /** ISO-8601 time when `acknowledgedBy` picked the thread up; absent while merely assigned. */
+  acknowledgedAt?: string;
+  /** Who acknowledged the thread. */
+  acknowledgedBy?: CommentAuthor;
+  /** The agent-session hand-off for this thread; roots only. */
+  agentRun?: CommentAgentRun;
   /** facet.key → selected option value. */
   facets?: Record<string, string>;
   refs?: CommentRefGroup[];
@@ -176,6 +206,13 @@ export type CommentCallbacks = {
   onUpdateStatus?: (id: string, status: string) => void | Promise<void>;
   /** Human-only transition from active or resolved to closed. */
   onClose?: (id: string) => void | Promise<void>;
+  /** Claim an unassigned active root for the current user or agent. */
+  onAcknowledge?: (id: string) => void | Promise<void>;
+  /** Hand an active root to `assignee`, or return it to unassigned with `null`. */
+  onAssign?: (
+    id: string,
+    assignee: CommentAuthor | null,
+  ) => void | Promise<void>;
   onUpdateRating?: (id: string, rating: CommentRating) => void | Promise<void>;
   onDelete?: (id: string) => void | Promise<void>;
   onChecklistToggle?: (
@@ -195,6 +232,8 @@ export type CommentConfig = {
   facets?: CommentFacet[];
   /** People/agents available for @-mention. */
   mentionables?: CommentMentionable[];
+  /** People/agents a root can be assigned to; the Assign menu lists exactly these. */
+  assignees?: CommentMentionable[];
   /** Status values a checklist item cycles through on click. */
   checklistStatusCycle?: string[];
 };
