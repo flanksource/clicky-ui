@@ -430,6 +430,13 @@ export type {
   SandboxPlatformPolicy,
   StdinWrite,
 } from "./approval-request";
+export {
+  usePromptRunStream,
+  type PromptRunStreamOptions,
+  type PromptRunStreamState,
+  type PromptRunStreamStatus,
+  type PromptRunSummary,
+} from "./use-prompt-run-stream";
 export { SessionTail, type SessionTailProps } from "./SessionTail";
 export {
   SessionInspector,
