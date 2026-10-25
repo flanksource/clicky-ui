@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";function t(e){return/^[A-Za-z0-9_@%+=:,./-]+$/.test(e)?e:`'${e.replaceAll(`'`,`'"'"'`)}'`}function n({command:e,args:n,cwd:r}){let i=[e,...n??[]].map(t).join(` `);return r?`cd ${t(r)} && ${i}`:i}function r(){return(r=e((()=>{})))()}export{n,t as r,r as t};
