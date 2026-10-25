@@ -6,7 +6,7 @@ codeBlocks: [bash]
 
 Measures wall time and peak memory of the Storybook story tests, which run every story in system Chrome through the Vitest Playwright provider. Peak RSS covers vitest, Playwright and every Chrome process:
 
-```sh
+```text
 gavel fixtures --benchmark --profile --max-concurrent 1 fixtures/benchmarks/storybook-tests.md
 ```
 

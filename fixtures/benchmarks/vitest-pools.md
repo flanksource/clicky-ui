@@ -6,7 +6,7 @@ codeBlocks: [bash]
 
 Measures wall time and peak memory of the packages/ui unit suite under each Vitest pool, so the default pool is chosen from numbers. Run it one variant at a time, or the variants share the machine and skew each other:
 
-```sh
+```text
 gavel fixtures --benchmark --profile --max-concurrent 1 fixtures/benchmarks/vitest-pools.md
 ```
 
