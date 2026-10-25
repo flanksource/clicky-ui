@@ -57,6 +57,9 @@ catalogs:
     '@monaco-editor/react':
       specifier: ^4.7.0
       version: 4.7.0
+    '@opentelemetry/api':
+      specifier: ^1.9.1
+      version: 1.9.1
     '@oxlint/plugins':
       specifier: ^1.60.0
       version: 1.68.0
@@ -375,6 +378,9 @@ importers:
       '@chromatic-com/storybook':
         specifier: 'catalog:'
         version: 5.2.1(storybook@10.6.3(@types/react@19.2.17)(prettier@3.8.3)(react@18.3.1))
+      '@opentelemetry/api':
+        specifier: 'catalog:'
+        version: 1.9.1
       '@storybook/addon-docs':
         specifier: 'catalog:'
         version: 10.6.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(storybook@10.6.3(@types/react@19.2.17)(prettier@3.8.3)(react@18.3.1))
