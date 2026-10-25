@@ -20,7 +20,8 @@ describe("downloadJson", () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     const parts: BlobPart[] = [];
     let blobType = "";
-    vi.spyOn(globalThis, "Blob").mockImplementation((p, opts) => {
+    // `new Blob(...)` constructs the mock, so the implementation must be a function, not an arrow.
+    vi.spyOn(globalThis, "Blob").mockImplementation(function (p, opts) {
       parts.push(...(p ?? []));
       blobType = opts?.type ?? "";
       return {} as Blob;
