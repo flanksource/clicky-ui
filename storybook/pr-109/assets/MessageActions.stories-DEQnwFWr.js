@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{n as t,t as n}from"./MessageActions-CVjzAF-R.js";var r,i,a,o,s;function c(){return(c=e((()=>{t(),{fn:r}=__STORYBOOK_MODULE_TEST__,i={title:`Chat/MessageActions`,component:n,tags:[`autodocs`],parameters:{docs:{description:{component:"Hover action row for an assistant message: copy its text (with a copied-confirmation) and, when `onRegenerate` is provided, re-generate it."}}},args:{text:`Found 2 pods in default: api-7c9 and worker-1f2.`,onRegenerate:r()}},a={},o={args:{onRegenerate:void 0}},s=[`Default`,`CopyOnly`],a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{}`,...a.parameters?.docs?.source}}},o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{
+  args: {
+    onRegenerate: undefined
+  }
+}`,...o.parameters?.docs?.source}}}})))()}c();export{o as CopyOnly,a as Default,s as __namedExportsOrder,i as default};

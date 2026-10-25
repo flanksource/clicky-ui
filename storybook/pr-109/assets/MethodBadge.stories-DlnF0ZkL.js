@@ -1,0 +1,5 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{t}from"./jsx-runtime-BG4KOiPz.js";import{n,t as r}from"./MethodBadge-mPHOBwpr.js";var i,a,o,s;function c(){return(c=e((()=>{n(),i=t(),a={title:`Data/MethodBadge`,component:r,args:{method:`GET`},parameters:{docs:{description:{component:`HTTP method badge with method-specific tones. It normalizes method casing and renders through the shared Badge primitive.`}}}},o={render:()=>(0,i.jsx)(`div`,{className:`flex flex-wrap items-center gap-2`,children:[`GET`,`POST`,`PUT`,`PATCH`,`DELETE`,`OPTIONS`].map(e=>(0,i.jsx)(r,{method:e},e))})},s=[`AllMethods`],o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{
+  render: () => <div className="flex flex-wrap items-center gap-2">
+      {["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].map(method => <MethodBadge key={method} method={method} />)}
+    </div>
+}`,...o.parameters?.docs?.source}}}})))()}c();export{o as AllMethods,s as __namedExportsOrder,a as default};
