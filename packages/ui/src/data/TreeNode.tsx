@@ -166,11 +166,14 @@ export function TreeNode<T>({
   const key = getKey(node);
   const isSelected = selected != null && getKey(selected) === key;
   const isForcedOpen = forcedOpenKeys?.has(key) ?? false;
-  const isOnRevealPath = revealPath?.has(key) ?? false;
+  // Only the selection's ancestors are on the reveal path; the selected node
+  // itself (mapped to null) keeps its own expansion.
+  const revealNextKey = revealPath?.get(key) ?? null;
+  const isOnRevealPath = revealNextKey !== null;
   const revealOverride = revealOverrides?.get(key);
   const pathOnly = isOnRevealPath && revealOverride === undefined;
   const ownOpen = getExpanded ? getExpanded(node) : open;
-  const isOpen = isForcedOpen || (pathOnly ? revealPath!.get(key) !== null : revealOverride ?? ownOpen);
+  const isOpen = isForcedOpen || pathOnly || (revealOverride ?? ownOpen);
 
   useEffect(() => {
     if (expandAll !== null && expandAll !== prevExpandAll.current && !skipExpandAll) {
@@ -297,7 +300,7 @@ export function TreeNode<T>({
       )}
       {isOpen && hasChildren && (
         <div role="group">
-          {(pathOnly ? children!.filter((child) => getKey(child) === revealPath!.get(key)) : children!).map((child) => (
+          {(pathOnly ? children!.filter((child) => getKey(child) === revealNextKey) : children!).map((child) => (
             <TreeNode
               key={getKey(child)}
               node={child}
