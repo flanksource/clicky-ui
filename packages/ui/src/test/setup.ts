@@ -1,4 +1,11 @@
 import * as matchers from "@testing-library/jest-dom/matchers";
+import {
+  ReadableStream,
+  TextDecoderStream,
+  TextEncoderStream,
+  TransformStream,
+  WritableStream,
+} from "node:stream/web";
 import { expect } from "vitest";
 
 expect.extend(matchers);
@@ -53,6 +60,19 @@ if (typeof window !== "undefined" && !window.matchMedia) {
       removeListener: () => {},
       dispatchEvent: () => false,
     }) as MediaQueryList;
+}
+
+// The vmThreads pool runs each file in a VM context that only sees jsdom's
+// globals, and jsdom ships no WHATWG streams. Browsers and Node both have them,
+// and the ai SDK's chat transport builds on TransformStream at import time.
+if (typeof globalThis.TransformStream === "undefined") {
+  Object.assign(globalThis, {
+    ReadableStream,
+    WritableStream,
+    TransformStream,
+    TextEncoderStream,
+    TextDecoderStream,
+  });
 }
 
 function installStorageShimIfNeeded() {
