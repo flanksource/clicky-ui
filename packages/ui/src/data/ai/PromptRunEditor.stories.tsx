@@ -157,9 +157,11 @@ export const TabbedSpec: Story = {
     await userEvent.click(canvas.getByRole("tab", { name: "System Prompt" }));
     await expect(canvas.getByLabelText("System")).toHaveValue("Be precise");
 
+    // Token and turn limits moved to the runtime bar; the Model tab keeps
+    // provider readiness and the advanced model settings.
     await userEvent.click(canvas.getByRole("tab", { name: "Model" }));
-    await expect(
-      canvas.getByRole("region", { name: "Model" }),
-    ).toHaveTextContent("Max tokens");
+    const model = canvas.getByRole("region", { name: "Model" });
+    await expect(model).toHaveTextContent("Provider status");
+    await expect(model).not.toHaveTextContent("Max tokens");
   },
 };

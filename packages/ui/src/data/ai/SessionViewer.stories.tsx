@@ -297,7 +297,8 @@ export const ApprovalStatuses: Story = {
 
     await step("keeps the underlying request visible", async () => {
       await expect(canvasElement.querySelector("ol")?.textContent).toContain("pnpm test -- --runInBand");
-      await expect(canvas.getByText("https://prod.example.com/config")).toBeInTheDocument();
+      // Once as the header's inline param, once in the expanded request body.
+      await expect(canvas.getAllByText("https://prod.example.com/config")).toHaveLength(2);
     });
   },
 };
