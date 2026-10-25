@@ -280,6 +280,24 @@ describe("Tree", () => {
       expect(screen.getByText("r").closest("[role=treeitem]")).toHaveAttribute("aria-expanded", "true");
     });
 
+    it("leaves the selected node's own default expansion alone", () => {
+      render(
+        <Tree<Node>
+          {...props}
+          roots={makeDeepTree()}
+          selected={leaf}
+          defaultOpen={(node) => node.id === leaf.id}
+        />,
+      );
+
+      const selected = screen.getByText("z").closest("[role=treeitem]")!;
+      expect(selected).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByText("child")).toBeInTheDocument();
+      expect(selected.querySelector('button[aria-label="Show all children"]')).toBeNull();
+      fireEvent.click(selected.querySelector('button[aria-label="Collapse"]')!);
+      expect(screen.queryByText("child")).toBeNull();
+    });
+
     it("expands a path-only ancestor fully on first click, then collapses it", () => {
       render(
         <Tree<Node>
