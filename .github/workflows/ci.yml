@@ -34,6 +34,18 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      # TEMP: debug — cold-cache storybook run with Vite's dependency log, to see
+      # why Chat.stories/ChatWindows.stories fail to import only in CI. Remove.
+      - name: Storybook cold-cache diagnostic
+        run: |
+          pnpm --filter @flanksource/clicky-ui run build > /dev/null
+          cd apps/storybook
+          set +e
+          DEBUG='vite:deps' pnpm exec vitest run --reporter=dot > ../../storybook-diag.log 2>&1
+          code=$?
+          set -e
+          grep -E -i "new dep|optimized dependencies changed|reload|outdated|scanner|Failed to|Error|Test Files|Tests  " ../../storybook-diag.log | grep -v "vite:deps Crawling" | cut -c1-300 | tail -n 80
+          exit $code
       - name: Gavel tests
         uses: flanksource/gavel@fb4916508ea984a8d1cdcc52190765a0ed6ec57a # v0.0.61
         with:
