@@ -1,4 +1,10 @@
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  forwardRef,
+  useMemo,
+  useState,
+  type ButtonHTMLAttributes,
+  type ReactNode,
+} from "react";
 import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
 import { UiCheck, UiEllipsis, UiFullscreen } from "../icons";
@@ -200,27 +206,28 @@ export function ObjectGraph<T extends ObjectGraphNode = ObjectGraphNode>({
   );
 }
 
-function ToolbarButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string;
-  onClick?: () => void;
-  children: ReactNode;
-}) {
+// Also a DropdownMenu trigger, which merges its ref and interaction props onto
+// it, so both are forwarded to the button.
+const ToolbarButton = forwardRef<
+  HTMLButtonElement,
+  ButtonHTMLAttributes<HTMLButtonElement> & { label: string }
+>(function ToolbarButton({ label, className, children, ...props }, ref) {
   return (
     <button
+      ref={ref}
       type="button"
       aria-label={label}
       title={label}
-      className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-      {...(onClick ? { onClick } : {})}
+      className={cn(
+        "inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+        className,
+      )}
+      {...props}
     >
       {children}
     </button>
   );
-}
+});
 
 function DefaultObjectLabel<T extends ObjectGraphNode>({
   node,

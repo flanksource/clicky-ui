@@ -1,6 +1,8 @@
 import { resourceSummary, taskTransportConnected, type ResourceSummary } from "./task-resource-summary";
 import { useResourceClock } from "../hooks/use-resource-clock";
-import { Button } from "../components/button";
+import { forwardRef } from "react";
+import { Button, type ButtonProps } from "../components/button";
+import { cn } from "../lib/utils";
 import { UiActivity, UiListChecks, UiMemoryStick } from "../icons";
 import { useTaskRun, useTaskRuns } from "../hooks/use-task-run";
 import { DropdownMenu, type DropdownMenuItem } from "../overlay/DropdownMenu";
@@ -135,10 +137,15 @@ function RecentTasksDropdown({
   );
 }
 
-function TaskTrigger({ active, resources }: { active: number; resources?: ResourceSummary }) {
+// DropdownMenu merges its ref and interaction props onto the trigger, so the
+// trigger has to forward both to the button it renders.
+const TaskTrigger = forwardRef<
+  HTMLButtonElement,
+  ButtonProps & { active: number; resources?: ResourceSummary }
+>(function TaskTrigger({ active, resources, className, ...props }, ref) {
   const label = `Tasks (${active} active)`;
   return (
-    <Button type="button" variant="ghost" size={resources ? "sm" : "icon"} aria-label={label} title={label} className="relative gap-1.5">
+    <Button ref={ref} type="button" variant="ghost" size={resources ? "sm" : "icon"} aria-label={label} title={label} className={cn("relative gap-1.5", className)} {...props}>
       <UiListChecks className={active > 0 ? "animate-pulse" : undefined} />
       {resources?.state === "unavailable" ? <span className="text-xs text-muted-foreground">Resources unavailable</span> : resources ? (
         <span className="flex items-center gap-1.5 text-xs" title={`Sampled ${new Date(resources.sampledAt).toLocaleTimeString()}; CPU 100% equals one core`}>
@@ -149,4 +156,4 @@ function TaskTrigger({ active, resources }: { active: number; resources?: Resour
       ) : null}
     </Button>
   );
-}
+});
