@@ -1,9 +1,0 @@
-import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{t}from"./react-pByjoP3I.js";import{t as n}from"./jsx-runtime-BG4KOiPz.js";import{n as r,t as i}from"./DateTimePicker-BRcE4Q4K.js";function a({value:e,...t}){let[n,r]=(0,o.useState)(e??``);return(0,s.jsxs)(`div`,{className:`max-w-xs space-y-3`,children:[(0,s.jsx)(i,{...t,value:n,onChange:r}),(0,s.jsxs)(`div`,{className:`rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs`,children:[`value=`,n||`empty`]})]})}var o,s,c,l,u,d,f;function p(){return(p=e((()=>{o=t(),r(),s=n(),c={title:`Components/DateTimePicker`,component:i,tags:[`autodocs`],render:e=>(0,s.jsx)(a,{...e}),parameters:{docs:{description:{component:'Text input paired with a hidden `datetime-local` picker, so it accepts both absolute timestamps (`2026-06-16T09:30`) and relative expressions (`now-1h`) while still offering a native calendar via the button. Controlled by string. For a unified API prefer `DateField` with `mode="datetime"`.'}}},argTypes:{value:{control:`text`,description:`Absolute (YYYY-MM-DDTHH:mm) or relative (now-1h) string.`},openButtonLabel:{control:`text`},disabled:{control:`boolean`},onChange:{control:!1},prefix:{control:!1},suffix:{control:!1}},args:{value:`2026-06-16T09:30`,openButtonLabel:`Open time picker`,disabled:!1}},l={},u={args:{value:`now-1h`}},d={args:{disabled:!0}},f=[`Default`,`Relative`,`Disabled`],l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{}`,...l.parameters?.docs?.source}}},u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{
-  args: {
-    value: "now-1h"
-  }
-}`,...u.parameters?.docs?.source}}},d.parameters={...d.parameters,docs:{...d.parameters?.docs,source:{originalSource:`{
-  args: {
-    disabled: true
-  }
-}`,...d.parameters?.docs?.source}}}})))()}p();export{l as Default,d as Disabled,u as Relative,f as __namedExportsOrder,c as default};

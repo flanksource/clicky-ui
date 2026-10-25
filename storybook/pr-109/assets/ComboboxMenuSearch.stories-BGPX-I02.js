@@ -1,8 +1,0 @@
-import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{t}from"./react-pByjoP3I.js";import{t as n}from"./jsx-runtime-BG4KOiPz.js";import{n as r,t as i}from"./Combobox-VMHkIXuY.js";var a,o,s,c,l,u;function d(){return(d=e((()=>{a=t(),r(),o=n(),s=[{value:`primary`,label:`Primary database`,group:`Live`},{value:`reporting`,label:`Reporting database`,group:`Live`},{value:`archive`,label:`Archive database`,group:`Historical`}],c={title:`Components/Combobox/Menu filter`,component:i,parameters:{docs:{description:{component:`Set searchPlacement to menu to show a compact selection button with filtering inside its grouped popup. Typing leaves the selection unchanged; choose an option to commit, or dismiss to discard the search.`}}}},l={render:()=>{let[e,t]=(0,a.useState)(`primary`);return(0,o.jsx)(`div`,{className:`w-64`,children:(0,o.jsx)(i,{ariaLabel:`Database`,searchPlacement:`menu`,options:s,value:e,onChange:t,allowCustomValue:!1})})}},u=[`Grouped`],l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{
-  render: () => {
-    const [value, setValue] = useState("primary");
-    return <div className="w-64">
-        <Combobox ariaLabel="Database" searchPlacement="menu" options={OPTIONS} value={value} onChange={setValue} allowCustomValue={false} />
-      </div>;
-  }
-}`,...l.parameters?.docs?.source}}}})))()}d();export{l as Grouped,u as __namedExportsOrder,c as default};
