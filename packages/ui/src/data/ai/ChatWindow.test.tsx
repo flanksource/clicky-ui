@@ -350,7 +350,7 @@ describe("ChatWindow", () => {
     expect(screen.getByTitle(/^Runtime mode — /)).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Model" })).toBeDisabled();
     fireEvent.click(
-      screen.getByRole("button", {
+      await screen.findByRole("button", {
         name: "Fork conversation into a new window",
       }),
     );
@@ -445,7 +445,7 @@ describe("ChatWindow", () => {
       expect(screen.getByText("Source question")).toBeInTheDocument(),
     );
     fireEvent.click(
-      screen.getByRole("button", {
+      await screen.findByRole("button", {
         name: "Fork conversation into a new window",
       }),
     );
