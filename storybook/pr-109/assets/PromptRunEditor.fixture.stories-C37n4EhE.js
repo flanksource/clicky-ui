@@ -1,9 +1,0 @@
-import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{t}from"./react-pByjoP3I.js";import{t as n}from"./jsx-runtime-BG4KOiPz.js";import{n as r,t as i}from"./PromptRunEditor-3qMgoJu1.js";function a(){let[e,t]=(0,o.useState)({spec:{model:`anthropic/claude-sonnet-4-6`,mode:`api`,workflow:{verify:{fixture:`# Verification
-
-\`\`\`yaml contract
-policy: smoke
-retries: 1
-\`\`\`
-`}}}});return(0,s.jsxs)(`div`,{className:`max-w-3xl p-density-4`,children:[(0,s.jsx)(i,{value:e,onChange:t,specSections:[`verify`],fixtureSchemas:c}),(0,s.jsx)(`pre`,{"aria-label":`Saved verification fixture`,className:`mt-density-4 whitespace-pre-wrap text-sm`,children:e.spec?.workflow?.verify?.fixture})]})}var o,s,c,l,u,d;function f(){return(f=e((()=>{o=t(),r(),s=n(),c={"yaml contract":{type:`object`,properties:{policy:{type:`string`,title:`Policy`,description:`Policy checked by the runner.`},retries:{type:`integer`,title:`Retries`,minimum:0}},required:[`policy`]}},l={title:`AI/PromptRunEditor/Verification fixture`,component:i,parameters:{layout:`fullscreen`,docs:{description:{component:`Pass runner-owned fixtureSchemas to the prompt run editor. Open the runtime bar's ⋮ → Advanced, then expand the contract fence to edit its schema fields. The schema map also populates Add fence and remains outside the serialized runtime spec.`}}}},u={render:()=>(0,s.jsx)(a,{})},d=[`HostSchemas`],u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{
-  render: () => <VerificationFixtureStory />
-}`,...u.parameters?.docs?.source}}}})))()}f();export{u as HostSchemas,d as __namedExportsOrder,l as default};
