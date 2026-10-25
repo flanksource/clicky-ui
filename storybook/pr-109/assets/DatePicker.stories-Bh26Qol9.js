@@ -1,0 +1,9 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{t}from"./react-pByjoP3I.js";import{t as n}from"./jsx-runtime-BG4KOiPz.js";import{n as r,t as i}from"./DatePicker-Djdq_y43.js";function a({value:e,...t}){let[n,r]=(0,o.useState)(e??``);return(0,s.jsxs)(`div`,{className:`max-w-xs space-y-3`,children:[(0,s.jsx)(i,{...t,value:n,onChange:r}),(0,s.jsxs)(`div`,{className:`rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs`,children:[`value=`,n||`empty`]})]})}var o,s,c,l,u,d,f;function p(){return(p=e((()=>{o=t(),r(),s=n(),c={title:`Components/DatePicker`,component:i,tags:[`autodocs`],render:e=>(0,s.jsx)(a,{...e}),parameters:{docs:{description:{component:'Native `<input type="date">` with a hidden default indicator and a custom calendar button that calls `showPicker()`. Controlled via an ISO `YYYY-MM-DD` string. For a unified date/datetime API prefer `DateField`.'}}},argTypes:{value:{control:`text`,description:`Controlled ISO date string (YYYY-MM-DD).`},openButtonLabel:{control:`text`,description:`Accessible label for the calendar button.`},disabled:{control:`boolean`},onChange:{control:!1}},args:{value:`2026-06-16`,openButtonLabel:`Open date picker`,disabled:!1}},l={},u={args:{value:``}},d={args:{disabled:!0}},f=[`Default`,`Empty`,`Disabled`],l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{}`,...l.parameters?.docs?.source}}},u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{
+  args: {
+    value: ""
+  }
+}`,...u.parameters?.docs?.source}}},d.parameters={...d.parameters,docs:{...d.parameters?.docs,source:{originalSource:`{
+  args: {
+    disabled: true
+  }
+}`,...d.parameters?.docs?.source}}}})))()}p();export{l as Default,d as Disabled,u as Empty,f as __namedExportsOrder,c as default};
