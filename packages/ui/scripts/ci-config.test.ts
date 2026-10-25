@@ -56,8 +56,11 @@ describe("CI suite isolation", () => {
       { command: "serve", mode: "test" },
       new URL("apps/storybook/vitest.config.ts", root).pathname,
     );
-    expect(config?.config.test.projects[0].test.browser.instances).toEqual([
-      { browser: "chromium", launch: { channel: "chrome" } },
-    ]);
+    const browser = config?.config.test.projects[0].test.browser;
+    expect(browser.instances).toEqual([{ browser: "chromium" }]);
+    expect(browser.provider).toMatchObject({
+      name: "playwright",
+      options: { launchOptions: { channel: "chrome" } },
+    });
   });
 });
