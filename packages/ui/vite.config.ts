@@ -1,12 +1,29 @@
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { defineConfig } from "vite";
+import { configDefaults } from "vitest/config";
 import dts from "vite-plugin-dts";
 import { gitInfo } from "./scripts/git-info.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const build = gitInfo();
+
+const VM_INCOMPATIBLE_TESTS = [
+  // Loads the Storybook Vitest config through Vite: rolldown rejects config
+  // objects created in another realm.
+  "scripts/ci-config.test.ts",
+  // Replaces window.location to observe reload(), which jsdom's location
+  // forbids inside a VM context.
+  "src/hooks/event-hub.test.ts",
+  // Heavy renders that run 1.5-2x slower when every file re-evaluates its
+  // modules in a fresh VM context, and then miss waitFor's 1s or the 5s test
+  // deadline under full-suite load.
+  "src/data/ai/runtime-profiles/RuntimeProfilesWorkspace.test.tsx",
+  "src/data/ai/SpecRuntimeEditor.test.tsx",
+  // Waits for Shiki's async highlighting, which a VM context reloads per file.
+  "src/data/SymbolBadge.test.tsx",
+];
 
 const entry = {
   index: resolve(__dirname, "src/index.ts"),
@@ -106,12 +123,34 @@ export default defineConfig(({ mode }) => {
       environment: "jsdom",
       globals: true,
       setupFiles: ["./src/test/setup.ts"],
-      include: [
-        "src/**/*.test.{ts,tsx}",
-        "oxlint-plugins/**/*.test.{ts,tsx}",
-        "scripts/**/*.test.ts",
-      ],
       css: true,
+      // vmThreads runs the suite about 3x faster than forks
+      // (fixtures/benchmarks/vitest-pools.md). Files that cannot run inside a
+      // VM context stay on forks. `include` is per project: extending
+      // concatenates arrays, so a shared one would run every file on both.
+      projects: [
+        {
+          extends: true,
+          test: {
+            name: "unit",
+            pool: "vmThreads",
+            include: [
+              "src/**/*.test.{ts,tsx}",
+              "oxlint-plugins/**/*.test.{ts,tsx}",
+              "scripts/**/*.test.ts",
+            ],
+            exclude: [...configDefaults.exclude, ...VM_INCOMPATIBLE_TESTS],
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: "forks",
+            pool: "forks",
+            include: VM_INCOMPATIBLE_TESTS,
+          },
+        },
+      ],
     },
   };
 });
