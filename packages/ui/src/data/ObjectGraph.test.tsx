@@ -183,7 +183,11 @@ describe("ObjectGraph", () => {
       expect(screen.queryByText("callbacks")).toBeNull();
       expect(screen.getByText("bound")).toBeTruthy();
 
-      fireEvent.click(screen.getByRole("button", { name: "Display options" }));
+      // The menu's trigger props land on the toolbar button itself.
+      const trigger = screen.getByRole("button", { name: "Display options" });
+      expect(trigger).toHaveAttribute("aria-haspopup", "menu");
+      fireEvent.click(trigger);
+      expect(trigger).toHaveAttribute("aria-expanded", "true");
       // 5 pruned nodes: callbacks, comment, missing, tags [0], nested (+ its child).
       fireEvent.click(screen.getByText("Hide null values (6)"));
 
