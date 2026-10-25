@@ -113,8 +113,9 @@ describe("TestRunner", () => {
 
   it("filters the tree to only failing branches when Failed is included", () => {
     render(<Harness />);
-    // The facets live in the tree toolbar, beside expand/collapse.
-    fireEvent.click(within(tree()).getByRole("button", { name: /^Status/ }));
+    // The facets live in the tree toolbar, beside expand/collapse, which sits
+    // above the semantic tree rather than inside it.
+    fireEvent.click(screen.getByRole("button", { name: /^Status/ }));
     fireEvent.click(within(screen.getByRole("menu", { name: "Status" })).getByText("Failed"));
     expect(within(tree()).queryByText(/issues a refund/)).not.toBeInTheDocument();
     expect(within(tree()).getByText(/rejects bad password/)).toBeInTheDocument();
@@ -122,7 +123,7 @@ describe("TestRunner", () => {
 
   it("narrows even a small forest to the tests whose name matches the text filter", () => {
     render(<Harness />);
-    fireEvent.change(within(tree()).getByRole("searchbox", { name: "Filter tests" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Filter tests" }), {
       target: { value: "refund" },
     });
     expect(within(tree()).getByText(/issues a refund/)).toBeInTheDocument();

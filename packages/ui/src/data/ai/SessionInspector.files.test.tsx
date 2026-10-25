@@ -18,14 +18,15 @@ describe("SessionFilesPanel", () => {
     expect(fileNode).toBeInTheDocument();
     expect(fileNode.firstElementChild).toHaveClass("min-h-6", "py-0");
 
-    fireEvent.click(within(tree).getByRole("button", { name: "Collapse all" }));
+    // The expand/collapse toolbar sits above the semantic tree, not inside it.
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
     expect(
       within(tree).queryByRole("treeitem", {
         name: "pkg/cli/webapp/src/SessionBrowser.tsx",
       }),
     ).toBeNull();
 
-    fireEvent.click(within(tree).getByRole("button", { name: "Expand all" }));
+    fireEvent.click(screen.getByRole("button", { name: "Expand all" }));
     expect(
       within(tree).getByRole("treeitem", {
         name: "pkg/cli/webapp/src/SessionBrowser.tsx",

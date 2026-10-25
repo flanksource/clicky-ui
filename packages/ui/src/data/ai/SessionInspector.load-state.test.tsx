@@ -58,8 +58,10 @@ describe("SessionInspector onLoadStateChange", () => {
     );
 
     await screen.findByRole("alert");
+    // The state is reported from a passive effect, which can run after the
+    // alert is already in the DOM.
+    await waitFor(() => expect(onLoadStateChange.mock.lastCall?.[0].status).toBe("error"));
     const last = onLoadStateChange.mock.lastCall![0];
-    expect(last.status).toBe("error");
     expect(last.error).toBeInstanceOf(Error);
     expect(last.error!.message).toContain(message);
     expect(last.error!.message).toContain("HTTP 404");

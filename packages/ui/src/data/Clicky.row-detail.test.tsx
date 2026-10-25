@@ -142,10 +142,11 @@ describe("ClickyTable renderRowDetail", () => {
 
   it("confines an inline (row-style) detail's intrinsic width so it cannot stretch the table", () => {
     // A `pre`/tree-shaped detail (a SQL statement, a call tree) has no
-    // natural wrap point. Without `w-0 min-w-full overflow-x-auto` on the
-    // wrapper, its intrinsic width becomes the expansion <td>'s width,
+    // natural wrap point. Without an explicit width and `overflow-x-auto` on
+    // the wrapper, its intrinsic width becomes the expansion <td>'s width,
     // which is also the table's width — every other column gets pushed
-    // off-screen. The wrapper must absorb that overflow internally instead.
+    // off-screen. The wrapper is sized to the scroll container's visible width
+    // (`--dt-viewport-w`) and absorbs that overflow internally instead.
     const { container } = render(
       <ClickyTable
         columns={columns}
@@ -167,7 +168,10 @@ describe("ClickyTable renderRowDetail", () => {
 
     const wrapper = container.querySelector("td .rounded-md.border.bg-background");
     expect(wrapper).not.toBeNull();
-    expect(wrapper).toHaveClass("w-0", "min-w-full", "overflow-x-auto");
+    expect(wrapper).toHaveClass(
+      "w-[calc(var(--dt-viewport-w)-2*var(--spacing-density-3))]",
+      "overflow-x-auto",
+    );
   });
 
   it("opens the detail in a dialog when detailStyle is 'dialog'", () => {
