@@ -82,6 +82,38 @@ export {
 } from "./marks";
 export { OutcomeIcon, LintSeverityIcon, ToolIcon } from "./MarkIcons";
 
+export {
+  MATRIX_MARKS,
+  MATRIX_ORDER,
+  MATRIX_PLAN_BAR,
+  matrixMarkKey,
+  repeatsMark,
+  matrixBarClass,
+  formatMatrixDuration,
+  type MatrixMarkToken,
+  type MatrixMarkKey,
+  type MatrixCounts,
+  type MatrixEnvCounts,
+} from "./matrix-marks";
+export {
+  MatrixMark,
+  MatrixMix,
+  MatrixElapsed,
+  EmptyMatrixCell,
+  MatrixLegend,
+  EnvChip,
+  MatrixEnvHeader,
+  MatrixUnavailableEnvHeader,
+  type MatrixMarkProps,
+  type MatrixMixProps,
+  type MatrixElapsedProps,
+  type EmptyMatrixCellProps,
+  type MatrixLegendProps,
+  type EnvChipProps,
+  type MatrixEnvHeaderProps,
+  type MatrixUnavailableEnvHeaderProps,
+} from "./MatrixMarks";
+
 export { slugify, annotateRoutePaths, findNodeByRoutePath } from "./routePath";
 
 export {
