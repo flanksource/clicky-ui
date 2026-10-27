@@ -50,6 +50,7 @@ const SourceEditor = lazy(() =>
 );
 import { useFeedbackCopy } from "./comments/useFeedbackCopy";
 import { useAgentRuns } from "./agent-runs/AgentRunsProvider";
+import { usePromptRuns } from "./prompt-runs/PromptRunsProvider";
 import {
   type PageComment,
   type PlaygroundComments,
@@ -89,6 +90,8 @@ export type PlaygroundShellProps = {
   commentsLoading: boolean;
   view: PlaygroundView;
   annotations: AnnotationVisibility;
+  showRejected: boolean;
+  onShowRejectedChange: (show: boolean) => void;
   review?: "resolved";
   selectedCommentId?: string;
   pageHref: (slug: string) => string;
@@ -99,6 +102,7 @@ export type PlaygroundShellProps = {
   onReviewExit: () => void;
   onCommentAndReopen: (id: string, body: string) => Promise<void>;
   onPrepareCommentSelection: PlaygroundComments["prepareSelection"];
+  onCaptureSelection: PlaygroundComments["captureSelection"];
 };
 
 function shortAnchorLabel(anchor: string): string {
@@ -114,6 +118,8 @@ export function PlaygroundShell({
   commentsLoading,
   view,
   annotations,
+  showRejected,
+  onShowRejectedChange,
   review,
   selectedCommentId,
   pageHref,
@@ -124,9 +130,11 @@ export function PlaygroundShell({
   onReviewExit,
   onCommentAndReopen,
   onPrepareCommentSelection,
+  onCaptureSelection,
 }: PlaygroundShellProps) {
   const ctx = useCommentContext();
   const agentRuns = useAgentRuns();
+  const { openPrompt } = usePromptRuns();
   const [sidebar, setSidebar] = useSidebarState();
   const activity = usePageActivity();
   const [editing, setEditing] = useState(false);
@@ -202,6 +210,10 @@ export function PlaygroundShell({
       ctx.registerAnchor(anchor, element);
       ctx.focusAnchor(anchor);
     },
+    onPrompt: ({ anchor, element }) => {
+      if (!active) throw new Error("Prompt needs an open playground page");
+      openPrompt({ page: active.slug, anchor, element: onCaptureSelection(anchor, element) });
+    },
   });
 
   const feedback = useFeedbackCopy({ active, comments: ctx.comments, labels });
@@ -268,6 +280,8 @@ export function PlaygroundShell({
           <PlaygroundShellActions
             view={view}
             annotations={annotations}
+            showRejected={showRejected}
+            onShowRejectedChange={onShowRejectedChange}
             copyDisabled={pageGuidance.markdown === null}
             pageMarkdownCopied={pageGuidance.copied}
             onViewChange={onViewChange}
@@ -350,7 +364,7 @@ export function PlaygroundShell({
             contentRef={contentRef}
             scrollRef={ctx.contentRef}
           >
-            <div ref={contentRef} className="min-w-0 p-density-4">
+            <div ref={contentRef} data-review-content data-show-rejected={showRejected} className="min-w-0 p-density-4">
               {pageFolders.error && (
                 <Banner tone="danger">{pageFolders.error}</Banner>
               )}

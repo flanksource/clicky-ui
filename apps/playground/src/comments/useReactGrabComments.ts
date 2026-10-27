@@ -17,6 +17,7 @@ export function useReactGrabComments(options: {
   contentRef: RefObject<HTMLElement | null>;
   enabled: boolean;
   onSelect: (selection: Selection) => void;
+  onPrompt: (selection: Omit<Selection, "screenshot">) => void;
 }) {
   const current = useRef(options);
   current.current = options;
@@ -99,6 +100,18 @@ export function useReactGrabComments(options: {
             label: "Comment with screenshot",
             enabled,
             onAction: (context) => select(context, true),
+          },
+          {
+            id: "playground-prompt",
+            label: "Prompt…",
+            enabled,
+            onAction: (context) => {
+              const anchor = anchorOf(context.element);
+              if (anchor === null) throw new Error("Prompt target is outside the playground artifact");
+              context.hideContextMenu();
+              context.cleanup();
+              current.current.onPrompt({ anchor, element: context.element });
+            },
           },
         ],
       });

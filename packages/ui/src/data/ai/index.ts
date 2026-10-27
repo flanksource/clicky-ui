@@ -332,6 +332,11 @@ export {
   type RuntimeBarActionsProps,
 } from "../runtime/RuntimeBarActions";
 export {
+  SEGMENT_CAPTION_CLASS,
+  SEGMENT_KEY_CLASS,
+  SegmentItemLabel,
+} from "../runtime/RuntimeBarSegment";
+export {
   ProviderStatusPanel,
   type ProviderStatusPanelProps,
 } from "../runtime/ProviderStatusPanel";

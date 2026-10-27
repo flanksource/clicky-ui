@@ -1,4 +1,5 @@
 import { RuntimeBar, type RuntimeBarProps } from "../runtime/RuntimeBar";
+import type { RuntimeBarAction } from "../runtime/RuntimeBarActions";
 import {
   runtimeFieldSupport,
   SUPPORT_ALL_RUNTIME_FIELDS,
@@ -34,6 +35,8 @@ export type SpecRuntimeBarProps = Pick<
   variant?: "run" | "preset" | undefined;
   sections?: readonly SpecSectionId[] | undefined;
   inheritedCommits?: AISpecRuntimeCommit[] | undefined;
+  /** Host settings appended after the spec's own fields, e.g. run presets. */
+  fields?: RuntimeBarAction[] | undefined;
 };
 
 export function SpecRuntimeBar({
@@ -50,6 +53,7 @@ export function SpecRuntimeBar({
   variant = "run",
   sections,
   inheritedCommits,
+  fields: hostFields = [],
 }: SpecRuntimeBarProps) {
   const families = catalog?.length ? catalog : SPEC_RUNTIME_FAMILIES;
   const family = familyForModel(
@@ -108,7 +112,7 @@ export function SpecRuntimeBar({
         showEffort={supports("effort")}
         showCost={supports("budget.cost")}
         showTimeout={supports("budget.timeout")}
-        actions={{ fields }}
+        actions={{ fields: [...fields, ...hostFields] }}
         ariaLabel={ariaLabel}
         className={className}
       />

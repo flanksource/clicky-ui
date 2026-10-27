@@ -15,6 +15,8 @@ import {
   playgroundAgentRuns,
 } from "./plugins/agent-runs-server";
 import { playgroundComments } from "./plugins/comments-server";
+import { createPromptRuns, playgroundPromptRuns } from "./plugins/prompt-runs-server";
+import { playgroundWorkspaceFiles } from "./plugins/workspace-files-server";
 import { playgroundBookmarklet } from "./plugins/bookmarklet-server";
 import { playgroundExports } from "./plugins/exports-server";
 import { playgroundMarkdown } from "./plugins/markdown-vite-plugin";
@@ -87,7 +89,7 @@ const agentRuns = createAgentRuns({
   skillPath: resolve(workspaceRoot, ".agents/skills/clicky-ui-playground/SKILL.md"),
 });
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     tailwindcss(),
@@ -96,11 +98,13 @@ export default defineConfig({
     // Before playgroundComments: that middleware answers every other
     // /__playground/comments/* path (including /:id/agent-run) with a 405.
     playgroundAgentRuns(agentRuns),
+    playgroundPromptRuns(createPromptRuns({ dir: playgroundDataDir, gavelURL: localEnv.PLAYGROUND_GAVEL_URL ?? "http://localhost:9330", workspace: workspaceRoot, onCreated: agentRuns.autoRunComment })),
     playgroundComments({
       dir: playgroundDataDir,
+      pagesDir: resolve(root, "src/pages"),
       onCreated: agentRuns.autoRunComment,
     }),
-    playgroundBookmarklet({ root, dir: playgroundDataDir }),
+    mode !== "test" && playgroundBookmarklet({ root, dir: playgroundDataDir }),
     playgroundExports({ dir: playgroundDataDir }),
     playgroundRuntimeProfiles({
       modelsURL: "http://localhost:9020/api/chat/models",
@@ -109,6 +113,7 @@ export default defineConfig({
       runtimesURL: "http://localhost:9020/api/chat/runtimes",
       resolveURL: "http://localhost:9020/api/chat/runtime-profiles/resolve",
     }),
+    playgroundWorkspaceFiles({ cwd: workspaceRoot }),
     playgroundSources({
       pagesDir: resolve(root, "src/pages"),
       commentsDir: playgroundDataDir,
@@ -216,4 +221,4 @@ export default defineConfig({
       allow: [searchForWorkspaceRoot(root), ...externalRoots],
     },
   },
-});
+}));

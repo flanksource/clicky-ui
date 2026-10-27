@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import { readAll, writeAll } from "./comments-store";
+import type { StoredComment } from "./comments-store";
+import { recordReviewDecision } from "./review-decisions";
 import { stageScreenshotRemoval } from "./comments-screenshots";
 import {
   PageStoreError,
@@ -11,10 +13,47 @@ import {
 import {
   deleteReviewableSource,
   markReviewableSource,
+  setReviewRejectedSource,
 } from "./reviewable-source";
 
 export function reviewAnchor(reviewId: string): string {
   return `[data-review-id="${reviewId}"]`;
+}
+
+export function persistReviewDecision(
+  request: ReviewSourceRequest,
+  decision: StoredComment,
+): StoredComment {
+  const reviewId = /^\[data-review-id="([A-Za-z][A-Za-z0-9:_-]*)"\]$/.exec(
+    decision.anchor ?? "",
+  )?.[1];
+  if (!reviewId) throw new Error("review decision requires a review anchor");
+  const current = currentSource(request);
+  const source = setReviewRejectedSource(
+    current,
+    reviewId,
+    decision.reviewDecision === "rejected",
+  );
+  const previous = readAll(request.commentsDir);
+  const comments = recordReviewDecision(previous[request.slug] ?? [], decision);
+  try {
+    writeSource(request.pagesDir, request.slug, source);
+    writeAll(request.commentsDir, { ...previous, [request.slug]: comments });
+  } catch (cause) {
+    try {
+      writeSource(request.pagesDir, request.slug, current);
+      writeAll(request.commentsDir, previous);
+    } catch (rollbackError) {
+      throw new AggregateError(
+        [cause, rollbackError],
+        "review decision and rollback both failed",
+      );
+    }
+    throw cause;
+  }
+  const result = comments.at(-1);
+  if (!result) throw new Error("review decision was not persisted");
+  return result;
 }
 
 export type ReviewSourceRequest = {
