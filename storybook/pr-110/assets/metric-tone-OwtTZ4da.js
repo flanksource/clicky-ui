@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";function t(e){return e>=90?`danger`:e>=60?`warning`:e>0?`success`:`neutral`}function n(e,t){if(!e||!t)return`neutral`;let n=e/t;return n>=.9?`danger`:n>=.6?`warning`:`info`}function r(){return(r=e((()=>{})))()}export{r as n,n as r,t};

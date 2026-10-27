@@ -1,0 +1,11 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{n as t,t as n}from"./LogsTable-u8rrBFPM.js";var r,i,a,o,s;function c(){return(c=e((()=>{t(),r={title:`Data/LogsTable`,component:n,args:{logs:`2026-05-05T09:30:00Z INFO api service ready\\n2026-05-05T09:31:00Z WARN worker retrying`,autoFilter:!0,showRawDetails:!0},parameters:{docs:{description:{component:`Log-focused DataTable wrapper. It normalizes raw log lines or parsed records into timestamp, level, source, message, tags, and expandable raw-detail rows.`}}}},i=[{pod:`policy-api-644b55c866-mg7tg`,container:`policy-api`,line:JSON.stringify({"@timestamp":`2026-05-03T10:09:30.288Z`,"log.level":`INFO`,message:`Filtering request path: appBanner/bannerInfo`,"ecs.version":`1.2.0`,"service.name":`policy-api`,"event.dataset":`policy-api`,"process.thread.name":`http-nio-8080-exec-6`,"log.logger":`com.example.policy.filter.ServiceRequestFilter`}),timestamp:`2026-05-03T10:09:30.288130925Z`,labels:{namespace:`claims-demo`,pod:`policy-api-644b55c866-mg7tg`}},{pod:`policy-api-644b55c866-mg7tg`,container:`policy-api`,line:JSON.stringify({"@timestamp":`2026-05-03T10:09:31.144Z`,"log.level":`WARN`,message:`Slow policy lookup for tenant default`,"service.name":`policy-api`,"event.dataset":`policy-api`,"process.thread.name":`http-nio-8080-exec-3`,"log.logger":`com.example.policy.lookup.PolicyLookup`}),timestamp:`2026-05-03T10:09:31.144019003Z`,labels:{namespace:`claims-demo`,pod:`policy-api-644b55c866-mg7tg`}},`plain startup line before JSON logging is configured`].map(e=>typeof e==`string`?e:JSON.stringify(e)).join(`
+`),a={args:{logs:i}},o={args:{logs:i,dark:!1}},s=[`Default`,`Light`],a.parameters={...a.parameters,docs:{...a.parameters?.docs,source:{originalSource:`{
+  args: {
+    logs: sampleLogs
+  }
+}`,...a.parameters?.docs?.source}}},o.parameters={...o.parameters,docs:{...o.parameters?.docs,source:{originalSource:`{
+  args: {
+    logs: sampleLogs,
+    dark: false
+  }
+}`,...o.parameters?.docs?.source}}}})))()}c();export{a as Default,o as Light,s as __namedExportsOrder,r as default};
