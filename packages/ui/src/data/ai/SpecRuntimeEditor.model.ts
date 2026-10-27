@@ -89,7 +89,7 @@ export type SpecCommitStage = (typeof SPEC_COMMIT_STAGES)[number];
 export const SPEC_COMMIT_GATES = ["none", "cheap", "full"] as const;
 export type SpecCommitGates = (typeof SPEC_COMMIT_GATES)[number];
 
-export const SPEC_SCHEMA_STRICTNESS = ["warning", "error", "retry"] as const;
+export const SPEC_SCHEMA_STRICTNESS = ["warning", "error", "repair"] as const;
 export type SpecSchemaStrictness = (typeof SPEC_SCHEMA_STRICTNESS)[number];
 
 export type AISpecRuntimePrompt = {
@@ -97,7 +97,7 @@ export type AISpecRuntimePrompt = {
   system?: string;
   appendSystem?: string;
   schemaJSON?: unknown;
-  schemaStrictness?: SpecSchemaStrictness | "";
+  schemaStrictness?: SpecSchemaStrictness | "retry" | "";
   attachments?: AISpecRuntimeAttachment[];
 };
 
@@ -469,9 +469,10 @@ function compactPrompt(
   if (
     value.schemaStrictness === "warning" ||
     value.schemaStrictness === "error" ||
+    value.schemaStrictness === "repair" ||
     value.schemaStrictness === "retry"
   ) {
-    prompt.schemaStrictness = value.schemaStrictness;
+    prompt.schemaStrictness = value.schemaStrictness === "retry" ? "repair" : value.schemaStrictness;
   }
   const attachments = value.attachments
     ?.map((attachment) => compactAttachment(attachment))
