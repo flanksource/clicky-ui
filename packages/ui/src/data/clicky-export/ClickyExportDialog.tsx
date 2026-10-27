@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { Button } from "../../components/button";
 import { Modal } from "../../overlay/Modal";
 import { Icon, type StaticIconComponent } from "../Icon";
@@ -33,6 +34,8 @@ export type ClickyExportDialogProps = {
   title?: string;
   formats: ClickyExportFormatOption[];
   scopes: ClickyExportScopeOption[];
+  pendingContent?: ReactNode;
+  allowCloseWhilePending?: boolean;
   /** Runs the export. Rejecting shows the reason without closing the dialog. */
   onDownload: (request: {
     format: string;
@@ -54,6 +57,8 @@ export function ClickyExportDialog({
   formats,
   scopes,
   onDownload,
+  pendingContent,
+  allowCloseWhilePending = false,
 }: ClickyExportDialogProps) {
   const [format, setFormat] = useState(formats[0]?.format);
   const [scope, setScope] = useState(scopes[0]?.scope);
@@ -91,8 +96,8 @@ export function ClickyExportDialog({
       closeOnEsc
       footer={
         <div className="flex items-center justify-end gap-2">
-          <Button variant="outline" onClick={onClose} disabled={pending}>
-            Cancel
+          <Button variant="outline" onClick={onClose} disabled={pending && !allowCloseWhilePending}>
+            {pending && allowCloseWhilePending ? "Continue in background" : "Cancel"}
           </Button>
           <Button
             onClick={() => void download()}
@@ -105,6 +110,7 @@ export function ClickyExportDialog({
       }
     >
       <div className="space-y-4">
+        {pending && pendingContent}
         {error && (
           <div
             role="alert"
