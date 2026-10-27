@@ -183,7 +183,7 @@ const INITIAL_VALUE: AISpecRuntimeValue = {
       type: "object",
       properties: { summary: { type: "string" } },
     },
-    schemaStrictness: "retry",
+    schemaStrictness: "repair",
   },
   permissions: {
     ...GENERATED_INITIAL_VALUE.permissions,
