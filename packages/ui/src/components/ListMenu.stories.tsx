@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
+import { ListMenuItems } from "./ListMenuItems";
 import {
   ListMenu,
   ListMenuActionBar,
@@ -188,4 +190,52 @@ export const RowStates: Story = {
       </ListMenuSection>
     </ListMenu>
   ),
+};
+
+const virtualGroups = ["Backlog", "Review", "Completed"].map(name => ({
+  name,
+  items: Array.from({ length: 300 }, (_, index) => ({ id: `${name}-${index}`, title: `${name} item ${index + 1}` })),
+}));
+
+function VirtualizedDemo() {
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  return (
+    <div className="h-96 w-[min(100%,28rem)] border border-border">
+      <ListMenu virtualize={{ estimateRowHeight: 40 }}>
+        {virtualGroups.map(group => (
+          <ListMenuSection key={group.name}>
+            <ListMenuHeader>
+              <button
+                type="button"
+                aria-expanded={!collapsed.has(group.name)}
+                onClick={() => setCollapsed(previous => {
+                  const next = new Set(previous);
+                  if (!next.delete(group.name)) next.add(group.name);
+                  return next;
+                })}
+              >
+                {group.name} ({group.items.length})
+              </button>
+            </ListMenuHeader>
+            {!collapsed.has(group.name) && (
+              <ListMenuItems items={group.items} getItemKey={item => item.id}>
+                {item => <ListMenuItem className="px-3 py-2">{item.title}</ListMenuItem>}
+              </ListMenuItems>
+            )}
+          </ListMenuSection>
+        ))}
+      </ListMenu>
+    </div>
+  );
+}
+
+export const Virtualized: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story: "Give ListMenu a bounded height and enable virtualize, then render each group's rows through ListMenuItems with stable getItemKey values. Groups share one scroll viewport, retain sticky headers, and measure variable row heights. Filtering, counts and selection still operate on the complete items collection. estimateRowHeight starts the layout estimate; overscan controls the extra mounted rows around the viewport.",
+      },
+    },
+  },
+  render: () => <VirtualizedDemo />,
 };
