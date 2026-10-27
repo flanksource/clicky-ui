@@ -104,7 +104,7 @@ export function PromptAdvanced({
           aria-label="Schema strictness"
           size="sm"
           wrap
-          value={value.prompt?.schemaStrictness ?? ""}
+          value={value.prompt?.schemaStrictness === "retry" ? "repair" : (value.prompt?.schemaStrictness ?? "")}
           options={SCHEMA_STRICTNESS_OPTIONS}
           onChange={(schemaStrictness) =>
             onChange(withPrompt(value, { schemaStrictness }))
