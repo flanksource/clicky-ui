@@ -3,9 +3,26 @@ import { describe, expect, it } from "vitest";
 import {
   deleteReviewableSource,
   markReviewableSource,
+  setReviewRejectedSource,
 } from "./reviewable-source";
 
 describe("reviewable source edits", () => {
+  it.each(['"existing gap-2"','{cn("existing", active && "active")}'])("round-trips rejection while preserving className %s", (className) => {
+    const source = `<main><section data-review-id="review-first" className=${className}>One</section></main>`;
+    const rejected = setReviewRejectedSource(source,"review-first",true);
+    expect(rejected).toContain("rejected");
+    expect(setReviewRejectedSource(rejected,"review-first",true)).toEqual(rejected);
+    const approved = setReviewRejectedSource(rejected,"review-first",false);
+    expect(approved).toEqual(source);
+  });
+  it("changes only the selected literal mapped row and forwards its class", () => {
+    const source = `const CARDS = [{id:"one",reviewId:"review-one"},{id:"two",reviewId:"review-two"}]; export default () => <main>{CARDS.map((card) => <section data-review-id={card.reviewId} className="card" />)}</main>`;
+    const rejected = setReviewRejectedSource(source,"review-one",true);
+    expect(rejected).toContain('className: "rejected"');
+    expect(rejected).toContain('className: ""');
+    expect(rejected).toContain('[("card"), card.className].filter(Boolean).join(" ")');
+    expect(setReviewRejectedSource(rejected,"review-one",false)).not.toContain('"rejected"');
+  });
   it("marks and removes one static JSX element", () => {
     const source = `export default function Page() { return <main><section id="first">One</section><section id="second">Two</section></main>; }`;
     const marked = markReviewableSource(source, {

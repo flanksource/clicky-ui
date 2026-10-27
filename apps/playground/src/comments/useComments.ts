@@ -15,6 +15,7 @@ import {
   type CommentRating,
   type CommentReplyInput,
 } from "@flanksource/clicky-ui/comments";
+import { normalizeErrorDiagnostics, type ErrorDiagnostics } from "@flanksource/clicky-ui";
 
 import type { AgentSessionRuntime } from "../../plugins/agent-session-store";
 import type {
@@ -22,6 +23,10 @@ import type {
   CommentElementContext,
   CommentScreenshotCapture,
 } from "../../plugins/comments-model";
+import type {
+  StoredComment,
+  StoredPromptRun,
+} from "../../plugins/comments-store";
 import { overlayLabel, resolveAnchor } from "./dom-anchor";
 import { captureElementContext, captureElementHtml } from "./element-context";
 import { captureScreenshot } from "./screenshot";
@@ -53,6 +58,8 @@ export const PLAYGROUND_COMMENT_CONFIG: CommentConfig = {
 /** A comment as the API returns it: tagged with the page it was left on. */
 export type PlaygroundComment = Comment & {
   element?: CommentElementContext;
+  promptRun?: StoredPromptRun;
+  lint?: StoredComment["lint"];
 };
 export type PageComment = PlaygroundComment & { page: string };
 
@@ -83,12 +90,23 @@ export async function request<T>(url: string, init?: RequestInit): Promise<T> {
   }
   const payload = (await response.json()) as T & { error?: string };
   if (!response.ok) {
-    throw new Error(
-      payload.error ??
-        `${init?.method ?? "GET"} ${url} failed (${response.status})`,
+    const fallback = `${init?.method ?? "GET"} ${url} failed (${response.status})`;
+    throw new ApiError(
+      response.status,
+      normalizeErrorDiagnostics(payload, fallback) ?? { message: fallback, context: [] },
     );
   }
   return payload;
+}
+
+/** A failed playground API call, keeping the server's error envelope (hint, context, details) for display. */
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly diagnostics: ErrorDiagnostics,
+  ) {
+    super(diagnostics.message);
+  }
 }
 
 /**
@@ -117,6 +135,11 @@ export type PlaygroundComments = {
   /** Surfaced as a banner — a broken backend must never look like "no comments". */
   error: string | null;
   create: (input: CommentCreateInput, actionId?: string) => Promise<void>;
+  /** Captures an element's source, HTML and locators as the comments store them. */
+  captureSelection: (
+    anchor: string,
+    target: Element,
+  ) => Promise<CommentElementCaptureContext>;
   prepareSelection: (
     anchor: string,
     target: Element,
@@ -168,6 +191,15 @@ export function useComments(
     screenshot?: Promise<CommentScreenshotCapture>;
   } | null>(null);
 
+  const captureSelection = useCallback(
+    (anchor: string, target: Element) =>
+      captureElementContext(target, {
+        fallbackSource: `apps/playground/src/pages/${page}.tsx`,
+        ...locatorRoot(anchor, contentRef.current),
+      }),
+    [contentRef, page],
+  );
+
   const prepareSelection = useCallback(
     (
       anchor: string,
@@ -178,17 +210,14 @@ export function useComments(
         page,
         anchor,
         target,
-        context: captureElementContext(target, {
-          fallbackSource: `apps/playground/src/pages/${page}.tsx`,
-          ...locatorRoot(anchor, contentRef.current),
-        }).then(
+        context: captureSelection(anchor, target).then(
           (value) => ({ status: "fulfilled" as const, value }),
           (reason: unknown) => ({ status: "rejected" as const, reason }),
         ),
         ...(screenshot ? { screenshot } : {}),
       };
     },
-    [contentRef, page],
+    [captureSelection, page],
   );
 
   const refresh = useCallback(async () => {
@@ -325,6 +354,13 @@ export function useComments(
             ...(capturedScreenshot ? { screenshot: capturedScreenshot } : {}),
           };
 
+          let expectedSource: string | undefined;
+          if (input.reviewDecision) {
+            const response = await fetch(`/__playground/sources?slug=${encodeURIComponent(page)}`);
+            const payload = await response.json() as { source?: string; error?: string };
+            if (!response.ok || typeof payload.source !== "string") throw new Error(payload.error ?? "Could not read review source");
+            expectedSource = payload.source;
+          }
           await post(COMMENTS_ROUTE, {
             page,
             body: input.body,
@@ -335,7 +371,9 @@ export function useComments(
               ? { reviewDecision: input.reviewDecision }
               : {}),
             element,
+            ...(expectedSource === undefined ? {} : { expectedSource }),
           });
+          if (input.reviewDecision) window.location.reload();
           if (preparedSelection.current === prepared) {
             preparedSelection.current = null;
           }
@@ -481,6 +519,7 @@ export function useComments(
     loading,
     error,
     create,
+    captureSelection,
     prepareSelection,
     reply,
     updateStatus,

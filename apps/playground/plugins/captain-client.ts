@@ -10,14 +10,36 @@ export class CaptainUnreachableError extends Error {
   }
 }
 
-/** Captain answered with a non-2xx status. */
+/** What Captain said when it refused a request: the request, plus its exit code and command when it ran one. */
+export type CaptainErrorDetail = { request: string; exitCode?: number; command?: string };
+
+/** Captain answered with a non-2xx status; `message` is Captain's own error text when its body carries one. */
 export class CaptainHttpError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly detail?: CaptainErrorDetail,
   ) {
     super(message);
   }
+}
+
+/** Captain's error body (`{success, exit_code, error, cli}`), or nothing when the body is not that JSON. */
+function captainErrorBody(raw: string): { error?: string; exitCode?: number; command?: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    // A non-JSON body (a proxy page, plain text) is reported verbatim by the caller.
+    return {};
+  }
+  if (parsed === null || typeof parsed !== "object") return {};
+  const { error, exit_code: exitCode, cli } = parsed as Record<string, unknown>;
+  return {
+    ...(typeof error === "string" && error.trim() ? { error: error.trim() } : {}),
+    ...(typeof exitCode === "number" ? { exitCode } : {}),
+    ...(typeof cli === "string" && cli ? { command: cli } : {}),
+  };
 }
 
 export type CaptainRunSnapshot = {
@@ -25,6 +47,41 @@ export type CaptainRunSnapshot = {
   state?: { sessionId?: string };
   done: boolean;
   error?: string;
+};
+
+/** A run's terminal summary; `structuredOutput` holds a schema-validated result. */
+export type CaptainRunSummary = {
+  success: boolean;
+  error?: string;
+  text?: string;
+  structuredOutput?: unknown;
+  sessionId?: string;
+};
+
+export type CaptainPromptVariable = {
+  name: string;
+  type?: string;
+  description?: string;
+  required?: boolean;
+};
+
+/** One saved prompt, as `GET /api/v1/prompt` lists it. */
+export type CaptainPromptSummary = {
+  id: string;
+  version?: string;
+  name: string;
+  description?: string;
+  source?: string;
+  presets?: string[] | null;
+  variables?: CaptainPromptVariable[] | null;
+};
+
+/** One saved prompt with its template and declared input schema. */
+export type CaptainPromptDetail = CaptainPromptSummary & {
+  content?: string;
+  inputSchema?: Record<string, unknown> | null;
+  /** The run the frontmatter configures: its presets, and a spec carrying the inline runtime fields (mode, model, effort, budget). */
+  run?: { presets?: string[] | null; spec?: Record<string, unknown> | null };
 };
 
 export type CaptainMessageResult = {
@@ -55,9 +112,12 @@ export class CaptainClient {
     const response = await this.fetch(path, init);
     const raw = await response.text();
     if (!response.ok) {
+      const request = `${init.method ?? "GET"} ${path.split("?")[0]}`;
+      const { error, exitCode, command } = captainErrorBody(raw);
       throw new CaptainHttpError(
         response.status,
-        `Captain ${init.method ?? "GET"} ${this.baseURL}${path} failed with ${response.status}: ${raw.trim() || response.statusText}`,
+        error ?? `Captain ${request} failed with ${response.status}: ${raw.trim() || response.statusText}`,
+        { request, ...(exitCode !== undefined ? { exitCode } : {}), ...(command ? { command } : {}) },
       );
     }
     try {

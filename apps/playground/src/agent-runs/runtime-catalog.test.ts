@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeCatalogFamily } from "../../../../packages/ui/src/data/runtime/runtime-mode";
 
-import { agentRuntimeCatalog } from "./runtime-catalog";
+import { availableRuntimeCatalog } from "./runtime-catalog";
 
 const agent = (defaultModel: string | undefined, state: string, disabled = false) => ({
   mode: "agent",
@@ -40,10 +40,17 @@ const catalog = [
   },
 ] as unknown as RuntimeCatalogFamily[];
 
-describe("agentRuntimeCatalog", () => {
+describe("availableRuntimeCatalog", () => {
   it("keeps only available, enabled agent modes with a default model, dropping emptied families", () => {
-    expect(agentRuntimeCatalog(catalog)).toEqual([
+    expect(availableRuntimeCatalog(catalog, { mode: "agent" })).toEqual([
       { ...catalog[0], modes: [agent("m-agent", "available")] },
+    ]);
+  });
+
+  it("keeps every available mode when no mode is required, still dropping unavailable and disabled ones", () => {
+    expect(availableRuntimeCatalog(catalog, {})).toEqual([
+      catalog[0],
+      { ...catalog[3] },
     ]);
   });
 });

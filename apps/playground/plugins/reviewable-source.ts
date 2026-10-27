@@ -236,3 +236,85 @@ export function deleteReviewableSource(
     text.slice(0, element.getStart()) + text.slice(element.getEnd()),
   );
 }
+
+function reviewClass(value: string, rejected: boolean): string {
+  const classes = value.split(/\s+/).filter((name) => name && name !== "rejected");
+  if (rejected) classes.push("rejected");
+  return classes.join(" ");
+}
+
+function classExpression(value: string, rejected: boolean): string {
+  const wrapper = /^\["rejected", \((.*)\)\]\.filter\(Boolean\)\.join\(" "\)$/s.exec(value);
+  const original = wrapper?.[1] ?? value;
+  return rejected ? `["rejected", (${original})].filter(Boolean).join(" ")` : original;
+}
+
+export function setReviewRejectedSource(source: string, reviewId: string, rejected: boolean): string {
+  if (!REVIEW_ID.test(reviewId)) throw new Error("invalid review id");
+  const file = sourceFile(source);
+  const openings = openingElements(file);
+  const direct = openings.filter((opening) => literalAttribute(opening, "data-review-id") === reviewId);
+  const rows = file.getDescendantsOfKind(SyntaxKind.ObjectLiteralExpression).filter((row) => {
+    const property = row.getProperty("reviewId");
+    if (!property || !Node.isPropertyAssignment(property)) return false;
+    const value = property.getInitializer();
+    return value && Node.isStringLiteral(value) && value.getLiteralValue() === reviewId;
+  });
+  if (direct.length + rows.length !== 1) throw new Error(`review id ${JSON.stringify(reviewId)} was not found uniquely`);
+  const opening = direct[0];
+  if (opening) {
+    const attribute = opening.getAttribute("className");
+    if (!attribute) {
+      if (rejected) opening.addAttribute({ name: "className", initializer: '"rejected"' });
+    } else {
+      if (!Node.isJsxAttribute(attribute)) throw new Error("className must be an explicit attribute");
+      const initializer = attribute.getInitializer();
+      if (initializer && Node.isStringLiteral(initializer)) {
+        attribute.setInitializer(JSON.stringify(reviewClass(initializer.getLiteralValue(), rejected)));
+      } else if (initializer && Node.isJsxExpression(initializer) && initializer.getExpression()) {
+        attribute.setInitializer(`{${classExpression(initializer.getExpressionOrThrow().getText(), rejected)}}`);
+      } else throw new Error("review className must have a value");
+    }
+    return validSource(file.getFullText());
+  }
+  const row = rows[0];
+  if (!row) throw new Error("review row disappeared");
+  const array = row.getParentIfKind(SyntaxKind.ArrayLiteralExpression);
+  const declaration = array?.getFirstAncestorByKind(SyntaxKind.VariableDeclaration);
+  if (!array || !declaration) throw new Error("review row must belong to a local literal array");
+  const templates = openings.filter((item) => {
+    const expression = item.getAttribute("data-review-id")?.getText();
+    const mapper = /^data-review-id=\{([A-Za-z_$][\w$]*)\.reviewId\}$/.exec(expression ?? "")?.[1];
+    if (!mapper) return false;
+    const callback = item.getFirstAncestorByKind(SyntaxKind.ArrowFunction);
+    const call = callback?.getParentIfKind(SyntaxKind.CallExpression);
+    const text = call?.getExpression().getText() ?? "";
+    return callback?.getParameters()[0]?.getName() === mapper && (text === `${declaration.getName()}.map` || text.startsWith(`${declaration.getName()}.filter(`) && text.endsWith(".map"));
+  });
+  if (templates.length !== 1) throw new Error("review row needs one matching local map template");
+  const template = templates[0];
+  if (!template) throw new Error("review template disappeared");
+  const mapper = /^data-review-id=\{([A-Za-z_$][\w$]*)\.reviewId\}$/.exec(template.getAttribute("data-review-id")?.getText() ?? "")?.[1];
+  if (!mapper) throw new Error("review template has no mapper");
+  const attribute = template.getAttribute("className");
+  if (!attribute) template.addAttribute({name:"className",initializer:`{${mapper}.className}`});
+  else if (Node.isJsxAttribute(attribute) && attribute.getText() !== `className={${mapper}.className}` && !attribute.getText().includes(`${mapper}.className`)) {
+    const initial = attribute.getInitializer();
+    const expression = initial && Node.isStringLiteral(initial) ? JSON.stringify(initial.getLiteralValue()) : initial && Node.isJsxExpression(initial) ? initial.getExpressionOrThrow().getText() : undefined;
+    if (!expression) throw new Error("mapped className must have a value");
+    attribute.setInitializer(`{[(${expression}), ${mapper}.className].filter(Boolean).join(" ")}`);
+  }
+  for (const item of array.getElements()) {
+    if (Node.isSpreadElement(item)) continue;
+    if (!Node.isObjectLiteralExpression(item)) throw new Error("review variants must be literal rows");
+    const property = item.getProperty("className");
+    if (!property) item.addPropertyAssignment({name:"className",initializer:JSON.stringify(item === row && rejected ? "rejected" : "")});
+    else if (item === row) {
+      if (!Node.isPropertyAssignment(property)) throw new Error("row className must be explicit");
+      const value = property.getInitializer();
+      if (!value || !Node.isStringLiteral(value)) throw new Error("row className must be a string literal");
+      property.setInitializer(JSON.stringify(reviewClass(value.getLiteralValue(), rejected)));
+    }
+  }
+  return validSource(file.getFullText());
+}

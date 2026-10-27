@@ -132,6 +132,7 @@ export function ReviewProvider({
     for (const element of content.querySelectorAll<HTMLElement>(
       "[data-review-id]",
     )) {
+      if (element.getClientRects().length === 0) continue;
       const id = element.dataset.reviewId ?? "";
       if (!REVIEW_ID.test(id) || seen.has(id)) {
         setError(
@@ -178,7 +179,7 @@ export function ReviewProvider({
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["data-review-id"],
+      attributeFilter: ["data-review-id", "class", "data-show-rejected"],
     });
     const resize = new ResizeObserver(schedule);
     resize.observe(content);
@@ -205,6 +206,7 @@ export function ReviewProvider({
   const approve = async (id: string) => {
     setError("");
     try {
+      if (sourceDirty) throw new Error("Save or revert the source before reviewing an element");
       await context.callbacks.onCreate?.({
         anchor: anchorFor(id),
         body: "",
@@ -241,6 +243,7 @@ export function ReviewProvider({
     setBusy(true);
     setError("");
     try {
+      if (sourceDirty) throw new Error("Save or revert the source before reviewing an element");
       if (kind === "delete") {
         if (sourceDirty)
           throw new Error(
@@ -367,6 +370,7 @@ export function ReviewProvider({
             enabled: ({ element }: { element: Element }) =>
               Boolean(
                 current.current.active &&
+                !current.current.sourceDirty &&
                 latest.current.reviewableFrom(element) &&
                 (kind !== "delete" || !current.current.sourceDirty),
               ),
@@ -436,6 +440,7 @@ export function ReviewProvider({
                   type="button"
                   aria-label={`Approve ${id}`}
                   title="Approve"
+                  disabled={sourceDirty || busy}
                   onClick={() => void approve(id)}
                 >
                   <UiCheck className="size-3.5" />
@@ -444,6 +449,7 @@ export function ReviewProvider({
                   type="button"
                   aria-label={`Reject ${id}`}
                   title="Reject with comment"
+                  disabled={sourceDirty || busy}
                   onClick={() => setPending({ id, kind: "rejected" })}
                 >
                   <UiClose className="size-3.5" />
@@ -452,6 +458,7 @@ export function ReviewProvider({
                   type="button"
                   aria-label={`Request revision ${id}`}
                   title="Request revision"
+                  disabled={sourceDirty || busy}
                   onClick={() => setPending({ id, kind: "revision_requested" })}
                 >
                   <UiEdit className="size-3.5" />

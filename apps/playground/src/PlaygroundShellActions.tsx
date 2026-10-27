@@ -17,6 +17,8 @@ import { AgentSessionButton } from "./agent-runs/AgentRunsProvider";
 export type PlaygroundShellActionsProps = {
   view: PlaygroundView;
   annotations: AnnotationVisibility;
+  showRejected: boolean;
+  onShowRejectedChange: (show: boolean) => void;
   copyDisabled: boolean;
   pageMarkdownCopied: boolean;
   onViewChange: (view: PlaygroundView) => void;
@@ -49,6 +51,8 @@ export function PlaygroundShellActions(props: PlaygroundShellActionsProps) {
         <PlaygroundViewActions
           view={props.view}
           annotations={props.annotations}
+          showRejected={props.showRejected}
+          onShowRejectedChange={props.onShowRejectedChange}
           copyDisabled={props.copyDisabled}
           copied={props.pageMarkdownCopied}
           onViewChange={props.onViewChange}
