@@ -1,1 +1,0 @@
-import{n as e}from"./rolldown-runtime-sJBDdmOt.js";function t(e){return e?e>=1e6?`${(e/1e6).toFixed(1)}M`:e>=1e3?`${Math.round(e/1e3)}k`:String(e):``}function n(e){return e<.01?`$${e.toFixed(4)}`:`$${e.toFixed(2)}`}function r(){return(r=e((()=>{})))()}export{n,r,t};
