@@ -57,6 +57,13 @@ describe("TaskManager selection", () => {
     vi.restoreAllMocks();
   });
 
+  it("renders host-provided output for the selected run", async () => {
+    vi.stubGlobal("fetch", mockFetch());
+    renderManager(createClient(), <TaskManager basePath="/api/v1" selectedId="g1" onSelectRun={() => {}}
+      renderRunDetails={(run, snapshots) => <span>{run.id}: {snapshots.length} snapshots</span>} />);
+    expect(await screen.findByText("g1: 2 snapshots")).toBeInTheDocument();
+  });
+
   it("expands the run matching selectedId and drills into its tasks", async () => {
     vi.stubGlobal("fetch", mockFetch());
     renderManager(createClient(), <TaskManager basePath="/api/v1" selectedId="g1" onSelectRun={() => {}} />);

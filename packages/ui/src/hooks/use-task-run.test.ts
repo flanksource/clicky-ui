@@ -213,6 +213,14 @@ describe("useTaskRun (polling fallback)", () => {
     vi.restoreAllMocks();
   });
 
+  it("passes caller headers to polling so a run stays in its selected context", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [groupSnap("success")] });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useTaskRun({ id: "g1", forcePoll: true, headers: { "X-Context": "dev" } }));
+    await waitFor(() => expect(result.current.isComplete).toBe(true));
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/tasks/g1"), { headers: { Accept: "application/json", "X-Context": "dev" } });
+  });
+
   it("polls the JSON endpoint and stops once all groups are terminal", async () => {
     // No EventSource available → fall back to polling.
     vi.stubGlobal("EventSource", undefined);

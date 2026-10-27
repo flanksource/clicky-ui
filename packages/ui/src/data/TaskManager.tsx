@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { hashKey, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
 import { cn } from "../lib/utils";
@@ -58,6 +59,9 @@ export interface TaskManagerProps {
    * for a task falls back to the default metadata chips.
    */
   headerExtra?: TaskHeaderExtra;
+  renderRunDetails?: (run: TaskRunMeta, snapshots: TaskSnapshot[]) => ReactNode;
+  controlUrl?: (run: TaskRunMeta, action: TaskControlAction) => string | undefined;
+  showTaskControls?: (run: TaskRunMeta) => boolean;
 }
 
 type RunTableRow = Record<string, unknown> & {
@@ -137,6 +141,9 @@ export function TaskManager({
   onSelectRun,
   extraTabs,
   headerExtra,
+  renderRunDetails,
+  controlUrl,
+  showTaskControls,
 }: TaskManagerProps) {
   const [kindFilter, setKindFilter] = useState<string>(kind ?? "");
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -235,6 +242,9 @@ export function TaskManager({
           runsQueryKey={runsQueryKey}
           extraTabs={extraTabs}
           headerExtra={headerExtra}
+          renderRunDetails={renderRunDetails}
+          controlUrl={controlUrl}
+          showTaskControls={showTaskControls}
         />
       )}
     />
@@ -265,6 +275,9 @@ function ExpandedRun({
   runsQueryKey,
   extraTabs,
   headerExtra,
+  renderRunDetails,
+  controlUrl,
+  showTaskControls,
 }: {
   run: TaskRunMeta;
   basePath: string | undefined;
@@ -272,6 +285,9 @@ function ExpandedRun({
   runsQueryKey: QueryKey;
   extraTabs: TaskExtraTabs | undefined;
   headerExtra: TaskHeaderExtra | undefined;
+  renderRunDetails: TaskManagerProps["renderRunDetails"];
+  controlUrl: TaskManagerProps["controlUrl"];
+  showTaskControls: TaskManagerProps["showTaskControls"];
 }) {
   const runId = run.id;
   const { snapshots, status } = useTaskRun({ id: runId, basePath, pollMs });
@@ -316,13 +332,13 @@ function ExpandedRun({
   }, [controlMutation.mutateAsync, controlMutation.reset]);
   const control = (action: TaskControlAction, group: TaskSnapshot) =>
     mutateControl({
-      url: `${apiBase}/tasks/${encodeURIComponent(runId)}/control`,
+      url: controlUrl?.(run, action) ?? `${apiBase}/tasks/${encodeURIComponent(runId)}/control`,
       action,
       target: group,
     });
   const controlTask = (action: TaskControlAction, task: TaskSnapshot) =>
     mutateControl({
-      url: `${apiBase}/tasks/${encodeURIComponent(runId)}/tasks/${encodeURIComponent(task.id)}/control`,
+      url: controlUrl?.(run, action) ?? `${apiBase}/tasks/${encodeURIComponent(runId)}/tasks/${encodeURIComponent(task.id)}/control`,
       action,
       target: task,
     });
@@ -338,13 +354,14 @@ function ExpandedRun({
           <span key={key} className="font-mono">{key}={value}</span>
         ))}
       </div>
+      {renderRunDetails?.(run, snapshots)}
       <TaskProgress
         snapshots={snapshots}
         compact
         connectionStatus={status}
         initialShowAllTasks
         onControl={control}
-        onTaskControl={controlTask}
+        {...(showTaskControls?.(run) !== false ? { onTaskControl: controlTask } : {})}
         metricsBaseUrl={`${apiBase}/tasks/metrics/`}
         {...(extraTabs ? { extraTabs } : {})}
         {...(headerExtra ? { headerExtra } : {})}
