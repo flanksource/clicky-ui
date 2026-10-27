@@ -28,16 +28,15 @@ import {
   assertRating,
   assertReviewDecision,
   patchComment,
-  readAll,
   removeComment,
-  writeAll,
   type CommentPatch,
   type StoredAuthor,
   type StoredComment,
 } from "./comments-store";
-import { recordReviewDecision } from "./review-decisions";
+import { persistReviewDecision, type ReviewSourceRequest } from "./reviewable-store";
 import { readExternalPages } from "./external-pages-store";
 import { externalUrl } from "../src/bookmarklet/model";
+import { PageStoreError } from "./pages-store";
 
 export const COMMENTS_ROUTE = "/__playground/comments";
 
@@ -273,22 +272,81 @@ function persistElementContext(
   }
 }
 
-/** A root just stored by `POST /__playground/comments` (not a review decision). */
+/** A root just stored by `POST /__playground/comments` or a prompt run (not a review decision). */
 export type CommentCreatedEvent = {
   page: string;
   comment: StoredComment;
   /** The playground origin the comment was posted to, e.g. `http://localhost:5801`. */
   origin: string;
+  /** The human behind a root authored by something else, e.g. who ran a prompt. */
+  requestedBy?: StoredAuthor;
 };
+
+/** What a new root is made of; `element` is the raw capture, screenshot included. */
+export type RootCommentInput = Pick<
+  StoredComment,
+  "body" | "rating" | "reviewDecision" | "checklist" | "refs" | "promptRun" | "lint"
+> & {
+  page: unknown;
+  author: StoredAuthor;
+  anchor?: string;
+  element: unknown;
+  source?: Pick<ReviewSourceRequest, "pagesDir" | "expectedSource">;
+};
+
+/**
+ * Stores a new thread root: persists its element capture, checks an external
+ * page's URL, and records a review decision in place of an earlier one. The
+ * screenshot is removed again when anything fails.
+ */
+export function createRootComment(
+  dir: string,
+  input: RootCommentInput,
+): { page: string; comment: StoredComment } {
+  const { page: rawPage, author, anchor, element: rawElement, source, ...fields } = input;
+  const id = randomUUID();
+  const element = persistElementContext(dir, id, rawElement);
+  const stored: StoredComment = {
+    ...fields,
+    id,
+    createdAt: new Date().toISOString(),
+    author,
+    status: "open",
+    parentId: null,
+    anchor: anchor ?? null,
+    element,
+  };
+  try {
+    const page = assertPage(rawPage);
+    if (page.startsWith("external:")) {
+      const target = readExternalPages(dir).find((entry) => entry.id === page);
+      if (!element.pageUrl || !target?.urls.includes(externalUrl(element.pageUrl).url)) {
+        throw new Error(
+          "External comment capture URL must belong to its registered comment set",
+        );
+      }
+    }
+    if (!stored.reviewDecision) {
+      return { page, comment: addComment(dir, page, stored) };
+    }
+    if (!source) throw new Error("review decisions require expectedSource and a local source page");
+    return { page, comment: persistReviewDecision({ ...source, commentsDir: dir, slug: page }, stored) };
+  } catch (cause) {
+    stageScreenshotRemoval(dir, [stored]).commit();
+    throw cause;
+  }
+}
 
 export type PlaygroundCommentsOptions = {
   dir: string;
+  pagesDir?: string;
   /** Runs after a root is stored and answered; a rejection is logged. */
   onCreated?: (event: CommentCreatedEvent) => Promise<void>;
 };
 
 function handle(
   dir: string,
+  pagesDir: string | undefined,
   req: IncomingMessage,
   res: ServerResponse,
   created: (event: CommentCreatedEvent) => void,
@@ -327,54 +385,28 @@ function handle(
           "author",
           "anchor",
           "element",
+          "expectedSource",
         ]);
-        const anchor = optionalText(body, "anchor");
+        const host = req.headers.host;
+        if (!host) throw new Error("request has no Host header");
         const rating = optionalText(body, "rating");
         const reviewDecision = optionalText(body, "reviewDecision");
-        const comment = draft(body, optionalText(body, "body") ?? "");
-        const element = persistElementContext(dir, comment.id, body["element"]);
-        const stored: StoredComment = {
-          ...comment,
-          status: "open",
-          parentId: null,
-          anchor: anchor ?? null,
+        if (reviewDecision && !pagesDir) throw new Error("local source review is not configured");
+        const anchor = optionalText(body, "anchor");
+        const { page, comment } = createRootComment(dir, {
+          page: body["page"],
+          body: optionalText(body, "body") ?? "",
+          author: requireAuthor(body),
+          ...(anchor === undefined ? {} : { anchor }),
+          element: body["element"],
           ...(rating === undefined ? {} : { rating: assertRating(rating) }),
           ...(reviewDecision === undefined
             ? {}
-            : { reviewDecision: assertReviewDecision(reviewDecision) }),
-          element,
-        };
-        try {
-          const page = assertPage(body["page"]);
-          if (page.startsWith("external:")) {
-            const target = readExternalPages(dir).find(
-              (entry) => entry.id === page,
-            );
-            if (
-              !element.pageUrl ||
-              !target?.urls.includes(externalUrl(element.pageUrl).url)
-            ) {
-              throw new Error(
-                "External comment capture URL must belong to its registered comment set",
-              );
-            }
-          }
-          if (stored.reviewDecision) {
-            const data = readAll(dir);
-            data[page] = recordReviewDecision(data[page] ?? [], stored);
-            writeAll(dir, data);
-            sendJson(res, 201, data[page].at(-1));
-          } else {
-            const host = req.headers.host;
-            if (!host) throw new Error("request has no Host header");
-            const saved = addComment(dir, page, stored);
-            sendJson(res, 201, saved);
-            created({ page, comment: saved, origin: `http://${host}` });
-          }
-        } catch (cause) {
-          const removal = stageScreenshotRemoval(dir, [stored]);
-          removal.commit();
-          throw cause;
+            : { reviewDecision: assertReviewDecision(reviewDecision), source: { pagesDir: pagesDir as string, expectedSource: requireText(body, "expectedSource") } }),
+        });
+        sendJson(res, 201, comment);
+        if (!comment.reviewDecision) {
+          created({ page, comment, origin: `http://${host}` });
         }
       });
 
@@ -487,7 +519,7 @@ export function playgroundComments(options: PlaygroundCommentsOptions): Plugin {
 function registerCommentsMiddleware(
   middlewares: Connect.Server,
   logger: Logger,
-  { dir, onCreated }: PlaygroundCommentsOptions,
+  { dir, pagesDir, onCreated }: PlaygroundCommentsOptions,
 ) {
   const created = (event: CommentCreatedEvent) => {
     onCreated?.(event).catch((error: unknown) => {
@@ -500,7 +532,7 @@ function registerCommentsMiddleware(
   middlewares.use(COMMENTS_ROUTE, (req, res, next) => {
     void (async () => {
       try {
-        await handle(dir, req, res, created);
+        await handle(dir, pagesDir, req, res, created);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         logger.error(`[playground-comments] ${req.method} failed: ${message}`);
@@ -510,7 +542,7 @@ function registerCommentsMiddleware(
         }
         sendJson(
           res,
-          error instanceof CommentHttpError ? error.statusCode : 400,
+          error instanceof CommentHttpError ? error.statusCode : error instanceof PageStoreError ? error.statusCode : 400,
           { error: message },
         );
       }

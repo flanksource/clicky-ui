@@ -11,7 +11,7 @@ import type { ChatModel } from "@flanksource/clicky-ui/chat";
 
 import type { AgentSessionGrouping, AgentSessionRuntime } from "./agent-runs-api";
 import {
-  agentRuntimeCatalog,
+  availableRuntimeCatalog,
   fetchModelCatalog,
   fetchRuntimeCatalog,
 } from "./runtime-catalog";
@@ -144,7 +144,7 @@ export function RunAgentDialog({
     setLoadError(null);
     Promise.all([fetchRuntimeCatalog(), fetchModelCatalog()]).then(
       ([runtimes, models]) => {
-        const agents = agentRuntimeCatalog(runtimes);
+        const agents = availableRuntimeCatalog(runtimes, { mode: "agent" });
         setCatalog({
           // familiesFromRuntimeCatalog falls back to built-in families for an
           // empty list, so an empty agent catalog must stay empty here.

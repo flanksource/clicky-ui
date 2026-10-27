@@ -184,6 +184,7 @@ export function useDomAnchors(
       registeredRef.current.push(tally.anchor);
       nextLabels[tally.anchor] = match ? matchLabel(match) : describeElement(element);
       const { left, top, width, height } = element.getBoundingClientRect();
+      if (element.getClientRects().length === 0 || width === 0 || height === 0) return;
       (dialog === null ? nextPins : nextOverlayPins).push({
         anchor: tally.anchor,
         index: position + 1,
@@ -232,7 +233,7 @@ export function useDomAnchors(
     // follow the elements they were dropped on.
     const mutationObserver =
       typeof MutationObserver === "undefined" ? null : new MutationObserver(scheduleRecompute);
-    mutationObserver?.observe(content, { childList: true, subtree: true });
+    mutationObserver?.observe(content, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "data-show-rejected"] });
 
     return () => {
       window.removeEventListener("resize", scheduleRecompute);
