@@ -33,6 +33,16 @@ function renderDialog(
 }
 
 describe("ClickyExportDialog", () => {
+	 it("shows pending progress and allows the caller to close while an export continues", async () => {
+		const onClose = vi.fn();
+		render(<ClickyExportDialog open onClose={onClose} formats={formats} scopes={scopes}
+			pendingContent={<div>Rendering report</div>} allowCloseWhilePending
+			onDownload={() => new Promise<void>(() => {})} />);
+		fireEvent.click(screen.getByRole("button", { name: "Download" }));
+		expect(await screen.findByText("Rendering report")).toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: "Continue in background" }));
+		expect(onClose).toHaveBeenCalledOnce();
+	});
   it("downloads the chosen format and range", async () => {
     const onDownload = vi.fn().mockResolvedValue(undefined);
     const dialog = renderDialog(onDownload);

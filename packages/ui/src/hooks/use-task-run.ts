@@ -28,6 +28,8 @@ export interface TaskTransportOptions {
   pollMs?: number | undefined;
   /** Force the polling transport even when EventSource exists (mainly tests). */
   forcePoll?: boolean | undefined;
+  /** Headers for context-scoped task endpoints. Supplying headers uses polling. */
+  headers?: Record<string, string> | undefined;
 }
 
 const DEFAULT_BASE = "/api/v1";
@@ -68,12 +70,14 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     enabled = true,
     pollMs = DEFAULT_POLL_MS,
     forcePoll = false,
+    headers,
   } = options;
+  const headersKey = JSON.stringify(headers ?? {});
   const runIdsKey = (ids?.filter(Boolean) ?? (id ? [id] : [])).join(",");
   // State is reset in an effect, so the first render after the subscription
   // changes still holds the previous run's snapshots and completion; stateKey
   // hides them until the reset lands.
-  const subscriptionKey = JSON.stringify([runIdsKey, kind ?? "", basePath, enabled]);
+  const subscriptionKey = JSON.stringify([runIdsKey, kind ?? "", basePath, enabled, headersKey]);
   const [stateKey, setStateKey] = useState(subscriptionKey);
 
   const [byId, setById] = useState<Record<string, TaskSnapshot>>({});
@@ -92,6 +96,7 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
   eventSourceFactoryRef.current = eventSourceFactory;
 
   useEffect(() => {
+    const requestHeaders = JSON.parse(headersKey) as Record<string, string>;
     const runIds = runIdsKey ? runIdsKey.split(",") : [];
     setStateKey(subscriptionKey);
     if (!enabled || (runIds.length === 0 && !kind)) {
@@ -129,14 +134,14 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     };
 
     // Polling fallback transport.
-    if (forcePoll || !hasEventSource()) {
+    if (forcePoll || headersKey !== "{}" || !hasEventSource()) {
       let stopped = false;
       let timer: ReturnType<typeof setTimeout> | undefined;
       const tick = async () => {
         try {
           const responses = await Promise.all(runIds.map((runId) => fetch(
             `${basePath}/tasks/${encodeURIComponent(runId)}`,
-            { headers: { Accept: "application/json" } },
+            { headers: { Accept: "application/json", ...requestHeaders } },
           )));
           if (responses.some((response) => !response.ok)) throw new Error("Task request failed");
           if (responses.every((response) => response.ok)) {
@@ -189,7 +194,7 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     });
     es.onerror = () => setStatus("connection lost — retrying");
     return () => es.close();
-  }, [subscriptionKey, runIdsKey, kind, basePath, enabled, pollMs, forcePoll]);
+  }, [subscriptionKey, runIdsKey, kind, basePath, enabled, pollMs, forcePoll, headersKey]);
 
   const current = stateKey === subscriptionKey;
   // The streams are merged back in only here, at the boundary. The polling
@@ -243,7 +248,9 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
     enabled = true,
     pollMs = DEFAULT_POLL_MS,
     forcePoll = false,
+    headers,
   } = options;
+  const headersKey = JSON.stringify(headers ?? {});
 
   // Runs are stored together with the key of the request that delivered them, so
   // a stale listing can never be mistaken for the current filters' result.
@@ -259,6 +266,7 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
 
   useEffect(() => {
     if (!enabled) return;
+    const requestHeaders = JSON.parse(headersKey) as Record<string, string>;
 
     const params = new URLSearchParams();
     if (kind) params.set("kind", kind);
@@ -269,13 +277,13 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
     const receive = (next: TaskRunMeta[]) => setReceived({ key: requestKey, runs: next });
 
     // Polling fallback transport.
-    if (forcePoll || !hasEventSource()) {
+    if (forcePoll || headersKey !== "{}" || !hasEventSource()) {
       let stopped = false;
       let timer: ReturnType<typeof setTimeout> | undefined;
       const tick = async () => {
         try {
           const res = await fetch(`${basePath}/tasks${query ? `?${query}` : ""}`, {
-            headers: { Accept: "application/json" },
+            headers: { Accept: "application/json", ...requestHeaders },
           });
           if (!res.ok) throw new Error(`Task listing failed with ${res.status}`);
           if (res.ok) {
@@ -310,7 +318,7 @@ export function useTaskRuns(options: UseTaskRunsOptions = {}): UseTaskRunsResult
     });
     es.onerror = () => setStatus("connection lost — retrying");
     return () => es.close();
-  }, [kind, statusFilter, JSON.stringify(labels ?? {}), basePath, enabled, pollMs, forcePoll]);
+  }, [kind, statusFilter, JSON.stringify(labels ?? {}), basePath, enabled, pollMs, forcePoll, headersKey]);
 
   return { runs: received.runs, status, runsKey: received.key };
 }
