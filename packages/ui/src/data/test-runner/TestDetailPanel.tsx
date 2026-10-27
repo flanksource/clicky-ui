@@ -3,7 +3,7 @@ import { Icon } from "../Icon";
 import { Button } from "../../components/button";
 import { Select } from "../../components/select";
 import { SplitButton } from "../../components/SplitButton";
-import { useCopyFlash } from "../../components/clipboard";
+import { useCopyFlash, type CopyFlashState } from "../../components/clipboard";
 import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
 import { cn } from "../../lib/utils";
 import { JsonView } from "../JsonView";
@@ -13,6 +13,7 @@ import {
   UiClass,
   UiClock,
   UiCopy,
+  UiHourglass,
   UiJson,
   UiRefresh,
   UiStop,
@@ -74,8 +75,18 @@ function copyMenuItem(item: CopyItem, copy: (text: string) => void): DropdownMen
   return { label: item.label, ...icon, onSelect: () => copy(item.value) };
 }
 
-const COPY_LABEL = { idle: "Copy details", copied: "Copied", error: "Copy failed" } as const;
-const COPY_ICON = { idle: UiCopy, copied: UiCheck, error: UiWarningCircle } as const;
+const COPY_LABEL = {
+  idle: "Copy details",
+  pending: "Copying…",
+  copied: "Copied",
+  error: "Copy failed",
+} as const satisfies Record<CopyFlashState, string>;
+const COPY_ICON = {
+  idle: UiCopy,
+  pending: UiHourglass,
+  copied: UiCheck,
+  error: UiWarningCircle,
+} as const satisfies Record<CopyFlashState, unknown>;
 
 /**
  * "Copy details" split button: the primary action copies a Markdown brief of
