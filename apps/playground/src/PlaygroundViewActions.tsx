@@ -5,6 +5,8 @@ import type { AnnotationVisibility, PlaygroundView } from "./route";
 export function PlaygroundViewActions({
   view,
   annotations,
+  showRejected,
+  onShowRejectedChange,
   copyDisabled,
   copied,
   onViewChange,
@@ -13,6 +15,8 @@ export function PlaygroundViewActions({
 }: {
   view: PlaygroundView;
   annotations: AnnotationVisibility;
+  showRejected: boolean;
+  onShowRejectedChange: (show: boolean) => void;
   copyDisabled: boolean;
   copied: boolean;
   onViewChange: (view: PlaygroundView) => void;
@@ -31,6 +35,11 @@ export function PlaygroundViewActions({
         size="sm"
         aria-label="Artifact view"
       />
+      {view === "preview" && (
+        <button type="button" aria-pressed={showRejected} onClick={() => onShowRejectedChange(!showRejected)} className="inline-flex items-center rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+          {showRejected ? "Hide rejected" : "Show rejected"}
+        </button>
+      )}
       {view === "preview" && (
         <button
           type="button"

@@ -13,16 +13,18 @@ export function fetchModelCatalog(): Promise<ChatModel[]> {
 }
 
 /**
- * Captain's catalog narrowed to available agent-SDK runtimes: only the agent
- * mode can keep one chat session alive and accept follow-up messages.
+ * Captain's catalog narrowed to enabled, available runtimes with a default
+ * model, optionally of one `mode` — agent sessions pass `"agent"`, since only
+ * the agent SDK keeps one chat session alive for follow-up messages.
  */
-export function agentRuntimeCatalog(
+export function availableRuntimeCatalog(
   catalog: RuntimeCatalogFamily[],
+  { mode: only }: { mode?: string },
 ): RuntimeCatalogFamily[] {
   return catalog.flatMap((family) => {
     const modes = family.modes.filter(
       (mode) =>
-        mode.mode === "agent" &&
+        (only === undefined || mode.mode === only) &&
         !mode.disabled &&
         mode.availability?.state === "available" &&
         mode.defaultModel,

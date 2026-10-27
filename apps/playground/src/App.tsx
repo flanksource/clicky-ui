@@ -10,6 +10,7 @@ import {
 } from "@flanksource/clicky-ui";
 
 import { AgentRunsProvider } from "./agent-runs/AgentRunsProvider";
+import { PromptRunsProvider } from "./prompt-runs/PromptRunsProvider";
 import { PLAYGROUND_COMMENT_CONFIG, useComments } from "./comments/useComments";
 import { PlaygroundShell } from "./PlaygroundShell";
 import { ExternalWorkspace } from "./bookmarklet/ExternalWorkspace";
@@ -63,7 +64,7 @@ export function App() {
   const standardRoute = (
     page: string,
     view: PlaygroundRoute["view"] = route.view,
-  ): PlaygroundRoute => ({ page, view, annotations: route.annotations });
+  ): PlaygroundRoute => ({ page, view, annotations: route.annotations, ...(route.showRejected ? { showRejected: true } : {}) });
 
   return (
     <ThemeProvider>
@@ -83,6 +84,7 @@ export function App() {
             onDelete={comments.remove}
           >
             <AgentRunsProvider runAgent={comments.runAgent}>
+            <PromptRunsProvider>
             {isExternal ? (
               <ExternalWorkspace
                 id={route.page}
@@ -113,6 +115,8 @@ export function App() {
                 commentsLoading={comments.loading}
                 view={route.view}
                 annotations={route.annotations}
+                showRejected={route.showRejected ?? false}
+                onShowRejectedChange={(showRejected) => navigateRoute({ ...route, showRejected })}
                 {...(route.review ? { review: route.review } : {})}
                 {...(route.comment ? { selectedCommentId: route.comment } : {})}
                 pageHref={(slug) => buildPlaygroundRoute(standardRoute(slug))}
@@ -135,8 +139,10 @@ export function App() {
                 onReviewExit={() => navigateRoute(standardRoute(route.page))}
                 onCommentAndReopen={comments.commentAndReopen}
                 onPrepareCommentSelection={comments.prepareSelection}
+                onCaptureSelection={comments.captureSelection}
               />
             )}
+            </PromptRunsProvider>
             </AgentRunsProvider>
           </CommentProvider>
         </RouterProvider>

@@ -20,6 +20,7 @@ export type JsonProperty = {
   minimum?: number;
   enum?: string[];
   default?: string | boolean;
+  writeOnly?: boolean;
   properties?: Record<string, JsonProperty>;
   required?: string[];
   additionalProperties?: false;
@@ -204,6 +205,7 @@ export const COMMENT_TOOLS: CommentTool[] = [
           description:
             "Human review decision for an element with data-review-id. Rejection and revision require body text.",
         },
+        expectedSource: {type:"string",writeOnly:true,description:"Current source returned by /__playground/sources; required for a review decision. A changed source returns 409."},
         author: AUTHOR,
         anchor: {
           type: "string",
