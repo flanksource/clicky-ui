@@ -216,6 +216,23 @@ export {
   type MatrixTableProps,
   type MatrixTableRow,
 } from "./data/MatrixTable";
+export {
+  MatrixTreeTable,
+  TreeRowLead,
+  TreeRowToggle,
+  type MatrixTreeTableProps,
+  type TreeLabelContext,
+} from "./data/MatrixTreeTable";
+export { TreeDataTable, type TreeDataTableProps } from "./data/TreeDataTable";
+export {
+  collectTreeKeys,
+  expandAllTree,
+  visibleTreeRows,
+  type TreeExpansion,
+  type TreeExpansionProps,
+  type TreeRow,
+  type TreeRowsAccessors,
+} from "./lib/tree-rows";
 export { Callout, type CalloutProps } from "./data/Callout";
 export {
   assertCalloutValue,
