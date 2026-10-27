@@ -49,7 +49,7 @@ describe("matrixMarkKey", () => {
     expect(matrixMarkKey(outcome)).toBe(outcome);
   });
 
-  it.each(["queued", "unavailable", "Passed", ""])("throws on outcome %j the matrix has no mark for", (outcome) => {
+  it.each(["queued", "unavailable", "Passed", "", "toString", "constructor"])("throws on outcome %j the matrix has no mark for", (outcome) => {
     expect(() => matrixMarkKey(outcome)).toThrow(`matrix has no mark for outcome "${outcome}"`);
   });
 });
