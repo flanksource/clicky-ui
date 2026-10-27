@@ -6,6 +6,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import type { Violation } from "../../../packages/ui/src/data/lint/types";
 import { externalUrl } from "../src/bookmarklet/model";
 
 import {
@@ -69,6 +70,21 @@ export type StoredAgentRun = {
   error?: string;
 };
 
+/** One finding of a structured comment, rendered as a chip and toggled by status. */
+export type StoredChecklistItem = { label: string; status: string };
+
+/** A labelled group of references (files, selectors) rendered as chips. */
+export type StoredRefGroup = { label: string; items: string[]; mono?: boolean };
+
+/** The captain prompt run a root was produced by. */
+export type StoredPromptRun = {
+  promptId: string;
+  promptName: string;
+  runId: string;
+  sessionId?: string;
+  variables?: Record<string, unknown>;
+};
+
 export type StoredComment = {
   id: string;
   body: string;
@@ -89,6 +105,11 @@ export type StoredComment = {
   acknowledgedBy?: StoredAuthor;
   agentRun?: StoredAgentRun;
   element?: CommentElementContext;
+  checklist?: StoredChecklistItem[];
+  refs?: StoredRefGroup[];
+  promptRun?: StoredPromptRun;
+  /** The lint findings a prompt run reported, kept verbatim. */
+  lint?: { violations: Violation[] };
 };
 
 /** Page slug → the comments left on that page. */
@@ -325,6 +346,61 @@ function assertLocators(input: unknown): void {
   }
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+/** Checklist, refs, prompt provenance and lint findings: only prompt runs write them. */
+function assertStructuredFields(candidate: Record<string, unknown>): void {
+  const { checklist, refs, promptRun, lint } = candidate;
+  if (
+    checklist !== undefined &&
+    !(
+      Array.isArray(checklist) &&
+      checklist.every(
+        (item: Partial<StoredChecklistItem> | null) =>
+          typeof item?.label === "string" && typeof item.status === "string",
+      )
+    )
+  ) {
+    throw new Error("checklist must be [{label, status}]");
+  }
+  if (
+    refs !== undefined &&
+    !(
+      Array.isArray(refs) &&
+      refs.every(
+        (group: Partial<StoredRefGroup> | null) =>
+          typeof group?.label === "string" &&
+          isStringArray(group.items) &&
+          (group.mono === undefined || typeof group.mono === "boolean"),
+      )
+    )
+  ) {
+    throw new Error("refs must be [{label, items: string[], mono?}]");
+  }
+  if (promptRun !== undefined) {
+    const run = promptRun as Partial<StoredPromptRun> | null;
+    if (
+      typeof run?.promptId !== "string" ||
+      typeof run.promptName !== "string" ||
+      typeof run.runId !== "string" ||
+      (run.sessionId !== undefined && typeof run.sessionId !== "string") ||
+      (run.variables !== undefined && (run.variables === null || typeof run.variables !== "object"))
+    ) {
+      throw new Error(
+        "promptRun must be {promptId, promptName, runId, sessionId?, variables}",
+      );
+    }
+  }
+  if (
+    lint !== undefined &&
+    !Array.isArray((lint as { violations?: unknown } | null)?.violations)
+  ) {
+    throw new Error("lint must be {violations: []}");
+  }
+}
+
 export function assertComment(input: unknown): StoredComment {
   if (input === null || typeof input !== "object" || Array.isArray(input)) {
     throw new Error("comment payload must be an object");
@@ -373,6 +449,7 @@ export function assertComment(input: unknown): StoredComment {
   if (candidate["element"] !== undefined) {
     assertElementContext(candidate["element"]);
   }
+  assertStructuredFields(candidate);
   const isReply = typeof candidate["parentId"] === "string";
   if (isReply && candidate["reviewDecision"] !== undefined) {
     throw new Error("review decisions belong on thread roots");

@@ -489,16 +489,22 @@ export function createAgentRuns(options: AgentRunsOptions) {
    */
   async function autoRunComment(event: CommentCreatedEvent): Promise<void> {
     const { comment, origin } = event;
+    // A root authored by something else (a prompt run) is handed off on behalf
+    // of the human who requested it.
+    const requester =
+      event.requestedBy ??
+      (comment.author && (comment.author.kind ?? "user") === "user"
+        ? comment.author
+        : undefined);
     if (
       comment.parentId ||
       comment.reviewDecision ||
-      !comment.author ||
-      (comment.author.kind ?? "user") !== "user" ||
+      !requester ||
       !readAgentSessions(dir).settings.autoRun
     ) {
       return;
     }
-    const human: StoredAuthor = { name: comment.author.name, kind: "user" };
+    const human: StoredAuthor = { name: requester.name, kind: "user" };
     try {
       await serialized(() => sendThread(comment.id, { human }, origin));
     } catch (error) {

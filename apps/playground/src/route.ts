@@ -7,6 +7,7 @@ export type PlaygroundRoute = {
   annotations: AnnotationVisibility;
   review?: "resolved";
   comment?: string;
+  showRejected?: boolean;
 };
 
 export function parsePlaygroundRoute(
@@ -18,6 +19,8 @@ export function parsePlaygroundRoute(
   const annotations = params.get("annotations") ?? "visible";
   const review = params.get("review");
   const comment = params.get("comment");
+  const rejected = params.get("rejected");
+  if (rejected !== null && rejected !== "show") throw new Error("invalid rejected visibility; expected rejected=show");
   if (view !== "preview" && view !== "markdown") {
     throw new Error(
       `invalid playground view "${view}"; expected preview or markdown`,
@@ -40,6 +43,7 @@ export function parsePlaygroundRoute(
     annotations,
     ...(review === "resolved" ? { review } : {}),
     ...(comment === null ? {} : { comment }),
+    ...(rejected === "show" ? { showRejected: true } : {}),
   };
 }
 
@@ -50,12 +54,13 @@ export function buildPlaygroundRoute(route: PlaygroundRoute): string {
     const value = current.get(key);
     if (value !== null) params.set(key, value);
   }
-  for (const key of ["page", "view", "annotations", "review", "comment"]) params.delete(key);
+  for (const key of ["page", "view", "annotations", "review", "comment", "rejected"]) params.delete(key);
   params.set("page", route.page);
   if (route.view !== "preview") params.set("view", route.view);
   if (route.annotations !== "visible")
     params.set("annotations", route.annotations);
   if (route.review) params.set("review", route.review);
   if (route.comment) params.set("comment", route.comment);
+  if (route.showRejected) params.set("rejected", "show");
   return `?${params.toString()}`;
 }
