@@ -27,7 +27,7 @@ export function TreeRowToggle({ open, label, onToggle }: { open: boolean; label:
       aria-expanded={open}
       aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
       className="inline-flex size-4 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground"
-      onClick={onToggle}
+      onClick={(event) => { event.stopPropagation(); onToggle(); }}
     >
       <Icon className="size-3.5" />
     </button>

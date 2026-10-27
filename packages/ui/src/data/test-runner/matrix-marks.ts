@@ -61,7 +61,7 @@ export type MatrixEnvCounts = {
 };
 
 export function matrixMarkKey(outcome: string): MatrixMarkKey {
-  if (!(outcome in MATRIX_MARKS)) throw new Error(`matrix has no mark for outcome "${outcome}"`);
+  if (!Object.hasOwn(MATRIX_MARKS, outcome)) throw new Error(`matrix has no mark for outcome "${outcome}"`);
   return outcome as MatrixMarkKey;
 }
 

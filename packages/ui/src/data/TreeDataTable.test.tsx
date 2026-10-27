@@ -41,6 +41,16 @@ describe("TreeDataTable", () => {
     expect(names()).toEqual(["Acme", "Globex", "Quote"]);
   });
 
+  it("toggles the tree without invoking the row action", () => {
+    const onRowClick = vi.fn();
+    render(<TreeDataTable {...props} onRowClick={onRowClick} />);
+    fireEvent.click(screen.getByRole("button", { name: "Expand Globex" }));
+    expect(names()).toEqual(["Acme", "Globex", "Quote"]);
+    expect(onRowClick).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Globex"));
+    expect(onRowClick).toHaveBeenCalledOnce();
+  });
+
   it("refuses a tree column that is not one of its columns", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => render(<TreeDataTable {...props} treeColumn="missing" />)).toThrow('treeColumn "missing"');
