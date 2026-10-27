@@ -35,7 +35,7 @@ describe("buildAISpecRuntimePayload", () => {
           system: "Be precise",
           schemaJSON:
             '{"type":"object","properties":{"ok":{"type":"boolean"}}}',
-          schemaStrictness: "retry",
+          schemaStrictness: "repair",
         },
         permissions: {
           presets: ["edit"],
@@ -131,7 +131,7 @@ describe("buildAISpecRuntimePayload", () => {
             type: "object",
             properties: { ok: { type: "boolean" } },
           },
-          schemaStrictness: "retry",
+          schemaStrictness: "repair",
         },
         permissions: {
           presets: ["edit"],
