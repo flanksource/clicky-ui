@@ -292,6 +292,8 @@ export {
   type ListMenuProps,
   type ListMenuSectionProps,
 } from "./components/ListMenu";
+export { ListMenuItems, type ListMenuItemsProps } from "./components/ListMenuItems";
+export type { ListMenuVirtualOptions } from "./components/list-menu-virtual";
 export {
   useListMenuSelection,
   type ListMenuSelection,
