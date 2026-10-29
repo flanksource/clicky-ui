@@ -29,7 +29,7 @@ export function MessageActions({ text, onRegenerate, className }: MessageActions
   return (
     <div
       className={cn(
-        "flex items-center gap-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100",
+        "flex items-center gap-1 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100",
         className,
       )}
     >

@@ -269,6 +269,7 @@ export {
 export { MethodBadge, type MethodBadgeProps } from "./data/MethodBadge";
 export { ProgressBar, type ProgressBarProps, type ProgressSegment } from "./data/ProgressBar";
 export { SignedDeltaBar, type SignedDeltaBarProps } from "./data/SignedDeltaBar";
+export { MultiGaugeBar, type MultiGaugeBarProps, type GaugeMarker } from './data/MultiGaugeBar';
 export { SortableHeader, type SortableHeaderProps } from "./data/SortableHeader";
 export { TabButton, type TabButtonProps, type TabButtonVariant } from "./data/TabButton";
 export {
@@ -338,6 +339,9 @@ export {
 } from "./data/server-timing";
 export { seriesStats, type SeriesStats } from "./data/gauge-stats";
 export { WorkloadCard, type WorkloadCardProps, type WorkloadCardSize, type WorkloadCardVariant } from "./data/WorkloadCard";
+export { WorkloadPanel } from "./data/workload-panel/WorkloadPanel";
+export { WorkloadMemoryStack, WorkloadMemoryLegend, type WorkloadMemoryStackProps } from "./data/workload-panel/MemoryStack";
+export type { WorkloadPanelProps, WorkloadResourceStatistics, WorkloadMemoryPart, WorkloadMemoryRegions, WorkloadJvmStatistics, WorkloadGcStatistics, WorkloadThreadStatistics } from "./data/workload-panel/types";
 export {
   formatReplicaCounts,
   workloadKindLabel,
@@ -609,3 +613,4 @@ export type {
 } from "./data/har/types";
 
 export * from "./data/traces";
+export * from "./data/charts";

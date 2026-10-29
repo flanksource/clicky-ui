@@ -86,7 +86,73 @@ describe("usePromptRunStream", () => {
   it("takes the session id from the run frame while staying running", () => {
     const { result } = renderHook(() => usePromptRunStream(RUN_ID), { wrapper });
     act(() => lastStream().frame("run", { sessionId: SESSION_ID }));
-    expect(result.current).toEqual({ status: "running", sessionId: SESSION_ID, entries: [] });
+    expect(result.current).toEqual({
+      status: "running",
+      sessionId: SESSION_ID,
+      run: { sessionId: SESSION_ID },
+      entries: [],
+    });
+  });
+
+  it("exposes the run frame's metadata while running", () => {
+    const { result } = renderHook(() => usePromptRunStream(RUN_ID), { wrapper });
+    act(() =>
+      lastStream().frame("run", {
+        runId: RUN_ID,
+        status: "running",
+        chat: false,
+        model: "claude-sonnet-5",
+        provider: "anthropic",
+        mode: "api",
+        capabilities: ["tools"],
+      }),
+    );
+    expect(result.current.run).toEqual({
+      runId: RUN_ID,
+      status: "running",
+      model: "claude-sonnet-5",
+      provider: "anthropic",
+      mode: "api",
+    });
+    expect(result.current.sessionId).toBeUndefined();
+  });
+
+  it("updates the run metadata and session id when a later run frame carries the session", () => {
+    const { result } = renderHook(() => usePromptRunStream(RUN_ID), { wrapper });
+    act(() => lastStream().frame("run", { runId: RUN_ID, status: "running", mode: "api" }));
+    act(() => lastStream().frame("run", { runId: RUN_ID, status: "running", mode: "api", sessionId: SESSION_ID }));
+    expect(result.current.sessionId).toBe(SESSION_ID);
+    expect(result.current.run).toEqual({ runId: RUN_ID, status: "running", mode: "api", sessionId: SESSION_ID });
+  });
+
+  it("keeps the last session id when a later run frame omits it", () => {
+    const { result } = renderHook(() => usePromptRunStream(RUN_ID), { wrapper });
+    act(() => lastStream().frame("run", { runId: RUN_ID, status: "running", sessionId: SESSION_ID }));
+    act(() => lastStream().frame("run", { runId: RUN_ID, status: "running", model: "m" }));
+    expect(result.current.sessionId).toBe(SESSION_ID);
+    expect(result.current.run).toMatchObject({ model: "m", sessionId: SESSION_ID });
+  });
+
+  it("passes Captain's summary fields through to state and onDone", () => {
+    const summary: PromptRunSummary = {
+      runId: RUN_ID,
+      sessionId: SESSION_ID,
+      model: "claude-sonnet-5",
+      provider: "anthropic",
+      mode: "api",
+      inputTokens: 1200,
+      outputTokens: 340,
+      costUSD: 0.0421,
+      duration: "3m2.5s",
+      success: true,
+      text: "done",
+      structuredOutput: { violations: [] },
+    };
+    const onDone = vi.fn();
+    const { result } = renderHook(() => usePromptRunStream(RUN_ID, { onDone }), { wrapper });
+    act(() => lastStream().frame("done", summary));
+    expect(result.current.summary).toEqual(summary);
+    expect(onDone).toHaveBeenCalledExactlyOnceWith(summary);
   });
 
   it("collects the run's transcript entries, replacing a replayed entry by id", () => {
@@ -112,7 +178,13 @@ describe("usePromptRunStream", () => {
     const { result } = renderHook(() => usePromptRunStream(RUN_ID, { onDone }), { wrapper });
     act(() => lastStream().frame("run", { sessionId: SESSION_ID }));
     act(() => lastStream().frame("done", summary));
-    expect(result.current).toEqual({ status: "succeeded", sessionId: SESSION_ID, summary, entries: [] });
+    expect(result.current).toEqual({
+      status: "succeeded",
+      sessionId: SESSION_ID,
+      run: { sessionId: SESSION_ID },
+      summary,
+      entries: [],
+    });
     expect(lastStream().closed).toBe(true);
     expect(onDone).toHaveBeenCalledExactlyOnceWith(summary);
   });
