@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ProgressBar } from "./ProgressBar";
+import { formatBytes } from "../lib/format";
 
 const meta: Meta<typeof ProgressBar> = {
   title: "Charts/ProgressBar",
@@ -27,7 +28,7 @@ const meta: Meta<typeof ProgressBar> = {
     docs: {
       description: {
         component:
-          "Segmented progress bar for small summaries and table/detail metrics. Each segment contributes a count, color class, and tooltip label.",
+          "Segmented progress bar for small summaries and table/detail metrics. Each segment contributes a count, color class, and tooltip label. Supply label for an accessible resource name and formatValue for byte sizes or durations in tooltips and the accessible summary.",
       },
     },
   },
@@ -37,6 +38,23 @@ export default meta;
 type Story = StoryObj<typeof ProgressBar>;
 
 export const Default: Story = {};
+export const JvmHeap: Story = {
+  args: {
+    label: "JVM heap",
+    height: "h-6",
+    total: 2048 * 1024 ** 2,
+    formatValue: formatBytes,
+    segments: [
+      { label: "Eden", count: 220 * 1024 ** 2, color: "var(--fs-info-500)" },
+      { label: "Survivor", count: 44 * 1024 ** 2, color: "var(--fs-hint-500)" },
+      {
+        label: "Old Gen",
+        count: 576 * 1024 ** 2,
+        color: "var(--fs-prereq-500)",
+      },
+    ],
+  },
+};
 
 export const TestRun: Story = {
   args: {

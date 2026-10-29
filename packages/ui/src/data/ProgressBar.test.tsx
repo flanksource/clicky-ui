@@ -1,8 +1,30 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ProgressBar } from "./ProgressBar";
+import { formatBytes } from "../lib/format";
 
 describe("ProgressBar", () => {
+  it("formats segment sizes and exposes a named byte summary without changing their proportions", () => {
+    render(
+      <ProgressBar
+        label="Heap"
+        total={2 * 1024 ** 2}
+        formatValue={formatBytes}
+        segments={[
+          { count: 512 * 1024, color: "bg-sky-400", label: "Eden" },
+          { count: 1024 ** 2, color: "bg-blue-400", label: "Old Gen" },
+        ]}
+      />,
+    );
+    const bar = screen.getByRole("progressbar", { name: "Heap" });
+    expect(bar).toHaveAttribute("title", "512 KB Eden, 1 MB Old Gen");
+    expect(bar).toHaveAttribute(
+      "aria-valuetext",
+      "1.5 MB of 2 MB. 512 KB Eden, 1 MB Old Gen",
+    );
+    expect(screen.getByTitle("512 KB Eden")).toHaveStyle({ width: "25%" });
+    expect(screen.getByTitle("1 MB Old Gen")).toHaveStyle({ width: "50%" });
+  });
   it("renders null when total is 0", () => {
     const { container } = render(<ProgressBar segments={[]} total={0} />);
     expect(container.firstChild).toBeNull();
