@@ -99,7 +99,7 @@ function RailToggle({
       onClick={onClick}
       data-testid={testId}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors",
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:text-sm",
         active
           ? "border-primary bg-primary text-primary-foreground"
           : "border-border bg-background text-muted-foreground hover:text-foreground",
@@ -316,7 +316,13 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
 
     const update = () => {
       const anchorTop = ctx.getAnchorTop(focusedAnchor);
-      if (anchorTop == null) {
+      // A rail stacked under the content (narrow screens) has no anchor row to
+      // line up with; offsetting it only pushes the thread out of view.
+      const contentBox = content.getBoundingClientRect();
+      const stacked =
+        contentBox.height > 0 &&
+        rail.getBoundingClientRect().top >= contentBox.bottom;
+      if (anchorTop == null || stacked) {
         setFocusedOffset(null);
         return;
       }
@@ -367,11 +373,11 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
     <aside
       ref={railRef}
       data-testid="comment-side-panel"
-      className={cn("relative w-[320px] space-y-3", props.className)}
+      className={cn("relative w-[320px] max-w-full space-y-3", props.className)}
     >
       <div
         data-testid="comment-rail-header"
-        className="sticky top-0 z-20 flex items-center gap-2 bg-background py-2"
+        className="sticky top-0 z-20 flex flex-wrap items-center gap-2 bg-background py-2"
       >
         {(counts.active > 0 || ctx.railMode === "all") && (
           <RailToggle
@@ -392,7 +398,7 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
             aria-pressed={ctx.railMode === "all" && stage === "resolved"}
             onClick={() => selectStage("resolved")}
             className={cn(
-              "rounded-full border px-2 py-1 text-xs font-medium transition-colors",
+              "rounded-full border px-2 py-1 text-xs font-medium transition-colors [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:text-sm",
               ctx.railMode === "all" && stage === "resolved"
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-background text-muted-foreground hover:text-foreground",
@@ -407,7 +413,7 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
             aria-pressed={ctx.railMode === "all" && stage === "closed"}
             onClick={() => selectStage("closed")}
             className={cn(
-              "rounded-full border px-2 py-1 text-xs font-medium transition-colors",
+              "rounded-full border px-2 py-1 text-xs font-medium transition-colors [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:text-sm",
               ctx.railMode === "all" && stage === "closed"
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-background text-muted-foreground hover:text-foreground",
@@ -420,7 +426,7 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
           <button
             type="button"
             onClick={ctx.closeRail}
-            className="ml-auto rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="ml-auto rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:text-sm"
           >
             {ctx.railMode === "all" ? "Close" : "Hide"}
           </button>
