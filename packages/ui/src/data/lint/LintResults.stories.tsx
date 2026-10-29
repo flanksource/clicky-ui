@@ -13,7 +13,9 @@ import {
   markdownlintClean,
   promptPending,
   promptRunning,
+  promptRunWithNestedLinters,
   pyrightFailed,
+  reviewRunning,
   valeSkipped,
 } from "./LintResults.fixtures";
 
@@ -221,6 +223,50 @@ export const PendingLinterDetail: Story = {
   render: () => <Harness results={IN_FLIGHT} selected={linterRoute(IN_FLIGHT, promptPending.linter)} />,
   play: async ({ canvasElement }) => {
     await expect(within(canvasElement).getByText("pending")).toBeInTheDocument();
+  },
+};
+
+/**
+ * A prompt run whose agent ran linters through its `lint` tool: they are published as
+ * `<run>/<linter>` and nest beneath the run, running first, then failed, findings, passed.
+ */
+export const PromptRunWithNestedLinters: Story = {
+  render: () => <Harness results={promptRunWithNestedLinters} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByRole("img", { name: "Running" })).toHaveLength(2);
+    await expect(canvas.getByText("failed to run")).toBeInTheDocument();
+    await expect(canvas.getByText("2.3s")).toBeInTheDocument();
+  },
+};
+
+/** The failed child is selected: its error, run id and the parent run's session are one click away. */
+export const NestedLinterFailed: Story = {
+  render: () => (
+    <Harness
+      results={promptRunWithNestedLinters}
+      selected={`${linterRoute(promptRunWithNestedLinters, reviewRunning.linter)}/uir`}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByText("uir executable not found on PATH").length).toBeGreaterThan(0);
+    await expect(canvas.getByText("run-91ab")).toBeInTheDocument();
+  },
+};
+
+/** The running prompt run itself: run id and session id are copyable from the first frame the host has them. */
+export const PromptRunIdentity: Story = {
+  render: () => (
+    <Harness
+      results={promptRunWithNestedLinters}
+      selected={linterRoute(promptRunWithNestedLinters, reviewRunning.linter)}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText(reviewRunning.session_id!)).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "Copy session id" })).toBeInTheDocument();
   },
 };
 
