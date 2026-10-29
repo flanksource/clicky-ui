@@ -65,6 +65,22 @@ describe("GitCommitList", () => {
 
     await waitFor(() => expect(loadDiff).toHaveBeenCalledTimes(1));
   });
+
+  it("opens the commit instead of expanding when onOpen is set", () => {
+    const commit = { ...COMMITS[0]!, body: "Pin pgx in the test module." };
+    const onOpen = vi.fn();
+    render(<GitCommitList commits={[commit]} onOpen={onOpen} />);
+
+    const row = screen.getByRole("button", { name: /update pgx in test module/ });
+    fireEvent.click(row);
+    fireEvent.keyDown(row, { key: "Enter" });
+
+    expect({ calls: onOpen.mock.calls, expanded: row.getAttribute("aria-expanded"), body: screen.queryByText(commit.body) }).toEqual({
+      calls: [[commit], [commit]],
+      expanded: null,
+      body: null,
+    });
+  });
 });
 
 describe("GitCommitList slots", () => {

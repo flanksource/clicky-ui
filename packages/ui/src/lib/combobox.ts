@@ -1,5 +1,7 @@
+import { belowBreakpoint } from "./breakpoints";
+
 export const COMBOBOX_MENU_MAX_WIDTH_PX = 400;
-export const COMBOBOX_MOBILE_QUERY = "(max-width: 639px)";
+export const COMBOBOX_MOBILE_QUERY = belowBreakpoint("sm");
 
 const COMBOBOX_MENU_EDGE_INSET_PX = 8;
 const COMBOBOX_MENU_ANCHOR_GAP_PX = 4;

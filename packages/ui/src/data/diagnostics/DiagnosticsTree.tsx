@@ -64,7 +64,7 @@ export function DiagnosticsTree({
               }
             />
             <span
-              className={`truncate ${
+              className={`min-w-0 truncate ${
                 selected ? "font-semibold text-primary" : "font-medium text-foreground"
               }`}
             >

@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { CodeBlock } from "./CodeBlock";
 
 const meta: Meta<typeof CodeBlock> = {
-  title: "Data/CodeBlock",
+  title: "Git/CodeBlock",
   component: CodeBlock,
   args: {
     language: "json",

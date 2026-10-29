@@ -59,6 +59,7 @@ export function CacheBrowser({
 
   return (
     <SplitPane
+      stackOnMobile
       className={cn("min-h-0 flex-1", className)}
       defaultSplit={defaultSplit}
       left={
