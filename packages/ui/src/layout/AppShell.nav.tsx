@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Icon } from "../data/Icon";
+import { UiChevronDown, UiChevronRight } from "../icons";
 import { cn } from "../lib/utils";
 import { ContextMenu } from "../overlay/ContextMenu";
 import type { RenderLink } from "../rpc/EndpointList";
@@ -182,10 +183,9 @@ function NavGroupRows({
   const collapsed =
     !group.forceExpanded && groupState.isCollapsed(group.key, fallback);
   const toggle = () => groupState.toggle(group.key, fallback);
+  const Chevron = collapsed ? UiChevronRight : UiChevronDown;
   const chevron = (
-    <span aria-hidden className="text-[0.65rem] opacity-60">
-      {collapsed ? "▸" : "▾"}
-    </span>
+    <Chevron aria-hidden className="size-3.5 shrink-0 opacity-60" />
   );
   const groupIcon = group.icon && (
     <span className="flex h-4 w-4 shrink-0 items-center justify-center">
@@ -246,7 +246,8 @@ function NavGroupRows({
         <div
           ref={setContextTarget}
           className={cn(
-            "group/nav flex items-center gap-1",
+            "group/nav flex items-center gap-1 rounded-md",
+            !collapsed && "bg-sidebar-accent/50",
             leafFolderDrag && NAV_DRAG_ROW_CLASS,
           )}
           {...leafFolderDrag}
@@ -290,7 +291,8 @@ function NavGroupRows({
             aria-expanded={!collapsed}
             className={cn(
               "flex items-center gap-2.5 rounded-md px-density-2 py-1.5 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              "text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/55",
+              "text-left text-[13px] text-sidebar-foreground",
+              !collapsed && "bg-sidebar-accent/50",
               folderDrag && NAV_DRAG_ROW_CLASS,
             )}
             {...folderDrag}
@@ -310,7 +312,7 @@ function NavGroupRows({
         </>
       )}
       {!collapsed && (
-        <div className="ml-2 mt-0.5 flex flex-col gap-0.5 border-l border-sidebar-border pl-2">
+        <div className="ml-4 mt-0.5 flex flex-col gap-0.5">
           {group.items.map((item) => (
               <NavItemRow
                 key={item.key}

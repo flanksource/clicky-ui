@@ -211,7 +211,7 @@ describe("AppShell", () => {
     expect(screen.getAllByText("content")).toHaveLength(1);
     expect(screen.getByRole("separator", { name: "" })).toHaveClass(
       "hidden",
-      "md:block",
+      "@3xl/split-pane:block",
     );
     expect(container.querySelector('[data-slot="app-shell-body-header-content"]')).toHaveAttribute(
       "data-content-width",
@@ -220,7 +220,7 @@ describe("AppShell", () => {
     expect(container.querySelector('[data-slot="app-shell-content"]')).toBeNull();
   });
 
-  // Responsive variants are CSS-driven (`hidden md:flex`), so each slot must be
+  // Responsive variants are CSS-driven (`hidden @3xl/app-shell:flex`), so each slot must be
   // mounted exactly once — a second mount would fork its state and re-run its
   // effects. This asserts the mount count and that slot state survives a
   // re-render; it does NOT exercise a viewport change (jsdom does not

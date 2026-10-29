@@ -214,44 +214,50 @@ export function Workspace({
       }
     : state;
 
+  // The regions switch between stacked and side-by-side on the workspace's own
+  // width (a container query), so a workspace embedded in a narrow column
+  // stacks even on a wide screen. A container cannot query itself, hence the
+  // outer box; caller classes size it.
   return (
     <div
-      className={cn(
-        "relative grid min-h-0 w-full grid-cols-1 overflow-auto bg-background md:h-full md:grid-cols-[auto_minmax(0,1fr)_auto] md:grid-rows-[minmax(0,1fr)_auto] md:overflow-hidden",
-        className,
-      )}
+      data-slot="workspace"
+      className={cn("@container/workspace h-full min-h-0 w-full", className)}
     >
-      <WorkspaceTopRight
-        hasLeft={groups.left.length > 0 && !held("left")}
-        hasRight={groups.right.length > 0 && !held("right")}
-        {...(slots ? { slots } : {})}
-        state={state}
-        update={update}
-      />
-      <WorkspaceSideRegion
-        location="left"
-        panes={groups.left}
-        state={shown}
-        update={update}
-      />
-      <WorkspaceSingleRegion
-        pane={groups.center}
-        state={state}
-        update={update}
-      />
-      <WorkspaceSideRegion
-        location="right"
-        panes={groups.right}
-        state={shown}
-        update={update}
-      />
-      {groups.bottom && (
-        <WorkspaceSingleRegion
-          pane={groups.bottom}
+      <div
+        className="relative grid h-full min-h-0 w-full grid-cols-1 content-start overflow-auto bg-background @3xl/workspace:grid-cols-[auto_minmax(0,1fr)_auto] @3xl/workspace:grid-rows-[minmax(0,1fr)_auto] @3xl/workspace:content-stretch @3xl/workspace:overflow-hidden"
+      >
+        <WorkspaceTopRight
+          hasLeft={groups.left.length > 0 && !held("left")}
+          hasRight={groups.right.length > 0 && !held("right")}
+          {...(slots ? { slots } : {})}
           state={state}
           update={update}
         />
-      )}
+        <WorkspaceSideRegion
+          location="left"
+          panes={groups.left}
+          state={shown}
+          update={update}
+        />
+        <WorkspaceSingleRegion
+          pane={groups.center}
+          state={state}
+          update={update}
+        />
+        <WorkspaceSideRegion
+          location="right"
+          panes={groups.right}
+          state={shown}
+          update={update}
+        />
+        {groups.bottom && (
+          <WorkspaceSingleRegion
+            pane={groups.bottom}
+            state={state}
+            update={update}
+          />
+        )}
+      </div>
     </div>
   );
 }
