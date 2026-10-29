@@ -356,7 +356,7 @@ function TaskRow({
             <CopyButton
               value={() => taskMarkdown(t)}
               label={`Copy ${t.name}`}
-              className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
               iconClassName="text-xs"
             />
             {onTaskControl && (

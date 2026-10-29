@@ -66,6 +66,7 @@ import {
   UiArrowRight,
 } from "../icons";
 import { useMediaQuery } from "../hooks/use-media-query";
+import { belowBreakpoint } from "../lib/breakpoints";
 import {
   DensityMenuSection,
   MenuActionSection,
@@ -1094,7 +1095,7 @@ function DataTableInner<T extends Record<string, unknown>>({
   const [columnMenu, setColumnMenu] = useState<ColumnMenuState | null>(null);
   const [headerFilterMenu, setHeaderFilterMenu] =
     useState<ColumnMenuState | null>(null);
-  const preferencesSheet = useMediaQuery("(max-width: 639px)");
+  const preferencesSheet = useMediaQuery(belowBreakpoint("sm"));
   const [textFilters, setTextFilters] = useState<Record<string, string>>({});
   const [multiFilters, setMultiFilters] = useState<
     Record<string, Record<string, FilterBarMultiFilterMode>>
@@ -3453,7 +3454,7 @@ function DataTablePaginationFooter({
     cursor.onCursorChange(cursor.next);
   };
 
-  const compact = useMediaQuery("(max-width: 639px)");
+  const compact = useMediaQuery(belowBreakpoint("sm"));
 
   return (
     <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-border/70 px-1 pt-2 text-xs text-muted-foreground max-sm:flex-nowrap sm:gap-3">

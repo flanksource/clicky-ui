@@ -95,7 +95,7 @@ const sampleFixture = [
 ].join("\n");
 
 const meta: Meta<typeof FixtureEditor> = {
-  title: "Data/FixtureEditor",
+  title: "Git/FixtureEditor",
   component: FixtureEditor,
   tags: ["browser"],
   args: {

@@ -78,7 +78,7 @@ export function Gauge({
   return (
     <div
       className={cn(
-        "flex min-h-28 w-[15.5rem] shrink-0 flex-col rounded-lg border border-border bg-card p-3",
+        "flex min-h-28 w-[15.5rem] max-w-full shrink-0 flex-col rounded-lg border border-border bg-card p-3",
         className,
       )}
       title={!showLabel ? labelText : undefined}
