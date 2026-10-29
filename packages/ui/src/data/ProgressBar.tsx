@@ -15,25 +15,42 @@ export type ProgressBarProps = {
   segments: ProgressSegment[];
   /** Total value used to calculate segment percentages. */
   total: number;
+  /** Accessible name for the measured resource. */
+  label?: string;
+  /** Formats amounts in tooltips and the accessible summary, e.g. bytes or durations. */
+  formatValue?: (value: number) => string;
   /** Height utility class, e.g. `h-2`. */
   height?: string;
   /** Classes applied to the progressbar root. */
   className?: string;
 };
 
-export function ProgressBar({ segments, total, height = "h-2", className }: ProgressBarProps) {
+export function ProgressBar({
+  segments,
+  total,
+  label,
+  formatValue = String,
+  height = "h-2",
+  className,
+}: ProgressBarProps) {
   if (total === 0) return null;
 
   const tooltip = segments
     .filter((s) => s.count > 0)
-    .map((s) => `${s.count} ${s.label}`)
+    .map((s) => `${formatValue(s.count)} ${s.label}`)
     .join(", ");
 
   return (
     <div
-      className={cn("w-full bg-muted rounded-full flex overflow-hidden", height, className)}
+      className={cn(
+        "w-full bg-muted rounded-full flex overflow-hidden",
+        height,
+        className,
+      )}
       title={tooltip}
       role="progressbar"
+      aria-label={label}
+      aria-valuetext={`${formatValue(segments.reduce((acc, s) => acc + s.count, 0))} of ${formatValue(total)}. ${tooltip}`}
       aria-valuemin={0}
       aria-valuemax={total}
       aria-valuenow={segments.reduce((acc, s) => acc + s.count, 0)}
@@ -45,9 +62,16 @@ export function ProgressBar({ segments, total, height = "h-2", className }: Prog
         return (
           <div
             key={i}
-            className={cn(asClass ? seg.color : undefined, height, "transition-all duration-300")}
-            style={{ width: `${pct}%`, ...(asClass ? {} : { backgroundColor: seg.color }) }}
-            title={`${seg.count} ${seg.label}`}
+            className={cn(
+              asClass ? seg.color : undefined,
+              height,
+              "transition-all duration-300",
+            )}
+            style={{
+              width: `${pct}%`,
+              ...(asClass ? {} : { backgroundColor: seg.color }),
+            }}
+            title={`${formatValue(seg.count)} ${seg.label}`}
           />
         );
       })}
