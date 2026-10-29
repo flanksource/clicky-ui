@@ -16,6 +16,19 @@ export type ConnectionFormExtensions = {
 const unitFormExtensions = createUnitFormExtensions();
 
 /**
+ * Concatenates form extension sets in argument order, so an earlier set (the
+ * schema-derived defaults) runs before a later one (the host's own).
+ */
+export function mergeConnectionFormExtensions(
+  ...sets: Array<ConnectionFormExtensions | undefined>
+): Required<ConnectionFormExtensions> {
+  return {
+    pre: sets.flatMap((set) => set?.pre ?? []),
+    post: sets.flatMap((set) => set?.post ?? []),
+  };
+}
+
+/**
  * The connection form's extensions: the unit-aware inputs (`x-clicky-unit`)
  * and the logging policy editor the connection schema always uses, around
  * whatever pickers the host adds (the query app's namespace and secret
