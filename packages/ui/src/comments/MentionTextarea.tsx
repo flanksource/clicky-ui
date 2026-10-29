@@ -250,7 +250,8 @@ export const MentionTextarea = forwardRef<
         placeholder={placeholder}
         data-testid={dataTestId}
         className={cn(
-          "w-full resize-none bg-transparent text-sm leading-snug outline-none placeholder:text-placeholder",
+          // iOS zooms the page into any focused field under 16px.
+          "w-full resize-none bg-transparent text-sm leading-snug outline-none placeholder:text-placeholder [@media(pointer:coarse)]:text-base",
           className,
         )}
         onChange={(e) => {
