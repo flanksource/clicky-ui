@@ -5,6 +5,7 @@ import { CommentSidePanel } from "../comments/CommentSidePanel";
 import { useCommentContext } from "../comments/comment-context";
 import type { CommentScrollOptions } from "../comments/comment-context";
 import type { CommentAnchor } from "../comments/comment-types";
+import { severityRank } from "../data/lint/stats";
 import { cn } from "../lib/utils";
 import type { Monaco } from "../monaco";
 import { MonacoEditor } from "../monaco/MonacoEditor";
@@ -31,6 +32,10 @@ export type AnnotatedCodeProps = {
   onLineChange?: ((line: number) => void) | undefined;
   /** Extra controls under each finding's thread, e.g. an ignore action. */
   renderFindingActions?: ((finding: FileFinding) => ReactNode) | undefined;
+  /** Makes the editor editable and receives every edit; without it the editor is read-only. */
+  onChange?: ((source: string) => void) | undefined;
+  /** Shows each line's worst finding as `rule · message` after the line's text. */
+  inlineChips?: boolean | undefined;
   className?: string | undefined;
 };
 
@@ -39,17 +44,27 @@ type MountedEditor = { editor: MonacoEditorApi.IStandaloneCodeEditor; monaco: Mo
 const MARKER_OWNER = "findings";
 
 // Tailwind utilities, so the library's own stylesheet scan emits them; Monaco
-// only applies the class names to its decoration elements.
+// only applies the class names to its decoration elements. Monaco replaces
+// every character outside [a-zA-Z0-9_-] in a decoration class with a space,
+// so none of these may use `/`, `.`, `[` or `:` (no `bg-red-500/10`, `px-1.5`
+// or `ml-[5px]`). The tint is a text-free overlay, so `opacity-10` stands in
+// for an alpha background.
 const LINE_TINT: Record<LintSeverity, string> = {
-  error: "bg-red-500/10",
-  warning: "bg-amber-500/10",
-  info: "bg-sky-500/10",
+  error: "bg-red-500 opacity-10",
+  warning: "bg-amber-500 opacity-10",
+  info: "bg-sky-500 opacity-10",
 };
-const GLYPH_BASE = "ml-[5px] mt-[6px] size-2 rounded-full";
+const GLYPH_BASE = "ml-1 mt-1 size-3 rounded-full";
 const GLYPH: Record<LintSeverity, string> = {
   error: `${GLYPH_BASE} bg-red-500`,
   warning: `${GLYPH_BASE} bg-amber-500`,
   info: `${GLYPH_BASE} bg-sky-500`,
+};
+const CHIP_BASE = "ml-6 italic";
+const CHIP: Record<LintSeverity, string> = {
+  error: `${CHIP_BASE} text-red-500`,
+  warning: `${CHIP_BASE} text-amber-500`,
+  info: `${CHIP_BASE} text-sky-500`,
 };
 
 function markerSeverity(monaco: Monaco, severity: LintSeverity): number {
@@ -82,6 +97,34 @@ function toMarkers(
   });
 }
 
+/**
+ * One chip per line that has findings: the worst finding's `rule · message`,
+ * with `+N` for the line's other findings, injected after the line's text.
+ */
+function inlineChipDecorations(
+  findings: readonly FileFinding[],
+  model: Pick<MonacoEditorApi.ITextModel, "getLineMaxColumn">,
+): MonacoEditorApi.IModelDeltaDecoration[] {
+  const byLine = new Map<number, FileFinding[]>();
+  for (const finding of findings) byLine.set(finding.line, [...(byLine.get(finding.line) ?? []), finding]);
+  return [...byLine].map(([line, onLine]) => {
+    const worst = onLine.reduce((a, b) => (severityRank(b.severity) > severityRank(a.severity) ? b : a));
+    const label = worst.rule ? `${worst.rule} · ${worst.message}` : worst.message;
+    const column = model.getLineMaxColumn(line);
+    return {
+      range: { startLineNumber: line, startColumn: column, endLineNumber: line, endColumn: column },
+      options: {
+        // Monaco drops injected text on an empty range unless told to keep it.
+        showIfCollapsed: true,
+        after: {
+          content: onLine.length > 1 ? `${label} +${onLine.length - 1}` : label,
+          inlineClassName: CHIP[worst.severity],
+        },
+      },
+    };
+  });
+}
+
 /** The first finding whose line range covers `line`. */
 function findingCovering(findings: readonly FileFinding[], line: number): FileFinding | undefined {
   return findings.find((f) => f.line <= line && line <= (f.endLine ?? f.line));
@@ -98,6 +141,8 @@ function CodeBody({
   line,
   onLineChange,
   renderFindingActions,
+  onChange,
+  inlineChips,
   className,
 }: AnnotatedCodeProps & {
   mounted: MountedEditor | null;
@@ -120,8 +165,8 @@ function CodeBody({
     if (!model) return;
     editor.updateOptions({ glyphMargin: true });
     monaco.editor.setModelMarkers(model, MARKER_OWNER, toMarkers(findings, model, monaco));
-    const decorations = editor.createDecorationsCollection(
-      findings.map((finding) => ({
+    const decorations = editor.createDecorationsCollection([
+      ...findings.map((finding) => ({
         range: {
           startLineNumber: finding.line,
           startColumn: 1,
@@ -135,12 +180,13 @@ function CodeBody({
           glyphMarginHoverMessage: { value: finding.message },
         },
       })),
-    );
+      ...(inlineChips ? inlineChipDecorations(findings, model) : []),
+    ]);
     return () => {
       decorations.clear();
       monaco.editor.setModelMarkers(model, MARKER_OWNER, []);
     };
-  }, [mounted, findings]);
+  }, [mounted, findings, inlineChips]);
 
   // Clicking a line a finding covers focuses its thread in the rail.
   useEffect(() => {
@@ -184,7 +230,7 @@ function CodeBody({
         className="min-w-0 flex-1 [&_[data-slot=monaco-editor]]:h-full [&_[data-slot=monaco-editor]]:rounded-none [&_[data-slot=monaco-editor]]:border-0"
       >
         <MonacoEditor
-          readOnly
+          {...(onChange ? { onChange } : { readOnly: true })}
           value={source}
           language={findingsLanguageForPath(path)}
           path={modelPath(workDir, path)}
@@ -208,8 +254,9 @@ function CodeBody({
 }
 
 /**
- * A source file in a read-only Monaco editor with its findings as markers, as
- * gutter dots and as read-only comment threads in a rail beside it. Needs a
+ * A source file in a Monaco editor with its findings as markers, as gutter
+ * dots and as read-only comment threads in a rail beside it. The editor is
+ * read-only unless `onChange` is given. Needs a
  * `MonacoProvider` above it. The rail and the editor share one anchor scheme
  * (`line:<n>`): the rail asks the editor where a line is and tells it to
  * reveal one.

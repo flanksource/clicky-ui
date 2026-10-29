@@ -9,6 +9,7 @@ import { cn } from "../lib/utils";
 import { groupFindingsByFile } from "./adapters";
 import { AnnotatedMarkdown } from "./AnnotatedMarkdown";
 import { AnnotatedCode } from "./LazyAnnotatedCode";
+import { countFindingsBySeverity, FINDING_SEVERITIES } from "./severity-counts";
 import {
   fileRefKey,
   sameFileRef,
@@ -16,7 +17,6 @@ import {
   type FileRef,
   type FileTreeNode,
   type FindingsViewMode,
-  type LintSeverity,
 } from "./types";
 
 export type FileFindingsViewProps = {
@@ -44,23 +44,15 @@ type LoadState =
   | { key: string; status: "error"; message: string }
   | { key: string; status: "ready"; text: string };
 
-const SEVERITIES: readonly LintSeverity[] = ["error", "warning", "info"];
-
 function isMarkdownPath(path: string): boolean {
   return /\.mdx?$/i.test(path);
 }
 
-function countBySeverity(findings: readonly FileFinding[]): Record<LintSeverity, number> {
-  const counts: Record<LintSeverity, number> = { error: 0, warning: 0, info: 0 };
-  for (const finding of findings) counts[finding.severity] += 1;
-  return counts;
-}
-
 function SeverityCounts({ findings }: { findings: readonly FileFinding[] }) {
-  const counts = countBySeverity(findings);
+  const counts = countFindingsBySeverity(findings);
   return (
     <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-      {SEVERITIES.filter((s) => counts[s] > 0).map((s) => (
+      {FINDING_SEVERITIES.filter((s) => counts[s] > 0).map((s) => (
         <span key={s} className="inline-flex items-center gap-0.5" title={`${counts[s]} ${s}`}>
           <LintSeverityIcon severity={s} />
           <span className="tabular-nums">{counts[s]}</span>
