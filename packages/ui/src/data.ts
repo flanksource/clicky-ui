@@ -216,6 +216,23 @@ export {
   type MatrixTableProps,
   type MatrixTableRow,
 } from "./data/MatrixTable";
+export {
+  MatrixTreeTable,
+  TreeRowLead,
+  TreeRowToggle,
+  type MatrixTreeTableProps,
+  type TreeLabelContext,
+} from "./data/MatrixTreeTable";
+export { TreeDataTable, type TreeDataTableProps } from "./data/TreeDataTable";
+export {
+  collectTreeKeys,
+  expandAllTree,
+  visibleTreeRows,
+  type TreeExpansion,
+  type TreeExpansionProps,
+  type TreeRow,
+  type TreeRowsAccessors,
+} from "./lib/tree-rows";
 export { Callout, type CalloutProps } from "./data/Callout";
 export {
   assertCalloutValue,
@@ -252,6 +269,7 @@ export {
 export { MethodBadge, type MethodBadgeProps } from "./data/MethodBadge";
 export { ProgressBar, type ProgressBarProps, type ProgressSegment } from "./data/ProgressBar";
 export { SignedDeltaBar, type SignedDeltaBarProps } from "./data/SignedDeltaBar";
+export { MultiGaugeBar, type MultiGaugeBarProps, type GaugeMarker } from './data/MultiGaugeBar';
 export { SortableHeader, type SortableHeaderProps } from "./data/SortableHeader";
 export { TabButton, type TabButtonProps, type TabButtonVariant } from "./data/TabButton";
 export {
@@ -321,6 +339,9 @@ export {
 } from "./data/server-timing";
 export { seriesStats, type SeriesStats } from "./data/gauge-stats";
 export { WorkloadCard, type WorkloadCardProps, type WorkloadCardSize, type WorkloadCardVariant } from "./data/WorkloadCard";
+export { WorkloadPanel } from "./data/workload-panel/WorkloadPanel";
+export { WorkloadMemoryStack, WorkloadMemoryLegend, type WorkloadMemoryStackProps } from "./data/workload-panel/MemoryStack";
+export type { WorkloadPanelProps, WorkloadResourceStatistics, WorkloadMemoryPart, WorkloadMemoryRegions, WorkloadJvmStatistics, WorkloadGcStatistics, WorkloadThreadStatistics } from "./data/workload-panel/types";
 export {
   formatReplicaCounts,
   workloadKindLabel,
@@ -592,3 +613,4 @@ export type {
 } from "./data/har/types";
 
 export * from "./data/traces";
+export * from "./data/charts";

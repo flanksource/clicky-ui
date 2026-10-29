@@ -247,7 +247,7 @@ export function ThreadPicker({
                 <button
                   type="button"
                   aria-label="Rename conversation"
-                  className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-foreground group-hover/thread:opacity-100"
+                  className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-foreground group-hover/thread:opacity-100 [@media(hover:none)]:opacity-100"
                   onClick={() => {
                     setRenaming({ id: t.id, title: t.title ?? "" });
                   }}
@@ -258,7 +258,7 @@ export function ThreadPicker({
               <button
                 type="button"
                 aria-label="Delete conversation"
-                className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-destructive group-hover/thread:opacity-100"
+                className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:text-destructive group-hover/thread:opacity-100 [@media(hover:none)]:opacity-100"
                 onClick={() => void handleDelete(t.id)}
               >
                 <Icon icon={UiTrash} className="size-3" />

@@ -4,7 +4,8 @@ import type { SessionUIMessage } from "./SessionViewer.unified";
 
 // Follows one Captain prompt run (`PromptRunHandler`):
 //   GET {baseUrl}/api/captain/prompt/runs/{runId}/stream (SSE)
-//     `run`   → {sessionId}: the session to tail, once Captain records one
+//     `run`   → {runId,status,model,provider,mode,sessionId?}: run metadata, and
+//               the session to tail once Captain records one
 //     `entry` → one transcript message; replayed from the start on reconnect
 //     `done`  → the run's summary (success or failure)
 //     `error` → with data, the run's failed summary; without, a dropped
@@ -15,10 +16,30 @@ import type { SessionUIMessage } from "./SessionViewer.unified";
 
 /** The terminal summary Captain publishes with `done` and server `error` frames. */
 export interface PromptRunSummary {
+  runId?: string;
   sessionId?: string;
+  model?: string;
+  provider?: string;
+  mode?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  costUSD?: number;
+  /** A Go duration string, e.g. "3m2.5s". */
+  duration?: string;
   success: boolean;
   error?: string;
+  text?: string;
   structuredOutput?: unknown;
+}
+
+/** What Captain's `run` frame says about the run; every field is optional because frames arrive as the run progresses. */
+export interface PromptRunFrame {
+  runId?: string;
+  status?: string;
+  model?: string;
+  provider?: string;
+  mode?: string;
+  sessionId?: string;
 }
 
 export interface PromptRunStreamOptions {
@@ -33,6 +54,8 @@ export type PromptRunStreamStatus = "idle" | "running" | "succeeded" | "failed";
 export interface PromptRunStreamState {
   status: PromptRunStreamStatus;
   sessionId?: string;
+  /** The latest `run` frame: model, provider, mode and ids, available from the first frame. */
+  run?: PromptRunFrame;
   summary?: PromptRunSummary;
   error?: string;
   /** The run's transcript as it streams, whether or not Captain records a session. */
@@ -86,7 +109,12 @@ export function usePromptRunStream(
     const finish = (summary: PromptRunSummary, fallbackError = "The prompt run failed.") => {
       stream.close();
       update((current) => {
-        const base = { entries: current.entries, ...(summary.sessionId ? { sessionId: summary.sessionId } : current.sessionId ? { sessionId: current.sessionId } : {}), summary };
+        const base = {
+          entries: current.entries,
+          ...(current.run ? { run: current.run } : {}),
+          ...(summary.sessionId ? { sessionId: summary.sessionId } : current.sessionId ? { sessionId: current.sessionId } : {}),
+          summary,
+        };
         return summary.success
           ? { status: "succeeded", ...base }
           : { status: "failed", ...base, error: summary.error || fallbackError };
@@ -95,8 +123,20 @@ export function usePromptRunStream(
     };
 
     stream.addEventListener("run", (event) => {
-      const { sessionId } = frameData<{ sessionId?: string }>(event);
-      if (sessionId) update((current) => ({ ...current, sessionId }));
+      const { runId, status, model, provider, mode, sessionId } = frameData<PromptRunFrame>(event);
+      const run: PromptRunFrame = {
+        ...(runId ? { runId } : {}),
+        ...(status ? { status } : {}),
+        ...(model ? { model } : {}),
+        ...(provider ? { provider } : {}),
+        ...(mode ? { mode } : {}),
+        ...(sessionId ? { sessionId } : {}),
+      };
+      update((current) => ({
+        ...current,
+        run: { ...current.run, ...run },
+        ...(sessionId ? { sessionId } : {}),
+      }));
     });
     stream.addEventListener("entry", (event) => {
       const entry = frameData<SessionUIMessage>(event);
