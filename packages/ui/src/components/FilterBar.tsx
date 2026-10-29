@@ -75,6 +75,8 @@ import {
 } from "../icons";
 import { cn } from "../lib/utils";
 import { useMediaQuery } from "../hooks/use-media-query";
+import { BREAKPOINTS, belowBreakpoint } from "../lib/breakpoints";
+import { useContainerWiderThan } from "../hooks/use-container-width";
 import { Modal } from "../overlay/Modal";
 import { useEscapeLayer, useFloatingZIndex } from "../overlay/modalStack";
 import { Button } from "./button";
@@ -527,11 +529,15 @@ export function FilterBar({
   const maximumInlineFilters =
     inlineFilterLimit === -1 ? allFilters.length : inlineFilterLimit;
   const hasForcedOverflow = maximumInlineFilters < allFilters.length;
-  const mobileFilterOverflow = useMediaQuery("(max-width: 767px)");
-  const mobilePageOverflow = useMediaQuery("(max-width: 639px)");
+  const mobileFilterOverflow = useMediaQuery(belowBreakpoint("md"));
+  const mobilePageOverflow = useMediaQuery(belowBreakpoint("sm"));
+  // A tablet viewport with a sidebar leaves the bar phone-narrow, so the range
+  // buttons go icon-only on the bar's own width as well as on the viewport.
+  const { ref: rowWidthRef, wider: roomyRow } = useContainerWiderThan(BREAKPOINTS.sm);
+  const compact = mobileFilterOverflow || !roomyRow;
   const contextValue = useMemo(
-    () => ({ autoSubmit, compact: mobileFilterOverflow }),
-    [autoSubmit, mobileFilterOverflow],
+    () => ({ autoSubmit, compact }),
+    [autoSubmit, compact],
   );
   // `wrap` describes how a crowded bar behaves on a desktop: it wraps instead
   // of hiding filters behind a trigger. At phone widths wrapping stacks every
@@ -596,8 +602,12 @@ export function FilterBar({
     const filterList = filterListRef.current;
     if (!filterList) return;
 
+    // An unlaid-out bar (jsdom, display:none) has no row width. A laid-out row
+    // whose flex-1 list is squeezed to 0px by search and range controls means
+    // "no room", and must push every filter into the menu rather than bail.
+    const rowWidth = filterList.parentElement?.getBoundingClientRect().width ?? 0;
+    if (rowWidth <= 0) return;
     const availableWidth = Math.floor(filterList.getBoundingClientRect().width);
-    if (availableWidth <= 0) return;
 
     const widths = current.slice(0, maximumInline).map((filter) => {
       const node = filterNodeRefs.current.get(filter.key);
@@ -684,6 +694,7 @@ export function FilterBar({
   const row = (
     <FilterBarContext.Provider value={contextValue}>
       <div
+        ref={rowWidthRef}
         data-slot="filter-bar"
         className={cn(
           FILTER_BAR_ROW_CLASS,
