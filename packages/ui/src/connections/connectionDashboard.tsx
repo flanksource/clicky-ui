@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Button } from "../components/button";
 import { cn } from "../lib/utils";
 import {
   groupConnectionDashboardLanes,
   type ConnectionDashboardItem,
   type ConnectionLinkRenderer,
+  type ConnectionActionsRenderer,
 } from "./connectionDashboardModel";
 import { useConnectionDashboard } from "./connectionDashboardQuery";
 import {
@@ -18,11 +19,14 @@ import {
 } from "./connectionHealth";
 
 export type ConnectionDashboardSurfaceProps = {
+  renderConnectionActions?: ConnectionActionsRenderer;
   /** Where the commons-db connections service is mounted, e.g. `/api/v1`. */
   apiBase: string;
   /** A list request whose connection type filters the dashboard carries over. */
   requestUrl?: string;
   renderConnectionLink: ConnectionLinkRenderer;
+  /** Replaces the default message when the service reports no connections. */
+  emptyState?: ReactNode;
 };
 
 /**
@@ -31,9 +35,11 @@ export type ConnectionDashboardSurfaceProps = {
  * the operator clicks a row's dot, a lane's Check button, or Check all.
  */
 export function ConnectionDashboardSurface({
+  renderConnectionActions,
   apiBase,
   requestUrl,
   renderConnectionLink,
+  emptyState,
 }: ConnectionDashboardSurfaceProps) {
   const dashboard = useConnectionDashboard({
     apiBase,
@@ -75,6 +81,7 @@ export function ConnectionDashboardSurface({
     );
   }
   if (connections.length === 0) {
+    if (emptyState !== undefined) return <>{emptyState}</>;
     return (
       <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
         No connections match the current filters.
@@ -120,12 +127,14 @@ export function ConnectionDashboardSurface({
         pending={pending}
         onCheck={check}
         renderConnectionLink={renderConnectionLink}
+        {...(renderConnectionActions ? { renderConnectionActions } : {})}
       />
     </div>
   );
 }
 
 export function ConnectionDashboardLanes({
+  renderConnectionActions,
   connections,
   health = {},
   pending = new Set<string>(),
@@ -137,6 +146,7 @@ export function ConnectionDashboardLanes({
   pending?: Set<string>;
   onCheck?: (ids: string[], options?: { force?: boolean }) => void;
   renderConnectionLink: ConnectionLinkRenderer;
+  renderConnectionActions?: ConnectionActionsRenderer;
 }) {
   return (
     <div className="space-y-4">
@@ -203,6 +213,7 @@ export function ConnectionDashboardLanes({
                   pending={pending.has(connection.id)}
                   onCheck={onCheck}
                   renderConnectionLink={renderConnectionLink}
+                  {...(renderConnectionActions ? { renderConnectionActions } : {})}
                 />
               ))}
             </div>
