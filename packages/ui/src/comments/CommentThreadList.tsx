@@ -79,11 +79,11 @@ function ReplyInput({
         }}
         placeholder="Write a reply…"
         data-testid="comment-reply-input"
-        className="h-7 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary/40"
+        className="h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary/40 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:text-base"
       />
       <Button
         size="sm"
-        className="h-7 text-xs"
+        className="h-7 text-xs [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:px-4 [@media(pointer:coarse)]:text-sm"
         disabled={submitting || !body.trim()}
         onClick={() => void send()}
       >

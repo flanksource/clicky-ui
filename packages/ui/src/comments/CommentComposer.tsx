@@ -196,7 +196,7 @@ export function CommentComposer({
     <div
       data-testid="comment-compose-box"
       aria-busy={submitting}
-      className="relative rounded-2xl border border-border bg-muted/25 px-3 pt-3 pb-10 shadow-sm transition-[border-color,box-shadow] focus-within:border-primary/40 focus-within:shadow-md"
+      className="relative rounded-2xl border border-border bg-muted/25 px-3 pt-3 pb-10 shadow-sm transition-[border-color,box-shadow] focus-within:border-primary/40 focus-within:shadow-md [@media(pointer:coarse)]:pb-2"
     >
       <MentionTextarea
         ref={inputRef}
@@ -214,7 +214,7 @@ export function CommentComposer({
         // scroll its host to it and steal the keyboard from the page.
         autoFocus={autoFocus || (collapsible && open)}
         data-testid="comment-compose-input"
-        className="min-h-[48px] pr-10"
+        className="min-h-[48px] pr-10 [@media(pointer:coarse)]:pr-12"
       />
       {collapsible && (
         <button
@@ -224,12 +224,14 @@ export function CommentComposer({
             setOpen(false);
           }}
           aria-label="Close composer"
-          className="absolute right-3 top-3 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="absolute right-3 top-3 inline-flex items-center justify-center rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground [@media(pointer:coarse)]:right-1 [@media(pointer:coarse)]:top-1 [@media(pointer:coarse)]:size-11"
         >
           <Icon icon={UiClose} className="text-xs" />
         </button>
       )}
-      <div className="absolute inset-x-3 bottom-2.5 flex items-center gap-1.5">
+      {/* Touch-sized controls cannot share one absolute row with the textarea,
+          so on a coarse pointer the row joins the flow and wraps. */}
+      <div className="absolute inset-x-3 bottom-2.5 flex items-center gap-1.5 [@media(pointer:coarse)]:static [@media(pointer:coarse)]:mt-2 [@media(pointer:coarse)]:flex-wrap [@media(pointer:coarse)]:gap-2">
         {(
           [
             ["positive", "Positive rating", UiThumbsUp],
@@ -245,7 +247,7 @@ export function CommentComposer({
               setRating((current) => (current === value ? undefined : value))
             }
             className={cn(
-              "inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+              "inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [@media(pointer:coarse)]:size-11",
               rating === value &&
                 (value === "positive"
                   ? "bg-green-100 text-green-700 [[data-theme=dark]_&]:bg-green-500/20 [[data-theme=dark]_&]:text-green-300"
@@ -264,14 +266,14 @@ export function CommentComposer({
           />
         ))}
         {createActions?.length ? (
-          <div className="ml-auto flex gap-1">
+          <div className="ml-auto flex gap-1 [@media(pointer:coarse)]:flex-wrap [@media(pointer:coarse)]:justify-end [@media(pointer:coarse)]:gap-2">
             {createActions.map((action) => (
               <button
                 key={action.id}
                 type="button"
                 onClick={() => void submit(action.id)}
                 disabled={submitting || (!body.trim() && !rating)}
-                className="whitespace-nowrap rounded-md bg-primary px-1.5 py-1 text-[10px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+                className="whitespace-nowrap rounded-md bg-primary px-1.5 py-1 text-[10px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:text-sm"
               >
                 {action.label}
               </button>
@@ -284,7 +286,7 @@ export function CommentComposer({
             aria-label="Post comment"
             onClick={() => void submit()}
             disabled={submitting || (!body.trim() && !rating)}
-            className="ml-auto inline-flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+            className="ml-auto inline-flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground [@media(pointer:coarse)]:size-11"
           >
             <Icon icon={UiArrowUp} className="text-xs" />
           </button>
