@@ -94,7 +94,7 @@ function WorkspaceResizeHandle(props: ResizeHandleProps) {
       aria-valuenow={Math.round(value)}
       data-testid={testId}
       className={cn(
-        "absolute z-20 hidden bg-border transition-colors hover:bg-primary focus-visible:bg-primary focus-visible:outline-none md:block",
+        "absolute z-20 hidden bg-border transition-colors hover:bg-primary focus-visible:bg-primary focus-visible:outline-none @3xl/workspace:block",
         orientation === "vertical"
           ? "top-0 h-full w-1 cursor-col-resize"
           : "left-0 h-1 w-full cursor-row-resize",
@@ -242,11 +242,11 @@ export function WorkspaceSideRegion({
       aria-hidden={sideCollapsed}
       style={style}
       className={cn(
-        "relative order-2 flex min-h-0 w-full flex-col overflow-hidden border-border md:row-span-2 md:h-full md:w-[var(--workspace-region-width)]",
+        "relative order-2 flex min-h-0 w-full flex-col overflow-hidden border-border @3xl/workspace:row-span-2 @3xl/workspace:h-full @3xl/workspace:w-[var(--workspace-region-width)]",
         location === "left"
-          ? "md:order-none md:col-start-1 md:row-start-1 md:border-r"
-          : "order-3 md:order-none md:col-start-3 md:row-start-1 md:border-l",
-        sideCollapsed && "hidden border-0 md:flex",
+          ? "@3xl/workspace:order-none @3xl/workspace:col-start-1 @3xl/workspace:row-start-1 @3xl/workspace:border-r"
+          : "order-3 @3xl/workspace:order-none @3xl/workspace:col-start-3 @3xl/workspace:row-start-1 @3xl/workspace:border-l",
+        sideCollapsed && "hidden border-0 @3xl/workspace:flex",
       )}
     >
       {!sideCollapsed &&
@@ -355,8 +355,8 @@ export function WorkspaceSingleRegion({
       className={cn(
         "relative flex min-h-0 min-w-0 flex-col overflow-hidden",
         isBottom
-          ? "order-4 w-full border-t border-border md:order-none md:col-start-2 md:row-start-2 md:h-[var(--workspace-bottom-height)]"
-          : "order-1 min-h-80 md:order-none md:col-start-2 md:row-start-1 md:min-h-0",
+          ? "order-4 w-full border-t border-border @3xl/workspace:order-none @3xl/workspace:col-start-2 @3xl/workspace:row-start-2 @3xl/workspace:h-[var(--workspace-bottom-height)]"
+          : "order-1 min-h-80 @3xl/workspace:order-none @3xl/workspace:col-start-2 @3xl/workspace:row-start-1 @3xl/workspace:min-h-0",
       )}
     >
       <WorkspacePaneView
