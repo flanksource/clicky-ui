@@ -116,6 +116,24 @@ describe("findDetailEndpointForList", () => {
 
     expect(findDetailEndpointForList(ops, list)?.operation.operationId).toBe("widget_get");
   });
+
+  it("skips a collection action whose optional id sorts ahead of the {id} route", () => {
+    const list = op("/api/v1/approvals", "get", { operationId: "approvals_list" });
+    const ops = [
+      list,
+      op("/api/v1/approvals/approver-progress", "get", {
+        operationId: "approvals_approver_progress",
+        parameters: [{ name: "id", in: "query", description: "Positional argument from command" }],
+        "x-clicky": { verb: "action", scope: "collection", actionName: "approver-progress" },
+      }),
+      op("/api/v1/approvals/{id}", "get", {
+        operationId: "approvals_get",
+        parameters: [{ name: "id", in: "path" }],
+      }),
+    ];
+
+    expect(findDetailEndpointForList(ops, list)?.operation.operationId).toBe("approvals_get");
+  });
 });
 
 describe("parseJsonBody", () => {

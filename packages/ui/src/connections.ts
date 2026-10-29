@@ -21,8 +21,17 @@ export * from "./connections/ConnectionsPage";
 export {
   connectionFormExtensions,
   isReadOnlyConnection,
+  mergeConnectionFormExtensions,
   type ConnectionFormExtensions,
 } from "./connections/connectionsPageModel";
+export {
+  connectionSchemaFormExtensions,
+  connectionSecretLoaders,
+  connectionSecretSources,
+  type ConnectionJsonFetcher,
+  type ConnectionSchemaFormExtensionsOptions,
+  type ConnectionSecretSources,
+} from "./connections/connectionSchemaFormExtensions";
 export * from "./connections/connectionDashboard";
 export * from "./connections/connectionDashboardQuery";
 export * from "./connections/connectionDashboardRow";

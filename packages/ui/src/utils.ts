@@ -20,6 +20,14 @@ export {
   type ComboboxMenuPosition,
 } from "./lib/combobox";
 export {
+  BREAKPOINTS,
+  VIEWPORT_PRESETS,
+  belowBreakpoint,
+  findViewportPreset,
+  type Breakpoint,
+  type ViewportPreset,
+} from "./lib/breakpoints";
+export {
   comboboxLabelPadding,
   createComboboxCustomEntry,
   multipleComboboxLabel,

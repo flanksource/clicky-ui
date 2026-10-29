@@ -437,6 +437,7 @@ export type {
 } from "./approval-request";
 export {
   usePromptRunStream,
+  type PromptRunFrame,
   type PromptRunStreamOptions,
   type PromptRunStreamState,
   type PromptRunStreamStatus,

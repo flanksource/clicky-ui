@@ -10,6 +10,26 @@
 export { FileFindingsView, type FileFindingsViewProps } from "./file-findings/FileFindingsView";
 export { AnnotatedCode, type AnnotatedCodeProps } from "./file-findings/LazyAnnotatedCode";
 export { AnnotatedMarkdown, type AnnotatedMarkdownProps } from "./file-findings/AnnotatedMarkdown";
+export { FindingsSummaryChips, type FindingsSummaryChipsProps } from "./file-findings/FindingsSummaryChips";
+export {
+  MarkdownReview,
+  type MarkdownReviewComments,
+  type MarkdownReviewLayout,
+  type MarkdownReviewProps,
+  type MarkdownReviewView,
+} from "./file-findings/markdown-review/MarkdownReview";
+export {
+  QUOTE_PREFIX,
+  describeQuote,
+  markdownOutline,
+  parseQuoteAnchor,
+  quoteAnchor,
+  resolveQuote,
+  type OutlineEntry,
+  type QuoteLocator,
+} from "./file-findings/markdown-review/quote-anchor";
+export { sourceBlockOf, type AnchorMode } from "./file-findings/markdown-review/geometry";
+export { countFindingsBySeverity } from "./file-findings/severity-counts";
 export { groupFindingsByFile, lintFindings, testFindings } from "./file-findings/adapters";
 export {
   FINDINGS_COMMENT_CONFIG,
