@@ -78,8 +78,15 @@ export function totalLintViolations(results: readonly LinterResult[]): number {
   return results.reduce((n, r) => n + (r.violations ?? []).length, 0);
 }
 
+/** The tool a linter node runs: a nested `<parent>/<tool>` result is just the tool part. */
+export function linterToolName(node: Pick<LintNode, "linterName" | "nestedUnder">): string | undefined {
+  return node.nestedUnder && node.linterName ? node.linterName.slice(node.nestedUnder.length + 1) : node.linterName;
+}
+
+type CountableNode = Pick<LintNode, "violations" | "noFileViolations"> & { children?: CountableNode[] | undefined };
+
 /** Violations at or beneath a node; error leaves count as zero (they are not findings). */
-export function lintNodeCount(node: LintNode): number {
+export function lintNodeCount(node: CountableNode): number {
   if (node.violations) return node.violations.length;
   return (
     (node.noFileViolations?.length ?? 0) +

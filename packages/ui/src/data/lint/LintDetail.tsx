@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Button } from "../../components/button";
+import { CopyButton } from "../../components/CopyButton";
 import { Icon } from "../Icon";
 import { cn } from "../../lib/utils";
 import { UiEyeClosed, UiListChecks } from "../../icons";
@@ -11,7 +12,7 @@ import {
   lintNodeActions,
   violationIgnoreAction,
 } from "./actions";
-import { isLinterErrored, lintNodeCount, severityOf } from "./stats";
+import { isLinterErrored, linterToolName, lintNodeCount, severityOf } from "./stats";
 import { OpenInFilesLink, type OpenFileTarget } from "../OpenInFilesLink";
 import type { LintAction, LintNode, LinterResult, Violation } from "./types";
 
@@ -209,11 +210,33 @@ function ResultStatus({ result }: { result: LinterResult }) {
   );
 }
 
+function CopyableId({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="break-all font-mono text-xs">{value}</span>
+      <CopyButton value={value} label={`Copy ${label}`} />
+    </div>
+  );
+}
+
+/** The prompt run and agent session behind a result, when it has them. */
+function RunIdentity({ result }: { result: LinterResult }) {
+  if (!result.run_id && !result.session_id) return null;
+  return (
+    <div className="space-y-0.5">
+      {result.run_id && <CopyableId label="run id" value={result.run_id} />}
+      {result.session_id && <CopyableId label="session id" value={result.session_id} />}
+    </div>
+  );
+}
+
 function ResultDetails({ result, workDir }: { result: LinterResult; workDir: string }) {
   return (
     <>
       <Section title="Status">
         <ResultStatus result={result} />
+        <RunIdentity result={result} />
       </Section>
       {result.command && (
         <Section title="Command">
@@ -438,7 +461,7 @@ function DetailHeader({ node }: { node: LintNode }) {
       data-detail-header=""
     >
       {node.kind === "linter" ? (
-        <ToolIcon tool={node.linterName} className="text-lg" />
+        <ToolIcon tool={linterToolName(node)} className="text-lg" />
       ) : node.kind === "linter-error" ? (
         <LintSeverityIcon severity="error" className="text-lg" />
       ) : null}
