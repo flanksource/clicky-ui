@@ -32,10 +32,12 @@ function TestSurface({
   scrollTo,
   renderRootDetails,
   extraAssignItems,
+  contentBottom,
 }: {
   scrollTo: ReturnType<typeof vi.fn>;
   renderRootDetails?: (comment: Comment) => ReactNode;
   extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
+  contentBottom?: number;
 }) {
   const ctx = useCommentContext();
   return (
@@ -50,7 +52,7 @@ function TestSurface({
             scrollTo: { configurable: true, value: scrollTo },
           });
           container.getBoundingClientRect = () =>
-            ({ top: 50, height: 400 }) as DOMRect;
+            ({ top: 50, height: 400, bottom: contentBottom }) as DOMRect;
           ctx.contentRef.current = container;
         }}
       >
@@ -141,6 +143,29 @@ describe("CommentSidePanel anchor navigation", () => {
     expect(focused).toHaveStyle({ top: "238px" });
     fireEvent.scroll(screen.getByTestId("comment-content"));
     expect(focused).toHaveStyle({ top: "238px" });
+  });
+
+  it("does not offset the focused thread when the rail is stacked below the content", () => {
+    const contentBottom = 450;
+    const railTop = contentBottom + 10;
+    const railRect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ top: railTop, bottom: railTop + 240 } as DOMRect);
+    render(
+      <CommentProvider
+        comments={comments}
+        config={config}
+        resolveAnchor={strictAnchorResolver}
+        onReply={vi.fn()}
+      >
+        <TestSurface scrollTo={vi.fn()} contentBottom={contentBottom} />
+      </CommentProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open comments" }));
+    fireEvent.click(screen.getByTestId("comment-card"));
+    expect(screen.getByTestId("comment-focused-rail").style.top).toBe("");
+    railRect.mockRestore();
   });
 
   it("keeps comments with no exact registered anchor visible but unavailable", () => {

@@ -258,7 +258,7 @@ function CommentBody(props: CommentCardProps) {
                 aria-label="Close comment"
                 title="Close comment"
                 onClick={() => void close()}
-                className="inline-flex rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex items-center justify-center rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:size-11"
               >
                 <Icon icon={UiCheck} className="text-sm" />
               </button>
@@ -269,7 +269,7 @@ function CommentBody(props: CommentCardProps) {
               aria-label="Reopen comment"
               title="Reopen comment"
               onClick={() => void updateStatus(active.value)}
-              className="inline-flex rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex items-center justify-center rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:size-11"
             >
               <Icon icon={UiRestart} className="text-sm" />
             </button>
@@ -283,7 +283,7 @@ function CommentBody(props: CommentCardProps) {
                   role="button"
                   tabIndex={0}
                   aria-label="Comment actions"
-                  className="inline-flex rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="inline-flex items-center justify-center rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [@media(pointer:coarse)]:size-11"
                 >
                   <Icon icon={UiDotsVertical} className="text-sm" />
                 </span>
@@ -321,7 +321,7 @@ function CommentBody(props: CommentCardProps) {
         <button
           type="button"
           onClick={onReply}
-          className="-ml-2 rounded px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+          className="-ml-2 rounded px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:text-sm"
         >
           Reply
         </button>
@@ -396,7 +396,7 @@ export function CommentCard(props: CommentCardProps) {
           )}
         >
           <CommentAuthorAvatar author={comment.author} bare />
-          <span className="shrink-0 text-[11px] font-semibold text-foreground">
+          <span className="min-w-0 truncate text-[11px] font-semibold text-foreground">
             {authorDisplayName(comment.author)}
           </span>
           {!isReply && (
@@ -419,6 +419,7 @@ export function CommentCard(props: CommentCardProps) {
                     : "Empty comment"}
           </span>
           <span
+            className="shrink-0"
             role="presentation"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
@@ -430,7 +431,7 @@ export function CommentCard(props: CommentCardProps) {
                   role="button"
                   tabIndex={0}
                   aria-label="Comment actions"
-                  className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:opacity-100 group-hover/comment:opacity-70"
+                  className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:opacity-100 group-hover/comment:opacity-70 [@media(hover:none)]:opacity-70 [@media(pointer:coarse)]:p-2.5"
                 >
                   <Icon icon={UiDotsVertical} className="text-sm" />
                 </span>
