@@ -439,7 +439,7 @@ export function renderObjectFields(
   const compactArrays = ctx.layout.mode !== "properties" && arrayEntries.length > 3;
   const rows = entries.flatMap(([key, prop]) => {
     if (hidden.has(key)) return [];
-    if (compactArrays && prop.type === "array" && (!Array.isArray(value[key]) || value[key].length === 0)) return [];
+    if (compactArrays && prop.type === "array" && prop["x-hidden"] !== false && (!Array.isArray(value[key]) || value[key].length === 0)) return [];
     const row = renderFieldRow(
       {
         key,
@@ -476,7 +476,7 @@ export function renderObjectFields(
   });
   if (compactArrays && !ctx.readOnly && !ctx.presentation) {
     const available = arrayEntries.filter(([key, prop]) =>
-      !hidden.has(key) && (!Array.isArray(value[key]) || prop.maxItems === undefined || value[key].length < prop.maxItems),
+      !hidden.has(key) && prop["x-hidden"] === undefined && (!Array.isArray(value[key]) || prop.maxItems === undefined || value[key].length < prop.maxItems),
     );
     if (available.length > 0) {
       rows.push(
