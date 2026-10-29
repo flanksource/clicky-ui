@@ -73,8 +73,9 @@ export function FrameSourceWindow({
 
   return (
     <div
+      data-scroll-x
       className={cn(
-        "mx-3 mb-2 ml-12 overflow-x-auto rounded border border-border/60 bg-muted/30 py-1 font-mono text-[11px] leading-relaxed",
+        "mx-3 mb-2 ml-12 overflow-x-auto max-sm:ml-6 rounded border border-border/60 bg-muted/30 py-1 font-mono text-[11px] leading-relaxed",
         className,
       )}
     >

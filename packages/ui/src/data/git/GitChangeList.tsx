@@ -107,10 +107,12 @@ type GitCommitListBaseProps<T extends GitCommitItem> = {
 // The expanded body is either the lazily loaded unified diff (`loadDiff` →
 // `GitDiffPanel`) or a host-rendered node (`renderExpanded`), never both.
 // `renderExpanded` is only called while the row is expanded, so a host
-// component it returns can fetch on mount.
+// component it returns can fetch on mount. `onOpen` replaces expansion: the
+// row navigates to the host's commit view instead of opening in place.
 type GitCommitListBody<T extends GitCommitItem> =
-  | { loadDiff?: GitDiffLoader<T>; renderExpanded?: never }
-  | { renderExpanded: (commit: T) => ReactNode; loadDiff?: never };
+  | { loadDiff?: GitDiffLoader<T>; renderExpanded?: never; onOpen?: never }
+  | { renderExpanded: (commit: T) => ReactNode; loadDiff?: never; onOpen?: never }
+  | { onOpen: (commit: T) => void; loadDiff?: never; renderExpanded?: never };
 
 export type GitCommitListProps<T extends GitCommitItem = GitCommitItem> =
   GitCommitListBaseProps<T> & GitCommitListBody<T>;
@@ -287,6 +289,7 @@ export function GitDiffPanel({
 type CommitRowSlots<T extends GitCommitItem> = {
   loadDiff: GitDiffLoader<T> | undefined;
   renderExpanded: ((commit: T) => ReactNode) | undefined;
+  onOpen: ((commit: T) => void) | undefined;
   renderTime: ((iso: string) => ReactNode) | undefined;
   renderBadges: ((commit: T) => ReactNode) | undefined;
   renderSubtitle: ((commit: T) => ReactNode) | undefined;
@@ -305,17 +308,19 @@ function CommitRow<T extends GitCommitItem>({
   selected: boolean;
   slots: CommitRowSlots<T>;
 }) {
-  const { loadDiff, renderExpanded, renderTime, renderBadges, renderSubtitle, onToggleSelect } = slots;
-  const [expanded, diffState, toggle] = useLazyDiff(commit, loadDiff);
+  const { loadDiff, renderExpanded, onOpen, renderTime, renderBadges, renderSubtitle, onToggleSelect } = slots;
+  const [expandedState, diffState, toggle] = useLazyDiff(commit, loadDiff);
+  const expanded = !onOpen && expandedState;
   const author = displayAuthor(commit);
-  const canExpand = Boolean(loadDiff || renderExpanded || commit.body);
+  const canExpand = Boolean(onOpen || loadDiff || renderExpanded || commit.body);
+  const activate = onOpen ? () => onOpen(commit) : toggle;
   const selectable = onToggleSelect !== undefined;
   const selectBlocked = selectable ? slots.selectBlockReason?.(commit) || undefined : undefined;
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (!canExpand || !isActivationKey(event)) return;
     event.preventDefault();
-    toggle();
+    activate();
   }
 
   return (
@@ -338,13 +343,13 @@ function CommitRow<T extends GitCommitItem>({
         <div
           role={canExpand ? "button" : undefined}
           tabIndex={canExpand ? 0 : undefined}
-          aria-expanded={canExpand ? expanded : undefined}
+          aria-expanded={canExpand && !onOpen ? expanded : undefined}
           className={cn(
             "flex min-h-14 min-w-0 flex-1 items-start gap-2 py-2 pr-3 text-xs",
             selectable ? "pl-2" : "pl-3",
             canExpand && "cursor-pointer",
           )}
-          onClick={canExpand ? toggle : undefined}
+          onClick={canExpand ? activate : undefined}
           onKeyDown={canExpand ? onKeyDown : undefined}
         >
           <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
@@ -441,6 +446,7 @@ export function GitCommitList<T extends GitCommitItem = GitCommitItem>(
   const slots: CommitRowSlots<T> = {
     loadDiff: props.loadDiff,
     renderExpanded: props.renderExpanded,
+    onOpen: props.onOpen,
     renderTime: props.renderTime,
     renderBadges: props.renderBadges,
     renderSubtitle: props.renderSubtitle,

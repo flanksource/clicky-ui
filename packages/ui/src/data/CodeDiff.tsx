@@ -172,7 +172,7 @@ export function CodeDiff(props: CodeDiffProps) {
 
   if (bare) {
     return (
-      <div className={cn("overflow-x-auto font-mono text-xs leading-relaxed", className)}>
+      <div data-scroll-x className={cn("overflow-x-auto font-mono text-xs leading-relaxed", className)}>
         {rows}
       </div>
     );
@@ -197,7 +197,7 @@ export function CodeDiff(props: CodeDiffProps) {
           <div data-diff-side="modified" className="min-w-0 break-words px-3 py-1.5">{view === "unified" ? "+ " : null}{modifiedLabel}</div>
         </div>
       ) : null}
-      <div className="overflow-x-auto font-mono text-xs leading-relaxed">{rows}</div>
+      <div data-scroll-x className="overflow-x-auto font-mono text-xs leading-relaxed">{rows}</div>
     </div>
   );
 }

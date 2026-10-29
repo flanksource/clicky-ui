@@ -125,7 +125,7 @@ export function StackFrameRow({
           className={[
             "flex shrink-0 items-start gap-1",
             frameActionsVisibility === "hover"
-              ? "opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100"
+              ? "opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
               : "opacity-100",
           ].join(" ")}
         >

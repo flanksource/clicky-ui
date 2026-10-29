@@ -34,7 +34,7 @@ export function ProfileGeneralSection({ draft, onChange }: EditorSectionProps) {
       title="Profile identity"
       description="Name the profile and choose its default presentation. Renaming updates dependent imports when you save."
     >
-      <div className="grid gap-5 md:grid-cols-2">
+      <div className="grid gap-5 @xl:grid-cols-2">
         <EditorField label="Profile name" required>
           <input
             value={draft.profile ?? ""}
@@ -112,7 +112,7 @@ export function ProfileSourceSection({
         title="Source"
         description="Select the provider and saved connection. Connection credentials remain server-side."
       >
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 @xl:grid-cols-2">
           <EditorField label="Provider type" required>
             <select
               value={providerType}
