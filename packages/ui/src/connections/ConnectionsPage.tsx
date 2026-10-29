@@ -14,6 +14,7 @@ import { ConnectionDashboardSurface } from "./connectionDashboard";
 import {
   CONNECTION_DASHBOARD_QUERY_KEY,
   type ConnectionLinkRenderer,
+  type ConnectionActionsRenderer,
 } from "./connectionDashboardModel";
 import { useConnectionDashboard } from "./connectionDashboardQuery";
 import { ConnectionTestButton } from "./connectionTestButton";
@@ -22,15 +23,19 @@ import {
   createConnectionAction,
   isPlainLeftClick,
   isReadOnlyConnection,
+  mergeConnectionFormExtensions,
   updateConnectionAction,
   type ConnectionFormExtensions,
 } from "./connectionsPageModel";
+import { connectionSchemaFormExtensions } from "./connectionSchemaFormExtensions";
 
 const CONNECTION_DETAIL_QUERY_KEY = "connection-detail";
 const ERROR_BOX =
   "rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive";
 
 export type ConnectionsPageProps = {
+	/** Optional actions beside each connection, outside its edit link. */
+	renderConnectionActions?: ConnectionActionsRenderer;
   /** Where the commons-db connections service is mounted, e.g. `/api/v1`. */
   apiBase: string;
   /** The connection whose edit dialog is open; the host keeps it in its route. */
@@ -43,6 +48,11 @@ export type ConnectionsPageProps = {
   formExtensions?: ConnectionFormExtensions;
   /** Shown in a read-only connection's view, e.g. where the host lets it be edited instead. */
   readOnlyHint?: ReactNode;
+  /**
+   * Replaces the dashboard's empty message when there are no connections. `create`
+   * opens the Add Connection dialog pre-filled with `initialValue`, e.g. `{ type: "postgres" }`.
+   */
+  renderEmptyState?: (create: (initialValue?: Record<string, unknown>) => void) => ReactNode;
 };
 
 /**
@@ -56,19 +66,41 @@ export type ConnectionsPageProps = {
  * Needs a react-query QueryClientProvider from the host.
  */
 export function ConnectionsPage({
+	renderConnectionActions,
   apiBase,
   selected,
   onSelect,
   connectionHref,
   formExtensions,
   readOnlyHint,
+  renderEmptyState,
 }: ConnectionsPageProps) {
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<{ initialValue?: Record<string, unknown> }>();
   const dashboard = useConnectionDashboard({ apiBase });
   const catalogReadOnly = dashboard.data?.readOnly === true;
   const queryClient = useQueryClient();
   const client = useMemo(() => createOperationsApiClient({ baseUrl: apiBase }), [apiBase]);
-  const extensions = useMemo(() => connectionFormExtensions(formExtensions), [formExtensions]);
+  const schema = useConnectionSchema(client);
+  const schemaExtensions = useMemo((): {
+    extensions?: Required<ConnectionFormExtensions>;
+    error?: string;
+  } => {
+    if (!schema.data) return {};
+    try {
+      return {
+        extensions: connectionSchemaFormExtensions({ apiBase, schema: schema.data }),
+      };
+    } catch (err) {
+      return { error: errorMessage(err) };
+    }
+  }, [apiBase, schema.data]);
+  const extensions = useMemo(
+    () =>
+      connectionFormExtensions(
+        mergeConnectionFormExtensions(schemaExtensions.extensions, formExtensions),
+      ),
+    [schemaExtensions.extensions, formExtensions],
+  );
   const renderConnectionLink = useCallback<ConnectionLinkRenderer>(
     (connection, link) => (
       <a
@@ -99,13 +131,28 @@ export function ConnectionsPage({
     <div className="space-y-4">
       {dashboard.data && !catalogReadOnly ? (
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => setCreating(true)}>
+          <Button type="button" variant="outline" size="sm" onClick={() => setCreating({})}>
             Add Connection
           </Button>
         </div>
       ) : null}
-      <ConnectionDashboardSurface apiBase={apiBase} renderConnectionLink={renderConnectionLink} />
-      {creating && !catalogReadOnly ? (
+      <ConnectionDashboardSurface
+        apiBase={apiBase}
+        renderConnectionLink={renderConnectionLink}
+        {...(renderConnectionActions ? { renderConnectionActions } : {})}
+        {...(renderEmptyState
+          ? {
+              emptyState: renderEmptyState((initialValue) =>
+                setCreating(initialValue ? { initialValue } : {}),
+              ),
+            }
+          : {})}
+      />
+      {schemaExtensions.error && (creating || selected) ? (
+        <Modal open onClose={() => (creating ? setCreating(undefined) : onSelect(undefined))} title="Connection form" size="2xl">
+          <div className={ERROR_BOX}>{schemaExtensions.error}</div>
+        </Modal>
+      ) : creating && !catalogReadOnly ? (
         <ConnectionFormDialog
           apiBase={apiBase}
           client={client}
@@ -114,9 +161,10 @@ export function ConnectionsPage({
           submitLabel="Add Connection"
           extensions={extensions}
           footerActions={testAction}
-          onClose={() => setCreating(false)}
+          {...(creating.initialValue ? { initialValue: creating.initialValue } : {})}
+          onClose={() => setCreating(undefined)}
           onSaved={() => {
-            setCreating(false);
+            setCreating(undefined);
             void refresh();
           }}
         />
@@ -346,21 +394,8 @@ function ConnectionViewDialog({
   onClose: () => void;
 }) {
   const lookupFetcher = useOperationLookupFetcher(client);
-  const schemaPath = createConnectionAction.path;
-  const schema = useQuery<JsonSchemaObject>({
-    queryKey: ["entity-schema", schemaPath],
-    queryFn: async () => {
-      const served = await client.getSchema(schemaPath);
-      if (!served) {
-        throw new Error(
-          `GET ${apiBase}/connection served no connection JSON Schema (Accept: application/schema+json).`,
-        );
-      }
-      return served;
-    },
-    staleTime: 5 * 60 * 1000,
-    retry: 0,
-  });
+  const schema = useConnectionSchema(client);
+  const missingSchema = schema.data === null;
 
   return (
     <Modal
@@ -389,6 +424,10 @@ function ConnectionViewDialog({
             post={extensions.post}
             {...(lookupFetcher ? { lookupFetcher } : {})}
           />
+        ) : missingSchema ? (
+          <div className={ERROR_BOX}>
+            {`GET ${apiBase}/connection served no connection JSON Schema (Accept: application/schema+json).`}
+          </div>
         ) : schema.isError ? (
           <div className={ERROR_BOX}>{errorMessage(schema.error)}</div>
         ) : (
@@ -397,6 +436,20 @@ function ConnectionViewDialog({
       </div>
     </Modal>
   );
+}
+
+/**
+ * The served connection schema, under the key SchemaActionForm reads, so the
+ * page, the editor and the read-only view share one request. `null` means the
+ * service served no schema.
+ */
+function useConnectionSchema(client: SharedOperationsApiClient) {
+  return useQuery<JsonSchemaObject | null>({
+    queryKey: ["entity-schema", createConnectionAction.path],
+    queryFn: async () => (await client.getSchema(createConnectionAction.path)) ?? null,
+    staleTime: 5 * 60 * 1000,
+    retry: 0,
+  });
 }
 
 function rejectReadOnlyEdit(): never {

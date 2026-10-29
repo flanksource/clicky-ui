@@ -1,6 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  PostExtension,
+  PreExtension,
+} from "../components/json-schema-form-runtime-types";
 import { ConnectionsPage, type ConnectionsPageProps } from "./ConnectionsPage";
 import {
   cacheConnectionFixture,
@@ -35,6 +39,7 @@ const baseRoutes: Record<string, Route> = {
     return json(connectionSchemaFixture, { contentType: "application/schema+json" });
   },
   [`GET ${API_BASE}/connection/cache-id`]: () => json(cacheConnectionFixture),
+  [`GET ${API_BASE}/connections/namespaces`]: () => json(["analytics", "default"]),
 };
 
 const readOnlyCatalogRoutes: Record<string, Route> = {
@@ -104,6 +109,39 @@ describe("ConnectionsPage", () => {
     expect(requests).toContain(`GET ${API_BASE}/connection`);
   });
 
+  it("renders the host's empty state, which opens the create form pre-filled with the type it picked", async () => {
+    mockApi({
+      ...baseRoutes,
+      [`GET ${API_BASE}/connections/dashboard`]: () =>
+        json({ connections: [], generatedAt: "2026-10-16T08:00:00Z" }),
+      [`POST ${API_BASE}/connection`]: (init) => json(JSON.parse(String(init?.body))),
+      [`GET ${API_BASE}/connections/secrets?kind=secret`]: () => json([]),
+    });
+    renderPage({
+      renderEmptyState: (create) => (
+        <button
+          type="button"
+          onClick={() => create({ type: "redis", name: "sessions", url: "redis://cache:6379/1" })}
+        >
+          Start with Redis
+        </button>
+      ),
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Start with Redis" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Add Connection" });
+    fireEvent.click(await within(dialog).findByRole("button", { name: "Add Connection" }));
+    await waitFor(() =>
+      expect(bodies[`POST ${API_BASE}/connection`]).toMatchObject({
+        name: "sessions",
+        type: "redis",
+        url: "redis://cache:6379/1",
+      }),
+    );
+    expect(screen.queryByText("No connections match the current filters.")).toBeNull();
+  });
+
   it("selects a connection on a plain row click and keeps a real href for new tabs", async () => {
     const { onSelect } = renderPage();
 
@@ -114,19 +152,65 @@ describe("ConnectionsPage", () => {
     expect(onSelect).toHaveBeenCalledExactlyOnceWith("warehouse-id");
   });
 
-  it("opens the selected connection for editing with k8s-hinted fields as plain inputs", async () => {
+  it("opens the selected connection for editing with the schema-derived pickers by default", async () => {
     renderPage({ selected: "cache-id" });
 
     const dialog = await screen.findByRole("dialog", { name: "Edit cache" });
-    // No host registered the k8s-url/secret-selector extensions, so those
-    // fields must still render as the plain controls their schema type implies.
-    expect(await within(dialog).findByDisplayValue(cacheConnectionFixture.url)).toBeInTheDocument();
-    expect(within(dialog).getByDisplayValue(cacheConnectionFixture.password)).toHaveAttribute(
-      "type",
-      "password",
-    );
+    // The page builds the namespace and secret pickers from the schema it
+    // fetched, so the k8s-hinted fields are not plain inputs.
+    expect(await within(dialog).findByPlaceholderText("Select namespace…")).toBeInTheDocument();
+    await waitFor(() => expect(requests).toContain(`GET ${API_BASE}/connections/namespaces`));
+    expect(within(dialog).getAllByRole("combobox", { name: "Secret value source" }).length).toBeGreaterThan(0);
     expect(within(dialog).getByRole("button", { name: "Delete" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Save" })).toBeInTheDocument();
+  });
+
+  it("applies the schema's source hints and merges the caller's extensions after the defaults", async () => {
+    const calls: string[] = [];
+    const pre: PreExtension = (field) => {
+      calls.push(`pre:${field.key}`);
+      return field;
+    };
+    const post: PostExtension = (field, nodes) => {
+      if (field.key === "password") calls.push("caller:password");
+      return nodes;
+    };
+    mockApi({
+      ...baseRoutes,
+      [`GET ${API_BASE}/connection/cache-id`]: () =>
+        json({ ...cacheConnectionFixture, password: "secret://credentials/password" }),
+      [`GET ${API_BASE}/connections/secrets?kind=secret`]: () =>
+        json([{ name: "credentials", keys: ["password"] }]),
+      [`GET ${API_BASE}/connection`]: () =>
+        json(
+          { ...connectionSchemaFixture, "x-clicky-secret-sources": ["secret"] },
+          { contentType: "application/schema+json" },
+        ),
+    });
+    renderPage({ selected: "cache-id", formExtensions: { pre: [pre], post: [post] } });
+
+    const dialog = await screen.findByRole("dialog", { name: "Edit cache" });
+    // The password is the last credential field of the connection branch.
+    const source = (await within(dialog).findAllByRole("combobox", { name: "Secret value source" })).at(-1)!;
+    fireEvent.focus(source);
+    expect(await screen.findByRole("option", { name: "Secret" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Value" })).not.toBeInTheDocument();
+    expect(calls).toContain("caller:password");
+    expect(calls).toContain("pre:password");
+  });
+
+  it("shows a loud error instead of the form when the schema's source hints are invalid", async () => {
+    mockApi({
+      ...baseRoutes,
+      [`GET ${API_BASE}/connection`]: () =>
+        json(
+          { ...connectionSchemaFixture, "x-clicky-secret-sources": ["vault"] },
+          { contentType: "application/schema+json" },
+        ),
+    });
+    renderPage({ selected: "cache-id" });
+
+    expect(await screen.findByText(/unknown source "vault"/)).toBeInTheDocument();
   });
 
   it("renders the conflict message when deleting a connection that is still referenced", async () => {
