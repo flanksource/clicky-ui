@@ -3,7 +3,7 @@ import { expect, userEvent, waitFor, within } from "storybook/test";
 import { CodeDiff } from "./CodeDiff";
 
 const meta = {
-  title: "Data/CodeDiff",
+  title: "Git/CodeDiff",
   component: CodeDiff,
   tags: ["autodocs"],
   parameters: {

@@ -3,7 +3,7 @@ import { AzureDevops, AzureDevopsPipeline, Deployment } from "@flanksource/icons
 import { CompactRecord, CompactRecordList } from "./CompactRecord";
 
 const meta: Meta = {
-  title: "Data/CompactRecord",
+  title: "Git/CompactRecord",
   parameters: { layout: "padded" },
 };
 
