@@ -5,6 +5,8 @@ import { CommentSidePanel } from "../comments/CommentSidePanel";
 import { useCommentContext, type CommentContextValue } from "../comments/comment-context";
 import { DOCUMENT_ANCHOR, type Comment } from "../comments/comment-types";
 import { Markdown } from "../data/Markdown";
+import { LintSeverityIcon } from "../data/test-runner/MarkIcons";
+import { HoverCard } from "../overlay/HoverCard";
 import { severityRank } from "../data/lint/stats";
 import {
   FINDINGS_COMMENT_CONFIG,
@@ -29,6 +31,14 @@ export type AnnotatedMarkdownProps = {
   /** Extra controls under each finding's thread, e.g. an ignore action. */
   renderFindingActions?: ((finding: FileFinding) => ReactNode) | undefined;
   className?: string | undefined;
+  /** Classes for the rendered markdown column, e.g. a max width; the side panel keeps its own width. */
+  bodyClassName?: string | undefined;
+  /**
+   * Show findings as threads in a side panel (default). Off, each block with
+   * findings gets a marker in a gutter beside it and the markdown flows in the
+   * host's scroll container, for a host that has a comment rail of its own.
+   */
+  rail?: boolean | undefined;
 };
 
 // The block border is drawn from the data attribute the sync below sets, so
@@ -43,6 +53,8 @@ const BLOCK_STYLES = [
 ].join(" ");
 
 type BlockFindings = { severity: LintSeverity; lines: number[] };
+/** A gutter marker: a block's findings and its offset from the top of the markdown body. */
+type GutterMarker = BlockFindings & { anchor: string; top: number };
 
 /** For each registered block, the worst severity and the sorted distinct finding lines that resolve to it. */
 function findingsByBlock(findings: readonly FileFinding[], registered: string[]): Map<string, BlockFindings> {
@@ -82,13 +94,16 @@ function useBlockAnchors({
   findings: readonly FileFinding[];
 }) {
   const [blockCount, setBlockCount] = useState(0);
+  const [markers, setMarkers] = useState<GutterMarker[]>([]);
   const blocks = useRef(new Map<string, BlockFindings>());
+  const elements = useRef(new Map<string, HTMLElement>());
   const { registerAnchor } = ctx;
 
   useLayoutEffect(() => {
     const element = root.current;
     if (!element) return;
     const registered = new Map<string, HTMLElement>();
+    elements.current = registered;
     registerAnchor(DOCUMENT_ANCHOR, element);
 
     const sync = () => {
@@ -116,19 +131,87 @@ function useBlockAnchors({
         else delete el.dataset.findingSeverity;
       }
       setBlockCount(registered.size);
+      const origin = element.getBoundingClientRect().top;
+      setMarkers(
+        [...registered].flatMap(([anchor, el]) => {
+          const block = blocks.current.get(anchor);
+          return block ? [{ ...block, anchor, top: el.getBoundingClientRect().top - origin }] : [];
+        }),
+      );
     };
 
     sync();
     const observer = new MutationObserver(sync);
     observer.observe(element, { childList: true, subtree: true });
+    // Reflow (a wider window, a loaded image) moves blocks without DOM churn.
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(sync);
+    resizeObserver?.observe(element);
     return () => {
       observer.disconnect();
+      resizeObserver?.disconnect();
       for (const anchor of registered.keys()) registerAnchor(anchor, null);
       registerAnchor(DOCUMENT_ANCHOR, null);
     };
   }, [registerAnchor, root, findings]);
 
-  return { blockCount, blocks };
+  return { blockCount, blocks, elements, markers };
+}
+
+function plural(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+/** One marker beside each block with findings; hovering lists them, clicking reports the first line. */
+function FindingsGutter({
+  markers,
+  findings,
+  onSelect,
+}: {
+  markers: GutterMarker[];
+  findings: readonly FileFinding[];
+  onSelect: (line: number) => void;
+}) {
+  return (
+    <div className="absolute inset-y-0 left-0 w-7">
+      {markers.map((marker) => {
+        const own = findings.filter((finding) => marker.lines.includes(finding.line));
+        const lines = `${marker.lines.length === 1 ? "line" : "lines"} ${marker.lines.join(", ")}`;
+        return (
+          <HoverCard
+            key={marker.anchor}
+            placement="right"
+            className="absolute left-0"
+            cardClassName="max-w-sm space-y-1.5 p-2 text-xs"
+            trigger={
+              <button
+                type="button"
+                aria-label={`${plural(own.length, "finding")} on ${lines}`}
+                data-severity={marker.severity}
+                style={{ top: marker.top }}
+                className="absolute left-0 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11"
+                onClick={() => onSelect(marker.lines[0]!)}
+              >
+                <LintSeverityIcon severity={marker.severity} />
+                {own.length > 1 && own.length}
+              </button>
+            }
+          >
+            {own.map((finding, index) => (
+              <div key={index} className="flex items-start gap-1.5">
+                <LintSeverityIcon severity={finding.severity} className="mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <div>{finding.message}</div>
+                  <div className="font-mono text-muted-foreground">
+                    {finding.rule ? `${finding.rule} · ` : ""}line {finding.line}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </HoverCard>
+        );
+      })}
+    </div>
+  );
 }
 
 function MarkdownBody({
@@ -138,10 +221,12 @@ function MarkdownBody({
   onLineChange,
   renderFindingActions,
   className,
+  bodyClassName,
+  rail = true,
 }: Omit<AnnotatedMarkdownProps, "path" | "source"> & { text: string }) {
   const ctx = useCommentContext();
   const root = useRef<HTMLDivElement>(null);
-  const { blockCount, blocks } = useBlockAnchors({ ctx, root, findings });
+  const { blockCount, blocks, elements, markers } = useBlockAnchors({ ctx, root, findings });
   const findingsById = useMemo(() => {
     const comments = findingsToComments(findings);
     return new Map(comments.map((comment, i) => [comment.id, findings[i]!]));
@@ -153,10 +238,15 @@ function MarkdownBody({
   useLayoutEffect(() => {
     if (line === undefined || blockCount === 0) return;
     const anchor = lineAnchor(line);
-    scrollToAnchor(anchor, { block: "center", behavior: "smooth" });
+    if (rail) scrollToAnchor(anchor, { block: "center", behavior: "smooth" });
+    else {
+      // Without a rail the host's container scrolls, not the provider's content box.
+      const block = lineRangeAnchorResolver(anchor, [...elements.current.keys()]);
+      elements.current.get(block ?? "")?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
     if (commentMeta[anchor]) focusAnchor(anchor);
     // commentMeta changes identity with the comments; the reveal is per line.
-  }, [line, blockCount, focusAnchor, scrollToAnchor]);
+  }, [line, blockCount, focusAnchor, scrollToAnchor, rail, elements]);
 
   const focusClickedBlock = (target: EventTarget) => {
     const block = (target as Element).closest<HTMLElement>("[data-finding-severity]");
@@ -166,6 +256,30 @@ function MarkdownBody({
     onLineChange?.(first);
   };
 
+  if (!rail) {
+    return (
+      <div className={cn("min-w-0", className)} data-annotated-markdown="">
+        <div
+          ref={ctx.contentRef}
+          className={cn("relative pl-8", BLOCK_STYLES)}
+          onClick={(event) => focusClickedBlock(event.target)}
+        >
+          <FindingsGutter
+            markers={markers}
+            findings={findings}
+            onSelect={(first) => {
+              focusAnchor(lineAnchor(first));
+              onLineChange?.(first);
+            }}
+          />
+          <div ref={root} className={bodyClassName}>
+            <Markdown sourceBlocks text={text} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("flex h-full min-h-0", className)} data-annotated-markdown="">
       <div
@@ -173,7 +287,7 @@ function MarkdownBody({
         className={cn("relative min-w-0 flex-1 overflow-y-auto p-density-4", BLOCK_STYLES)}
         onClick={(event) => focusClickedBlock(event.target)}
       >
-        <div ref={root}>
+        <div ref={root} className={bodyClassName}>
           <Markdown sourceBlocks text={text} />
         </div>
       </div>

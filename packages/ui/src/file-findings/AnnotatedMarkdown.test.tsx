@@ -50,6 +50,18 @@ describe("AnnotatedMarkdown", () => {
     expect(list.dataset.findingSeverity).toBe("info");
   });
 
+  it("applies bodyClassName to the rendered markdown body and not to the side panel", async () => {
+    const bodyClassName = "mx-auto max-w-[1600px]";
+    const { container } = render(
+      <AnnotatedMarkdown path="docs/guide.md" source={DOC} findings={FINDINGS} bodyClassName={bodyClassName} />,
+    );
+    const { heading } = await renderedBlocks(container);
+
+    const body = container.querySelector<HTMLElement>(".max-w-\\[1600px\\]");
+    expect(body?.contains(heading)).toBe(true);
+    expect(body?.contains(screen.getByTestId("comment-all-rail"))).toBe(false);
+  });
+
   it("lists every finding in the side panel as a read-only thread", async () => {
     const { container } = render(<AnnotatedMarkdown path="docs/guide.md" source={DOC} findings={FINDINGS} />);
     await renderedBlocks(container);
@@ -137,5 +149,43 @@ describe("AnnotatedMarkdown", () => {
     await renderedBlocks(container);
 
     expect(await screen.findByRole("button", { name: "Ignore MD013" })).toBeInTheDocument();
+  });
+
+  describe("without a rail", () => {
+    it("marks each block with findings in the gutter instead of a side panel", async () => {
+      const { container } = render(
+        <AnnotatedMarkdown path="docs/guide.md" source={DOC} findings={FINDINGS} rail={false} />,
+      );
+      await renderedBlocks(container);
+
+      const markers = await screen.findAllByRole("button", { name: /finding/ });
+      expect({
+        panel: screen.queryByTestId("comment-side-panel"),
+        markers: markers.map((marker) => [marker.getAttribute("aria-label"), marker.dataset.severity]),
+      }).toEqual({
+        panel: null,
+        markers: [
+          ["2 findings on lines 3, 4", "error"],
+          ["1 finding on line 7", "info"],
+        ],
+      });
+    });
+
+    it("reports a marker click as the first finding line of its block", async () => {
+      const onLineChange = vi.fn();
+      const { container } = render(
+        <AnnotatedMarkdown
+          path="docs/guide.md"
+          source={DOC}
+          findings={FINDINGS}
+          rail={false}
+          onLineChange={onLineChange}
+        />,
+      );
+      await renderedBlocks(container);
+
+      fireEvent.click(await screen.findByRole("button", { name: "2 findings on lines 3, 4" }));
+      expect(onLineChange).toHaveBeenCalledWith(3);
+    });
   });
 });

@@ -81,7 +81,7 @@ function getEditorWorker(): Worker {
 }
 
 const meta: Meta<typeof FileFindingsView> = {
-  title: "Data/FileFindingsView",
+  title: "Git/FileFindingsView",
   component: FileFindingsView,
   parameters: {
     layout: "fullscreen",
