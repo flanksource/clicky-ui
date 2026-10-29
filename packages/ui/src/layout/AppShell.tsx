@@ -93,8 +93,8 @@ export type AppShellNavSection = {
   /**
    * How the groups read.
    *
-   * `"list"` (the default) styles each group heading as a small uppercase
-   * cluster label — right for a handful of named clusters under one section.
+   * `"list"` (the default) renders groups as navigation rows with a trailing
+   * disclosure and indented children. Section labels provide the cluster headings.
    *
    * `"tree"` styles headings as ordinary nav rows, because in a tree a folder
    * sits at the same level as its sibling destinations: a group carrying an
@@ -311,7 +311,7 @@ export function AppShell(props: AppShellProps) {
 
   return (
     <div
-      className={cn("flex h-full min-h-0 w-full bg-background", className)}
+      className={cn("@container/app-shell flex h-full min-h-0 w-full bg-background", className)}
       {...(debugSlots ? { "data-debug-slots": "true" } : {})}
     >
       {debugSlots && <AppShellSlotOutlines />}
@@ -321,7 +321,7 @@ export function AppShell(props: AppShellProps) {
           data-collapsed={collapsed}
           style={{ width: railWidth }}
           className={cn(
-            "hidden shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 md:flex",
+            "hidden shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 @3xl/app-shell:flex",
             sidebarClassName,
           )}
         >
@@ -387,7 +387,7 @@ export function AppShell(props: AppShellProps) {
             <div
               className={cn(
                 hasSidebar
-                  ? "flex flex-wrap items-center gap-density-2 px-density-3 py-density-2 md:h-14 md:flex-nowrap md:gap-density-3 md:px-density-4 md:py-0"
+                  ? "flex flex-wrap items-center gap-density-2 px-density-3 py-density-2 @3xl/app-shell:h-14 @3xl/app-shell:flex-nowrap @3xl/app-shell:gap-density-3 @3xl/app-shell:px-density-4 @3xl/app-shell:py-0"
                   : // Wraps rather than squeezing. The nav shrinks and the
                     // actions cluster does not, so on a laptop a full actions
                     // row left the nav a sliver — every tab but the first
@@ -402,7 +402,7 @@ export function AppShell(props: AppShellProps) {
                   type="button"
                   aria-label={`Open ${mobileSidebarLabel}`}
                   title={mobileSidebarLabel}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-accent md:hidden"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-accent @3xl/app-shell:hidden"
                   onClick={() => setMobileSidebarOpen(true)}
                 >
                   <Icon icon={UiMenu} className="h-4 w-4" />
@@ -413,7 +413,7 @@ export function AppShell(props: AppShellProps) {
                   data-slot="app-shell-brand"
                   className={cn(
                     "min-w-0 items-center gap-density-2",
-                    hasSidebar ? "flex flex-1 md:hidden" : "flex shrink-0",
+                    hasSidebar ? "flex flex-1 @3xl/app-shell:hidden" : "flex shrink-0",
                   )}
                 >
                   {brand}
@@ -431,7 +431,7 @@ export function AppShell(props: AppShellProps) {
                     // and both become unreadable. Scrolling keeps every tab
                     // reachable; overflowing keeps none of them.
                     "flex min-w-0 items-center overflow-x-auto",
-                    hasSidebar && "order-3 basis-full md:order-none md:basis-auto",
+                    hasSidebar && "order-3 basis-full @3xl/app-shell:order-none @3xl/app-shell:basis-auto",
                   )}
                 >
                   {nav}
@@ -443,7 +443,7 @@ export function AppShell(props: AppShellProps) {
                   className={cn(
                     "flex min-w-0 flex-1 justify-center",
                     hasSidebar &&
-                      "order-2 basis-full md:order-none md:basis-auto md:flex-1",
+                      "order-2 basis-full @3xl/app-shell:order-none @3xl/app-shell:basis-auto @3xl/app-shell:flex-1",
                   )}
                 >
                   <div className="w-full" style={{ maxWidth: searchMaxWidth }}>
@@ -453,7 +453,7 @@ export function AppShell(props: AppShellProps) {
               )}
               {search === undefined && (
                 <div
-                  className={cn("flex-1", hasSidebar && "hidden md:block")}
+                  className={cn("flex-1", hasSidebar && "hidden @3xl/app-shell:block")}
                 />
               )}
               {(actions !== undefined ||
@@ -467,18 +467,18 @@ export function AppShell(props: AppShellProps) {
                     // viewport, and then every fixed overlay on the page
                     // loses its right edge. Let it shrink and scroll its own
                     // contents instead, the same guard the nav slot has.
-                    "max-md:min-w-0 max-md:max-w-full max-md:shrink max-md:overflow-x-auto",
-                    hasSidebar && "order-1 ml-auto md:order-none md:ml-0",
+                    "@max-3xl/app-shell:min-w-0 @max-3xl/app-shell:max-w-full @max-3xl/app-shell:shrink @max-3xl/app-shell:overflow-x-auto",
+                    hasSidebar && "order-1 ml-auto @3xl/app-shell:order-none @3xl/app-shell:ml-0",
                   )}
                 >
                   {!hasSidebar || mobileActions === undefined ? (
                     actions
                   ) : (
                     <>
-                      <div className="hidden items-center gap-density-2 md:flex">
+                      <div className="hidden items-center gap-density-2 @3xl/app-shell:flex">
                         {actions}
                       </div>
-                      <div className="flex items-center gap-density-2 md:hidden">
+                      <div className="flex items-center gap-density-2 @3xl/app-shell:hidden">
                         {mobileActions}
                       </div>
                     </>
@@ -490,7 +490,7 @@ export function AppShell(props: AppShellProps) {
               <div
                 data-slot="app-shell-toolbar"
                 className={cn(
-                  "flex flex-wrap items-center gap-density-2 border-t border-border bg-muted px-density-3 py-density-2 md:px-density-4",
+                  "flex flex-wrap items-center gap-density-2 border-t border-border bg-muted px-density-3 py-density-2 @3xl/app-shell:px-density-4",
                   toolbarClassName,
                 )}
               >
@@ -512,7 +512,7 @@ export function AppShell(props: AppShellProps) {
               data-slot="app-shell-body-header-content"
               data-content-width={effectiveContentWidth}
               className={cn(
-                "flex flex-col items-stretch gap-density-2 px-density-3 py-density-2 md:flex-row md:items-start md:justify-between md:gap-density-3 md:px-density-4",
+                "flex flex-col items-stretch gap-density-2 px-density-3 py-density-2 @3xl/app-shell:flex-row @3xl/app-shell:items-start @3xl/app-shell:justify-between @3xl/app-shell:gap-density-3 @3xl/app-shell:px-density-4",
                 contentWidthClassName(effectiveContentWidth),
               )}
             >
@@ -552,8 +552,7 @@ export function AppShell(props: AppShellProps) {
                 {children}
               </main>
             }
-            leftClass="max-h-[40vh] shrink-0 border-b border-border md:max-h-none md:border-b-0"
-            rightClass="min-h-0 flex-1 md:flex-none"
+            leftClass="max-h-[40vh]"
           />
         ) : (
           <main
@@ -575,7 +574,7 @@ export function AppShell(props: AppShellProps) {
       </div>
       {hasSidebar && mobileSidebarOpen && (
         <div
-          className="fixed inset-0 z-50 md:hidden"
+          className="fixed inset-0 z-50 @3xl/app-shell:hidden"
           role="presentation"
           onClick={() => setMobileSidebarOpen(false)}
         >
