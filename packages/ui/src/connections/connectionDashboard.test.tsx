@@ -124,4 +124,22 @@ describe("connection dashboard lanes", () => {
       html.indexOf('href="/connection/failing-id"'),
     );
   });
+
+  it("marks only a connection that failed to load, with its warnings as the tooltip", () => {
+    const problem = "connection /conf/legacy.yaml is not a Connection resource";
+    const html = renderToStaticMarkup(
+      <ConnectionDashboardLanes
+        health={{}}
+        renderConnectionLink={renderConnectionLink}
+        connections={[
+          connection({ id: "broken-id", name: "legacy", warnings: [problem] }),
+          connection({ id: "good-id", name: "orders" }),
+        ]}
+      />,
+    );
+
+    expect(html.match(/Cannot load/g)).toHaveLength(1);
+    expect(html).toContain(`title="${problem}"`);
+    expect(html).toContain('href="/connection/good-id"');
+  });
 });
