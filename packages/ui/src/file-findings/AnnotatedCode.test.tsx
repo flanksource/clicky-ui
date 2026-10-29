@@ -6,6 +6,8 @@ const fake = vi.hoisted(() => {
   const model = { getLineCount: () => 50, getLineMaxColumn: () => 80 };
   const state = {
     value: "",
+    readOnly: undefined as boolean | undefined,
+    onChange: undefined as ((value: string) => void) | undefined,
     decorations: [] as Array<{ range: unknown; options: Record<string, unknown> }>,
     onMouseDown: undefined as ((event: { target: { position?: { lineNumber: number } } }) => void) | undefined,
   };
@@ -48,15 +50,21 @@ vi.mock("@monaco-editor/react", () => ({
   default: function FakeMonacoEditor({
     value,
     language,
+    options,
+    onChange,
     beforeMount,
     onMount,
   }: {
     value: string;
     language: string;
+    options: { readOnly: boolean };
+    onChange: (value: string | undefined) => void;
     beforeMount?: (monaco: typeof fake.monaco) => void;
     onMount?: (editor: typeof fake.editor, monaco: typeof fake.monaco) => void;
   }) {
     fake.state.value = value;
+    fake.state.readOnly = options.readOnly;
+    fake.state.onChange = onChange;
     // @monaco-editor/react runs beforeMount ahead of creating the model, so the
     // language an editor opens with has to be registered by then.
     const [created] = useState(() => {
@@ -167,7 +175,7 @@ describe("AnnotatedCode", () => {
       range: { startLineNumber: 30, startColumn: 1, endLineNumber: 34, endColumn: 1 },
       options: {
         isWholeLine: true,
-        className: "bg-red-500/10",
+        className: "bg-red-500 opacity-10",
         glyphMarginClassName: expect.stringContaining("bg-red-500"),
         glyphMarginHoverMessage: { value: "Test failed" },
       },
@@ -230,6 +238,57 @@ describe("AnnotatedCode", () => {
     fireEvent.click(cards[1]!);
 
     expect(fake.editor.revealLineInCenter).toHaveBeenCalledWith(30, 0);
+  });
+
+  it("is read-only without onChange", async () => {
+    mount();
+
+    await waitFor(() => expect(fake.state.readOnly).toBe(true));
+  });
+
+  it("is editable with onChange, which receives each edit while the markers stay", async () => {
+    const onChange = vi.fn();
+    mount({ onChange });
+    await waitFor(() => expect(fake.monaco.editor.setModelMarkers).toHaveBeenCalled());
+    const markerCalls = fake.monaco.editor.setModelMarkers.mock.calls.length;
+    const edited = "package a\n\nfunc b() {}\n";
+
+    fake.state.onChange!(edited);
+
+    expect(fake.state.readOnly).toBe(false);
+    expect(onChange).toHaveBeenCalledWith(edited);
+    expect(fake.monaco.editor.setModelMarkers).toHaveBeenCalledTimes(markerCalls);
+  });
+
+  it("adds no inline chips unless asked", async () => {
+    mount();
+
+    await waitFor(() => expect(fake.state.decorations).toHaveLength(2));
+    expect(fake.state.decorations.some((d) => "after" in d.options)).toBe(false);
+  });
+
+  it("shows each line's worst finding as an inline chip with a count of the rest", async () => {
+    const line12Error: FileFinding = {
+      file: "pkg/a.go",
+      line: 12,
+      severity: "error",
+      message: "Undefined name",
+      source: "go vet",
+      kind: "lint",
+    };
+    mount({ inlineChips: true, findings: [...FINDINGS, line12Error] });
+
+    await waitFor(() => expect(fake.state.decorations).toHaveLength(5));
+    expect(fake.state.decorations.filter((d) => "after" in d.options)).toEqual([
+      {
+        range: { startLineNumber: 12, startColumn: 80, endLineNumber: 12, endColumn: 80 },
+        options: { showIfCollapsed: true, after: { content: "Undefined name +1", inlineClassName: expect.stringContaining("text-red-500") } },
+      },
+      {
+        range: { startLineNumber: 30, startColumn: 80, endLineNumber: 30, endColumn: 80 },
+        options: { showIfCollapsed: true, after: { content: "TestA · Test failed", inlineClassName: expect.stringContaining("text-red-500") } },
+      },
+    ]);
   });
 
   it("aligns the focused thread with the editor's position of its line", async () => {
