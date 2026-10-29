@@ -59,6 +59,8 @@ export type LinterResult = {
   status?: LinterStatus;
   /** The prompt run that produced (or is producing) this result, for hosts that can follow it. */
   run_id?: string;
+  /** The agent session behind that run, kept so a replayed snapshot still names it. */
+  session_id?: string;
 };
 
 export type LinterStatus = "pending" | "running";
@@ -104,6 +106,12 @@ export type LintNode = {
   target_path?: string | undefined;
   work_dir?: string | undefined;
   linterName?: string | undefined;
+  /**
+   * For a linter published as `<parent>/<child>` beneath an existing `<parent>`
+   * result: the parent's linter name. `name` is then just the child part and
+   * `linterName` stays the full result name.
+   */
+  nestedUnder?: string | undefined;
   ruleName?: string | undefined;
   linter?: LinterResult | undefined;
   violations?: Violation[] | undefined;

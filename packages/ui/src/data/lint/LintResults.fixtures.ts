@@ -158,6 +158,84 @@ export const promptFinished: LinterResult = {
 
 export const inFlightLintResults: LinterResult[] = [promptPending, promptRunning, promptFinished];
 
+const REVIEW = "messaging-review:report.mdx";
+const REVIEW_DIR = "/repo/gtm";
+
+/** A prompt run whose agent is still working: its session is known, linters beneath it are in flight. */
+export const reviewRunning: LinterResult = {
+  linter: REVIEW,
+  work_dir: REVIEW_DIR,
+  status: "running",
+  run_id: "run-91ab",
+  session_id: "7c1d2e44-5b0a-4c53-9a73-0c9d3f5e8b11",
+  violations: [
+    {
+      file: `${REVIEW_DIR}/report.mdx`,
+      line: 12,
+      severity: "warning",
+      rule: { method: "tone" },
+      message: "Claim lacks a source",
+    },
+  ],
+};
+
+/** A linter the agent started through its `lint` tool and is still running. */
+export const reviewEslintRunning: LinterResult = {
+  linter: `${REVIEW}/eslint`,
+  work_dir: REVIEW_DIR,
+  status: "running",
+  run_id: "run-91ab",
+  violations: [],
+};
+
+/** A linter the agent ran that could not start. */
+export const reviewUirFailed: LinterResult = {
+  linter: `${REVIEW}/uir`,
+  work_dir: REVIEW_DIR,
+  run_id: "run-91ab",
+  success: false,
+  duration: 1_200_000,
+  violations: null,
+  error: "uir executable not found on PATH",
+};
+
+/** A linter the agent ran that finished clean. */
+export const reviewMarkdownlintPassed: LinterResult = {
+  linter: `${REVIEW}/markdownlint`,
+  work_dir: REVIEW_DIR,
+  run_id: "run-91ab",
+  success: true,
+  duration: 480_000_000,
+  violations: [],
+};
+
+/** A linter the agent ran that reported findings. */
+export const reviewValeViolations: LinterResult = {
+  linter: `${REVIEW}/vale`,
+  work_dir: REVIEW_DIR,
+  run_id: "run-91ab",
+  success: false,
+  duration: 2_300_000_000,
+  violations: [
+    {
+      file: `${REVIEW_DIR}/report.mdx`,
+      line: 30,
+      severity: "warning",
+      rule: { method: "Vale.Passive" },
+      message: "Avoid the passive voice",
+    },
+  ],
+};
+
+/** A prompt run with nested linters: running, failed, with findings and passed. */
+export const promptRunWithNestedLinters: LinterResult[] = [
+  reviewMarkdownlintPassed,
+  reviewRunning,
+  reviewValeViolations,
+  reviewUirFailed,
+  reviewEslintRunning,
+];
+
 export const allLintResults: LinterResult[] = [
   golangci,
   eslint,
