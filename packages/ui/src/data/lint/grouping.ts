@@ -11,7 +11,14 @@
 import { matchesFilterState } from "../test-runner/filterState";
 import { slugify } from "../test-runner/routePath";
 import { collapsedPathSegments, decorateLintFile, normalizeLintPath, relPath } from "./paths";
-import { isLinterErrored, isLinterInFlight, linterErrorMessage, severityOf, worstSeverity } from "./stats";
+import {
+  isLinterErrored,
+  isLinterInFlight,
+  linterErrorMessage,
+  lintNodeCount,
+  severityOf,
+  worstSeverity,
+} from "./stats";
 import type {
   LintFilters,
   LintGrouping,
@@ -525,6 +532,86 @@ function withInFlightLinters(roots: Draft[], results: readonly LinterResult[], f
 }
 
 // ---------------------------------------------------------------------------
+// Linter ordering and nesting (linter-first groupings)
+
+const STATUS_BUCKETS = ["running", "pending", "failed", "findings", "passed"] as const;
+type StatusBucket = (typeof STATUS_BUCKETS)[number];
+
+/** Where a linter node sorts: its own state, or a nested linter's if that is more urgent. */
+function statusBucket(node: Draft): number {
+  const own: StatusBucket =
+    node.linter?.status === "running"
+      ? "running"
+      : node.linter?.status === "pending"
+        ? "pending"
+        : node.children?.some((c) => c.kind === "linter-error")
+          ? "failed"
+          : lintNodeCount(node) > 0
+            ? "findings"
+            : "passed";
+  const nested = (node.children ?? []).filter((c) => c.kind === "linter").map(statusBucket);
+  return Math.min(STATUS_BUCKETS.indexOf(own), ...nested);
+}
+
+/** Running → pending → failed → with findings → passed; by name within a bucket (the sort is stable). */
+function sortLinterNodes(nodes: Draft[]): Draft[] {
+  return nodes
+    .map((node) => ({ node, bucket: statusBucket(node) }))
+    .sort((a, b) => a.bucket - b.bucket || (a.node.name < b.node.name ? -1 : a.node.name > b.node.name ? 1 : 0))
+    .map(({ node }) => node);
+}
+
+/**
+ * Results named `<parent>/<child>` where a `<parent>` result exists (the linters
+ * a prompt run's agent ran) become linter nodes beneath the parent's node,
+ * shown by their child name. Without a visible parent they stay top-level.
+ */
+function nestChildLinters(roots: Draft[], results: readonly LinterResult[], filters: LintFilters): Draft[] {
+  const visible = results.filter((r) => matchesFilterState(r.linter, filters.linter));
+  const meta = linterMetaOf(visible);
+  const parentOf = (name: string): string | undefined => {
+    for (let i = name.lastIndexOf("/"); i > 0; i = name.lastIndexOf("/", i - 1)) {
+      if (meta.has(name.slice(0, i))) return name.slice(0, i);
+    }
+    return undefined;
+  };
+  const nodes = new Map(roots.filter((n) => n.kind === "linter").map((n) => [n.name, n]));
+  const childrenOf = groupBy(
+    Array.from(meta.keys()).filter((name) => parentOf(name) !== undefined),
+    (name) => parentOf(name)!,
+  );
+  if (childrenOf.size === 0) return roots;
+
+  const attach = (name: string, nestedUnder?: string): Draft => {
+    const node = nodes.get(name) ?? linterNode(name, meta.get(name), []);
+    const nested = (childrenOf.get(name) ?? []).map((child) => attach(child, name));
+    const label = nestedUnder ? { name: name.slice(nestedUnder.length + 1), nestedUnder } : {};
+    if (nested.length === 0) return { ...node, ...label };
+    const own = node.children ?? [];
+    const failed = node.failed || nested.some((n) => n.failed);
+    return {
+      ...node,
+      ...label,
+      children: [
+        ...own.filter((c) => c.kind === "linter-error"),
+        ...sortLinterNodes(nested),
+        ...own.filter((c) => c.kind !== "linter-error"),
+      ],
+      failed,
+      passed: node.passed && !failed && nested.every((n) => n.passed || n.skipped),
+    };
+  };
+
+  const topLevel = new Set([...nodes.keys(), ...childrenOf.keys()]);
+  return [
+    ...roots.filter((n) => n.kind !== "linter"),
+    ...Array.from(topLevel)
+      .filter((name) => parentOf(name) === undefined)
+      .map((name) => attach(name)),
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // Collapsing, route paths, lookup
 
 function joinChainNames(parent: string, child: string): string {
@@ -594,8 +681,10 @@ export function buildLintTree({
     results,
     filters,
   );
+  // The file-rooted grouping has no linter roots to order or nest.
+  const ordered = grouping === "file-linter-rule" ? grouped : sortLinterNodes(nestChildLinters(grouped, results, filters));
   // Summary keeps its linter -> rule -> file branches as built.
-  return annotateRoutePaths(grouping === "summary" ? grouped : collapseFolderChains(grouped, "lint-folder"));
+  return annotateRoutePaths(grouping === "summary" ? ordered : collapseFolderChains(ordered, "lint-folder"));
 }
 
 /** Depth-first lookup of the node whose route_path equals `path`, or null. */
