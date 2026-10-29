@@ -25,16 +25,19 @@ function mockFilterBarWidths({
   listWidth,
   itemWidths,
   triggerWidth = 44,
+  rowWidth = 1_200,
 }: {
   listWidth: () => number;
   itemWidths: Record<string, number>;
   triggerWidth?: number;
+  rowWidth?: number;
 }) {
   const original = HTMLElement.prototype.getBoundingClientRect;
   return vi
     .spyOn(HTMLElement.prototype, "getBoundingClientRect")
     .mockImplementation(function () {
       if (this instanceof HTMLElement) {
+        if (this.getAttribute("data-slot") === "filter-bar") return rect(rowWidth);
         if (this.hasAttribute("data-filter-bar-list")) return rect(listWidth());
         const itemKey = this.getAttribute("data-filter-bar-item");
         if (itemKey) return rect(itemWidths[itemKey] ?? 120);
@@ -759,6 +762,32 @@ describe("FilterBar", () => {
     ).not.toBeInTheDocument();
     expect(screen.getByLabelText("Service")).toBeInTheDocument();
     expect(screen.getByLabelText("Region")).toBeInTheDocument();
+
+    measurement.mockRestore();
+  });
+
+  it("moves every filter behind the menu when search and range controls leave the list no width", async () => {
+    // Tablet width with a sidebar: search plus the date/time buttons consume
+    // the row, so the flex-1 list is laid out at 0px. That is "no room", not
+    // "not laid out yet" — the row itself has width.
+    const measurement = mockFilterBarWidths({
+      listWidth: () => 0,
+      rowWidth: 460,
+      itemWidths: { team: 200, owner: 200 },
+    });
+
+    render(
+      <FilterBar
+        filters={[
+          { key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() },
+          { key: "owner", kind: "text", label: "Owner", value: "", onChange: vi.fn() },
+        ]}
+      />,
+    );
+
+    await screen.findByRole("button", { name: /^(more )?filters$/i });
+    expect(screen.queryByLabelText("Team")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Owner")).not.toBeInTheDocument();
 
     measurement.mockRestore();
   });
