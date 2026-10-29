@@ -60,7 +60,7 @@ export function ItemActions({
       className={cn(
         "ml-auto flex shrink-0 items-center gap-0.5",
         reveal &&
-          "opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100",
+          "opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100",
         className,
       )}
     >
