@@ -51,12 +51,12 @@ export function AvatarBadge({
 
   return (
     <span
-      className={cn("inline-flex max-w-[50ch] min-w-0 flex-col items-start", className)}
+      className={cn("inline-flex max-w-[min(50ch,100%)] min-w-0 flex-col items-start", className)}
       style={style}
     >
       <span
         className={cn(
-          "inline-flex max-w-[40ch] min-w-0 items-center gap-2 overflow-visible rounded-full border bg-background shadow-sm",
+          "inline-flex max-w-[min(40ch,100%)] min-w-0 items-center gap-2 overflow-visible rounded-full border bg-background shadow-sm",
           badgeClassName,
         )}
         style={{
@@ -98,7 +98,7 @@ export function AvatarBadge({
       {comment && (
         <span
           className={cn(
-            "mt-1 max-w-[50ch] overflow-hidden text-xs leading-snug text-muted-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]",
+            "mt-1 max-w-[min(50ch,100%)] overflow-hidden text-xs leading-snug text-muted-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]",
             commentClassName,
           )}
           title={typeof comment === "string" ? comment : undefined}

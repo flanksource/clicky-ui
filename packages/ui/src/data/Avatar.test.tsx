@@ -100,7 +100,7 @@ describe("Avatar", () => {
 });
 
 describe("AvatarBadge", () => {
-  it("allows the badge label to grow to 40ch before truncating", () => {
+  it("allows the badge label to grow to 40ch, capped at its container, before truncating", () => {
     render(
       <AvatarBadge
         alt="Tokollo Mphahlele"
@@ -111,10 +111,10 @@ describe("AvatarBadge", () => {
     );
 
     const label = screen.getByText("Tokollo Mphahlele");
-    expect(label.parentElement).toHaveClass("max-w-[40ch]", "overflow-visible");
+    expect(label.parentElement).toHaveClass("max-w-[min(40ch,100%)]", "overflow-visible");
   });
 
-  it("limits comments under the badge to 50ch and three lines", () => {
+  it("limits comments under the badge to 50ch (capped at its container) and three lines", () => {
     render(
       <AvatarBadge
         alt="Tokollo Mphahlele"
@@ -124,6 +124,6 @@ describe("AvatarBadge", () => {
     );
 
     const comment = screen.getByText(/Approved after validating/);
-    expect(comment).toHaveClass("max-w-[50ch]", "[-webkit-line-clamp:3]");
+    expect(comment).toHaveClass("max-w-[min(50ch,100%)]", "[-webkit-line-clamp:3]");
   });
 });

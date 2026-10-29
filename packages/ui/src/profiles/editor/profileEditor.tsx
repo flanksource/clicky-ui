@@ -226,7 +226,7 @@ export function ProfileEditor({
   };
 
   const sectionContent = (
-    <div className="h-full overflow-auto p-5">
+    <div className="@container h-full overflow-auto p-5">
       {section === "general" ? (
         <div className="space-y-4">
           <ProfileGeneralSection draft={draft} onChange={setDraft} />

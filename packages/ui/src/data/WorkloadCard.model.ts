@@ -35,6 +35,8 @@ export interface WorkloadCardStatus {
 export interface WorkloadCardMetadataItem {
   label: string;
   value: ReactNode;
+  /** Shown instead of the label text; the label moves to the hover title. */
+  icon?: WorkloadCardIcon;
 }
 
 /**

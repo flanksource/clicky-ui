@@ -33,7 +33,7 @@ const files: GitFileChangeItem[] = [
 ];
 
 const meta: Meta = {
-  title: "Data/GitChangeList",
+  title: "Git/GitChangeList",
   parameters: { layout: "padded" },
 };
 

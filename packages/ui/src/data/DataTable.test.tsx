@@ -123,6 +123,8 @@ function mockFilterBarWidths(listWidth: number, itemWidth = 112) {
     .spyOn(HTMLElement.prototype, "getBoundingClientRect")
     .mockImplementation(function () {
       if (this instanceof HTMLElement) {
+        // FilterBar only measures once its row is laid out (non-zero width).
+        if (this.getAttribute("data-slot") === "filter-bar") return rect(1_200);
         if (this.hasAttribute("data-filter-bar-list")) return rect(listWidth);
         if (this.hasAttribute("data-filter-bar-item")) return rect(itemWidth);
         if (this.getAttribute("aria-label") === "More filters") return rect(44);

@@ -10,6 +10,7 @@ import {
   UiFullscreenFilled,
 } from "../icons";
 import { mediaMatches } from "../hooks/use-media-query";
+import { belowBreakpoint } from "../lib/breakpoints";
 import { useEscapeLayer, useModalStack } from "./modalStack";
 import { zIndex } from "./zIndex";
 
@@ -90,7 +91,7 @@ const DEFAULT_CONFIRM: Required<ConfirmCloseOptions> = {
   cancelLabel: "Keep editing",
 };
 
-const MOBILE_QUERY = "(max-width: 639px)";
+const MOBILE_QUERY = belowBreakpoint("sm");
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 const MOBILE_TRANSITION_MS = 200;
 const FOCUSABLE_SELECTOR = [

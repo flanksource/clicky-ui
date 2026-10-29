@@ -46,7 +46,7 @@ export {
   pruneExitedProcesses,
   type ProcessTreeNode,
 } from "./process-tree";
-export { Sparkline, LabeledSparkline, type SparklineProps, type LabeledSparklineProps } from "./Sparkline";
+export { LabeledSparkline, type LabeledSparklineProps } from "./Sparkline";
 export type {
   HttpExchangeRequest,
   HttpExchangeResponse,

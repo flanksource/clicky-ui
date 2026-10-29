@@ -39,6 +39,8 @@ import {
 } from "./WorkloadCard.model";
 
 export interface WorkloadCardProps {
+  /** Caller-owned metric body, e.g. statistical snapshots instead of time series. */
+  children?: ReactNode;
   workload: WorkloadCardWorkload;
   /**
    * CPU/memory/disk series. Each is requested as `baseUrl + id` via `fetcher`,
@@ -257,7 +259,15 @@ function headerMetaItems(
       key: `meta-${i}`,
       content: (
         <>
-          <span className="text-muted-foreground/70">{item.label}</span>{" "}
+          {item.icon ? (
+            <WorkloadIcon
+              icon={item.icon}
+              title={item.label}
+              className="h-3.5 w-auto shrink-0"
+            />
+          ) : (
+            <span className="text-muted-foreground/70">{item.label}</span>
+          )}{" "}
           {item.value}
         </>
       ),
@@ -280,6 +290,7 @@ function headerMetaItems(
  * `QueryClientProvider` above it.
  */
 export function WorkloadCard({
+  children,
   workload,
   metrics,
   baseUrl,
@@ -423,7 +434,7 @@ export function WorkloadCard({
         </div>
       </div>
 
-      {hasMetric(metrics) ? (
+      {children !== undefined ? children : hasMetric(metrics) ? (
         <div
           className={cn(
             "grid items-start gap-3",
