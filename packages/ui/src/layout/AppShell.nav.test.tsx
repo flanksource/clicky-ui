@@ -112,7 +112,7 @@ describe("AppShell nested nav groups", () => {
     expect(screen.queryByRole("button", { name: /Collapse jms/ })).toBeNull();
   });
 
-  // The rail stays mounted (`hidden md:flex`) while the drawer is open, so both
+  // The rail stays mounted (`hidden @3xl/app-shell:flex`) while the drawer is open, so both
   // NavSections renders are live at once. Group collapse state is owned by
   // AppShell, not by each NavSections, or a toggle in one would leave the other
   // stale (and the two would race each other through localStorage).
