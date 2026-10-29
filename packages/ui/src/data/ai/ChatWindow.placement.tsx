@@ -1,12 +1,13 @@
 import type { ComponentType, CSSProperties, ReactNode } from "react";
 import type { Props as RndProps } from "react-rnd";
 import { cn } from "../../lib/utils";
+import { belowBreakpoint } from "../../lib/breakpoints";
 import type { ChatWindowState } from "./chat-window-context";
 
 /** The small-screen query the chat window switches to a full-screen sheet at.
  *  Matches AppShell's md breakpoint (its mobile drawer is md:hidden); export so hosts can align
  *  their own chrome (e.g. hide a bottom bar) with it. */
-export const CHAT_WINDOW_MOBILE_QUERY = "(max-width: 767px)";
+export const CHAT_WINDOW_MOBILE_QUERY = belowBreakpoint("md");
 
 const MAXIMIZE_CSS = `
 .chat-maximized .react-draggable {

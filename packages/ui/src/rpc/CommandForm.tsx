@@ -282,7 +282,7 @@ function TagInput({
       ))}
       <input
         id={id}
-        className="min-w-32 flex-1 bg-transparent px-1 py-1 text-sm outline-none"
+        className="min-w-0 flex-1 basis-32 bg-transparent px-1 py-1 text-sm outline-none"
         placeholder={tags.length === 0 ? placeholder : ""}
         onKeyDown={handleKeyDown}
         onBlur={(event) => commit(event.currentTarget.value, event.currentTarget)}

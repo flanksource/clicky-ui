@@ -58,10 +58,13 @@ export function findDetailEndpointForList(
   }
 
   const baseSegments = splitPath(listEndpoint.path);
+  // A collection action (an optional-id one carries a positional `id` query
+  // parameter) is never a detail endpoint, however its path sorts.
   const candidates = operations.filter(
     (op) =>
       op.method === "get" &&
       op.path !== listEndpoint.path &&
+      op.operation["x-clicky"]?.scope !== "collection" &&
       op.operation.parameters?.some((p) => p.in === "path" || isPositionalParam(p)),
   );
 
