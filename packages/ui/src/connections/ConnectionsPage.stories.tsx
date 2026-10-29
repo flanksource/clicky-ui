@@ -53,6 +53,12 @@ const fakeConnectionsApi: typeof fetch = async (input, init) => {
   if (method === "GET" && url === `${API_BASE}/connection` && accept.includes("schema")) {
     return json(connectionSchemaFixture, 200, "application/schema+json");
   }
+  if (method === "GET" && url === `${API_BASE}/connections/namespaces`) {
+    return json(["analytics", "default", "payments"]);
+  }
+  if (method === "GET" && url.startsWith(`${API_BASE}/connections/secrets?kind=`)) {
+    return json([{ name: "warehouse-credentials", keys: ["username", "password"] }]);
+  }
   if (method === "GET" && url === `${API_BASE}/connection/cache-id`) {
     return json(cacheConnectionFixture);
   }
@@ -115,8 +121,34 @@ const fakeReadOnlyConnectionsApi: typeof fetch = async (input, init) => {
   return fakeConnectionsApi(input, init);
 };
 
+/**
+ * The same service under an app policy that forbids literal credentials: the
+ * schema root carries `x-clicky-secret-sources` / `x-clicky-url-sources`
+ * without `value`, so the form's pickers only offer references.
+ */
+const fakePolicyConnectionsApi: typeof fetch = async (input, init) => {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const accept = new Headers(init?.headers).get("Accept") ?? "";
+  if (method === "GET" && String(input) === `${API_BASE}/connection` && accept.includes("schema")) {
+    return json(
+      {
+        ...connectionSchemaFixture,
+        "x-clicky-secret-sources": ["secret", "configmap", "helm"],
+        "x-clicky-url-sources": ["secret", "configmap", "helm"],
+      },
+      200,
+      "application/schema+json",
+    );
+  }
+  return fakeConnectionsApi(input, init);
+};
+
 const withFakeConnectionsApi: Decorator = (Story, context) => {
-  const fake = context.parameters.readOnlyCatalog ? fakeReadOnlyConnectionsApi : fakeConnectionsApi;
+  const fake = context.parameters.readOnlyCatalog
+    ? fakeReadOnlyConnectionsApi
+    : context.parameters.policyRestricted
+      ? fakePolicyConnectionsApi
+      : fakeConnectionsApi;
   const original = useRef<typeof globalThis.fetch | undefined>(undefined);
   if (globalThis.fetch !== fake) {
     original.current = globalThis.fetch;
@@ -190,6 +222,13 @@ export const EditingSelected: Story = {
   args: { selected: "cache-id" },
 };
 
+export const RowActions: Story = {
+  args: {
+    renderConnectionActions: (connection) => <a className="px-2 text-xs text-primary" href={`?inspect=${encodeURIComponent(connection.id)}`}>Inspect</a>,
+  },
+  parameters: { docs: { description: { story: "Hosts can add actions beside each connection through renderConnectionActions. The slot is outside the edit link, so each action remains independently keyboard accessible." } } },
+};
+
 export const DeleteConflict: Story = {
   args: { selected: "cache-id" },
   play: async ({ canvasElement }) => {
@@ -201,6 +240,28 @@ export const DeleteConflict: Story = {
     await expect(
       await within(editor).findByText(/still referenced by database_modules_connection_id_fkey/),
     ).toBeInTheDocument();
+  },
+};
+
+/**
+ * A policy-restricted connection form: the served schema's
+ * `x-clicky-secret-sources` / `x-clicky-url-sources` omit `value`, so a
+ * credential can only reference a Secret, ConfigMap or Helm release, and the
+ * namespace picker lists the cluster's namespaces.
+ */
+export const PolicyRestrictedForm: Story = {
+  args: { selected: "warehouse-id" },
+  parameters: { policyRestricted: true },
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    const editor = await body.findByRole("dialog", { name: "Edit warehouse" });
+    await expect(await within(editor).findByPlaceholderText("Select namespace…")).toBeInTheDocument();
+    const sources = await within(editor).findAllByRole("combobox", { name: "Secret value source" });
+    await userEvent.click(sources[sources.length - 1]!);
+    await expect(await body.findByRole("option", { name: "Secret" })).toBeInTheDocument();
+    await expect(body.getByRole("option", { name: "ConfigMap" })).toBeInTheDocument();
+    await expect(body.queryByRole("option", { name: "Value" })).toBeNull();
+    await expect(body.queryByRole("option", { name: "1Password" })).toBeNull();
   },
 };
 

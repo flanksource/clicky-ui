@@ -7,6 +7,7 @@ import type {
   ConnectionDashboardItem,
   ConnectionHealth,
   ConnectionLinkRenderer,
+  ConnectionActionsRenderer,
 } from "./connectionDashboardModel";
 
 const HEALTH_LABELS: Record<ConnectionDashboardHealthState, string> = {
@@ -39,6 +40,7 @@ const HEALTH_STYLES: Record<
 const UNCHECKED_EDGE = "border-l-transparent";
 
 export function ConnectionDashboardRow({
+  renderConnectionActions,
   connection,
   health,
   pending,
@@ -50,6 +52,7 @@ export function ConnectionDashboardRow({
   pending: boolean;
   onCheck: (ids: string[], options?: { force?: boolean }) => void;
   renderConnectionLink: ConnectionLinkRenderer;
+  renderConnectionActions?: ConnectionActionsRenderer;
 }) {
   return (
     <div
@@ -97,6 +100,7 @@ export function ConnectionDashboardRow({
           </>
         ),
       })}
+      {renderConnectionActions?.(connection)}
     </div>
   );
 }
@@ -179,8 +183,18 @@ function SecretChip({ count }: { count: number }) {
 }
 
 function RiskChips({ connection }: { connection: ConnectionDashboardItem }) {
+  const warnings = connection.warnings ?? [];
   return (
     <>
+      {warnings.length > 0 ? (
+        <span
+          className="inline-flex items-center gap-1 rounded bg-rose-100 px-1.5 py-0.5 text-[11px] text-rose-700 ring-1 ring-inset ring-rose-300/60 dark:bg-rose-400/10 dark:text-rose-300 dark:ring-rose-400/25"
+          title={warnings.join("\n")}
+        >
+          <Icon icon={UiWarningTriangle} className="text-[11px]" />
+          Cannot load
+        </span>
+      ) : null}
       {connection.inlineCredential ? (
         <span className="inline-flex items-center gap-1 rounded bg-rose-100 px-1.5 py-0.5 text-[11px] text-rose-700 ring-1 ring-inset ring-rose-300/60 dark:bg-rose-400/10 dark:text-rose-300 dark:ring-rose-400/25">
           <Icon icon={UiKey} className="text-[11px]" />
