@@ -3,10 +3,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { allLintResults } from "../data/lint/LintResults.fixtures";
 import type { LinterResult } from "../data/lint/types";
 import type { Test } from "../data/test-runner/types";
-import { MonacoProvider } from "../monaco/MonacoProvider";
 import { lintFindings, testFindings } from "./adapters";
 import { FileFindingsView } from "./FileFindingsView";
-import type { FileRef, FindingsViewMode } from "./types";
+import type { FileReviewView } from "./file-review/FileReview";
+import type { FileRef } from "./types";
 
 const WORK_DIR = "/repo/gavel";
 
@@ -74,11 +74,6 @@ function sourceFor(file: string): string {
   return Array.from({ length: 120 }, (_, i) => `// ${file} line ${i + 1}`).join("\n");
 }
 
-// Vite bundles a worker named by `new Worker(new URL(...))`; the editor worker
-// is enough for read-only viewing (no language services are used).
-function getEditorWorker(): Worker {
-  return new Worker(new URL("monaco-editor/esm/vs/editor/editor.worker.js", import.meta.url), { type: "module" });
-}
 
 const meta: Meta<typeof FileFindingsView> = {
   title: "Git/FileFindingsView",
@@ -88,7 +83,7 @@ const meta: Meta<typeof FileFindingsView> = {
     docs: {
       description: {
         component:
-          "Every file with lint violations or failed tests as a tree beside an annotated viewer. Code opens in a read-only Monaco editor with markers and gutter dots; markdown renders with each finding as a read-only comment thread anchored to the block holding its line, with a Rendered/Source toggle. Controlled: the open file, line and view are props so a host can keep them in its URL, and file text comes from `loadFile`. Needs a `MonacoProvider` above it.",
+          "Every file with lint violations or failed tests as a tree beside a `FileReview` of the open file: syntax-highlighted source with each finding under its line, a rendered Preview for markdown with findings as read-only threads, and a Problems list. Controlled: the open file, line and view are props so a host can keep them in its URL, and file text comes from `loadFile`.",
       },
     },
   },
@@ -99,13 +94,12 @@ type Story = StoryObj<typeof FileFindingsView>;
 
 const findings = [...lintFindings([...allLintResults, markdownLint]), ...testFindings(failedTests)];
 
-function Harness({ initialFile = null, initialView = "rendered" }: { initialFile?: FileRef | null; initialView?: FindingsViewMode }) {
+function Harness({ initialFile = null, initialView = "preview" }: { initialFile?: FileRef | null; initialView?: FileReviewView }) {
   const [file, setFile] = useState<FileRef | null>(initialFile);
   const [line, setLine] = useState<number | undefined>(undefined);
-  const [view, setView] = useState<FindingsViewMode>(initialView);
+  const [view, setView] = useState<FileReviewView>(initialView);
   return (
-    <MonacoProvider getWorker={getEditorWorker}>
-      <div className="h-[640px]">
+    <div className="h-[640px]">
         <FileFindingsView
           findings={findings}
           selectedFile={file}
@@ -119,14 +113,13 @@ function Harness({ initialFile = null, initialView = "rendered" }: { initialFile
           onViewChange={setView}
           loadFile={async ({ file: path }) => sourceFor(path)}
         />
-      </div>
-    </MonacoProvider>
+    </div>
   );
 }
 
 export const Default: Story = { render: () => <Harness /> };
 
-export const MarkdownRendered: Story = {
+export const MarkdownPreview: Story = {
   render: () => <Harness initialFile={{ workDir: WORK_DIR, file: "docs/guide.md" }} />,
 };
 

@@ -36,8 +36,6 @@ export type FileRef = {
   file: string;
 };
 
-export type FindingsViewMode = "rendered" | "source";
-
 export type FileTreeNode = {
   /** Stable, unique key (folders collapsed into a child keep the child's key). */
   key: string;
