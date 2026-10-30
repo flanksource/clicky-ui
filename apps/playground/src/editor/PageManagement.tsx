@@ -297,7 +297,7 @@ export function PageManagementDialogs(props: DialogProps) {
     if (action === "new-page") {
       const slug = joinPageSlug(folder, filename.trim());
       void finish(async () => {
-        const result = await createPage(slug, pageTemplate(slug, title.trim()));
+        const result = await createPage(slug, pageTemplate(slug, title.trim()), ".tsx");
         applyPageCreated(result.slug);
         return result.slug;
       });

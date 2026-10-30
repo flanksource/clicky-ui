@@ -1,4 +1,8 @@
-export type PlaygroundView = "preview" | "markdown";
+/**
+ * `preview` renders the page. `markdown` is a TSX page's extracted guidance;
+ * `source` is a markdown page's annotated editor and `problems` its lint findings.
+ */
+export type PlaygroundView = "preview" | "markdown" | "source" | "problems";
 export type AnnotationVisibility = "visible" | "hidden";
 
 export type PlaygroundRoute = {
@@ -20,10 +24,10 @@ export function parsePlaygroundRoute(
   const review = params.get("review");
   const comment = params.get("comment");
   const rejected = params.get("rejected");
-  if (rejected !== null && rejected !== "show") throw new Error("invalid rejected visibility; expected rejected=show");
-  if (view !== "preview" && view !== "markdown") {
+  if (rejected !== null && rejected !== "show") throw new Error('invalid rejected visibility; expected rejected=show');
+  if (view !== "preview" && view !== "markdown" && view !== "source" && view !== "problems") {
     throw new Error(
-      `invalid playground view "${view}"; expected preview or markdown`,
+      `invalid playground view "${view}"; expected preview, markdown, source or problems`,
     );
   }
   if (annotations !== "visible" && annotations !== "hidden") {
@@ -50,7 +54,7 @@ export function parsePlaygroundRoute(
 export function buildPlaygroundRoute(route: PlaygroundRoute): string {
   const current = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
   const params = current.get("page") === route.page ? current : new URLSearchParams();
-  for (const key of ["sidebar.sort", "sidebar.filters", "sidebar.q"]) {
+  for (const key of ["sidebar.sort", "sidebar.filters", "sidebar.q", "sidebar.age"]) {
     const value = current.get(key);
     if (value !== null) params.set(key, value);
   }

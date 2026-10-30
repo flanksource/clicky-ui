@@ -68,6 +68,8 @@ export type StoredAgentRun = {
   state: AgentRunState;
   /** Why the hand-off failed; present only when `state` is `error`. */
   error?: string;
+  /** The live captain session it went to, when not the playground's own; `channel` once delivered. */
+  target?: { label: string; channel?: string };
 };
 
 /** One finding of a structured comment, rendered as a chip and toggled by status. */
@@ -288,11 +290,13 @@ const LOCATOR_FIELDS: Record<CommentLocator["kind"], readonly string[]> = {
   css: ["selector"],
   role: ["tag", "role", "name"],
   text: ["tag", "text"],
+  markdown: ["tag", "text"],
 };
 const OPTIONAL_LOCATOR_FIELDS: Record<CommentLocator["kind"], readonly string[]> = {
   css: [],
   role: [],
   text: ["heading", "scope"],
+  markdown: ["path", "line"],
 };
 
 const SELECTOR_FIELDS = new Set(["selector", "scope"]);
@@ -330,6 +334,16 @@ function assertLocators(input: unknown): void {
       throw new Error(`comment element ${kind} locator has unexpected field ${JSON.stringify(unexpected)}`);
     }
     for (const field of required) assertLocatorText(entry[field], `${kind}.${field}`);
+    if (kind === "markdown") {
+      const { path, line } = entry;
+      if (!Array.isArray(path)) {
+        throw new Error("comment element markdown locator path must be an array of heading texts");
+      }
+      path.forEach((heading, index) => assertLocatorText(heading, `markdown.path[${index}]`));
+      if (line !== undefined && !(Number.isInteger(line) && (line as number) > 0)) {
+        throw new Error("comment element markdown locator line must be a positive integer");
+      }
+    }
     if (entry["scope"] !== undefined) assertLocatorText(entry["scope"], "text.scope");
     if (entry["heading"] !== undefined) {
       const heading = entry["heading"];
@@ -439,10 +453,15 @@ export function assertComment(input: unknown): StoredComment {
       typeof run !== "object" ||
       (run.sessionId !== undefined && typeof run.sessionId !== "string") ||
       typeof run.requestedAt !== "string" ||
-      !AGENT_RUN_STATES.includes(run.state as AgentRunState)
+      !AGENT_RUN_STATES.includes(run.state as AgentRunState) ||
+      (run.target !== undefined &&
+        (typeof run.target !== "object" ||
+          run.target === null ||
+          typeof run.target.label !== "string" ||
+          (run.target.channel !== undefined && typeof run.target.channel !== "string")))
     ) {
       throw new Error(
-        `agentRun must be {sessionId?, requestedAt, state: ${AGENT_RUN_STATES.join("|")}}`,
+        `agentRun must be {sessionId?, requestedAt, state: ${AGENT_RUN_STATES.join("|")}, target?: {label, channel?}}`,
       );
     }
   }

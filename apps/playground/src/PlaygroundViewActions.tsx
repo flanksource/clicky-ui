@@ -12,6 +12,7 @@ export function PlaygroundViewActions({
   onViewChange,
   onAnnotationsChange,
   onCopy,
+  viewToggle,
 }: {
   view: PlaygroundView;
   annotations: AnnotationVisibility;
@@ -22,19 +23,23 @@ export function PlaygroundViewActions({
   onViewChange: (view: PlaygroundView) => void;
   onAnnotationsChange: (annotations: AnnotationVisibility) => void;
   onCopy: () => void;
+  /** Shows the Preview/Markdown toggle; a markdown page renders its own view toggle. */
+  viewToggle: boolean;
 }) {
   return (
     <>
-      <SegmentedControl
-        value={view}
-        options={[
-          { id: "preview", label: "Preview" },
-          { id: "markdown", label: "Markdown" },
-        ]}
-        onChange={onViewChange}
-        size="sm"
-        aria-label="Artifact view"
-      />
+      {viewToggle && (
+        <SegmentedControl
+          value={view}
+          options={[
+            { id: "preview", label: "Preview" },
+            { id: "markdown", label: "Markdown" },
+          ]}
+          onChange={onViewChange}
+          size="sm"
+          aria-label="Artifact view"
+        />
+      )}
       {view === "preview" && (
         <button type="button" aria-pressed={showRejected} onClick={() => onShowRejectedChange(!showRejected)} className="inline-flex items-center rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
           {showRejected ? "Hide rejected" : "Show rejected"}

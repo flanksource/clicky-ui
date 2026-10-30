@@ -50,8 +50,12 @@ export function fetchFolders(): Promise<string[]> {
   return request<{ folders: string[] }>(SOURCES_ROUTE).then(({ folders }) => folders);
 }
 
-export function createPage(slug: string, source: string): Promise<{ slug: string }> {
-  return jsonRequest(SOURCES_ROUTE, "POST", { slug, source });
+export function createPage(
+  slug: string,
+  source: string,
+  extension: ".tsx" | ".md" | ".mdx",
+): Promise<{ slug: string }> {
+  return jsonRequest(SOURCES_ROUTE, "POST", { slug, source, extension });
 }
 
 export function createFolder(folder: string): Promise<{ folder: string }> {
@@ -98,7 +102,8 @@ export function deleteFolder(folder: string): Promise<DeleteFolderResult> {
   );
 }
 
-export function readPage(slug: string): Promise<{ source: string }> {
+/** `path` is the page file relative to the workspace root, e.g. `apps/playground/src/pages/notes.md`. */
+export function readPage(slug: string): Promise<{ source: string; path: string }> {
   return request(`${SOURCES_ROUTE}?slug=${encodeURIComponent(slug)}`);
 }
 

@@ -13,7 +13,7 @@ function pageUpdates(pagesDir: string): Record<string, string> {
       if (entry.isSymbolicLink()) throw new Error(`Page activity cannot traverse symbolic link ${join(directory, entry.name)}`);
       const path = join(directory, entry.name);
       if (entry.isDirectory()) walk(path, `${prefix}${entry.name}/`);
-      else if (entry.isFile() && entry.name.endsWith(".tsx") && !/\.(test|stories)\.tsx$/.test(entry.name)) updates[`${prefix}${entry.name.slice(0, -4)}`] = statSync(path).mtime.toISOString();
+      else if (entry.isFile() && /\.(tsx|md|mdx)$/.test(entry.name) && !/\.(test|stories)\.(tsx|md|mdx)$/.test(entry.name)) updates[`${prefix}${entry.name.replace(/\.(tsx|md|mdx)$/, "")}`] = statSync(path).mtime.toISOString();
     }
   }
   walk(pagesDir, "");
