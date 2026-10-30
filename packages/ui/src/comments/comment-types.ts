@@ -134,6 +134,8 @@ export type CommentAgentRun = {
   state: CommentAgentRunState;
   /** Why the hand-off failed; present only when `state` is `error`. */
   error?: string;
+  /** Host label for where the root went, and how it was delivered, when not the host's default session. */
+  target?: { label: string; channel?: string };
 };
 
 /** A single comment. Replies set `parentId`; roots leave it null. */
