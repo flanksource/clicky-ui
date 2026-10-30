@@ -2,7 +2,8 @@ import { useLayoutEffect, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { CommentAuthorAvatar } from "../../comments/CommentAuthor";
 import type { Comment } from "../../comments/comment-types";
-import { getRoots } from "../../comments/comment-utils";
+import { authorDisplayName, buildReplyMap, getRoots, truncatePlain } from "../../comments/comment-utils";
+import { cn } from "../../lib/utils";
 
 import { QUOTE_PREFIX, parseQuoteAnchor, resolveQuote } from "./quote-anchor";
 
@@ -31,7 +32,7 @@ export function InlineAuthors({
         if (!range) continue;
         const host = document.createElement("span");
         host.dataset.commentAuthor = comment.id;
-        host.className = "ml-1 inline-flex align-middle leading-none";
+        host.className = "ml-1 inline-flex max-w-full align-middle leading-none";
         host.contentEditable = "false";
         range.collapse(false);
         range.insertNode(host);
@@ -49,19 +50,27 @@ export function InlineAuthors({
     };
   }, [markdown, comments]);
 
+  const replies = buildReplyMap(comments);
   return getRoots(comments).map((comment) => {
     const host = hosts.get(comment.id);
     const anchor = comment.anchor;
     if (!host || !anchor) return null;
+    const replyCount = replies.get(comment.id)?.length ?? 0;
     return createPortal(
       <button
         type="button"
-        aria-label={`Open comment by ${comment.author?.name ?? "Anonymous"}`}
+        aria-label={`Open comment by ${authorDisplayName(comment.author ?? null)}`}
         aria-pressed={focused === anchor}
-        className="inline-flex rounded-full ring-offset-background hover:ring-2 hover:ring-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        title={comment.body}
+        className={cn(
+          "inline-flex max-w-[min(40ch,100%)] items-center gap-1 rounded-full border border-border bg-muted py-px pl-px pr-2 text-xs font-normal text-muted-foreground ring-offset-background hover:text-foreground hover:ring-2 hover:ring-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+          focused === anchor && "text-foreground ring-2 ring-primary",
+        )}
         onClick={() => onFocus(anchor)}
       >
         <CommentAuthorAvatar author={comment.author ?? null} size="xs" bare />
+        <span className="truncate">{truncatePlain(comment.body)}</span>
+        {replyCount > 0 && <span className="shrink-0 tabular-nums">· {replyCount}</span>}
       </button>,
       host,
       comment.id,

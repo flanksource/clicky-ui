@@ -11,26 +11,41 @@ import { fileRefKey, type FileFinding, type FileTreeNode } from "./types";
 /**
  * One finding per violation that names a file. A violation without a file
  * cannot be placed in a source view and is left out; one without a line is
- * anchored to the first line of its file (a file-level finding).
+ * anchored to the first line of its file (a file-level finding). A violation
+ * found at several places (`locations`) is a finding at each of them, its
+ * message naming what is there.
  */
 export function lintFindings(results: readonly LinterResult[]): FileFinding[] {
   return results.flatMap((result) =>
     (result.violations ?? []).flatMap((violation): FileFinding[] => {
+      const finding = {
+        workDir: result.work_dir,
+        severity: severityOf(violation),
+        source: violation.source ?? result.linter,
+        rule: violation.rule?.method,
+        kind: "lint" as const,
+      };
+      const message = violation.message ?? "";
+      if ((violation.locations?.length ?? 0) > 1) {
+        return violation.locations!.map((location) => ({
+          ...finding,
+          file: relPath(location.file, result.work_dir)!,
+          line: Math.max(location.line ?? 1, 1),
+          column: location.column,
+          message: location.message ? `${message} (${location.message})` : message,
+        }));
+      }
       const file = violation.raw_file ?? relPath(violation.file, result.work_dir);
       if (!file) return [];
       return [
         {
+          ...finding,
           file,
-          workDir: result.work_dir,
           line: Math.max(violation.line ?? 1, 1),
           column: violation.column,
           endLine: violation.end_line,
           endColumn: violation.end_column,
-          severity: severityOf(violation),
-          message: violation.message ?? "",
-          source: violation.source ?? result.linter,
-          rule: violation.rule?.method,
-          kind: "lint",
+          message,
         },
       ];
     }),
