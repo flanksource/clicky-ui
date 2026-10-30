@@ -4,9 +4,9 @@ import {
   lintFileActions,
   lintFolderActions,
   lintNodeActions,
-  violationIgnoreAction,
+  violationIgnoreActions,
 } from "./actions";
-import type { LintNode, LinterResult } from "./types";
+import type { LintNode, LinterResult, Violation } from "./types";
 
 function node(partial: Partial<LintNode> & Pick<LintNode, "kind">): LintNode {
   return {
@@ -199,28 +199,30 @@ describe("lintNodeActions", () => {
   });
 });
 
-describe("violationIgnoreAction", () => {
-  it("targets the violation's rule in its file", () => {
-    expect(
-      violationIgnoreAction({
-        violation: { rule: { method: "errcheck" }, line: 3 },
-        linter: "golangci-lint",
-        file: "pkg/a.go",
-        workDir: "/repo",
-      }),
-    ).toEqual({
-      key: "violation",
-      label: "Ignore this violation",
-      title: "Add {source, rule, file} to .gavel.yaml",
-      variant: "subtle",
-      req: { source: "golangci-lint", rule: "errcheck", file: "pkg/a.go", work_dir: "/repo" },
-    });
+describe("violationIgnoreActions", () => {
+  const LINTER = "golangci-lint";
+  const FILE = "pkg/a.go";
+  const WORK_DIR = "/repo";
+  const scopes = (violation: Violation, file = FILE) =>
+    violationIgnoreActions({ violation, linter: LINTER, file, workDir: WORK_DIR }).map((a) => [a.key, a.req]);
+
+  it("offers this occurrence, the rule everywhere and the linter in the file, narrowest first", () => {
+    expect(scopes({ rule: { method: "errcheck" }, line: 3 })).toEqual([
+      ["violation-occurrence", { source: LINTER, rule: "errcheck", file: FILE, line: 3, work_dir: WORK_DIR }],
+      ["violation-rule", { source: LINTER, rule: "errcheck", work_dir: WORK_DIR }],
+      ["violation-file", { source: LINTER, file: FILE, work_dir: WORK_DIR }],
+    ]);
   });
 
-  it("is unavailable without a rule or a file", () => {
-    expect(violationIgnoreAction({ violation: { line: 3 }, linter: "x", file: "a.go", workDir: "" })).toBeNull();
-    expect(
-      violationIgnoreAction({ violation: { rule: { method: "r" } }, linter: "x", file: "", workDir: "" }),
-    ).toBeNull();
+  it("leaves out the scopes a violation without a rule, line or file cannot express", () => {
+    expect({
+      noRule: scopes({ line: 3 }).map(([key]) => key),
+      noLine: scopes({ rule: { method: "errcheck" } }).map(([key]) => key),
+      noFile: scopes({ rule: { method: "errcheck" }, line: 3 }, "").map(([key]) => key),
+    }).toEqual({
+      noRule: ["violation-occurrence", "violation-file"],
+      noLine: ["violation-rule", "violation-file"],
+      noFile: ["violation-rule"],
+    });
   });
 });

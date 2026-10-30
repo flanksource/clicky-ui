@@ -3,6 +3,8 @@
 // names match the JSON tags exactly. This module is generic — it carries no
 // application-specific concepts.
 
+import type { PromptSnapshot } from "../hooks/use-prompts";
+
 export interface LogEntry {
   level: string;
   message: string;
@@ -136,6 +138,8 @@ export interface TaskSnapshot {
   stdoutTruncated?: boolean;
   stderrTruncated?: boolean;
   details?: TaskProcessDetails | TaskExecDetails | Record<string, unknown>;
+  /** Pending prompts a running task is blocked on (Go `prompt.TaskLabel`). */
+  prompts?: PromptSnapshot[];
 }
 
 // TaskRunMeta mirrors the Go `task.RunMeta` listing summary returned by

@@ -31,6 +31,19 @@ export type Violation = {
   /** The offending source snippet, not a rule id. */
   code?: string;
   fixable?: boolean;
+  /**
+   * Every place one fix resolves (gavel models.ViolationLocation), `file` and
+   * `line` naming the first; absent for a violation found at one place.
+   */
+  locations?: ViolationLocation[];
+};
+
+export type ViolationLocation = {
+  file: string;
+  line?: number;
+  column?: number;
+  /** What is at this place, e.g. the statement a plan finding came from. */
+  message?: string;
 };
 
 export type LinterResult = {
@@ -128,6 +141,8 @@ export type LintIgnoreRequest = {
   source?: string | undefined;
   rule?: string | undefined;
   file?: string | undefined;
+  /** Narrows a `file` ignore to the violation on this 1-based line. */
+  line?: number | undefined;
   work_dir?: string | undefined;
 };
 
