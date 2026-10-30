@@ -10,10 +10,11 @@ import {
   collectFolderLintStats,
   folderPattern,
   lintNodeActions,
-  violationIgnoreAction,
+  violationIgnoreActions,
 } from "./actions";
 import { isLinterErrored, linterToolName, lintNodeCount, severityOf } from "./stats";
 import { OpenInFilesLink, type OpenFileTarget } from "../OpenInFilesLink";
+import { relPath } from "./paths";
 import type { LintAction, LintNode, LinterResult, Violation } from "./types";
 
 type HostActionProps = {
@@ -108,6 +109,38 @@ function violationLocation(v: Violation, withFile: boolean): string {
   return withFile && v.file ? `${v.file}${position}` : position;
 }
 
+// ViolationLocations lists each place a violation one fix resolves applies,
+// relative to the linter's work dir, each opening its own line.
+function ViolationLocations({
+  violation,
+  workDir,
+  onOpenFile,
+}: Pick<HostActionProps, "onOpenFile"> & { violation: Violation; workDir: string }) {
+  const locations = violation.locations ?? [];
+  return (
+    <div className="mt-1 space-y-0.5">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{`${locations.length} locations`}</div>
+      <ul className="space-y-0.5">
+        {locations.map((location, i) => {
+          const file = relPath(location.file, workDir) ?? location.file;
+          return (
+            <li key={i} className="flex flex-wrap items-baseline gap-2 text-xs" data-testid="lint-violation-location">
+              <span className="font-mono text-muted-foreground">{`${file}${location.line ? `:${location.line}` : ""}`}</span>
+              {location.message && <span>{location.message}</span>}
+              {onOpenFile && (
+                <OpenInFilesLink
+                  target={{ file, ...(workDir ? { workDir } : {}), ...(location.line ? { line: location.line } : {}) }}
+                  onOpenFile={onOpenFile}
+                />
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function ViolationCard({
   violation,
   linter,
@@ -126,7 +159,7 @@ function ViolationCard({
   showFile?: boolean;
 }) {
   const rule = violation.rule?.method ?? "";
-  const ignore = onIgnore ? violationIgnoreAction({ violation, linter, file, workDir }) : null;
+  const ignores = onIgnore ? violationIgnoreActions({ violation, linter, file, workDir }) : [];
   return (
     <div className="rounded border border-border bg-card p-2" data-lint-violation="">
       <div className="flex items-start gap-2">
@@ -145,12 +178,17 @@ function ViolationCard({
           {violation.message && (
             <div className="mt-0.5 whitespace-pre-wrap text-sm">{violation.message}</div>
           )}
+          {(violation.locations?.length ?? 0) > 1 && (
+            <ViolationLocations violation={violation} workDir={workDir} onOpenFile={onOpenFile} />
+          )}
           {violation.code && (
             <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 font-mono text-xs">{violation.code}</pre>
           )}
-          {ignore && onIgnore && (
-            <div className="mt-1.5">
-              <IgnoreButton action={ignore} onIgnore={onIgnore} disabled={Boolean(ignoreBusy)} />
+          {ignores.length > 0 && onIgnore && (
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {ignores.map((action) => (
+                <IgnoreButton key={action.key} action={action} onIgnore={onIgnore} disabled={Boolean(ignoreBusy)} />
+              ))}
             </div>
           )}
         </div>

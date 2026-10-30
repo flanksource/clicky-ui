@@ -24,7 +24,7 @@ export {
   lintFileActions,
   lintFolderActions,
   lintNodeActions,
-  violationIgnoreAction,
+  violationIgnoreActions,
 } from "./actions";
 
 export {
@@ -40,4 +40,5 @@ export {
   type LinterResult,
   type LinterStatus,
   type Violation,
+  type ViolationLocation,
 } from "./types";
