@@ -87,6 +87,43 @@ describe("LintResults", () => {
     expect(screen.getByText("func `legacyRoute` is unused")).toBeInTheDocument();
   });
 
+  // One fix at three places (lab run 2026-10-30: an nvarchar parameter
+  // against varchar OMDataIntakeGL.FileID) is one violation listing each place.
+  it("lists every place a violation applies, each opening its own line", () => {
+    const onOpenFile = vi.fn();
+    const workDir = "/repo/oipa";
+    const file = "rules/tr/Billing/XMLData.xml";
+    const convert: LinterResult = {
+      linter: "oipa-transaction",
+      work_dir: workDir,
+      violations: [
+        {
+          file,
+          line: 125,
+          severity: "warning",
+          rule: { method: "transaction.math.sql.plan-warning" },
+          message: "PlanAffectingConvert — CONVERT_IMPLICIT(nvarchar(100),[OMDataIntakeGL].[FileID],0)",
+          locations: [
+            { file: `${workDir}/${file}`, line: 125, message: "screen over activity a1: statement s1" },
+            { file, line: 126, message: "screen over activity a1: statement s2" },
+            { file: "rules/br/CopyBook-Fees/XMLData.xml", line: 9, message: "transaction math over activity a1: statement s3" },
+          ],
+        },
+      ],
+    };
+    render(<Harness results={[convert]} onOpenFile={onOpenFile} />);
+    fireEvent.click(within(tree()).getByText("rules > tr > Billing > XMLData.xml"));
+    const places = screen.getAllByTestId("lint-violation-location");
+    expect(places.map((p) => p.textContent)).toEqual([
+      expect.stringContaining(`${file}:125screen over activity a1: statement s1`),
+      expect.stringContaining(`${file}:126screen over activity a1: statement s2`),
+      expect.stringContaining("rules/br/CopyBook-Fees/XMLData.xml:9transaction math over activity a1: statement s3"),
+    ]);
+    expect(screen.getByText("3 locations")).toBeInTheDocument();
+    fireEvent.click(within(places[2]!).getByRole("button"));
+    expect(onOpenFile).toHaveBeenLastCalledWith({ file: "rules/br/CopyBook-Fees/XMLData.xml", workDir, line: 9 });
+  });
+
   it("shows a placeholder until something is selected", () => {
     render(<Harness />);
     expect(screen.getByText("Select a linter, rule or file to view its findings.")).toBeInTheDocument();
@@ -191,16 +228,15 @@ describe("LintResults", () => {
       });
     });
 
-    it("offers a per-violation ignore on a file's findings", () => {
+    it("offers per-violation ignores for the occurrence, its rule and its file", () => {
       const onIgnore = vi.fn<(action: LintAction) => void>();
       render(<Harness onIgnore={onIgnore} initialSelected={`${ruleNode}/pkg-server-handler-go`} />);
       const first = document.querySelectorAll<HTMLElement>("[data-lint-violation]")[0]!;
-      fireEvent.click(within(first).getByRole("button", { name: "Ignore this violation" }));
-      expect(onIgnore.mock.calls[0]![0].req).toEqual({
-        source: "golangci-lint",
-        rule: "errcheck",
-        file: "pkg/server/handler.go",
-        work_dir: "/repo/gavel",
+      const labels = within(first).getAllByRole("button", { name: /^Ignore/ }).map((b) => b.textContent);
+      fireEvent.click(within(first).getByRole("button", { name: "Ignore this occurrence" }));
+      expect({ labels, req: onIgnore.mock.calls[0]![0].req }).toEqual({
+        labels: ["Ignore this occurrence", "Ignore errcheck everywhere", "Ignore all golangci-lint in this file"],
+        req: { source: "golangci-lint", rule: "errcheck", file: "pkg/server/handler.go", line: 41, work_dir: "/repo/gavel" },
       });
     });
 

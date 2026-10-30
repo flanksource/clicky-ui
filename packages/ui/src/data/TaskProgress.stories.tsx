@@ -68,6 +68,37 @@ export const Running: Story = {
   },
 };
 
+export const WaitingForAnswer: Story = {
+  args: {
+    snapshots: run("running", [
+      { name: "Stage files", status: "success", duration: "0.4s" },
+      {
+        name: "Commit",
+        status: "running",
+        prompts: [
+          {
+            id: "p-lock",
+            kind: "select",
+            state: "pending",
+            title: "Stale git lock detected: .git/index.lock (age 12s, 0 bytes, no process has it open). Remove and retry?",
+            schema: {
+              type: "object",
+              properties: {
+                choice: {
+                  type: "string",
+                  enum: ["0", "1"],
+                  "x-enum-labels": { "0": "Remove and retry", "1": "Cancel" },
+                },
+              },
+              required: ["choice"],
+            },
+          },
+        ],
+      },
+    ]),
+  },
+};
+
 export const WithFailure: Story = {
   args: {
     snapshots: run("failed", [

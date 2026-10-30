@@ -205,8 +205,12 @@ export function lintNodeActions(node: LintNode, results: readonly LinterResult[]
   }
 }
 
-/** Ignore one finding's rule in its file; unavailable for a finding without a rule or file. */
-export function violationIgnoreAction({
+/**
+ * One finding's ignore scopes, narrowest first: this occurrence (its file and
+ * line), its rule everywhere, and everything its linter reports in the file.
+ * A scope the finding cannot express (no line, rule or file) is left out.
+ */
+export function violationIgnoreActions({
   violation,
   linter,
   file,
@@ -216,14 +220,41 @@ export function violationIgnoreAction({
   linter: string;
   file: string;
   workDir: string;
-}): LintAction | null {
+}): LintAction[] {
   const rule = violation.rule?.method;
-  if (!rule || !file) return null;
-  return {
-    key: "violation",
-    label: "Ignore this violation",
-    title: "Add {source, rule, file} to .gavel.yaml",
-    variant: "subtle",
-    req: { source: linter, rule, file, work_dir: workDir },
-  };
+  const line = violation.line;
+  return [
+    ...(file && line
+      ? [
+          {
+            key: "violation-occurrence",
+            label: "Ignore this occurrence",
+            title: `Add {source${rule ? ", rule" : ""}, file, line} to .gavel.yaml`,
+            req: { source: linter, ...(rule ? { rule } : {}), file, line, work_dir: workDir },
+          },
+        ]
+      : []),
+    ...(rule
+      ? [
+          {
+            key: "violation-rule",
+            label: `Ignore ${rule} everywhere`,
+            title: "Add {source, rule} to .gavel.yaml",
+            variant: "subtle" as const,
+            req: { source: linter, rule, work_dir: workDir },
+          },
+        ]
+      : []),
+    ...(file
+      ? [
+          {
+            key: "violation-file",
+            label: `Ignore all ${linter} in this file`,
+            title: "Add {source, file} to .gavel.yaml",
+            variant: "subtle" as const,
+            req: { source: linter, file, work_dir: workDir },
+          },
+        ]
+      : []),
+  ];
 }
