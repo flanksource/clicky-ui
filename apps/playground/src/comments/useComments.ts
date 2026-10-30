@@ -16,6 +16,7 @@ import {
   type CommentReplyInput,
 } from "@flanksource/clicky-ui/comments";
 import { normalizeErrorDiagnostics, type ErrorDiagnostics } from "@flanksource/clicky-ui";
+import { QUOTE_PREFIX, parseQuoteAnchor, resolveQuote, sourceBlockOf } from "@flanksource/clicky-ui/file-findings";
 
 import type { AgentSessionRuntime } from "../../plugins/agent-session-store";
 import type {
@@ -28,10 +29,23 @@ import type {
   StoredPromptRun,
 } from "../../plugins/comments-store";
 import { overlayLabel, resolveAnchor } from "./dom-anchor";
+import { MARKDOWN_ROOT } from "./markdown-anchor";
 import { captureElementContext, captureElementHtml } from "./element-context";
 import { captureScreenshot } from "./screenshot";
 
 export const COMMENTS_ROUTE = "/__playground/comments";
+
+/**
+ * The element a new comment captures. A quote anchor (words selected in a
+ * FileReview) captures the rendered block holding them, so the store gets
+ * that block's usual css and markdown locators.
+ */
+export function anchorTarget(content: Element, anchor: string): Element | null {
+  if (!anchor.startsWith(QUOTE_PREFIX)) return resolveAnchor(content, anchor);
+  const scope = content.matches(MARKDOWN_ROOT) ? content : content.querySelector(MARKDOWN_ROOT);
+  const range = scope && resolveQuote(scope, parseQuoteAnchor(anchor));
+  return range ? sourceBlockOf(range.startContainer) : null;
+}
 
 /** The playground is single-user and local; there is no identity to look up. */
 export const PLAYGROUND_COMMENT_AUTHOR = {
@@ -168,6 +182,7 @@ export function useComments(
   options: {
     enabled?: boolean;
     poll?: boolean;
+    all?: boolean;
     capture?: (
       input: CommentCreateInput,
       actionId: string,
@@ -177,8 +192,10 @@ export function useComments(
   const captureRef = useRef(options.capture);
   captureRef.current = options.capture;
   const enabled = options.enabled !== false;
-  const pageRef = useRef(page);
-  pageRef.current = page;
+  const scope = `${page}:${Boolean(options.all)}`;
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
+  const [loadedScope, setLoadedScope] = useState<string>();
   const [comments, setComments] = useState<PlaygroundComment[]>([]);
   const [allComments, setAllComments] = useState<PageComment[]>([]);
   const [loading, setLoading] = useState(enabled);
@@ -225,22 +242,26 @@ export function useComments(
     try {
       const [pageComments, everyComment] = await Promise.all([
         page === "" ? Promise.resolve([]) : fetchComments({ page }),
-        fetchComments(),
+        options.all ? fetchComments() : Promise.resolve([]),
       ]);
-      if (pageRef.current !== page) return;
-      setComments(pageComments);
-      setAllComments(everyComment);
+      if (scopeRef.current !== scope) return;
+      setComments((previous) => JSON.stringify(previous) === JSON.stringify(pageComments) ? previous : pageComments);
+      const selected = options.all ? everyComment : pageComments;
+      setAllComments((previous) => JSON.stringify(previous) === JSON.stringify(selected) ? previous : selected);
+      setLoadedScope(scope);
       setError(null);
     } catch (cause) {
-      if (pageRef.current !== page) return;
+      if (scopeRef.current !== scope) return;
       setError(describeError(cause));
     } finally {
-      if (pageRef.current === page) setLoading(false);
+      if (scopeRef.current === scope) setLoading(false);
     }
-  }, [page, enabled]);
+  }, [page, enabled, options.all, scope]);
 
   useEffect(() => {
     setComments([]);
+    setAllComments([]);
+    setLoading(true);
     preparedSelection.current = null;
     void refresh();
   }, [refresh]);
@@ -271,6 +292,7 @@ export function useComments(
         if (options.rethrow) throw cause;
       }
       await refresh();
+      window.dispatchEvent(new Event("playground-feedback-updated"));
     },
     [refresh],
   );
@@ -323,7 +345,7 @@ export function useComments(
           const target =
             anchor === null || anchor === DOCUMENT_ANCHOR
               ? content
-              : (resolveAnchor(content, anchor) ?? prepared?.target);
+              : (anchorTarget(content, anchor) ?? prepared?.target);
           if (!target) {
             throw new Error(
               `Comment anchor ${JSON.stringify(anchor)} no longer matches an element`,
@@ -516,7 +538,7 @@ export function useComments(
   return {
     comments,
     allComments,
-    loading,
+    loading: loading || (enabled && loadedScope !== scope && error === null),
     error,
     create,
     captureSelection,

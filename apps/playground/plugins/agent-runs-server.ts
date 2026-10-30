@@ -11,6 +11,7 @@ import {
 import type { PlaygroundComment } from "../src/comments/useComments";
 import {
   AGENT_SESSION_GROUPINGS,
+  isCaptainTarget,
   readAgentSessions,
   writeAgentSessions,
   type AgentSession,
@@ -18,11 +19,15 @@ import {
   type AgentSessionRuntime,
   type AgentSessionSettings,
   type AgentSessionsFile,
+  type AgentTarget,
+  type CaptainAgentTarget,
 } from "./agent-session-store";
 import {
   CaptainClient,
   CaptainHttpError,
   CaptainUnreachableError,
+  type CaptainDeliverResult,
+  type CaptainLiveSession,
 } from "./captain-client";
 import {
   CommentHttpError,
@@ -75,6 +80,56 @@ const SESSION_PERMISSIONS = `permissions:
   mode: acceptEdits
   tools:
     allow: [Read, Edit, Write, Glob, Grep, Bash]`;
+
+/** curl that fails on an error status and reports the API's reason on stderr. */
+const CALL_API = [
+  "set -euo pipefail",
+  'call() { local out; out=$(curl -sS --fail-with-body "$@") || { echo "$out" >&2; return 1; }; echo "$out"; }',
+];
+
+/**
+ * The inline tools a session handles feedback with. Each posts to the comments
+ * API as the session's agent author, so the agent never builds those calls
+ * itself. Captain renders `origin` and `author` into the scripts shell-quoted;
+ * a thread id or reply body only ever arrives on stdin.
+ */
+export const SESSION_TOOLS = {
+  list_feedback: {
+    description:
+      "List unresolved playground feedback threads with their replies, captured element context and screenshot URLs. Pass page to read one page's threads.",
+    input: { "page?": "string, page slug, e.g. team/summary" },
+    readonly: true,
+    exec: [
+      ...CALL_API,
+      "page=$(jq -r '.page // empty')",
+      'call --get {{shq origin}}/__playground/comments --data-urlencode unresolved=true ${page:+--data-urlencode "page=$page"}',
+    ].join("\n"),
+  },
+  reply_to_thread: {
+    description:
+      "Reply to a feedback thread as this session's agent. Say what you changed and how you verified it.",
+    input: { id: "string, the thread root's comment id", body: "string, the reply in Markdown" },
+    permission: "allow",
+    exec: [
+      ...CALL_API,
+      "input=$(cat)",
+      "id=$(jq -r '.id | @uri' <<<\"$input\")",
+      "body=$(jq -c --arg name {{shq author}} '{body: .body, author: {name: $name, kind: \"agent\"} }' <<<\"$input\")",
+      'call -X POST -H "Content-Type: application/json" --data "$body" {{shq origin}}"/__playground/comments/$id/replies"',
+    ].join("\n"),
+  },
+  resolve_thread: {
+    description:
+      "Resolve a feedback thread once its change is made, verified and replied to. It then waits for a human's review.",
+    input: { id: "string, the thread root's comment id" },
+    permission: "allow",
+    exec: [
+      ...CALL_API,
+      "id=$(jq -r '.id | @uri')",
+      `call -X POST -H "Content-Type: application/json" --data '{}' {{shq origin}}"/__playground/comments/$id/resolve"`,
+    ].join("\n"),
+  },
+};
 
 class RequestError extends Error {
   constructor(
@@ -173,6 +228,57 @@ function parseSettingsPatch(body: Record<string, unknown>): SettingsPatch {
   };
 }
 
+/**
+ * A live captain session as the target picker shows it. Only these fields
+ * leave the server: captain's `live.environment` carries the agent's
+ * messaging credentials and is never forwarded.
+ */
+export type CaptainSessionOption = {
+  id: string;
+  source: string;
+  title: string;
+  cwd?: string;
+  model?: string;
+  /** The agent runs in a cmux pane, so delivery can fall back to typing into it. */
+  inCmux: boolean;
+};
+
+export function captainSessionOption(record: CaptainLiveSession): CaptainSessionOption {
+  const prompt = record.initialPrompt?.trim().split("\n")[0];
+  return {
+    id: record.id,
+    source: record.source,
+    title: record.title || record.slug || prompt || record.id,
+    ...(record.cwd ? { cwd: record.cwd } : {}),
+    ...(record.model ? { model: record.model } : {}),
+    inCmux: Boolean(record.live?.surface?.surfaceId),
+  };
+}
+
+function parseTargetRequest(body: Record<string, unknown>): { page: string; target: AgentTarget } {
+  const unexpected = Object.keys(body).find((key) => key !== "page" && key !== "target");
+  if (unexpected) {
+    throw new RequestError(
+      `target request has no field ${JSON.stringify(unexpected)}; use page and target`,
+      400,
+    );
+  }
+  const { page, target } = body;
+  if (typeof page !== "string" || page === "") {
+    throw new RequestError('"page" is required: a page slug or external:<uuid> key', 400);
+  }
+  if (isRecord(target) && target["kind"] === "playground" && Object.keys(target).length === 1) {
+    return { page, target: { kind: "playground" } };
+  }
+  if (!isCaptainTarget(target) || Object.keys(target).length !== 3) {
+    throw new RequestError(
+      '"target" must be {kind:"playground"} or {kind:"captain", sessionId, label}',
+      400,
+    );
+  }
+  return { page, target };
+}
+
 /** The session a page's threads go to: its own in `page` grouping, else the shared one. */
 function sessionPage(settings: AgentSessionSettings, page: string): string | null {
   return settings.grouping === "page" ? page : null;
@@ -184,13 +290,20 @@ function requestOrigin(req: IncomingMessage): string {
   return `http://${host}`;
 }
 
-/** Identity the agent acts under: the session's model, delegated by the playground. */
-function agentAuthor(model: string, sessionId?: string): StoredAuthor {
+/**
+ * Identity the agent acts under: its model, and whoever handed it the thread —
+ * the playground for its own session, captain for a live session it delivered to.
+ */
+function agentAuthor(options: {
+  model: string;
+  sessionId?: string | undefined;
+  via: "playground" | "captain";
+}): StoredAuthor {
   return {
-    name: model,
+    name: options.model,
     kind: "agent",
-    via: "playground",
-    ...(sessionId ? { sessionId } : {}),
+    via: options.via,
+    ...(options.sessionId ? { sessionId: options.sessionId } : {}),
   };
 }
 
@@ -218,23 +331,49 @@ function markdownOptions(origin: string): CommentMarkdownOptions {
   };
 }
 
-function threadMessage(options: {
+type ThreadMessageOptions = {
   dir: string;
   page: string;
   rootId: string;
   origin: string;
   author: StoredAuthor;
-}): string {
+};
+
+function threadMarkdown(options: ThreadMessageOptions): string {
   const thread = readPage(options.dir, options.page).filter(
     (entry) => entry.id === options.rootId || entry.parentId === options.rootId,
   ) as PlaygroundComment[];
+  return commentsToMarkdown(
+    [{ page: options.page, comments: thread }],
+    markdownOptions(options.origin),
+  );
+}
+
+function threadMessage(options: ThreadMessageOptions): string {
   const identity = JSON.stringify({ name: options.author.name, kind: "agent" });
   return [
-    `Handle this playground feedback thread. It is already acknowledged for you as ${identity}: do not acknowledge it again, and use exactly that author for every reply. Reply with what you changed and how you verified it, then resolve the thread.`,
-    commentsToMarkdown(
-      [{ page: options.page, comments: thread }],
-      markdownOptions(options.origin),
-    ),
+    `Handle this playground feedback thread. It is already acknowledged for you as ${identity}: do not acknowledge it again. Reply with what you changed and how you verified it using reply_to_thread, then resolve the thread with resolve_thread.`,
+    threadMarkdown(options),
+  ].join("\n\n");
+}
+
+/**
+ * The thread for a live session the playground did not start: it has no
+ * session tools, so it calls the thread's reply and resolve URLs itself, as
+ * the author it was acknowledged as.
+ */
+function captainThreadMessage(options: ThreadMessageOptions): string {
+  const author = JSON.stringify({ name: options.author.name, kind: "agent" });
+  const base = `${options.origin}/__playground/comments/${encodeURIComponent(options.rootId)}`;
+  return [
+    `Playground feedback thread ${options.rootId}, sent to this session from the playground at ${options.origin}. It is already acknowledged for you as ${author}: do not acknowledge it again. Implement the scoped change it asks for and verify it, then reply with what you changed and how you verified it, and resolve the thread:`,
+    [
+      "```sh",
+      `curl -sS --fail-with-body -X POST -H 'Content-Type: application/json' --data "$(jq -n --arg body '<your reply in Markdown>' '{body: $body, author: ${author}}')" '${base}/replies'`,
+      `curl -sS --fail-with-body -X POST -H 'Content-Type: application/json' --data '{}' '${base}/resolve'`,
+      "```",
+    ].join("\n"),
+    threadMarkdown(options),
   ].join("\n\n");
 }
 
@@ -256,7 +395,8 @@ function sessionInstructions(options: {
       skill: options.skill,
     }),
     "## This session",
-    `${scope} as separate messages over time; work through them in order, one thread at a time. The playground acknowledges each thread for you before sending it, as ${identity}. That overrides the acknowledge step and the author name in the workflow above: never acknowledge, and use ${identity} as the author of every reply. Everything else in the workflow still applies: implement the scoped change, verify it, reply, then resolve the thread.`,
+    `${scope} as separate messages over time; work through them in order, one thread at a time. The playground acknowledges each thread for you before sending it, as ${identity}. That overrides the acknowledge step and the author name in the workflow above: never acknowledge. Everything else in the workflow still applies: implement the scoped change, verify it, reply, then resolve the thread.`,
+    "Use this session's tools for the feedback API instead of HTTP calls: list_feedback reads unresolved threads, reply_to_thread replies and resolve_thread resolves, both as your author.",
   ].join("\n\n");
 }
 
@@ -266,6 +406,8 @@ function draftPrompt(cwd: string): string {
     "setup:",
     `  cwd: ${JSON.stringify(cwd)}`,
     SESSION_PERMISSIONS,
+    // JSON is YAML, and keeps the scripts' quoting intact.
+    `tools: ${JSON.stringify(SESSION_TOOLS)}`,
     "---",
     '{{role "system"}}',
     "{{{instructions}}}",
@@ -295,6 +437,11 @@ function claimForAgent(options: {
   // that acknowledged first) leaves the previous session id on record.
   patchComment(dir, comment.id, { assignee: agent, acknowledgedBy: agent });
 }
+
+/** A root handed to the playground's own session, or delivered into a live captain one. */
+type ThreadHandoff =
+  | { comment: StoredComment; session: AgentSession }
+  | { comment: StoredComment; delivery: CaptainDeliverResult };
 
 function setAgentRun(dir: string, id: string, run: StoredAgentRun): void {
   patchComment(dir, id, { agentRun: run });
@@ -355,12 +502,17 @@ export function createAgentRuns(options: AgentRunsOptions) {
     runtime: AgentSessionRuntime;
     instructions: string;
     message: string;
+    origin: string;
+    author: StoredAuthor;
   }): Promise<AgentSession> {
     const runId = await captain.startChatRun({
       content: draftPrompt(cwd),
       variables: {
         instructions: startOptions.instructions,
         message: startOptions.message,
+        // The session tools post to this playground, as this author.
+        origin: startOptions.origin,
+        author: startOptions.author.name,
       },
       spec: startOptions.runtime.spec,
       presets: startOptions.runtime.presets,
@@ -383,12 +535,90 @@ export function createAgentRuns(options: AgentRunsOptions) {
     return session;
   }
 
+  /** Every live captain session, projected for the target picker. */
+  async function captainSessions(): Promise<CaptainSessionOption[]> {
+    return (await captain.listLiveSessions()).map(captainSessionOption);
+  }
+
+  /**
+   * Hands a root to the page's live captain session. Liveness is checked before
+   * the thread is claimed, so a target that has gone leaves the comment as it was.
+   */
+  async function deliverToCaptain(options: {
+    comment: StoredComment;
+    page: string;
+    request: RunRequest;
+    origin: string;
+    target: CaptainAgentTarget;
+  }): Promise<ThreadHandoff> {
+    const { comment, page, request, origin, target } = options;
+    const live = (await captain.listLiveSessions()).find(
+      (entry) => entry.id === target.sessionId,
+    );
+    if (!live) {
+      throw new RequestError(
+        `captain session ${JSON.stringify(target.label)} (${target.sessionId}) is no longer live; choose another target for page ${page}`,
+        409,
+      );
+    }
+    const author = agentAuthor({
+      model: live.model || live.source,
+      sessionId: target.sessionId,
+      via: "captain",
+    });
+    const requestedAt = new Date().toISOString();
+    claimForAgent({ dir, comment, human: request.human, agent: author });
+    setAgentRun(dir, comment.id, {
+      sessionId: target.sessionId,
+      requestedAt,
+      state: "queued",
+      target: { label: target.label },
+    });
+    let delivery: CaptainDeliverResult;
+    try {
+      delivery = await captain.deliver(
+        target.sessionId,
+        captainThreadMessage({ dir, page, rootId: comment.id, origin, author }),
+      );
+    } catch (error) {
+      setAgentRun(dir, comment.id, {
+        sessionId: target.sessionId,
+        requestedAt,
+        state: "error",
+        error: describeError(error),
+        target: { label: target.label },
+      });
+      throw error;
+    }
+    setAgentRun(dir, comment.id, {
+      sessionId: target.sessionId,
+      requestedAt,
+      state: delivery.status === "queued" ? "queued" : "sent",
+      target: { label: target.label, channel: delivery.channel },
+    });
+    return { comment: findComment(dir, comment.id)!.comment, delivery };
+  }
+
+  /** Points a page's threads at a live captain session, or back at the playground's. */
+  function setTarget(body: Record<string, unknown>): Promise<AgentSessionSettings> {
+    const { page, target } = parseTargetRequest(body);
+    return serialized(async () => {
+      const data = readAgentSessions(dir);
+      const targets = { ...data.settings.targets };
+      if (target.kind === "captain") targets[page] = target;
+      else delete targets[page];
+      const settings = { ...data.settings, targets };
+      writeAgentSessions(dir, { ...data, settings });
+      return settings;
+    });
+  }
+
   /** Hands one thread root to its session, starting that session when none is live. */
   async function sendThread(
     id: string,
     request: RunRequest,
     origin: string,
-  ): Promise<{ comment: StoredComment; session: AgentSession }> {
+  ): Promise<ThreadHandoff> {
     const found = findComment(dir, id);
     if (!found) throw new CommentHttpError(`comment "${id}" not found`, 404);
     if (found.comment.parentId) {
@@ -399,6 +629,17 @@ export function createAgentRuns(options: AgentRunsOptions) {
         `comment status "${found.comment.status}" cannot be sent to an agent`,
         409,
       );
+    }
+
+    const target = readAgentSessions(dir).settings.targets?.[found.page];
+    if (target) {
+      if (request.runtime) {
+        throw new RequestError(
+          `page ${found.page} sends its threads to captain session ${JSON.stringify(target.label)}, which needs no runtime`,
+          409,
+        );
+      }
+      return deliverToCaptain({ comment: found.comment, page: found.page, request, origin, target });
     }
 
     // A named runtime becomes the one every new or replacement session starts with.
@@ -419,7 +660,11 @@ export function createAgentRuns(options: AgentRunsOptions) {
       );
     }
     const requestedAt = new Date().toISOString();
-    const author = agentAuthor(runtime.spec.model, session?.sessionId);
+    const author = agentAuthor({
+      model: runtime.spec.model,
+      sessionId: session?.sessionId,
+      via: "playground",
+    });
     const message = (agent: StoredAuthor) =>
       threadMessage({ dir, page: found.page, rootId: id, origin, author: agent });
 
@@ -434,12 +679,18 @@ export function createAgentRuns(options: AgentRunsOptions) {
           page,
         }),
         message: message(author),
+        origin,
+        author,
       });
       claimForAgent({
         dir,
         comment: found.comment,
         human: request.human,
-        agent: agentAuthor(runtime.spec.model, started.sessionId),
+        agent: agentAuthor({
+          model: runtime.spec.model,
+          sessionId: started.sessionId,
+          via: "playground",
+        }),
       });
       setAgentRun(dir, id, {
         sessionId: started.sessionId,
@@ -478,7 +729,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
     id: string,
     body: Record<string, unknown>,
     origin: string,
-  ): Promise<{ comment: StoredComment; session: AgentSession }> {
+  ): Promise<ThreadHandoff> {
     const request = parseRunRequest(body);
     return serialized(() => sendThread(id, request, origin));
   }
@@ -646,6 +897,8 @@ export function createAgentRuns(options: AgentRunsOptions) {
     runOnComment,
     autoRunComment,
     updateSettings,
+    setTarget,
+    captainSessions,
     proxy,
     forgetSession,
     sessions: () => serialized(verifiedSessions),
@@ -692,7 +945,9 @@ export function playgroundAgentRuns(runs: AgentRuns): Plugin {
       const entry = SESSION_ENTRY_ROUTE.exec(url.pathname);
       const isSessions = url.pathname === "/agent-sessions";
       const isSettings = url.pathname === "/agent-sessions/settings";
-      if (!(comment || proxied || entry || isSessions || isSettings)) {
+      const isTargets = url.pathname === "/agent-sessions/targets";
+      const isCaptain = url.pathname === "/agent-sessions/captain";
+      if (!(comment || proxied || entry || isSessions || isSettings || isTargets || isCaptain)) {
         next();
         return;
       }
@@ -720,6 +975,18 @@ export function playgroundAgentRuns(runs: AgentRuns): Plugin {
             sendJson(res, 200, {
               settings: await runs.updateSettings(await readJsonBody(req)),
             });
+          } else if (isTargets) {
+            if (method !== "PUT") {
+              throw new RequestError("PUT sets a page's agent target", 405);
+            }
+            sendJson(res, 200, {
+              settings: await runs.setTarget(await readJsonBody(req)),
+            });
+          } else if (isCaptain) {
+            if (method !== "GET") {
+              throw new RequestError("GET lists the live captain sessions", 405);
+            }
+            sendJson(res, 200, { sessions: await runs.captainSessions() });
           } else if (entry) {
             if (method !== "DELETE") {
               throw new RequestError("DELETE ends and forgets an agent session", 405);

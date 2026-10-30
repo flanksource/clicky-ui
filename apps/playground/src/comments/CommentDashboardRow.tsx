@@ -79,8 +79,15 @@ export function CommentDashboardEntry({
   );
   const captured = comment.element?.screenshot?.status === "captured";
   return (
-    <article data-comment-id={comment.id} className="space-y-3 p-2 md:p-3">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
+    // One wrapping header row on desktop. On a phone the header dissolves
+    // (`contents`) so the comment body sits right under author/page/status and
+    // the assignment, run and action rows follow it.
+    <article
+      data-comment-id={comment.id}
+      className="flex flex-col gap-3 p-2 md:block md:space-y-3 md:p-3"
+    >
+      <header className="contents md:flex md:flex-wrap md:items-center md:gap-x-3 md:gap-y-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 md:contents">
         <div className="flex items-center gap-2">
           <CommentAuthorAvatar author={comment.author} size="md" />
           <span className="text-sm font-medium">
@@ -108,6 +115,8 @@ export function CommentDashboardEntry({
         >
           {status?.label ?? comment.status}
         </Badge>
+        </div>
+        <div className="order-last flex flex-wrap items-center gap-x-3 gap-y-2 md:contents">
         {comment.assignee && (
           <span
             className="inline-flex items-center gap-1 text-xs text-muted-foreground"
@@ -129,6 +138,7 @@ export function CommentDashboardEntry({
         )}
         <div className="ml-auto">
           <CommentDashboardActions comment={comment} href={href} />
+        </div>
         </div>
       </header>
       <div
@@ -236,7 +246,7 @@ export function CommentDashboardActions({
 
   return (
     <div>
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1 [@media(pointer:coarse)]:gap-2 [@media(pointer:coarse)]:[&>*]:size-11">
         <a
           href={href}
           aria-label="Open comment page"

@@ -6,10 +6,12 @@ import { deleteFolder, deletePage, movePage } from "./page-management-store";
 import { deleteReviewable, markReviewable } from "./reviewable-store";
 import {
   PageStoreError,
+  assertPageExtension,
   assertSlug,
   createFolder,
   createSource,
   folderPath,
+  listFolderPages,
   listFolders,
   pagePath,
   readSource,
@@ -177,9 +179,15 @@ export function announcePageMove(
   events.created(pagePath(pagesDir, nextSlug));
 }
 
+type SourcesOptions = {
+  pagesDir: string;
+  commentsDir: string;
+  /** Root that a read's `path` is relative to, so it matches the paths linters report. */
+  workspaceRoot: string;
+};
+
 function handle(
-  pagesDir: string,
-  commentsDir: string,
+  { pagesDir, commentsDir, workspaceRoot }: SourcesOptions,
   events: SourceEvents,
   req: IncomingMessage,
   res: ServerResponse,
@@ -250,7 +258,11 @@ function handle(
 
     case "read": {
       const slug = assertSlug(slugParam);
-      return sendJson(res, 200, { slug, source: readSource(pagesDir, slug) });
+      return sendJson(res, 200, {
+        slug,
+        source: readSource(pagesDir, slug),
+        path: relative(workspaceRoot, pagePath(pagesDir, slug)),
+      });
     }
 
     case "write":
@@ -269,7 +281,12 @@ function handle(
     case "create-page":
       return readJsonBody(req).then((body) => {
         const slug = assertSlug(body["slug"]);
-        createSource(pagesDir, slug, requireSource(body));
+        createSource(
+          pagesDir,
+          slug,
+          requireSource(body),
+          assertPageExtension(body["extension"]),
+        );
         events.created(pagePath(pagesDir, slug));
         sendJson(res, 201, { slug });
       });
@@ -309,11 +326,13 @@ function handle(
     case "delete-folder": {
       const folder = assertSlug(folderParam);
       const directory = folderPath(pagesDir, folder);
+      // Resolved before the delete: once a page is gone its extension is too.
+      const files = listFolderPages(pagesDir, folder).map((slug) =>
+        pagePath(pagesDir, slug),
+      );
       const result = deleteFolder({ pagesDir, commentsDir, folder });
       // One unlink per page so the glob drops each module, then the directory.
-      for (const slug of result.deletedPages) {
-        events.deleted(pagePath(pagesDir, slug));
-      }
+      for (const file of files) events.deleted(file);
       events.folderDeleted(directory);
       return sendJson(res, 200, result);
     }
@@ -325,10 +344,7 @@ function handle(
  * `src/pages/`. Dev-server only: `vite build` output has no file backend, and
  * writes are confined to validated slugs inside the pages directory.
  */
-export function playgroundSources(options: {
-  pagesDir: string;
-  commentsDir: string;
-}): Plugin {
+export function playgroundSources(options: SourcesOptions): Plugin {
   return {
     name: "playground-sources",
     apply: "serve",
@@ -355,13 +371,7 @@ export function playgroundSources(options: {
       server.middlewares.use(SOURCES_ROUTE, (req, res, next) => {
         void (async () => {
           try {
-            await handle(
-              options.pagesDir,
-              options.commentsDir,
-              events,
-              req,
-              res,
-            );
+            await handle(options, events, req, res);
           } catch (error) {
             const message =
               error instanceof Error ? error.message : String(error);

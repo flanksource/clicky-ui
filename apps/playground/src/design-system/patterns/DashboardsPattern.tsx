@@ -13,10 +13,9 @@
  * is visible here.
  */
 
-import { Callout, SegmentedControl, cn } from "@flanksource/clicky-ui";
+import { BarChart, Callout, SegmentedControl, Sparkline, StackedBarChart, cn } from "@flanksource/clicky-ui";
 import { useState } from "react";
 
-import { BarSeries, Legend, Sparkline, StackedBar } from "./dataviz-marks";
 import {
   CATEGORICAL,
   DIVERGING,
@@ -201,24 +200,25 @@ function BoardSpecimen() {
         <div className="space-y-1">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Findings</p>
           <p className="text-2xl font-semibold tabular-nums text-foreground">468</p>
-          <Sparkline slot={0} values={TREND} />
+          <Sparkline height={40} values={TREND} width={200} />
         </div>
         <div className="space-y-1 sm:col-span-2">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Severity mix</p>
-          <StackedBar points={MIX} />
-          <Legend points={MIX} />
+          <StackedBarChart
+            categories={["Findings"]}
+            height={36}
+            legend
+            orientation="horizontal"
+            series={MIX.map((row) => ({ label: row.label, values: [row.value] }))}
+            width={440}
+          />
         </div>
       </div>
 
       {/* 2. Support — where? */}
       <div className="space-y-1 border-t border-border pt-density-3">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">Concentration by service</p>
-        <BarSeries height={100} points={BY_SERVICE} slot={0} />
-        <div className="flex justify-between text-[10px] text-muted-foreground">
-          {BY_SERVICE.map((row) => (
-            <span key={row.label}>{row.label}</span>
-          ))}
-        </div>
+        <BarChart data={BY_SERVICE} height={120} orientation="vertical" width={640} />
       </div>
 
       {/* 3. Detail — what do I do? Only when asked for. */}

@@ -10,6 +10,8 @@ export type PageSource = {
   /** Text currently in the editor buffer. */
   draft: string;
   setDraft: (next: string) => void;
+  /** The page file relative to the workspace root, once loaded. */
+  path: string | null;
   /** Last text known to be on disk. */
   saved: string;
   dirty: boolean;
@@ -22,7 +24,8 @@ export type PageSource = {
   loading: boolean;
   saving: boolean;
   error: string | null;
-  save: () => Promise<void>;
+  /** Resolves true once the draft is on disk, false when the write failed (see `error`). */
+  save: () => Promise<boolean>;
   revert: () => void;
 };
 
@@ -34,6 +37,7 @@ export type PageSource = {
 export function useSource(slug: string | undefined, enabled: boolean): PageSource {
   const [draft, setDraft] = useState("");
   const [saved, setSaved] = useState("");
+  const [path, setPath] = useState<string | null>(null);
   const [loadedSlug, setLoadedSlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -45,9 +49,10 @@ export function useSource(slug: string | undefined, enabled: boolean): PageSourc
     let cancelled = false;
     setLoading(true);
     void readPage(slug)
-      .then(({ source }) => {
+      .then(({ source, path }) => {
         if (cancelled) return;
         setSaved(source);
+        setPath(path);
         setDraft(source);
         setLoadedSlug(slug);
         setError(null);
@@ -65,14 +70,16 @@ export function useSource(slug: string | undefined, enabled: boolean): PageSourc
   }, [enabled, slug]);
 
   const save = useCallback(async () => {
-    if (!slug) return;
+    if (!slug) return false;
     setSaving(true);
     try {
       await writePage(slug, draft);
       setSaved(draft);
       setError(null);
+      return true;
     } catch (cause) {
       setError(describeError(cause));
+      return false;
     } finally {
       setSaving(false);
     }
@@ -83,6 +90,7 @@ export function useSource(slug: string | undefined, enabled: boolean): PageSourc
   return {
     draft,
     setDraft,
+    path: loadedSlug === slug ? path : null,
     saved,
     dirty: draft !== saved,
     ready: Boolean(slug) && loadedSlug === slug,

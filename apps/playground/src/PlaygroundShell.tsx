@@ -2,6 +2,7 @@ import {
   Suspense,
   lazy,
   useCallback,
+  useEffect,
   useMemo,
   useState,
   type ComponentType,
@@ -12,6 +13,7 @@ import {
   AppShell,
   CommentSidePanel,
   DOCUMENT_ANCHOR,
+  cn,
   useCommentContext,
   useFloatingZIndex,
 } from "@flanksource/clicky-ui";
@@ -35,7 +37,11 @@ import { MarkdownPage } from "./markdown/MarkdownPage";
 import { usePageGuidance } from "./markdown/usePageGuidance";
 import { PlaygroundBanner as Banner } from "./PlaygroundShellParts";
 import { PlaygroundBodyHeader } from "./PlaygroundBodyHeader";
-import { PlaygroundShellActions } from "./PlaygroundShellActions";
+import {
+  PlaygroundMobileActions,
+  PlaygroundShellActions,
+  type PlaygroundShellActionsProps,
+} from "./PlaygroundShellActions";
 import { ReviewProvider } from "./review/ReviewProvider";
 import { PlaygroundSidebarControls } from "./PlaygroundSidebarControls";
 import { useSidebarState } from "./sidebar-state";
@@ -48,6 +54,12 @@ const SourceEditor = lazy(() =>
     default: module.SourceEditor,
   })),
 );
+// Same for a markdown page: its source view is a Monaco editor.
+const MarkdownDocumentPage = lazy(() =>
+  import("./markdown-doc/MarkdownDocumentPage").then((module) => ({
+    default: module.MarkdownDocumentPage,
+  })),
+);
 import { useFeedbackCopy } from "./comments/useFeedbackCopy";
 import { useAgentRuns } from "./agent-runs/AgentRunsProvider";
 import { usePromptRuns } from "./prompt-runs/PromptRunsProvider";
@@ -57,12 +69,15 @@ import {
 } from "./comments/useComments";
 import { useDomAnchors } from "./comments/useDomAnchors";
 import { overlayLabel } from "./comments/dom-anchor";
+import { describeMarkdown, parseMarkdownAnchor } from "./comments/markdown-anchor";
+import { screenshotCaptureSupported } from "./comments/screenshot";
 import {
   fallbackPageSlug,
   loadPage,
   pageMeta,
   pageTitle,
   pages,
+  type ComponentPageEntry,
   type PageEntry,
 } from "./registry";
 import type { AnnotationVisibility, PlaygroundView } from "./route";
@@ -73,7 +88,7 @@ import {
 
 const lazyPageCache = new Map<string, LazyExoticComponent<ComponentType>>();
 
-function lazyPage(entry: PageEntry): LazyExoticComponent<ComponentType> {
+function lazyPage(entry: ComponentPageEntry): LazyExoticComponent<ComponentType> {
   const existing = lazyPageCache.get(entry.slug);
   if (existing) return existing;
 
@@ -106,6 +121,8 @@ export type PlaygroundShellProps = {
 };
 
 function shortAnchorLabel(anchor: string): string {
+  const markdown = parseMarkdownAnchor(anchor);
+  if (markdown) return describeMarkdown(markdown);
   const last = anchor.split(" > ").pop() ?? anchor;
   return last === ":scope" ? "Whole page" : last;
 }
@@ -139,23 +156,26 @@ export function PlaygroundShell({
   const activity = usePageActivity();
   const [editing, setEditing] = useState(false);
   const [pageAction, setPageAction] = useState<PageActionState | null>(null);
-  const source = useSource(active?.slug, editing);
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const markdownPage = active?.kind === "markdown";
+  // A markdown page is always its own editor, so its source is always loaded.
+  const source = useSource(active?.slug, editing || markdownPage);
   const pageFolders = usePageFolders();
-  const filesystemActionsDisabled = !import.meta.env.DEV || source.dirty;
+  const filesystemActionsDisabled = !import.meta.env.DEV || source.dirty || activity.loading || activity.error !== null;
   const filesystemActionsDisabledReason = !import.meta.env.DEV
     ? "Page filesystem actions are only available under vite dev"
     : source.dirty
       ? "Save or revert the source before changing pages"
-      : undefined;
+      : activity.error ?? (activity.loading ? "Loading feedback counts…" : undefined);
 
   // The provider's comments are typed without the element context the
   // locators live in; the same page's comments from the API carry it.
   const pageComments = useMemo(
     () =>
-      view === "preview" && active
+      view === "preview" && active && !markdownPage
         ? allComments.filter((comment) => comment.page === active.slug)
         : [],
-    [active, allComments, view],
+    [active, allComments, view, markdownPage],
   );
   const { pins, overlayPins, orphans, labels } = useDomAnchors(
     { scrollRef: ctx.contentRef, contentRef },
@@ -172,13 +192,14 @@ export function PlaygroundShell({
 
   const navSections = usePlaygroundNavigation({
     activeSlug: active?.slug,
-    allComments,
+    feedback: activity.feedback,
+    age: sidebar.age,
     query: sidebar.query,
     onQueryChange: (query) => setSidebar({ query }),
     sort: sidebar.sort,
     filters: sidebar.filters,
     updates: activity.updates,
-    loading: commentsLoading,
+    loading: commentsLoading || activity.loading,
     folders: pageFolders.folders,
     pageHref,
     actionsDisabled: filesystemActionsDisabled,
@@ -198,7 +219,7 @@ export function PlaygroundShell({
 
   useReactGrabComments({
     contentRef,
-    enabled: view === "preview" && Boolean(active),
+    enabled: view === "preview" && Boolean(active) && !markdownPage,
     onSelect: ({ anchor, element, screenshot }) => {
       if (!(element instanceof HTMLElement)) {
         throw new Error(
@@ -211,18 +232,24 @@ export function PlaygroundShell({
       ctx.focusAnchor(anchor);
     },
     onPrompt: ({ anchor, element }) => {
-      if (!active) throw new Error("Prompt needs an open playground page");
-      openPrompt({ page: active.slug, anchor, element: onCaptureSelection(anchor, element) });
+      if (!active) {
+        throw new Error("Prompt… needs an open playground page");
+      }
+      openPrompt({
+        page: active.slug,
+        anchor,
+        element: onCaptureSelection(anchor, element),
+      });
     },
   });
 
   const feedback = useFeedbackCopy({ active, comments: ctx.comments, labels });
-  const { queue: reviewQueue, selectItem: selectReviewItem } =
+  const { selectItem: selectReviewItem } =
     useResolvedCommentReview({
       allComments,
       activeSlug: active?.slug,
       selectedId: selectedCommentId,
-      active: review === "resolved",
+      active: review === "resolved" && !commentsLoading,
       pinsVersion: pins.length,
       context: ctx,
       onNavigate: onReviewNavigate,
@@ -234,18 +261,18 @@ export function PlaygroundShell({
     );
     return {
       pages: inFolder.length,
-      comments: allComments.filter((comment) =>
-        inFolder.some((entry) => entry.slug === comment.page),
-      ).length,
+      comments: inFolder.reduce((count, entry) => count + (activity.feedback[entry.slug]?.commentCount ?? 0), 0),
     };
   };
 
-  const PageComponent = active ? lazyPage(active) : null;
+  const PageComponent = active?.kind === "component" ? lazyPage(active) : null;
   const activeTitle = active ? pageTitle(active) : "";
   const activeMeta = active ? pageMeta(active) : undefined;
   const pageGuidance = usePageGuidance(active, activeTitle);
   const railVisible =
     Boolean(active) && view === "preview" &&
+    // A markdown page shows its own threads; only the resolved-review queue needs the rail there.
+    (!markdownPage || review === "resolved") &&
     (annotations === "visible" || review === "resolved") &&
     (review === "resolved" ||
       ctx.railMode !== "closed" ||
@@ -257,8 +284,45 @@ export function PlaygroundShell({
     ctx.railMode === "focused" &&
     ctx.focusedAnchor !== null &&
     overlayLabel(ctx.focusedAnchor) !== null;
-  const editorOpen = editing && active !== undefined;
+  const editorOpen = editing && active?.kind === "component";
+  // source and problems are markdown-page views; a .tsx page's source is its
+  // Edit editor, so such a link opens that instead.
+  const unsupportedView = active?.kind === "component" && (view === "source" || view === "problems");
+  useEffect(() => {
+    if (!unsupportedView) return;
+    setEditing(true);
+    onViewChange("preview");
+  }, [unsupportedView, onViewChange]);
   const actionPage = pageAction?.page ?? active;
+  const shellActionProps: PlaygroundShellActionsProps = {
+    view,
+    annotations,
+    showRejected,
+    onShowRejectedChange,
+    copyDisabled: pageGuidance.markdown === null,
+    pageMarkdownCopied: pageGuidance.copied,
+    onViewChange,
+    onAnnotationsChange,
+    onCopyPage: () => void pageGuidance.copyPage(),
+    filesystemActionsDisabled,
+    ...(filesystemActionsDisabledReason
+      ? { filesystemActionsDisabledReason }
+      : {}),
+    onNewPage: (action) => setPageAction({ action }),
+    active: Boolean(active),
+    markdownPage,
+    editing,
+    sourceDirty: source.dirty,
+    onToggleEditing: () => setEditing((on) => !on),
+    reviewActive: review === "resolved",
+    reviewCount: Object.values(activity.feedback).reduce((count, page) => count + page.resolvedCount, 0),
+    onToggleReview: () => review === "resolved" ? onReviewExit() : onReviewNavigate(active?.slug ?? ""),
+    onCommentWholePage: () => ctx.focusAnchor(DOCUMENT_ANCHOR),
+    feedbackCopied: feedback.copied,
+    onCopyFeedback: feedback.copyFeedback,
+    feedbackCopyActions: feedback.copyActions,
+    pageCommentCount: ctx.comments.length,
+  };
 
   return (
     <AppShell
@@ -267,56 +331,37 @@ export function PlaygroundShell({
           <span className="grid h-7 w-7 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
             P
           </span>
-          <span className="font-semibold tracking-tight">
+          <span className="truncate font-semibold tracking-tight">
             Clicky UI · Playground
           </span>
         </>
       }
-      sidebarHeader={<PlaygroundSidebarControls state={sidebar} onChange={setSidebar} error={activity.error} />}
+      sidebarHeader={<PlaygroundSidebarControls activeSlug={active?.slug} activity={activity} state={sidebar} onChange={setSidebar} error={activity.error} />}
       sidebarWidth={300}
       actions={
         <>
           {activeMeta?.appShellActions}
-          <PlaygroundShellActions
-            view={view}
-            annotations={annotations}
-            showRejected={showRejected}
-            onShowRejectedChange={onShowRejectedChange}
-            copyDisabled={pageGuidance.markdown === null}
-            pageMarkdownCopied={pageGuidance.copied}
-            onViewChange={onViewChange}
-            onAnnotationsChange={onAnnotationsChange}
-            onCopyPage={() => void pageGuidance.copyPage()}
-            filesystemActionsDisabled={filesystemActionsDisabled}
-            {...(filesystemActionsDisabledReason
-              ? { filesystemActionsDisabledReason }
-              : {})}
-            onNewPage={(action) => setPageAction({ action })}
-            active={Boolean(active)}
-            editing={editing}
-            sourceDirty={source.dirty}
-            onToggleEditing={() => setEditing((on) => !on)}
-            reviewActive={review === "resolved"}
-            reviewCount={reviewQueue.length}
-            onToggleReview={() =>
-              review === "resolved"
-                ? onReviewExit()
-                : selectReviewItem(
-                    reviewQueue.find(
-                      (comment) => comment.page === active?.slug,
-                    ) ?? reviewQueue[0],
-                  )
-            }
-            onCommentWholePage={() => {
-              ctx.focusAnchor(DOCUMENT_ANCHOR);
-            }}
-            feedbackCopied={feedback.copied}
-            onCopyFeedback={feedback.copyFeedback}
-            feedbackCopyActions={feedback.copyActions}
-            pageCommentCount={ctx.comments.length}
-          />
+          <PlaygroundShellActions {...shellActionProps} />
         </>
       }
+      mobileActions={
+        <PlaygroundMobileActions
+          {...shellActionProps}
+          moreOpen={moreActionsOpen}
+          onToggleMore={() => setMoreActionsOpen((open) => !open)}
+        />
+      }
+      {...(moreActionsOpen
+        ? {
+            toolbar: (
+              <>
+                {activeMeta?.appShellActions}
+                <PlaygroundShellActions {...shellActionProps} overflow />
+              </>
+            ),
+          }
+        : {})}
+      toolbarClassName="@3xl/app-shell:hidden [@media(pointer:coarse)]:[&_button]:min-h-11 [@media(pointer:coarse)]:[&_button]:min-w-11"
       navSections={[{ items: [{ key: "comments", label: "Comments", icon: UiComment, to: pageHref(""), active: !active }] }, ...navSections]}
       collapsedStorageKey="playground:sidebar:collapsed"
       contentClassName="overflow-hidden"
@@ -358,13 +403,13 @@ export function PlaygroundShell({
           <ReviewProvider
             page={active?.slug ?? ""}
             active={
-              view === "preview" && annotations === "visible" && Boolean(active)
+              view === "preview" && annotations === "visible" && Boolean(active) && !markdownPage
             }
             sourceDirty={source.dirty}
             contentRef={contentRef}
             scrollRef={ctx.contentRef}
           >
-            <div ref={contentRef} data-review-content data-show-rejected={showRejected} className="min-w-0 p-density-4">
+            <div ref={contentRef} data-review-content data-show-rejected={showRejected} className={cn("min-w-0 p-density-4", markdownPage && "h-full")}>
               {pageFolders.error && (
                 <Banner tone="danger">{pageFolders.error}</Banner>
               )}
@@ -394,7 +439,42 @@ export function PlaygroundShell({
                   “Unavailable” in the rail.
                 </Banner>
               )}
-              {view === "markdown" ? (
+              {active.kind === "markdown" ? (
+                view === "markdown" ? (
+                  <Banner tone="danger">
+                    view=markdown is the guidance export of a .tsx page; a
+                    markdown page has view=preview (rendered), view=source and
+                    view=problems.
+                  </Banner>
+                ) : (
+                  <Suspense
+                    fallback={
+                      <p className="text-sm text-muted-foreground">Loading…</p>
+                    }
+                  >
+                    <MarkdownDocumentPage
+                      slug={active.slug}
+                      view={view}
+                      onViewChange={onViewChange}
+                      source={source}
+                      annotations={annotations}
+                      onLint={(file) => {
+                        if (!contentRef.current) {
+                          throw new Error("Lint needs the playground content mounted");
+                        }
+                        openPrompt({
+                          page: active.slug,
+                          anchor: DOCUMENT_ANCHOR,
+                          element: onCaptureSelection(DOCUMENT_ANCHOR, contentRef.current),
+                          files: [file],
+                        });
+                      }}
+                    />
+                  </Suspense>
+                )
+              ) : unsupportedView ? (
+                null
+              ) : view === "markdown" ? (
                 <MarkdownPage
                   markdown={pageGuidance.markdown}
                   error={pageGuidance.loadError}
@@ -438,10 +518,13 @@ export function PlaygroundShell({
         {railVisible && (
           <div
             data-comment-rail
-            className="relative max-h-60 shrink-0 overflow-y-auto border-t border-border bg-background p-density-3 md:max-h-none md:border-l md:border-t-0"
+            // Stacked under the artifact on a phone: tall enough for a focused
+            // thread and its composer, with room under it for the fixed
+            // react-grab toolbar so it never covers the rail's controls.
+            className="relative max-h-[max(15rem,45dvh)] shrink-0 overflow-y-auto border-t border-border bg-background p-density-3 pb-16 md:max-h-none md:border-l md:border-t-0 md:pb-density-3"
             {...(railOverDialog ? { style: { zIndex: floatingZIndex } } : {})}
           >
-            {review === "resolved" ? (
+            {review === "resolved" && (commentsLoading || commentsError) ? <p role="status">{commentsError ?? "Loading resolved feedback…"}</p> : review === "resolved" ? (
               <PlaygroundCommentReview
                 allComments={allComments}
                 selectedId={selectedCommentId}
@@ -473,13 +556,16 @@ export function PlaygroundShell({
               />
             ) : (
               <CommentSidePanel
+                className="w-full md:w-[320px]"
                 focusedAlignment="anchor"
                 anchorLabels={labels}
                 formatAnchorLabel={shortAnchorLabel}
                 compact
                 createActions={[
                   { id: "plain", label: "Post comment" },
-                  { id: "screenshot", label: "Post with screenshot" },
+                  ...(screenshotCaptureSupported()
+                    ? [{ id: "screenshot", label: "Post with screenshot" }]
+                    : []),
                 ]}
                 threadToMarkdown={feedback.threadToMarkdown}
                 extraAssignItems={agentRuns.extraAssignItems}
@@ -502,10 +588,7 @@ export function PlaygroundShell({
           : {})}
         folders={pageFolders.folders}
         commentCount={
-          actionPage
-            ? allComments.filter((comment) => comment.page === actionPage.slug)
-                .length
-            : 0
+          actionPage ? activity.feedback[actionPage.slug]?.commentCount ?? 0 : 0
         }
         {...(pageAction?.initialFolder
           ? { folderImpact: folderImpact(pageAction.initialFolder) }

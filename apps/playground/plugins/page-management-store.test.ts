@@ -40,7 +40,7 @@ describe("page management", () => {
   });
 
   it("renames the path and title while moving every comment to the new slug", () => {
-    createSource(pagesDir, "old-page", SOURCE);
+    createSource(pagesDir, "old-page", SOURCE, ".tsx");
     addComment(commentsDir, "old-page", {
       id: "comment-1",
       body: "Keep this feedback",
@@ -93,7 +93,7 @@ describe("page management", () => {
   });
 
   it("moves a page without rewriting its source when title is omitted", () => {
-    createSource(pagesDir, "drafts/old-page", SOURCE);
+    createSource(pagesDir, "drafts/old-page", SOURCE, ".tsx");
 
     movePage({
       sourceRoot: pagesDir,
@@ -108,7 +108,7 @@ describe("page management", () => {
 
   it("rejects derived metadata before moving the page or its comments", () => {
     const derived = 'export const meta = pageMetadata("old-page");\n';
-    createSource(pagesDir, "old-page", derived);
+    createSource(pagesDir, "old-page", derived, ".tsx");
     addComment(commentsDir, "old-page", {
       id: "comment-1",
       body: "Keep this feedback",
@@ -132,8 +132,8 @@ describe("page management", () => {
   });
 
   it("refuses a destination conflict without changing either page", () => {
-    createSource(pagesDir, "old-page", SOURCE);
-    createSource(pagesDir, "taken", "taken");
+    createSource(pagesDir, "old-page", SOURCE, ".tsx");
+    createSource(pagesDir, "taken", "taken", ".tsx");
 
     expect(() =>
       movePage({
@@ -154,7 +154,7 @@ describe("page management", () => {
       'import { fixture } from "./_access-review-decisions/fixture";',
       "export default function AccessReview() { return null; }",
     ].join("\n");
-    createSource(pagesDir, "access-review-decisions", source);
+    createSource(pagesDir, "access-review-decisions", source, ".tsx");
     const consumer = join(pagesDir, "review.tsx");
     writeFileSync(
       consumer,
@@ -194,7 +194,7 @@ describe("page management", () => {
   });
 
   it("updates JavaScript-style imports that resolve to a moved TSX page", () => {
-    createSource(pagesDir, "review", SOURCE);
+    createSource(pagesDir, "review", SOURCE, ".tsx");
     const consumer = join(pagesDir, "consumer.tsx");
     writeFileSync(consumer, 'import OldPage from "./review.js";\n');
 
@@ -212,7 +212,7 @@ describe("page management", () => {
   });
 
   it("leaves an import of a separate JavaScript file intact", () => {
-    createSource(pagesDir, "review", SOURCE);
+    createSource(pagesDir, "review", SOURCE, ".tsx");
     writeFileSync(join(pagesDir, "review.js"), "export default 'separate';\n");
     const consumer = join(pagesDir, "consumer.tsx");
     const source = 'import value from "./review.js";\n';
@@ -238,6 +238,7 @@ describe("page management", () => {
         'const icon = new URL("./review.svg", import.meta.url);',
         'export const meta = { title: "Review" };',
       ].join("\n"),
+      ".tsx",
     );
     writeFileSync(join(pagesDir, "review.css"), "body {}\n");
     writeFileSync(join(pagesDir, "review.svg"), "<svg />\n");
@@ -290,6 +291,7 @@ describe("page management", () => {
         'export const logo = ART["./_brand/assets/logo.svg"];',
         'export const unrelated = "./_other/logo.svg";',
       ].join("\n"),
+      ".tsx",
     );
 
     expect(
@@ -313,7 +315,7 @@ describe("page management", () => {
   });
 
   it("rolls back the page and rewritten references when a write fails", () => {
-    createSource(pagesDir, "review", SOURCE);
+    createSource(pagesDir, "review", SOURCE, ".tsx");
     const consumer = join(pagesDir, "consumer.ts");
     const consumerSource = [
       'import Review from "./review";',
@@ -342,9 +344,9 @@ describe("page management", () => {
   });
 
   it("deletes a folder with its pages, nested folders and feedback", () => {
-    createSource(pagesDir, "trust/signoff", SOURCE);
-    createSource(pagesDir, "trust/nested/review", SOURCE);
-    createSource(pagesDir, "designs/keep", SOURCE);
+    createSource(pagesDir, "trust/signoff", SOURCE, ".tsx");
+    createSource(pagesDir, "trust/nested/review", SOURCE, ".tsx");
+    createSource(pagesDir, "designs/keep", SOURCE, ".tsx");
     // Helpers and colocated tests are not artifacts: they go with the folder,
     // but they never had a slug, so they are not reported as deleted pages.
     writeFileSync(join(pagesDir, "trust", "_helper.tsx"), SOURCE);
@@ -381,7 +383,7 @@ describe("page management", () => {
   });
 
   it("puts the folder back when the comment rewrite fails", () => {
-    createSource(pagesDir, "trust/signoff", SOURCE);
+    createSource(pagesDir, "trust/signoff", SOURCE, ".tsx");
     addComment(commentsDir, "trust/signoff", {
       id: "comment-1",
       body: "Feedback",
@@ -405,7 +407,7 @@ describe("page management", () => {
   });
 
   it("deletes the page and all feedback without leaving a backup", () => {
-    createSource(pagesDir, "old-page", SOURCE);
+    createSource(pagesDir, "old-page", SOURCE, ".tsx");
     addComment(commentsDir, "old-page", {
       id: "comment-1",
       body: "Delete with the page",

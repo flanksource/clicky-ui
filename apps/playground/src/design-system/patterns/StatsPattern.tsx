@@ -9,9 +9,8 @@
  *
  * Everything here uses clicky-ui's own components — `Gauge`, `RadialGauge`,
  * `ProgressBar`, `SignedDeltaBar`, `StackedStatusBar`, and the Grafana-style
- * formatters in `lib/format.ts` — rather than redrawing them. The one thing
- * added is the sparkline, which the library cannot supply without a query
- * client.
+ * formatters in `lib/format.ts` — rather than redrawing them. The sparkline is
+ * the library's static `Sparkline`, which needs no query client.
  */
 
 import {
@@ -19,6 +18,7 @@ import {
   ProgressBar,
   RadialGauge,
   SignedDeltaBar,
+  Sparkline,
   StackedStatusBar,
   formatBytes,
   formatDuration,
@@ -27,7 +27,6 @@ import {
 } from "@flanksource/clicky-ui";
 import type { ReactNode } from "react";
 
-import { Sparkline } from "./dataviz-marks";
 import { PracticeGrid, type Practice } from "../practice/PracticeGrid";
 
 import "./dataviz-palette.css";
@@ -106,7 +105,7 @@ export function StatsPattern() {
             </div>
           </Tile>
           <Tile label="Scan duration" meta="p95 over 10 runs" value={formatDuration(184_000)}>
-            <Sparkline className="pt-1" slot={0} values={TREND} />
+            <Sparkline className="pt-1" height={40} values={TREND} width={200} />
           </Tile>
           <Tile label="Evidence stored" meta="72% of 128 MiB budget" value={formatBytes(94_371_840)}>
             <div className="pt-2">

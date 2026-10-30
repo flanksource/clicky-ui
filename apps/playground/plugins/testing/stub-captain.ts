@@ -8,6 +8,7 @@ import type { AddressInfo } from "node:net";
 import { promptVariablesSchema } from "../prompt-result";
 
 import type {
+  CaptainDeliverResult,
   CaptainPromptDetail,
   CaptainRunSummary,
 } from "../captain-client";
@@ -33,6 +34,10 @@ export class StubCaptain {
   };
   /** When set, the next prompt run start answers with this status and body instead of a run. */
   nextRunFailure: { status: number; body: unknown } | undefined;
+  /** Rows `GET /api/captain/sessions/live` answers, as captain shapes them. */
+  liveSessions: Record<string, unknown>[] = [];
+  /** How `POST /api/captain/sessions/{id}/deliver` answers a live session. */
+  deliverResult: CaptainDeliverResult = { channel: "claude-socket", status: "sent" };
   server!: Server;
   private nextRun = 1;
   private streams = new Set<ServerResponse>();
@@ -152,6 +157,19 @@ export class StubCaptain {
         state.done = true;
         return json(202, { status: "stopping" });
       }
+    }
+    if (method === "GET" && path === "/api/captain/sessions/live") {
+      return json(200, { sessions: this.liveSessions, total: this.liveSessions.length });
+    }
+    const deliver = /^\/api\/captain\/sessions\/([^/]+)\/deliver$/.exec(path);
+    if (method === "POST" && deliver) {
+      const id = decodeURIComponent(deliver[1] ?? "");
+      if (!this.liveSessions.some((entry) => entry["id"] === id)) {
+        res.writeHead(409, { "Content-Type": "text/plain" });
+        res.end(`session ${id} has no live process\n`);
+        return;
+      }
+      return json(202, this.deliverResult);
     }
     if (method === "GET" && path.startsWith("/api/captain/sessions/")) {
       res.writeHead(200, { "Content-Type": "text/event-stream" });

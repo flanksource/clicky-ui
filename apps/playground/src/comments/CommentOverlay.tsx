@@ -47,6 +47,8 @@ function Pins({ pins, focusedAnchor, onFocus }: CommentOverlayProps) {
       style={{ left: pin.box.left + pin.box.width, top: pin.box.top }}
       className={cn(
         "pointer-events-auto absolute grid h-5 min-w-5 -translate-x-1/2 -translate-y-1/2",
+        // A finger needs ~44px; grow the hit area, not the badge.
+        "[@media(pointer:coarse)]:before:absolute [@media(pointer:coarse)]:before:-inset-3 [@media(pointer:coarse)]:before:content-['']",
         "place-items-center rounded-full border px-1 text-[10px] font-semibold shadow-sm",
         "transition-colors",
         pin.moved && "border-dashed",
