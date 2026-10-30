@@ -313,7 +313,7 @@ export function AvatarDemo() {
       <DemoRow label="Sizes · variants">
         <div
           className="grid gap-x-6 gap-y-3"
-          style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(10rem, 1fr))" }}
         >
           {VARIANTS.map((entry) => (
             <div key={`size-${entry.variant}`} className="space-y-2">
@@ -380,7 +380,7 @@ export function AvatarDemo() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-2 rounded-lg border border-border bg-background p-4">
           <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             Deployment report
