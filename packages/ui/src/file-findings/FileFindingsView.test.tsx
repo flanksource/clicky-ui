@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { useEffect, useState } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Keep the Shiki dynamic imports out of jsdom (same approach as Markdown.test.tsx).
 vi.mock("../data/code-highlight", async (importOriginal) => ({
@@ -9,115 +9,84 @@ vi.mock("../data/code-highlight", async (importOriginal) => ({
   highlightToLines: vi.fn(async () => null),
 }));
 
-const fake = vi.hoisted(() => {
-  const model = { getLineCount: () => 50, getLineMaxColumn: () => 80 };
-  const editor = {
-    getValue: () => "",
-    setValue: vi.fn(),
-    getModel: () => model,
-    getDomNode: () => document.createElement("div"),
-    updateOptions: vi.fn(),
-    createDecorationsCollection: vi.fn(() => ({ clear: vi.fn() })),
-    onMouseDown: vi.fn(() => ({ dispose: vi.fn() })),
-    onDidScrollChange: vi.fn(() => ({ dispose: vi.fn() })),
-    revealLineInCenter: vi.fn(),
-    getTopForLineNumber: (line: number) => line * 20,
-    getScrollTop: () => 0,
-  };
-  const monaco = {
-    editor: { setModelMarkers: vi.fn(), ScrollType: { Smooth: 0, Immediate: 1 } },
-    MarkerSeverity: { Error: 8, Warning: 4, Info: 2 },
-  };
-  return { model, editor, monaco, props: [] as Array<{ language: string; path: string; value: string }> };
-});
-
-vi.mock("monaco-editor", async () => (await import("../test/monaco-core.test-utils")).monacoCoreStub);
-vi.mock("@monaco-editor/react", () => ({
-  loader: { config: () => undefined },
-  default: function FakeMonacoEditor({
-    value,
-    language,
-    path,
-    onMount,
-  }: {
-    value: string;
-    language: string;
-    path: string;
-    onMount?: (editor: typeof fake.editor, monaco: typeof fake.monaco) => void;
-  }) {
-    fake.props.push({ language, path, value });
-    fake.editor.getValue = () => value;
-    useEffect(() => {
-      onMount?.(fake.editor, fake.monaco);
-    }, []);
-    return <div data-testid="fake-monaco">{value}</div>;
-  },
-}));
-
-import { MonacoProvider } from "../monaco/MonacoProvider";
 import { FileFindingsView } from "./FileFindingsView";
-import type { FileFinding, FileRef, FindingsViewMode } from "./types";
+import type { FileReviewView } from "./file-review/FileReview";
+import type { FileFinding, FileRef } from "./types";
 
 const WORK_DIR = "/repo/gavel";
+const GO_FILE = "pkg/server/handler.go";
+const MD_FILE = "docs/guide.md";
 
 function finding(file: string, line: number, severity: FileFinding["severity"], message: string): FileFinding {
   return { file, workDir: WORK_DIR, line, severity, message, source: "golangci-lint", rule: "rule", kind: "lint" };
 }
 
 const FINDINGS: FileFinding[] = [
-  finding("pkg/server/handler.go", 41, "error", "Error return value is not checked"),
-  finding("pkg/server/handler.go", 88, "warning", "Unused parameter"),
-  finding("docs/guide.md", 3, "warning", "Line too long"),
+  finding(GO_FILE, 3, "error", "Error return value is not checked"),
+  finding(GO_FILE, 5, "warning", "Unused parameter"),
+  finding(MD_FILE, 3, "warning", "Line too long"),
 ];
 
 const FILES: Record<string, string> = {
-  "pkg/server/handler.go": "package server\n",
-  "docs/guide.md": "# Guide\n\nA long line.\n",
+  [GO_FILE]: ["package server", "", "func Handle() {", "\tcall()", "\t_ = x", "}"].join("\n"),
+  [MD_FILE]: "# Guide\n\nA long line.\n",
 };
 
 function Harness({
   loadFile,
   initialFile = null,
-  initialView = "rendered",
+  initialView = "preview",
   onViewChange,
   onSelectFile,
+  onLineChange,
+  renderFindingActions,
 }: {
   loadFile: (file: FileRef) => Promise<string>;
   initialFile?: FileRef | null;
-  initialView?: FindingsViewMode;
-  onViewChange?: (view: FindingsViewMode) => void;
+  initialView?: FileReviewView;
+  onViewChange?: (view: FileReviewView) => void;
   onSelectFile?: (file: FileRef) => void;
+  onLineChange?: (line: number | undefined) => void;
+  renderFindingActions?: (finding: FileFinding) => React.ReactNode;
 }) {
   const [file, setFile] = useState<FileRef | null>(initialFile);
-  const [view, setView] = useState<FindingsViewMode>(initialView);
+  const [view, setView] = useState<FileReviewView>(initialView);
   const [line, setLine] = useState<number | undefined>(undefined);
   return (
-    <MonacoProvider getWorker={() => ({}) as Worker}>
-      <FileFindingsView
-        findings={FINDINGS}
-        selectedFile={file}
-        onSelectFile={(next) => {
-          onSelectFile?.(next);
-          setFile(next);
-        }}
-        line={line}
-        onLineChange={setLine}
-        view={view}
-        onViewChange={(next) => {
-          onViewChange?.(next);
-          setView(next);
-        }}
-        loadFile={loadFile}
-      />
-    </MonacoProvider>
+    <FileFindingsView
+      findings={FINDINGS}
+      selectedFile={file}
+      onSelectFile={(next) => {
+        onSelectFile?.(next);
+        setFile(next);
+      }}
+      line={line}
+      onLineChange={(next) => {
+        onLineChange?.(next);
+        setLine(next);
+      }}
+      view={view}
+      onViewChange={(next) => {
+        onViewChange?.(next);
+        setView(next);
+      }}
+      loadFile={loadFile}
+      {...(renderFindingActions ? { renderFindingActions } : {})}
+    />
   );
 }
 
 const readFile = (file: FileRef) => Promise.resolve(FILES[file.file]!);
+const listedLines = (container: HTMLElement) => container.querySelectorAll("[data-source-line]").length;
+
+// jsdom does no layout and gives Range no client rects; measured highlights are simply empty.
+beforeAll(() => {
+  Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
+  Range.prototype.getBoundingClientRect = () => new DOMRect();
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
-  fake.props.length = 0;
 });
 
 describe("FileFindingsView", () => {
@@ -134,33 +103,56 @@ describe("FileFindingsView", () => {
 
     fireEvent.click(row);
 
-    expect(onSelectFile).toHaveBeenCalledWith({ workDir: WORK_DIR, file: "pkg/server/handler.go" });
+    expect(onSelectFile).toHaveBeenCalledWith({ workDir: WORK_DIR, file: GO_FILE });
   });
 
-  it("loads the open file and shows code in the editor with its markers", async () => {
+  it("loads a code file and lists its source with each finding under its line, even when the view is preview", async () => {
     let finishLoading!: (text: string) => void;
     const loadFile = vi.fn(() => new Promise<string>((resolve) => (finishLoading = resolve)));
-    render(<Harness loadFile={loadFile} initialFile={{ workDir: WORK_DIR, file: "pkg/server/handler.go" }} />);
+    const { container } = render(<Harness loadFile={loadFile} initialFile={{ workDir: WORK_DIR, file: GO_FILE }} />);
 
-    expect(await screen.findByText("Loading pkg/server/handler.go")).toBeInTheDocument();
-    finishLoading("package server\n");
-    await waitFor(() => expect(screen.getByTestId("fake-monaco")).toHaveTextContent("package server"));
+    expect(await screen.findByText(`Loading ${GO_FILE}`)).toBeInTheDocument();
+    finishLoading(FILES[GO_FILE]!);
+    await waitFor(() => expect(listedLines(container)).toBe(6));
 
-    expect(loadFile).toHaveBeenCalledWith({ workDir: WORK_DIR, file: "pkg/server/handler.go" });
-    expect(fake.props.at(-1)?.language).toBe("go");
-    await waitFor(() => {
-      expect(fake.monaco.editor.setModelMarkers).toHaveBeenCalledWith(
-        fake.model,
-        "findings",
-        expect.arrayContaining([expect.objectContaining({ startLineNumber: 41 })]),
-      );
+    const messages = (line: number) => within(container.querySelector<HTMLElement>(`[data-source-line="${line}"]`)!).queryAllByRole("button").map((b) => b.textContent);
+    expect({
+      loaded: loadFile.mock.calls[0],
+      tabs: screen.getAllByRole("tab").map((tab) => tab.textContent?.replace(/\d+$/, "")),
+      line3: messages(3),
+      line5: messages(5),
+    }).toEqual({
+      loaded: [{ workDir: WORK_DIR, file: GO_FILE }],
+      tabs: ["Source", "Problems"],
+      line3: ["Error return value is not checkedgolangci-lint rule"],
+      line5: ["Unused parametergolangci-lint rule"],
     });
-    expect(screen.queryByRole("tablist", { name: "Markdown view" })).toBeNull();
+  });
+
+  it("reports the line of a picked finding and shows the host's actions beside it", async () => {
+    const onLineChange = vi.fn();
+    const { container } = render(
+      <Harness
+        loadFile={readFile}
+        initialFile={{ workDir: WORK_DIR, file: GO_FILE }}
+        onLineChange={onLineChange}
+        renderFindingActions={(f) => <button type="button">Ignore {f.rule}</button>}
+      />,
+    );
+    await waitFor(() => expect(listedLines(container)).toBe(6));
+
+    const row = container.querySelector<HTMLElement>('[data-source-line="5"] [data-source-finding]')!;
+    fireEvent.click(within(row).getByRole("button", { name: /Unused parameter/ }));
+
+    expect({ line: onLineChange.mock.calls.at(-1), action: within(row).getByRole("button", { name: "Ignore rule" }).textContent }).toEqual({
+      line: [5],
+      action: "Ignore rule",
+    });
   });
 
   it("shows the whole load error, not a summary of it", async () => {
     const loadFile = () => Promise.reject(new Error("GET /api/file: 404 file not found: pkg/server/handler.go"));
-    render(<Harness loadFile={loadFile} initialFile={{ workDir: WORK_DIR, file: "pkg/server/handler.go" }} />);
+    render(<Harness loadFile={loadFile} initialFile={{ workDir: WORK_DIR, file: GO_FILE }} />);
 
     const alert = await screen.findByRole("alert");
 
@@ -168,36 +160,20 @@ describe("FileFindingsView", () => {
     expect(alert).toHaveTextContent("GET /api/file: 404 file not found: pkg/server/handler.go");
   });
 
-  it("renders a markdown file with its findings and switches to the editor on request", async () => {
+  it("renders a markdown file with its findings and switches to the source listing on request", async () => {
     const onViewChange = vi.fn();
-    render(
-      <Harness
-        loadFile={readFile}
-        initialFile={{ workDir: WORK_DIR, file: "docs/guide.md" }}
-        onViewChange={onViewChange}
-      />,
+    const { container } = render(
+      <Harness loadFile={readFile} initialFile={{ workDir: WORK_DIR, file: MD_FILE }} onViewChange={onViewChange} />,
     );
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Guide" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Guide" })).toBeVisible();
     expect(await screen.findByText(/Line too long/)).toBeInTheDocument();
-    expect(screen.queryByTestId("fake-monaco")).toBeNull();
+    expect(listedLines(container)).toBe(0);
 
     fireEvent.click(screen.getByRole("tab", { name: "Source" }));
 
     expect(onViewChange).toHaveBeenCalledWith("source");
-    await waitFor(() => expect(screen.getByTestId("fake-monaco")).toHaveTextContent("A long line."));
-    expect(fake.props.at(-1)?.language).toBe("markdown");
-    expect(screen.queryByRole("heading", { level: 1, name: "Guide" })).toBeNull();
-  });
-
-  it("opens a markdown file in the editor when the view is source", async () => {
-    render(
-      <Harness loadFile={readFile} initialFile={{ workDir: WORK_DIR, file: "docs/guide.md" }} initialView="source" />,
-    );
-
-    await waitFor(() => expect(screen.getByTestId("fake-monaco")).toHaveTextContent("# Guide"));
-    const toggle = screen.getByRole("tablist", { name: "Markdown view" });
-    expect(within(toggle).getByRole("tab", { name: "Source" })).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelector('[data-source-line="3"]')).toHaveTextContent("A long line."));
   });
 
   it("says so when the open file has no findings in this run", async () => {
@@ -215,15 +191,12 @@ describe("FileFindingsView", () => {
           <button type="button" onClick={() => force((n) => n + 1)}>
             rerender
           </button>
-          <Harness
-            loadFile={(file) => loads(file)}
-            initialFile={{ workDir: WORK_DIR, file: "pkg/server/handler.go" }}
-          />
+          <Harness loadFile={(file) => loads(file)} initialFile={{ workDir: WORK_DIR, file: GO_FILE }} />
         </>
       );
     }
-    render(<Unstable />);
-    await waitFor(() => expect(screen.getByTestId("fake-monaco")).toBeInTheDocument());
+    const { container } = render(<Unstable />);
+    await waitFor(() => expect(listedLines(container)).toBe(6));
 
     fireEvent.click(screen.getByRole("button", { name: "rerender" }));
 

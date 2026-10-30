@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon } from "../data/Icon";
-import { TabButton } from "../data/TabButton";
 import { Tree } from "../data/Tree";
 import { LintSeverityIcon } from "../data/test-runner/MarkIcons";
 import { UiFileCode, UiFolder, UiLoader } from "../icons";
 import { SplitPane } from "../layout/SplitPane";
 import { cn } from "../lib/utils";
 import { groupFindingsByFile } from "./adapters";
-import { AnnotatedMarkdown } from "./AnnotatedMarkdown";
-import { AnnotatedCode } from "./LazyAnnotatedCode";
+import { FileReview, type FileReviewView } from "./file-review/FileReview";
 import { countFindingsBySeverity, FINDING_SEVERITIES } from "./severity-counts";
 import {
   fileRefKey,
@@ -16,7 +14,6 @@ import {
   type FileFinding,
   type FileRef,
   type FileTreeNode,
-  type FindingsViewMode,
 } from "./types";
 
 export type FileFindingsViewProps = {
@@ -27,9 +24,9 @@ export type FileFindingsViewProps = {
   /** Line to reveal in the open file. Controlled. */
   line?: number | undefined;
   onLineChange: (line: number | undefined) => void;
-  /** How a markdown file is shown; other files always open in the editor. Controlled. */
-  view: FindingsViewMode;
-  onViewChange: (view: FindingsViewMode) => void;
+  /** The open file's tab. A code file has no Preview, so "preview" shows its Source. Controlled. */
+  view: FileReviewView;
+  onViewChange: (view: FileReviewView) => void;
   /** Fetches a file's text. A rejection is shown to the reader in full. */
   loadFile: (file: FileRef) => Promise<string>;
   /** Extra controls under each finding's thread, e.g. an ignore action. */
@@ -134,8 +131,8 @@ function FileViewer({
   state: LoadState | null;
 }) {
   const markdown = isMarkdownPath(file.file);
-  const rendered = markdown && view === "rendered";
-  const key = fileRefKey(file);
+  // Moving from a markdown file to code keeps the view; code has no Preview, so it reads as Source.
+  const shown: FileReviewView = !markdown && view === "preview" ? "source" : view;
 
   let body: ReactNode;
   if (!state || state.status === "loading") {
@@ -152,29 +149,19 @@ function FileViewer({
         <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-xs">{state.message}</pre>
       </div>
     );
-  } else if (rendered) {
-    body = (
-      <AnnotatedMarkdown
-        key={key}
-        path={file.file}
-        source={state.text}
-        findings={findings}
-        line={line}
-        onLineChange={onLineChange}
-        renderFindingActions={renderFindingActions}
-      />
-    );
   } else {
     body = (
-      <AnnotatedCode
-        key={key}
+      <FileReview
+        key={fileRefKey(file)}
         path={file.file}
-        workDir={file.workDir}
         source={state.text}
+        view={shown}
+        onViewChange={onViewChange}
         findings={findings}
         line={line}
         onLineChange={onLineChange}
         renderFindingActions={renderFindingActions}
+        className="h-full p-density-2"
       />
     );
   }
@@ -186,12 +173,6 @@ function FileViewer({
           {file.file}
         </span>
         <SeverityCounts findings={findings} />
-        {markdown && (
-          <div className="ml-auto flex shrink-0 items-center gap-1" role="tablist" aria-label="Markdown view">
-            <TabButton active={view === "rendered"} onClick={() => onViewChange("rendered")} label="Rendered" />
-            <TabButton active={view === "source"} onClick={() => onViewChange("source")} label="Source" />
-          </div>
-        )}
       </div>
       <div className="min-h-0 flex-1">{body}</div>
     </div>
@@ -199,10 +180,9 @@ function FileViewer({
 }
 
 /**
- * Every file that has lint violations or failed tests, as a tree beside an
- * annotated viewer of the open file: Monaco with markers for code, and the
- * rendered document with its findings as comment threads for markdown (with a
- * Rendered/Source toggle). Needs a `MonacoProvider` above it. Fully controlled:
+ * Every file that has lint violations or failed tests, as a tree beside a
+ * `FileReview` of the open file: syntax-highlighted source with each finding
+ * under its line, a rendered Preview for markdown, and a Problems list. Fully controlled:
  * the open file, line and view live in props so the host can keep them in its
  * URL, and file text comes from `loadFile`, so nothing here fetches.
  */
