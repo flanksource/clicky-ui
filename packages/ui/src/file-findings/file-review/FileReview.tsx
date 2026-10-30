@@ -218,6 +218,7 @@ export function FileReview({
   if (view === "problems" && !lint) throw new Error("FileReview: view \"problems\" needs `findings`");
   if (view === "preview" && !prose) throw new Error(`FileReview: view "preview" needs a markdown file, got ${path}`);
   const [showBlame, setShowBlame] = useState(false);
+  const [showFindings, setShowFindings] = useState(true);
   const blaming = showBlame && blame !== undefined;
   // Blame annotates committed lines, so it shows in the read-only listing even for an editable file.
   const editing = onSourceChange !== undefined && !blaming;
@@ -673,6 +674,19 @@ export function FileReview({
             ...(lint ? [{ id: "problems", label: "Problems", icon: UiListChecks, count: findings.length }] : []),
           ]}
         />
+        {lint && findings.length > 0 && view === "source" && !editing && (
+          <Button
+            size="sm"
+            variant={showFindings ? "secondary" : "ghost"}
+            aria-pressed={showFindings}
+            title={showFindings ? "Show only the gutter marks; pick one to read its findings" : "Show each line's findings underneath it"}
+            onClick={() => setShowFindings((shown) => !shown)}
+            className="shrink-0 gap-1.5"
+          >
+            <Icon icon={UiListChecks} />
+            Findings
+          </Button>
+        )}
         {blame && view === "source" && (
           <Button
             size="sm"
@@ -750,6 +764,7 @@ export function FileReview({
               tokens={sourceTokens}
               blame={blamed}
               findings={findings}
+              showFindings={showFindings}
               marks={sourceMarks}
               comments={open}
               selected={inlineAnchor ?? draftAnchor}

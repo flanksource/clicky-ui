@@ -124,6 +124,18 @@ describe("FileReview on a code file", () => {
     expect(onViewChange).toHaveBeenCalledWith("source");
   });
 
+  it("hides findings under the lines behind the Findings toggle and lists a line's when its mark is picked", () => {
+    const { container } = renderCode({ findings: [GO_FINDING] });
+    const listed = () => container.querySelectorAll(`[data-source-finding="${GO_FINDING.line}"]`).length;
+    const shown = listed();
+
+    fireEvent.click(screen.getByRole("button", { name: "Findings" }));
+    const hidden = listed();
+    fireEvent.click(screen.getByRole("button", { name: `1 finding on line ${GO_FINDING.line}` }));
+
+    expect({ shown, hidden, picked: listed() }).toEqual({ shown: 1, hidden: 0, picked: 1 });
+  });
+
   it("highlights a source-anchored comment on its characters", async () => {
     const comment: Comment = { ...COMMENT, body: "Retry forever?", anchor: sourceAnchor({ line: 4, prefix: "\treturn ", quote: "call(n)", suffix: "\n}" }) };
     const { container } = renderCode({ comments: { items: [comment], callbacks: {} } });
