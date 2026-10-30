@@ -18,11 +18,14 @@ import { UiRobotAi } from "@flanksource/clicky-ui/icons";
 import {
   fetchAgentSessions,
   forgetAgentSession,
+  setPageAgentTarget,
   stopAgentSession,
   updateAgentSessionSettings,
   type AgentSessionRuntime,
   type AgentSessionSettings,
   type AgentSessionsFile,
+  type AgentTarget,
+  type CaptainAgentTarget,
 } from "./agent-runs-api";
 import { AgentSessionPanel } from "./AgentSessionPanel";
 import { RunAgentDialog } from "./RunAgentDialog";
@@ -37,6 +40,10 @@ type AgentRunsContext = {
   data: AgentSessionsFile | null;
   /** Opens the sessions panel, optionally focused on one captain session. */
   openPanel: (sessionId?: string) => void;
+  /** The live captain session `page`'s threads go to; undefined for the playground session. */
+  target: CaptainAgentTarget | undefined;
+  /** Points `page`'s threads at a target; rejects when no `page` was given. */
+  setTarget: (target: AgentTarget) => Promise<void>;
 };
 
 /** What the runtime dialog is open for: a thread to run, or the runtime setting. */
@@ -76,6 +83,19 @@ function AgentRunChip({
 }) {
   const run = comment.agentRun;
   if (!run) return null;
+  const where = run.target
+    ? `Sent to ${run.target.label}${run.target.channel ? ` via ${run.target.channel}` : ""}`
+    : "Sent to agent session";
+  // A captain target is not one of the playground's sessions, so there is no panel to open.
+  if (run.target) {
+    return (
+      <span title={run.error ?? where} className="inline-flex items-center">
+        <Badge tone={runTone(run.state)} variant="soft" clickToCopy={false}>
+          {where} · {STATE_LABEL[run.state]}
+        </Badge>
+      </span>
+    );
+  }
   return (
     <button
       type="button"
@@ -83,24 +103,22 @@ function AgentRunChip({
       title={run.error ?? "Open the agent session"}
       className="inline-flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <Badge
-        tone={
-          run.state === "error"
-            ? "danger"
-            : run.state === "done"
-              ? "success"
-              : "info"
-        }
-        variant="soft"
-        clickToCopy={false}
-      >
-        Sent to agent session · {STATE_LABEL[run.state]}
+      <Badge tone={runTone(run.state)} variant="soft" clickToCopy={false}>
+        {where} · {STATE_LABEL[run.state]}
       </Badge>
     </button>
   );
 }
 
-function runAgentTitle(data: AgentSessionsFile | null): string {
+function runTone(state: NonNullable<Comment["agentRun"]>["state"]) {
+  return state === "error" ? "danger" : state === "done" ? "success" : "info";
+}
+
+function runAgentTitle(
+  data: AgentSessionsFile | null,
+  target: CaptainAgentTarget | undefined,
+): string {
+  if (target) return `Deliver this thread into the live captain session ${target.label}`;
   const model = data?.settings.runtime?.spec.model;
   if (!model) return "Choose a runtime and start an agent session for this thread";
   return data.settings.grouping === "page"
@@ -115,9 +133,12 @@ function runAgentTitle(data: AgentSessionsFile | null): string {
  */
 export function AgentRunsProvider({
   runAgent,
+  page,
   children,
 }: {
   runAgent: (id: string, runtime?: AgentSessionRuntime) => Promise<void>;
+  /** The page whose agent target "Run agent" describes and `setTarget` changes. */
+  page?: string;
   children: ReactNode;
 }) {
   const [data, setData] = useState<AgentSessionsFile | null>(null);
@@ -152,9 +173,19 @@ export function AgentRunsProvider({
     };
   }, [refresh]);
 
+  const pageTarget = page ? data?.settings.targets?.[page] : undefined;
   // New and replacement sessions start with the configured runtime, so only a
   // playground without one needs the runtime dialog.
   const hasRuntime = data?.settings.runtime !== undefined;
+
+  const changePageTarget = useCallback(
+    async (next: AgentTarget) => {
+      if (!page) throw new Error("AgentRunsProvider has no page to set a target for");
+      await setPageAgentTarget(page, next);
+      await refresh();
+    },
+    [page, refresh],
+  );
 
   const send = useCallback(
     async (comment: Comment, runtime?: AgentSessionRuntime) => {
@@ -171,7 +202,8 @@ export function AgentRunsProvider({
 
   const start = useCallback(
     async (comment: Comment) => {
-      if (!hasRuntime) {
+      // A captain target is delivered into as it is, with no runtime to choose.
+      if (!hasRuntime && !pageTarget) {
         openDialog({ mode: "run", comment });
         return;
       }
@@ -188,7 +220,7 @@ export function AgentRunsProvider({
         setPanel({ focusSessionId: null });
       }
     },
-    [hasRuntime, openDialog, send],
+    [hasRuntime, openDialog, pageTarget, send],
   );
 
   const act = useCallback(
@@ -223,14 +255,20 @@ export function AgentRunsProvider({
     () => ({
       data,
       openPanel,
+      target: pageTarget,
+      setTarget: changePageTarget,
       extraAssignItems: (comment) =>
         comment.parentId
           ? []
           : [
               {
-                label: hasRuntime ? "Run agent" : "Run agent…",
+                label: pageTarget
+                  ? `Send to ${pageTarget.label}`
+                  : hasRuntime
+                    ? "Run agent"
+                    : "Run agent…",
                 icon: UiRobotAi,
-                title: runAgentTitle(data),
+                title: runAgentTitle(data, pageTarget),
                 disabled: !isUnresolved(PLAYGROUND_COMMENT_CONFIG, comment.status),
                 onSelect: () => void start(comment),
               },
@@ -242,7 +280,7 @@ export function AgentRunsProvider({
           </div>
         ) : null,
     }),
-    [data, hasRuntime, openPanel, start],
+    [changePageTarget, data, hasRuntime, openPanel, pageTarget, start],
   );
 
   const submitRuntime = (runtime: AgentSessionRuntime) => {

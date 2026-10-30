@@ -55,6 +55,8 @@ describe("slugFromGlobKey", () => {
     ["./pages/welcome.tsx", "welcome"],
     ["./pages/agent-inbox.tsx", "agent-inbox"],
     ["./pages/nested/thing.tsx", "nested/thing"],
+    ["./pages/notes.md", "notes"],
+    ["./pages/docs/intro.mdx", "docs/intro"],
   ])("maps %s to %s", (key, slug) => {
     expect(slugFromGlobKey(key)).toBe(slug);
   });
@@ -69,7 +71,11 @@ describe("isPlaygroundPage", () => {
     ["./pages/welcome.test.tsx", false],
     ["./pages/welcome.stories.tsx", false],
     ["./comments/CommentLayer.tsx", false],
-    ["./pages/notes.md", false],
+    ["./pages/notes.md", true],
+    ["./pages/nested/notes.mdx", true],
+    ["./pages/_notes.md", false],
+    ["./pages/_drafts/notes.md", false],
+    ["./pages/notes.txt", false],
   ])("classifies %s as %s", (key, expected) => {
     expect(isPlaygroundPage(key)).toBe(expected);
   });
@@ -138,7 +144,41 @@ describe("buildRegistry", () => {
     const module = { default: () => null };
     const [entry] = buildRegistry({ "./pages/welcome.tsx": () => Promise.resolve(module) });
 
-    await expect(entry?.load()).resolves.toBe(module);
+    if (entry?.kind !== "component") throw new Error("expected a component page");
+    await expect(entry.load()).resolves.toBe(module);
+  });
+
+  it("lists markdown files as markdown pages beside the components", async () => {
+    const source = "# Guide\n";
+    const entries = buildRegistry(
+      { "./pages/welcome.tsx": noop },
+      {},
+      {
+        "./pages/docs/guide.md": () => Promise.resolve(source),
+        "./pages/docs/intro.mdx": () => Promise.resolve(source),
+        "./pages/docs/_partial.md": () => Promise.resolve(source),
+      },
+    );
+
+    expect(entries.map(({ kind, slug, group }) => ({ kind, slug, group }))).toEqual([
+      { kind: "component", slug: "welcome", group: "Pages" },
+      { kind: "markdown", slug: "docs/guide", group: "Docs" },
+      { kind: "markdown", slug: "docs/intro", group: "Docs" },
+    ]);
+    const guide = entries[1];
+    if (guide?.kind !== "markdown") throw new Error("expected a markdown page");
+    expect(guide.file).toBe("docs/guide.md");
+    await expect(guide.loadSource()).resolves.toBe(source);
+  });
+
+  it("refuses a component and a markdown file that share a slug", () => {
+    expect(() =>
+      buildRegistry(
+        { "./pages/docs/guide.tsx": noop },
+        {},
+        { "./pages/docs/guide.md": () => Promise.resolve("") },
+      ),
+    ).toThrow(/two pages for slug "docs\/guide" \(docs\/guide\.tsx and docs\/guide\.md\)/);
   });
 });
 
@@ -193,14 +233,14 @@ describe("optimistic overlay", () => {
   it("keeps a renamed title even after the moved module reports its own", async () => {
     move(DEFAULT_PAGE_SLUG, "renamed-hub", "Renamed hub");
     const entry = findPage("renamed-hub");
-    expect(entry).toBeDefined();
-    expect(pageTitle(entry!)).toBe("Renamed hub");
-    expect(pageMeta(entry!)?.title).toBe("Renamed hub");
+    if (entry?.kind !== "component") throw new Error("expected the renamed hub as a component page");
+    expect(pageTitle(entry)).toBe("Renamed hub");
+    expect(pageMeta(entry)?.title).toBe("Renamed hub");
 
     // Opening the page loads the module from its pre-rename path, which still
     // carries the old title and writes it into the meta cache.
     await loadPage({
-      ...entry!,
+      ...entry,
       load: () =>
         Promise.resolve({ default: () => null, meta: { title: "Old hub" } }),
     });

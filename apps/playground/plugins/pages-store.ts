@@ -70,11 +70,49 @@ function assertSafeParents(rootDir: string, parentDir: string): void {
   }
 }
 
-export function pagePath(pagesDir: string, slug: string): string {
+/** The file types a page can be: a React component, or a markdown document. */
+export const PAGE_EXTENSIONS = [".tsx", ".md", ".mdx"] as const;
+export type PageExtension = (typeof PAGE_EXTENSIONS)[number];
+
+export function assertPageExtension(extension: unknown): PageExtension {
+  if (!PAGE_EXTENSIONS.includes(extension as PageExtension)) {
+    throw new PageStoreError(
+      `invalid page extension ${JSON.stringify(extension)} — expected one of ${PAGE_EXTENSIONS.join(", ")}`,
+      400,
+    );
+  }
+  return extension as PageExtension;
+}
+
+export function pageExtension(file: string): PageExtension {
+  const extension = PAGE_EXTENSIONS.find((candidate) => file.endsWith(candidate));
+  if (!extension) throw new PageStoreError(`${file} is not a page file`, 400);
+  return extension;
+}
+
+/**
+ * The file behind `slug`: whichever of `<slug>.tsx`, `.md` and `.mdx` exists,
+ * or `<slug><extension>` for a page that does not exist yet. Two files for one
+ * slug make every slug-keyed route ambiguous, so that is refused.
+ */
+export function pagePath(
+  pagesDir: string,
+  slug: string,
+  extension: PageExtension = ".tsx",
+): string {
   assertSlug(slug);
-  const full = resolvedInside(pagesDir, `${slug}.tsx`);
-  assertSafeParents(pagesDir, dirname(full));
-  return full;
+  const candidates = PAGE_EXTENSIONS.map((candidate) =>
+    resolvedInside(pagesDir, `${slug}${candidate}`),
+  );
+  assertSafeParents(pagesDir, dirname(candidates[0]!));
+  const existing = candidates.filter((file) => existsSync(file));
+  if (existing.length > 1) {
+    throw new PageStoreError(
+      `page "${slug}" is ambiguous: ${existing.map((file) => relative(pagesDir, file)).join(" and ")} both exist — rename or delete one`,
+      409,
+    );
+  }
+  return existing[0] ?? resolvedInside(pagesDir, `${slug}${extension}`);
 }
 
 export function folderPath(pagesDir: string, folder: string): string {
@@ -122,11 +160,11 @@ export function listFolderPages(pagesDir: string, folder: string): string[] {
       }
       if (entry.isDirectory()) {
         walk(join(dir, entry.name), `${prefix}${entry.name}/`);
-      } else if (
-        entry.name.endsWith(".tsx") &&
-        !/\.(test|stories)\.tsx$/.test(entry.name)
-      ) {
-        slugs.push(`${prefix}${entry.name.slice(0, -".tsx".length)}`);
+        continue;
+      }
+      const extension = PAGE_EXTENSIONS.find((candidate) => entry.name.endsWith(candidate));
+      if (extension && !/\.(test|stories)\.(tsx|md|mdx)$/.test(entry.name)) {
+        slugs.push(`${prefix}${entry.name.slice(0, -extension.length)}`);
       }
     }
   }
@@ -155,21 +193,31 @@ export function readSource(pagesDir: string, slug: string): string {
   return readFileSync(file, "utf8");
 }
 
-export function writeSource(pagesDir: string, slug: string, source: string): void {
+export function writeSource(
+  pagesDir: string,
+  slug: string,
+  source: string,
+  extension?: PageExtension,
+): void {
   if (typeof source !== "string") throw new PageStoreError("page source must be a string", 400);
 
-  const file = pagePath(pagesDir, slug);
+  const file = pagePath(pagesDir, slug, extension);
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.tmp`;
   writeFileSync(tmp, source, "utf8");
   renameSync(tmp, file);
 }
 
-/** Creates a new artifact, refusing to clobber an existing one. */
-export function createSource(pagesDir: string, slug: string, source: string): string {
+/** Creates a new artifact of the given file type, refusing to clobber an existing one. */
+export function createSource(
+  pagesDir: string,
+  slug: string,
+  source: string,
+  extension: PageExtension,
+): string {
   if (sourceExists(pagesDir, slug)) {
     throw new PageStoreError(`page "${slug}" already exists`, 409);
   }
-  writeSource(pagesDir, slug, source);
+  writeSource(pagesDir, slug, source, extension);
   return slug;
 }

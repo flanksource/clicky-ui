@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { lazy, Suspense } from "react";
 import { ErrorWrapper, setFallbackIconProvider } from "@flanksource/clicky-ui";
 import { clickyIconProvider } from "@flanksource/clicky-ui/icons";
+import { FlanksourceIcon } from "@flanksource/clicky-ui/connections";
 import { BookmarkletPanel } from "./bookmarklet/BookmarkletPanel";
 import "@flanksource/clicky-ui/styles.css";
 import "./styles.css";
@@ -14,8 +15,9 @@ if (!bookmarklet) void import("react-grab");
 
 // Schema-driven surfaces carry icons as runtime strings (x-enum-icons, x-icon,
 // <Icon name="...">), which no import can resolve. Registering this package's
-// own generated set is what turns those names into glyphs instead of `?`.
-setFallbackIconProvider(clickyIconProvider());
+// own generated set is what turns those names into glyphs instead of `?`;
+// FlanksourceIcon then resolves product logos such as connection types.
+setFallbackIconProvider(clickyIconProvider(FlanksourceIcon));
 
 // react-rnd (used by ChatWindow's draggable frame) reads `process.env` in its
 // drag logger; the browser has no `process`, so provide a minimal shim.

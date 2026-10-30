@@ -27,12 +27,24 @@ export type AgentSessionRuntime = {
   presets?: string[];
 };
 
+/**
+ * A live captain session a page's threads are delivered into instead of the
+ * playground's own session. `sessionId` is captain's session id; `label` is
+ * what the picker showed, kept for chips once the session has ended.
+ */
+export type CaptainAgentTarget = { kind: "captain"; sessionId: string; label: string };
+
+/** Where a page's threads go; `playground` is the playground's own session. */
+export type AgentTarget = { kind: "playground" } | CaptainAgentTarget;
+
 export type AgentSessionSettings = {
   /** Send every new top-level human comment to its agent session on creation. */
   autoRun: boolean;
   grouping: AgentSessionGrouping;
   /** Runtime every new session starts with. */
   runtime?: AgentSessionRuntime;
+  /** Per-page captain targets; a page without one uses the playground session. */
+  targets?: Record<string, CaptainAgentTarget>;
 };
 
 /**
@@ -98,6 +110,20 @@ function isRuntime(value: unknown): value is AgentSessionRuntime {
   return isRecord(value) && isRecord(value["spec"]) && typeof value["spec"]["model"] === "string";
 }
 
+export function isCaptainTarget(value: unknown): value is CaptainAgentTarget {
+  return (
+    isRecord(value) &&
+    value["kind"] === "captain" &&
+    typeof value["sessionId"] === "string" &&
+    value["sessionId"] !== "" &&
+    typeof value["label"] === "string"
+  );
+}
+
+function isTargets(value: unknown): boolean {
+  return value === undefined || (isRecord(value) && Object.values(value).every(isCaptainTarget));
+}
+
 function isSession(value: unknown): value is AgentSession {
   return (
     isRecord(value) &&
@@ -118,11 +144,12 @@ function assertAgentSessionsFile(value: unknown, file: string): AgentSessionsFil
     typeof settings["autoRun"] !== "boolean" ||
     !AGENT_SESSION_GROUPINGS.includes(settings["grouping"] as AgentSessionGrouping) ||
     (settings["runtime"] !== undefined && !isRuntime(settings["runtime"])) ||
+    !isTargets(settings["targets"]) ||
     !Array.isArray(sessions) ||
     !sessions.every(isSession)
   ) {
     throw new Error(
-      `${file} must hold {settings:{autoRun, grouping: ${AGENT_SESSION_GROUPINGS.join("|")}, runtime?}, sessions:[{runId, sessionId, page, runtime:{spec:{model}}, startedAt, state: ${AGENT_SESSION_STATES.join("|")}}]} — fix or delete it`,
+      `${file} must hold {settings:{autoRun, grouping: ${AGENT_SESSION_GROUPINGS.join("|")}, runtime?, targets?:{<page>:{kind:"captain", sessionId, label}}}, sessions:[{runId, sessionId, page, runtime:{spec:{model}}, startedAt, state: ${AGENT_SESSION_STATES.join("|")}}]} — fix or delete it`,
     );
   }
   return value as AgentSessionsFile;

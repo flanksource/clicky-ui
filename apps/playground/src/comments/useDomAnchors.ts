@@ -13,6 +13,7 @@ import {
   type Box,
   type CommentMatch,
 } from "./dom-anchor";
+import { describeMarkdown, markdownLocator, markdownTarget } from "./markdown-anchor";
 import {
   PLAYGROUND_COMMENT_CONFIG,
   type PlaygroundComment,
@@ -64,9 +65,17 @@ function locatorsFor(
   return derived;
 }
 
+/** A markdown block by its section and text; any other element by tag and text. */
+function describe(element: Element): string {
+  const markdown = markdownTarget(element);
+  return markdown?.block === element
+    ? describeMarkdown(markdownLocator(element, markdown.root))
+    : describeElement(element);
+}
+
 /** Rail label: how the element was found when that was not the stored anchor. */
 function matchLabel(match: CommentMatch): string {
-  const described = describeElement(match.element);
+  const described = describe(match.element);
   const { matchedBy, conflict } = match;
   if (matchedBy === "anchor") {
     return conflict ? `Locators disagree — ${described}` : described;
@@ -76,10 +85,20 @@ function matchLabel(match: CommentMatch): string {
       ? "matched by its saved selector"
       : matchedBy.kind === "role"
         ? "matched by role and name"
-        : matchedBy.heading
+        : matchedBy.kind === "markdown"
+          ? markdownHow(match.element, matchedBy.path)
+          : matchedBy.heading
           ? `found under “${matchedBy.heading.text}”`
           : "matched by text";
   return `Moved — ${how}${conflict ? ", locators disagree" : ""}: ${described}`;
+}
+
+function markdownHow(element: Element, path: readonly string[]): string {
+  const markdown = markdownTarget(element);
+  const now = markdown ? markdownLocator(element, markdown.root).path : [];
+  return now.join(" › ") === path.join(" › ")
+    ? "edited in its section"
+    : `found by its text, no longer under “${path.at(-1) ?? "the top"}”`;
 }
 
 export { tallyAnchors, type AnchorTally } from "./anchor-tally";
@@ -182,7 +201,7 @@ export function useDomAnchors(
       }
       registerAnchor(tally.anchor, element);
       registeredRef.current.push(tally.anchor);
-      nextLabels[tally.anchor] = match ? matchLabel(match) : describeElement(element);
+      nextLabels[tally.anchor] = match ? matchLabel(match) : describe(element);
       const { left, top, width, height } = element.getBoundingClientRect();
       if (element.getClientRects().length === 0 || width === 0 || height === 0) return;
       (dialog === null ? nextPins : nextOverlayPins).push({
@@ -233,7 +252,7 @@ export function useDomAnchors(
     // follow the elements they were dropped on.
     const mutationObserver =
       typeof MutationObserver === "undefined" ? null : new MutationObserver(scheduleRecompute);
-    mutationObserver?.observe(content, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "data-show-rejected"] });
+    mutationObserver?.observe(content, { childList: true, subtree: true, attributes:true, attributeFilter:["class","data-show-rejected"] });
 
     return () => {
       window.removeEventListener("resize", scheduleRecompute);

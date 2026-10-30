@@ -22,6 +22,7 @@ import {
   PageStoreError,
   folderPath,
   listFolderPages,
+  pageExtension,
   pagePath,
   readSource,
   sourceExists,
@@ -194,6 +195,10 @@ export function movePage(options: MovePageOptions): MovePageResult {
   const { pagesDir, slug, nextSlug } = options;
   if (!sourceExists(pagesDir, slug)) {
     throw new PageStoreError(`page "${slug}" does not exist`, 404);
+  }
+  // Moving rewrites the page's title and its importers as TypeScript.
+  if (pageExtension(pagePath(pagesDir, slug)) !== ".tsx") {
+    throw new PageStoreError(`page "${slug}" is a markdown page; only .tsx pages can be moved or renamed`, 400);
   }
   if (slug !== nextSlug && sourceExists(pagesDir, nextSlug)) {
     throw new PageStoreError(`page "${nextSlug}" already exists`, 409);

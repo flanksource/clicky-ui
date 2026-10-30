@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useRef, useSyncExternalStore } from "react";
 import {
   CommentProvider,
   DensityProvider,
@@ -15,12 +15,10 @@ import { PLAYGROUND_COMMENT_CONFIG, useComments } from "./comments/useComments";
 import { PlaygroundShell } from "./PlaygroundShell";
 import { ExternalWorkspace } from "./bookmarklet/ExternalWorkspace";
 import {
-  PAGES,
   fallbackPageSlug,
   findPage,
   getMetaVersion,
   pages,
-  preloadMeta,
   subscribeMeta,
 } from "./registry";
 import {
@@ -51,20 +49,16 @@ export function App() {
   const router = useBrowserRouter();
   const contentRef = useRef<HTMLDivElement>(null);
 
-  // Nav labels start from the filename and settle once each `meta` has loaded;
-  // PlaygroundShell subscribes to the resulting store updates. The same store
-  // carries optimistic renames/moves/deletes, so the active page has to be
-  // re-resolved when it fires — the route is unchanged by a rename.
+  // Re-resolve the active page after optimistic renames, moves and deletions.
   useSyncExternalStore(subscribeMeta, getMetaVersion, getMetaVersion);
-  useEffect(() => preloadMeta(PAGES), []);
 
   const active = findPage(route.page);
   const isExternal = route.page.startsWith("external:");
-  const comments = useComments(route.page, contentRef, { poll: true });
+  const comments = useComments(route.page, contentRef, { poll: true, all: route.page === "" || route.review === "resolved" });
   const standardRoute = (
     page: string,
     view: PlaygroundRoute["view"] = route.view,
-  ): PlaygroundRoute => ({ page, view, annotations: route.annotations, ...(route.showRejected ? { showRejected: true } : {}) });
+  ): PlaygroundRoute => ({ page, view, annotations: route.annotations, ...(route.showRejected ? { showRejected:true } : {}) });
 
   return (
     <ThemeProvider>
@@ -83,7 +77,7 @@ export function App() {
             onUpdateRating={comments.updateRating}
             onDelete={comments.remove}
           >
-            <AgentRunsProvider runAgent={comments.runAgent}>
+            <AgentRunsProvider runAgent={comments.runAgent} {...(route.page ? { page: route.page } : {})}>
             <PromptRunsProvider>
             {isExternal ? (
               <ExternalWorkspace
@@ -95,13 +89,13 @@ export function App() {
                 review={route.review === "resolved"}
                 {...(route.comment ? { selectedId: route.comment } : {})}
                 onReopen={comments.commentAndReopen}
-                navigate={(page, comment) =>
+                navigate={(page, comment, review) =>
                   navigateRoute({
                     page,
                     view: "preview",
                     annotations: route.annotations,
-                    ...(comment
-                      ? { review: "resolved" as const, comment }
+                    ...(review || comment
+                      ? { review: "resolved" as const, ...(comment ? { comment } : {}) }
                       : {}),
                   })
                 }

@@ -152,6 +152,15 @@ const ELEMENT: JsonProperty = {
 
 export const COMMENT_TOOLS: CommentTool[] = [
   {
+    name: "comment_activity",
+    label: "Comment activity",
+    description: "Per-page feedback timestamps, root counts and pending assignees without comment bodies or captures.",
+    method: "GET",
+    path: `${BASE}/activity`,
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
     name: "list_comments",
     label: "List comments",
     description:
