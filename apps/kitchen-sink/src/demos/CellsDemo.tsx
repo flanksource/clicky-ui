@@ -27,7 +27,7 @@ export function CellsDemo() {
       </DemoRow>
 
       <DemoRow label="TagList">
-        <div className="w-80">
+        <div className="w-80 max-w-full">
           <TagList tags={TAGS} maxVisible={3} />
         </div>
       </DemoRow>

@@ -13,7 +13,7 @@ export function SearchInputDemo() {
       description="Search field with a leading magnifier and a trailing ⌘K hint (the Gavel app-bar search). Press ⌘K / Ctrl+K to focus the first field."
     >
       <DemoRow label="With ⌘K">
-        <div className="w-[440px]">
+        <div className="w-[440px] max-w-full">
           <SearchInput
             value={query}
             onChange={setQuery}
@@ -23,7 +23,7 @@ export function SearchInputDemo() {
         </div>
       </DemoRow>
       <DemoRow label="No shortcut">
-        <div className="w-[440px]">
+        <div className="w-[440px] max-w-full">
           <SearchInput value={plain} onChange={setPlain} placeholder="Filter…" shortcut={null} />
         </div>
       </DemoRow>
