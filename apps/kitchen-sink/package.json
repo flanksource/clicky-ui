@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@flanksource/clicky-ui": "workspace:*",
+    "@flanksource/icons": "catalog:",
     "@shikijs/langs": "catalog:",
     "@shikijs/themes": "catalog:",
     "@shikijs/transformers": "catalog:",
