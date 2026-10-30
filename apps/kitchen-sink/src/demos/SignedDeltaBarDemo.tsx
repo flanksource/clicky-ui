@@ -17,7 +17,7 @@ export function SignedDeltaBarDemo() {
       description="Centered bidirectional bar for signed deltas. Grows right for positive, left for negative, clamped at ±max, mutes when not significant."
     >
       <div className="space-y-density-3">
-        <div className="w-96 space-y-density-2">
+        <div className="w-96 max-w-full space-y-density-2">
           <p className="text-xs text-muted-foreground">
             Default semantics (positive = good / green)
           </p>
@@ -25,7 +25,7 @@ export function SignedDeltaBarDemo() {
           <SignedDeltaBar value={-8.1} />
           <SignedDeltaBar value={-3.2} significant={false} />
         </div>
-        <div className="w-96 space-y-density-2">
+        <div className="w-96 max-w-full space-y-density-2">
           <p className="text-xs text-muted-foreground">
             Benchmark comparison (positive = regression / red)
           </p>
