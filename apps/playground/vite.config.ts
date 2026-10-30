@@ -15,14 +15,20 @@ import {
   playgroundAgentRuns,
 } from "./plugins/agent-runs-server";
 import { playgroundComments } from "./plugins/comments-server";
-import { createPromptRuns, playgroundPromptRuns } from "./plugins/prompt-runs-server";
-import { playgroundWorkspaceFiles } from "./plugins/workspace-files-server";
+import {
+  createPromptRuns,
+  playgroundPromptRuns,
+} from "./plugins/prompt-runs-server";
 import { playgroundBookmarklet } from "./plugins/bookmarklet-server";
 import { playgroundExports } from "./plugins/exports-server";
 import { playgroundMarkdown } from "./plugins/markdown-vite-plugin";
+import { playgroundPageMeta } from "./plugins/page-meta-vite-plugin";
 import { playgroundSources } from "./plugins/sources-server";
 import { playgroundPageActivity } from "./plugins/page-activity";
 import { playgroundRuntimeProfiles } from "./plugins/runtime-profiles-server";
+import { playgroundWorkspaceFiles } from "./plugins/workspace-files-server";
+import { playgroundGavelLint } from "./plugins/gavel-lint-server";
+import { playgroundBlame } from "./plugins/blame-server";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(root, "../..");
@@ -94,11 +100,19 @@ export default defineConfig(({ mode }) => ({
     react(),
     tailwindcss(),
     playgroundMarkdown({ sourceRoot: resolve(root, "src") }),
+    playgroundPageMeta({ sourceRoot: resolve(root, "src") }),
     playgroundPageActivity(resolve(root, "src/pages")),
     // Before playgroundComments: that middleware answers every other
     // /__playground/comments/* path (including /:id/agent-run) with a 405.
     playgroundAgentRuns(agentRuns),
-    playgroundPromptRuns(createPromptRuns({ dir: playgroundDataDir, gavelURL: localEnv.PLAYGROUND_GAVEL_URL ?? "http://localhost:9330", workspace: workspaceRoot, onCreated: agentRuns.autoRunComment })),
+    playgroundPromptRuns(
+      createPromptRuns({
+        dir: playgroundDataDir,
+        gavelURL: localEnv.PLAYGROUND_GAVEL_URL ?? "http://localhost:9330",
+        workspace: workspaceRoot,
+        onCreated: agentRuns.autoRunComment,
+      }),
+    ),
     playgroundComments({
       dir: playgroundDataDir,
       pagesDir: resolve(root, "src/pages"),
@@ -114,9 +128,16 @@ export default defineConfig(({ mode }) => ({
       resolveURL: "http://localhost:9020/api/chat/runtime-profiles/resolve",
     }),
     playgroundWorkspaceFiles({ cwd: workspaceRoot }),
+    playgroundBlame({ cwd: workspaceRoot }),
+    playgroundGavelLint({
+      pagesDir: resolve(root, "src/pages"),
+      workspaceRoot,
+      promptFile: resolve(root, "prompts/markdown-review.prompt"),
+    }),
     playgroundSources({
       pagesDir: resolve(root, "src/pages"),
       commentsDir: playgroundDataDir,
+      workspaceRoot,
     }),
   ],
   resolve: {
@@ -142,8 +163,16 @@ export default defineConfig(({ mode }) => ({
         replacement: resolve(uiSrc, "monaco.ts"),
       },
       {
+        find: /^@flanksource\/clicky-ui\/file-findings$/,
+        replacement: resolve(uiSrc, "file-findings.ts"),
+      },
+      {
         find: /^@flanksource\/clicky-ui\/rpc$/,
         replacement: resolve(uiSrc, "rpc.ts"),
+      },
+      {
+        find: /^@flanksource\/clicky-ui\/connections$/,
+        replacement: resolve(uiSrc, "connections.ts"),
       },
       {
         find: /^@flanksource\/clicky-ui\/chat$/,

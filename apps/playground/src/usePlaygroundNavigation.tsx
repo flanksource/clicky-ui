@@ -1,4 +1,6 @@
 import {
+  useEffect,
+  useState,
   useMemo,
   useSyncExternalStore,
   type Dispatch,
@@ -10,6 +12,7 @@ import {
   type AppShellNavSection,
 } from "@flanksource/clicky-ui";
 import {
+  UiFileCode,
   UiFilePlus,
   UiFolder,
   UiLinkExternal,
@@ -17,18 +20,18 @@ import {
   UiTrash,
 } from "@flanksource/clicky-ui/icons";
 
-import { countOpenCommentsByPage } from "./comments/counts";
-import {
-  PLAYGROUND_COMMENT_CONFIG,
-  type PageComment,
-} from "./comments/useComments";
+import type { FeedbackActivity } from "../plugins/comment-activity";
 import type { PageAction } from "./editor/PageManagement";
 import { buildPlaygroundNavSections } from "./navigation";
+import { buildRecentSection } from "./recent-navigation";
 import { useExternalCatalog } from "./bookmarklet/external-catalog";
-import { activityByPage, matchesActivity, type SidebarSort, type SidebarFilter } from "./sidebar-activity";
+import { mergeActivity, matchesActivity, type SidebarSort, type SidebarFilter } from "./sidebar-activity";
+import { visibleByAge } from "./sidebar-visibility";
 import {
+  loadMetadata,
   getMetaVersion,
   pageMeta,
+  pageTitle,
   pages,
   subscribeMeta,
   type PageEntry,
@@ -42,7 +45,8 @@ export type PageActionState = {
 
 export function usePlaygroundNavigation({
   activeSlug,
-  allComments,
+  feedback,
+  age,
   query,
   onQueryChange,
   sort,
@@ -57,7 +61,8 @@ export function usePlaygroundNavigation({
   setPageAction,
 }: {
   activeSlug: string | undefined;
-  allComments: PageComment[];
+  feedback: Record<string, FeedbackActivity>;
+  age: "recent" | "all";
   query: string;
   onQueryChange: (query: string) => void;
   sort: SidebarSort;
@@ -77,19 +82,51 @@ export function usePlaygroundNavigation({
     getMetaVersion,
   );
   const external = useExternalCatalog();
-  const activity = useMemo(() => activityByPage(allComments, updates), [allComments, updates]);
-  const openCommentCounts = useMemo(
-    () => countOpenCommentsByPage(allComments, PLAYGROUND_COMMENT_CONFIG),
-    [allComments],
-  );
+  const activity = useMemo(() => mergeActivity(feedback, updates), [feedback, updates]);
+  const entries = pages();
+  const visible = entries.filter((page) => visibleByAge({ slug: page.slug, age, query, activeSlug, activity: activity.get(page.slug) }));
+  const metadataKey = (!activeSlug ? entries : visible).map((page) => page.slug).join("\n");
+  const [metadataError, setMetadataError] = useState<string | null>(null);
+  useEffect(() => {
+    let disposed = false;
+    void loadMetadata(pages().filter((page) => metadataKey.split("\n").includes(page.slug))).then(
+      () => { if (!disposed) setMetadataError(null); },
+      (cause: unknown) => { if (!disposed) setMetadataError(cause instanceof Error ? cause.message : String(cause)); },
+    );
+    return () => { disposed = true; };
+  }, [metadataKey]);
+  const openCommentCounts = useMemo(() => new Map([...activity].map(([slug, value]) => [slug, value.openCount])), [activity]);
 
   return useMemo(
     () => [
-      ...buildPlaygroundNavSections(pages(), folders, {
+      ...(metadataError ? [{ label: "Metadata error", items: [{ key: "metadata-error", label: <span role="alert">{metadataError}</span>, to: pageHref(activeSlug ?? "") }] }] : []),
+      buildRecentSection({
+        entries: [
+          ...visible.map((page) => ({
+            slug: page.slug,
+            title: pageTitle(page),
+            description: pageMeta(page)?.description ?? "",
+            icon: pageMeta(page)?.icon ?? UiFileCode,
+          })),
+          ...external.pages.filter((page) => visibleByAge({ slug: page.id, age, query, activeSlug, activity: activity.get(page.id) })).map((page) => ({
+            slug: page.id,
+            title: page.title,
+            description: page.urls.join(" "),
+            icon: UiLinkExternal,
+          })),
+        ],
+        activity,
+        query,
+        filters,
+        activeSlug,
+        pageHref,
+        loading,
+      }),
+      ...buildPlaygroundNavSections(visible, age === "all" && !query ? folders : folders.filter((folder) => visible.some((page) => page.slug.startsWith(`${folder}/`))), {
         activeSlug,
         query,
-        activity,
-        sort,
+        activity: sort === "none" ? new Map([...activity].map(([slug, value]) => [slug, { ...value, updated: Math.max(value.updated, value.commented) }])) : activity,
+        sort: sort === "none" ? "updated" : sort,
         filters,
         pageHref,
         drag,
@@ -165,8 +202,10 @@ export function usePlaygroundNavigation({
               .toLowerCase()
               .includes(query.toLowerCase()),
           )
-          .filter((page) => matchesActivity(activity.get(page.id), filters, Date.now()))
-          .sort((left, right) => sort === "none" ? 0 : (activity.get(right.id)?.[sort] ?? 0) - (activity.get(left.id)?.[sort] ?? 0))
+          .filter((page) => visibleByAge({ slug: page.id, age, query, activeSlug, activity: activity.get(page.id) }) && matchesActivity(activity.get(page.id), filters, Date.now()))
+          .sort((left, right) => sort === "none"
+            ? Math.max(activity.get(right.id)?.updated ?? 0, activity.get(right.id)?.commented ?? 0) - Math.max(activity.get(left.id)?.updated ?? 0, activity.get(left.id)?.commented ?? 0)
+            : (activity.get(right.id)?.[sort] ?? 0) - (activity.get(left.id)?.[sort] ?? 0))
           .map((page) => ({
             key: page.id,
             icon: UiLinkExternal,
@@ -179,6 +218,8 @@ export function usePlaygroundNavigation({
     ],
     [
       activeSlug,
+      feedback,
+  age,
       activity,
       sort,
       filters,
@@ -189,6 +230,8 @@ export function usePlaygroundNavigation({
       drag,
       folders,
       metaVersion,
+      metadataKey,
+      metadataError,
       external.pages,
       openCommentCounts,
       pageHref,

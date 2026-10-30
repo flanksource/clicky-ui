@@ -216,6 +216,20 @@ describe("captureScreenshot", () => {
     expect(canvases).toHaveLength(0);
   });
 
+  it.each([
+    ["a phone browser without display capture", {}, false],
+    ["display capture without tab identity", { getDisplayMedia: vi.fn() }, false],
+    [
+      "display capture with tab identity",
+      { getDisplayMedia: vi.fn(), setCaptureHandleConfig: vi.fn() },
+      true,
+    ],
+  ])("reports screenshot support for %s", async (_name, mediaDevices, expected) => {
+    vi.stubGlobal("navigator", { mediaDevices });
+    const { screenshotCaptureSupported } = await import("./screenshot");
+    expect(screenshotCaptureSupported()).toBe(expected);
+  });
+
   it("does not request display capture when tab identity cannot be checked", async () => {
     const getDisplayMedia = vi.fn();
     vi.stubGlobal("navigator", { mediaDevices: { getDisplayMedia } });

@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@iconify-icons/ph": "1.2.5",
+    "@iconify-icons/vscode-icons": "^1.2.29",
     "@tailwindcss/vite": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/node": "catalog:",

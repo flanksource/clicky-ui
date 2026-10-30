@@ -212,17 +212,22 @@ function unavailableReason(error: unknown): CommentScreenshotUnavailableReason {
     : "failed";
 }
 
-export async function captureScreenshot(
-  element: Element,
-): Promise<CommentScreenshotCapture> {
+/** False on phone browsers, which have no tab capture; hide screenshot actions there. */
+export function screenshotCaptureSupported(): boolean {
   const mediaDevices = navigator.mediaDevices as
     | CaptureMediaDevices
     | undefined;
-  if (
-    !mediaDevices?.getDisplayMedia ||
-    !mediaDevices.setCaptureHandleConfig ||
-    !crypto.randomUUID
-  ) {
+  return Boolean(
+    mediaDevices?.getDisplayMedia &&
+      mediaDevices.setCaptureHandleConfig &&
+      crypto.randomUUID,
+  );
+}
+
+export async function captureScreenshot(
+  element: Element,
+): Promise<CommentScreenshotCapture> {
+  if (!screenshotCaptureSupported()) {
     return { status: "unavailable", reason: "unsupported" };
   }
 

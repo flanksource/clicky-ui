@@ -4,7 +4,10 @@ import type {
   AgentSessionRuntime,
   AgentSessionSettings,
   AgentSessionsFile,
+  AgentTarget,
+  CaptainAgentTarget,
 } from "../../plugins/agent-session-store";
+import type { CaptainSessionOption } from "../../plugins/agent-runs-server";
 import { request } from "../comments/useComments";
 
 export type {
@@ -13,6 +16,9 @@ export type {
   AgentSessionRuntime,
   AgentSessionSettings,
   AgentSessionsFile,
+  AgentTarget,
+  CaptainAgentTarget,
+  CaptainSessionOption,
 };
 
 export const AGENT_SESSIONS_ROUTE = "/__playground/agent-sessions";
@@ -36,6 +42,30 @@ export async function updateAgentSessionSettings(
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
+    },
+  );
+  return settings;
+}
+
+/** Live captain sessions a page's threads can be delivered into. */
+export async function fetchCaptainSessions(): Promise<CaptainSessionOption[]> {
+  const { sessions } = await request<{ sessions: CaptainSessionOption[] }>(
+    `${AGENT_SESSIONS_ROUTE}/captain`,
+  );
+  return sessions;
+}
+
+/** Sends `page`'s threads to a live captain session, or back to the playground's own. */
+export async function setPageAgentTarget(
+  page: string,
+  target: AgentTarget,
+): Promise<AgentSessionSettings> {
+  const { settings } = await request<{ settings: AgentSessionSettings }>(
+    `${AGENT_SESSIONS_ROUTE}/targets`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ page, target }),
     },
   );
   return settings;

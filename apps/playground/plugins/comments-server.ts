@@ -13,6 +13,7 @@ import {
 } from "./comments-lifecycle";
 import type { CommentElementContext } from "./comments-model";
 import { listComments, parseCommentFilter } from "./comments-query";
+import { commentActivity } from "./comment-activity";
 import {
   assertScreenshotCapture,
   discardScreenshot,
@@ -42,6 +43,7 @@ export const COMMENTS_ROUTE = "/__playground/comments";
 
 export type CommentRoute =
   | "list"
+  | "activity"
   | "schema"
   | "screenshot"
   | "create"
@@ -78,6 +80,8 @@ export function matchRoute(
   const [first, second] = segments as [string, string | undefined];
 
   if (segments.length === 1) {
+    if (first === "activity")
+      return method === "GET" ? { route: "activity", id: "" } : undefined;
     if (first === "schema")
       return method === "GET" ? { route: "schema", id: "" } : undefined;
     if (method === "PATCH") return { route: "update", id: first };
@@ -361,6 +365,8 @@ function handle(
   const { route, id } = matched;
 
   switch (route) {
+    case "activity":
+      return sendJson(res, 200, { pages: commentActivity(listComments(dir)) });
     case "screenshot":
       if (!serveScreenshot(dir, url.pathname, res)) {
         return sendJson(res, 404, { error: `screenshot "${id}" not found` });

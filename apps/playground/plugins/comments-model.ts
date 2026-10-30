@@ -47,6 +47,16 @@ export type CommentLocator =
       heading?: CommentLocatorHeading;
       /** Selector of the landmark the text is searched within. */
       scope?: string;
+    }
+  | {
+      /** A rendered markdown block, found by its section and its text. */
+      kind: "markdown";
+      /** Heading texts from the outermost section in; empty before the first heading. */
+      path: string[];
+      tag: string;
+      text: string;
+      /** Source line the block started on when captured; breaks ties only. */
+      line?: number;
     };
 
 export type CommentElementContext = {
