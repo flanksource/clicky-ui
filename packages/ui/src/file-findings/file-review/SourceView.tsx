@@ -46,14 +46,17 @@ function BlameCell({ blame }: { blame: BlameLine | undefined }) {
  * The source with line numbers, syntax colours when `tokens` are given, and a
  * blame column when `blame` is; a line with findings carries its worst
  * severity's rail icon, squiggle and messages. Picking a message selects its
- * finding. People's comments highlight their quote and list under the line
- * that ends it; picking one opens its thread there.
+ * finding. With `showFindings` off only the selected line lists its messages,
+ * and the rail icon picks a line, the way a comment highlight opens its thread.
+ * People's comments highlight their quote and list under the line that ends
+ * it; picking one opens its thread there.
  */
 export function SourceView({
   source,
   tokens,
   blame,
   findings,
+  showFindings,
   marks,
   comments,
   selected,
@@ -65,6 +68,7 @@ export function SourceView({
   tokens: readonly HighlightedLine[] | null;
   blame: ReadonlyMap<number, BlameLine> | null;
   findings: readonly FileFinding[];
+  showFindings: boolean;
   marks: readonly SourceMark[];
   comments: Comment[];
   selected: string | null;
@@ -79,6 +83,7 @@ export function SourceView({
         const here = findings.filter((f) => f.line === line).sort(bySeverityThenLine);
         const worst = here[0] ? SEVERITY_MARK[severityOf(here[0].severity)] : null;
         const threads = marks.filter((m) => m.spans.at(-1)?.line === line);
+        const listed = showFindings || selected === lineAnchor(line) ? here : [];
         return (
           <li
             key={line}
@@ -86,7 +91,20 @@ export function SourceView({
             className={cn("grid pr-3", blame ? "grid-cols-[13rem_1.25rem_2.5rem_1fr]" : "grid-cols-[1.25rem_2.5rem_1fr]")}
           >
             {blame && <BlameCell blame={blame.get(line)} />}
-            <span className={cn("flex h-5 items-center justify-center", worst?.tone)}>{worst && <Icon icon={worst.icon} className="text-[13px]" />}</span>
+            {worst && !showFindings ? (
+              <button
+                type="button"
+                data-source-mark={line}
+                aria-label={`${here.length} ${here.length === 1 ? "finding" : "findings"} on line ${line}`}
+                aria-pressed={selected === lineAnchor(line)}
+                onClick={() => (selected === lineAnchor(line) ? onFocus(null) : onSelect(here[0]!))}
+                className={cn("flex h-5 items-center justify-center rounded-sm hover:bg-muted", worst.tone)}
+              >
+                <Icon icon={worst.icon} className="text-[13px]" />
+              </button>
+            ) : (
+              <span className={cn("flex h-5 items-center justify-center", worst?.tone)}>{worst && <Icon icon={worst.icon} className="text-[13px]" />}</span>
+            )}
             <span className="select-none pr-3 text-right text-muted-foreground tabular-nums">{line}</span>
             <span className="min-w-0 whitespace-pre-wrap break-words">
               <span data-source-text={line} style={worst ? squiggleUnder(worst.stroke) : undefined}>
@@ -135,7 +153,7 @@ export function SourceView({
                   </button>
                 );
               })}
-              {here.map((f) => (
+              {listed.map((f) => (
                 <span key={`${f.rule}:${f.message}`} data-source-finding={f.line} className="flex items-center gap-2">
                   <button
                     type="button"

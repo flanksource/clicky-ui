@@ -52,6 +52,31 @@ describe("lintFindings", () => {
     expect(finding?.severity).toBe("error");
   });
 
+  it("places a violation found at several places on each of them, naming what is there", () => {
+    const findings = lintFindings([
+      lintResult({
+        linter: "oipa-transaction",
+        violations: [
+          {
+            file: "rules/a/XMLData.xml",
+            line: 4,
+            severity: "warning",
+            message: "PlanAffectingConvert — CONVERT_IMPLICIT(nvarchar(100),[FileID],0)",
+            locations: [
+              { file: `${WORK_DIR}/rules/a/XMLData.xml`, line: 4, message: "statement s1" },
+              { file: "rules/b/XMLData.xml", line: 9, message: "statement s2" },
+            ],
+          },
+        ],
+      }),
+    ]);
+
+    expect(findings.map((f) => `${f.file}:${f.line} ${f.message}`)).toEqual([
+      "rules/a/XMLData.xml:4 PlanAffectingConvert — CONVERT_IMPLICIT(nvarchar(100),[FileID],0) (statement s1)",
+      "rules/b/XMLData.xml:9 PlanAffectingConvert — CONVERT_IMPLICIT(nvarchar(100),[FileID],0) (statement s2)",
+    ]);
+  });
+
   it("prefers the violation's own source over the linter name", () => {
     const [finding] = lintFindings([
       lintResult({ linter: "eslint", violations: [{ file: "a.ts", line: 3, source: "typescript-eslint", message: "m" }] }),
