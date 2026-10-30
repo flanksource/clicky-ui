@@ -18,17 +18,56 @@ import {
   findDemoEntry,
   findDemoGroup,
 } from "./demo-catalog";
+import {
+  ViewportPicker,
+  ViewportStage,
+  parseViewportMode,
+  type ViewportMode,
+} from "./ViewportStage";
+
+type Route = { demo: string; viewport: ViewportMode };
+
+function demoHref({ demo, viewport }: Route): string {
+  const viewportParam = viewport === "fit" ? "" : `&viewport=${encodeURIComponent(viewport)}`;
+  return `?demo=${encodeURIComponent(demo)}${viewportParam}`;
+}
+
+// `?frame=1` is what ViewportStage's iframes load: the demo alone, so the
+// frame's width is the demo's width.
+function FramedDemo({ demoId }: { demoId: string }) {
+  const Demo = (findDemoEntry(demoId) ?? findDemoEntry(DEFAULT_DEMO_ID))?.component;
+  if (!Demo) throw new Error(`kitchen-sink: no demo "${demoId}"`);
+  return (
+    <ThemeProvider>
+      <DensityProvider>
+        <MonacoProvider getWorker={getMonacoWorker}>
+          <div id={`demo-panel-${demoId}`} className="min-h-dvh min-w-0 bg-background p-density-4 text-foreground">
+            <Demo />
+          </div>
+        </MonacoProvider>
+      </DensityProvider>
+    </ThemeProvider>
+  );
+}
 
 export function App() {
-  const [route] = useHistoryRoute<{ demo: string }>({
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("frame") === "1") {
+    return <FramedDemo demoId={params.get("demo") ?? DEFAULT_DEMO_ID} />;
+  }
+  return <KitchenSink />;
+}
+
+function KitchenSink() {
+  const [route, setRoute] = useHistoryRoute<Route>({
     parse: (_pathname, search) => {
       const params = new URLSearchParams(search);
-      const candidate = params.get("demo");
       return {
-        demo: findDemoEntry(candidate)?.id ?? DEFAULT_DEMO_ID,
+        demo: findDemoEntry(params.get("demo"))?.id ?? DEFAULT_DEMO_ID,
+        viewport: parseViewportMode(params.get("viewport")),
       };
     },
-    build: (next) => `?demo=${encodeURIComponent(next.demo)}`,
+    build: demoHref,
   });
 
   const [query, setQuery] = useState("");
@@ -52,10 +91,10 @@ export function App() {
           label: item.label,
           ...(item.icon ? { icon: item.icon } : {}),
           active: item.id === activeDemo?.id,
-          to: `?demo=${encodeURIComponent(item.id)}`,
+          to: demoHref({ demo: item.id, viewport: route.viewport }),
         })),
     })).filter((section) => section.items.length > 0);
-  }, [query, activeDemo?.id]);
+  }, [query, activeDemo?.id, route.viewport]);
 
   if (!activeDemo || !activeGroup) {
     return null;
@@ -90,6 +129,10 @@ export function App() {
               }
               actions={
                 <>
+                  <ViewportPicker
+                    value={route.viewport}
+                    onChange={(viewport) => setRoute({ viewport })}
+                  />
                   <ThemeSwitcher />
                   <DensitySwitcher />
                 </>
@@ -106,13 +149,17 @@ export function App() {
                 </div>
               }
             >
-              <div
-                id={`demo-panel-${activeDemo.id}`}
-                role="tabpanel"
-                className="min-w-0 p-density-4"
-              >
-                <ActiveDemoComponent />
-              </div>
+              {route.viewport === "fit" ? (
+                <div
+                  id={`demo-panel-${activeDemo.id}`}
+                  role="tabpanel"
+                  className="min-w-0 p-density-4"
+                >
+                  <ActiveDemoComponent />
+                </div>
+              ) : (
+                <ViewportStage demoId={activeDemo.id} mode={route.viewport} />
+              )}
             </AppShell>
           </RouterProvider>
         </MonacoProvider>

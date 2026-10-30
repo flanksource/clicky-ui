@@ -88,6 +88,7 @@ export function DiagnosticsDemo() {
     >
       <div className="h-[calc(100vh-8rem)] min-h-[420px] border border-border rounded-md overflow-hidden flex">
         <SplitPane
+          stackOnMobile
           left={
             <div className="h-full overflow-auto">
               <DiagnosticsTree root={sampleTree} selectedPid={pid} onSelect={setPid} />

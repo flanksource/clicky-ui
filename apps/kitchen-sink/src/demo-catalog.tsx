@@ -16,6 +16,8 @@ import { EndpointSelectorDemo } from "./demos/EndpointSelectorDemo";
 import { ConnectionLoggingPolicyDemo } from "./demos/ConnectionLoggingPolicyDemo";
 import { ProgressBarDemo } from "./demos/ProgressBarDemo";
 import { ProgressBarsDemo } from "./demos/ProgressBarsDemo";
+import { MultiGaugeBarDemo } from './demos/MultiGaugeBarDemo';
+import { WorkloadPanelDemo } from "./demos/WorkloadPanelDemo";
 import { SignedDeltaBarDemo } from "./demos/SignedDeltaBarDemo";
 import { JsonViewDemo } from "./demos/JsonViewDemo";
 import { AnsiHtmlDemo } from "./demos/AnsiHtmlDemo";
@@ -166,6 +168,8 @@ export const DEMO_GROUPS: DemoGroup[] = [
         component: ProgressBarsDemo,
         icon: UiChartBar,
       },
+      { id: 'multi-gauge-bar', label: 'MultiGaugeBar', component: MultiGaugeBarDemo, icon: UiChartBar },
+      { id: "workload-panel", label: "WorkloadPanel", component: WorkloadPanelDemo, icon: UiLayoutDashboard },
       {
         id: "signed-delta-bar",
         label: "SignedDeltaBar",
