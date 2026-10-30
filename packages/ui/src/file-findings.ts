@@ -1,23 +1,21 @@
 // Lint violations and failed tests overlaid on the source of the files they
 // name. A separate entry (like ./monaco) so the root bundle never pulls Monaco.
-// Hosts must render a MonacoProvider (from "@flanksource/clicky-ui/monaco")
-// above FileFindingsView and AnnotatedCode.
+// Hosts that make FileReview's source editable (`onSourceChange`) or use
+// AnnotatedCode must render a MonacoProvider (from "@flanksource/clicky-ui/monaco").
 //
-// Importing this entry does not load Monaco: AnnotatedCode is exported through
+// Importing this entry does not load Monaco: the editor is exported through
 // a lazy wrapper, so monaco-editor and @monaco-editor/react arrive in a
-// dynamically imported chunk the first time a code file is shown.
+// dynamically imported chunk the first time an editor is shown.
 
 export { FileFindingsView, type FileFindingsViewProps } from "./file-findings/FileFindingsView";
 export { AnnotatedCode, type AnnotatedCodeProps } from "./file-findings/LazyAnnotatedCode";
-export { AnnotatedMarkdown, type AnnotatedMarkdownProps } from "./file-findings/AnnotatedMarkdown";
-export { FindingsSummaryChips, type FindingsSummaryChipsProps } from "./file-findings/FindingsSummaryChips";
 export {
-  MarkdownReview,
-  type MarkdownReviewComments,
-  type MarkdownReviewLayout,
-  type MarkdownReviewProps,
-  type MarkdownReviewView,
-} from "./file-findings/markdown-review/MarkdownReview";
+  FileReview,
+  type FileReviewComments,
+  type FileReviewLayout,
+  type FileReviewProps,
+  type FileReviewView,
+} from "./file-findings/file-review/FileReview";
 export {
   QUOTE_PREFIX,
   describeQuote,
@@ -27,8 +25,17 @@ export {
   resolveQuote,
   type OutlineEntry,
   type QuoteLocator,
-} from "./file-findings/markdown-review/quote-anchor";
-export { sourceBlockOf, type AnchorMode } from "./file-findings/markdown-review/geometry";
+} from "./file-findings/file-review/quote-anchor";
+export {
+  SOURCE_PREFIX,
+  describeSource,
+  parseSourceAnchor,
+  resolveSource,
+  sourceAnchor,
+  type SourceLocator,
+} from "./file-findings/file-review/source-anchor";
+export { blameAge, isUncommitted, type BlameCommit, type BlameRange } from "./file-findings/file-review/blame";
+export { sourceBlockOf, type AnchorMode } from "./file-findings/file-review/geometry";
 export { countFindingsBySeverity } from "./file-findings/severity-counts";
 export { groupFindingsByFile, lintFindings, testFindings } from "./file-findings/adapters";
 export {
@@ -47,6 +54,5 @@ export {
   type FileRef,
   type FileTreeNode,
   type FindingKind,
-  type FindingsViewMode,
   type LintSeverity,
 } from "./file-findings/types";

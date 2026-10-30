@@ -1,5 +1,5 @@
-import type { CSSProperties } from "react";
-import type { HighlightedLine, HighlightedToken } from "./code-highlight";
+import { tokenStyle } from "./token-style";
+import type { HighlightedLine } from "./code-highlight";
 
 // HighlightedTokens paints one `highlightToLines` line as themed spans, falling
 // back to the raw text when tokenization was unavailable (unsupported language,
@@ -26,13 +26,3 @@ export function HighlightedTokens({
   );
 }
 
-// Shiki's `fontStyle` is a bitmask: 1=italic, 2=bold, 4=underline.
-function tokenStyle(token: HighlightedToken): CSSProperties {
-  const style: CSSProperties = {};
-  if (token.color) style.color = token.color;
-  const fontStyle = token.fontStyle ?? 0;
-  if (fontStyle & 1) style.fontStyle = "italic";
-  if (fontStyle & 2) style.fontWeight = 700;
-  if (fontStyle & 4) style.textDecorationLine = "underline";
-  return style;
-}
