@@ -63,6 +63,18 @@ describe("playground comment lifecycle API", () => {
     );
   }
 
+  it("serves activity without bodies or capture context", async () => {
+    writeAll(dir, { sample: [comment] });
+    const response = await fetch(`${baseUrl}/__playground/comments/activity`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ pages: { sample: {
+      updated: 0, commented: Date.parse(comment.createdAt), resolved: 0,
+      openCount: 1, resolvedCount: 0, waitingOn: ["Unassigned"],
+      rootCounts: { open: 1, in_progress: 0, resolved: 0, closed: 0 },
+      commentCount: 1,
+    } } });
+  });
+
   it.each(["open", "in_progress", "resolved"])(
     "closes a %s root directly and reopens it with attribution cleared",
     async (status) => {

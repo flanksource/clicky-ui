@@ -1,18 +1,12 @@
 // @vitest-environment node
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
-import {
-  createServer as createHttpServer,
-  type IncomingMessage,
-  type Server,
-  type ServerResponse,
-} from "node:http";
-import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createServer, type ViteDevServer } from "vite";
 
-import { createAgentRuns, playgroundAgentRuns } from "./agent-runs-server";
+import { createAgentRuns, playgroundAgentRuns, SESSION_TOOLS } from "./agent-runs-server";
 import {
   readAgentSessions,
   type AgentSession,
@@ -20,6 +14,7 @@ import {
 } from "./agent-session-store";
 import { playgroundComments } from "./comments-server";
 import { readAll, writeAll, type StoredComment } from "./comments-store";
+import { StubCaptain } from "./testing/stub-captain";
 
 const SKILL_PATH = fileURLToPath(
   new URL(
@@ -45,96 +40,6 @@ const second: StoredComment = {
   id: "second",
   body: "Tighten the footer spacing",
 };
-
-type Call = { method: string; url: string; body: unknown };
-
-/** A captain that records every request and answers the run, message and stop endpoints. */
-class StubCaptain {
-  calls: Call[] = [];
-  runs = new Map<string, { done: boolean; sessionId: string }>();
-  messageStatus = "started";
-  server!: Server;
-  private nextRun = 1;
-  private streams = new Set<ServerResponse>();
-
-  async listen(): Promise<string> {
-    this.server = createHttpServer((req, res) => void this.handle(req, res));
-    await new Promise<void>((resolve) =>
-      this.server.listen(0, "127.0.0.1", resolve),
-    );
-    return `http://127.0.0.1:${(this.server.address() as AddressInfo).port}`;
-  }
-
-  async close(): Promise<void> {
-    for (const stream of this.streams) stream.end();
-    this.server.closeAllConnections();
-    await new Promise<void>((resolve) => this.server.close(() => resolve()));
-  }
-
-  callsTo(method: string, pattern: RegExp): Call[] {
-    return this.calls.filter(
-      (call) => call.method === method && pattern.test(call.url),
-    );
-  }
-
-  private async handle(req: IncomingMessage, res: ServerResponse) {
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) chunks.push(chunk as Buffer);
-    const raw = Buffer.concat(chunks).toString("utf8");
-    const url = req.url ?? "";
-    const method = req.method ?? "";
-    this.calls.push({ method, url, body: raw ? JSON.parse(raw) : undefined });
-    const json = (status: number, body: unknown) => {
-      res.writeHead(status, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(body));
-    };
-
-    if (method === "POST" && url.startsWith("/api/v1/prompt/run")) {
-      const runId = `run-${this.nextRun++}`;
-      this.runs.set(runId, { done: false, sessionId: `session-of-${runId}` });
-      return json(200, { runId, status: "running", chat: true });
-    }
-    const run = /^\/api\/captain\/prompt\/runs\/([^/]+)(\/.*)?$/.exec(
-      url.split("?")[0] ?? "",
-    );
-    if (run) {
-      const state = this.runs.get(run[1] ?? "");
-      if (!state) return json(404, { error: "unknown run" });
-      if (method === "GET" && run[2] === "/stream") {
-        res.writeHead(200, { "Content-Type": "text/event-stream" });
-        this.streams.add(res);
-        res.write(
-          `event: run\ndata: ${JSON.stringify({ runId: run[1], status: "running" })}\n\n`,
-        );
-        res.write(
-          `event: state\ndata: ${JSON.stringify({ runId: run[1], sessionId: state.sessionId })}\n\n`,
-        );
-        return;
-      }
-      if (method === "GET" && !run[2]) {
-        return json(200, {
-          run: { runId: run[1], sessionId: state.sessionId },
-          entries: [],
-          done: state.done,
-        });
-      }
-      if (method === "POST" && run[2] === "/message") {
-        return json(202, { runId: run[1], status: this.messageStatus });
-      }
-      if (method === "POST" && run[2] === "/stop") {
-        state.done = true;
-        return json(202, { status: "stopping" });
-      }
-    }
-    if (method === "GET" && url.startsWith("/api/captain/sessions/")) {
-      res.writeHead(200, { "Content-Type": "text/event-stream" });
-      this.streams.add(res);
-      res.write(`event: entry\ndata: {"id":"m1"}\n\n`);
-      return;
-    }
-    json(404, { error: `stub has no ${method} ${url}` });
-  }
-}
 
 describe("playground shared agent session", () => {
   let dir: string;
@@ -239,6 +144,54 @@ describe("playground shared agent session", () => {
     return stored(id).agentRun;
   }
 
+  describe("session tools", () => {
+    /** Runs a tool's script as captain does: variables shell-quoted by shq, input on stdin. */
+    function callTool(name: keyof typeof SESSION_TOOLS, input: Record<string, unknown>) {
+      const script = SESSION_TOOLS[name].exec
+        .replaceAll("{{shq origin}}", `'${baseUrl}'`)
+        .replaceAll("{{shq author}}", `'${MODEL}'`);
+      return spawnSync("bash", ["-c", script], { input: JSON.stringify(input), encoding: "utf8" });
+    }
+
+    it("lists one page's unresolved threads", () => {
+      const listed = callTool("list_feedback", { page: "welcome" });
+
+      expect(listed.status).toBe(0);
+      const ids = (JSON.parse(listed.stdout) as { comments: StoredComment[] }).comments.map(
+        (comment) => comment.id,
+      );
+      expect(ids).toEqual(["first", "second"]);
+    });
+
+    it("replies and resolves as the session's agent", async () => {
+      await fetch(`${baseUrl}/__playground/comments/first/acknowledge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ author: { name: MODEL, kind: "agent" } }),
+      });
+
+      const replied = callTool("reply_to_thread", { id: "first", body: "Bolded the heading; checked desktop and compact." });
+      const resolved = callTool("resolve_thread", { id: "first" });
+
+      expect([replied.status, resolved.status]).toEqual([0, 0]);
+      const reply = Object.values(readAll(dir))
+        .flat()
+        .find((entry) => entry.parentId === "first");
+      expect(reply).toMatchObject({
+        body: "Bolded the heading; checked desktop and compact.",
+        author: { name: MODEL, kind: "agent" },
+      });
+      expect(stored("first").status).toBe("resolved");
+    });
+
+    it("fails with the API's reason when the thread cannot be resolved", () => {
+      const resolved = callTool("resolve_thread", { id: "missing" });
+
+      expect(resolved.status).not.toBe(0);
+      expect(resolved.stderr).toContain('comment \\"missing\\" not found');
+    });
+  });
+
   it("starts the shared session on the first run and acknowledges as the agent", async () => {
     const response = await run("first", { runtime: RUNTIME });
     expect(response.status).toBe(202);
@@ -248,13 +201,16 @@ describe("playground shared agent session", () => {
     expect(starts).toHaveLength(1);
     const start = starts[0]?.body as {
       content: string;
-      variables: { instructions: string; message: string };
+      variables: { instructions: string; message: string; origin: string; author: string };
       spec: { model: string };
       chat: boolean;
     };
     expect(start).toMatchObject({ chat: true, spec: RUNTIME.spec });
     expect(start.content).toMatch(/^---\nsetup:\n {2}cwd: /);
     expect(start.content).toContain(JSON.stringify(REPO_ROOT));
+    // The session handles threads through inline tools that post as its author.
+    expect(start.content).toContain(`tools: ${JSON.stringify(SESSION_TOOLS)}`);
+    expect(start.variables).toMatchObject({ origin: baseUrl, author: MODEL });
     // The thread travels as a variable so braces in a comment are not template syntax.
     expect(start.variables.message).toContain(
       "Make the heading bolder {{not-a-template}}",
@@ -588,6 +544,165 @@ describe("playground shared agent session", () => {
       expect(run).toMatchObject({ state: "error" });
       expect(run?.error).toContain(captainURL);
       expect(run).not.toHaveProperty("sessionId");
+    });
+  });
+
+  describe("captain session target", () => {
+    const LIVE_ID = "captain-live-1";
+    const LIVE_MODEL = "claude-opus-5-5";
+    const target = { kind: "captain", sessionId: LIVE_ID, label: "Fix toolbar · claude" };
+    const liveRow = {
+      id: LIVE_ID,
+      source: "claude",
+      title: "Fix toolbar",
+      model: LIVE_MODEL,
+      cwd: "/work/acme",
+      live: {
+        pid: 4242,
+        active: true,
+        environment: { CLAUDE_CODE_SESSION_ID: "provider-1", CMUX_SURFACE_ID: "surface-1" },
+        surface: { surfaceId: "surface-1" },
+      },
+    };
+
+    /** The text of the one delivery captain received. */
+    function deliveredText(): string {
+      const delivered = captain.callsTo("POST", /^\/api\/captain\/sessions\/captain-live-1\/deliver$/);
+      expect(delivered).toHaveLength(1);
+      const body = delivered[0]?.body as { text?: unknown } | undefined;
+      if (typeof body?.text !== "string") throw new Error(`delivery without text: ${JSON.stringify(body)}`);
+      return body.text;
+    }
+
+    function putTarget(page: string, body: unknown) {
+      return fetch(`${baseUrl}/__playground/agent-sessions/targets`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ page, target: body }),
+      });
+    }
+
+    beforeEach(() => {
+      captain.liveSessions = [liveRow];
+    });
+
+    it("lists live captain sessions without their process environment", async () => {
+      const response = await fetch(`${baseUrl}/__playground/agent-sessions/captain`);
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        sessions: [
+          {
+            id: LIVE_ID,
+            source: "claude",
+            title: "Fix toolbar",
+            cwd: "/work/acme",
+            model: LIVE_MODEL,
+            inCmux: true,
+          },
+        ],
+      });
+      expect(captain.callsTo("GET", /^\/api\/captain\/sessions\/live\?all=true/)).toHaveLength(1);
+    });
+
+    it("stores a page's captain target and clears it back to the playground session", async () => {
+      expect((await putTarget("welcome", target)).status).toBe(200);
+      expect(readAgentSessions(dir).settings.targets).toEqual({ welcome: target });
+
+      expect((await putTarget("welcome", { kind: "playground" })).status).toBe(200);
+      expect(readAgentSessions(dir).settings.targets).toEqual({});
+    });
+
+    it.each([
+      ["a captain target without a session", { kind: "captain", label: "x" }],
+      ["an unknown kind", { kind: "terminal" }],
+      ["extra fields", { ...target, environment: {} }],
+    ])("rejects %s", async (_label, body) => {
+      const response = await putTarget("welcome", body);
+      expect(response.status).toBe(400);
+      expect(readAgentSessions(dir).settings.targets).toBeUndefined();
+    });
+
+    it("delivers the thread into the page's live captain session as that session's agent", async () => {
+      await putTarget("welcome", target);
+      captain.deliverResult = { channel: "cmux", status: "sent" };
+
+      const response = await run("first", {});
+
+      expect(response.status).toBe(202);
+      expect(captain.callsTo("POST", /\/api\/v1\/prompt\/run/)).toHaveLength(0);
+      const text = deliveredText();
+      expect(text).toContain("Make the heading bolder {{not-a-template}}");
+      expect(text).toContain(`${baseUrl}/__playground/comments/first/replies`);
+      expect(text).toContain(`${baseUrl}/__playground/comments/first/resolve`);
+      expect(text).toContain(`{"name":"${LIVE_MODEL}","kind":"agent"}`);
+
+      const agent = { name: LIVE_MODEL, kind: "agent", via: "captain", sessionId: LIVE_ID };
+      expect(stored("first")).toMatchObject({
+        status: "in_progress",
+        assignee: agent,
+        acknowledgedBy: agent,
+        agentRun: {
+          sessionId: LIVE_ID,
+          state: "sent",
+          target: { label: target.label, channel: "cmux" },
+        },
+      });
+    });
+
+    it("lets the delivered agent reply and resolve with the curl commands it was sent", async () => {
+      await putTarget("welcome", target);
+      await run("first", {});
+      const text = deliveredText();
+      const commands = /```sh\n([\s\S]*?)\n```/.exec(text)?.[1];
+      if (!commands) throw new Error(`no sh block in:\n${text}`);
+
+      const result = spawnSync("bash", ["-euo", "pipefail", "-c", commands], { encoding: "utf8" });
+
+      expect(result.status, result.stderr).toBe(0);
+      expect(stored("first").status).toBe("resolved");
+      const reply = Object.values(readAll(dir)).flat().find((entry) => entry.parentId === "first");
+      expect(reply?.author).toMatchObject({ name: LIVE_MODEL, kind: "agent" });
+    });
+
+    it("refuses a target that is no longer live and leaves the thread unclaimed", async () => {
+      await putTarget("welcome", target);
+      captain.liveSessions = [];
+
+      const response = await run("first", {});
+
+      expect(response.status).toBe(409);
+      expect(((await response.json()) as { error: string }).error).toContain("no longer live");
+      expect(stored("first")).toMatchObject({ status: "open" });
+      expect(stored("first")).not.toHaveProperty("assignee");
+      expect(stored("first")).not.toHaveProperty("agentRun");
+    });
+
+    it("refuses a runtime for a page that sends to captain", async () => {
+      await putTarget("welcome", target);
+      const response = await run("first", { runtime: RUNTIME });
+      expect(response.status).toBe(409);
+      expect(captain.callsTo("POST", /\/deliver$/)).toHaveLength(0);
+    });
+
+    it("auto-runs a new comment into the page's captain target", async () => {
+      await putTarget("welcome", target);
+      await putSettings({ autoRun: true, runtime: RUNTIME });
+
+      const created = await createRoot("welcome", {});
+
+      expect(await settledRun(created.id)).toMatchObject({ sessionId: LIVE_ID, state: "sent" });
+      expect(captain.callsTo("POST", /\/api\/v1\/prompt\/run/)).toHaveLength(0);
+    });
+
+    it("keeps other pages on the playground session", async () => {
+      await putTarget("elsewhere", target);
+
+      const response = await run("first", { runtime: RUNTIME });
+
+      expect(response.status).toBe(202);
+      expect(captain.callsTo("POST", /\/deliver$/)).toHaveLength(0);
+      expect(stored("first").agentRun).toMatchObject({ sessionId: "session-of-run-1" });
     });
   });
 });

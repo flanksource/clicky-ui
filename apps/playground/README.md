@@ -10,7 +10,7 @@ The root URL opens the **Comments** dashboard, showing unresolved threads across
 
 Screenshot previews automatically trim uniform light, dark, or transparent margins and faint panel borders, retaining padding around the content. Cropping applies to the preview and hover expansion; the full-capture link opens the original file. Inline mini-threads show the latest two replies, with older replies available to expand. Comments and replies refresh every five seconds while the page is visible.
 
-The `?page=flanksource` route is the canonical Flanksource design-system hub. Its tracked foundation and pattern pages document colors, type, spacing, icons, tones, page anatomy, collections, forms with preview, object arrays, and feedback states using the actual shared components.
+The `?page=flanksource/brands/flanksource` route is the canonical Flanksource design-system hub. Its tracked foundation and pattern pages document colors, type, spacing, icons, tones, page anatomy, collections, forms with preview, object arrays, and feedback states using the actual shared components.
 
 ```bash
 pnpm run dev:playground     # http://localhost:5274
@@ -43,11 +43,25 @@ It appears in the sidebar immediately — `import.meta.glob` is HMR-aware, so no
 
 Artifacts may use the full `@flanksource/clicky-ui` library and its theme tokens, plain Tailwind, and offline-generated icons imported from `@flanksource/clicky-ui/icons`. Pages are type-checked by `pnpm run typecheck` at the repo root, so scratch code still has to compile.
 
+### Navigation metadata and loading
+
+Navigation defaults to source edits or feedback activity within the last seven days. **Show older (N)** reveals older artifacts; **Show recent only** restores the default. The selected page remains visible even when old, and search covers the entire catalog. The age selection persists in `sidebar.age=recent|all` across page navigation and browser history. Markdown documents participate in source-update tracking; external captures use feedback activity.
+
+Page metadata loads on demand for visible and selected pages. Showing older pages, searching globally, and opening the global Comments dashboard may load additional metadata, while page implementations remain lazy. Sidebar badges and pending-review labels use `GET /__playground/comments/activity`, a lightweight per-page projection containing timestamps, root counts and pending assignees without bodies, captured HTML or screenshot context. Activity refreshes every five seconds while visible and immediately after feedback mutations. Viewing an artifact or external capture fetches full feedback only for that page; the Comments dashboard, resolved-review queue and cross-page copy actions fetch global feedback when requested.
+
+Vite serves each page's `meta` through a small `?playground-meta` projection. The sidebar loads these projections without importing page components, fixtures, styles, or unrelated top-level effects. Page implementations load when opened; diagram example implementations load when their tab is selected.
+
+Keep metadata declarative: an exported `const` object, optionally with `satisfies PageMeta`, may reference other local constants, functions, and imported helpers. Generated `Ui*` icons, local icon components, and lightweight factories such as `designSystemPage()` retain their component references. Imported metadata helpers should contain only metadata or small rendering primitives; split an icon out of a full page helper when necessary. A mutable binding, destructuring dependency, or unsupported metadata export reports its source location instead of importing the page as a fallback. Declared metadata must return an object. Omitting `meta` intentionally keeps filename-derived defaults.
+
+The original file remains the single source of metadata. Vite watches the projection source and its normal imported dependencies. With `server.hmr: false`, reload to pick up edited metadata or added, moved, and deleted pages; automatic refresh follows the configured HMR behavior. Rename/move/delete operations keep their existing optimistic navigation updates.
+
 ## Editing in the browser
 
 **Edit** opens the artifact's source in Monaco beside the live preview. `⌘S` (or the Save button) writes the file to disk; Vite's HMR then refreshes the preview — there is no separate "apply" step, and your own editor sees the same file.
 
 Choose **New → New folder** to create a visible folder. The active page header also exposes **Rename**, **Move**, and **Delete**. Right-click a page for those same page actions, or right-click a folder to create a page or nested folder there; the Context Menu key and Shift+F10 provide the same keyboard access. Rename updates the filename and a simple string-literal `export const meta = { title: "…" }`; derived metadata fails loudly instead of being rewritten. Move and rename rebase the page's relative module and `import.meta.url` references, update incoming TypeScript imports and static `?page=` links under `src/`, and carry feedback to the new slug as one rollback-protected operation. They do not create an alias for the old URL or rewrite prose and comments. Delete confirms the exact `.tsx` path and removes its feedback. These filesystem actions are disabled while the Monaco buffer has unsaved changes and are available only under `vite dev`.
+
+A `.md` page renders through the library's `FileReview` (`@flanksource/clicky-ui/file-findings`), with every feature on. It has three views: **Preview** (`view=preview`), **Source** (`view=source`) and **Problems** (`view=problems`). Source is a Monaco editor; `⌘S` saves the file and re-runs `gavel lint` (vale and markdownlint). Findings show as a severity rail and squiggles in Preview, as read-only threads, and as the Problems list. **AI review** adds a Captain grammar and clarity pass; **Lint** runs a Captain prompt on the saved file. To start a comment, select or right-click words. The thread is anchored on the quote (a `q:` anchor: heading path plus surrounding words) and is stored in the playground comment store like any other feedback. It appears in a margin sidebar or inline (⋮ menu), and People/Tools filters threads by author kind. **Hide annotations** removes comment highlights and threads. The shell's generic pins and rail are off on markdown pages, except in the **Review resolved** queue. Try it at [Markdown review](http://localhost:5274/?page=markdown-review); [Annotated markdown](http://localhost:5274/?page=playground%2Fannotated-markdown) shows the same component on fixture documents with comments kept in page state. **Blame** (Source tab) shows who last changed each line, from `git blame` through `/__playground/blame?path=`; it is offered only while the saved file matches the text on screen, and an untracked page says why it has none. [File review](http://localhost:5274/?page=playground%2Ffile-review) opens any tracked workspace file (`?file=`) the same way: syntax-coloured source, blame, and comments anchored on the selected characters (`s:` anchors).
 
 Monaco is configured for TSX but **not** wired to the real type graph: pulling `@flanksource/clicky-ui` types into the browser would cost megabytes, so "cannot find module" diagnostics are suppressed. Syntax, JSX and local type errors still surface; authoritative type checking stays with `pnpm run typecheck` and the dev-server overlay.
 
@@ -107,11 +121,11 @@ Each root comment menu offers **Close** alongside **Resolve** for active comment
 
 Sidebar pages with feedback show their open root-comment count in a badge. Replies and resolved or closed comments do not increase the badge.
 
-The AppShell sidebar renders its folders and pages through Clicky Tree, including search, expand/collapse controls, page/folder context menus and page drag-and-drop. **Sort by** offers **None** (the configured page order), **Updated** (page source-file modification time), **Commented** (latest root comment or reply), and **Resolved** (latest currently resolved thread). Date sorts put the newest activity first and retain the folder hierarchy. Folder order follows the newest matching descendant.
+The AppShell sidebar renders its folders and pages through Clicky Tree, including search, expand/collapse controls, page/folder context menus and page drag-and-drop. **Sort by** offers **Recent activity** (latest source edit or feedback), **Updated** (page source-file modification time), **Commented** (latest feedback activity), and **Resolved** (latest currently resolved thread). Date sorts put the newest activity first and retain the folder hierarchy. Folder order follows the newest matching descendant.
 
-**Open** includes pages with open or in-progress threads; **Resolved** includes pages with threads waiting for human review. Selecting both matches either status. **Recently updated** restricts those results to page files changed within seven days. Closed threads are separate from resolved threads. External captures have no local source-file timestamp, so they do not match Recently updated. Filters remain available when no pages match, and **Reset view** clears search, sorting and filters.
+**Open** includes pages with open or in-progress threads; **Resolved** includes pages with threads waiting for human review. Selecting both matches either status. The default age view includes source edits or feedback within seven days; **Show older** widens it. External captures use feedback timestamps. Closed threads are separate from resolved threads. Filters remain available when no pages match, and **Reset view** restores the recent view and clears search, sorting and filters.
 
-Sidebar settings persist in `sidebar.sort`, `sidebar.filters`, and `sidebar.q` URL parameters, including navigation between artifact and external pages and browser history. Development refreshes source-file dates and comment activity while the page is visible; built artifacts retain source-file dates from their build. `GET /__playground/page-activity` exposes development page timestamps without source content.
+Sidebar settings persist in `sidebar.sort`, `sidebar.filters`, `sidebar.age`, and `sidebar.q` URL parameters, including navigation between artifact and external pages and browser history. Development refreshes source-file dates and comment activity while the page is visible; built artifacts retain source-file dates from their build. `GET /__playground/page-activity` exposes development page timestamps without source content.
 
 If an anchored element disappears (you edited the artifact), the note is _kept_ and flagged as an orphan in a banner and in the rail — never silently dropped or moved.
 
@@ -169,7 +183,11 @@ Replies land one level deep: replying to a reply attaches to the thread root, ma
 }
 ```
 
-`state` is `running`, `ended`, `stopped` or `failed`. The **Agent sessions** panel (toolbar) edits the settings:
+`state` is `running`, `ended`, `stopped` or `failed`.
+
+A session is a captain chat whose prompt declares three inline tools (`SESSION_TOOLS`): `list_feedback` reads unresolved threads, and `reply_to_thread` and `resolve_thread` post as the session's agent author. They call this playground's comments API at the origin the session was started from, so the agent never builds those HTTP calls itself. The tools need `curl` and `jq` on the host running captain, and a captain release whose chats bind inline tools.
+
+The **Agent sessions** panel (toolbar) edits the settings:
 
 - **Sessions: Shared | Per page** (`grouping`). `shared` keeps one session for every page (`page: null`); `page` gives each page its own session (`page: "<page id>"`), primed to handle only that page's threads. Switching leaves existing sessions alone; they stay listed until stopped or forgotten.
 - **Auto-run new comments** (`autoRun`). Every new top-level comment by a human (not review decisions) is sent to its session right after it is stored, exactly as if **Run agent** had been chosen, starting the session if none is live. A failed hand-off shows on the thread as `agentRun.state: "error"` and is logged. Turning it on requires a runtime.
@@ -181,18 +199,50 @@ How a thread reaches its session:
 - Every later thread for that session is sent as a new message into the same run (`POST <captain>/api/captain/prompt/runs/{runId}/message`).
 - The server checks the session against captain before each use. If it finished, failed, was stopped, or captain forgot it (a restart), the next thread starts a replacement with the configured runtime.
 - Before sending, the server hands the thread to the agent: it assigns the thread to the session's agent author `{name: <model>, kind:"agent", via:"playground", sessionId}` (a human action, so it can take a thread over) and acknowledges as that author. The message tells the agent its author name, so it must not acknowledge again and must reply and resolve as that author. Completion comes from the agent's own reply and resolve; the server posts no summary.
-- A handed-off root stores `agentRun: {sessionId?, requestedAt, state, error?}`, where `state` is `queued` (the agent was busy), `sent`, `done` (the thread was resolved) or `error` (the hand-off failed; `error` says why, and `sessionId` is absent when no session was started). Several roots can share one `sessionId`. Reopening a thread clears it. The thread shows a "Sent to agent session · state" chip that opens the **Agent sessions** panel on that session: a list of every session (page, state, model, **Stop**, **Forget**) and, for the selected one, a live `SessionTail` with an **Inspect** toggle for the full `SessionInspector`.
+- A handed-off root stores `agentRun: {sessionId?, requestedAt, state, error?, target?}`, where `state` is `queued` (the agent was busy), `sent`, `done` (the thread was resolved) or `error` (the hand-off failed; `error` says why, and `sessionId` is absent when no session was started). Several roots can share one `sessionId`. Reopening a thread clears it. The thread shows a "Sent to agent session · state" chip that opens the **Agent sessions** panel on that session: a list of every session (page, state, model, **Stop**, **Forget**) and, for the selected one, a live `SessionTail` with an **Inspect** toggle for the full `SessionInspector`.
 
 | Method | Path | Purpose |
 | ------ | ---- | ------- |
 | `GET`  | `/__playground/agent-sessions` | `{settings, sessions}` — running sessions verified against captain first |
 | `PUT`  | `/__playground/agent-sessions/settings` | Patch `{autoRun?, grouping?, runtime?}`; `400` on unknown fields or bad values, `409` for `autoRun: true` without a runtime |
+| `PUT`  | `/__playground/agent-sessions/targets` | `{page, target}` with `target` `{kind:"playground"}` or `{kind:"captain", sessionId, label}`; answers `{settings}` |
+| `GET`  | `/__playground/agent-sessions/captain` | `{sessions:[{id, source, title, cwd?, model?, inCmux}]}` — captain's live sessions without their process environment |
 | `DELETE` | `/__playground/agent-sessions/sessions/{runId}` | Stop the session if it is running and forget it (the panel's **Forget**); the next thread for it starts a new one |
 | `GET`  | `/__playground/agent-runs/runs/{runId}` and `.../stream` | Proxy to captain's run snapshot and SSE stream |
 | `POST` | `/__playground/agent-runs/runs/{runId}/stop` | Proxy to captain's stop; the stored session becomes `stopped` |
 | `GET`  | `/__playground/agent-runs/sessions/{sessionId}` (`?follow=1` for SSE) | Proxy to captain's session transcript, streamed unbuffered; the contract `SessionTail` and `SessionInspector` read |
 
+#### Per-page target: the playground agent or a live captain session
+
+Each page chooses where its threads go: the **Playground agent** (the sessions above), or a **live captain session** — a Claude Code or Codex agent you already run, which captain lists under `GET <captain>/api/captain/sessions/live`. The bookmarklet rail shows a **Send comments to** picker for its page; the choice is stored per page as `settings.targets["<page id>"] = {kind:"captain", sessionId, label}` and applies to **Run agent** (shown as **Send to <label>**) and auto-run alike. Choosing **Playground agent** removes the page's entry.
+
+Sending a thread to a captain target:
+
+- The server first checks the session is still in captain's live list. If not, the request is a `409` and the thread is left untouched: the picker marks the target **No longer live** rather than falling back to the playground agent.
+- It assigns and acknowledges the thread as `{name: <session model>, kind:"agent", via:"captain", sessionId}`, then `POST <captain>/api/captain/sessions/{id}/deliver` with the thread. The message carries `curl` commands for the thread's reply and resolve URLs, since that session has no playground tools.
+- Captain delivers into the running process through its own channel and never resumes the session in a second process: Claude Code's messaging socket (`CLAUDE_CODE_MESSAGING_SOCKET`, read off the live process at delivery time and never stored), then `codex queue --thread`, and otherwise typing into the agent's cmux pane. A session with no live process is `409`; one with no channel is `422`.
+- `agentRun.target` records `{label, channel}`, and the chip reads "Sent to <label> via <channel> · state". A `runtime` in the request is refused with `409`, since the target needs none.
+
 Captain is `http://localhost:9020` (`captain serve`), the same base the runtime-profile routes use. If it cannot be reached the route answers `502` naming that URL; there is no fallback. Register `playgroundAgentRuns` before `playgroundComments` (as `vite.config.ts` does): the comments middleware answers every other `/__playground/comments/*` path with `405`. Both share one `createAgentRuns(...)` instance; auto-run is wired as `playgroundComments({dir, onCreated: agentRuns.autoRunComment})`.
+
+### Prompt: run a saved captain prompt on an element
+
+Right-click an element → **Prompt…** picks one of captain's saved prompts (e.g. `diagram-smells`), fills in its arguments and runs it one-shot (`chat:false`). The argument form comes from the prompt's declared input schema, else its listed variables, else the `{{placeholders}}` in its template; `files` is seeded with the element's source file and `input` with its component, source and HTML. **Presets** default to `lint`, which gives lint-style prompts their `{violations:[…]}` output schema.
+
+When the run finishes, the server adds one root comment on the element, authored `{name:"captain", kind:"agent", via:"prompt:<name>"}`:
+
+- lint violations → a body listing each finding, one `checklist` item per violation (`status: "open"`), `refs` with the flagged `file:line`s, and the raw `lint: {violations}`;
+- other structured output → a fenced JSON body; free text → the text;
+- no violations → no comment (the toast says so); a failed run → no comment, the toast shows captain's error.
+
+Each result also records `promptRun: {promptId, promptName, runId, sessionId?, variables}`. The checklist and provenance are part of the thread markdown an agent receives. With **Auto-run new comments** on, the result is handed to the agent session on behalf of whoever ran the prompt; otherwise use **Run agent** on it. Clients cannot set `checklist`, `refs`, `promptRun` or `lint` through `POST /__playground/comments`.
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `GET`  | `/__playground/prompts` | `{prompts}` — captain's saved prompts |
+| `GET`  | `/__playground/prompts/{id or name}` | `{prompt, variablesSchema}` — the prompt and the schema its arguments are entered with |
+| `POST` | `/__playground/prompt-runs` | Start a run: `{promptId, variables, presets, page, anchor, element, author}` (human author; element without screenshot) → `202 {run}` |
+| `GET`  | `/__playground/prompt-runs` | `{runs}` — recent runs, `state` `running`, `done` (with `commentId`), `empty` or `failed` (with `error`); kept in memory, so a playground restart forgets them |
 
 ## How it fits together
 

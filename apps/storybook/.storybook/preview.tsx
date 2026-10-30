@@ -20,6 +20,7 @@ import {
 import { setFallbackIconProvider } from "../../../packages/ui/src/data/icon-fallback";
 import { providerIcon } from "../../../packages/ui/src/data/chat/provider-icons";
 import * as UiIcons from "../../../packages/ui/src/icons";
+import { VIEWPORT_PRESETS } from "../../../packages/ui/src/lib/breakpoints";
 import "@flanksource/clicky-ui/styles.css";
 // The MDXEditor-backed markdown field (JsonSchemaForm `format: md`) needs the
 // editor's base CSS, shipped as a separate optional export so consumers who
@@ -59,11 +60,26 @@ setFallbackIconProvider(({ name, className }) => {
   return <Glyph {...(className ? { className } : {})} />;
 });
 
+// The viewport toolbar offers the library's breakpoint-straddling presets (the
+// same list the kitchen-sink sweep and the e2e overflow check use) instead of
+// Storybook's device catalog, so stepping through it hits every sm/md/lg branch.
+const VIEWPORT_OPTIONS = Object.fromEntries(
+  VIEWPORT_PRESETS.map((preset) => [
+    preset.id,
+    {
+      name: `${preset.label} · ${preset.width}×${preset.height}`,
+      styles: { width: `${preset.width}px`, height: `${preset.height}px` },
+      type: preset.kind === "phone" ? ("mobile" as const) : preset.kind,
+    },
+  ]),
+);
+
 const preview: Preview = {
   tags: ["autodocs"],
   parameters: {
     controls: { expanded: true },
     backgrounds: { disabled: true },
+    viewport: { options: VIEWPORT_OPTIONS },
     docs: {
       toc: true,
     },

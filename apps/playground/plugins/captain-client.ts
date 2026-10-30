@@ -88,15 +88,49 @@ export type CaptainMessageResult = {
   status: "queued" | "started" | "steered" | string;
 };
 
+/**
+ * One row of `GET /api/captain/sessions/live`, narrowed to what the playground
+ * reads. `live.environment` is deliberately not typed: it is never forwarded.
+ */
+export type CaptainLiveSession = {
+  id: string;
+  source: string;
+  title?: string;
+  slug?: string;
+  initialPrompt?: string;
+  model?: string;
+  cwd?: string;
+  live?: { pid?: number; active?: boolean; surface?: { surfaceId?: string } | null } | null;
+};
+
+/** How captain delivered a message into a live session it did not launch. */
+export type CaptainDeliverResult = {
+  channel: "claude-socket" | "codex-queue" | "cmux";
+  status: "sent" | "queued";
+};
+
 type PromptRunResult = {
   runId?: string;
   runs?: Array<{ runId?: string }>;
 };
 
 const PROMPT_RUN_PATH = "/api/v1/prompt/run";
+const PROMPTS_PATH = "/api/v1/prompt";
 const RUNS_PATH = "/api/captain/prompt/runs";
+const SESSIONS_PATH = "/api/captain/sessions";
+const LIVE_SESSIONS_LIMIT = 200;
 
-/** The slice of captain's HTTP API the playground's shared agent session uses. */
+function singleRunId(result: PromptRunResult): string {
+  const runId = result.runId ?? result.runs?.[0]?.runId;
+  if (!runId || (result.runs?.length ?? 0) > 1) {
+    throw new Error(
+      `Captain did not start exactly one run: ${JSON.stringify(result)}`,
+    );
+  }
+  return runId;
+}
+
+/** The slice of captain's HTTP API the playground's agent sessions and prompt runs use. */
 export class CaptainClient {
   constructor(readonly baseURL: string) {}
 
@@ -153,13 +187,87 @@ export class CaptainClient {
         }),
       },
     );
-    const runId = result.runId ?? result.runs?.[0]?.runId;
-    if (!runId || (result.runs?.length ?? 0) > 1) {
-      throw new Error(
-        `Captain did not start exactly one run: ${JSON.stringify(result)}`,
+    return singleRunId(result);
+  }
+
+  listPrompts(): Promise<CaptainPromptSummary[]> {
+    return this.json<CaptainPromptSummary[]>(PROMPTS_PATH, { method: "GET" });
+  }
+
+  /** `idOrName` is a prompt id or its bare name. */
+  getPrompt(idOrName: string): Promise<CaptainPromptDetail> {
+    return this.json<CaptainPromptDetail>(
+      `${PROMPTS_PATH}/${encodeURIComponent(idOrName)}`,
+      { method: "GET" },
+    );
+  }
+
+  /** Starts a one-shot (non-chat) run of a saved prompt. */
+  async startPromptRun(options: {
+    id: string;
+    variables: Record<string, unknown>;
+    presets: string[];
+    spec: Record<string, unknown>;
+  }): Promise<string> {
+    const result = await this.json<PromptRunResult>(
+      `${PROMPT_RUN_PATH}?id=${encodeURIComponent(options.id)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          variables: options.variables,
+          presets: options.presets,
+          spec: options.spec,
+          chat: false,
+        }),
+      },
+    );
+    return singleRunId(result);
+  }
+
+  /**
+   * Follows a run's SSE stream to its terminal frame. A run that errors still
+   * resolves (with `success: false`); only a broken stream or `timeoutMs` rejects.
+   */
+  async awaitRunSummary(runId: string, timeoutMs: number): Promise<CaptainRunSummary> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await this.fetch(
+        `${RUNS_PATH}/${encodeURIComponent(runId)}/stream`,
+        { headers: { Accept: "text/event-stream" }, signal: controller.signal },
       );
+      if (!response.ok || !response.body) {
+        throw new CaptainHttpError(
+          response.status,
+          `Captain stream for run ${runId} failed with ${response.status}`,
+        );
+      }
+      for await (const frame of readSseFrames(response.body)) {
+        if (frame.event === "done") {
+          // A run without a summary ends with a bare {status:"completed"}.
+          const data = frame.data as Partial<CaptainRunSummary> | null;
+          return { ...data, success: data?.success ?? true };
+        }
+        if (frame.event === "error") {
+          const data = frame.data as Partial<CaptainRunSummary> | null;
+          return {
+            ...data,
+            success: false,
+            error: data?.error ?? `Captain run ${runId} failed`,
+          };
+        }
+      }
+      throw new Error(`Captain closed the stream for run ${runId} before it finished`);
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw new Error(`Captain run ${runId} did not finish within ${timeoutMs}ms`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      controller.abort();
     }
-    return runId;
   }
 
   /** `null` when captain no longer knows the run (it restarted, or pruned it). */
@@ -173,6 +281,30 @@ export class CaptainClient {
       if (error instanceof CaptainHttpError && error.status === 404) return null;
       throw error;
     }
+  }
+
+  /** Every live claude/codex session on this host, across projects. */
+  async listLiveSessions(): Promise<CaptainLiveSession[]> {
+    const { sessions } = await this.json<{ sessions: CaptainLiveSession[] }>(
+      `${SESSIONS_PATH}/live?all=true&limit=${LIVE_SESSIONS_LIMIT}`,
+      { method: "GET" },
+    );
+    return sessions;
+  }
+
+  /**
+   * Delivers text into a live session captain did not launch, through its own
+   * channel; captain refuses (409/422) rather than resume a session that is not live.
+   */
+  deliver(sessionId: string, text: string): Promise<CaptainDeliverResult> {
+    return this.json<CaptainDeliverResult>(
+      `${SESSIONS_PATH}/${encodeURIComponent(sessionId)}/deliver`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      },
+    );
   }
 
   sendMessage(runId: string, text: string): Promise<CaptainMessageResult> {

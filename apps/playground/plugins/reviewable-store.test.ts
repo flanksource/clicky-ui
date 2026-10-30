@@ -30,7 +30,7 @@ describe("source-backed review decisions", () => {
     mkdirSync(commentsDir);
     const source =
       'export default () => <section data-review-id="design" className="existing">Design</section>;';
-    createSource(pagesDir, "review", source);
+    createSource(pagesDir, "review", source, ".tsx");
     const request = {
       pagesDir,
       commentsDir,
@@ -91,7 +91,7 @@ describe("delete reviewable", () => {
     mkdirSync(commentsDir);
     const source =
       'export default function Page() { return <main><section id="target">Review me</section></main>; }';
-    createSource(pagesDir, "review", source);
+    createSource(pagesDir, "review", source, ".tsx");
 
     const marked = markReviewable({
       pagesDir,
@@ -125,7 +125,7 @@ describe("delete reviewable", () => {
     mkdirSync(commentsDir);
     const source = `const variants = [{ id: "first", reviewId: "review-first" }, { id: "second", reviewId: "review-second" }];
 export default function Page() { return <main>{variants.map((variant) => <section key={variant.id} id={variant.id} data-review-id={variant.reviewId}>{variant.id}</section>)}</main>; }`;
-    createSource(pagesDir, "review", source);
+    createSource(pagesDir, "review", source, ".tsx");
     const comment = (
       id: string,
       anchor: string,

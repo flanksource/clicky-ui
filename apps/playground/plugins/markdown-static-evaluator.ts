@@ -342,15 +342,19 @@ export class StaticModuleGraph {
   }
 
   private indexImport(file: string, record: ModuleRecord, declaration: ts.ImportDeclaration) {
-    if (!ts.isStringLiteral(declaration.moduleSpecifier)) return;
+    const clause = declaration.importClause;
+    // Types carry no values to evaluate, so a type-only import is never resolved.
+    if (!ts.isStringLiteral(declaration.moduleSpecifier) || !clause || clause.isTypeOnly) return;
+    const bindings = clause.namedBindings;
+    const values =
+      bindings && ts.isNamedImports(bindings) ? bindings.elements.filter((element) => !element.isTypeOnly) : [];
+    if (!clause.name && values.length === 0) return;
     const resolved = this.host.resolve(file, declaration.moduleSpecifier.text);
-    if (!resolved || !declaration.importClause) return;
-    if (declaration.importClause.name) {
-      record.imports.set(declaration.importClause.name.text, { file: resolved, name: "default" });
+    if (!resolved) return;
+    if (clause.name) {
+      record.imports.set(clause.name.text, { file: resolved, name: "default" });
     }
-    const bindings = declaration.importClause.namedBindings;
-    if (!bindings || !ts.isNamedImports(bindings)) return;
-    for (const element of bindings.elements) {
+    for (const element of values) {
       record.imports.set(element.name.text, {
         file: resolved,
         name: element.propertyName?.text ?? element.name.text,

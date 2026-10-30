@@ -9,6 +9,8 @@
  * one broken selector does not lose the element. A comment none of them can
  * find yields an *orphan* — kept and flagged, never silently dropped — and one
  * found by a fallback is reported as moved, never silently repositioned.
+ * Rendered markdown is the exception: there the anchor is structural — the
+ * block's heading path and text (see markdown-anchor.ts) — and is its only locator.
  */
 import { attr as wordLikeAttr, finder } from "@medv/finder";
 import { computeAccessibleName, getRole } from "dom-accessibility-api";
@@ -20,6 +22,14 @@ import {
   type CommentLocator,
   type CommentLocatorHeading,
 } from "../../plugins/comments-model";
+import {
+  MARKDOWN_ROOT,
+  markdownAnchor,
+  markdownLocator,
+  markdownTarget,
+  parseMarkdownAnchor,
+  resolveMarkdown,
+} from "./markdown-anchor";
 
 export type Box = { left: number; top: number; width: number; height: number };
 
@@ -204,7 +214,16 @@ export function resolveLocator(
       }
       return null;
     }
+    case "markdown": {
+      const markdown = markdownRootIn(root);
+      return markdown ? (resolveMarkdown(markdown, locator)?.element ?? null) : null;
+    }
   }
+}
+
+/** The rendered markdown inside (or at) `root`, if the page is a markdown document. */
+function markdownRootIn(root: Element): Element | null {
+  return root.matches(MARKDOWN_ROOT) ? root : root.querySelector(MARKDOWN_ROOT);
 }
 
 /**
@@ -217,6 +236,8 @@ export function captureLocators(
   root: Element,
 ): CommentLocator[] {
   if (target === root || !root.contains(target)) return [];
+  const markdown = markdownTarget(target);
+  if (markdown) return [markdownLocator(markdown.block, markdown.root)];
   const tag = target.tagName.toLowerCase();
   const candidates: CommentLocator[] = [];
 
@@ -308,6 +329,15 @@ export function resolveComment(
 }
 
 /**
+ * The element a click comments on: inside rendered markdown, the block holding
+ * it (or the whole page between blocks); elsewhere the clicked element itself.
+ */
+export function commentTarget(target: Element, content: Element): Element {
+  if (!content.contains(target) || !target.closest(MARKDOWN_ROOT)) return target;
+  return markdownTarget(target)?.block ?? content;
+}
+
+/**
  * Builds the anchor for a clicked element. Elements inside the artifact get a
  * path from `content`. Overlays (e.g. `Modal`) portal into `document.body`, so
  * an element inside a titled dialog is keyed on that dialog's `aria-label`
@@ -317,7 +347,13 @@ export function commentAnchor(
   target: Element,
   content: Element,
 ): string | null {
-  if (content.contains(target)) return cssPath(target, content);
+  if (content.contains(target)) {
+    const element = commentTarget(target, content);
+    const markdown = markdownTarget(element);
+    return markdown
+      ? markdownAnchor(markdownLocator(markdown.block, markdown.root))
+      : cssPath(element, content);
+  }
   const dialog = target.closest('[role="dialog"][aria-label]');
   const label = dialog?.getAttribute("aria-label");
   if (!dialog || !label) return null;
@@ -334,6 +370,14 @@ export function overlayLabel(anchor: string): string | null {
 /** Resolves a stored anchor, returning null when the node is gone (orphaned). */
 export function resolveAnchor(root: Element, anchor: string): Element | null {
   if (anchor === ROOT_ANCHOR) return root;
+  const markdown = parseMarkdownAnchor(anchor);
+  if (markdown) {
+    // The anchor only names the block as it was; a reworded or relocated
+    // block is the locator's to find, and reported as moved.
+    const scope = markdownRootIn(root);
+    const found = scope && resolveMarkdown(scope, markdown);
+    return found?.how === "exact" ? found.element : null;
+  }
   const separator = anchor.indexOf(OVERLAY_SEPARATOR);
   if (separator !== -1) {
     const dialog = query(root.ownerDocument, anchor.slice(0, separator));
