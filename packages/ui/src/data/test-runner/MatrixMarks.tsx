@@ -97,7 +97,7 @@ export type MatrixHeatmapProps = {
 /** One tick per item, filled with its outcome's bar colour. */
 export function MatrixHeatmap({ ticks, unit, static: isStatic = false }: MatrixHeatmapProps) {
   return (
-    <span role="list" {...(ticks.length > 0 ? { tabIndex: 0 } : {})} className="flex h-3 min-w-10 flex-1 items-stretch gap-px overflow-x-auto [scrollbar-width:none] print:[print-color-adjust:exact] print:[-webkit-print-color-adjust:exact]" aria-label={`${ticks.length} ${unit}`} data-heatmap={unit}>
+    <span role="list" {...(ticks.length > 0 ? { tabIndex: 0 } : {})} className="flex h-3 min-w-10 flex-1 items-stretch [contain:inline-size] gap-px overflow-x-auto [scrollbar-width:none] print:[print-color-adjust:exact] print:[-webkit-print-color-adjust:exact]" aria-label={`${ticks.length} ${unit}`} data-heatmap={unit}>
       {ticks.map((tick, i) => (
         <span
           key={i}
@@ -177,8 +177,8 @@ export function EnvChip({ context, className }: EnvChipProps) {
   );
 }
 
-const HEADER_GRID = "grid min-w-48 grid-rows-[auto_auto_auto] gap-1.5";
-const HEADER_ROW = "flex h-5 min-w-0 items-center gap-2";
+const HEADER_LINE = "flex h-6 w-full items-center gap-3 whitespace-nowrap";
+const HEADER_GROUP = "flex shrink-0 items-center gap-2";
 
 export type MatrixEnvHeaderProps = {
   context: string;
@@ -196,28 +196,28 @@ export type MatrixEnvHeaderProps = {
 };
 
 /**
- * One environment's column head in three fixed rows: its chip, the plans'
- * progress as a heatmap with the elapsed time, and the plan verdict naming
- * its units.
+ * One environment's column head on one line that never wraps: its chip, the
+ * plans' progress as a heatmap with the elapsed time, and the plan verdict
+ * naming its units.
  */
 export function MatrixEnvHeader({ context, counts, plans, durationMs, running, renderChip, aside, static: isStatic = false }: MatrixEnvHeaderProps) {
   if (plans.length !== counts.total) throw new Error(`${context} header has ${plans.length} plan ticks but counts ${counts.total} plans`);
   const done = counts.passed + counts.warned + counts.failed + counts.error;
   const chip = <EnvChip context={context} />;
   return (
-    <div className={HEADER_GRID} data-env-header={context}>
-      <div className={HEADER_ROW}>
+    <div className={HEADER_LINE} data-env-header={context}>
+      <div className={HEADER_GROUP}>
         {renderChip && !isStatic ? renderChip(chip) : chip}
         {aside}
       </div>
-      <div className={HEADER_ROW} title={`${done} of ${counts.total} plans finished`} data-env-progress="">
+      <div className={`${HEADER_GROUP} flex-1`} title={`${done} of ${counts.total} plans finished`} data-env-progress="">
         <MatrixHeatmap ticks={plans} unit="plans" static={isStatic} />
         <span className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-foreground">
           {done}/{counts.total} plans
         </span>
         <MatrixElapsed ms={durationMs} running={running} clock />
       </div>
-      <div className={HEADER_ROW} data-env-verdict="">
+      <div className={HEADER_GROUP} data-env-verdict="">
         <MatrixMix
           counts={{ passed: counts.passed, warned: counts.warned, running: counts.running, pending: counts.queued, failed: counts.failed, error: counts.error }}
           unit="plans"
@@ -231,18 +231,15 @@ export function MatrixEnvHeader({ context, counts, plans, durationMs, running, r
 
 export type MatrixUnavailableEnvHeaderProps = { context: string };
 
-/** An environment whose member run did not load, in the same three rows as MatrixEnvHeader. */
+/** An environment whose member run did not load, on the same single line as MatrixEnvHeader. */
 export function MatrixUnavailableEnvHeader({ context }: MatrixUnavailableEnvHeaderProps) {
   return (
-    <div className={HEADER_GRID} data-env-header={context}>
-      <div className={HEADER_ROW}>
-        <EnvChip context={context} />
-      </div>
-      <div className={`${HEADER_ROW} text-[11px] font-medium ${MATRIX_MARKS.error.tone}`}>
+    <div className={HEADER_LINE} data-env-header={context}>
+      <EnvChip context={context} />
+      <div className={`${HEADER_GROUP} text-[11px] font-medium ${MATRIX_MARKS.error.tone}`}>
         <MatrixMark mark="error" label="" />
         did not load
       </div>
-      <div className={HEADER_ROW} aria-hidden="true" />
     </div>
   );
 }

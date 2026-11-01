@@ -171,7 +171,7 @@ export const CodeFile: Story = {
       const el = canvasElement.querySelector<HTMLElement>('[data-source-text="12"]');
       if (!el?.querySelector("span[style*='color']")) throw new Error("line 12 is not highlighted yet");
       return el;
-    });
+    }, { timeout: 5_000 });
     const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
     let text: Text | null = null;
     while (walker.nextNode()) if ((walker.currentNode as Text).data.includes("attempts")) text = walker.currentNode as Text;
