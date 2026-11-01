@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from "react";
 import {
-  Badge,
   isUnresolved,
   type Comment,
   type DropdownMenuItem,
@@ -27,6 +26,7 @@ import {
   type AgentTarget,
   type CaptainAgentTarget,
 } from "./agent-runs-api";
+import { AgentRunChip } from "./AgentRunChip";
 import { AgentSessionPanel } from "./AgentSessionPanel";
 import { RunAgentDialog } from "./RunAgentDialog";
 import { PLAYGROUND_COMMENT_CONFIG } from "../comments/useComments";
@@ -65,53 +65,6 @@ const NO_LIVE_SESSION = /no live agent session/;
 
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
-}
-
-const STATE_LABEL: Record<NonNullable<Comment["agentRun"]>["state"], string> = {
-  queued: "queued",
-  sent: "sent",
-  done: "done",
-  error: "failed",
-};
-
-function AgentRunChip({
-  comment,
-  onOpen,
-}: {
-  comment: Comment;
-  onOpen: (sessionId?: string) => void;
-}) {
-  const run = comment.agentRun;
-  if (!run) return null;
-  const where = run.target
-    ? `Sent to ${run.target.label}${run.target.channel ? ` via ${run.target.channel}` : ""}`
-    : "Sent to agent session";
-  // A captain target is not one of the playground's sessions, so there is no panel to open.
-  if (run.target) {
-    return (
-      <span title={run.error ?? where} className="inline-flex items-center">
-        <Badge tone={runTone(run.state)} variant="soft" clickToCopy={false}>
-          {where} · {STATE_LABEL[run.state]}
-        </Badge>
-      </span>
-    );
-  }
-  return (
-    <button
-      type="button"
-      onClick={() => onOpen(run.sessionId)}
-      title={run.error ?? "Open the agent session"}
-      className="inline-flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <Badge tone={runTone(run.state)} variant="soft" clickToCopy={false}>
-        {where} · {STATE_LABEL[run.state]}
-      </Badge>
-    </button>
-  );
-}
-
-function runTone(state: NonNullable<Comment["agentRun"]>["state"]) {
-  return state === "error" ? "danger" : state === "done" ? "success" : "info";
 }
 
 function runAgentTitle(
