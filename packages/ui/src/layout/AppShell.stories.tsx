@@ -148,6 +148,50 @@ export const CompactMobileActions: Story = {
   ),
 };
 
+const PAGED_ITEMS = ["Fix parser", "Add plan heatmap", "Bump dependencies"];
+
+function PagedListDetailDemo() {
+  const [selected, setSelected] = useState("");
+  return (
+    <div className="h-[520px] w-[390px] border border-border">
+      <AppShell
+        brand={<span className="font-bold">gavel</span>}
+        navSections={[{ items: [{ key: "prs", label: "PRs", icon: UiGrid, to: "/prs", active: true }] }]}
+        bodySidebar={
+          <ul className="divide-y divide-border">
+            {PAGED_ITEMS.map((item) => (
+              <li key={item}>
+                <button type="button" className="min-h-11 w-full px-density-3 text-left text-sm" onClick={() => setSelected(item)}>
+                  {item}
+                </button>
+              </li>
+            ))}
+          </ul>
+        }
+        bodyPane={selected ? "main" : "sidebar"}
+        onBodyBack={() => setSelected("")}
+        bodyBackLabel="Back to pull requests"
+      >
+        <div className="p-density-4 text-sm">{selected || "Select a pull request"}</div>
+      </AppShell>
+    </div>
+  );
+}
+
+// A narrow list/detail body pages instead of stacking: the list fills the
+// body until an item is picked, then the detail fills it under a back bar.
+export const PagedListDetail: Story = {
+  name: "Paged list/detail on a phone",
+  render: () => <PagedListDetailDemo />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Add plan heatmap" }));
+    await expect(canvas.getByText("Add plan heatmap", { selector: "div" })).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Back to pull requests" }));
+    await expect(canvas.getByRole("button", { name: "Fix parser" })).toBeVisible();
+  },
+};
+
 // Mission-Control style: collapsible nav rail, a centered search,
 // right-side icon buttons + an org/settings picker, and a body with a fixed
 // header + actions row over a bodySidebar | body-main split.
