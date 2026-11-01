@@ -82,6 +82,7 @@ export function ConnectionDashboardRow({
             </span>
             <div className="min-w-0 flex-1">
               <EndpointLine endpoint={connection.endpoint} />
+              {connection.source && <div className="truncate text-xs text-muted-foreground" title={connection.source}>{connection.source}</div>}
             </div>
             <div className="hidden shrink-0 items-center gap-1.5 lg:flex">
               <SecretChip count={connection.secretCount} />
