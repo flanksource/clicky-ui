@@ -70,6 +70,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const LargeField: Story = {
+  tags: ["browser"],
   args: {
     schema: largeFieldSchema,
     value: { groupAction: "01" },

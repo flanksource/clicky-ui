@@ -5,6 +5,7 @@ import {
   COMMENT_ELEMENT_HTML_TRUNCATION,
   type CommentElementContext,
 } from "../../plugins/comments-model";
+import { captureLocators } from "./dom-anchor";
 
 const STACK_TIMEOUT_MS = 1500;
 
@@ -40,9 +41,16 @@ export function captureElementHtml(element: Element): string {
 
 export async function captureElementContext(
   element: Element,
-  fallbackSource?: string,
+  options: {
+    fallbackSource?: string;
+    /** Root the locators are computed against; omit when the element has none (an overlay). */
+    root?: Element;
+  } = {},
 ): Promise<Omit<CommentElementContext, "screenshot">> {
+  const { fallbackSource, root } = options;
   const html = captureElementHtml(element);
+  // Synchronously, before any await, so the locators see the DOM as clicked.
+  const locators = root ? captureLocators(element, root) : [];
   const api = window.__REACT_GRAB__;
   if (!api) {
     throw new Error(
@@ -69,5 +77,6 @@ export async function captureElementContext(
     ...(componentName ? { componentName } : {}),
     source,
     html,
+    ...(locators.length > 0 ? { locators } : {}),
   };
 }

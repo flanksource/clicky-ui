@@ -5,3 +5,4 @@ export * from "./data";
 export * from "./comments";
 export * from "./clicky";
 export * from "./rpc";
+export { ChatLayer, type ChatLayerProps } from "./rpc/ChatLayer";

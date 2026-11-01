@@ -11,6 +11,7 @@ import { Icon } from "./Icon";
 import { ProgressBar } from "./ProgressBar";
 import { TaskProcessDetailsView } from "./TaskProcessDetails";
 import { TaskExecDetailsView } from "./TaskExecDetails";
+import { TaskPrompts } from "./TaskPrompts";
 import type { LogEntry, TaskControlAction, TaskSnapshot } from "./TaskSnapshot";
 import { type TaskHeaderExtra, TaskMetadataChips } from "./TaskHeaderExtras";
 import { type TaskExtraTabs, TaskStreamTabs } from "./TaskStreamTabs";
@@ -40,6 +41,7 @@ import {
 
 const MAX_COMPLETED = 5;
 const MAX_PENDING = 3;
+const DEFAULT_PROMPT_BASE = "/api/todos";
 
 export interface TaskProgressProps {
   snapshots: TaskSnapshot[];
@@ -68,6 +70,8 @@ export interface TaskProgressProps {
    * process metadata.
    */
   headerExtra?: TaskHeaderExtra;
+  /** Base path the prompt API is mounted under; a task's pending prompts are answered there. */
+  promptBasePath?: string;
 }
 
 export function TaskProgress({
@@ -82,6 +86,7 @@ export function TaskProgress({
   connectionStatus,
   extraTabs,
   headerExtra,
+  promptBasePath = DEFAULT_PROMPT_BASE,
 }: TaskProgressProps) {
   const groups = snapshots.filter((s) => s.type === "group");
   const tasks = snapshots.filter((s) => s.type === "task");
@@ -110,6 +115,7 @@ export function TaskProgress({
           {...(connectionStatus ? { connectionStatus } : {})}
           {...(extraTabs ? { extraTabs } : {})}
           {...(headerExtra ? { headerExtra } : {})}
+          promptBasePath={promptBasePath}
         />
       ))}
     </div>
@@ -127,6 +133,7 @@ function TaskGroupCard({
   connectionStatus,
   extraTabs,
   headerExtra,
+  promptBasePath,
 }: {
   group: TaskSnapshot;
   tasks: TaskSnapshot[];
@@ -134,6 +141,7 @@ function TaskGroupCard({
   initialShowAllTasks: boolean | undefined;
   extraTabs?: TaskExtraTabs;
   headerExtra?: TaskHeaderExtra;
+  promptBasePath: string;
   onControl?: (action: TaskControlAction, group: TaskSnapshot) => void | Promise<void>;
   onTaskControl?: (
     action: TaskControlAction,
@@ -269,6 +277,7 @@ function TaskGroupCard({
           {...(connectionStatus ? { connectionStatus } : {})}
           {...(extraTabs ? { extraTabs } : {})}
           {...(headerExtra ? { headerExtra } : {})}
+          promptBasePath={promptBasePath}
         />
       ))}
     </div>
@@ -284,6 +293,7 @@ function TaskRow({
   connectionStatus,
   extraTabs: contributeTabs,
   headerExtra,
+  promptBasePath,
 }: {
   task: TaskSnapshot;
   group: TaskSnapshot;
@@ -292,6 +302,7 @@ function TaskRow({
   connectionStatus?: string;
   extraTabs?: TaskExtraTabs;
   headerExtra?: TaskHeaderExtra;
+  promptBasePath: string;
   onTaskControl?: (
     action: TaskControlAction,
     task: TaskSnapshot,
@@ -356,7 +367,7 @@ function TaskRow({
             <CopyButton
               value={() => taskMarkdown(t)}
               label={`Copy ${t.name}`}
-              className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
               iconClassName="text-xs"
             />
             {onTaskControl && (
@@ -390,6 +401,7 @@ function TaskRow({
             />
           </div>
         )}
+        {t.prompts && t.prompts.length > 0 && <TaskPrompts prompts={t.prompts} basePath={promptBasePath} />}
         {expanded && execDetails && <TaskExecDetailsView details={execDetails} />}
         {expanded && processDetails && (
           <TaskProcessDetailsView

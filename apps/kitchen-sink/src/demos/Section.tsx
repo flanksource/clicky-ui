@@ -25,7 +25,10 @@ export function DemoRow({ label, children }: { label?: string; children: ReactNo
   return (
     <div className="flex flex-wrap items-center gap-density-3">
       {label && <span className="w-28 text-xs text-muted-foreground">{label}</span>}
-      <div className="flex flex-wrap items-center gap-density-2">{children}</div>
+      {/* As a flex item this row would otherwise size to its max-content and run
+          off narrow screens; the 16rem basis drops it below the label on phones
+          instead of squeezing it into the space beside it. */}
+      <div className="flex min-w-0 flex-1 basis-64 flex-wrap items-center gap-density-2">{children}</div>
     </div>
   );
 }

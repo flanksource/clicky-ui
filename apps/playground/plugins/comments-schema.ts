@@ -20,6 +20,7 @@ export type JsonProperty = {
   minimum?: number;
   enum?: string[];
   default?: string | boolean;
+  writeOnly?: boolean;
   properties?: Record<string, JsonProperty>;
   required?: string[];
   additionalProperties?: false;
@@ -52,7 +53,6 @@ export type CommentTool = {
 const BASE = "/__playground/comments";
 
 const STATUS_VALUES = [...COMMENT_STATUSES];
-const ACTIVE_STATUS_VALUES = [...UNRESOLVED_STATUSES];
 
 const AUTHOR: JsonProperty = {
   type: "object",
@@ -91,12 +91,6 @@ const BODY: JsonProperty = {
 const ID: JsonProperty = {
   type: "string",
   description: "Comment id, as returned by list_comments.",
-};
-
-const STATUS: JsonProperty = {
-  type: "string",
-  description: `Comment status. ${UNRESOLVED_STATUSES.join(" and ")} count as unresolved.`,
-  enum: STATUS_VALUES,
 };
 
 const RATING: JsonProperty = {
@@ -158,10 +152,19 @@ const ELEMENT: JsonProperty = {
 
 export const COMMENT_TOOLS: CommentTool[] = [
   {
+    name: "comment_activity",
+    label: "Comment activity",
+    description: "Per-page feedback timestamps, root counts and pending assignees without comment bodies or captures.",
+    method: "GET",
+    path: `${BASE}/activity`,
+    annotations: { readOnlyHint: true, idempotentHint: true },
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
     name: "list_comments",
     label: "List comments",
     description:
-      "List playground feedback across every artifact page. New roots carry captured component/source and HTML, with optional screenshot context. Replies carry parentId and no status.",
+      "List playground feedback across every artifact page. New roots carry captured component/source and HTML, with optional screenshot context. Replies carry parentId and no status. A root being worked on carries assignee, acknowledgedBy and acknowledgedAt.",
     method: "GET",
     path: BASE,
     annotations: { readOnlyHint: true, idempotentHint: true },
@@ -211,6 +214,7 @@ export const COMMENT_TOOLS: CommentTool[] = [
           description:
             "Human review decision for an element with data-review-id. Rejection and revision require body text.",
         },
+        expectedSource: {type:"string",writeOnly:true,description:"Current source returned by /__playground/sources; required for a review decision. A changed source returns 409."},
         author: AUTHOR,
         anchor: {
           type: "string",
@@ -239,6 +243,21 @@ export const COMMENT_TOOLS: CommentTool[] = [
     },
   },
   {
+    name: "acknowledge_comment",
+    label: "Acknowledge comment",
+    description:
+      "Claim an open thread before starting work on it: it moves to in_progress and you become its assignee, so a human can see it is being handled. Acknowledge, implement, reply, then resolve. Repeating the call as the same assignee changes nothing; a thread another agent holds, or one that is already resolved or closed, is refused with 409. A human may take any thread over.",
+    method: "POST",
+    path: `${BASE}/{id}/acknowledge`,
+    annotations: { idempotentHint: true },
+    inputSchema: {
+      type: "object",
+      properties: { id: ID, author: AUTHOR },
+      required: ["id", "author"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "resolve_comment",
     label: "Resolve comment",
     description:
@@ -259,7 +278,7 @@ export const COMMENT_TOOLS: CommentTool[] = [
     name: "update_comment",
     label: "Update comment",
     description:
-      "Edit a comment's text, rating, or active work status. Resolve uses the dedicated resolve_comment operation; closing and reopening are human review actions.",
+      "Edit a comment's text or rating. Status changes use their own operations: acknowledge_comment to start work and resolve_comment to finish it; closing, reopening and assigning are human review actions.",
     method: "PATCH",
     path: `${BASE}/{id}`,
     annotations: { idempotentHint: true },
@@ -268,11 +287,6 @@ export const COMMENT_TOOLS: CommentTool[] = [
       properties: {
         id: ID,
         body: BODY,
-        status: {
-          ...STATUS,
-          description: "Active work status only.",
-          enum: ACTIVE_STATUS_VALUES,
-        },
         rating: RATING,
       },
       required: ["id"],

@@ -84,6 +84,40 @@ describe("commentsToMarkdown", () => {
     );
   });
 
+  it("lists a prompt result's provenance, checklist and refs under its body", () => {
+    const promptRoot: PageComment = {
+      ...comment({
+        id: "c1",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        body: "**diagram-smells** found 2 issues",
+        author: { name: "captain", kind: "agent" },
+        checklist: [
+          { label: "error · diagram-smells/label-overflow — label clipped", status: "open" },
+          { label: "warning · diagram-smells/crossing — edges cross", status: "done" },
+        ],
+        refs: [{ label: "Files", items: ["src/a.svg:3", "src/a.svg:9"], mono: true }],
+      }),
+      page: "welcome",
+      promptRun: {
+        promptId: "p-1",
+        promptName: "diagram-smells",
+        runId: "run-7",
+        variables: { files: "src/a.svg" },
+      },
+    };
+    const markdown = commentsToMarkdown(page("welcome", [promptRoot]), RAW_ANCHOR_OPTIONS);
+    expect(markdown).toContain(
+      [
+        "- captain: **diagram-smells** found 2 issues",
+        "- produced by captain prompt `diagram-smells` (run `run-7`)",
+        "- checklist:",
+        "  - [open] error · diagram-smells/label-overflow — label clipped",
+        "  - [done] warning · diagram-smells/crossing — edges cross",
+        "- Files: `src/a.svg:3`, `src/a.svg:9`",
+      ].join("\n"),
+    );
+  });
+
   it("includes the rating in copied feedback", () => {
     const markdown = commentsToMarkdown(
       page("welcome", [
@@ -97,6 +131,72 @@ describe("commentsToMarkdown", () => {
     );
 
     expect(markdown).toContain("- rating: negative");
+  });
+
+  it("lists the reply, acknowledge and resolve URLs in workflow order", () => {
+    const markdown = commentsToMarkdown(
+      page("welcome", [
+        comment({ id: "c 1", createdAt: "2026-01-01T00:00:00.000Z" }),
+      ]),
+      {
+        ...MARKDOWN_OPTIONS,
+        commentActionUrls: (id) => ({
+          reply: `http://x/comments/${id}/replies`,
+          acknowledge: `http://x/comments/${id}/acknowledge`,
+          resolve: `http://x/comments/${id}/resolve`,
+        }),
+      },
+    );
+
+    expect(markdown).toContain(
+      [
+        "- status: open",
+        "- acknowledge before starting: `POST http://x/comments/c 1/acknowledge`",
+        "- add comment: `POST http://x/comments/c 1/replies`",
+        "- mark resolved: `POST http://x/comments/c 1/resolve`",
+      ].join("\n"),
+    );
+  });
+
+  it.each([
+    [
+      "an acknowledged agent",
+      {
+        assignee: { name: "Claude", kind: "agent" as const },
+        acknowledgedAt: "2026-01-01T00:05:00.000Z",
+      },
+      "- assignee: Claude (agent, acknowledged 2026-01-01T00:05:00.000Z)",
+    ],
+    [
+      "an assigned user who has not acknowledged",
+      { assignee: { name: "Bo", kind: "user" as const } },
+      "- assignee: Bo (user, not yet acknowledged)",
+    ],
+  ])("names the assignee for %s", (_label, fields, line) => {
+    const markdown = commentsToMarkdown(
+      page("welcome", [
+        comment({
+          id: "c1",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          status: "in_progress",
+          ...fields,
+        }),
+      ]),
+      MARKDOWN_OPTIONS,
+    );
+
+    expect(markdown).toContain(`- status: in_progress\n${line}\n`);
+  });
+
+  it("omits the assignee line when nobody holds the thread", () => {
+    const markdown = commentsToMarkdown(
+      page("welcome", [
+        comment({ id: "c1", createdAt: "2026-01-01T00:00:00.000Z" }),
+      ]),
+      MARKDOWN_OPTIONS,
+    );
+
+    expect(markdown).not.toContain("assignee");
   });
 
   it("includes the captured React component, source stack, and HTML", () => {
@@ -127,6 +227,32 @@ describe("commentsToMarkdown", () => {
     expect(markdown).toContain(
       '**HTML:**\n```html\n<button class="btn-primary">Approve</button>\n```',
     );
+  });
+
+  it("names a markdown block by its section, text and captured line instead of its anchor", () => {
+    const locator = {
+      kind: "markdown" as const,
+      path: ["Guide", "Install"],
+      tag: "p",
+      text: "Run the installer.",
+      line: 7,
+    };
+    const onBlock = comment({
+      id: "c1",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      anchor: `md:${JSON.stringify([locator.path, locator.tag, locator.text])}`,
+    }) as Comment & { element: CommentElementContext };
+    onBlock.element = { source: "docs/guide.md", html: "<p>Run the installer.</p>", locators: [locator] };
+
+    const markdown = commentsToMarkdown(page("docs/guide", [onBlock]), RAW_ANCHOR_OPTIONS);
+
+    expect(markdown.split("\n").slice(4, 9)).toEqual([
+      "### 1. Guide › Install — paragraph “Run the installer.”",
+      "- section: Guide › Install",
+      "- text: “Run the installer.”",
+      "- line: 7 (when commented)",
+      "- status: open",
+    ]);
   });
 
   it("nests replies under their root", () => {

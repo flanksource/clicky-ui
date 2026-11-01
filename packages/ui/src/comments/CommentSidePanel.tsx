@@ -9,6 +9,7 @@ import {
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiComment } from "../icons";
+import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { CommentThread } from "./CommentThread";
 import { CommentThreadList } from "./CommentThreadList";
 import {
@@ -47,6 +48,11 @@ export type CommentSidePanelProps = {
   threadToMarkdown?: (thread: readonly Comment[]) => string;
   renderRootDetails?: (comment: Comment) => ReactNode;
   createActions?: readonly CommentCreateAction[];
+  /**
+   * Entries appended to each root's "Assign…" submenu — the seam for host
+   * actions that start from an assignment, such as running an agent.
+   */
+  extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
 };
 
 function defaultAnchorLabel(anchor: CommentAnchor): string {
@@ -93,7 +99,7 @@ function RailToggle({
       onClick={onClick}
       data-testid={testId}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors",
+        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:text-sm",
         active
           ? "border-primary bg-primary text-primary-foreground"
           : "border-border bg-background text-muted-foreground hover:text-foreground",
@@ -147,6 +153,7 @@ function AllComments({
   emptyLabel,
   threadToMarkdown,
   renderRootDetails,
+  extraAssignItems,
 }: {
   ctx: CommentContextValue;
   comments: Comment[];
@@ -154,6 +161,7 @@ function AllComments({
   emptyLabel: string;
   threadToMarkdown?: (thread: readonly Comment[]) => string;
   renderRootDetails?: (comment: Comment) => ReactNode;
+  extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
 }) {
   const ordered = useMemo(() => {
     const anchorOrder = new Map(orderedAnchors(ctx).map((a, i) => [a, i]));
@@ -223,6 +231,7 @@ function AllComments({
         })}
         {...handlers}
         {...(renderRootDetails ? { renderRootDetails } : {})}
+        {...(extraAssignItems ? { extraAssignItems } : {})}
         {...(threadToMarkdown ? { threadToMarkdown } : {})}
       />
     </div>
@@ -238,6 +247,7 @@ function FocusedComments({
   threadToMarkdown,
   renderRootDetails,
   createActions,
+  extraAssignItems,
 }: {
   ctx: CommentContextValue;
   comments: Comment[];
@@ -247,6 +257,7 @@ function FocusedComments({
   threadToMarkdown?: (thread: readonly Comment[]) => string;
   renderRootDetails?: (comment: Comment) => ReactNode;
   createActions?: readonly CommentCreateAction[];
+  extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
 }) {
   const comments = selectAnchorThreads(visible, anchor);
   const hasComments = comments.length > 0;
@@ -272,6 +283,7 @@ function FocusedComments({
         {...ctx.callbacks}
         {...(renderRootDetails ? { renderRootDetails } : {})}
         {...(createActions ? { createActions } : {})}
+        {...(extraAssignItems ? { extraAssignItems } : {})}
         {...(threadToMarkdown ? { threadToMarkdown } : {})}
       />
     </div>
@@ -304,7 +316,13 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
 
     const update = () => {
       const anchorTop = ctx.getAnchorTop(focusedAnchor);
-      if (anchorTop == null) {
+      // A rail stacked under the content (narrow screens) has no anchor row to
+      // line up with; offsetting it only pushes the thread out of view.
+      const contentBox = content.getBoundingClientRect();
+      const stacked =
+        contentBox.height > 0 &&
+        rail.getBoundingClientRect().top >= contentBox.bottom;
+      if (anchorTop == null || stacked) {
         setFocusedOffset(null);
         return;
       }
@@ -355,11 +373,11 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
     <aside
       ref={railRef}
       data-testid="comment-side-panel"
-      className={cn("relative w-[320px] space-y-3", props.className)}
+      className={cn("relative w-[320px] max-w-full space-y-3", props.className)}
     >
       <div
         data-testid="comment-rail-header"
-        className="sticky top-0 z-20 flex items-center gap-2 bg-background py-2"
+        className="sticky top-0 z-20 flex flex-wrap items-center gap-2 bg-background py-2"
       >
         {(counts.active > 0 || ctx.railMode === "all") && (
           <RailToggle
@@ -380,7 +398,7 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
             aria-pressed={ctx.railMode === "all" && stage === "resolved"}
             onClick={() => selectStage("resolved")}
             className={cn(
-              "rounded-full border px-2 py-1 text-xs font-medium transition-colors",
+              "rounded-full border px-2 py-1 text-xs font-medium transition-colors [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:text-sm",
               ctx.railMode === "all" && stage === "resolved"
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-background text-muted-foreground hover:text-foreground",
@@ -395,7 +413,7 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
             aria-pressed={ctx.railMode === "all" && stage === "closed"}
             onClick={() => selectStage("closed")}
             className={cn(
-              "rounded-full border px-2 py-1 text-xs font-medium transition-colors",
+              "rounded-full border px-2 py-1 text-xs font-medium transition-colors [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:text-sm",
               ctx.railMode === "all" && stage === "closed"
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-background text-muted-foreground hover:text-foreground",
@@ -408,7 +426,7 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
           <button
             type="button"
             onClick={ctx.closeRail}
-            className="ml-auto rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="ml-auto rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:text-sm"
           >
             {ctx.railMode === "all" ? "Close" : "Hide"}
           </button>
@@ -432,6 +450,9 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
           {...(props.renderRootDetails
             ? { renderRootDetails: props.renderRootDetails }
             : {})}
+          {...(props.extraAssignItems
+            ? { extraAssignItems: props.extraAssignItems }
+            : {})}
         />
       ) : ctx.railMode === "focused" && ctx.focusedAnchor ? (
         <div
@@ -454,6 +475,9 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
               : {})}
             {...(props.renderRootDetails
               ? { renderRootDetails: props.renderRootDetails }
+              : {})}
+            {...(props.extraAssignItems
+              ? { extraAssignItems: props.extraAssignItems }
               : {})}
           />
         </div>

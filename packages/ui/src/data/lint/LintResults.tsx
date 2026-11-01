@@ -4,11 +4,17 @@ import { Tree } from "../Tree";
 import { SplitPane } from "../../layout/SplitPane";
 import { useContainerWiderThan } from "../../hooks/use-container-width";
 import { cn } from "../../lib/utils";
-import { UiArrowLeft, UiListChecks } from "../../icons";
+import { UiArrowLeft, UiListChecks, UiListTree, UiTable } from "../../icons";
+import { SegmentedControl, type SegmentedOption } from "../../components/SegmentedControl";
+import { LintTable } from "./LintTable";
+import type { OpenFileTarget } from "../OpenInFilesLink";
 import { LintSeverityIcon } from "../test-runner/MarkIcons";
-import { LintDetailPanel } from "./LintDetail";
-import { LintFilterBar } from "./LintFilterBar";
+import { LintDetailPanel, type LintDetailPanelProps } from "./LintDetail";
+import { LintFilterFacets, LintGroupingPicker } from "./LintFilterBar";
+import { ProblemViewOptions } from "../diagnostics/ProblemViewOptions";
 import { LintTreeNode } from "./LintTreeNode";
+import type { LintSourceLoader } from "./ViolationSnippet";
+import { lintNodeActions } from "./actions";
 import { buildLintTree, findLintNode } from "./grouping";
 import { countLintBySeverity, isLinterErrored } from "./stats";
 import type { LintAction, LintFilters, LintGrouping, LintNode, LinterResult, LintSeverity } from "./types";
@@ -33,14 +39,41 @@ export type LintResultsProps = {
   onIgnore?: (action: LintAction) => void | Promise<void>;
   /** Disables the ignore buttons while the host applies an action. */
   ignoreBusy?: boolean;
+  /**
+   * Called with a violation's file, work dir and line when the reader asks to
+   * open it in the host's annotated file view. Omit to hide the "Open in Files" links.
+   */
+  onOpenFile?: (target: OpenFileTarget) => void;
+  /**
+   * Loads a violation's file (work-dir-relative, as `onOpenFile` receives it) so
+   * each violation shows its flagged lines with context. Omit to show only the
+   * snippet the linter reported.
+   */
+  loadSource?: LintSourceLoader;
+  /** Renders the prompt run behind a linter in its detail pane (see LintDetailPanelProps.renderRun). */
+  renderRun?: LintDetailPanelProps["renderRun"];
   /** Actions at the right end of the header bar (e.g. re-run, export). */
   headerSlot?: ReactNode;
   /** Header title. Defaults to a "Lint Results" heading; pass `null` for none. */
   title?: ReactNode;
+  /**
+   * "tree" (the default) shows the grouped tree beside a detail pane; "table"
+   * lists every violation as a row whose detail opens beneath it.
+   */
+  view?: LintView;
+  /** Called by the Tree / Table toggle. Omit to hide the toggle. */
+  onViewChange?: (next: LintView) => void;
   /** Initial left-pane width percentage. */
   defaultSplit?: number;
   className?: string;
 };
+
+export type LintView = "tree" | "table";
+
+const VIEW_OPTIONS: SegmentedOption<LintView>[] = [
+  { id: "tree", label: "Tree", icon: UiListTree },
+  { id: "table", label: "Table", icon: UiTable },
+];
 
 const SPLIT_MIN_WIDTH = 640;
 const SEVERITIES: readonly LintSeverity[] = ["error", "warning", "info"];
@@ -90,8 +123,13 @@ export function LintResults({
   onExpandAllChange,
   onIgnore,
   ignoreBusy,
+  onOpenFile,
+  loadSource,
+  renderRun,
   headerSlot,
   title,
+  view = "tree",
+  onViewChange,
   defaultSplit = 45,
   className,
 }: LintResultsProps) {
@@ -100,16 +138,26 @@ export function LintResults({
   const { ref, wider: roomy } = useContainerWiderThan(SPLIT_MIN_WIDTH);
 
   const filterBar =
-    results.length > 0 ? (
-      <LintFilterBar
-        results={results}
-        grouping={grouping}
-        onGroupingChange={onGroupingChange}
-        filters={filters}
-        onFiltersChange={onFiltersChange}
-        className="border-b border-border bg-card px-density-4 py-density-2"
-      />
-    ) : null;
+    (
+      <div
+        className="flex flex-wrap items-center gap-2 border-b border-border bg-card px-density-4 py-density-2"
+        data-lint-filter-bar=""
+      >
+        {onViewChange && (
+          <SegmentedControl<LintView>
+            size="sm"
+            aria-label="View"
+            value={view}
+            options={VIEW_OPTIONS}
+            onChange={onViewChange}
+          />
+        )}
+        <ProblemViewOptions active={filters.severity.size + filters.linter.size}>
+          {view === "tree" && <LintGroupingPicker grouping={grouping} onGroupingChange={onGroupingChange} />}
+          <LintFilterFacets results={results} filters={filters} onFiltersChange={onFiltersChange} />
+        </ProblemViewOptions>
+      </div>
+    );
 
   const treePane = (
     <Tree<LintNode>
@@ -118,7 +166,7 @@ export function LintResults({
       getKey={(node) => node.route_path}
       getChildren={(node) => node.children}
       selected={selectedNode}
-      onSelect={(node) => onSelect(node.route_path === selected ? null : node.route_path)}
+      onSelect={(node) => onSelect(node.route_path)}
       expandAll={expandAll}
       onExpandAllChange={onExpandAllChange}
       defaultOpen={(node, depth) => depth < 1 || node.failed}
@@ -126,11 +174,27 @@ export function LintResults({
       searchLabel="Filter findings"
       getSearchText={(node) => `${node.name} ${node.linterName ?? ""} ${node.ruleName ?? ""}`}
       empty={<div className="p-8 text-center text-sm text-muted-foreground">{emptyMessage(results, filters)}</div>}
-      renderRow={({ node, selected: isSelected }) => <LintTreeNode node={node} selected={isSelected} />}
+      renderRow={({ node, selected: isSelected }) => (
+        <LintTreeNode
+          node={node}
+          selected={isSelected}
+          actions={onIgnore ? lintNodeActions(node, results) : []}
+          onIgnore={onIgnore}
+          ignoreBusy={ignoreBusy}
+        />
+      )}
     />
   );
   const detailPane = (
-    <LintDetailPanel node={selectedNode} results={results} onIgnore={onIgnore} ignoreBusy={ignoreBusy} />
+    <LintDetailPanel
+      node={selectedNode}
+      results={results}
+      onIgnore={onIgnore}
+      ignoreBusy={ignoreBusy}
+      onOpenFile={onOpenFile}
+      loadSource={loadSource}
+      renderRun={renderRun}
+    />
   );
   const showHeader = title !== null || results.length > 0 || headerSlot != null;
 
@@ -154,7 +218,21 @@ export function LintResults({
         </div>
       )}
 
-      {roomy ? (
+      {view === "table" ? (
+        <>
+          {filterBar}
+          <div className="min-h-0 flex-1 overflow-y-auto" data-lint-table="">
+            <LintTable
+              results={results}
+              filters={filters}
+              onIgnore={onIgnore}
+              ignoreBusy={ignoreBusy}
+              onOpenFile={onOpenFile}
+              loadSource={loadSource}
+            />
+          </div>
+        </>
+      ) : roomy ? (
         <>
           {filterBar}
           <SplitPane

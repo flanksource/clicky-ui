@@ -3,6 +3,7 @@ import {
   buildPathTree,
   foldersFirst,
   isPathTreeFolder,
+  matchesTreeSelection,
   splitPath,
   type PathTreeNode,
 } from "./path-tree";
@@ -163,5 +164,60 @@ describe("buildPathTree", () => {
 
   it("skips items with no path rather than inventing a root", () => {
     expect(tree(["", "jms"])).toHaveLength(1);
+  });
+});
+
+describe("matchesTreeSelection", () => {
+  const PAGE = "acme/billing/invoices";
+
+  it("matches everything when nothing is selected", () => {
+    expect(matchesTreeSelection(PAGE, {})).toBe(true);
+  });
+
+  it("with only excludes, matches everything outside the excluded subtree", () => {
+    const value = { "acme/billing": "exclude" } as const;
+    expect(matchesTreeSelection(PAGE, value)).toBe(false);
+    expect(matchesTreeSelection("acme/billing", value)).toBe(false);
+    expect(matchesTreeSelection("acme/support/tickets", value)).toBe(true);
+  });
+
+  it("with any include, matches only included subtrees", () => {
+    const value = { acme: "include" } as const;
+    expect(matchesTreeSelection(PAGE, value)).toBe(true);
+    expect(matchesTreeSelection("globex/billing", value)).toBe(false);
+  });
+
+  it("lets an exclude beneath an include carve out its subtree", () => {
+    const value = { acme: "include", "acme/billing": "exclude" } as const;
+    expect(matchesTreeSelection(PAGE, value)).toBe(false);
+    expect(matchesTreeSelection("acme/support/tickets", value)).toBe(true);
+  });
+
+  it("lets an include beneath an exclude restore its subtree", () => {
+    const value = { acme: "exclude", "acme/billing": "include" } as const;
+    expect(matchesTreeSelection(PAGE, value)).toBe(true);
+    expect(matchesTreeSelection("acme/support/tickets", value)).toBe(false);
+  });
+
+  it("lets the exact path decide over any ancestor", () => {
+    const value = { acme: "include", [PAGE]: "exclude" } as const;
+    expect(matchesTreeSelection(PAGE, value)).toBe(false);
+    expect(matchesTreeSelection("acme/billing/payments", value)).toBe(true);
+  });
+
+  it("treats a key as a whole path segment, never a string prefix", () => {
+    const value = { "acme/bill": "exclude" } as const;
+    expect(matchesTreeSelection(PAGE, value)).toBe(true);
+  });
+
+  it("does not let a descendant selection decide for its ancestor", () => {
+    const value = { [PAGE]: "include" } as const;
+    expect(matchesTreeSelection("acme/billing", value)).toBe(false);
+  });
+
+  it("honours a custom separator", () => {
+    const value = { "acme.billing": "exclude" } as const;
+    expect(matchesTreeSelection("acme.billing.invoices", value, ".")).toBe(false);
+    expect(matchesTreeSelection("acme/billing/invoices", value, ".")).toBe(true);
   });
 });

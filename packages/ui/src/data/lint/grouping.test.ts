@@ -23,7 +23,14 @@ import {
   eslint,
   golangci,
   markdownlintClean,
+  promptPending,
+  promptRunning,
+  promptRunWithNestedLinters,
   pyrightFailed,
+  reviewMarkdownlintPassed,
+  reviewRunning,
+  reviewUirFailed,
+  reviewValeViolations,
   valeSkipped,
 } from "./LintResults.fixtures";
 
@@ -45,7 +52,7 @@ describe("buildLintTree linter-rule-file", () => {
     ]);
     const [errcheckFile] = linter!.children![0]!.children!;
     expect(errcheckFile).toMatchObject({
-      name: "pkg > server > handler.go",
+      name: "pkg/server/handler.go",
       kind: "lint-file",
       file: "pkg/server/handler.go",
       target_path: "pkg/server/handler.go",
@@ -68,7 +75,7 @@ describe("buildLintTree linter-rule-file", () => {
   it("assigns unique URL-safe route paths and resolves them back to nodes", () => {
     const tree = buildLintTree({ results: [golangci], grouping: "linter-rule-file", filters: none });
     const leaf = findLintNode(tree, "golangci-lint/errcheck/pkg-server-handler-go");
-    expect(leaf?.name).toBe("pkg > server > handler.go");
+    expect(leaf?.name).toBe("pkg/server/handler.go");
     expect(findLintNode(tree, "golangci-lint/nope")).toBeNull();
     expect(findLintNode(tree, "")).toBeNull();
   });
@@ -100,10 +107,10 @@ describe("buildLintTree linter-file", () => {
     expect(linter!.children!.map((c) => c.name)).toEqual(["pkg"]);
     const pkg = linter!.children![0]!;
     expect(pkg.kind).toBe("lint-folder");
-    expect(pkg.children!.map((c) => c.name)).toEqual(["server", "store > db.go"]);
+    expect(pkg.children!.map((c) => c.name)).toEqual(["server", "store/db.go"]);
     const server = pkg.children![0]!;
     expect(server.children!.map((c) => [c.name, c.kind])).toEqual([
-      ["routes > api.go", "lint-file"],
+      ["routes/api.go", "lint-file"],
       ["handler.go", "lint-file"],
     ]);
     expect(server.children![1]!.violations).toHaveLength(2);
@@ -118,7 +125,7 @@ describe("buildLintTree file-linter-rule", () => {
       { linter: "beta", work_dir: "/r", violations: violation("/r/pkg/a.go", "b-rule") },
     ];
     const [file] = buildLintTree({ results, grouping: "file-linter-rule", filters: none });
-    expect(file).toMatchObject({ name: "pkg > a.go", kind: "lint-file", file: "pkg/a.go" });
+    expect(file).toMatchObject({ name: "pkg/a.go", kind: "lint-file", file: "pkg/a.go" });
     expect(file!.children!.map((c) => [c.name, c.kind])).toEqual([
       ["alpha", "linter"],
       ["beta", "linter"],
@@ -251,7 +258,7 @@ describe("multiple work dirs", () => {
     const tree = buildLintTree({ results: [golangci, eslint], grouping: "linter-file", filters: none });
     const esl = tree.find((n) => n.name === "eslint")!;
     expect(esl.children![0]).toMatchObject({
-      name: "gavel > web > src > App.tsx",
+      name: "gavel/web/src/App.tsx",
       file: "gavel/web/src/App.tsx",
       target_path: "src/App.tsx",
       work_dir: "/repo/gavel/web",
@@ -290,5 +297,147 @@ describe("counting helpers", () => {
     const unused = linter!.children!.find((c) => c.ruleName === "unused")!;
     expect(lintNodeSeverity(unused)).toBe("warning");
     expect(lintNodeSeverity(linter!.children!.find((c) => c.ruleName === "godot")!)).toBe("info");
+  });
+});
+
+describe("linter ordering in linter-first groupings", () => {
+  const cleanZ: LinterResult = { linter: "zz-clean", success: true, violations: [] };
+  const cleanA: LinterResult = { linter: "aa-clean", success: true, violations: [] };
+  const mixed = [cleanZ, golangci, pyrightFailed, promptPending, promptRunning, cleanA, eslint, valeSkipped];
+
+  it.each(["summary", "linter-rule-file", "linter-file"] as const)(
+    "orders %s linters running, pending, failed, with violations, then passed, by name within a bucket",
+    (grouping) => {
+      const names = buildLintTree({ results: mixed, grouping, filters: none }).map((n) => n.name);
+      const expected = [
+        "review:models/violation.go",
+        "review:pkg/server",
+        "pyright",
+        "eslint",
+        "golangci-lint",
+        ...(grouping === "summary" ? ["aa-clean", "vale", "zz-clean"] : []),
+      ];
+      expect(names).toEqual(expected);
+    },
+  );
+
+  it("does not reorder the file-rooted grouping", () => {
+    const results: LinterResult[] = [
+      { linter: "beta", work_dir: "/r", violations: violation("/r/b.go", "x") },
+      { linter: "alpha", work_dir: "/r", violations: violation("/r/a.go", "x") },
+    ];
+    expect(buildLintTree({ results, grouping: "file-linter-rule", filters: none }).map((n) => n.name)).toEqual([
+      "a.go",
+      "b.go",
+    ]);
+  });
+});
+
+describe("linters nested under a prompt run", () => {
+  const tree = () =>
+    buildLintTree({ results: promptRunWithNestedLinters, grouping: "linter-rule-file", filters: none });
+
+  it("nests <parent>/<child> results under the parent, running then failed then findings then passed", () => {
+    const [parent, ...rest] = tree();
+    expect(rest).toEqual([]);
+    expect(parent).toMatchObject({ name: "messaging-review:report.mdx", kind: "linter", passed: false, failed: true });
+    const nested = parent!.children!.filter((c) => c.kind === "linter");
+    expect(nested.map((c) => [c.name, c.linterName, c.nestedUnder])).toEqual([
+      ["eslint", "messaging-review:report.mdx/eslint", "messaging-review:report.mdx"],
+      ["uir", "messaging-review:report.mdx/uir", "messaging-review:report.mdx"],
+      ["vale", "messaging-review:report.mdx/vale", "messaging-review:report.mdx"],
+      ["markdownlint", "messaging-review:report.mdx/markdownlint", "messaging-review:report.mdx"],
+    ]);
+    expect(nested.map((c) => c.linter?.status)).toEqual(["running", undefined, undefined, undefined]);
+    expect(nested[1]!.children![0]).toMatchObject({ kind: "linter-error", message: reviewUirFailed.error });
+    expect(nested[2]!.children![0]).toMatchObject({ kind: "lint-rule-group", ruleName: "Vale.Passive" });
+    expect(nested[3]).toMatchObject({ passed: true, failed: false });
+  });
+
+  it("keeps the parent's own findings beside the nested linters and rolls counts up", () => {
+    const [parent] = tree();
+    expect(parent!.children!.filter((c) => c.kind === "lint-rule-group").map((c) => c.ruleName)).toEqual(["tone"]);
+    expect(lintNodeCount(parent!)).toBe(2);
+  });
+
+  it("gives nested linters unique route paths that findLintNode resolves", () => {
+    const nodes = tree();
+    const paths: string[] = [];
+    const walk = (n: LintNode): void => {
+      paths.push(n.route_path);
+      n.children?.forEach(walk);
+    };
+    nodes.forEach(walk);
+    expect(new Set(paths).size).toBe(paths.length);
+    expect(findLintNode(nodes, "messaging-review-report-mdx/eslint")).toMatchObject({
+      linterName: "messaging-review:report.mdx/eslint",
+      kind: "linter",
+    });
+    expect(findLintNode(nodes, "messaging-review-report-mdx/vale/vale-passive")).toMatchObject({
+      kind: "lint-rule-group",
+    });
+    expect(findLintNode(nodes, "messaging-review-report-mdx")?.linter?.session_id).toBe(reviewRunning.session_id);
+  });
+
+  it.each(["linter-file", "summary"] as const)("nests in the %s grouping too", (grouping) => {
+    const [parent] = buildLintTree({ results: promptRunWithNestedLinters, grouping, filters: none });
+    expect(parent!.children!.filter((c) => c.kind === "linter").map((c) => c.name)).toEqual([
+      "eslint",
+      "uir",
+      "vale",
+      "markdownlint",
+    ]);
+  });
+
+  it("lists a result without an existing parent at the top level under its full name", () => {
+    const orphan: LinterResult = { ...reviewValeViolations, linter: "other-review:x.mdx/vale" };
+    const [node] = buildLintTree({ results: [orphan], grouping: "linter-rule-file", filters: none });
+    expect(node).toMatchObject({ name: "other-review:x.mdx/vale", linterName: "other-review:x.mdx/vale" });
+    expect(node!.nestedUnder).toBeUndefined();
+  });
+
+  it("lists a child at the top level when the linter filter hides its parent", () => {
+    const filters = emptyLintFilters();
+    filters.linter.set(reviewRunning.linter, "exclude");
+    const names = buildLintTree({ results: promptRunWithNestedLinters, grouping: "linter-rule-file", filters }).map(
+      (n) => n.name,
+    );
+    expect(names).toEqual([
+      "messaging-review:report.mdx/eslint",
+      "messaging-review:report.mdx/uir",
+      "messaging-review:report.mdx/vale",
+    ]);
+  });
+
+  it("shows a finished parent that has no findings of its own so its nested linters have a home", () => {
+    const finishedParent: LinterResult = { linter: reviewRunning.linter, work_dir: reviewRunning.work_dir!, violations: [], success: true };
+    const [parent] = buildLintTree({
+      results: [finishedParent, reviewMarkdownlintPassed],
+      grouping: "linter-rule-file",
+      filters: none,
+    });
+    expect(parent).toMatchObject({ name: "messaging-review:report.mdx", passed: true });
+    expect(parent!.children!.map((c) => c.name)).toEqual(["markdownlint"]);
+  });
+
+  it("nests more than one level using the nearest existing ancestor", () => {
+    const results: LinterResult[] = [
+      { linter: "a", violations: [] },
+      { linter: "a/b", violations: [] },
+      { linter: "a/b/c", violations: violation("f.go", "r") },
+    ];
+    const [a] = buildLintTree({ results, grouping: "summary", filters: none });
+    const [b] = a!.children!;
+    expect(b).toMatchObject({ name: "b", nestedUnder: "a" });
+    expect(b!.children![0]).toMatchObject({ name: "c", nestedUnder: "a/b", linterName: "a/b/c" });
+  });
+
+  it("sorts a parent with a failed nested linter into the failed bucket", () => {
+    const results: LinterResult[] = [
+      { linter: "later", violations: violation("f.go", "r") },
+      { linter: "p", violations: [] },
+      { linter: "p/q", violations: null, error: "boom" },
+    ];
+    expect(buildLintTree({ results, grouping: "summary", filters: none }).map((n) => n.name)).toEqual(["p", "later"]);
   });
 });

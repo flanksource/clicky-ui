@@ -332,6 +332,11 @@ export {
   type RuntimeBarActionsProps,
 } from "../runtime/RuntimeBarActions";
 export {
+  SEGMENT_CAPTION_CLASS,
+  SEGMENT_KEY_CLASS,
+  SegmentItemLabel,
+} from "../runtime/RuntimeBarSegment";
+export {
   ProviderStatusPanel,
   type ProviderStatusPanelProps,
 } from "../runtime/ProviderStatusPanel";
@@ -430,6 +435,14 @@ export type {
   SandboxPlatformPolicy,
   StdinWrite,
 } from "./approval-request";
+export {
+  usePromptRunStream,
+  type PromptRunFrame,
+  type PromptRunStreamOptions,
+  type PromptRunStreamState,
+  type PromptRunStreamStatus,
+  type PromptRunSummary,
+} from "./use-prompt-run-stream";
 export { SessionTail, type SessionTailProps } from "./SessionTail";
 export {
   SessionInspector,

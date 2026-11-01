@@ -1,10 +1,12 @@
 // Public surface of the lint results view. Re-exported from ../../data.ts so
 // consumers import from "@flanksource/clicky-ui".
 
-export { LintResults, type LintResultsProps } from "./LintResults";
-export { LintFilterBar, type LintFilterBarProps } from "./LintFilterBar";
+export { LintResults, type LintResultsProps, type LintView } from "./LintResults";
+export { LintTable, type LintTableProps } from "./LintTable";
+export { LintFilterBar, LintFilterFacets, LintGroupingPicker, type LintFilterBarProps } from "./LintFilterBar";
 export { LintDetailPanel, type LintDetailPanelProps } from "./LintDetail";
 export { LintTreeNode } from "./LintTreeNode";
+export { ViolationSnippet, VIOLATION_CONTEXT_LINES, type LintSourceLoader } from "./ViolationSnippet";
 export { LINT_GROUPING_OPTIONS } from "./grouping-options";
 
 export { buildLintTree, findLintNode } from "./grouping";
@@ -13,6 +15,7 @@ export {
   countLintByLinter,
   countLintBySeverity,
   isLinterErrored,
+  isLinterInFlight,
   lintNodeCount,
   lintNodeSeverity,
   totalLintViolations,
@@ -23,7 +26,7 @@ export {
   lintFileActions,
   lintFolderActions,
   lintNodeActions,
-  violationIgnoreAction,
+  violationIgnoreActions,
 } from "./actions";
 
 export {
@@ -37,5 +40,8 @@ export {
   type LintNode,
   type LintNodeKind,
   type LinterResult,
+  type LinterStatus,
+  type LintResultProvenance,
   type Violation,
+  type ViolationLocation,
 } from "./types";

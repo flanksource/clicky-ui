@@ -99,7 +99,10 @@ function install() {
     const image = screenshot ? captureScreenshot(element) : undefined;
     api.deactivate();
     try {
-      const context = await captureElementContext(element, url);
+      const context = await captureElementContext(element, {
+        fallbackSource: url,
+        root: document.body,
+      });
       const capture = await image;
       if (closed || version !== selectionVersion || location.href !== url)
         return;

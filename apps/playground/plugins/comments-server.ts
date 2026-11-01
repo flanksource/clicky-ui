@@ -5,13 +5,15 @@ import type { Connect, Logger, Plugin } from "vite";
 import { COMMENT_TOOLS } from "./comments-schema";
 import {
   CommentHttpError,
-  assertActiveStatusTransition,
+  acknowledgeComment,
+  assignComment,
   closeComment,
   reopenComment,
   resolveComment,
 } from "./comments-lifecycle";
 import type { CommentElementContext } from "./comments-model";
 import { listComments, parseCommentFilter } from "./comments-query";
+import { commentActivity } from "./comment-activity";
 import {
   assertScreenshotCapture,
   discardScreenshot,
@@ -27,25 +29,27 @@ import {
   assertRating,
   assertReviewDecision,
   patchComment,
-  readAll,
   removeComment,
-  writeAll,
   type CommentPatch,
   type StoredAuthor,
   type StoredComment,
 } from "./comments-store";
-import { recordReviewDecision } from "./review-decisions";
+import { persistReviewDecision, type ReviewSourceRequest } from "./reviewable-store";
 import { readExternalPages } from "./external-pages-store";
 import { externalUrl } from "../src/bookmarklet/model";
+import { PageStoreError } from "./pages-store";
 
 export const COMMENTS_ROUTE = "/__playground/comments";
 
 export type CommentRoute =
   | "list"
+  | "activity"
   | "schema"
   | "screenshot"
   | "create"
   | "reply"
+  | "acknowledge"
+  | "assign"
   | "resolve"
   | "close"
   | "reopen"
@@ -76,6 +80,8 @@ export function matchRoute(
   const [first, second] = segments as [string, string | undefined];
 
   if (segments.length === 1) {
+    if (first === "activity")
+      return method === "GET" ? { route: "activity", id: "" } : undefined;
     if (first === "schema")
       return method === "GET" ? { route: "schema", id: "" } : undefined;
     if (method === "PATCH") return { route: "update", id: first };
@@ -85,6 +91,8 @@ export function matchRoute(
 
   if (segments.length === 2 && method === "POST") {
     if (second === "replies") return { route: "reply", id: first };
+    if (second === "acknowledge") return { route: "acknowledge", id: first };
+    if (second === "assign") return { route: "assign", id: first };
     if (second === "resolve") return { route: "resolve", id: first };
     if (second === "close") return { route: "close", id: first };
     if (second === "reopen") return { route: "reopen", id: first };
@@ -150,26 +158,29 @@ function requireText(body: Record<string, unknown>, key: string): string {
  * agent wrote it is worse than a 400 naming the missing field.
  */
 function requireAuthor(body: Record<string, unknown>): StoredAuthor {
-  const author = body["author"];
-  if (author === null || typeof author !== "object" || Array.isArray(author)) {
+  return parseAuthor(body["author"], "author");
+}
+
+function parseAuthor(value: unknown, field: "author" | "assignee"): StoredAuthor {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(
-      '"author" is required, e.g. {"name":"Claude","kind":"agent"}',
+      `"${field}" is required, e.g. {"name":"Claude","kind":"agent"}`,
     );
   }
-  const candidate = author as Record<string, unknown>;
+  const candidate = value as Record<string, unknown>;
   const name = candidate["name"];
   if (typeof name !== "string" || name.trim() === "") {
-    throw new Error('"author.name" is required and must be a non-empty string');
+    throw new Error(`"${field}.name" is required and must be a non-empty string`);
   }
   const kind = candidate["kind"];
   if (kind !== undefined && kind !== "user" && kind !== "agent") {
-    throw new Error('"author.kind" must be "user" or "agent"');
+    throw new Error(`"${field}.kind" must be "user" or "agent"`);
   }
-  const via = optionalAuthorText(candidate, "via");
-  const sessionId = optionalAuthorText(candidate, "sessionId");
+  const via = optionalAuthorText(candidate, "via", field);
+  const sessionId = optionalAuthorText(candidate, "sessionId", field);
   const cost = candidate["cost"];
   if (cost !== undefined && (typeof cost !== "number" || !Number.isFinite(cost) || cost < 0)) {
-    throw new Error('"author.cost" must be a non-negative number of USD');
+    throw new Error(`"${field}.cost" must be a non-negative number of USD`);
   }
   return {
     name,
@@ -183,13 +194,26 @@ function requireAuthor(body: Record<string, unknown>): StoredAuthor {
 function optionalAuthorText(
   author: Record<string, unknown>,
   key: "via" | "sessionId",
+  field: string,
 ): string | undefined {
   const value = author[key];
   if (value === undefined) return undefined;
   if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`"author.${key}" must be a non-empty string when present`);
+    throw new Error(`"${field}.${key}" must be a non-empty string when present`);
   }
   return value;
+}
+
+/** `null` clears the assignee; omitting the field is a caller bug, not a clear. */
+function requireAssignee(body: Record<string, unknown>): StoredAuthor | null {
+  if (!("assignee" in body)) {
+    throw new Error(
+      '"assignee" is required: an object like {"name":"Claude","kind":"agent"}, or null to unassign',
+    );
+  }
+  return body["assignee"] === null
+    ? null
+    : parseAuthor(body["assignee"], "assignee");
 }
 
 function optionalText(
@@ -252,10 +276,84 @@ function persistElementContext(
   }
 }
 
+/** A root just stored by `POST /__playground/comments` or a prompt run (not a review decision). */
+export type CommentCreatedEvent = {
+  page: string;
+  comment: StoredComment;
+  /** The playground origin the comment was posted to, e.g. `http://localhost:5801`. */
+  origin: string;
+  /** The human behind a root authored by something else, e.g. who ran a prompt. */
+  requestedBy?: StoredAuthor;
+};
+
+/** What a new root is made of; `element` is the raw capture, screenshot included. */
+export type RootCommentInput = Pick<
+  StoredComment,
+  "body" | "rating" | "reviewDecision" | "checklist" | "refs" | "promptRun" | "lint"
+> & {
+  page: unknown;
+  author: StoredAuthor;
+  anchor?: string;
+  element: unknown;
+  source?: Pick<ReviewSourceRequest, "pagesDir" | "expectedSource">;
+};
+
+/**
+ * Stores a new thread root: persists its element capture, checks an external
+ * page's URL, and records a review decision in place of an earlier one. The
+ * screenshot is removed again when anything fails.
+ */
+export function createRootComment(
+  dir: string,
+  input: RootCommentInput,
+): { page: string; comment: StoredComment } {
+  const { page: rawPage, author, anchor, element: rawElement, source, ...fields } = input;
+  const id = randomUUID();
+  const element = persistElementContext(dir, id, rawElement);
+  const stored: StoredComment = {
+    ...fields,
+    id,
+    createdAt: new Date().toISOString(),
+    author,
+    status: "open",
+    parentId: null,
+    anchor: anchor ?? null,
+    element,
+  };
+  try {
+    const page = assertPage(rawPage);
+    if (page.startsWith("external:")) {
+      const target = readExternalPages(dir).find((entry) => entry.id === page);
+      if (!element.pageUrl || !target?.urls.includes(externalUrl(element.pageUrl).url)) {
+        throw new Error(
+          "External comment capture URL must belong to its registered comment set",
+        );
+      }
+    }
+    if (!stored.reviewDecision) {
+      return { page, comment: addComment(dir, page, stored) };
+    }
+    if (!source) throw new Error("review decisions require expectedSource and a local source page");
+    return { page, comment: persistReviewDecision({ ...source, commentsDir: dir, slug: page }, stored) };
+  } catch (cause) {
+    stageScreenshotRemoval(dir, [stored]).commit();
+    throw cause;
+  }
+}
+
+export type PlaygroundCommentsOptions = {
+  dir: string;
+  pagesDir?: string;
+  /** Runs after a root is stored and answered; a rejection is logged. */
+  onCreated?: (event: CommentCreatedEvent) => Promise<void>;
+};
+
 function handle(
   dir: string,
+  pagesDir: string | undefined,
   req: IncomingMessage,
   res: ServerResponse,
+  created: (event: CommentCreatedEvent) => void,
 ): Promise<void> | void {
   const url = new URL(req.url ?? "/", "http://playground.local");
   const matched = matchRoute(req.method ?? "", url.pathname);
@@ -267,6 +365,8 @@ function handle(
   const { route, id } = matched;
 
   switch (route) {
+    case "activity":
+      return sendJson(res, 200, { pages: commentActivity(listComments(dir)) });
     case "screenshot":
       if (!serveScreenshot(dir, url.pathname, res)) {
         return sendJson(res, 404, { error: `screenshot "${id}" not found` });
@@ -291,50 +391,28 @@ function handle(
           "author",
           "anchor",
           "element",
+          "expectedSource",
         ]);
-        const anchor = optionalText(body, "anchor");
+        const host = req.headers.host;
+        if (!host) throw new Error("request has no Host header");
         const rating = optionalText(body, "rating");
         const reviewDecision = optionalText(body, "reviewDecision");
-        const comment = draft(body, optionalText(body, "body") ?? "");
-        const element = persistElementContext(dir, comment.id, body["element"]);
-        const stored: StoredComment = {
-          ...comment,
-          status: "open",
-          parentId: null,
-          anchor: anchor ?? null,
+        if (reviewDecision && !pagesDir) throw new Error("local source review is not configured");
+        const anchor = optionalText(body, "anchor");
+        const { page, comment } = createRootComment(dir, {
+          page: body["page"],
+          body: optionalText(body, "body") ?? "",
+          author: requireAuthor(body),
+          ...(anchor === undefined ? {} : { anchor }),
+          element: body["element"],
           ...(rating === undefined ? {} : { rating: assertRating(rating) }),
           ...(reviewDecision === undefined
             ? {}
-            : { reviewDecision: assertReviewDecision(reviewDecision) }),
-          element,
-        };
-        try {
-          const page = assertPage(body["page"]);
-          if (page.startsWith("external:")) {
-            const target = readExternalPages(dir).find(
-              (entry) => entry.id === page,
-            );
-            if (
-              !element.pageUrl ||
-              !target?.urls.includes(externalUrl(element.pageUrl).url)
-            ) {
-              throw new Error(
-                "External comment capture URL must belong to its registered comment set",
-              );
-            }
-          }
-          if (stored.reviewDecision) {
-            const data = readAll(dir);
-            data[page] = recordReviewDecision(data[page] ?? [], stored);
-            writeAll(dir, data);
-            sendJson(res, 201, data[page].at(-1));
-          } else {
-            sendJson(res, 201, addComment(dir, page, stored));
-          }
-        } catch (cause) {
-          const removal = stageScreenshotRemoval(dir, [stored]);
-          removal.commit();
-          throw cause;
+            : { reviewDecision: assertReviewDecision(reviewDecision), source: { pagesDir: pagesDir as string, expectedSource: requireText(body, "expectedSource") } }),
+        });
+        sendJson(res, 201, comment);
+        if (!comment.reviewDecision) {
+          created({ page, comment, origin: `http://${host}` });
         }
       });
 
@@ -345,6 +423,22 @@ function handle(
           res,
           201,
           addReply(dir, id, draft(body, requireText(body, "body"))),
+        );
+      });
+
+    case "acknowledge":
+      return readJsonBody(req).then((body) => {
+        assertOnlyFields(body, ["author"]);
+        sendJson(res, 200, acknowledgeComment(dir, id, requireAuthor(body)));
+      });
+
+    case "assign":
+      return readJsonBody(req).then((body) => {
+        assertOnlyFields(body, ["author", "assignee"]);
+        sendJson(
+          res,
+          200,
+          assignComment(dir, id, requireAuthor(body), requireAssignee(body)),
         );
       });
 
@@ -386,24 +480,21 @@ function handle(
 
     case "update":
       return readJsonBody(req).then((body) => {
-        assertOnlyFields(body, ["body", "status", "rating"]);
+        // Status is not editable here: acknowledge, assign, resolve, close and
+        // reopen are the only ways to move a thread between stages.
+        assertOnlyFields(body, ["body", "rating"]);
         // A non-string field is a caller bug, not an omission: naming it in a
         // 400 (as every other route does) beats a 200 that silently wrote
         // nothing but `updatedAt`.
         const nextBody = optionalText(body, "body");
-        const nextStatus = optionalText(body, "status");
         const nextRating = optionalText(body, "rating");
         const patch: CommentPatch = {
           ...(nextBody === undefined ? {} : { body: nextBody }),
-          ...(nextStatus === undefined ? {} : { status: nextStatus }),
           ...(nextRating === undefined
             ? {}
             : { rating: assertRating(nextRating) }),
           updatedAt: new Date().toISOString(),
         };
-        if (nextStatus !== undefined) {
-          assertActiveStatusTransition(dir, id, nextStatus);
-        }
         sendJson(res, 200, patchComment(dir, id, patch));
       });
 
@@ -419,22 +510,14 @@ function handle(
  * available to agents. Human-only lifecycle routes remain UI-owned.
  * The middleware runs in both Vite development and local build preview.
  */
-export function playgroundComments(options: { dir: string }): Plugin {
+export function playgroundComments(options: PlaygroundCommentsOptions): Plugin {
   return {
     name: "playground-comments",
     configureServer(server) {
-      registerCommentsMiddleware(
-        server.middlewares,
-        server.config.logger,
-        options.dir,
-      );
+      registerCommentsMiddleware(server.middlewares, server.config.logger, options);
     },
     configurePreviewServer(server) {
-      registerCommentsMiddleware(
-        server.middlewares,
-        server.config.logger,
-        options.dir,
-      );
+      registerCommentsMiddleware(server.middlewares, server.config.logger, options);
     },
   };
 }
@@ -442,12 +525,20 @@ export function playgroundComments(options: { dir: string }): Plugin {
 function registerCommentsMiddleware(
   middlewares: Connect.Server,
   logger: Logger,
-  dir: string,
+  { dir, pagesDir, onCreated }: PlaygroundCommentsOptions,
 ) {
+  const created = (event: CommentCreatedEvent) => {
+    onCreated?.(event).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(
+        `[playground-comments] onCreated for comment ${event.comment.id} failed: ${message}`,
+      );
+    });
+  };
   middlewares.use(COMMENTS_ROUTE, (req, res, next) => {
     void (async () => {
       try {
-        await handle(dir, req, res);
+        await handle(dir, pagesDir, req, res, created);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         logger.error(`[playground-comments] ${req.method} failed: ${message}`);
@@ -457,7 +548,7 @@ function registerCommentsMiddleware(
         }
         sendJson(
           res,
-          error instanceof CommentHttpError ? error.statusCode : 400,
+          error instanceof CommentHttpError ? error.statusCode : error instanceof PageStoreError ? error.statusCode : 400,
           { error: message },
         );
       }

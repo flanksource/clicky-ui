@@ -50,6 +50,8 @@ type RewriteContext = {
   newSlug: string;
   moved: boolean;
   moduleLiterals: Set<number>;
+  /** Old → new static directory of each glob in the moved page; its result keys start with these. */
+  globDirectories: Map<string, string>;
   changed: Set<string>;
   edits: Map<string, TextEdit>;
 };
@@ -263,8 +265,94 @@ function rewriteModule(context: RewriteContext, node: StaticString): void {
   );
 }
 
+function globPatterns(node: Node): StaticString[] {
+  if (
+    !Node.isCallExpression(node) ||
+    node.getExpression().getText() !== "import.meta.glob"
+  ) {
+    return [];
+  }
+  const first = node.getArguments()[0];
+  if (isStaticString(first)) return [first];
+  return Node.isArrayLiteralExpression(first)
+    ? first.getElements().filter(isStaticString)
+    : [];
+}
+
+function rebaseGlob(pattern: string, oldFile: string, newFile: string): string {
+  const negated = pattern.startsWith("!");
+  const rebased = rebaseSpecifier(
+    negated ? pattern.slice(1) : pattern,
+    oldFile,
+    newFile,
+  );
+  return `${negated ? "!" : ""}${rebased}`;
+}
+
+/** The relative directory a glob's matches (and so its result keys) start with, before any wildcard. */
+function globDirectory(pattern: string): string | undefined {
+  const path = pattern.startsWith("!") ? pattern.slice(1) : pattern;
+  if (!path.startsWith(".")) return undefined;
+  const wildcard = path.search(/[*?{[]/);
+  const fixed = wildcard < 0 ? path : path.slice(0, wildcard);
+  const slash = fixed.lastIndexOf("/");
+  return slash < 0 ? undefined : fixed.slice(0, slash + 1);
+}
+
+function collectGlobDirectories(context: RewriteContext): void {
+  context.sourceFile.forEachDescendant((node) => {
+    for (const pattern of globPatterns(node)) {
+      const directory = globDirectory(pattern.getLiteralValue());
+      if (directory === undefined) continue;
+      context.globDirectories.set(
+        directory,
+        `${rebaseSpecifier(directory, context.oldFile, context.newFile)}/`,
+      );
+    }
+  });
+}
+
+/** Rewrites a glob result key such as `./_brand/assets/logo.svg` to follow the moved glob. */
+function rebaseGlobKey(context: RewriteContext, value: string): string {
+  for (const [from, to] of context.globDirectories) {
+    if (value.startsWith(from)) return `${to}${value.slice(from.length)}`;
+  }
+  return value;
+}
+
+function rewriteTemplateHead(context: RewriteContext, node: Node): void {
+  if (!Node.isTemplateHead(node)) return;
+  const literal = node.getLiteralText();
+  const next = rebaseGlobKey(context, literal);
+  if (next === literal) return;
+  const start = node.getStart();
+  const end = node.getEnd();
+  const raw = context.sourceFile.getFullText().slice(start, end);
+  if (!raw.startsWith(`\`${literal}`)) {
+    throw new Error(
+      `cannot rebase escaped template ${raw} in ${context.document.file}`,
+    );
+  }
+  const key = `${start}:${end}`;
+  context.edits.set(key, {
+    start,
+    end,
+    text: `\`${next}${raw.slice(literal.length + 1)}`,
+  });
+  context.changed.add(key);
+}
+
 function rewriteCall(context: RewriteContext, node: Node): void {
   if (!Node.isCallExpression(node)) return;
+  if (context.moved) {
+    for (const pattern of globPatterns(node)) {
+      replaceNode(
+        context,
+        pattern,
+        rebaseGlob(pattern.getLiteralValue(), context.oldFile, context.newFile),
+      );
+    }
+  }
   const expression = node.getExpression();
   const first = node.getArguments()[0];
   if (
@@ -307,9 +395,14 @@ function rewriteReferenceNode(context: RewriteContext, node: Node): void {
     replaceNode(
       context,
       node,
-      rewritePageUrl(node.getLiteralValue(), context.oldSlug, context.newSlug),
+      rewritePageUrl(
+        rebaseGlobKey(context, node.getLiteralValue()),
+        context.oldSlug,
+        context.newSlug,
+      ),
     );
   }
+  rewriteTemplateHead(context, node);
 }
 
 function rewriteDocument(
@@ -351,6 +444,7 @@ function rewriteDocument(
       rewriteModule(context, literal);
     }
   }
+  if (context.moved) collectGlobDirectories(context);
   context.sourceFile.forEachDescendant((node) =>
     rewriteReferenceNode(context, node),
   );
@@ -424,6 +518,7 @@ export function planPageReferenceUpdates(options: {
         newSlug: options.newSlug,
         moved,
         moduleLiterals: new Set<number>(),
+        globDirectories: new Map<string, string>(),
         changed: new Set<string>(),
         edits: new Map<string, TextEdit>(),
       },

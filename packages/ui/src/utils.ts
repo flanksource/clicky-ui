@@ -20,6 +20,14 @@ export {
   type ComboboxMenuPosition,
 } from "./lib/combobox";
 export {
+  BREAKPOINTS,
+  VIEWPORT_PRESETS,
+  belowBreakpoint,
+  findViewportPreset,
+  type Breakpoint,
+  type ViewportPreset,
+} from "./lib/breakpoints";
+export {
   comboboxLabelPadding,
   createComboboxCustomEntry,
   multipleComboboxLabel,
@@ -78,9 +86,11 @@ export {
   buildPathTree,
   foldersFirst,
   isPathTreeFolder,
+  matchesTreeSelection,
   splitPath,
   type BuildPathTreeOptions,
   type PathTreeNode,
+  type TreeSelection,
 } from "./lib/path-tree";
 export {
   CLICKY_COLUMN_FORMAT_OPTIONS,

@@ -4,8 +4,8 @@ import { commentPlugin, type ContextMenuActionContext } from "react-grab";
 import type { CommentScreenshotCapture } from "../../plugins/comments-model";
 import { writeClipboard } from "./clipboard";
 import { copyContextMarkdown } from "./copy-context";
-import { commentAnchor } from "./dom-anchor";
-import { captureScreenshot } from "./screenshot";
+import { commentAnchor, commentTarget } from "./dom-anchor";
+import { captureScreenshot, screenshotCaptureSupported } from "./screenshot";
 
 type Selection = {
   anchor: string;
@@ -17,6 +17,8 @@ export function useReactGrabComments(options: {
   contentRef: RefObject<HTMLElement | null>;
   enabled: boolean;
   onSelect: (selection: Selection) => void;
+  /** "Prompt…": run a saved captain prompt against the element. */
+  onPrompt: (selection: Omit<Selection, "screenshot">) => void;
 }) {
   const current = useRef(options);
   current.current = options;
@@ -33,23 +35,29 @@ export function useReactGrabComments(options: {
     };
     const enabled = (context: { element: Element }) =>
       anchorOf(context.element) !== null;
-    const select = (
-      context: ContextMenuActionContext,
-      withScreenshot: boolean,
-    ) => {
+    // The selection is what the anchor names — inside markdown, the whole
+    // block — so the pin, the captured HTML and the screenshot all agree.
+    const selectionFor = (context: ContextMenuActionContext) => {
       const anchor = anchorOf(context.element);
-      if (anchor === null) {
+      const content = current.current.contentRef.current;
+      if (anchor === null || !content) {
         throw new Error(
           "React Grab selected an element outside the playground artifact and its titled dialogs",
         );
       }
       context.hideContextMenu();
       context.cleanup();
+      return { anchor, element: commentTarget(context.element, content) };
+    };
+    const select = (
+      context: ContextMenuActionContext,
+      withScreenshot: boolean,
+    ) => {
+      const selection = selectionFor(context);
       current.current.onSelect({
-        anchor,
-        element: context.element,
+        ...selection,
         ...(withScreenshot
-          ? { screenshot: captureScreenshot(context.element) }
+          ? { screenshot: captureScreenshot(selection.element) }
           : {}),
       });
     };
@@ -86,6 +94,7 @@ export function useReactGrabComments(options: {
           {
             id: "playground-copy-screenshot",
             label: "Copy screenshot",
+            enabled: screenshotCaptureSupported,
             onAction: copyScreenshot,
           },
           {
@@ -97,8 +106,16 @@ export function useReactGrabComments(options: {
           {
             id: "playground-comment-screenshot",
             label: "Comment with screenshot",
-            enabled,
+            enabled: (context) =>
+              screenshotCaptureSupported() && enabled(context),
             onAction: (context) => select(context, true),
+          },
+          {
+            id: "playground-prompt",
+            label: "Prompt…",
+            enabled,
+            onAction: (context) =>
+              current.current.onPrompt(selectionFor(context)),
           },
         ],
       });

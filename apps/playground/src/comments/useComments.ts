@@ -9,22 +9,43 @@ import {
   DEFAULT_COMMENT_STATUSES,
   DOCUMENT_ANCHOR,
   type Comment,
+  type CommentAuthor,
   type CommentConfig,
   type CommentCreateInput,
   type CommentRating,
   type CommentReplyInput,
 } from "@flanksource/clicky-ui/comments";
+import { normalizeErrorDiagnostics, type ErrorDiagnostics } from "@flanksource/clicky-ui";
+import { QUOTE_PREFIX, parseQuoteAnchor, resolveQuote, sourceBlockOf } from "@flanksource/clicky-ui/file-findings";
 
+import type { AgentSessionRuntime } from "../../plugins/agent-session-store";
 import type {
   CommentElementCaptureContext,
   CommentElementContext,
   CommentScreenshotCapture,
 } from "../../plugins/comments-model";
-import { resolveAnchor } from "./dom-anchor";
+import type {
+  StoredComment,
+  StoredPromptRun,
+} from "../../plugins/comments-store";
+import { overlayLabel, resolveAnchor } from "./dom-anchor";
+import { MARKDOWN_ROOT } from "./markdown-anchor";
 import { captureElementContext, captureElementHtml } from "./element-context";
 import { captureScreenshot } from "./screenshot";
 
 export const COMMENTS_ROUTE = "/__playground/comments";
+
+/**
+ * The element a new comment captures. A quote anchor (words selected in a
+ * FileReview) captures the rendered block holding them, so the store gets
+ * that block's usual css and markdown locators.
+ */
+export function anchorTarget(content: Element, anchor: string): Element | null {
+  if (!anchor.startsWith(QUOTE_PREFIX)) return resolveAnchor(content, anchor);
+  const scope = content.matches(MARKDOWN_ROOT) ? content : content.querySelector(MARKDOWN_ROOT);
+  const range = scope && resolveQuote(scope, parseQuoteAnchor(anchor));
+  return range ? sourceBlockOf(range.startContainer) : null;
+}
 
 /** The playground is single-user and local; there is no identity to look up. */
 export const PLAYGROUND_COMMENT_AUTHOR = {
@@ -32,15 +53,41 @@ export const PLAYGROUND_COMMENT_AUTHOR = {
   kind: "user",
 } as const;
 
+/**
+ * Who a thread can be handed to. Agent names match the `author.name` the
+ * copied instructions tell each agent to use, so an agent acknowledging its own
+ * hand-off is recognised as the assignee rather than as a competing claim.
+ */
+export const PLAYGROUND_ASSIGNEES: NonNullable<CommentConfig["assignees"]> = [
+  { id: "you", name: PLAYGROUND_COMMENT_AUTHOR.name, kind: "user" },
+  { id: "claude", name: "Claude", kind: "agent" },
+  { id: "codex", name: "Codex", kind: "agent" },
+];
+
 export const PLAYGROUND_COMMENT_CONFIG: CommentConfig = {
   statuses: DEFAULT_COMMENT_STATUSES,
+  assignees: PLAYGROUND_ASSIGNEES,
 };
 
 /** A comment as the API returns it: tagged with the page it was left on. */
 export type PlaygroundComment = Comment & {
   element?: CommentElementContext;
+  promptRun?: StoredPromptRun;
+  lint?: StoredComment["lint"];
 };
 export type PageComment = PlaygroundComment & { page: string };
+
+/**
+ * The root an anchor's locators are computed against. Dialog anchors get none:
+ * their element lives in a portal outside the artifact and is usually closed
+ * when the page is reloaded, so only the anchor itself can find it.
+ */
+function locatorRoot(
+  anchor: string,
+  content: Element | null,
+): { root?: Element } {
+  return content && overlayLabel(anchor) === null ? { root: content } : {};
+}
 
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
@@ -57,12 +104,23 @@ export async function request<T>(url: string, init?: RequestInit): Promise<T> {
   }
   const payload = (await response.json()) as T & { error?: string };
   if (!response.ok) {
-    throw new Error(
-      payload.error ??
-        `${init?.method ?? "GET"} ${url} failed (${response.status})`,
+    const fallback = `${init?.method ?? "GET"} ${url} failed (${response.status})`;
+    throw new ApiError(
+      response.status,
+      normalizeErrorDiagnostics(payload, fallback) ?? { message: fallback, context: [] },
     );
   }
   return payload;
+}
+
+/** A failed playground API call, keeping the server's error envelope (hint, context, details) for display. */
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly diagnostics: ErrorDiagnostics,
+  ) {
+    super(diagnostics.message);
+  }
 }
 
 /**
@@ -91,6 +149,11 @@ export type PlaygroundComments = {
   /** Surfaced as a banner — a broken backend must never look like "no comments". */
   error: string | null;
   create: (input: CommentCreateInput, actionId?: string) => Promise<void>;
+  /** Captures an element's source, HTML and locators as the comments store them. */
+  captureSelection: (
+    anchor: string,
+    target: Element,
+  ) => Promise<CommentElementCaptureContext>;
   prepareSelection: (
     anchor: string,
     target: Element,
@@ -98,7 +161,16 @@ export type PlaygroundComments = {
   ) => void;
   reply: (input: CommentReplyInput) => Promise<void>;
   updateStatus: (id: string, status: string) => Promise<void>;
+  /** Claim a thread for the current user. */
+  acknowledge: (id: string) => Promise<void>;
+  /** Hand a thread to `assignee`, or clear the hand-off with `null`. */
+  assign: (id: string, assignee: CommentAuthor | null) => Promise<void>;
   close: (id: string) => Promise<void>;
+  /**
+   * Send a thread to the shared agent session. `runtime` is required only when
+   * no session is live, in which case it starts one.
+   */
+  runAgent: (id: string, runtime?: AgentSessionRuntime) => Promise<void>;
   commentAndReopen: (id: string, body: string) => Promise<void>;
   updateRating: (id: string, rating: CommentRating) => Promise<void>;
   remove: (id: string) => Promise<void>;
@@ -110,6 +182,7 @@ export function useComments(
   options: {
     enabled?: boolean;
     poll?: boolean;
+    all?: boolean;
     capture?: (
       input: CommentCreateInput,
       actionId: string,
@@ -119,8 +192,10 @@ export function useComments(
   const captureRef = useRef(options.capture);
   captureRef.current = options.capture;
   const enabled = options.enabled !== false;
-  const pageRef = useRef(page);
-  pageRef.current = page;
+  const scope = `${page}:${Boolean(options.all)}`;
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
+  const [loadedScope, setLoadedScope] = useState<string>();
   const [comments, setComments] = useState<PlaygroundComment[]>([]);
   const [allComments, setAllComments] = useState<PageComment[]>([]);
   const [loading, setLoading] = useState(enabled);
@@ -133,6 +208,15 @@ export function useComments(
     screenshot?: Promise<CommentScreenshotCapture>;
   } | null>(null);
 
+  const captureSelection = useCallback(
+    (anchor: string, target: Element) =>
+      captureElementContext(target, {
+        fallbackSource: `apps/playground/src/pages/${page}.tsx`,
+        ...locatorRoot(anchor, contentRef.current),
+      }),
+    [contentRef, page],
+  );
+
   const prepareSelection = useCallback(
     (
       anchor: string,
@@ -143,17 +227,14 @@ export function useComments(
         page,
         anchor,
         target,
-        context: captureElementContext(
-          target,
-          `apps/playground/src/pages/${page}.tsx`,
-        ).then(
+        context: captureSelection(anchor, target).then(
           (value) => ({ status: "fulfilled" as const, value }),
           (reason: unknown) => ({ status: "rejected" as const, reason }),
         ),
         ...(screenshot ? { screenshot } : {}),
       };
     },
-    [page],
+    [captureSelection, page],
   );
 
   const refresh = useCallback(async () => {
@@ -161,22 +242,26 @@ export function useComments(
     try {
       const [pageComments, everyComment] = await Promise.all([
         page === "" ? Promise.resolve([]) : fetchComments({ page }),
-        fetchComments(),
+        options.all ? fetchComments() : Promise.resolve([]),
       ]);
-      if (pageRef.current !== page) return;
-      setComments(pageComments);
-      setAllComments(everyComment);
+      if (scopeRef.current !== scope) return;
+      setComments((previous) => JSON.stringify(previous) === JSON.stringify(pageComments) ? previous : pageComments);
+      const selected = options.all ? everyComment : pageComments;
+      setAllComments((previous) => JSON.stringify(previous) === JSON.stringify(selected) ? previous : selected);
+      setLoadedScope(scope);
       setError(null);
     } catch (cause) {
-      if (pageRef.current !== page) return;
+      if (scopeRef.current !== scope) return;
       setError(describeError(cause));
     } finally {
-      if (pageRef.current === page) setLoading(false);
+      if (scopeRef.current === scope) setLoading(false);
     }
-  }, [page, enabled]);
+  }, [page, enabled, options.all, scope]);
 
   useEffect(() => {
     setComments([]);
+    setAllComments([]);
+    setLoading(true);
     preparedSelection.current = null;
     void refresh();
   }, [refresh]);
@@ -207,6 +292,7 @@ export function useComments(
         if (options.rethrow) throw cause;
       }
       await refresh();
+      window.dispatchEvent(new Event("playground-feedback-updated"));
     },
     [refresh],
   );
@@ -259,7 +345,7 @@ export function useComments(
           const target =
             anchor === null || anchor === DOCUMENT_ANCHOR
               ? content
-              : (resolveAnchor(content, anchor) ?? prepared?.target);
+              : (anchorTarget(content, anchor) ?? prepared?.target);
           if (!target) {
             throw new Error(
               `Comment anchor ${JSON.stringify(anchor)} no longer matches an element`,
@@ -279,10 +365,10 @@ export function useComments(
                   source: `apps/playground/src/pages/${page}.tsx`,
                   html: captureElementHtml(target),
                 })
-              : captureElementContext(
-                  target,
-                  `apps/playground/src/pages/${page}.tsx`,
-                );
+              : captureElementContext(target, {
+                  fallbackSource: `apps/playground/src/pages/${page}.tsx`,
+                  ...locatorRoot(anchor, content),
+                });
           const capturedContext = await context;
           const capturedScreenshot = await screenshot;
           const element: CommentElementCaptureContext = {
@@ -290,6 +376,13 @@ export function useComments(
             ...(capturedScreenshot ? { screenshot: capturedScreenshot } : {}),
           };
 
+          let expectedSource: string | undefined;
+          if (input.reviewDecision) {
+            const response = await fetch(`/__playground/sources?slug=${encodeURIComponent(page)}`);
+            const payload = await response.json() as { source?: string; error?: string };
+            if (!response.ok || typeof payload.source !== "string") throw new Error(payload.error ?? "Could not read review source");
+            expectedSource = payload.source;
+          }
           await post(COMMENTS_ROUTE, {
             page,
             body: input.body,
@@ -300,7 +393,9 @@ export function useComments(
               ? { reviewDecision: input.reviewDecision }
               : {}),
             element,
+            ...(expectedSource === undefined ? {} : { expectedSource }),
           });
+          if (input.reviewDecision) window.location.reload();
           if (preparedSelection.current === prepared) {
             preparedSelection.current = null;
           }
@@ -339,12 +434,41 @@ export function useComments(
               author: PLAYGROUND_COMMENT_AUTHOR,
             });
           }
-          return request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status }),
-          });
+          throw new Error(
+            `Status ${JSON.stringify(status)} cannot be set directly; use acknowledge, assign, resolve or reopen`,
+          );
         },
+        { rethrow: true },
+      ),
+    [mutate, post],
+  );
+
+  const acknowledge = useCallback(
+    (id: string) =>
+      mutate(
+        () =>
+          post(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}/acknowledge`, {
+            author: PLAYGROUND_COMMENT_AUTHOR,
+          }),
+        { rethrow: true },
+      ),
+    [mutate, post],
+  );
+
+  const assign = useCallback(
+    (id: string, assignee: CommentAuthor | null) =>
+      mutate(
+        () =>
+          post(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}/assign`, {
+            author: PLAYGROUND_COMMENT_AUTHOR,
+            assignee:
+              assignee === null
+                ? null
+                : {
+                    name: assignee.name,
+                    ...(assignee.kind ? { kind: assignee.kind } : {}),
+                  },
+          }),
         { rethrow: true },
       ),
     [mutate, post],
@@ -356,6 +480,19 @@ export function useComments(
         () =>
           post(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}/close`, {
             author: PLAYGROUND_COMMENT_AUTHOR,
+          }),
+        { rethrow: true },
+      ),
+    [mutate, post],
+  );
+
+  const runAgent = useCallback(
+    (id: string, runtime?: AgentSessionRuntime) =>
+      mutate(
+        () =>
+          post(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}/agent-run`, {
+            author: PLAYGROUND_COMMENT_AUTHOR,
+            ...(runtime ? { runtime } : {}),
           }),
         { rethrow: true },
       ),
@@ -401,13 +538,17 @@ export function useComments(
   return {
     comments,
     allComments,
-    loading,
+    loading: loading || (enabled && loadedScope !== scope && error === null),
     error,
     create,
+    captureSelection,
     prepareSelection,
     reply,
     updateStatus,
+    acknowledge,
+    assign,
     close,
+    runAgent,
     commentAndReopen,
     updateRating,
     remove,

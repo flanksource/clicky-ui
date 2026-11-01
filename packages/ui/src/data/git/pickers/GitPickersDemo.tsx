@@ -4,7 +4,10 @@ import { GitBranchPicker, GitPipelinePicker, GitPipelineExecutionPicker } from "
 import type { GitFileValue, GitPickerClient } from "./types";
 
 const sha = "ca13cb2938c401821f792ae9c8d4e4b6d12adfb0";
-const branches = [{ name: "refs/heads/main", sha, author: "Alex Morgan", subject: "Update authorization workbook", date: "2026-10-20T09:30:00Z" }];
+const branches = [
+  { name: "refs/heads/main", sha, author: "Alex Morgan", subject: "Update authorization workbook", date: "2026-10-20T09:30:00Z" },
+  { name: "refs/heads/feature/validate-authorization-workbook-before-release", sha: "de92bf0938c401821f792ae9c8d4e4b6d12adfb1", author: "Taylor Example", subject: "Validate every authorization rule before publishing the updated workbook", date: "2026-10-21T10:00:00Z" },
+];
 const pipelines = [{ id: "42", name: "Validate configuration", path: ".github/workflows/validate.yml" }];
 const executions = [{ id: "123", pipeline: "42", number: "123", name: "Validate configuration", branch: "refs/heads/main", sha,
   status: "completed", result: "succeeded", author: "Alex Morgan", createdAt: "2026-10-20T09:35:00Z" }];

@@ -110,6 +110,7 @@ export {
   type RangeSliderProps,
   type RangeSliderValue,
 } from "./components/RangeSlider";
+export { Slider, type SliderProps } from "./components/Slider";
 export {
   FilterBar,
   FilterBarFilterPanel,
@@ -135,7 +136,9 @@ export {
   type FilterBarSearchProps,
   type FilterBarSelectMultiFilter,
   type FilterBarTextFilter,
+  type FilterBarTreeFilter,
   type FilterBarWorkloadFilter,
+  type FilterTreeNode,
   TriStateMultiSelect,
   type TriStateMultiSelectProps,
 } from "./components/FilterBar";
@@ -289,6 +292,8 @@ export {
   type ListMenuProps,
   type ListMenuSectionProps,
 } from "./components/ListMenu";
+export { ListMenuItems, type ListMenuItemsProps } from "./components/ListMenuItems";
+export type { ListMenuVirtualOptions } from "./components/list-menu-virtual";
 export {
   useListMenuSelection,
   type ListMenuSelection,
@@ -439,6 +444,8 @@ export {
   type HoverCardPlacement,
 } from "./overlay/HoverCard";
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
+export { LocalPathPicker, type LocalPathPickerProps } from "./components/LocalPathPicker";
+export { isLocalHostname, type LocalPathLoader, type LocalPathListing } from "./components/local-path";
 export {
   ConfirmDialog,
   type ConfirmDialogProps,

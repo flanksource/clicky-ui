@@ -27,6 +27,7 @@ vi.mock("./page-api", async (importOriginal) => ({
 }));
 
 const active: PageEntry = {
+  kind: "component",
   slug: "designs/review",
   title: "Design review",
   group: "Designs",

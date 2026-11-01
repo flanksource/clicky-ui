@@ -355,7 +355,7 @@ describe("runtime bar and detailed editor", () => {
       within(prompt).getByRole("radiogroup", { name: "Schema strictness" }),
     ).toBeInTheDocument();
     expect(
-      within(prompt).getByRole("radio", { name: "Retry" }),
+      within(prompt).getByRole("radio", { name: "Repair" }),
     ).toHaveAttribute("aria-checked", "true");
   });
 

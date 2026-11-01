@@ -24,8 +24,18 @@ export type SplitPaneProps = {
   rightClass?: string;
   /** Classes applied to the root split container. */
   className?: string;
-  /** Stack the panes and hide the resize handle below the `md` breakpoint. */
+  /**
+   * Stack the panes and hide the resize handle while the split's own width is
+   * below 48rem (the `md` breakpoint) — a container query, so a split nested in
+   * a narrow column stacks even on a wide screen.
+   */
   stackOnMobile?: boolean;
+  /**
+   * With `stackOnMobile`, pages the narrow split instead of stacking it: only
+   * this pane renders, at full height, and the other appears again once the
+   * split is 48rem wide. A list/detail host sets it from its selection.
+   */
+  mobilePane?: "left" | "right";
 };
 
 export function SplitPane({
@@ -38,7 +48,15 @@ export function SplitPane({
   rightClass,
   className,
   stackOnMobile = false,
+  mobilePane,
 }: SplitPaneProps) {
+  const paged = stackOnMobile && mobilePane !== undefined;
+  const narrowPane = (pane: "left" | "right") =>
+    !paged
+      ? undefined
+      : mobilePane === pane
+        ? "flex-1 @3xl/split-pane:block"
+        : "hidden @3xl/split-pane:block";
   const [split, setSplit] = useState(defaultSplit);
   const dragging = useRef(false);
   const container = useRef<HTMLDivElement>(null);
@@ -71,13 +89,12 @@ export function SplitPane({
     [minLeft, minRight],
   );
 
-  return (
+  const panes = (
     <div
       ref={container}
       className={cn(
         "flex h-full flex-1 overflow-hidden",
-        stackOnMobile && "flex-col md:flex-row",
-        className,
+        stackOnMobile ? "w-full flex-col @3xl/split-pane:flex-row" : className,
       )}
     >
       <div
@@ -86,10 +103,16 @@ export function SplitPane({
             ? ({ "--split-pane-width": `${split}%` } as CSSProperties)
             : { width: `${split}%` }
         }
+        data-slot={stackOnMobile ? "split-pane-left" : undefined}
         className={cn(
           "min-h-0 overflow-y-auto bg-background",
-          stackOnMobile && "w-full md:w-[var(--split-pane-width)]",
+          stackOnMobile &&
+            "w-full shrink-0 @3xl/split-pane:w-[var(--split-pane-width)] @3xl/split-pane:flex-none",
+          stackOnMobile &&
+            !paged &&
+            "max-h-[40%] border-b border-border @3xl/split-pane:max-h-none @3xl/split-pane:border-b-0",
           leftClass,
+          narrowPane("left"),
         )}
       >
         {left}
@@ -99,7 +122,7 @@ export function SplitPane({
         aria-orientation="vertical"
         className={cn(
           "w-1 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-primary",
-          stackOnMobile && "hidden md:block",
+          stackOnMobile && "hidden @3xl/split-pane:block",
         )}
         onMouseDown={onMouseDown}
       />
@@ -109,14 +132,30 @@ export function SplitPane({
             ? ({ "--split-pane-width": `${100 - split}%` } as CSSProperties)
             : { width: `${100 - split}%` }
         }
+        data-slot={stackOnMobile ? "split-pane-right" : undefined}
         className={cn(
           "min-h-0 overflow-hidden bg-background",
-          stackOnMobile && "w-full md:w-[var(--split-pane-width)]",
+          stackOnMobile &&
+            "w-full flex-1 @3xl/split-pane:flex-none @3xl/split-pane:w-[var(--split-pane-width)]",
           rightClass,
+          narrowPane("right"),
         )}
       >
         {right}
       </div>
     </div>
   );
+
+  if (!stackOnMobile) return panes;
+  // A container cannot query its own width, so the stacking split needs an
+  // outer box to measure; caller classes size that box.
+  return (
+    <div
+      data-slot="split-pane"
+      className={cn("@container/split-pane flex h-full min-h-0 min-w-0 flex-1", className)}
+    >
+      {panes}
+    </div>
+  );
 }
+

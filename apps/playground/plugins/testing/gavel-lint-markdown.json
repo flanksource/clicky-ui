@@ -1,0 +1,82 @@
+{
+  "metadata": {
+    "version": "v0.0.54-570-g772329a3",
+    "started": "2026-10-25T20:24:53.011956Z",
+    "ended": "2026-10-25T20:24:53.716451Z",
+    "kind": "lint"
+  },
+  "git": {
+    "repo": "clicky-ui",
+    "root": "/repo",
+    "sha": "743efedf8f09cf73c3500fde2ffed3dde21e5de9"
+  },
+  "status": {
+    "running": false,
+    "lint_run": true,
+    "test_edit_supported": false
+  },
+  "tests": null,
+  "lint": [
+    {
+      "linter": "vale",
+      "work_dir": "/repo",
+      "command": "vale",
+      "args": [
+        "--output=JSON",
+        "apps/playground/README.md"
+      ],
+      "success": true,
+      "duration": 156542666,
+      "violations": []
+    },
+    {
+      "linter": "markdownlint",
+      "work_dir": "/repo",
+      "command": "markdownlint",
+      "args": [
+        "--json",
+        "apps/playground/README.md"
+      ],
+      "success": true,
+      "duration": 419398541,
+      "violations": [
+        {
+          "file": "apps/playground/README.md",
+          "line": 3,
+          "column": 81,
+          "message": "Line length: Expected: 80; Actual: 134",
+          "source": "markdownlint",
+          "rule": {
+            "type": "deny",
+            "package": "markdownlint",
+            "method": "MD013/line-length"
+          }
+        },
+        {
+          "file": "apps/playground/README.md",
+          "line": 5,
+          "column": 81,
+          "message": "Line length: Expected: 80; Actual: 172",
+          "source": "markdownlint",
+          "rule": {
+            "type": "deny",
+            "package": "markdownlint",
+            "method": "MD013/line-length"
+          }
+        },
+        {
+          "file": "apps/playground/README.md",
+          "line": 7,
+          "column": 81,
+          "message": "Line length: Expected: 80; Actual: 1452",
+          "source": "markdownlint",
+          "rule": {
+            "type": "deny",
+            "package": "markdownlint",
+            "method": "MD013/line-length"
+          }
+        }
+      ]
+    }
+  ]
+}

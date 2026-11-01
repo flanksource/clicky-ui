@@ -136,6 +136,7 @@ export const MultiWindow: Story = {
 };
 
 export const MobileSheet: Story = {
+  tags: ["browser"],
   parameters: {
     viewport: { defaultViewport: "mobile1" },
     docs: {

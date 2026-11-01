@@ -133,3 +133,31 @@ export function foldersFirst<T>(
   if (leftIsParent !== rightIsParent) return leftIsParent ? -1 : 1;
   return left.label.localeCompare(right.label);
 }
+
+/** Include/exclude state keyed by a node's joined path; neutral nodes are absent. */
+export type TreeSelection = Record<string, "include" | "exclude">;
+
+/**
+ * Decides whether `path` passes a tree include/exclude selection, where a
+ * selection key stands for that path *and everything beneath it*.
+ *
+ * The deepest selected ancestor-or-self decides, so excluding `a/b` under an
+ * included `a` carves `a/b` back out, and including `a/b/c` under an excluded
+ * `a/b` restores it. When no ancestor-or-self is selected the path matches only
+ * if the selection has no includes at all: with no includes everything matches
+ * except excluded subtrees, with any include only included subtrees match.
+ *
+ * Keys match on whole segments — `acme/bill` does not select `acme/billing`.
+ */
+export function matchesTreeSelection(
+  path: string,
+  selection: TreeSelection,
+  separator: string = PATH_SEPARATOR,
+): boolean {
+  const segments = splitPath(path, separator);
+  for (let depth = segments.length; depth > 0; depth--) {
+    const mode = selection[segments.slice(0, depth).join(separator)];
+    if (mode !== undefined) return mode === "include";
+  }
+  return !Object.values(selection).includes("include");
+}

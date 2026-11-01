@@ -202,6 +202,7 @@ function HostActionsStory({ inline }: { inline: boolean }) {
 }
 
 export const HostActions: Story = {
+  tags: ["browser"],
   render: () => (
     <div className="grid gap-4">
       <HostActionsStory inline />

@@ -98,6 +98,11 @@
       "import": "./dist/monaco-schema.js",
       "require": "./dist/monaco-schema.cjs"
     },
+    "./file-findings": {
+      "types": "./dist/file-findings.d.ts",
+      "import": "./dist/file-findings.js",
+      "require": "./dist/file-findings.cjs"
+    },
     "./expressions": {
       "types": "./dist/expressions.d.ts",
       "import": "./dist/expressions.js",
@@ -181,7 +186,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "country-flag-icons": "catalog:",
-    "dompurify": "^3.4.11",
+    "dompurify": "catalog:",
     "jotai": "catalog:",
     "jsonc-parser": "catalog:",
     "monaco-yaml": "catalog:",
@@ -194,6 +199,7 @@
     "@iconify/utils": "catalog:",
     "@mdxeditor/editor": "catalog:",
     "@oxlint/plugins": "catalog:",
+    "@storybook/addon-vitest": "catalog:",
     "@storybook/react-vite": "catalog:",
     "@tailwindcss/cli": "^4.3.3",
     "@tanstack/react-query": "^5.66.8",
@@ -211,7 +217,7 @@
     "recharts": "^3.8.1",
     "storybook": "catalog:",
     "streamdown": "^2.5.0",
-    "svgo": "^3.2.0",
+    "svgo": "catalog:",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.7.0",
     "typescript": "^5.7.2",

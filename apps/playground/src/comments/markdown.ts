@@ -1,12 +1,20 @@
+// Relative imports, not the `@flanksource/clicky-ui/comments` alias: the
+// playground's Vite plugins build the same thread markdown for agent runs, and
+// the plugin bundle cannot resolve that alias.
+import { DOCUMENT_ANCHOR } from "../../../../packages/ui/src/comments/comment-types";
 import {
-  DOCUMENT_ANCHOR,
   buildReplyMap,
   getRoots,
   sortReplies,
-} from "@flanksource/clicky-ui/comments";
+} from "../../../../packages/ui/src/comments/comment-utils";
 
+import { tallyAnchors } from "./anchor-tally";
+import {
+  describeMarkdown,
+  parseMarkdownAnchor,
+  type MarkdownLocator,
+} from "./markdown-anchor";
 import type { PageComment, PlaygroundComment } from "./useComments";
-import { tallyAnchors } from "./useDomAnchors";
 
 /** One page's notes. A cross-page copy passes several; the toolbar passes one. */
 export type CommentPageSection = {
@@ -21,6 +29,7 @@ export type CommentMarkdownOptions = {
   screenshotUrl?: (url: string) => string;
   commentActionUrls?: (commentId: string) => {
     reply: string;
+    acknowledge: string;
     resolve: string;
   };
 };
@@ -75,6 +84,9 @@ function renderSection(
   const elementByComment = new Map(
     comments.map((comment) => [comment.id, comment.element]),
   );
+  const promptRunByComment = new Map(
+    comments.map((comment) => [comment.id, comment.promptRun]),
+  );
   const rank = new Map(
     tallyAnchors(comments).map((tally, index) => [tally.anchor, index]),
   );
@@ -88,17 +100,39 @@ function renderSection(
     const anchor = root.anchor ?? DOCUMENT_ANCHOR;
     const isDocument = anchor === DOCUMENT_ANCHOR;
 
+    const block = parseMarkdownAnchor(anchor);
     out.push(
-      `### ${index + 1}. ${isDocument ? "Page-level" : (labels[anchor] ?? anchor)}`,
+      `### ${index + 1}. ${isDocument ? "Page-level" : (labels[anchor] ?? (block ? describeMarkdown(block) : anchor))}`,
     );
-    if (!isDocument) out.push(`- anchor: \`${anchor}\``);
+    if (block) {
+      // An agent edits the markdown source: the section and text find the
+      // block there; the line is only where it was when commented on.
+      const line = elementByComment
+        .get(root.id)
+        ?.locators?.find(
+          (locator): locator is MarkdownLocator => locator.kind === "markdown",
+        )?.line;
+      if (block.path.length > 0) out.push(`- section: ${block.path.join(" › ")}`);
+      out.push(`- text: “${block.text}”`);
+      if (line !== undefined) out.push(`- line: ${line} (when commented)`);
+    } else if (!isDocument) out.push(`- anchor: \`${anchor}\``);
     out.push(`- status: ${root.status ?? "open"}`);
+    if (root.assignee) {
+      out.push(
+        `- assignee: ${root.assignee.name} (${root.assignee.kind ?? "user"}, ${
+          root.acknowledgedAt
+            ? `acknowledged ${root.acknowledgedAt}`
+            : "not yet acknowledged"
+        })`,
+      );
+    }
     if (root.rating) out.push(`- rating: ${root.rating}`);
     if (root.reviewDecision)
       out.push(`- review decision: ${root.reviewDecision}`);
     const actionUrls = commentActionUrls?.(root.id);
     if (actionUrls) {
       out.push(
+        `- acknowledge before starting: \`POST ${actionUrls.acknowledge}\``,
         `- add comment: \`POST ${actionUrls.reply}\``,
         `- mark resolved: \`POST ${actionUrls.resolve}\``,
       );
@@ -107,6 +141,21 @@ function renderSection(
       out.push(`- ${root.author?.name ?? "Anonymous"}: ${root.body}`);
     } else {
       out.push(`- author: ${root.author?.name ?? "Anonymous"}`);
+    }
+    const promptRun = promptRunByComment.get(root.id);
+    if (promptRun) {
+      out.push(
+        `- produced by captain prompt \`${promptRun.promptName}\` (run \`${promptRun.runId}\`)`,
+      );
+    }
+    if (root.checklist?.length) {
+      out.push("- checklist:");
+      for (const item of root.checklist) {
+        out.push(`  - [${item.status}] ${item.label}`);
+      }
+    }
+    for (const group of root.refs ?? []) {
+      out.push(`- ${group.label}: ${group.items.map((item) => `\`${item}\``).join(", ")}`);
     }
     for (const reply of sortReplies(replies.get(root.id) ?? [])) {
       out.push(

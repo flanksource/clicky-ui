@@ -25,12 +25,16 @@ import {
   StatusChip,
 } from "./CommentCardParts";
 import { CommentMarkdown } from "./CommentMarkdown";
+import {
+  assignmentMenuItems,
+  type CommentActionRunner,
+} from "./comment-assign";
 import { authorDisplayName, truncatePlain } from "./comment-utils";
 import {
   resolveCommentStage,
   statusForCommentStage,
 } from "../lib/comment-stage";
-import type { Comment, CommentConfig } from "./comment-types";
+import type { Comment, CommentAuthor, CommentConfig } from "./comment-types";
 
 export type CommentCardProps = {
   comment: Comment;
@@ -45,6 +49,15 @@ export type CommentCardProps = {
   onUpdateStatus?: (status: string) => void | Promise<void>;
   /** Close an active or resolved root comment. */
   onClose?: () => void | Promise<void>;
+  /** Claim an unassigned active root for the current user or agent. */
+  onAcknowledge?: () => void | Promise<void>;
+  /** Hand an active root to an assignee, or clear it with `null`. */
+  onAssign?: (assignee: CommentAuthor | null) => void | Promise<void>;
+  /**
+   * Caller-owned entries appended to the "Assign…" submenu, such as a run-agent
+   * action. Computed per comment so they can reflect its state.
+   */
+  extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
   /** Delete this comment. */
   onDelete?: () => void;
   /** Copy this comment's whole thread in the caller's canonical format. */
@@ -88,18 +101,51 @@ function actionMenuItems(
   return items;
 }
 
-function CommentBody({
-  comment,
-  config,
-  renderBody,
-  onUpdateStatus,
-  onClose,
-  onDelete,
-  onCopy,
-  onReply,
-  onChecklistToggle,
-  onMaximize,
-}: CommentCardProps) {
+/** A runner for {@link assignmentMenuItems} that shows a failure through `setError`. */
+function reportingRunner(setError: (message: string) => void): CommentActionRunner {
+  return (verb, action) => {
+    setError("");
+    void (async () => {
+      try {
+        await action();
+      } catch (cause) {
+        setError(
+          `Couldn't ${verb} comment: ${cause instanceof Error ? cause.message : "Unexpected error"}`,
+        );
+      }
+    })();
+  };
+}
+
+/** The Acknowledge and Assign… entries for a root; none for replies. */
+function rootAssignmentItems(
+  props: CommentCardProps,
+  run: CommentActionRunner,
+): DropdownMenuItem[] {
+  const { comment, config, onAcknowledge, onAssign, extraAssignItems } = props;
+  return assignmentMenuItems({
+    comment,
+    config,
+    run,
+    ...(onAcknowledge ? { onAcknowledge } : {}),
+    ...(onAssign ? { onAssign } : {}),
+    ...(extraAssignItems ? { extraAssignItems } : {}),
+  });
+}
+
+function CommentBody(props: CommentCardProps) {
+  const {
+    comment,
+    config,
+    renderBody,
+    onUpdateStatus,
+    onClose,
+    onDelete,
+    onCopy,
+    onReply,
+    onChecklistToggle,
+    onMaximize,
+  } = props;
   const [actionError, setActionError] = useState("");
   const isReply = Boolean(comment.parentId);
   const date = parseTimestamp(comment.createdAt);
@@ -140,6 +186,7 @@ function CommentBody({
   const menuItems = actionMenuItems(isReply, {
     ...(onDelete ? { onDelete } : {}),
     statusActions: [
+      ...rootAssignmentItems(props, reportingRunner(setActionError)),
       ...(stage === "active" && onUpdateStatus && resolved
         ? [
             {
@@ -211,7 +258,7 @@ function CommentBody({
                 aria-label="Close comment"
                 title="Close comment"
                 onClick={() => void close()}
-                className="inline-flex rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="inline-flex items-center justify-center rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:size-11"
               >
                 <Icon icon={UiCheck} className="text-sm" />
               </button>
@@ -222,7 +269,7 @@ function CommentBody({
               aria-label="Reopen comment"
               title="Reopen comment"
               onClick={() => void updateStatus(active.value)}
-              className="inline-flex rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex items-center justify-center rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:size-11"
             >
               <Icon icon={UiRestart} className="text-sm" />
             </button>
@@ -236,7 +283,7 @@ function CommentBody({
                   role="button"
                   tabIndex={0}
                   aria-label="Comment actions"
-                  className="inline-flex rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="inline-flex items-center justify-center rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [@media(pointer:coarse)]:size-11"
                 >
                   <Icon icon={UiDotsVertical} className="text-sm" />
                 </span>
@@ -274,7 +321,7 @@ function CommentBody({
         <button
           type="button"
           onClick={onReply}
-          className="-ml-2 rounded px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+          className="-ml-2 rounded px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:text-sm"
         >
           Reply
         </button>
@@ -349,7 +396,7 @@ export function CommentCard(props: CommentCardProps) {
           )}
         >
           <CommentAuthorAvatar author={comment.author} bare />
-          <span className="shrink-0 text-[11px] font-semibold text-foreground">
+          <span className="min-w-0 truncate text-[11px] font-semibold text-foreground">
             {authorDisplayName(comment.author)}
           </span>
           {!isReply && (
@@ -372,6 +419,7 @@ export function CommentCard(props: CommentCardProps) {
                     : "Empty comment"}
           </span>
           <span
+            className="shrink-0"
             role="presentation"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
@@ -383,7 +431,7 @@ export function CommentCard(props: CommentCardProps) {
                   role="button"
                   tabIndex={0}
                   aria-label="Comment actions"
-                  className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:opacity-100 group-hover/comment:opacity-70"
+                  className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:opacity-100 group-hover/comment:opacity-70 [@media(hover:none)]:opacity-70 [@media(pointer:coarse)]:p-2.5"
                 >
                   <Icon icon={UiDotsVertical} className="text-sm" />
                 </span>
@@ -391,6 +439,10 @@ export function CommentCard(props: CommentCardProps) {
               items={actionMenuItems(isReply, {
                 ...(props.onDelete ? { onDelete: props.onDelete } : {}),
                 statusActions: [
+                  ...rootAssignmentItems(
+                    props,
+                    reportingRunner(setCollapsedActionError),
+                  ),
                   ...(resolveCommentStage(config, comment.status) ===
                     "active" &&
                   props.onUpdateStatus &&

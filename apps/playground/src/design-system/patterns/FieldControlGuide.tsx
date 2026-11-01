@@ -10,6 +10,7 @@ import {
   MultiSelect,
   RangeSlider,
   SegmentedControl,
+  Slider,
   Switch,
   TriStateToggle,
 } from "@flanksource/clicky-ui";
@@ -40,6 +41,7 @@ export function FieldControlGuide() {
   const [labels, setLabels] = useState<string[]>(["tier=1", "team=platform"]);
   const [after, setAfter] = useState("2026-08-01");
   const [severity, setSeverity] = useState<RangeSliderValue>([3, 8]);
+  const [threshold, setThreshold] = useState(40);
   const [secret, setSecret] = useState("");
   const [dimension, setDimension] = useState(24);
   const [timestamp, setTimestamp] = useState("2026-08-23T09:30");
@@ -170,6 +172,22 @@ export function FieldControlGuide() {
           onChange={setSeverity}
           ariaLabelMin="Minimum severity"
           ariaLabelMax="Maximum severity"
+        />
+      ),
+    },
+    {
+      shape: "A single bounded number",
+      control: "Slider",
+      why: "One value on a known scale where position reads faster than digits. The number field sits on the same row so users can still type an exact value.",
+      example: (
+        <Slider
+          editable
+          min={0}
+          max={100}
+          step={5}
+          value={threshold}
+          onChange={setThreshold}
+          ariaLabel="Alert threshold"
         />
       ),
     },

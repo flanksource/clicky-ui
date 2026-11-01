@@ -21,28 +21,47 @@ export type PageModule = {
 
 export type PageLoader = () => Promise<PageModule>;
 export type GuidanceLoader = () => Promise<ExtractedGuidance>;
+export type SourceLoader = () => Promise<string>;
 
-export type PageEntry = {
+type PageEntryBase = {
   slug: string;
   title: string;
   group: string;
-  load: PageLoader;
   loadGuidance: GuidanceLoader;
 };
 
+/** A `.tsx` page: a module whose default export is the artifact. */
+export type ComponentPageEntry = PageEntryBase & {
+  kind: "component";
+  load: PageLoader;
+};
+
+/** A `.md`/`.mdx` page: a document the playground renders, lints and edits. */
+export type MarkdownPageEntry = PageEntryBase & {
+  kind: "markdown";
+  /** Path relative to `src/pages/`, e.g. `docs/guide.md`. */
+  file: string;
+  loadSource: SourceLoader;
+};
+
+export type PageEntry = ComponentPageEntry | MarkdownPageEntry;
+
 const PAGES_PREFIX = "./pages/";
 const ROOT_GROUP = "Pages";
+const PAGE_FILE = /\.(tsx|md|mdx)$/;
 
 export function isPlaygroundPage(key: string): boolean {
-  if (!key.startsWith(PAGES_PREFIX) || !key.endsWith(".tsx")) return false;
+  if (!key.startsWith(PAGES_PREFIX) || !PAGE_FILE.test(key)) return false;
   const segments = key.slice(PAGES_PREFIX.length).split("/");
   // `_`-prefixed files and directories are shared helpers, not artifacts.
   if (segments.some((segment) => segment.startsWith("_"))) return false;
-  return !/\.(test|stories)\.tsx$/.test(segments[segments.length - 1] ?? "");
+  return !/\.(test|stories)\.(tsx|md|mdx)$/.test(
+    segments[segments.length - 1] ?? "",
+  );
 }
 
 export function slugFromGlobKey(key: string): string {
-  return key.slice(PAGES_PREFIX.length).replace(/\.tsx$/, "");
+  return key.slice(PAGES_PREFIX.length).replace(PAGE_FILE, "");
 }
 
 export function humanizeSlug(slug: string): string {
@@ -69,24 +88,62 @@ export function folderForPage(
     : undefined;
 }
 
+const NO_GUIDANCE: GuidanceLoader = () => Promise.resolve({ blocks: [] });
+
+/**
+ * One entry per page file. A `.tsx` and a `.md` that resolve to the same slug
+ * would make every slug-keyed path (URL, sources endpoint, comments) ambiguous,
+ * so that is an error rather than a silent pick.
+ */
 export function buildRegistry(
   modules: Record<string, PageLoader>,
   guidanceModules: Record<string, GuidanceLoader> = {},
+  markdownSources: Record<string, SourceLoader> = {},
 ): PageEntry[] {
-  return Object.entries(modules)
-    .filter(([key]) => isPlaygroundPage(key))
-    .map(([key, load]) => {
-      const slug = slugFromGlobKey(key);
-      return {
-        slug,
-        title: humanizeSlug(slug),
-        group: groupFromSlug(slug),
-        load,
-        loadGuidance:
-          guidanceModules[key] ?? (() => Promise.resolve({ blocks: [] })),
-      };
-    })
-    .sort(compareEntries);
+  const entries: PageEntry[] = [
+    ...Object.entries(modules)
+      .filter(([key]) => isPlaygroundPage(key))
+      .map(([key, load]): ComponentPageEntry => {
+        const slug = slugFromGlobKey(key);
+        return {
+          kind: "component",
+          slug,
+          title: humanizeSlug(slug),
+          group: groupFromSlug(slug),
+          load,
+          loadGuidance: guidanceModules[key] ?? NO_GUIDANCE,
+        };
+      }),
+    ...Object.entries(markdownSources)
+      .filter(([key]) => isPlaygroundPage(key))
+      .map(([key, loadSource]): MarkdownPageEntry => {
+        const slug = slugFromGlobKey(key);
+        return {
+          kind: "markdown",
+          slug,
+          title: humanizeSlug(slug),
+          group: groupFromSlug(slug),
+          file: key.slice(PAGES_PREFIX.length),
+          loadSource,
+          loadGuidance: NO_GUIDANCE,
+        };
+      }),
+  ];
+  const seen = new Map<string, PageEntry>();
+  for (const entry of entries) {
+    const clash = seen.get(entry.slug);
+    if (clash) {
+      throw new Error(
+        `src/pages has two pages for slug "${entry.slug}" (${pageFileOf(clash)} and ${pageFileOf(entry)}); rename or delete one`,
+      );
+    }
+    seen.set(entry.slug, entry);
+  }
+  return entries.sort(compareEntries);
+}
+
+function pageFileOf(entry: PageEntry): string {
+  return entry.kind === "markdown" ? entry.file : `${entry.slug}.tsx`;
 }
 
 function compareEntries(a: PageEntry, b: PageEntry): number {
@@ -124,7 +181,22 @@ export const PAGES: PageEntry[] = buildRegistry(
       import: "default",
     },
   ) as Record<string, GuidanceLoader>,
+  import.meta.glob(
+    ["./pages/**/*.{md,mdx}", "!./pages/**/_*/**", "!./pages/**/_*.{md,mdx}"],
+    { query: "?raw", import: "default" },
+  ) as Record<string, SourceLoader>,
 );
+
+const projectedMeta = import.meta.glob(
+  [
+    "./pages/**/*.tsx",
+    "!./pages/**/_*/**",
+    "!./pages/**/_*.tsx",
+    "!./pages/**/*.test.tsx",
+    "!./pages/**/*.stories.tsx",
+  ],
+  { query: "?playground-meta", import: "default" },
+) as Record<string, () => Promise<PageMeta | undefined>>;
 
 export const DEFAULT_PAGE_SLUG = "welcome";
 export function fallbackPageSlug(
@@ -227,12 +299,22 @@ export function applyPageCreated(slug: string): void {
   emit();
 }
 
-/*
- * `meta` is a named export, so it is invisible until a module has been imported.
- * Nav labels therefore start from the filename and settle to `meta.title` once
- * the module has loaded; the store below lets React re-render when that happens.
- */
 const metaCache = new Map<string, PageMeta>();
+const pendingMeta = new Map<string, Promise<void>>();
+
+export async function loadMetadata(entries: readonly PageEntry[]): Promise<void> {
+  await Promise.all(entries.map((entry) => {
+    if (entry.kind === "markdown" || metaCache.has(entry.slug)) return;
+    const pending = pendingMeta.get(entry.slug);
+    if (pending) return pending;
+    const loader = projectedMeta[`./pages/${globSlugFor(entry.slug)}.tsx`];
+    if (!loader) throw new Error(`Missing metadata loader for ${entry.slug}`);
+    const request = loader().then((meta) => cacheMeta(entry.slug, meta)).finally(() => pendingMeta.delete(entry.slug));
+    pendingMeta.set(entry.slug, request);
+    return request;
+  }));
+  emit();
+}
 const listeners = new Set<() => void>();
 let version = 0;
 
@@ -279,40 +361,8 @@ export function pageMeta(entry: PageEntry): PageMeta | undefined {
   return { ...meta, title };
 }
 
-/** Warms `meta` for every page once the browser is idle, so nav labels settle. */
-export function preloadMeta(entries: PageEntry[]): void {
-  if (typeof window === "undefined") return;
-  const pending = entries.filter((entry) => !metaCache.has(entry.slug));
-  if (pending.length === 0) return;
-
-  const run = () => {
-    void Promise.all(
-      pending.map((entry) =>
-        entry.load().then(
-          (module) => cacheMeta(entry.slug, module.meta),
-          (error: unknown) => {
-            // The page still renders its own loud error when navigated to; this
-            // only degrades the nav label, so report it and keep the rest.
-            console.error(
-              `[playground] could not preload ${entry.slug}`,
-              error,
-            );
-            cacheMeta(entry.slug, undefined);
-          },
-        ),
-      ),
-    ).then(emit);
-  };
-
-  const idle = (
-    window as Window & { requestIdleCallback?: (cb: () => void) => number }
-  ).requestIdleCallback;
-  if (idle) idle(run);
-  else window.setTimeout(run, 200);
-}
-
 export async function loadPage(
-  entry: PageEntry,
+  entry: ComponentPageEntry,
 ): Promise<{ default: ComponentType }> {
   const module = await entry.load();
   cacheMeta(entry.slug, module.meta);

@@ -59,6 +59,10 @@ export function useFeedbackCopy({
             `${COMMENTS_ROUTE}/${encodedId}/replies`,
             window.location.origin,
           ).href,
+          acknowledge: new URL(
+            `${COMMENTS_ROUTE}/${encodedId}/acknowledge`,
+            window.location.origin,
+          ).href,
           resolve: new URL(
             `${COMMENTS_ROUTE}/${encodedId}/resolve`,
             window.location.origin,

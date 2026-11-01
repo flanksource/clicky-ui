@@ -5,7 +5,7 @@ import { mockMarkdownPreview } from "./examples/markdown-preview-mock";
 import { MARKDOWN_SYNTAX_DOCUMENT } from "./examples/markdown-syntax";
 
 const meta: Meta<typeof MarkdownEditor> = {
-  title: "Data/MarkdownEditor",
+  title: "Git/MarkdownEditor",
   component: MarkdownEditor,
   args: {
     defaultValue: MARKDOWN_SYNTAX_DOCUMENT,

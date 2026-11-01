@@ -15,6 +15,7 @@ import { effectiveProperties } from "./json-schema-form-conditionals";
 import { LabelIcon } from "../data/Icon";
 import { resolveItemSpec } from "./json-schema-form-item-summary";
 import { isFieldTone } from "./json-schema-form-tone";
+import { unionBranches } from "./json-schema-form-union-model";
 
 // isOpenStringMap reports whether a property is an object whose entries are
 // described by a sub-schema in `additionalProperties` (a typed key/value map) or
@@ -166,17 +167,22 @@ function adornmentNode(iconName: unknown, text: unknown): ReactNode {
   return undefined;
 }
 
-// enumBranch returns the first anyOf/oneOf member carrying a non-empty `enum`,
-// for a union of "an enum value OR a free-form string" (e.g. a value-or-token
-// field). It lets such a union render as a dropdown. Returns undefined when no
-// branch enumerates values.
+// Combine literal choices across scalar branches, including enum-or-template unions.
 export function enumBranch(
   prop: JsonSchemaProperty,
 ): JsonSchemaProperty | undefined {
-  for (const branch of [...(prop.anyOf ?? []), ...(prop.oneOf ?? [])]) {
-    if (Array.isArray(branch.enum) && branch.enum.length > 0) return branch;
-  }
-  return undefined;
+  const branches = [...(prop.anyOf ?? []), ...(prop.oneOf ?? [])];
+  const literalsOnly = branches.every((branch) => branch.enum?.length || typeof branch.const === "string");
+  const choices = branches.filter((branch) => branch.enum?.length || (literalsOnly && typeof branch.const === "string"));
+  const first = choices[0];
+  if (!first) return undefined;
+  return {
+    ...first,
+    enum: [...new Set(choices.flatMap((branch) => branch.enum ?? [branch.const]))],
+    "x-enum-labels": Object.assign({}, ...choices.map((branch) => branch["x-enum-labels"])),
+    "x-enum-icons": Object.assign({}, ...choices.map((branch) => branch["x-enum-icons"])),
+    "x-enum-descriptions": Object.assign({}, ...choices.map((branch) => branch["x-enum-descriptions"])),
+  };
 }
 
 // lookupDescriptor reads the `x-clicky-lookup` extension into a LookupDescriptor,
@@ -290,6 +296,8 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
       allowCustomValue: lookup.multi !== true,
     };
   }
+  if (prop.format === "json") return { ...base, kind: "json" };
+  if (unionBranches(prop).length > 1) return { ...base, kind: "union" };
   if (Array.isArray(prop.enum) && prop.enum.length > 0) {
     const display = enumDisplay(prop);
     return {
@@ -456,7 +464,8 @@ export function scalarItemsType(
     items.properties !== undefined ||
     items.items !== undefined ||
     items.additionalProperties !== undefined ||
-    items.allOf !== undefined
+    items.allOf !== undefined ||
+    items.oneOf !== undefined || items.anyOf !== undefined
   ) {
     return undefined;
   }

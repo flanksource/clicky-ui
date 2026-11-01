@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   AppShell,
   Button,
@@ -6,6 +7,10 @@ import {
 } from "@flanksource/clicky-ui";
 import { BookmarkletInstall } from "./BookmarkletInstall";
 import { PlaygroundAgentInstructions } from "../PlaygroundAgentInstructions";
+import {
+  AgentSessionButton,
+  useAgentRuns,
+} from "../agent-runs/AgentRunsProvider";
 import { useExternalCatalog } from "./external-catalog";
 import { ExternalPreview } from "./ExternalPreview";
 import { CommentCapture } from "../comments/CommentCapture";
@@ -37,14 +42,14 @@ export function ExternalWorkspace({
   error: string | null;
   review: boolean;
   selectedId?: string;
-  navigate: (page: string, comment?: string) => void;
+  navigate: (page: string, comment?: string, review?: boolean) => void;
   onReopen: (id: string, body: string) => Promise<void>;
 }) {
   const catalog = useExternalCatalog();
   const [sidebar, setSidebar] = useSidebarState();
   const activity = usePageActivity();
   const folders = usePageFolders();
-  const sections = usePlaygroundNavigation({ activeSlug: id, allComments: comments,
+  const sections = usePlaygroundNavigation({ activeSlug: id, feedback: activity.feedback, age: sidebar.age,
     query: sidebar.query, onQueryChange: (query) => setSidebar({ query }), sort: sidebar.sort, filters: sidebar.filters, updates: activity.updates, loading: commentsLoading,
     folders: folders.folders, pageHref, actionsDisabled: true, disabledReason: "Open an artifact page to manage its source",
     drag: { canDrag: () => false, onDrop: () => { throw new Error("Page dragging is unavailable from an external page"); } },
@@ -52,6 +57,7 @@ export function ExternalWorkspace({
   });
   const page = catalog.pages.find((entry) => entry.id === id);
   const ctx = useCommentContext();
+  const agentRuns = useAgentRuns();
   const feedback = useFeedbackCopy({
     active: undefined,
     external: page,
@@ -60,6 +66,11 @@ export function ExternalWorkspace({
   });
   const queue = resolvedReviewQueue(comments);
   const selected = queue.find((entry) => entry.id === selectedId) ?? queue[0];
+  useEffect(() => {
+    if (review && !commentsLoading && !error && selected && (selected.page !== id || selected.id !== selectedId)) {
+      navigate(selected.page, selected.id);
+    }
+  }, [review, commentsLoading, error, selected, id, selectedId, navigate]);
   return (
     <AppShell
       brand="Playground · External pages"
@@ -67,10 +78,11 @@ export function ExternalWorkspace({
       contentWidth="full"
       sidebarWidth={300}
       collapsedStorageKey="playground:sidebar:collapsed"
-      sidebarHeader={<PlaygroundSidebarControls state={sidebar} onChange={setSidebar} error={activity.error ?? folders.error} />}
+      sidebarHeader={<PlaygroundSidebarControls activeSlug={id} activity={activity} state={sidebar} onChange={setSidebar} error={activity.error ?? folders.error} />}
       actions={
         <>
           <PlaygroundAgentInstructions />
+          <AgentSessionButton />
           <BookmarkletInstall />
           <Button
             size="sm"
@@ -83,12 +95,12 @@ export function ExternalWorkspace({
           <Button
             size="sm"
             variant="outline"
-            disabled={!queue.length}
+            disabled={!Object.values(activity.feedback).some((page) => page.resolvedCount > 0)}
             onClick={() =>
-              navigate(selected?.page ?? id, review ? undefined : selected?.id)
+              navigate(id, undefined, !review)
             }
           >
-            Review resolved ({queue.length})
+            Review resolved ({Object.values(activity.feedback).reduce((count, page) => count + page.resolvedCount, 0)})
           </Button>
         </>
       }
@@ -159,7 +171,7 @@ export function ExternalWorkspace({
           className="max-h-[40dvh] min-h-0 shrink-0 overflow-y-auto border-t border-border p-3 lg:max-h-none lg:w-[420px] lg:border-l lg:border-t-0"
           aria-label="External page feedback"
         >
-          {review ? (
+          {review && (commentsLoading || error) ? <p role="status">{error ?? "Loading resolved feedback…"}</p> : review ? (
             <PlaygroundCommentReview
               allComments={comments}
               selectedId={selected?.id}
@@ -190,8 +202,12 @@ export function ExternalWorkspace({
               className="!w-full"
               formatAnchorLabel={(anchor) => anchor}
               threadToMarkdown={feedback.threadToMarkdown}
+              extraAssignItems={agentRuns.extraAssignItems}
               renderRootDetails={(comment) => (
-                <CommentCapture comment={comment} />
+                <>
+                  <CommentCapture comment={comment} />
+                  {agentRuns.renderRunDetails(comment)}
+                </>
               )}
             />
           )}

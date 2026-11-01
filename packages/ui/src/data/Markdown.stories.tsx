@@ -66,6 +66,7 @@ export const Lists: Story = {
 };
 
 export const TaskLists: Story = {
+  tags: ["browser"],
   ...section("task-lists"),
   play: async ({ canvasElement, step }) => {
     await step("checkboxes render read-only in the source order", async () => {
@@ -116,6 +117,7 @@ export const Code: Story = {
 };
 
 export const Tables: Story = {
+  tags: ["browser"],
   ...section("tables"),
   play: async ({ canvasElement, step }) => {
     const tables = await waitFor(() => {

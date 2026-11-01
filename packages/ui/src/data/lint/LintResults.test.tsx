@@ -3,9 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { LintResults, type LintResultsProps } from "./LintResults";
 import { emptyLintFilters, type LintAction, type LintFilters, type LintGrouping, type LinterResult } from "./types";
-import { allLintResults, eslint, golangci, pyrightFailed } from "./LintResults.fixtures";
+import { allLintResults, betterleaks, eslint, golangci, pyrightFailed } from "./LintResults.fixtures";
 
-type HarnessProps = Partial<Pick<LintResultsProps, "onIgnore" | "ignoreBusy" | "title" | "headerSlot">> & {
+type HarnessProps = Partial<
+  Pick<LintResultsProps, "onIgnore" | "ignoreBusy" | "title" | "headerSlot" | "onOpenFile" | "view" | "onViewChange">
+> & {
   results?: LinterResult[];
   initialGrouping?: LintGrouping;
   initialFilters?: LintFilters;
@@ -55,6 +57,7 @@ function Harness({
 }
 
 const tree = () => screen.getByRole("tree");
+const filterBar = () => document.querySelector<HTMLElement>("[data-lint-filter-bar]")!;
 
 describe("LintResults", () => {
   it("lists each linter as a root with its violations opened beneath it", () => {
@@ -69,22 +72,60 @@ describe("LintResults", () => {
   it("reports the selected node's route path and shows its findings", () => {
     const onSelectSpy = vi.fn();
     render(<Harness onSelectSpy={onSelectSpy} />);
-    fireEvent.click(within(tree()).getByText("pkg > server > handler.go"));
+    fireEvent.click(within(tree()).getByText("pkg/server/handler.go"));
     expect(onSelectSpy).toHaveBeenLastCalledWith("golangci-lint/errcheck/pkg-server-handler-go");
     expect(screen.getByText("Error return value of `w.Write` is not checked")).toBeInTheDocument();
     expect(screen.getByText("Error return value of `f.Close` is not checked")).toBeInTheDocument();
   });
 
-  it("deselects when the selected row is clicked again", () => {
+  it("keeps the selected row when clicked again", () => {
     const onSelectSpy = vi.fn();
     render(<Harness onSelectSpy={onSelectSpy} initialSelected="golangci-lint/errcheck/pkg-server-handler-go" />);
-    fireEvent.click(within(tree()).getByText("pkg > server > handler.go"));
-    expect(onSelectSpy).toHaveBeenLastCalledWith(null);
+    fireEvent.click(within(tree()).getByText("pkg/server/handler.go"));
+    expect(onSelectSpy).toHaveBeenLastCalledWith("golangci-lint/errcheck/pkg-server-handler-go");
   });
 
   it("opens the detail for a route path the host restored from its URL", () => {
     render(<Harness initialSelected="golangci-lint/unused/pkg-server-routes-api-go" />);
     expect(screen.getByText("func `legacyRoute` is unused")).toBeInTheDocument();
+  });
+
+  // One fix at three places (lab run 2026-10-30: an nvarchar parameter
+  // against varchar OMDataIntakeGL.FileID) is one violation listing each place.
+  it("lists every place a violation applies, each opening its own line", () => {
+    const onOpenFile = vi.fn();
+    const workDir = "/repo/oipa";
+    const file = "rules/tr/Billing/XMLData.xml";
+    const convert: LinterResult = {
+      linter: "oipa-transaction",
+      work_dir: workDir,
+      violations: [
+        {
+          file,
+          line: 125,
+          severity: "warning",
+          rule: { method: "transaction.math.sql.plan-warning" },
+          message: "PlanAffectingConvert — CONVERT_IMPLICIT(nvarchar(100),[OMDataIntakeGL].[FileID],0)",
+          locations: [
+            { file: `${workDir}/${file}`, line: 125, message: "screen over activity a1: statement s1" },
+            { file, line: 126, message: "screen over activity a1: statement s2" },
+            { file: "rules/br/CopyBook-Fees/XMLData.xml", line: 9, message: "transaction math over activity a1: statement s3" },
+          ],
+        },
+      ],
+    };
+    render(<Harness results={[convert]} onOpenFile={onOpenFile} />);
+    fireEvent.click(within(tree()).getByText("rules/tr/Billing/XMLData.xml"));
+    fireEvent.click(screen.getByRole("button", { name: /PlanAffectingConvert/ }));
+    const places = screen.getAllByTestId("lint-violation-location");
+    expect(places.map((p) => p.textContent)).toEqual([
+      expect.stringContaining(`${file}:125screen over activity a1: statement s1`),
+      expect.stringContaining(`${file}:126screen over activity a1: statement s2`),
+      expect.stringContaining("rules/br/CopyBook-Fees/XMLData.xml:9transaction math over activity a1: statement s3"),
+    ]);
+    expect(screen.getByText("3 locations")).toBeInTheDocument();
+    fireEvent.click(within(places[2]!).getByRole("button"));
+    expect(onOpenFile).toHaveBeenLastCalledWith({ file: "rules/br/CopyBook-Fees/XMLData.xml", workDir, line: 9 });
   });
 
   it("shows a placeholder until something is selected", () => {
@@ -114,15 +155,29 @@ describe("LintResults", () => {
     it("regroups through the picker", () => {
       const onGroupingSpy = vi.fn();
       render(<Harness onGroupingSpy={onGroupingSpy} />);
+      fireEvent.click(screen.getByRole("button", { name: /^View Options/ }));
       fireEvent.click(screen.getByTitle("Group by Summary"));
       expect(onGroupingSpy).toHaveBeenCalledWith("summary");
       expect(within(tree()).getByText(/^errcheck \(2\)/)).toBeInTheDocument();
     });
 
-    it("includes then excludes a severity as its pill is clicked", () => {
+    const facetMenu = (name: string) => {
+      fireEvent.click(within(filterBar()).getByRole("button", { name: /^View Options/ }));
+      return screen.getByRole("region", { name });
+    };
+
+    it("keeps View Options in the results toolbar and its facets inside the menu", () => {
+      render(<Harness results={[golangci, eslint]} />);
+      const header = document.querySelector<HTMLElement>("[data-lint-header]")!;
+      expect(within(header).queryByRole("button", { name: /^View Options/ })).toBeNull();
+      facetMenu("Severity");
+      expect(screen.getByRole("region", { name: "Linter" })).toBeInTheDocument();
+    });
+
+    it("includes then excludes a severity picked from the filter bar's Severity multi-select", () => {
       const onFiltersSpy = vi.fn();
       render(<Harness onFiltersSpy={onFiltersSpy} />);
-      fireEvent.click(screen.getByTitle("Warning: neutral. Click to include"));
+      fireEvent.click(within(facetMenu("Severity")).getByText("Warning"));
       expect(onFiltersSpy).toHaveBeenLastCalledWith({
         severity: new Map([["warning", "include"]]),
         linter: new Map(),
@@ -130,19 +185,20 @@ describe("LintResults", () => {
       expect(within(tree()).queryByText("errcheck")).toBeNull();
       expect(within(tree()).getByText("unused")).toBeInTheDocument();
 
-      fireEvent.click(screen.getByTitle("Warning: included. Click to exclude"));
+      fireEvent.click(within(screen.getByRole("region", { name: "Severity" })).getByText("Warning"));
       expect(onFiltersSpy).toHaveBeenLastCalledWith({
         severity: new Map([["warning", "exclude"]]),
         linter: new Map(),
       });
     });
 
-    it("offers linter pills only when there is more than one linter", () => {
+    it("offers the Linter multi-select only when there is more than one linter", () => {
       const { unmount } = render(<Harness results={[golangci]} />);
-      expect(screen.queryByTitle("golangci-lint: neutral. Click to include")).toBeNull();
+      facetMenu("Severity");
+      expect(screen.queryByRole("region", { name: "Linter" })).toBeNull();
       unmount();
       render(<Harness results={[golangci, eslint]} />);
-      fireEvent.click(screen.getByTitle("eslint: neutral. Click to include"));
+      fireEvent.click(within(facetMenu("Linter")).getByText("ESLint"));
       expect(within(tree()).queryByText("golangci-lint")).toBeNull();
     });
 
@@ -151,7 +207,8 @@ describe("LintResults", () => {
       filters.severity.set("error", "exclude");
       const onFiltersSpy = vi.fn();
       render(<Harness initialFilters={filters} onFiltersSpy={onFiltersSpy} />);
-      fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+      facetMenu("Severity");
+      fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
       expect(onFiltersSpy).toHaveBeenLastCalledWith(emptyLintFilters());
     });
 
@@ -160,7 +217,34 @@ describe("LintResults", () => {
       filters.linter.set("golangci-lint", "exclude");
       render(<Harness initialFilters={filters} />);
       expect(screen.getByText("No violations match the current filters")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
+      facetMenu("Severity");
+      expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
+    });
+  });
+
+  describe("table view", () => {
+    it("hides the Tree / Table toggle unless the host handles view changes", () => {
+      render(<Harness />);
+      expect(screen.queryByRole("radiogroup", { name: "View" })).toBeNull();
+    });
+
+    it("reports the view picked from the toggle", () => {
+      const onViewChange = vi.fn();
+      render(<Harness onViewChange={onViewChange} />);
+      fireEvent.click(screen.getByRole("radio", { name: /Table/ }));
+      expect(onViewChange).toHaveBeenCalledWith("table");
+    });
+
+    it("lists the filtered violations as rows, errors first, and opens a row's violation card beneath it", () => {
+      const filters = emptyLintFilters();
+      filters.linter.set("eslint", "exclude");
+      render(<Harness results={[golangci, eslint]} initialFilters={filters} view="table" onViewChange={vi.fn()} />);
+      const table = document.querySelector<HTMLElement>("[data-lint-table]")!;
+      const bodyRows = within(table).getAllByRole("row").slice(1);
+      const rules = bodyRows.map((row) => within(row).getAllByRole("cell")[2]?.textContent);
+      expect(rules).toEqual(["errcheck", "errcheck", "unused", "godot"]);
+      fireEvent.click(within(table).getByText("Error return value of `w.Write` is not checked"));
+      expect(table.querySelectorAll("[data-lint-violation-detail]")).toHaveLength(1);
     });
   });
 
@@ -182,7 +266,8 @@ describe("LintResults", () => {
     it("hands the chosen action to onIgnore", () => {
       const onIgnore = vi.fn<(action: LintAction) => void>();
       render(<Harness onIgnore={onIgnore} initialSelected={ruleNode} />);
-      fireEvent.click(screen.getByRole("button", { name: "Ignore rule errcheck everywhere" }));
+      fireEvent.click(within(document.querySelector<HTMLElement>("[data-lint-node-actions]")!).getByRole("button", { name: "Actions" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Ignore rule errcheck everywhere" }));
       expect(onIgnore).toHaveBeenCalledTimes(1);
       expect(onIgnore.mock.calls[0]![0].req).toEqual({
         source: "golangci-lint",
@@ -191,17 +276,39 @@ describe("LintResults", () => {
       });
     });
 
-    it("offers a per-violation ignore on a file's findings", () => {
+    it("offers occurrence, rule and file ignores in the finding menu", async () => {
       const onIgnore = vi.fn<(action: LintAction) => void>();
       render(<Harness onIgnore={onIgnore} initialSelected={`${ruleNode}/pkg-server-handler-go`} />);
       const first = document.querySelectorAll<HTMLElement>("[data-lint-violation]")[0]!;
-      fireEvent.click(within(first).getByRole("button", { name: "Ignore this violation" }));
-      expect(onIgnore.mock.calls[0]![0].req).toEqual({
-        source: "golangci-lint",
-        rule: "errcheck",
-        file: "pkg/server/handler.go",
-        work_dir: "/repo/gavel",
+      fireEvent.click(within(first).getByRole("button", { name: "Problem actions" }));
+      const menuLabels = (await screen.findAllByRole("menuitem")).map((item) => item.textContent);
+      fireEvent.click(screen.getByRole("menuitem", { name: "Ignore this occurrence" }));
+      expect({ menuLabels, req: onIgnore.mock.calls[0]![0].req }).toEqual({
+        menuLabels: ["Copy description", "Ignore this occurrence", "Ignore errcheck everywhere", "Ignore all golangci-lint in this file"],
+        req: { source: "golangci-lint", rule: "errcheck", file: "pkg/server/handler.go", line: 41, work_dir: "/repo/gavel" },
       });
+    });
+
+    it("offers a row's ignore actions from its right-click menu without selecting the row", async () => {
+      const onIgnore = vi.fn<(action: LintAction) => void>();
+      const onSelectSpy = vi.fn();
+      render(<Harness onIgnore={onIgnore} onSelectSpy={onSelectSpy} />);
+      const label = within(tree()).getByText("errcheck");
+      fireEvent.contextMenu(label);
+      fireEvent.click(await screen.findByRole("menuitem", { name: /Ignore rule errcheck everywhere/ }));
+      expect({ req: onIgnore.mock.calls[0]![0].req, selected: onSelectSpy.mock.calls.length }).toEqual({
+        req: { source: "golangci-lint", rule: "errcheck", work_dir: "/repo/gavel" },
+        selected: 0,
+      });
+    });
+
+    it("offers a row's ignore actions from its ⋯ menu", async () => {
+      render(<Harness onIgnore={vi.fn()} />);
+      fireEvent.click(within(tree()).getByRole("button", { name: "Ignore options for errcheck" }));
+      expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual([
+        "Ignore rule errcheck everywhere",
+        "Disable golangci-lint entirely",
+      ]);
     });
 
     it("renders no ignore buttons without onIgnore", () => {
@@ -209,13 +316,27 @@ describe("LintResults", () => {
       expect(screen.queryByRole("button", { name: /Ignore|Disable/ })).toBeNull();
     });
 
-    it("disables the buttons while the host is busy", () => {
-      render(<Harness onIgnore={vi.fn()} ignoreBusy initialSelected={ruleNode} />);
-      expect(screen.getByRole("button", { name: "Ignore rule errcheck everywhere" })).toBeDisabled();
-      expect(screen.getByRole("button", { name: "Disable golangci-lint entirely" })).toBeDisabled();
+    it("offers the selected node's actions in a menu in the detail header", async () => {
+      const onIgnore = vi.fn<(action: LintAction) => void>();
+      render(<Harness onIgnore={onIgnore} initialSelected={ruleNode} />);
+      const actions = document.querySelector<HTMLElement>("[data-detail-header] [data-lint-node-actions]")!;
+      fireEvent.click(within(actions).getByRole("button", { name: "Actions" }));
+      expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual([
+        "Ignore rule errcheck everywhere",
+        "Disable golangci-lint entirely",
+      ]);
+      fireEvent.click(screen.getByRole("menuitem", { name: "Ignore rule errcheck everywhere" }));
+      expect(onIgnore.mock.calls[0]![0].req).toEqual({ source: "golangci-lint", rule: "errcheck", work_dir: "/repo/gavel" });
     });
 
-    it("disables folder-scoped ignores when the work dir is unknown", () => {
+    it("disables the header split button while the host is busy", () => {
+      render(<Harness onIgnore={vi.fn()} ignoreBusy initialSelected={ruleNode} />);
+      const actions = document.querySelector<HTMLElement>("[data-lint-node-actions]")!;
+      fireEvent.click(within(actions).getByRole("button", { name: "Actions" }));
+      expect(screen.getByRole("menuitem", { name: "Ignore rule errcheck everywhere" })).toBeDisabled();
+    });
+
+    it("disables folder-scoped ignores when the work dir is unknown", async () => {
       const noWorkDir: LinterResult = {
         linter: "x",
         violations: [{ file: "a/b/c.go", line: 1, severity: "error", rule: { method: "r" } }],
@@ -228,8 +349,10 @@ describe("LintResults", () => {
           onIgnore={vi.fn()}
         />,
       );
-      expect(screen.getByRole("button", { name: "Ignore everything in this folder" })).toBeDisabled();
-      expect(screen.getByRole("button", { name: "Disable x entirely" })).toBeEnabled();
+      const actions = document.querySelector<HTMLElement>("[data-lint-node-actions]")!;
+      fireEvent.click(within(actions).getByRole("button", { name: "Actions" }));
+      expect(screen.getByRole("menuitem", { name: "Ignore everything in this folder" })).toBeDisabled();
+      expect(await screen.findByRole("menuitem", { name: /Disable x entirely/ })).toBeEnabled();
     });
   });
 
@@ -248,6 +371,33 @@ describe("LintResults", () => {
     });
   });
 
+  describe("Open in Files", () => {
+    const SELECTED_FILE = "golangci-lint/errcheck/pkg-server-handler-go";
+
+    it("hands the host each violation's file, work dir and line", () => {
+      const onOpenFile = vi.fn();
+      render(<Harness onOpenFile={onOpenFile} initialSelected={SELECTED_FILE} />);
+
+      const menus = screen.getAllByRole("button", { name: "Problem actions" });
+      expect(menus).toHaveLength(2);
+      fireEvent.click(menus[1]!);
+      fireEvent.click(screen.getByRole("menuitem", { name: "Open in Files" }));
+
+      expect(onOpenFile).toHaveBeenCalledWith({ file: "pkg/server/handler.go", workDir: "/repo/gavel", line: 88 });
+    });
+
+    it("is absent unless the host supplies onOpenFile", () => {
+      render(<Harness initialSelected={SELECTED_FILE} />);
+      expect(screen.queryByRole("button", { name: "Open in Files" })).toBeNull();
+    });
+
+    it("is absent for a violation that names no file", () => {
+      render(<Harness onOpenFile={vi.fn()} results={[betterleaks]} initialSelected="betterleaks/generic-api-key" />);
+      expect(screen.getByText("Potential API key found in git history")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Open in Files" })).toBeNull();
+    });
+  });
+
   describe("in a container narrower than the split needs", () => {
     afterEach(() => vi.restoreAllMocks());
 
@@ -256,12 +406,12 @@ describe("LintResults", () => {
       render(<Harness />);
       expect(screen.queryByText("Select a linter, rule or file to view its findings.")).toBeNull();
 
-      fireEvent.click(within(tree()).getByText("pkg > server > handler.go"));
+      fireEvent.click(within(tree()).getByText("pkg/server/handler.go"));
       expect(screen.queryByRole("tree")).toBeNull();
       expect(screen.getByText("Error return value of `w.Write` is not checked")).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole("button", { name: "Back to results" }));
-      expect(within(tree()).getByText("pkg > server > handler.go")).toBeInTheDocument();
+      expect(within(tree()).getByText("pkg/server/handler.go")).toBeInTheDocument();
     });
   });
 });

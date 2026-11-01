@@ -1,10 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { CommentProvider } from "./CommentProvider";
+import { CommentProvider, type CommentProviderProps } from "./CommentProvider";
 import { CommentSidePanel } from "./CommentSidePanel";
 import { strictAnchorResolver, useCommentContext } from "./comment-context";
 import type { Comment } from "./comment-types";
+import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 
 const config = {
   statuses: [
@@ -30,9 +31,13 @@ const comments: Comment[] = [
 function TestSurface({
   scrollTo,
   renderRootDetails,
+  extraAssignItems,
+  contentBottom,
 }: {
   scrollTo: ReturnType<typeof vi.fn>;
   renderRootDetails?: (comment: Comment) => ReactNode;
+  extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
+  contentBottom?: number;
 }) {
   const ctx = useCommentContext();
   return (
@@ -47,7 +52,7 @@ function TestSurface({
             scrollTo: { configurable: true, value: scrollTo },
           });
           container.getBoundingClientRect = () =>
-            ({ top: 50, height: 400 }) as DOMRect;
+            ({ top: 50, height: 400, bottom: contentBottom }) as DOMRect;
           ctx.contentRef.current = container;
         }}
       >
@@ -66,6 +71,7 @@ function TestSurface({
       <CommentSidePanel
         focusedAlignment="anchor"
         {...(renderRootDetails ? { renderRootDetails } : {})}
+        {...(extraAssignItems ? { extraAssignItems } : {})}
       />
     </div>
   );
@@ -137,6 +143,29 @@ describe("CommentSidePanel anchor navigation", () => {
     expect(focused).toHaveStyle({ top: "238px" });
     fireEvent.scroll(screen.getByTestId("comment-content"));
     expect(focused).toHaveStyle({ top: "238px" });
+  });
+
+  it("does not offset the focused thread when the rail is stacked below the content", () => {
+    const contentBottom = 450;
+    const railTop = contentBottom + 10;
+    const railRect = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ top: railTop, bottom: railTop + 240 } as DOMRect);
+    render(
+      <CommentProvider
+        comments={comments}
+        config={config}
+        resolveAnchor={strictAnchorResolver}
+        onReply={vi.fn()}
+      >
+        <TestSurface scrollTo={vi.fn()} contentBottom={contentBottom} />
+      </CommentProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open comments" }));
+    fireEvent.click(screen.getByTestId("comment-card"));
+    expect(screen.getByTestId("comment-focused-rail").style.top).toBe("");
+    railRect.mockRestore();
   });
 
   it("keeps comments with no exact registered anchor visible but unavailable", () => {
@@ -351,6 +380,87 @@ describe("CommentSidePanel anchor navigation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Closed (1)" }));
     expect(screen.getByText("Human approved")).toBeVisible();
     expect(screen.queryByText("Already resolved")).not.toBeInTheDocument();
+  });
+
+  describe("acknowledge and assign", () => {
+    const agent = { id: "claude", name: "Claude", kind: "agent" as const };
+    const assignable = { ...config, assignees: [agent] };
+
+    function openRail(
+      props: Partial<CommentProviderProps> = {},
+      panelProps: {
+        extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
+      } = {},
+    ) {
+      render(
+        <CommentProvider
+          comments={comments}
+          config={assignable}
+          resolveAnchor={strictAnchorResolver}
+          {...props}
+        >
+          <TestSurface scrollTo={vi.fn()} {...panelProps} />
+        </CommentProvider>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Open comments" }));
+    }
+
+    it("acknowledges a thread from the all-comments rail by its id", () => {
+      const onAcknowledge = vi.fn();
+      openRail({ onAcknowledge });
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Acknowledge" }));
+
+      expect(onAcknowledge).toHaveBeenCalledWith("comment-1");
+    });
+
+    it("assigns a thread to a configured agent by its id", () => {
+      const onAssign = vi.fn();
+      openRail({ onAssign });
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Assign…" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Claude" }));
+
+      expect(onAssign).toHaveBeenCalledWith("comment-1", agent);
+    });
+
+    it.each([
+      ["all-comments rail", false],
+      ["focused thread", true],
+    ])("forwards the extra assign items to the %s", (_view, focused) => {
+      const runAgent = vi.fn();
+      openRail(
+        { onAssign: vi.fn() },
+        {
+          extraAssignItems: (comment) => [
+            { label: `Run agent on ${comment.id}`, onSelect: runAgent },
+          ],
+        },
+      );
+      if (focused) fireEvent.click(screen.getByTestId("comment-card"));
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Assign…" }));
+      fireEvent.click(
+        screen.getByRole("menuitem", { name: "Run agent on comment-1" }),
+      );
+
+      expect(runAgent).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps both actions available in the focused thread", () => {
+      const onAcknowledge = vi.fn();
+      openRail({ onAcknowledge, onAssign: vi.fn() });
+      fireEvent.click(screen.getByTestId("comment-card"));
+
+      fireEvent.click(screen.getByRole("button", { name: "Comment actions" }));
+
+      expect(
+        screen.getAllByRole("menuitem").map((item) => item.textContent),
+      ).toEqual(["Acknowledge", "Assign…", "Maximise"]);
+    });
   });
 
   it("pins the rail header outside the anchor-offset box", () => {

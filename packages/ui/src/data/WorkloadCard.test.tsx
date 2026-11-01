@@ -71,6 +71,11 @@ const fetcher = async (url: string): Promise<TimeseriesResponse> => {
 };
 
 describe("WorkloadCard", () => {
+  it('renders caller-owned statistical metrics without an empty state', () => {
+    renderWithQueryClient(<WorkloadCard workload={workload} metrics={{}}><span>Average 45%, P95 84%</span></WorkloadCard>);
+    expect(screen.getByText('Average 45%, P95 84%')).toBeInTheDocument();
+    expect(screen.queryByText('No metrics configured')).not.toBeInTheDocument();
+  });
   it("renders workload identity, status, replicas, and configured resource metrics", async () => {
     const { container } = renderWithQueryClient(
       <WorkloadCard

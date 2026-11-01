@@ -10,13 +10,25 @@ import {
   type Alias,
 } from "vite";
 
+import {
+  createAgentRuns,
+  playgroundAgentRuns,
+} from "./plugins/agent-runs-server";
 import { playgroundComments } from "./plugins/comments-server";
+import {
+  createPromptRuns,
+  playgroundPromptRuns,
+} from "./plugins/prompt-runs-server";
 import { playgroundBookmarklet } from "./plugins/bookmarklet-server";
 import { playgroundExports } from "./plugins/exports-server";
 import { playgroundMarkdown } from "./plugins/markdown-vite-plugin";
+import { playgroundPageMeta } from "./plugins/page-meta-vite-plugin";
 import { playgroundSources } from "./plugins/sources-server";
 import { playgroundPageActivity } from "./plugins/page-activity";
 import { playgroundRuntimeProfiles } from "./plugins/runtime-profiles-server";
+import { playgroundWorkspaceFiles } from "./plugins/workspace-files-server";
+import { playgroundGavelLint } from "./plugins/gavel-lint-server";
+import { playgroundBlame } from "./plugins/blame-server";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(root, "../..");
@@ -76,24 +88,56 @@ const externalAliases: Alias[] = envList("PLAYGROUND_EXTERNAL_ALIASES").map(
   },
 );
 
-export default defineConfig({
+const agentRuns = createAgentRuns({
+  dir: playgroundDataDir,
+  captainURL: "http://localhost:9020",
+  cwd: workspaceRoot,
+  skillPath: resolve(workspaceRoot, ".agents/skills/clicky-ui-playground/SKILL.md"),
+});
+
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     tailwindcss(),
     playgroundMarkdown({ sourceRoot: resolve(root, "src") }),
+    playgroundPageMeta({ sourceRoot: resolve(root, "src") }),
     playgroundPageActivity(resolve(root, "src/pages")),
-    playgroundComments({ dir: playgroundDataDir }),
-    playgroundBookmarklet({ root, dir: playgroundDataDir }),
+    // Before playgroundComments: that middleware answers every other
+    // /__playground/comments/* path (including /:id/agent-run) with a 405.
+    playgroundAgentRuns(agentRuns),
+    playgroundPromptRuns(
+      createPromptRuns({
+        dir: playgroundDataDir,
+        gavelURL: localEnv.PLAYGROUND_GAVEL_URL ?? "http://localhost:9330",
+        workspace: workspaceRoot,
+        onCreated: agentRuns.autoRunComment,
+      }),
+    ),
+    playgroundComments({
+      dir: playgroundDataDir,
+      pagesDir: resolve(root, "src/pages"),
+      onCreated: agentRuns.autoRunComment,
+    }),
+    mode !== "test" && playgroundBookmarklet({ root, dir: playgroundDataDir }),
     playgroundExports({ dir: playgroundDataDir }),
     playgroundRuntimeProfiles({
+      modelsURL: "http://localhost:9020/api/chat/models",
       permissionsURL:
         "http://localhost:9020/api/captain/ai/permissions/catalog",
       runtimesURL: "http://localhost:9020/api/chat/runtimes",
       resolveURL: "http://localhost:9020/api/chat/runtime-profiles/resolve",
     }),
+    playgroundWorkspaceFiles({ cwd: workspaceRoot }),
+    playgroundBlame({ cwd: workspaceRoot }),
+    playgroundGavelLint({
+      pagesDir: resolve(root, "src/pages"),
+      workspaceRoot,
+      promptFile: resolve(root, "prompts/markdown-review.prompt"),
+    }),
     playgroundSources({
       pagesDir: resolve(root, "src/pages"),
       commentsDir: playgroundDataDir,
+      workspaceRoot,
     }),
   ],
   resolve: {
@@ -119,8 +163,16 @@ export default defineConfig({
         replacement: resolve(uiSrc, "monaco.ts"),
       },
       {
+        find: /^@flanksource\/clicky-ui\/file-findings$/,
+        replacement: resolve(uiSrc, "file-findings.ts"),
+      },
+      {
         find: /^@flanksource\/clicky-ui\/rpc$/,
         replacement: resolve(uiSrc, "rpc.ts"),
+      },
+      {
+        find: /^@flanksource\/clicky-ui\/connections$/,
+        replacement: resolve(uiSrc, "connections.ts"),
       },
       {
         find: /^@flanksource\/clicky-ui\/chat$/,
@@ -163,6 +215,8 @@ export default defineConfig({
     // The React artifact tests render through @testing-library, and the shared
     // setup stubs window.matchMedia — both need a DOM.
     environment: "jsdom",
+    pool: "vmThreads",
+    maxWorkers: 2,
     setupFiles: ["./src/test/setup.ts"],
     server: {
       deps: {
@@ -196,4 +250,4 @@ export default defineConfig({
       allow: [searchForWorkspaceRoot(root), ...externalRoots],
     },
   },
-});
+}));

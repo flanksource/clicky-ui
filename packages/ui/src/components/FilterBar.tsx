@@ -47,6 +47,11 @@ import {
   type FilterBarMultiFilter,
 } from "./filter-bar-multi";
 import {
+  TreeFilterField,
+  type FilterBarTreeFilter,
+  type FilterTreeNode,
+} from "./filter-bar-tree";
+import {
   clearFilterBarFilter,
   dateRangeFilterProps,
   isFilterBarFilterActive,
@@ -57,6 +62,7 @@ export {
   type TriStateMultiSelectProps,
 } from "./filter-bar-multi";
 export type { FilterBarMultiFilter, FilterBarMultiFilterMode };
+export type { FilterBarTreeFilter, FilterTreeNode };
 import { Icon, LabelIcon, type LabelIconSpec } from "../data/Icon";
 import { formatDateTimeRelative } from "../data/cells/timestamp-format";
 import {
@@ -69,6 +75,8 @@ import {
 } from "../icons";
 import { cn } from "../lib/utils";
 import { useMediaQuery } from "../hooks/use-media-query";
+import { BREAKPOINTS, belowBreakpoint } from "../lib/breakpoints";
+import { useContainerWiderThan } from "../hooks/use-container-width";
 import { Modal } from "../overlay/Modal";
 import { useEscapeLayer, useFloatingZIndex } from "../overlay/modalStack";
 import { Button } from "./button";
@@ -377,6 +385,7 @@ export type FilterBarFilter = (
   | FilterBarLookupFilter
   | FilterBarLookupMultiFilter
   | FilterBarMultiFilter
+  | FilterBarTreeFilter
   | FilterBarNestedMultiFilter
   | FilterBarWorkloadFilter
   | FilterBarSelectMultiFilter
@@ -520,11 +529,15 @@ export function FilterBar({
   const maximumInlineFilters =
     inlineFilterLimit === -1 ? allFilters.length : inlineFilterLimit;
   const hasForcedOverflow = maximumInlineFilters < allFilters.length;
-  const mobileFilterOverflow = useMediaQuery("(max-width: 767px)");
-  const mobilePageOverflow = useMediaQuery("(max-width: 639px)");
+  const mobileFilterOverflow = useMediaQuery(belowBreakpoint("md"));
+  const mobilePageOverflow = useMediaQuery(belowBreakpoint("sm"));
+  // A tablet viewport with a sidebar leaves the bar phone-narrow, so the range
+  // buttons go icon-only on the bar's own width as well as on the viewport.
+  const { ref: rowWidthRef, wider: roomyRow } = useContainerWiderThan(BREAKPOINTS.sm);
+  const compact = mobileFilterOverflow || !roomyRow;
   const contextValue = useMemo(
-    () => ({ autoSubmit, compact: mobileFilterOverflow }),
-    [autoSubmit, mobileFilterOverflow],
+    () => ({ autoSubmit, compact }),
+    [autoSubmit, compact],
   );
   // `wrap` describes how a crowded bar behaves on a desktop: it wraps instead
   // of hiding filters behind a trigger. At phone widths wrapping stacks every
@@ -589,8 +602,12 @@ export function FilterBar({
     const filterList = filterListRef.current;
     if (!filterList) return;
 
+    // An unlaid-out bar (jsdom, display:none) has no row width. A laid-out row
+    // whose flex-1 list is squeezed to 0px by search and range controls means
+    // "no room", and must push every filter into the menu rather than bail.
+    const rowWidth = filterList.parentElement?.getBoundingClientRect().width ?? 0;
+    if (rowWidth <= 0) return;
     const availableWidth = Math.floor(filterList.getBoundingClientRect().width);
-    if (availableWidth <= 0) return;
 
     const widths = current.slice(0, maximumInline).map((filter) => {
       const node = filterNodeRefs.current.get(filter.key);
@@ -677,6 +694,7 @@ export function FilterBar({
   const row = (
     <FilterBarContext.Provider value={contextValue}>
       <div
+        ref={rowWidthRef}
         data-slot="filter-bar"
         className={cn(
           FILTER_BAR_ROW_CLASS,
@@ -836,6 +854,7 @@ function FilterBarFilterPanelContent({
       {filter.kind === "multi" && (
         <MultiFilterPanel filter={filter} chrome={chrome} />
       )}
+      {filter.kind === "tree" && <TreeFilterField filter={filter} grow />}
       {filter.kind === "nested-multi" && (
         <NestedMultiFilterPanel filter={filter} chrome={chrome} />
       )}
@@ -874,6 +893,10 @@ function renderFilterField(filter: FilterBarFilter, grow: boolean) {
 
   if (filter.kind === "multi") {
     return <MultiFilterField filter={filter} grow={grow} />;
+  }
+
+  if (filter.kind === "tree") {
+    return <TreeFilterField filter={filter} grow={grow} />;
   }
 
   if (filter.kind === "nested-multi") {
@@ -1235,6 +1258,9 @@ function FilterBarKeyValueControl({ filter }: { filter: FilterBarFilter }) {
   }
   if (filter.kind === "multi") {
     return <MultiFilterField filter={filter} grow />;
+  }
+  if (filter.kind === "tree") {
+    return <TreeFilterField filter={filter} grow />;
   }
   if (filter.kind === "nested-multi") {
     return <NestedMultiFilterField filter={filter} grow />;
@@ -3168,6 +3194,14 @@ function filterWithStagedValue(
         onChange(next),
     };
   }
+  if (filter.kind === "tree") {
+    return {
+      ...filter,
+      value: isMultiFilterValue(value) ? value : {},
+      onChange: (next: Record<string, FilterBarMultiFilterMode>) =>
+        onChange(next),
+    };
+  }
   if (filter.kind === "nested-multi") {
     return {
       ...filter,
@@ -3301,7 +3335,7 @@ function estimateFilterWidth(filter: FilterBarFilter) {
     return Math.max(88, filter.label.length * 8 + 40);
   // Multi renders as a combobox field (min-w-[11rem] ≈ 176px); nested keeps
   // its compact trigger button.
-  if (filter.kind === "multi") return 176;
+  if (filter.kind === "multi" || filter.kind === "tree") return 176;
   if (filter.kind === "nested-multi") return 136;
   if (filter.kind === "workload") return 224;
   if (filter.kind === "number" || filter.kind === "duration") return 152;

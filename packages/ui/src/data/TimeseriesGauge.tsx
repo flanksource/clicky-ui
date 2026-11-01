@@ -10,7 +10,12 @@ import {
   type TimeseriesResponse,
   type TimeseriesSeries,
 } from "./TimeseriesPanel";
-import { defaultTimeseriesFetcher, latestValue, useTimeseriesQueries } from "./timeseries-query";
+import {
+  defaultTimeseriesFetcher,
+  latestValue,
+  soleSeries,
+  useTimeseriesQueries,
+} from "./timeseries-query";
 import { GaugeHoverCard, type GaugeHoverRow } from "./GaugeHoverCard";
 import { seriesStats } from "./gauge-stats";
 
@@ -183,7 +188,10 @@ export function TimeseriesGauge({
     fetcher,
   });
 
-  const rawValue = latestValue(results[0]?.data);
+  const valueRead = soleSeries(value.id, results[0]);
+  const maxRead = maxSeries ? soleSeries(maxSeries.id, results[1]) : undefined;
+  const error = valueRead.error ?? maxRead?.error ?? null;
+  const rawValue = latestValue(valueRead.data);
   const hasValue = rawValue !== undefined;
   const usage = value.transform ? value.transform(rawValue ?? 0) : (rawValue ?? 0);
 
@@ -191,7 +199,7 @@ export function TimeseriesGauge({
   if (typeof max === "number") {
     limit = max;
   } else if (maxSeries) {
-    const rawMax = latestValue(results[1]?.data);
+    const rawMax = latestValue(maxRead?.data);
     limit = rawMax === undefined ? undefined : maxSeries.transform ? maxSeries.transform(rawMax) : rawMax;
   }
 
@@ -209,7 +217,7 @@ export function TimeseriesGauge({
       : hasValue
         ? formatUnit(usage, unit)
         : "—";
-  const titleText = `${title}: ${readout}`;
+  const titleText = `${title}: ${error ? error.message : readout}`;
   const canExpand = expandable && variant === "default";
   const readoutTone = bounded ? tone : "text-foreground";
 
@@ -222,9 +230,11 @@ export function TimeseriesGauge({
   // Hover card: reduce the value's points to current/min/max/avg (transformed to
   // the display unit), plus the resolved capacity. The current row is tinted by
   // its threshold tone when the reading is bounded.
-  const stats = seriesStats(results[0]?.data?.points, value.transform);
+  const stats = seriesStats(valueRead.data?.points, value.transform);
   const fmt = (n: number) => formatUnit(n, unit);
-  const hoverRows: GaugeHoverRow[] = hasValue
+  const hoverRows: GaugeHoverRow[] = error
+    ? [{ label: "Error", value: error.message, tone: "text-red-500" }]
+    : hasValue
     ? [
         { label: "Current", value: fmt(usage), ...(bounded ? { tone } : {}) },
         ...(stats

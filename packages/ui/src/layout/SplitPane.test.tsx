@@ -31,7 +31,7 @@ describe("SplitPane", () => {
     expect(sep).toHaveAttribute("aria-orientation", "vertical");
   });
 
-  it("stacks one instance of each pane and hides the resize handle on mobile", () => {
+  it("stacks one instance of each pane and hides the resize handle while its container is narrow", () => {
     render(
       <SplitPane
         stackOnMobile
@@ -43,13 +43,14 @@ describe("SplitPane", () => {
 
     const left = screen.getByTestId("left").parentElement!;
     const right = screen.getByTestId("right").parentElement!;
-    expect(left).toHaveClass("w-full", "md:w-[var(--split-pane-width)]");
-    expect(right).toHaveClass("w-full", "md:w-[var(--split-pane-width)]");
+    expect(left).toHaveClass("w-full", "@3xl/split-pane:w-[var(--split-pane-width)]");
+    expect(right).toHaveClass("w-full", "@3xl/split-pane:w-[var(--split-pane-width)]");
     expect(left.style.getPropertyValue("--split-pane-width")).toBe("40%");
     expect(right.style.getPropertyValue("--split-pane-width")).toBe("60%");
     const separator = screen.getByRole("separator");
-    expect(separator).toHaveClass("hidden", "md:block");
-    expect(separator.parentElement).toHaveClass("flex-col", "md:flex-row");
+    expect(separator).toHaveClass("hidden", "@3xl/split-pane:block");
+    expect(separator.parentElement).toHaveClass("flex-col", "@3xl/split-pane:flex-row");
+    expect(separator.parentElement!.parentElement).toHaveClass("@container/split-pane");
     expect(screen.getAllByTestId("left")).toHaveLength(1);
     expect(screen.getAllByTestId("right")).toHaveLength(1);
 
@@ -61,5 +62,24 @@ describe("SplitPane", () => {
 
     expect(parseFloat(left.style.getPropertyValue("--split-pane-width"))).toBeCloseTo(55);
     expect(parseFloat(right.style.getPropertyValue("--split-pane-width"))).toBeCloseTo(45);
+  });
+
+  it.each([
+    { mobilePane: "left" as const, shown: "left", hidden: "right" },
+    { mobilePane: "right" as const, shown: "right", hidden: "left" },
+  ])("shows only the $mobilePane pane, full height, while its container is narrow", ({ mobilePane, shown, hidden }) => {
+    render(
+      <SplitPane
+        stackOnMobile
+        mobilePane={mobilePane}
+        left={<div data-testid="left">L</div>}
+        right={<div data-testid="right">R</div>}
+      />,
+    );
+
+    const shownPane = screen.getByTestId(shown).parentElement!;
+    expect(shownPane).toHaveClass("flex-1", "@3xl/split-pane:block");
+    expect(shownPane).not.toHaveClass("max-h-[40%]", "border-b");
+    expect(screen.getByTestId(hidden).parentElement).toHaveClass("hidden", "@3xl/split-pane:block");
   });
 });

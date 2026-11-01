@@ -29,6 +29,7 @@
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "jsdom": "catalog:",
     "playwright": "^1.61.0",
     "storybook": "catalog:",
     "tailwindcss": "catalog:",

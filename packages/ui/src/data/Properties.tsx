@@ -115,19 +115,19 @@ const DENSITY_CLASSES: Record<
     row: "px-density-4 py-density-3",
     label: "text-sm font-medium text-muted-foreground",
     value: "text-base text-foreground",
-    gridTemplateColumns: "minmax(12rem, 20rem) minmax(0, 1fr)",
+    gridTemplateColumns: "minmax(min(12rem, 40%), min(20rem, 50%)) minmax(0, 1fr)",
   },
   comfortable: {
     row: "px-density-3 py-density-2",
     label: "text-xs font-medium text-muted-foreground",
     value: "text-sm text-foreground",
-    gridTemplateColumns: "minmax(7rem, 12rem) minmax(0, 1fr)",
+    gridTemplateColumns: "minmax(min(7rem, 40%), min(12rem, 50%)) minmax(0, 1fr)",
   },
   compact: {
     row: "px-density-2 py-density-1.5",
     label: "font-mono text-[11px] text-muted-foreground",
     value: "text-xs text-foreground",
-    gridTemplateColumns: "minmax(8rem, 14rem) minmax(0, 1fr)",
+    gridTemplateColumns: "minmax(min(8rem, 40%), min(14rem, 50%)) minmax(0, 1fr)",
   },
 };
 

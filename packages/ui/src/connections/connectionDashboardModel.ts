@@ -40,6 +40,9 @@ export type ConnectionDashboardItem = {
   updatedAt: string;
   /** A virtual or read-only connection: the service answers 405 to saving or deleting it. */
   readOnly?: boolean;
+  source?: string;
+  /** Problems loading the connection (e.g. an invalid file); it cannot be used until they are fixed. */
+  warnings?: string[];
 };
 
 export type ConnectionDashboardResponse = {
@@ -80,6 +83,8 @@ export type ConnectionLinkRenderer = (
   connection: ConnectionDashboardItem,
   link: ConnectionLinkProps,
 ) => ReactNode;
+
+export type ConnectionActionsRenderer = (connection: ConnectionDashboardItem) => ReactNode;
 
 /** The react-query key prefix every dashboard listing is cached under. */
 export const CONNECTION_DASHBOARD_QUERY_KEY = "connection-dashboard";

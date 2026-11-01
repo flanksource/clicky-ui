@@ -43,12 +43,15 @@ function Pins({ pins, focusedAnchor, onFocus }: CommentOverlayProps) {
       type="button"
       data-testid="comment-pin"
       onClick={() => onFocus(pin.anchor)}
-      title={`${pin.count} comment${pin.count === 1 ? "" : "s"}`}
+      title={`${pin.count} comment${pin.count === 1 ? "" : "s"}${pin.moved ? " · moved: re-found by a fallback locator" : ""}`}
       style={{ left: pin.box.left + pin.box.width, top: pin.box.top }}
       className={cn(
         "pointer-events-auto absolute grid h-5 min-w-5 -translate-x-1/2 -translate-y-1/2",
+        // A finger needs ~44px; grow the hit area, not the badge.
+        "[@media(pointer:coarse)]:before:absolute [@media(pointer:coarse)]:before:-inset-3 [@media(pointer:coarse)]:before:content-['']",
         "place-items-center rounded-full border px-1 text-[10px] font-semibold shadow-sm",
         "transition-colors",
+        pin.moved && "border-dashed",
         focusedAnchor === pin.anchor
           ? "border-primary bg-primary text-primary-foreground"
           : "border-border bg-background text-foreground hover:border-primary hover:text-primary",

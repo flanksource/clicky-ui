@@ -35,7 +35,7 @@ export type DesignSystemPage = PageMeta & {
 
 export const DESIGN_SYSTEM_PAGES = [
   {
-    slug: "flanksource",
+    slug: "flanksource/brands/flanksource",
     title: "Flanksource",
     description:
       "The foundations and repeatable patterns behind Flanksource product interfaces.",

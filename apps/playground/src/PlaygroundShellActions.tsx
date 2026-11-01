@@ -5,17 +5,25 @@ import {
   cn,
   type DropdownMenuItem,
 } from "@flanksource/clicky-ui";
-import { UiCode2, UiComment, UiFileText } from "@flanksource/clicky-ui/icons";
+import {
+  UiCode2,
+  UiComment,
+  UiDotsVertical,
+  UiFileText,
+} from "@flanksource/clicky-ui/icons";
 
 import { NewPageMenu, type PageAction } from "./editor/PageManagement";
 import { PlaygroundViewActions } from "./PlaygroundViewActions";
 import type { AnnotationVisibility, PlaygroundView } from "./route";
 import { BookmarkletInstall } from "./bookmarklet/BookmarkletInstall";
 import { PlaygroundAgentInstructions } from "./PlaygroundAgentInstructions";
+import { AgentSessionButton } from "./agent-runs/AgentRunsProvider";
 
 export type PlaygroundShellActionsProps = {
   view: PlaygroundView;
   annotations: AnnotationVisibility;
+  showRejected: boolean;
+  onShowRejectedChange: (show: boolean) => void;
   copyDisabled: boolean;
   pageMarkdownCopied: boolean;
   onViewChange: (view: PlaygroundView) => void;
@@ -25,6 +33,8 @@ export type PlaygroundShellActionsProps = {
   filesystemActionsDisabledReason?: string;
   onNewPage: (action: PageAction) => void;
   active: boolean;
+  /** A markdown page has its own Rendered/Source toggle and editor. */
+  markdownPage: boolean;
   editing: boolean;
   sourceDirty: boolean;
   onToggleEditing: () => void;
@@ -36,22 +46,87 @@ export type PlaygroundShellActionsProps = {
   onCopyFeedback: () => void;
   feedbackCopyActions: DropdownMenuItem[];
   pageCommentCount: number;
+  /** The phone overflow row: leaves out what {@link PlaygroundMobileActions} already shows. */
+  overflow?: boolean;
 };
+
+/**
+ * The phone header: the two actions a reviewer reaches for while reading a
+ * page, plus a toggle for the full action set (rendered as a wrapping row).
+ */
+export function PlaygroundMobileActions(
+  props: Pick<
+    PlaygroundShellActionsProps,
+    | "view"
+    | "active"
+    | "onCommentWholePage"
+    | "feedbackCopied"
+    | "onCopyFeedback"
+    | "feedbackCopyActions"
+    | "pageCommentCount"
+  > & { moreOpen: boolean; onToggleMore: () => void },
+) {
+  return (
+    <>
+      {props.view === "preview" && props.active && (
+        <button
+          type="button"
+          onClick={props.onCommentWholePage}
+          aria-label="Comment on page"
+          title="Comment on page"
+          className="inline-flex size-11 items-center justify-center rounded-md border border-border bg-background text-muted-foreground hover:text-foreground"
+        >
+          <UiFileText className="size-4" />
+        </button>
+      )}
+      {props.active && (
+        <SplitButton
+          label={props.feedbackCopied ? "Copied" : "Copy feedback"}
+          onClick={props.onCopyFeedback}
+          items={props.feedbackCopyActions}
+          variant="outline"
+          className="h-11 [&>button]:h-11"
+          primaryDisabled={props.pageCommentCount === 0}
+          title="More copy actions"
+        />
+      )}
+      <button
+        type="button"
+        onClick={props.onToggleMore}
+        aria-expanded={props.moreOpen}
+        aria-label="More actions"
+        title="More actions"
+        className={cn(
+          "inline-flex size-11 items-center justify-center rounded-md border transition-colors",
+          props.moreOpen
+            ? "border-primary bg-primary text-primary-foreground"
+            : "border-border bg-background text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <UiDotsVertical className="size-4" />
+      </button>
+    </>
+  );
+}
 
 export function PlaygroundShellActions(props: PlaygroundShellActionsProps) {
   return (
     <>
       <PlaygroundAgentInstructions />
+      <AgentSessionButton />
       <BookmarkletInstall />
       {props.active && (
         <PlaygroundViewActions
           view={props.view}
           annotations={props.annotations}
+          showRejected={props.showRejected}
+          onShowRejectedChange={props.onShowRejectedChange}
           copyDisabled={props.copyDisabled}
           copied={props.pageMarkdownCopied}
           onViewChange={props.onViewChange}
           onAnnotationsChange={props.onAnnotationsChange}
           onCopy={props.onCopyPage}
+          viewToggle={!props.markdownPage}
         />
       )}
       <NewPageMenu
@@ -59,7 +134,7 @@ export function PlaygroundShellActions(props: PlaygroundShellActionsProps) {
         disabledReason={props.filesystemActionsDisabledReason}
         onSelect={props.onNewPage}
       />
-      {props.active && (
+      {props.active && !props.markdownPage && (
         <button
           type="button"
           onClick={props.onToggleEditing}
@@ -97,26 +172,30 @@ export function PlaygroundShellActions(props: PlaygroundShellActionsProps) {
             <UiComment className="size-3.5" />
             Review resolved ({props.reviewCount})
           </button>
-          <button
-            type="button"
-            onClick={props.onCommentWholePage}
-            disabled={!props.active}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40"
-          >
-            <UiFileText className="size-3.5" />
-            Comment on page
-          </button>
+          {!props.overflow && (
+            <button
+              type="button"
+              onClick={props.onCommentWholePage}
+              disabled={!props.active}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-40"
+            >
+              <UiFileText className="size-3.5" />
+              Comment on page
+            </button>
+          )}
         </>
       )}
-      <SplitButton
-        label={props.feedbackCopied ? "Copied" : "Copy feedback"}
-        onClick={props.onCopyFeedback}
-        items={props.feedbackCopyActions}
-        variant="outline"
-        size="sm"
-        primaryDisabled={props.pageCommentCount === 0}
-        title="More copy actions"
-      />
+      {!props.overflow && (
+        <SplitButton
+          label={props.feedbackCopied ? "Copied" : "Copy feedback"}
+          onClick={props.onCopyFeedback}
+          items={props.feedbackCopyActions}
+          variant="outline"
+          size="sm"
+          primaryDisabled={props.pageCommentCount === 0}
+          title="More copy actions"
+        />
+      )}
       <ThemeSwitcher />
       <DensitySwitcher />
     </>

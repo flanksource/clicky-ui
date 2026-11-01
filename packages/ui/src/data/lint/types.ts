@@ -5,6 +5,7 @@
 
 import type { FilterState } from "../test-runner/filterState";
 import type { LintSeverity } from "../test-runner/marks";
+import { formatRelativeTime } from "../cells/timestamp-format";
 
 export type { LintSeverity };
 
@@ -14,6 +15,10 @@ export type Violation = {
   raw_file?: string | undefined;
   line?: number;
   column?: number;
+  /** Last line of the flagged range, when the linter reports one. */
+  end_line?: number;
+  /** Column just past the flagged range on `end_line`, when reported. */
+  end_column?: number;
   message?: string;
   source?: string;
   rule?: {
@@ -27,6 +32,19 @@ export type Violation = {
   /** The offending source snippet, not a rule id. */
   code?: string;
   fixable?: boolean;
+  /**
+   * Every place one fix resolves (gavel models.ViolationLocation), `file` and
+   * `line` naming the first; absent for a violation found at one place.
+   */
+  locations?: ViolationLocation[];
+};
+
+export type ViolationLocation = {
+  file: string;
+  line?: number;
+  column?: number;
+  /** What is at this place, e.g. the statement a plan finding came from. */
+  message?: string;
 };
 
 export type LinterResult = {
@@ -48,7 +66,37 @@ export type LinterResult = {
   error?: string;
   file_count?: number;
   rule_count?: number;
+  /**
+   * Set while the linter is in flight: `pending` (queued, not launched) or
+   * `running`. Absent once it has finished, so a finished result never carries it.
+   */
+  status?: LinterStatus;
+  /** Where the result came from when its linter answered from its own cache (gavel linters.ResultProvenance). */
+  cache?: LintResultProvenance;
+  /** The prompt run that produced (or is producing) this result, for hosts that can follow it. */
+  run_id?: string;
+  /** The agent session behind that run, kept so a replayed snapshot still names it. */
+  session_id?: string;
 };
+
+export type LinterStatus = "pending" | "running";
+
+export type LintResultProvenance = {
+  /** What `fingerprint` is computed from: "build" (the linter's input digest) or "uir" (a UIR symbol closure). */
+  source: string;
+  fingerprint?: string;
+  /** When the oldest reused entry was linted. */
+  stored_at: string;
+  /** True only when the whole result came from the cache. */
+  hit: boolean;
+};
+
+/** A full cache hit's age, e.g. "3h ago"; undefined for a fresh or partly cached result. */
+export function cachedAge(result: LinterResult | undefined, now: Date = new Date()): string | undefined {
+  const cache = result?.cache;
+  if (!cache?.hit) return undefined;
+  return formatRelativeTime(new Date(cache.stored_at), now);
+}
 
 export type LintGrouping = "linter-rule-file" | "linter-file" | "file-linter-rule" | "summary";
 
@@ -91,6 +139,12 @@ export type LintNode = {
   target_path?: string | undefined;
   work_dir?: string | undefined;
   linterName?: string | undefined;
+  /**
+   * For a linter published as `<parent>/<child>` beneath an existing `<parent>`
+   * result: the parent's linter name. `name` is then just the child part and
+   * `linterName` stays the full result name.
+   */
+  nestedUnder?: string | undefined;
   ruleName?: string | undefined;
   linter?: LinterResult | undefined;
   violations?: Violation[] | undefined;
@@ -107,6 +161,8 @@ export type LintIgnoreRequest = {
   source?: string | undefined;
   rule?: string | undefined;
   file?: string | undefined;
+  /** Narrows a `file` ignore to the violation on this 1-based line. */
+  line?: number | undefined;
   work_dir?: string | undefined;
 };
 

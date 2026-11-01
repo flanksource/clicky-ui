@@ -73,15 +73,12 @@ export function useDebouncedMultiDraft(
   }, [onChange]);
 
   useEffect(() => {
-    if (!sameMultiFilterValue(latestValue.current, value)) {
-      latestValue.current = value;
+    const externalChange = !sameMultiFilterValue(latestValue.current, value);
+    latestValue.current = value;
+    if (externalChange) {
       setDraft(value);
       return;
     }
-    latestValue.current = value;
-  }, [valueKey, value]);
-
-  useEffect(() => {
     if (sameMultiFilterValue(draft, value)) return;
 
     if (!autoSubmit) {

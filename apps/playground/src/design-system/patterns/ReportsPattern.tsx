@@ -14,9 +14,8 @@
  * controls the reader cannot see.
  */
 
-import { Callout } from "@flanksource/clicky-ui";
+import { BarChart, Callout, StackedBarChart } from "@flanksource/clicky-ui";
 
-import { BarSeries, Legend, StackedBar } from "./dataviz-marks";
 import { PracticeGrid, type Practice } from "../practice/PracticeGrid";
 
 import "./dataviz-palette.css";
@@ -104,8 +103,14 @@ function ReportSheet() {
 
       <section className="space-y-2">
         <h5 className="text-sm font-semibold text-foreground">Severity mix</h5>
-        <StackedBar points={MIX} />
-        <Legend points={MIX} />
+        <StackedBarChart
+          categories={["Findings"]}
+          height={36}
+          legend
+          orientation="horizontal"
+          series={MIX.map((row) => ({ label: row.label, values: [row.value] }))}
+          width={672}
+        />
         {/* The table is not an accessibility afterthought — it is how the figure
             survives being printed. */}
         <table className="w-full text-xs">
@@ -132,12 +137,7 @@ function ReportSheet() {
 
       <section className="space-y-2">
         <h5 className="text-sm font-semibold text-foreground">Concentration by service</h5>
-        <BarSeries height={110} points={BY_SERVICE} slot={0} />
-        <div className="flex justify-between text-[10px] text-muted-foreground">
-          {BY_SERVICE.map((row) => (
-            <span key={row.label}>{row.label}</span>
-          ))}
-        </div>
+        <BarChart data={BY_SERVICE} height={140} orientation="vertical" width={672} />
         <p className="text-[11px] leading-4 text-muted-foreground">
           Top six of 61 services. The remaining 55 hold 539 findings between them and are not shown —
           named here rather than silently dropped.

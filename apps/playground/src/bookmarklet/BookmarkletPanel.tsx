@@ -18,6 +18,8 @@ import {
 import { commentsToMarkdown } from "../comments/markdown";
 import { tallyAnchors } from "../comments/useDomAnchors";
 import { PlaygroundCommentReview } from "../comments/PlaygroundCommentReview";
+import { AgentRunsProvider, useAgentRuns } from "../agent-runs/AgentRunsProvider";
+import { AgentTargetPicker } from "../agent-runs/AgentTargetPicker";
 import {
   EXTERNAL_PAGES_ROUTE,
   externalUrl,
@@ -256,6 +258,8 @@ function SessionRail({
       onReply={comments.reply}
       onUpdateStatus={comments.updateStatus}
       onClose={comments.close}
+      onAcknowledge={comments.acknowledge}
+      onAssign={comments.assign}
       onDelete={comments.remove}
       onUpdateRating={comments.updateRating}
       onScrollToAnchor={navigate}
@@ -264,22 +268,24 @@ function SessionRail({
           ?.top ?? null
       }
     >
-      {comments.error && (
-        <p role="alert" className="text-sm text-destructive">
-          {comments.error}
-        </p>
-      )}
-      <RailContents
-        page={page}
-        state={state}
-        visible={visible}
-        anchors={anchors}
-        comments={comments.allComments.filter(
-          (value) => value.page === page.id,
+      <AgentRunsProvider runAgent={comments.runAgent} page={page.id}>
+        {comments.error && (
+          <p role="alert" className="text-sm text-destructive">
+            {comments.error}
+          </p>
         )}
-        onReopen={comments.commentAndReopen}
-        {...(focus ? { focus } : {})}
-      />
+        <RailContents
+          page={page}
+          state={state}
+          visible={visible}
+          anchors={anchors}
+          comments={comments.allComments.filter(
+            (value) => value.page === page.id,
+          )}
+          onReopen={comments.commentAndReopen}
+          {...(focus ? { focus } : {})}
+        />
+      </AgentRunsProvider>
     </CommentProvider>
   );
 }
@@ -300,6 +306,7 @@ function RailContents({
   onReopen: (id: string, body: string) => Promise<void>;
 }) {
   const ctx = useCommentContext();
+  const agentRuns = useAgentRuns();
   const [review, setReview] = useState(false);
   const [selected, setSelected] = useState<string>();
   const labels = Object.fromEntries(
@@ -336,6 +343,7 @@ function RailContents({
       screenshotUrl: (url) => new URL(url, location.origin).href,
       commentActionUrls: (id) => ({
         reply: `${location.origin}/__playground/comments/${encodeURIComponent(id)}/replies`,
+        acknowledge: `${location.origin}/__playground/comments/${encodeURIComponent(id)}/acknowledge`,
         resolve: `${location.origin}/__playground/comments/${encodeURIComponent(id)}/resolve`,
       }),
     });
@@ -351,6 +359,9 @@ function RailContents({
       <p className="mb-3 break-all text-xs text-muted-foreground">
         {state.url}
       </p>
+      <div className="mb-3">
+        <AgentTargetPicker />
+      </div>
       <div className="mb-3 flex flex-wrap gap-2">
         <Button
           size="sm"
@@ -422,7 +433,13 @@ function RailContents({
                 : "Post comment",
             },
           ]}
-          renderRootDetails={(comment) => <CommentCapture comment={comment} />}
+          extraAssignItems={agentRuns.extraAssignItems}
+          renderRootDetails={(comment) => (
+            <>
+              <CommentCapture comment={comment} />
+              {agentRuns.renderRunDetails(comment)}
+            </>
+          )}
           threadToMarkdown={markdown}
         />
       )}

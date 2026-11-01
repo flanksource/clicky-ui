@@ -31,7 +31,7 @@
         "skipHooks": true
       },
       "mode": "cmux",
-      "model": "anthropic/claude-sonnet-5",
+      "model": "claude-sonnet-5-5",
       "noCache": true,
       "permissions": {
         "mcp": {
@@ -82,9 +82,9 @@
   },
   "models": [
     {
-      "id": "claude-opus-5",
+      "id": "claude-opus-5-5",
       "provider": "anthropic",
-      "label": "Claude Opus 5",
+      "label": "Claude Opus 5.5",
       "capabilitiesKnown": true,
       "reasoning": true,
       "temperature": false,
@@ -95,13 +95,65 @@
         "xhigh",
         "max"
       ],
+      "defaultEffort": "medium",
       "configured": true,
       "modes": [
+        "api",
         "agent",
         "cli"
       ],
       "runtime": {
-        "model": "claude-opus-5"
+        "model": "claude-opus-5-5"
+      }
+    },
+    {
+      "id": "claude-haiku-5-5",
+      "provider": "anthropic",
+      "label": "Claude Haiku 5.5",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": false,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "defaultEffort": "medium",
+      "configured": true,
+      "modes": [
+        "api",
+        "agent",
+        "cli"
+      ],
+      "runtime": {
+        "model": "claude-haiku-5-5"
+      }
+    },
+    {
+      "id": "claude-sonnet-5-5",
+      "provider": "anthropic",
+      "label": "Claude Sonnet 5.5",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": false,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "defaultEffort": "high",
+      "configured": true,
+      "modes": [
+        "api",
+        "agent",
+        "cli"
+      ],
+      "runtime": {
+        "model": "claude-sonnet-5-5"
       }
     },
     {
@@ -121,6 +173,7 @@
       "defaultEffort": "high",
       "configured": true,
       "modes": [
+        "api",
         "agent",
         "cli"
       ],
@@ -129,19 +182,49 @@
       }
     },
     {
-      "id": "claude-haiku-4-5",
+      "id": "claude-opus-5",
       "provider": "anthropic",
-      "label": "Claude Haiku 4.5 (latest)",
+      "label": "Claude Opus 5",
       "capabilitiesKnown": true,
       "reasoning": true,
-      "temperature": true,
+      "temperature": false,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "configured": true,
+      "modes": [
+        "api"
+      ],
+      "runtime": {
+        "model": "claude-opus-5"
+      }
+    },
+    {
+      "id": "gpt-6.1-sol",
+      "provider": "openai",
+      "label": "GPT-6.1-Sol",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": false,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "defaultEffort": "medium",
       "configured": true,
       "modes": [
         "agent",
         "cli"
       ],
       "runtime": {
-        "model": "claude-haiku-4-5"
+        "model": "gpt-6.1-sol"
       }
     },
     {
@@ -165,6 +248,52 @@
       ],
       "runtime": {
         "model": "gpt-6-astra"
+      }
+    },
+    {
+      "id": "gpt-6-sol",
+      "provider": "openai",
+      "label": "GPT-6-Sol",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": false,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "configured": true,
+      "modes": [
+        "agent",
+        "cli"
+      ],
+      "runtime": {
+        "model": "gpt-6-sol"
+      }
+    },
+    {
+      "id": "gpt-6-luna",
+      "provider": "openai",
+      "label": "GPT-6-Luna",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": false,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "configured": true,
+      "modes": [
+        "agent",
+        "cli"
+      ],
+      "runtime": {
+        "model": "gpt-6-luna"
       }
     },
     {
@@ -239,31 +368,96 @@
       }
     },
     {
-      "id": "gpt-5.5",
-      "provider": "openai",
-      "label": "GPT-5.5",
+      "id": "gemini-3.8-flash",
+      "provider": "google",
+      "label": "Gemini 3.8 Flash",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": true,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "configured": true,
+      "modes": [
+        "api",
+        "cli"
+      ],
+      "runtime": {
+        "model": "gemini-3.8-flash"
+      }
+    },
+    {
+      "id": "gemini-4-argon",
+      "provider": "google",
+      "label": "Gemini 4 Argon",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": true,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "configured": true,
+      "modes": [
+        "api",
+        "cli"
+      ],
+      "runtime": {
+        "model": "gemini-4-argon"
+      }
+    },
+    {
+      "id": "nano-banana-pro-preview",
+      "provider": "google",
+      "label": "nano-banana-pro-preview",
+      "capabilitiesKnown": true,
+      "reasoning": false,
+      "temperature": false,
+      "configured": true,
+      "modes": [
+        "api"
+      ],
+      "runtime": {
+        "model": "nano-banana-pro-preview"
+      }
+    },
+    {
+      "id": "lyria-3.5",
+      "provider": "google",
+      "label": "lyria-3.5",
+      "capabilitiesKnown": true,
+      "reasoning": false,
+      "temperature": false,
+      "configured": true,
+      "modes": [
+        "api"
+      ],
+      "runtime": {
+        "model": "lyria-3.5"
+      }
+    },
+    {
+      "id": "gemini-nano-banana-2.1",
+      "provider": "google",
+      "label": "gemini-nano-banana-2.1",
       "capabilitiesKnown": true,
       "reasoning": true,
       "temperature": false,
-      "supportedEfforts": [
-        "low",
-        "medium",
-        "high",
-        "xhigh"
-      ],
       "configured": true,
       "modes": [
-        "agent",
-        "cli"
+        "api"
       ],
       "runtime": {
-        "model": "gpt-5.5"
+        "model": "gemini-nano-banana-2.1"
       }
     },
     {
-      "id": "gemini-3.6-flash",
+      "id": "gemini-flash-latest",
       "provider": "google",
-      "label": "Gemini 3.6 Flash",
+      "label": "gemini-flash-latest",
       "capabilitiesKnown": true,
       "reasoning": true,
       "temperature": true,
@@ -274,16 +468,16 @@
       ],
       "configured": true,
       "modes": [
-        "cli"
+        "api"
       ],
       "runtime": {
-        "model": "gemini-3.6-flash"
+        "model": "gemini-flash-latest"
       }
     },
     {
-      "id": "gemini-3.5-flash",
+      "id": "gemini-3.5-flash-lite",
       "provider": "google",
-      "label": "Gemini 3.5 Flash",
+      "label": "gemini-3.5-flash-lite",
       "capabilitiesKnown": true,
       "reasoning": true,
       "temperature": true,
@@ -294,10 +488,85 @@
       ],
       "configured": true,
       "modes": [
-        "cli"
+        "api"
       ],
       "runtime": {
-        "model": "gemini-3.5-flash"
+        "model": "gemini-3.5-flash-lite"
+      }
+    },
+    {
+      "id": "antigravity-preview-latest",
+      "provider": "google",
+      "label": "antigravity-preview-latest",
+      "capabilitiesKnown": true,
+      "reasoning": false,
+      "temperature": false,
+      "configured": true,
+      "modes": [
+        "api"
+      ],
+      "runtime": {
+        "model": "antigravity-preview-latest"
+      }
+    },
+    {
+      "id": "antigravity-preview-09-2026",
+      "provider": "google",
+      "label": "antigravity-preview-09-2026",
+      "capabilitiesKnown": true,
+      "reasoning": false,
+      "temperature": false,
+      "configured": true,
+      "modes": [
+        "api"
+      ],
+      "runtime": {
+        "model": "antigravity-preview-09-2026"
+      }
+    },
+    {
+      "id": "antigravity-preview-05-2026",
+      "provider": "google",
+      "label": "antigravity-preview-05-2026",
+      "capabilitiesKnown": true,
+      "reasoning": false,
+      "temperature": false,
+      "configured": true,
+      "modes": [
+        "api"
+      ],
+      "runtime": {
+        "model": "antigravity-preview-05-2026"
+      }
+    },
+    {
+      "id": "deepseek-flash",
+      "provider": "deepseek",
+      "label": "DeepSeek V4.1 Flash 1017",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": true,
+      "configured": true,
+      "modes": [
+        "api"
+      ],
+      "runtime": {
+        "model": "deepseek-flash"
+      }
+    },
+    {
+      "id": "deepseek-v4-pro",
+      "provider": "deepseek",
+      "label": "DeepSeek V4 Pro",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": true,
+      "configured": true,
+      "modes": [
+        "api"
+      ],
+      "runtime": {
+        "model": "deepseek-v4-pro"
       }
     }
   ],
@@ -342,11 +611,18 @@
             },
             "type": "array"
           },
+          "inputSchemaJSON": true,
+          "inputSchemaType": {
+            "type": "string"
+          },
           "metadata": {
             "additionalProperties": {
               "type": "string"
             },
             "type": "object"
+          },
+          "outputSchemaType": {
+            "type": "string"
           },
           "schemaJSON": true,
           "schemaStrictness": {
@@ -358,6 +634,7 @@
           "system": {
             "type": "string"
           },
+          "typeSafeQuestions": true,
           "user": {
             "type": "string"
           }
@@ -378,6 +655,9 @@
         "type": "string"
       },
       "APIURL": {
+        "type": "string"
+      },
+      "Access": {
         "type": "string"
       },
       "AllowedTools": {
@@ -469,6 +749,12 @@
       "PermissionMode": {
         "type": "string"
       },
+      "Perms": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
       "Preset": {
         "items": {
           "type": "string"
@@ -527,6 +813,7 @@
       "Resume",
       "Edit",
       "PermissionMode",
+      "Access",
       "NoMCP",
       "NoHooks",
       "NoSkills",
@@ -549,7 +836,105 @@
       "authenticated": true,
       "kind": "api",
       "mode": "api",
-      "modelError": "anthropic: anthropic models: transport request failed",
+      "modelDetails": [
+        {
+          "id": "claude-opus-5-5",
+          "label": "Claude Opus 5.5",
+          "provider": "anthropic",
+          "mode": "api",
+          "releaseDate": "2026-09-22",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultEffort": "medium",
+          "priority": 1
+        },
+        {
+          "id": "claude-haiku-5-5",
+          "label": "Claude Haiku 5.5",
+          "provider": "anthropic",
+          "mode": "api",
+          "releaseDate": "2026-10-07",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultEffort": "medium"
+        },
+        {
+          "id": "claude-sonnet-5-5",
+          "label": "Claude Sonnet 5.5",
+          "provider": "anthropic",
+          "mode": "api",
+          "releaseDate": "2026-09-28",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultEffort": "high"
+        },
+        {
+          "id": "claude-fable-5-1",
+          "label": "Claude Fable 5.1",
+          "provider": "anthropic",
+          "mode": "api",
+          "releaseDate": "2026-09-01",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultEffort": "high"
+        },
+        {
+          "id": "claude-opus-5",
+          "label": "Claude Opus 5",
+          "provider": "anthropic",
+          "mode": "api",
+          "releaseDate": "2026-07-24",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        }
+      ],
+      "models": [
+        "claude-opus-5-5",
+        "claude-haiku-5-5",
+        "claude-sonnet-5-5",
+        "claude-fable-5-1",
+        "claude-opus-5"
+      ],
       "permissions": {
         "modes": {
           "acceptEdits": {
@@ -623,7 +1008,7 @@
             "ask": {
               "kind": "requires-broker",
               "effects": {
-                "note": "enforced through Config.CanUseTool when a broker is attached"
+                "note": "enforced through Config.OnApproval when a broker is attached"
               }
             },
             "auto": {
@@ -703,6 +1088,17 @@
               }
             }
           }
+        },
+        "access": {
+          "full": {
+            "kind": "native"
+          },
+          "read-only": {
+            "kind": "native",
+            "effects": {
+              "note": "no built-in file tools to restrict; caller tools stay governed by toolPolicy"
+            }
+          }
         }
       },
       "provider": "anthropic",
@@ -718,11 +1114,11 @@
       "mode": "agent",
       "modelDetails": [
         {
-          "id": "claude-opus-5",
-          "label": "Claude Opus 5",
+          "id": "claude-opus-5-5",
+          "label": "Claude Opus 5.5",
           "provider": "anthropic",
           "mode": "agent",
-          "releaseDate": "2026-07-24",
+          "releaseDate": "2026-09-22",
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": false,
@@ -740,7 +1136,58 @@
             "xhigh",
             "max"
           ],
+          "defaultEffort": "medium",
           "priority": 1
+        },
+        {
+          "id": "claude-haiku-5-5",
+          "label": "Claude Haiku 5.5",
+          "provider": "anthropic",
+          "mode": "agent",
+          "releaseDate": "2026-10-07",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "inputMediaTypes": [
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp",
+            "application/pdf"
+          ],
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultEffort": "medium"
+        },
+        {
+          "id": "claude-sonnet-5-5",
+          "label": "Claude Sonnet 5.5",
+          "provider": "anthropic",
+          "mode": "agent",
+          "releaseDate": "2026-09-28",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "inputMediaTypes": [
+            "image/png",
+            "image/jpeg",
+            "image/gif",
+            "image/webp",
+            "application/pdf"
+          ],
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultEffort": "high"
         },
         {
           "id": "claude-fable-5-1",
@@ -766,29 +1213,13 @@
             "max"
           ],
           "defaultEffort": "high"
-        },
-        {
-          "id": "claude-haiku-4-5",
-          "label": "Claude Haiku 4.5 (latest)",
-          "provider": "anthropic",
-          "mode": "agent",
-          "releaseDate": "2025-10-15",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": true,
-          "inputMediaTypes": [
-            "image/png",
-            "image/jpeg",
-            "image/gif",
-            "image/webp",
-            "application/pdf"
-          ]
         }
       ],
       "models": [
-        "claude-opus-5",
-        "claude-fable-5-1",
-        "claude-haiku-4-5"
+        "claude-opus-5-5",
+        "claude-haiku-5-5",
+        "claude-sonnet-5-5",
+        "claude-fable-5-1"
       ],
       "permissions": {
         "modes": {
@@ -865,7 +1296,7 @@
             "ask": {
               "kind": "requires-broker",
               "effects": {
-                "note": "enforced through Config.CanUseTool when a broker is attached"
+                "note": "enforced through Config.OnApproval when a broker is attached"
               }
             },
             "auto": {
@@ -946,24 +1377,44 @@
             }
           }
         },
+        "access": {
+          "full": {
+            "kind": "native"
+          },
+          "read-only": {
+            "kind": "native",
+            "effects": {
+              "flag": "--disallowedTools",
+              "note": "denies every edit, write and shell carrier plus the tools that act outside the agent's process (sub-agents and teams, SendMessage to peer sessions, RemoteTrigger, CronCreate/CronDelete, Enter/ExitWorktree), and disables third-party MCP servers"
+            }
+          }
+        },
         "tools": [
           "Agent",
           "AskUserQuestion",
           "Bash",
           "BashOutput",
+          "CronCreate",
+          "CronDelete",
+          "CronList",
           "DesignSync",
           "Edit",
           "EnterPlanMode",
+          "EnterWorktree",
           "ExitPlanMode",
+          "ExitWorktree",
           "Glob",
           "Grep",
           "KillShell",
+          "ListAgents",
           "Monitor",
           "MultiEdit",
           "NotebookEdit",
           "PushNotification",
           "Read",
+          "RemoteTrigger",
           "ScheduleWakeup",
+          "SendMessage",
           "Skill",
           "Task",
           "TaskCreate",
@@ -972,6 +1423,8 @@
           "TaskOutput",
           "TaskStop",
           "TaskUpdate",
+          "TeamCreate",
+          "TeamDelete",
           "TodoWrite",
           "ToolSearch",
           "WebFetch",
@@ -988,16 +1441,16 @@
         "ANTHROPIC_API_KEY"
       ],
       "authenticated": true,
-      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/E8504C34-EA28-4D2E-B73E-1247F22E71C7/claude",
+      "binary": "/Users/moshe/.cmuxterm/cmux-cli-shims/24589DC2-E866-410B-ABED-C61117D59BD2/claude",
       "kind": "cli",
       "mode": "cli",
       "modelDetails": [
         {
-          "id": "claude-opus-5",
-          "label": "Claude Opus 5",
+          "id": "claude-opus-5-5",
+          "label": "Claude Opus 5.5",
           "provider": "anthropic",
           "mode": "cli",
-          "releaseDate": "2026-07-24",
+          "releaseDate": "2026-09-22",
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": false,
@@ -1008,7 +1461,44 @@
             "xhigh",
             "max"
           ],
+          "defaultEffort": "medium",
           "priority": 1
+        },
+        {
+          "id": "claude-haiku-5-5",
+          "label": "Claude Haiku 5.5",
+          "provider": "anthropic",
+          "mode": "cli",
+          "releaseDate": "2026-10-07",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultEffort": "medium"
+        },
+        {
+          "id": "claude-sonnet-5-5",
+          "label": "Claude Sonnet 5.5",
+          "provider": "anthropic",
+          "mode": "cli",
+          "releaseDate": "2026-09-28",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultEffort": "high"
         },
         {
           "id": "claude-fable-5-1",
@@ -1027,22 +1517,13 @@
             "max"
           ],
           "defaultEffort": "high"
-        },
-        {
-          "id": "claude-haiku-4-5",
-          "label": "Claude Haiku 4.5 (latest)",
-          "provider": "anthropic",
-          "mode": "cli",
-          "releaseDate": "2025-10-15",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": true
         }
       ],
       "models": [
-        "claude-opus-5",
-        "claude-fable-5-1",
-        "claude-haiku-4-5"
+        "claude-opus-5-5",
+        "claude-haiku-5-5",
+        "claude-sonnet-5-5",
+        "claude-fable-5-1"
       ],
       "permissions": {
         "modes": {
@@ -1107,24 +1588,24 @@
           },
           "caller": {
             "allow": {
-              "kind": "unsupported",
+              "kind": "native",
               "effects": {
-                "note": "no tool filter for this source"
+                "flag": "registered without an approval gate"
               }
             },
             "ask": {
-              "kind": "unsupported",
+              "kind": "requires-broker",
               "effects": {
-                "note": "no per-tool prompt for this source"
+                "note": "enforced through Config.OnApproval when a broker is attached"
               }
             },
             "auto": {
               "kind": "native"
             },
             "deny": {
-              "kind": "unsupported",
+              "kind": "native",
               "effects": {
-                "note": "no tool filter for this source"
+                "flag": "omitted from the served tool list"
               }
             }
           },
@@ -1196,24 +1677,44 @@
             }
           }
         },
+        "access": {
+          "full": {
+            "kind": "native"
+          },
+          "read-only": {
+            "kind": "native",
+            "effects": {
+              "flag": "--disallowedTools",
+              "note": "denies every edit, write and shell carrier plus the tools that act outside the agent's process (sub-agents and teams, SendMessage to peer sessions, RemoteTrigger, CronCreate/CronDelete, Enter/ExitWorktree), and disables third-party MCP servers"
+            }
+          }
+        },
         "tools": [
           "Agent",
           "AskUserQuestion",
           "Bash",
           "BashOutput",
+          "CronCreate",
+          "CronDelete",
+          "CronList",
           "DesignSync",
           "Edit",
           "EnterPlanMode",
+          "EnterWorktree",
           "ExitPlanMode",
+          "ExitWorktree",
           "Glob",
           "Grep",
           "KillShell",
+          "ListAgents",
           "Monitor",
           "MultiEdit",
           "NotebookEdit",
           "PushNotification",
           "Read",
+          "RemoteTrigger",
           "ScheduleWakeup",
+          "SendMessage",
           "Skill",
           "Task",
           "TaskCreate",
@@ -1222,6 +1723,8 @@
           "TaskOutput",
           "TaskStop",
           "TaskUpdate",
+          "TeamCreate",
+          "TeamDelete",
           "TodoWrite",
           "ToolSearch",
           "WebFetch",
@@ -1240,7 +1743,6 @@
       "authenticated": true,
       "kind": "api",
       "mode": "api",
-      "modelError": "openai: openai models: transport request failed",
       "permissions": {
         "modes": {
           "acceptEdits": {
@@ -1314,7 +1816,7 @@
             "ask": {
               "kind": "requires-broker",
               "effects": {
-                "note": "enforced through Config.CanUseTool when a broker is attached"
+                "note": "enforced through Config.OnApproval when a broker is attached"
               }
             },
             "auto": {
@@ -1394,6 +1896,17 @@
               }
             }
           }
+        },
+        "access": {
+          "full": {
+            "kind": "native"
+          },
+          "read-only": {
+            "kind": "native",
+            "effects": {
+              "note": "no built-in file tools to restrict; caller tools stay governed by toolPolicy"
+            }
+          }
         }
       },
       "provider": "openai",
@@ -1404,10 +1917,29 @@
         "OPENAI_API_KEY"
       ],
       "authenticated": true,
-      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/E8504C34-EA28-4D2E-B73E-1247F22E71C7/codex",
+      "binary": "/Users/moshe/.cmuxterm/cmux-cli-shims/24589DC2-E866-410B-ABED-C61117D59BD2/codex",
       "kind": "cli",
       "mode": "agent",
       "modelDetails": [
+        {
+          "id": "gpt-6.1-sol",
+          "label": "GPT-6.1-Sol",
+          "provider": "openai",
+          "mode": "agent",
+          "releaseDate": "2026-09-29",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultEffort": "medium",
+          "priority": 1
+        },
         {
           "id": "gpt-6-astra",
           "label": "GPT-6-Astra",
@@ -1424,7 +1956,43 @@
             "xhigh",
             "max"
           ],
-          "priority": 1
+          "priority": 2
+        },
+        {
+          "id": "gpt-6-sol",
+          "label": "GPT-6-Sol",
+          "provider": "openai",
+          "mode": "agent",
+          "releaseDate": "2026-09-22",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "priority": 4
+        },
+        {
+          "id": "gpt-6-luna",
+          "label": "GPT-6-Luna",
+          "provider": "openai",
+          "mode": "agent",
+          "releaseDate": "2026-09-22",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "priority": 5
         },
         {
           "id": "gpt-5.6-sol",
@@ -1443,7 +2011,7 @@
             "max",
             "ultra"
           ],
-          "priority": 4
+          "priority": 6
         },
         {
           "id": "gpt-5.6-terra",
@@ -1462,7 +2030,7 @@
             "max",
             "ultra"
           ],
-          "priority": 7
+          "priority": 8
         },
         {
           "id": "gpt-5.6-luna",
@@ -1480,32 +2048,17 @@
             "xhigh",
             "max"
           ],
-          "priority": 8
-        },
-        {
-          "id": "gpt-5.5",
-          "label": "GPT-5.5",
-          "provider": "openai",
-          "mode": "agent",
-          "releaseDate": "2026-04-23",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh"
-          ],
-          "priority": 12
+          "priority": 9
         }
       ],
       "models": [
+        "gpt-6.1-sol",
         "gpt-6-astra",
+        "gpt-6-sol",
+        "gpt-6-luna",
         "gpt-5.6-sol",
         "gpt-5.6-terra",
-        "gpt-5.6-luna",
-        "gpt-5.5"
+        "gpt-5.6-luna"
       ],
       "permissions": {
         "modes": {
@@ -1529,7 +2082,7 @@
             "effects": {
               "approval": "never",
               "reviewer": "user",
-              "note": "approval prompts are disabled without changing the configured sandbox isolation"
+              "note": "approval prompts are disabled without lifting sandbox isolation; with no sandbox requested it writes the workspace"
             }
           },
           "default": {
@@ -1589,7 +2142,7 @@
             "ask": {
               "kind": "requires-broker",
               "effects": {
-                "note": "enforced through Config.CanUseTool when a broker is attached"
+                "note": "enforced through Config.OnApproval when a broker is attached"
               }
             },
             "auto": {
@@ -1670,6 +2223,19 @@
             }
           }
         },
+        "access": {
+          "full": {
+            "kind": "native"
+          },
+          "read-only": {
+            "kind": "native",
+            "effects": {
+              "sandbox": "read-only",
+              "approval": "never",
+              "note": "the shell stays as codex's read path, confined by the read-only sandbox; third-party MCP servers are disabled; execpolicy allow rules, which run commands outside the sandbox, are kept out with --ignore-rules on exec and an isolated CODEX_HOME on the app-server and cmux"
+            }
+          }
+        },
         "tools": [
           "apply_patch",
           "close_agent",
@@ -1695,10 +2261,29 @@
         "OPENAI_API_KEY"
       ],
       "authenticated": true,
-      "binary": "/var/folders/ww/yzzdt3j11fxff_154l2mq2200000gn/T/cmux-cli-shims/E8504C34-EA28-4D2E-B73E-1247F22E71C7/codex",
+      "binary": "/Users/moshe/.cmuxterm/cmux-cli-shims/24589DC2-E866-410B-ABED-C61117D59BD2/codex",
       "kind": "cli",
       "mode": "cli",
       "modelDetails": [
+        {
+          "id": "gpt-6.1-sol",
+          "label": "GPT-6.1-Sol",
+          "provider": "openai",
+          "mode": "cli",
+          "releaseDate": "2026-09-29",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultEffort": "medium",
+          "priority": 1
+        },
         {
           "id": "gpt-6-astra",
           "label": "GPT-6-Astra",
@@ -1715,7 +2300,43 @@
             "xhigh",
             "max"
           ],
-          "priority": 1
+          "priority": 2
+        },
+        {
+          "id": "gpt-6-sol",
+          "label": "GPT-6-Sol",
+          "provider": "openai",
+          "mode": "cli",
+          "releaseDate": "2026-09-22",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "priority": 4
+        },
+        {
+          "id": "gpt-6-luna",
+          "label": "GPT-6-Luna",
+          "provider": "openai",
+          "mode": "cli",
+          "releaseDate": "2026-09-22",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "priority": 5
         },
         {
           "id": "gpt-5.6-sol",
@@ -1734,7 +2355,7 @@
             "max",
             "ultra"
           ],
-          "priority": 4
+          "priority": 6
         },
         {
           "id": "gpt-5.6-terra",
@@ -1753,7 +2374,7 @@
             "max",
             "ultra"
           ],
-          "priority": 7
+          "priority": 8
         },
         {
           "id": "gpt-5.6-luna",
@@ -1771,32 +2392,17 @@
             "xhigh",
             "max"
           ],
-          "priority": 8
-        },
-        {
-          "id": "gpt-5.5",
-          "label": "GPT-5.5",
-          "provider": "openai",
-          "mode": "cli",
-          "releaseDate": "2026-04-23",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh"
-          ],
-          "priority": 12
+          "priority": 9
         }
       ],
       "models": [
+        "gpt-6.1-sol",
         "gpt-6-astra",
+        "gpt-6-sol",
+        "gpt-6-luna",
         "gpt-5.6-sol",
         "gpt-5.6-terra",
-        "gpt-5.6-luna",
-        "gpt-5.5"
+        "gpt-5.6-luna"
       ],
       "permissions": {
         "modes": {
@@ -1820,7 +2426,7 @@
             "effects": {
               "approval": "never",
               "reviewer": "user",
-              "note": "approval prompts are disabled without changing the configured sandbox isolation"
+              "note": "approval prompts are disabled without lifting sandbox isolation; with no sandbox requested it writes the workspace"
             }
           },
           "default": {
@@ -1872,24 +2478,24 @@
           },
           "caller": {
             "allow": {
-              "kind": "unsupported",
+              "kind": "native",
               "effects": {
-                "note": "no tool filter for this source"
+                "flag": "registered without an approval gate"
               }
             },
             "ask": {
-              "kind": "unsupported",
+              "kind": "requires-broker",
               "effects": {
-                "note": "no per-tool prompt for this source"
+                "note": "enforced through Config.OnApproval when a broker is attached"
               }
             },
             "auto": {
               "kind": "native"
             },
             "deny": {
-              "kind": "unsupported",
+              "kind": "native",
               "effects": {
-                "note": "no tool filter for this source"
+                "flag": "omitted from the served tool list"
               }
             }
           },
@@ -1920,9 +2526,9 @@
         "resources": {
           "mcp": {
             "disabled": {
-              "kind": "unsupported",
+              "kind": "native",
               "effects": {
-                "note": "permissions.mcp.disabled is accepted and then dropped on this runtime"
+                "flag": "external and ambient MCP servers silenced; captain's caller-tool server is kept"
               }
             },
             "enabled": {
@@ -1961,6 +2567,19 @@
             }
           }
         },
+        "access": {
+          "full": {
+            "kind": "native"
+          },
+          "read-only": {
+            "kind": "native",
+            "effects": {
+              "sandbox": "read-only",
+              "approval": "never",
+              "note": "the shell stays as codex's read path, confined by the read-only sandbox; third-party MCP servers are disabled; execpolicy allow rules, which run commands outside the sandbox, are kept out with --ignore-rules on exec and an isolated CODEX_HOME on the app-server and cmux"
+            }
+          }
+        },
         "tools": [
           "apply_patch",
           "close_agent",
@@ -1989,7 +2608,128 @@
       "authenticated": true,
       "kind": "api",
       "mode": "api",
-      "modelError": "google: google models: transport request failed",
+      "modelDetails": [
+        {
+          "id": "gemini-3.8-flash",
+          "label": "Gemini 3.8 Flash",
+          "provider": "google",
+          "mode": "api",
+          "releaseDate": "2026-09-02",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": true,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "priority": 1
+        },
+        {
+          "id": "gemini-4-argon",
+          "label": "Gemini 4 Argon",
+          "provider": "google",
+          "mode": "api",
+          "releaseDate": "2026-10-13",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": true,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "priority": 2
+        },
+        {
+          "id": "nano-banana-pro-preview",
+          "label": "nano-banana-pro-preview",
+          "provider": "google",
+          "mode": "api",
+          "capabilitiesKnown": true,
+          "temperature": false
+        },
+        {
+          "id": "lyria-3.5",
+          "label": "lyria-3.5",
+          "provider": "google",
+          "mode": "api",
+          "capabilitiesKnown": true,
+          "temperature": false
+        },
+        {
+          "id": "gemini-nano-banana-2.1",
+          "label": "gemini-nano-banana-2.1",
+          "provider": "google",
+          "mode": "api",
+          "capabilitiesKnown": true,
+          "temperature": false
+        },
+        {
+          "id": "gemini-flash-latest",
+          "label": "gemini-flash-latest",
+          "provider": "google",
+          "mode": "api",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": true,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "id": "gemini-3.5-flash-lite",
+          "label": "gemini-3.5-flash-lite",
+          "provider": "google",
+          "mode": "api",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": true,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "id": "antigravity-preview-latest",
+          "label": "antigravity-preview-latest",
+          "provider": "google",
+          "mode": "api",
+          "capabilitiesKnown": true,
+          "temperature": false
+        },
+        {
+          "id": "antigravity-preview-09-2026",
+          "label": "antigravity-preview-09-2026",
+          "provider": "google",
+          "mode": "api",
+          "capabilitiesKnown": true,
+          "temperature": false
+        },
+        {
+          "id": "antigravity-preview-05-2026",
+          "label": "antigravity-preview-05-2026",
+          "provider": "google",
+          "mode": "api",
+          "capabilitiesKnown": true,
+          "temperature": false
+        }
+      ],
+      "models": [
+        "gemini-3.8-flash",
+        "gemini-4-argon",
+        "nano-banana-pro-preview",
+        "lyria-3.5",
+        "gemini-nano-banana-2.1",
+        "gemini-flash-latest",
+        "gemini-3.5-flash-lite",
+        "antigravity-preview-latest",
+        "antigravity-preview-09-2026",
+        "antigravity-preview-05-2026"
+      ],
       "permissions": {
         "modes": {
           "acceptEdits": {
@@ -2063,7 +2803,7 @@
             "ask": {
               "kind": "requires-broker",
               "effects": {
-                "note": "enforced through Config.CanUseTool when a broker is attached"
+                "note": "enforced through Config.OnApproval when a broker is attached"
               }
             },
             "auto": {
@@ -2143,6 +2883,17 @@
               }
             }
           }
+        },
+        "access": {
+          "full": {
+            "kind": "native"
+          },
+          "read-only": {
+            "kind": "native",
+            "effects": {
+              "note": "no built-in file tools to restrict; caller tools stay governed by toolPolicy"
+            }
+          }
         }
       },
       "provider": "google",
@@ -2154,16 +2905,16 @@
         "GOOGLE_API_KEY"
       ],
       "authenticated": true,
-      "binary": "/Users/moshe/Library/pnpm/gemini",
+      "binary": "/Users/moshe/Library/pnpm/bin/gemini",
       "kind": "cli",
       "mode": "cli",
       "modelDetails": [
         {
-          "id": "gemini-3.6-flash",
-          "label": "Gemini 3.6 Flash",
+          "id": "gemini-3.8-flash",
+          "label": "Gemini 3.8 Flash",
           "provider": "google",
           "mode": "cli",
-          "releaseDate": "2026-07-21",
+          "releaseDate": "2026-09-02",
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": true,
@@ -2171,14 +2922,15 @@
             "low",
             "medium",
             "high"
-          ]
+          ],
+          "priority": 1
         },
         {
-          "id": "gemini-3.5-flash",
-          "label": "Gemini 3.5 Flash",
+          "id": "gemini-4-argon",
+          "label": "Gemini 4 Argon",
           "provider": "google",
           "mode": "cli",
-          "releaseDate": "2026-05-19",
+          "releaseDate": "2026-10-13",
           "capabilitiesKnown": true,
           "reasoning": true,
           "temperature": true,
@@ -2186,12 +2938,13 @@
             "low",
             "medium",
             "high"
-          ]
+          ],
+          "priority": 2
         }
       ],
       "models": [
-        "gemini-3.6-flash",
-        "gemini-3.5-flash"
+        "gemini-3.8-flash",
+        "gemini-4-argon"
       ],
       "permissions": {
         "modes": {
@@ -2347,6 +3100,18 @@
             }
           }
         },
+        "access": {
+          "full": {
+            "kind": "native"
+          },
+          "read-only": {
+            "kind": "approximated",
+            "effects": {
+              "flag": "--approval-mode plan",
+              "note": "plan mode is enforced by the gemini client rather than an OS sandbox, and gemini has no per-run MCP override"
+            }
+          }
+        },
         "tools": [
           "glob",
           "google_web_search",
@@ -2370,7 +3135,33 @@
       "authenticated": true,
       "kind": "api",
       "mode": "api",
-      "modelError": "deepseek: deepseek models: transport request failed",
+      "modelDetails": [
+        {
+          "id": "deepseek-flash",
+          "label": "DeepSeek V4.1 Flash 1017",
+          "provider": "deepseek",
+          "mode": "api",
+          "releaseDate": "2026-10-17",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": true,
+          "priority": 1
+        },
+        {
+          "id": "deepseek-v4-pro",
+          "label": "DeepSeek V4 Pro",
+          "provider": "deepseek",
+          "mode": "api",
+          "releaseDate": "2026-08-12",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": true
+        }
+      ],
+      "models": [
+        "deepseek-flash",
+        "deepseek-v4-pro"
+      ],
       "permissions": {
         "modes": {
           "acceptEdits": {
@@ -2444,7 +3235,7 @@
             "ask": {
               "kind": "requires-broker",
               "effects": {
-                "note": "enforced through Config.CanUseTool when a broker is attached"
+                "note": "enforced through Config.OnApproval when a broker is attached"
               }
             },
             "auto": {
@@ -2524,10 +3315,198 @@
               }
             }
           }
+        },
+        "access": {
+          "full": {
+            "kind": "native"
+          },
+          "read-only": {
+            "kind": "native",
+            "effects": {
+              "note": "no built-in file tools to restrict; caller tools stay governed by toolPolicy"
+            }
+          }
         }
       },
       "provider": "deepseek",
       "ready": true
+    },
+    {
+      "authEnvVars": [
+        "TYPESAFE_API_KEY"
+      ],
+      "authenticated": false,
+      "kind": "api",
+      "mode": "api",
+      "modelError": "configure a Captain vault token or set TYPESAFE_API_KEY to list models",
+      "permissions": {
+        "modes": {
+          "acceptEdits": {
+            "kind": "unsupported",
+            "effects": {
+              "note": "this runtime has no provider-native sandbox approval posture"
+            }
+          },
+          "auto": {
+            "kind": "unsupported",
+            "effects": {
+              "note": "this runtime has no provider-native sandbox approval posture"
+            }
+          },
+          "bypassPermissions": {
+            "kind": "unsupported",
+            "effects": {
+              "note": "this runtime has no provider-native sandbox approval posture"
+            }
+          },
+          "default": {
+            "kind": "unsupported",
+            "effects": {
+              "note": "this runtime has no provider-native sandbox approval posture"
+            }
+          },
+          "dontAsk": {
+            "kind": "unsupported",
+            "effects": {
+              "note": "this runtime has no provider-native sandbox approval posture"
+            }
+          },
+          "plan": {
+            "kind": "unsupported",
+            "effects": {
+              "note": "this runtime has no provider-native sandbox approval posture"
+            }
+          }
+        },
+        "toolPolicies": {
+          "agent": {
+            "allow": {
+              "kind": "unsupported",
+              "effects": {
+                "note": "no tool filter for this source"
+              }
+            },
+            "ask": {
+              "kind": "unsupported",
+              "effects": {
+                "note": "no per-tool prompt for this source"
+              }
+            },
+            "auto": {
+              "kind": "native"
+            },
+            "deny": {
+              "kind": "unsupported",
+              "effects": {
+                "note": "no tool filter for this source"
+              }
+            }
+          },
+          "caller": {
+            "allow": {
+              "kind": "unsupported",
+              "effects": {
+                "note": "no tool filter for this source"
+              }
+            },
+            "ask": {
+              "kind": "unsupported",
+              "effects": {
+                "note": "no per-tool prompt for this source"
+              }
+            },
+            "auto": {
+              "kind": "native"
+            },
+            "deny": {
+              "kind": "unsupported",
+              "effects": {
+                "note": "no tool filter for this source"
+              }
+            }
+          },
+          "mcp": {
+            "allow": {
+              "kind": "unsupported",
+              "effects": {
+                "note": "no tool filter for this source"
+              }
+            },
+            "ask": {
+              "kind": "unsupported",
+              "effects": {
+                "note": "no per-tool prompt for this source"
+              }
+            },
+            "auto": {
+              "kind": "native"
+            },
+            "deny": {
+              "kind": "unsupported",
+              "effects": {
+                "note": "no tool filter for this source"
+              }
+            }
+          }
+        },
+        "resources": {
+          "mcp": {
+            "disabled": {
+              "kind": "unsupported",
+              "effects": {
+                "note": "permissions.mcp.disabled is accepted and then dropped on this runtime"
+              }
+            },
+            "enabled": {
+              "kind": "unsupported",
+              "effects": {
+                "note": "mcp.servers / mcp.modes have no reader: per-server enabling is not implemented"
+              }
+            }
+          },
+          "plugins": {
+            "disabled": {
+              "kind": "unsupported",
+              "effects": {
+                "note": "permissions.plugins reaches req.Permissions.Plugins and has no reader beyond it"
+              }
+            },
+            "enabled": {
+              "kind": "unsupported",
+              "effects": {
+                "note": "permissions.plugins reaches req.Permissions.Plugins and has no reader beyond it"
+              }
+            }
+          },
+          "skills": {
+            "disabled": {
+              "kind": "native",
+              "effects": {
+                "flag": "omitted by ResourcePolicies.Enabled before any provider sees it"
+              }
+            },
+            "enabled": {
+              "kind": "unsupported",
+              "effects": {
+                "note": "skill directories are not loaded on this runtime"
+              }
+            }
+          }
+        },
+        "access": {
+          "full": {
+            "kind": "native"
+          },
+          "read-only": {
+            "kind": "native",
+            "effects": {
+              "note": "no built-in file tools to restrict; caller tools stay governed by toolPolicy"
+            }
+          }
+        }
+      },
+      "provider": "jev",
+      "ready": false
     }
   ],
   "runtimeSources": [
@@ -2605,7 +3584,7 @@
           "mode": "api",
           "kind": "api",
           "keyless": false,
-          "defaultModel": "claude-opus-5",
+          "defaultModel": "claude-sonnet-5-5",
           "catalogProvider": "anthropic",
           "disabled": false,
           "availability": {
@@ -2684,7 +3663,7 @@
                 "ask": {
                   "kind": "requires-broker",
                   "effects": {
-                    "note": "enforced through Config.CanUseTool when a broker is attached"
+                    "note": "enforced through Config.OnApproval when a broker is attached"
                   }
                 },
                 "auto": {
@@ -2762,6 +3741,17 @@
                   "effects": {
                     "note": "skill directories are not loaded on this runtime"
                   }
+                }
+              }
+            },
+            "access": {
+              "full": {
+                "kind": "native"
+              },
+              "read-only": {
+                "kind": "native",
+                "effects": {
+                  "note": "no built-in file tools to restrict; caller tools stay governed by toolPolicy"
                 }
               }
             }
@@ -2925,7 +3915,7 @@
           "mode": "agent",
           "kind": "cli",
           "keyless": false,
-          "defaultModel": "claude-opus-5",
+          "defaultModel": "claude-sonnet-5-5",
           "catalogProvider": "anthropic",
           "disabled": false,
           "availability": {
@@ -3006,7 +3996,7 @@
                 "ask": {
                   "kind": "requires-broker",
                   "effects": {
-                    "note": "enforced through Config.CanUseTool when a broker is attached"
+                    "note": "enforced through Config.OnApproval when a broker is attached"
                   }
                 },
                 "auto": {
@@ -3087,24 +4077,44 @@
                 }
               }
             },
+            "access": {
+              "full": {
+                "kind": "native"
+              },
+              "read-only": {
+                "kind": "native",
+                "effects": {
+                  "flag": "--disallowedTools",
+                  "note": "denies every edit, write and shell carrier plus the tools that act outside the agent's process (sub-agents and teams, SendMessage to peer sessions, RemoteTrigger, CronCreate/CronDelete, Enter/ExitWorktree), and disables third-party MCP servers"
+                }
+              }
+            },
             "tools": [
               "Agent",
               "AskUserQuestion",
               "Bash",
               "BashOutput",
+              "CronCreate",
+              "CronDelete",
+              "CronList",
               "DesignSync",
               "Edit",
               "EnterPlanMode",
+              "EnterWorktree",
               "ExitPlanMode",
+              "ExitWorktree",
               "Glob",
               "Grep",
               "KillShell",
+              "ListAgents",
               "Monitor",
               "MultiEdit",
               "NotebookEdit",
               "PushNotification",
               "Read",
+              "RemoteTrigger",
               "ScheduleWakeup",
+              "SendMessage",
               "Skill",
               "Task",
               "TaskCreate",
@@ -3113,6 +4123,8 @@
               "TaskOutput",
               "TaskStop",
               "TaskUpdate",
+              "TeamCreate",
+              "TeamDelete",
               "TodoWrite",
               "ToolSearch",
               "WebFetch",
@@ -3927,7 +4939,7 @@
           "mode": "cli",
           "kind": "cli",
           "keyless": false,
-          "defaultModel": "claude-opus-5",
+          "defaultModel": "claude-sonnet-5-5",
           "catalogProvider": "anthropic",
           "disabled": false,
           "availability": {
@@ -3996,24 +5008,24 @@
               },
               "caller": {
                 "allow": {
-                  "kind": "unsupported",
+                  "kind": "native",
                   "effects": {
-                    "note": "no tool filter for this source"
+                    "flag": "registered without an approval gate"
                   }
                 },
                 "ask": {
-                  "kind": "unsupported",
+                  "kind": "requires-broker",
                   "effects": {
-                    "note": "no per-tool prompt for this source"
+                    "note": "enforced through Config.OnApproval when a broker is attached"
                   }
                 },
                 "auto": {
                   "kind": "native"
                 },
                 "deny": {
-                  "kind": "unsupported",
+                  "kind": "native",
                   "effects": {
-                    "note": "no tool filter for this source"
+                    "flag": "omitted from the served tool list"
                   }
                 }
               },
@@ -4085,24 +5097,44 @@
                 }
               }
             },
+            "access": {
+              "full": {
+                "kind": "native"
+              },
+              "read-only": {
+                "kind": "native",
+                "effects": {
+                  "flag": "--disallowedTools",
+                  "note": "denies every edit, write and shell carrier plus the tools that act outside the agent's process (sub-agents and teams, SendMessage to peer sessions, RemoteTrigger, CronCreate/CronDelete, Enter/ExitWorktree), and disables third-party MCP servers"
+                }
+              }
+            },
             "tools": [
               "Agent",
               "AskUserQuestion",
               "Bash",
               "BashOutput",
+              "CronCreate",
+              "CronDelete",
+              "CronList",
               "DesignSync",
               "Edit",
               "EnterPlanMode",
+              "EnterWorktree",
               "ExitPlanMode",
+              "ExitWorktree",
               "Glob",
               "Grep",
               "KillShell",
+              "ListAgents",
               "Monitor",
               "MultiEdit",
               "NotebookEdit",
               "PushNotification",
               "Read",
+              "RemoteTrigger",
               "ScheduleWakeup",
+              "SendMessage",
               "Skill",
               "Task",
               "TaskCreate",
@@ -4111,6 +5143,8 @@
               "TaskOutput",
               "TaskStop",
               "TaskUpdate",
+              "TeamCreate",
+              "TeamDelete",
               "TodoWrite",
               "ToolSearch",
               "WebFetch",
@@ -4911,6 +5945,31 @@
                 "title": "Temperature",
                 "type": "number",
                 "x-clicky-section": "model"
+              },
+              "toolPolicy": {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "title": "ToolPolicy",
+                "type": "array",
+                "x-clicky-section": "permissions",
+                "x-icon": "shield"
+              },
+              "toolPreferences": {
+                "additionalProperties": {
+                  "enum": [
+                    "auto",
+                    "ask",
+                    "allow",
+                    "deny"
+                  ],
+                  "type": "string"
+                },
+                "title": "ToolPreferences",
+                "type": "object",
+                "x-clicky-section": "permissions",
+                "x-icon": "shield"
               }
             },
             "type": "object",
@@ -4954,7 +6013,7 @@
           "mode": "api",
           "kind": "api",
           "keyless": false,
-          "defaultModel": "gpt-5.6-sol",
+          "defaultModel": "gpt-6.1-sol",
           "catalogProvider": "openai",
           "disabled": false,
           "availability": {
@@ -5033,7 +6092,7 @@
                 "ask": {
                   "kind": "requires-broker",
                   "effects": {
-                    "note": "enforced through Config.CanUseTool when a broker is attached"
+                    "note": "enforced through Config.OnApproval when a broker is attached"
                   }
                 },
                 "auto": {
@@ -5111,6 +6170,17 @@
                   "effects": {
                     "note": "skill directories are not loaded on this runtime"
                   }
+                }
+              }
+            },
+            "access": {
+              "full": {
+                "kind": "native"
+              },
+              "read-only": {
+                "kind": "native",
+                "effects": {
+                  "note": "no built-in file tools to restrict; caller tools stay governed by toolPolicy"
                 }
               }
             }
@@ -5274,7 +6344,7 @@
           "mode": "agent",
           "kind": "cli",
           "keyless": false,
-          "defaultModel": "gpt-5.6-sol",
+          "defaultModel": "gpt-6.1-sol",
           "catalogProvider": "openai",
           "disabled": false,
           "availability": {
@@ -5302,7 +6372,7 @@
                 "effects": {
                   "approval": "never",
                   "reviewer": "user",
-                  "note": "approval prompts are disabled without changing the configured sandbox isolation"
+                  "note": "approval prompts are disabled without lifting sandbox isolation; with no sandbox requested it writes the workspace"
                 }
               },
               "default": {
@@ -5362,7 +6432,7 @@
                 "ask": {
                   "kind": "requires-broker",
                   "effects": {
-                    "note": "enforced through Config.CanUseTool when a broker is attached"
+                    "note": "enforced through Config.OnApproval when a broker is attached"
                   }
                 },
                 "auto": {
@@ -5443,6 +6513,19 @@
                 }
               }
             },
+            "access": {
+              "full": {
+                "kind": "native"
+              },
+              "read-only": {
+                "kind": "native",
+                "effects": {
+                  "sandbox": "read-only",
+                  "approval": "never",
+                  "note": "the shell stays as codex's read path, confined by the read-only sandbox; third-party MCP servers are disabled; execpolicy allow rules, which run commands outside the sandbox, are kept out with --ignore-rules on exec and an isolated CODEX_HOME on the app-server and cmux"
+                }
+              }
+            },
             "tools": [
               "apply_patch",
               "close_agent",
@@ -5494,6 +6577,10 @@
                   {
                     "implementation": "mapped",
                     "name": "turn/start.effort"
+                  },
+                  {
+                    "implementation": "mapped",
+                    "name": "turn/start.collaborationMode"
                   }
                 ],
                 "x-clicky-section": "model",
@@ -5559,6 +6646,10 @@
                   {
                     "implementation": "mapped",
                     "name": "turn/start.model"
+                  },
+                  {
+                    "implementation": "mapped",
+                    "name": "turn/start.collaborationMode"
                   }
                 ],
                 "x-clicky-section": "model",
@@ -5659,6 +6750,10 @@
                       {
                         "implementation": "mapped",
                         "name": "turn/start.approvalsReviewer"
+                      },
+                      {
+                        "implementation": "mapped",
+                        "name": "turn/start.collaborationMode"
                       }
                     ],
                     "x-clicky-section": "permissions",
@@ -6053,7 +7148,7 @@
           "mode": "cli",
           "kind": "cli",
           "keyless": false,
-          "defaultModel": "gpt-5.6-sol",
+          "defaultModel": "gpt-6.1-sol",
           "catalogProvider": "openai",
           "disabled": false,
           "availability": {
@@ -6081,7 +7176,7 @@
                 "effects": {
                   "approval": "never",
                   "reviewer": "user",
-                  "note": "approval prompts are disabled without changing the configured sandbox isolation"
+                  "note": "approval prompts are disabled without lifting sandbox isolation; with no sandbox requested it writes the workspace"
                 }
               },
               "default": {
@@ -6133,24 +7228,24 @@
               },
               "caller": {
                 "allow": {
-                  "kind": "unsupported",
+                  "kind": "native",
                   "effects": {
-                    "note": "no tool filter for this source"
+                    "flag": "registered without an approval gate"
                   }
                 },
                 "ask": {
-                  "kind": "unsupported",
+                  "kind": "requires-broker",
                   "effects": {
-                    "note": "no per-tool prompt for this source"
+                    "note": "enforced through Config.OnApproval when a broker is attached"
                   }
                 },
                 "auto": {
                   "kind": "native"
                 },
                 "deny": {
-                  "kind": "unsupported",
+                  "kind": "native",
                   "effects": {
-                    "note": "no tool filter for this source"
+                    "flag": "omitted from the served tool list"
                   }
                 }
               },
@@ -6181,9 +7276,9 @@
             "resources": {
               "mcp": {
                 "disabled": {
-                  "kind": "unsupported",
+                  "kind": "native",
                   "effects": {
-                    "note": "permissions.mcp.disabled is accepted and then dropped on this runtime"
+                    "flag": "external and ambient MCP servers silenced; captain's caller-tool server is kept"
                   }
                 },
                 "enabled": {
@@ -6219,6 +7314,19 @@
                   "effects": {
                     "note": "skill directories are not loaded on this runtime"
                   }
+                }
+              }
+            },
+            "access": {
+              "full": {
+                "kind": "native"
+              },
+              "read-only": {
+                "kind": "native",
+                "effects": {
+                  "sandbox": "read-only",
+                  "approval": "never",
+                  "note": "the shell stays as codex's read path, confined by the read-only sandbox; third-party MCP servers are disabled; execpolicy allow rules, which run commands outside the sandbox, are kept out with --ignore-rules on exec and an isolated CODEX_HOME on the app-server and cmux"
                 }
               }
             },
@@ -6393,6 +7501,16 @@
                       }
                     ],
                     "x-clicky-section": "permissions"
+                  },
+                  "mcp": {
+                    "properties": {
+                      "disabled": {
+                        "title": "Disabled",
+                        "type": "boolean",
+                        "x-clicky-section": "permissions"
+                      }
+                    },
+                    "type": "object"
                   },
                   "mode": {
                     "enum": [
@@ -6659,6 +7777,31 @@
                 "title": "Temperature",
                 "type": "number",
                 "x-clicky-section": "model"
+              },
+              "toolPolicy": {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "title": "ToolPolicy",
+                "type": "array",
+                "x-clicky-section": "permissions",
+                "x-icon": "shield"
+              },
+              "toolPreferences": {
+                "additionalProperties": {
+                  "enum": [
+                    "auto",
+                    "ask",
+                    "allow",
+                    "deny"
+                  ],
+                  "type": "string"
+                },
+                "title": "ToolPreferences",
+                "type": "object",
+                "x-clicky-section": "permissions",
+                "x-icon": "shield"
               }
             },
             "type": "object",
@@ -6692,7 +7835,7 @@
           "mode": "api",
           "kind": "api",
           "keyless": false,
-          "defaultModel": "gemini-3.6-flash",
+          "defaultModel": "gemini-3.8-flash",
           "catalogProvider": "google",
           "disabled": false,
           "availability": {
@@ -6771,7 +7914,7 @@
                 "ask": {
                   "kind": "requires-broker",
                   "effects": {
-                    "note": "enforced through Config.CanUseTool when a broker is attached"
+                    "note": "enforced through Config.OnApproval when a broker is attached"
                   }
                 },
                 "auto": {
@@ -6849,6 +7992,17 @@
                   "effects": {
                     "note": "skill directories are not loaded on this runtime"
                   }
+                }
+              }
+            },
+            "access": {
+              "full": {
+                "kind": "native"
+              },
+              "read-only": {
+                "kind": "native",
+                "effects": {
+                  "note": "no built-in file tools to restrict; caller tools stay governed by toolPolicy"
                 }
               }
             }
@@ -7012,7 +8166,7 @@
           "mode": "cli",
           "kind": "cli",
           "keyless": false,
-          "defaultModel": "gemini-3.6-flash",
+          "defaultModel": "gemini-3.8-flash",
           "catalogProvider": "google",
           "disabled": false,
           "availability": {
@@ -7169,6 +8323,18 @@
                   "effects": {
                     "note": "skill directories are not loaded on this runtime"
                   }
+                }
+              }
+            },
+            "access": {
+              "full": {
+                "kind": "native"
+              },
+              "read-only": {
+                "kind": "approximated",
+                "effects": {
+                  "flag": "--approval-mode plan",
+                  "note": "plan mode is enforced by the gemini client rather than an OS sandbox, and gemini has no per-run MCP override"
                 }
               }
             },
@@ -7465,7 +8631,7 @@
                 "ask": {
                   "kind": "requires-broker",
                   "effects": {
-                    "note": "enforced through Config.CanUseTool when a broker is attached"
+                    "note": "enforced through Config.OnApproval when a broker is attached"
                   }
                 },
                 "auto": {
@@ -7543,6 +8709,17 @@
                   "effects": {
                     "note": "skill directories are not loaded on this runtime"
                   }
+                }
+              }
+            },
+            "access": {
+              "full": {
+                "kind": "native"
+              },
+              "read-only": {
+                "kind": "native",
+                "effects": {
+                  "note": "no built-in file tools to restrict; caller tools stay governed by toolPolicy"
                 }
               }
             }
@@ -7688,6 +8865,299 @@
           }
         }
       ]
+    },
+    {
+      "family": "jev",
+      "provider": "jev",
+      "catalogPrefix": "jev",
+      "modes": [
+        {
+          "mode": "api",
+          "kind": "api",
+          "keyless": false,
+          "defaultModel": "jev-latest",
+          "catalogProvider": "jev",
+          "disabled": false,
+          "availability": {
+            "state": "available"
+          },
+          "permissions": {
+            "modes": {
+              "acceptEdits": {
+                "kind": "unsupported",
+                "effects": {
+                  "note": "this runtime has no provider-native sandbox approval posture"
+                }
+              },
+              "auto": {
+                "kind": "unsupported",
+                "effects": {
+                  "note": "this runtime has no provider-native sandbox approval posture"
+                }
+              },
+              "bypassPermissions": {
+                "kind": "unsupported",
+                "effects": {
+                  "note": "this runtime has no provider-native sandbox approval posture"
+                }
+              },
+              "default": {
+                "kind": "unsupported",
+                "effects": {
+                  "note": "this runtime has no provider-native sandbox approval posture"
+                }
+              },
+              "dontAsk": {
+                "kind": "unsupported",
+                "effects": {
+                  "note": "this runtime has no provider-native sandbox approval posture"
+                }
+              },
+              "plan": {
+                "kind": "unsupported",
+                "effects": {
+                  "note": "this runtime has no provider-native sandbox approval posture"
+                }
+              }
+            },
+            "toolPolicies": {
+              "agent": {
+                "allow": {
+                  "kind": "unsupported",
+                  "effects": {
+                    "note": "no tool filter for this source"
+                  }
+                },
+                "ask": {
+                  "kind": "unsupported",
+                  "effects": {
+                    "note": "no per-tool prompt for this source"
+                  }
+                },
+                "auto": {
+                  "kind": "native"
+                },
+                "deny": {
+                  "kind": "unsupported",
+                  "effects": {
+                    "note": "no tool filter for this source"
+                  }
+                }
+              },
+              "caller": {
+                "allow": {
+                  "kind": "unsupported",
+                  "effects": {
+                    "note": "no tool filter for this source"
+                  }
+                },
+                "ask": {
+                  "kind": "unsupported",
+                  "effects": {
+                    "note": "no per-tool prompt for this source"
+                  }
+                },
+                "auto": {
+                  "kind": "native"
+                },
+                "deny": {
+                  "kind": "unsupported",
+                  "effects": {
+                    "note": "no tool filter for this source"
+                  }
+                }
+              },
+              "mcp": {
+                "allow": {
+                  "kind": "unsupported",
+                  "effects": {
+                    "note": "no tool filter for this source"
+                  }
+                },
+                "ask": {
+                  "kind": "unsupported",
+                  "effects": {
+                    "note": "no per-tool prompt for this source"
+                  }
+                },
+                "auto": {
+                  "kind": "native"
+                },
+                "deny": {
+                  "kind": "unsupported",
+                  "effects": {
+                    "note": "no tool filter for this source"
+                  }
+                }
+              }
+            },
+            "resources": {
+              "mcp": {
+                "disabled": {
+                  "kind": "unsupported",
+                  "effects": {
+                    "note": "permissions.mcp.disabled is accepted and then dropped on this runtime"
+                  }
+                },
+                "enabled": {
+                  "kind": "unsupported",
+                  "effects": {
+                    "note": "mcp.servers / mcp.modes have no reader: per-server enabling is not implemented"
+                  }
+                }
+              },
+              "plugins": {
+                "disabled": {
+                  "kind": "unsupported",
+                  "effects": {
+                    "note": "permissions.plugins reaches req.Permissions.Plugins and has no reader beyond it"
+                  }
+                },
+                "enabled": {
+                  "kind": "unsupported",
+                  "effects": {
+                    "note": "permissions.plugins reaches req.Permissions.Plugins and has no reader beyond it"
+                  }
+                }
+              },
+              "skills": {
+                "disabled": {
+                  "kind": "native",
+                  "effects": {
+                    "flag": "omitted by ResourcePolicies.Enabled before any provider sees it"
+                  }
+                },
+                "enabled": {
+                  "kind": "unsupported",
+                  "effects": {
+                    "note": "skill directories are not loaded on this runtime"
+                  }
+                }
+              }
+            },
+            "access": {
+              "full": {
+                "kind": "native"
+              },
+              "read-only": {
+                "kind": "native",
+                "effects": {
+                  "note": "no built-in file tools to restrict; caller tools stay governed by toolPolicy"
+                }
+              }
+            }
+          },
+          "schema": {
+            "properties": {
+              "budget": {
+                "properties": {
+                  "maxTokens": {
+                    "title": "Max tokens",
+                    "type": "integer",
+                    "x-clicky-section": "model",
+                    "x-icon": "coins"
+                  },
+                  "timeout": {
+                    "title": "Timeout",
+                    "type": "string",
+                    "x-clicky-section": "model",
+                    "x-icon": "timer"
+                  }
+                },
+                "type": "object"
+              },
+              "fallbacks": {
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "additionalProperties": true,
+                      "type": "object"
+                    }
+                  ]
+                },
+                "title": "Fallbacks",
+                "type": "array",
+                "x-clicky-section": "model"
+              },
+              "mode": {
+                "title": "Mode",
+                "type": "string",
+                "x-clicky-section": "model"
+              },
+              "model": {
+                "title": "Model",
+                "type": "string",
+                "x-clicky-section": "model",
+                "x-icon": "sparkles"
+              },
+              "noCache": {
+                "title": "NoCache",
+                "type": "boolean",
+                "x-clicky-section": "model"
+              },
+              "prompt": {
+                "properties": {
+                  "appendSystem": {
+                    "title": "AppendSystem",
+                    "type": "string",
+                    "x-clicky-section": "prompt"
+                  },
+                  "system": {
+                    "title": "System",
+                    "type": "string",
+                    "x-clicky-section": "prompt"
+                  },
+                  "user": {
+                    "title": "User",
+                    "type": "string",
+                    "x-clicky-section": "prompt"
+                  }
+                },
+                "type": "object"
+              },
+              "sandbox": {
+                "properties": {
+                  "mode": {
+                    "enum": [
+                      "off"
+                    ],
+                    "title": "Sandbox mode",
+                    "type": "string",
+                    "x-clicky-section": "sandbox",
+                    "x-enum-display": "segmented",
+                    "x-icon": "shield"
+                  }
+                },
+                "type": "object"
+              },
+              "setup": {
+                "properties": {
+                  "cwd": {
+                    "title": "Directory",
+                    "type": "string",
+                    "x-clicky-section": "workspace",
+                    "x-icon": "folder"
+                  },
+                  "envVars": {
+                    "items": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    "title": "EnvVars",
+                    "type": "array",
+                    "x-clicky-section": "environment"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        }
+      ]
     }
   ],
   "sandboxes": {
@@ -7755,10 +9225,24 @@
       "writable": false
     },
     {
+      "id": "builtin",
+      "kind": "embedded",
+      "label": "Built-in prompts",
+      "writable": false
+    },
+    {
       "id": "883fbbc4b6ff",
       "kind": "local",
       "label": "/Users/moshe/go/src/github.com/flanksource/captain/.captain/prompts",
       "root": "/Users/moshe/go/src/github.com/flanksource/captain/.captain/prompts",
+      "writable": true,
+      "implicit": true
+    },
+    {
+      "id": "a67d68fbca52",
+      "kind": "local",
+      "label": "/Users/moshe/.config/captain/prompts",
+      "root": "/Users/moshe/.config/captain/prompts",
       "writable": true,
       "implicit": true
     }
@@ -7791,6 +9275,37 @@
           },
           "skipTLSVerify": {
             "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "AccessLevel": {
+        "description": "Portable access contract, compiled to each runtime's native dialect. read-only: the agent may read the workspace but cannot create, modify or delete files, spawn sub-agents, use third-party MCP servers, or obtain write access by approval. full: no access restriction, overriding a read-only intent from an earlier layer. Unset leaves every runtime unchanged.",
+        "enum": [
+          "read-only",
+          "full"
+        ],
+        "type": "string"
+      },
+      "AfterStep": {
+        "additionalProperties": false,
+        "properties": {
+          "commands": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "when": {
+            "enum": [
+              "onVerify",
+              "onSuccess",
+              "always"
+            ],
+            "type": "string"
           }
         },
         "type": "object"
@@ -8411,6 +9926,9 @@
       "Permissions": {
         "additionalProperties": false,
         "properties": {
+          "access": {
+            "$ref": "#/$defs/AccessLevel"
+          },
           "approvalTimeout": {
             "type": "string"
           },
@@ -8464,11 +9982,18 @@
             },
             "type": "array"
           },
+          "inputSchemaJSON": true,
+          "inputSchemaType": {
+            "type": "string"
+          },
           "metadata": {
             "additionalProperties": {
               "type": "string"
             },
             "type": "object"
+          },
+          "outputSchemaType": {
+            "type": "string"
           },
           "schemaJSON": true,
           "schemaStrictness": {
@@ -8480,6 +10005,7 @@
           "system": {
             "type": "string"
           },
+          "typeSafeQuestions": true,
           "user": {
             "type": "string"
           }
@@ -9113,6 +10639,12 @@
       "Workflow": {
         "additionalProperties": false,
         "properties": {
+          "after": {
+            "items": {
+              "$ref": "#/$defs/AfterStep"
+            },
+            "type": "array"
+          },
           "autoVerifyWithoutFixture": {
             "type": "boolean"
           },
@@ -9132,6 +10664,9 @@
         "additionalProperties": false,
         "properties": {
           "base": {
+            "type": "string"
+          },
+          "branch": {
             "type": "string"
           },
           "ignored": {

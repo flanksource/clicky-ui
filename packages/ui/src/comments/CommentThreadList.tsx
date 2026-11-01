@@ -4,10 +4,11 @@ import { Button } from "../components/button";
 import { copyText } from "../components/clipboard";
 import { Markdown } from "../data/Markdown";
 import { Tabs } from "../layout/Tabs";
+import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { Modal } from "../overlay/Modal";
 import { CommentCard } from "./CommentCard";
 import { buildReplyMap, getRoots, sortReplies } from "./comment-utils";
-import type { Comment, CommentConfig } from "./comment-types";
+import type { Comment, CommentAuthor, CommentConfig } from "./comment-types";
 
 export type CommentThreadListProps = {
   comments: Comment[];
@@ -27,6 +28,13 @@ export type CommentThreadListProps = {
   threadToMarkdown?: (thread: readonly Comment[]) => string;
   onUpdateStatus?: (id: string, status: string) => void | Promise<void>;
   onClose?: (id: string) => void | Promise<void>;
+  onAcknowledge?: (id: string) => void | Promise<void>;
+  onAssign?: (
+    id: string,
+    assignee: CommentAuthor | null,
+  ) => void | Promise<void>;
+  /** Caller-owned entries appended to each root's "Assign…" submenu. */
+  extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
   onChecklistToggle?: (id: string, index: number) => void;
   onDelete?: (id: string) => void;
   /** Submit a reply to `parent`. Presence enables the inline reply affordance. */
@@ -71,11 +79,11 @@ function ReplyInput({
         }}
         placeholder="Write a reply…"
         data-testid="comment-reply-input"
-        className="h-7 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary/40"
+        className="h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary/40 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:text-base"
       />
       <Button
         size="sm"
-        className="h-7 text-xs"
+        className="h-7 text-xs [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:px-4 [@media(pointer:coarse)]:text-sm"
         disabled={submitting || !body.trim()}
         onClick={() => void send()}
       >
@@ -102,6 +110,9 @@ export function CommentThreadList({
   threadToMarkdown,
   onUpdateStatus,
   onClose,
+  onAcknowledge,
+  onAssign,
+  extraAssignItems,
   onChecklistToggle,
   onDelete,
   onReply,
@@ -137,6 +148,14 @@ export function CommentThreadList({
         ? { onUpdateStatus: (status: string) => onUpdateStatus(id, status) }
         : {}),
       ...(onClose ? { onClose: () => onClose(id) } : {}),
+      ...(onAcknowledge ? { onAcknowledge: () => onAcknowledge(id) } : {}),
+      ...(onAssign
+        ? {
+            onAssign: (assignee: CommentAuthor | null) =>
+              onAssign(id, assignee),
+          }
+        : {}),
+      ...(extraAssignItems ? { extraAssignItems } : {}),
       ...(onChecklistToggle
         ? { onChecklistToggle: (index: number) => onChecklistToggle(id, index) }
         : {}),

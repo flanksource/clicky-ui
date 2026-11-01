@@ -269,6 +269,7 @@ export {
 export { MethodBadge, type MethodBadgeProps } from "./data/MethodBadge";
 export { ProgressBar, type ProgressBarProps, type ProgressSegment } from "./data/ProgressBar";
 export { SignedDeltaBar, type SignedDeltaBarProps } from "./data/SignedDeltaBar";
+export { MultiGaugeBar, type MultiGaugeBarProps, type GaugeMarker } from './data/MultiGaugeBar';
 export { SortableHeader, type SortableHeaderProps } from "./data/SortableHeader";
 export { TabButton, type TabButtonProps, type TabButtonVariant } from "./data/TabButton";
 export {
@@ -279,7 +280,9 @@ export {
   resolveSeries,
   resolveBreakdown,
   mergeSeries,
+  expandServedSeries,
   type BreakdownItem,
+  type DisplaySeries,
   type MergedRow,
   type ResolvedSeries,
   type SeriesLoadContext,
@@ -288,7 +291,29 @@ export {
   type TimeseriesReferenceLine,
   type TimeseriesResponse,
   type TimeseriesSeries,
+  type TimeseriesServerSeries,
 } from "./data/TimeseriesPanel.model";
+export {
+  TimeseriesStreamProvider,
+  type TimeseriesStreamProviderProps,
+} from "./data/timeseries-stream-provider";
+export {
+  createTimeseriesStream,
+  EMPTY_TIMESERIES_STREAM_GROUP,
+  timeseriesStreamAddress,
+  timeseriesStreamGroupKey,
+  timeseriesStreamInterval,
+  timeseriesStreamUrl,
+  timeseriesWindowStart,
+  TimeseriesStreamContext,
+  useTimeseriesStream,
+  type TimeseriesStream,
+  type TimeseriesStreamFrame,
+  type TimeseriesStreamGroup,
+  type TimeseriesStreamGroupState,
+  type TimeseriesStreamOptions,
+  type TimeseriesStreamRegistration,
+} from "./data/timeseries-stream";
 export {
   assignAxes,
   latestOf,
@@ -338,6 +363,9 @@ export {
 } from "./data/server-timing";
 export { seriesStats, type SeriesStats } from "./data/gauge-stats";
 export { WorkloadCard, type WorkloadCardProps, type WorkloadCardSize, type WorkloadCardVariant } from "./data/WorkloadCard";
+export { WorkloadPanel } from "./data/workload-panel/WorkloadPanel";
+export { WorkloadMemoryStack, WorkloadMemoryLegend, type WorkloadMemoryStackProps } from "./data/workload-panel/MemoryStack";
+export type { WorkloadPanelProps, WorkloadResourceStatistics, WorkloadMemoryPart, WorkloadMemoryRegions, WorkloadJvmStatistics, WorkloadGcStatistics, WorkloadThreadStatistics } from "./data/workload-panel/types";
 export {
   formatReplicaCounts,
   workloadKindLabel,
@@ -418,6 +446,7 @@ export {
   type CompactRecordProps,
   type CompactRecordStatus,
 } from "./data/CompactRecord";
+export { OpenInFilesLink, type OpenFileTarget, type OpenInFilesLinkProps } from "./data/OpenInFilesLink";
 export * from "./data/test-runner";
 export * from "./data/lint";
 export * from "./data/verification";
@@ -608,3 +637,4 @@ export type {
 } from "./data/har/types";
 
 export * from "./data/traces";
+export * from "./data/charts";

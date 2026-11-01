@@ -1,7 +1,8 @@
-import type { HTMLAttributes, MouseEvent, ReactNode } from "react";
+import { useMemo, useState, type HTMLAttributes, type MouseEvent, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Button, type ButtonProps } from "./button";
 import { Checkbox } from "./Checkbox";
+import { ListMenuVirtualContext, type ListMenuVirtualOptions } from "./list-menu-virtual";
 import {
   ListMenuSelectionContext,
   useListMenuSelectionContext,
@@ -9,6 +10,8 @@ import {
 } from "./use-list-menu-selection";
 
 export type ListMenuProps = HTMLAttributes<HTMLDivElement> & {
+  /** Window ListMenuItems inside this menu's bounded scroll viewport. */
+  virtualize?: boolean | ListMenuVirtualOptions;
   /**
    * Enables multi-select. Pass the object returned by `useListMenuSelection`;
    * rows that set `itemKey` then become selectable via checkbox or Shift+Click.
@@ -22,18 +25,40 @@ export function ListMenu({
   className,
   selection,
   showCheckboxes = true,
+  virtualize = false,
   children,
   ...props
 }: ListMenuProps) {
+  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
+  const [contentElement, setContentElement] = useState<HTMLDivElement | null>(null);
+  const estimateRowHeight = typeof virtualize === "object" ? virtualize.estimateRowHeight ?? 40 : 40;
+  const overscan = typeof virtualize === "object" ? virtualize.overscan ?? 8 : 8;
+  const enabled = Boolean(virtualize);
+  if (!Number.isFinite(estimateRowHeight) || estimateRowHeight <= 0 || !Number.isInteger(overscan) || overscan < 0) {
+    throw new Error("ListMenu virtualization requires a positive row height and a non-negative integer overscan");
+  }
+  const virtual = useMemo(
+    () => enabled ? { scrollElement, contentElement, estimateRowHeight, overscan } : null,
+    [enabled, scrollElement, contentElement, estimateRowHeight, overscan],
+  );
   const menu = (
-    <div className={cn("divide-y divide-border", className)} {...props}>
+    <div ref={enabled ? setContentElement : undefined} className={cn("divide-y divide-border", className)} {...props}>
       {children}
     </div>
   );
-  if (!selection) return menu;
+  const body = (
+    <ListMenuVirtualContext.Provider value={virtual}>
+      {virtualize ? (
+        <div ref={setScrollElement} data-slot="list-menu-scroll" className="h-full overflow-y-auto">
+          {menu}
+        </div>
+      ) : menu}
+    </ListMenuVirtualContext.Provider>
+  );
+  if (!selection) return body;
   return (
     <ListMenuSelectionContext.Provider value={{ selection, showCheckboxes }}>
-      {menu}
+      {body}
     </ListMenuSelectionContext.Provider>
   );
 }

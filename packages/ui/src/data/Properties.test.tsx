@@ -91,7 +91,7 @@ describe("Properties", () => {
     const row = namespaceRow();
     expect(row).toHaveClass("px-density-4", "py-density-3");
     expect(row.closest("dl")).toHaveStyle({
-      gridTemplateColumns: "minmax(12rem, 20rem) minmax(0, 1fr)",
+      gridTemplateColumns: "minmax(min(12rem, 40%), min(20rem, 50%)) minmax(0, 1fr)",
     });
     expect(row).toHaveClass("grid-cols-subgrid");
     expect(row?.querySelector("dt")).toHaveClass("text-sm");
