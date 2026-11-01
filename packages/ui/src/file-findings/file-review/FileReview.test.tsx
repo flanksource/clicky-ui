@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 // Keep the Shiki dynamic imports out of jsdom (same approach as Markdown.test.tsx).
@@ -17,6 +18,7 @@ vi.mock("../AnnotatedCode", () => ({
 import type { Comment } from "../../comments/comment-types";
 import type { FileFinding } from "../types";
 import { FileReview, type FileReviewProps } from "./FileReview";
+import { emptyProblemFilters, type ProblemFilters } from "./problem-filters";
 import { quoteAnchor } from "./quote-anchor";
 import { sourceAnchor } from "./source-anchor";
 import type { BlameRange } from "./blame";
@@ -46,11 +48,19 @@ const COMMENT: Comment = {
   author: { id: "dana", name: "Dana", kind: "user" },
 };
 
+/** FileReview with the Problems filters held in state, as a host's URL would. */
+function WithProblemFilters(props: FileReviewProps) {
+  const [problemFilters, setProblemFilters] = useState<ProblemFilters>(emptyProblemFilters);
+  return <FileReview problemFilters={problemFilters} onProblemFiltersChange={setProblemFilters} {...props} />;
+}
+
 function renderReview(props: Partial<FileReviewProps> = {}) {
   const onViewChange = vi.fn();
-  const view = render(<FileReview path={PATH} source={SOURCE} view="preview" onViewChange={onViewChange} {...props} />);
+  const view = render(<WithProblemFilters path={PATH} source={SOURCE} view="preview" onViewChange={onViewChange} {...props} />);
   return { ...view, onViewChange };
 }
+
+const problemLines = () => Array.from(document.querySelectorAll("[data-problem-line] [data-problem-ln]"), (row) => row.textContent);
 
 const tabNames = () => screen.getAllByRole("tab").map((tab) => tab.textContent?.replace(/\d+$/, "").trim());
 
@@ -63,10 +73,50 @@ describe("FileReview", () => {
   it("adds a Problems tab listing every finding worst first, and opening one switches to the preview", () => {
     const { onViewChange } = renderReview({ findings: FINDINGS, view: "problems" });
     expect(tabNames()).toEqual(["Preview", "Source", "Problems"]);
-    const rows = screen.getAllByTitle("Open in preview");
+    const rows = screen.getAllByRole("button", { expanded: false }).filter((row) => row.querySelector("[data-problem-ln]"));
     expect(rows.map((row) => row.querySelector("[data-problem-ln]")?.textContent)).toEqual(["5", "3"]);
     fireEvent.click(rows[1]!);
+    expect(onViewChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole("button", { name: "Problem actions" })[1]!);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Open in preview" }));
     expect(onViewChange).toHaveBeenCalledWith("preview");
+  });
+
+  it("filters Problems by severity and issue type, each pill cycling include, exclude, clear", () => {
+    const findings: FileFinding[] = [...FINDINGS, { ...FINDINGS[0]!, line: 1, rule: "MD041", message: "First line should be a heading" }];
+    renderReview({ findings, view: "problems" });
+    const pill = (name: RegExp) => within(screen.getByRole("menu", { name: "Problem view options" })).getByText(name);
+    const all = problemLines();
+    fireEvent.click(screen.getByRole("button", { name: /^View Options/ }));
+
+    fireEvent.click(pill(/^Warnings/));
+    const onlyWarnings = problemLines();
+    fireEvent.click(pill(/^Warnings/));
+    const noWarnings = problemLines();
+    fireEvent.click(pill(/^Warnings/));
+    fireEvent.click(pill(/^MD013/));
+    fireEvent.click(pill(/^MD013/));
+    const noMD013 = problemLines();
+    fireEvent.click(pill(/^vale\.Units/));
+    fireEvent.click(pill(/^vale\.Units/));
+    fireEvent.click(pill(/^MD041/));
+    fireEvent.click(pill(/^MD041/));
+    const noneLeft = { lines: problemLines(), empty: screen.queryByText("No problems match the current filters.") !== null };
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+
+    expect({ all, onlyWarnings, noWarnings, noMD013, noneLeft, cleared: problemLines() }).toEqual({
+      all: ["5", "1", "3"],
+      onlyWarnings: ["1", "3"],
+      noWarnings: ["5"],
+      noMD013: ["5", "1"],
+      noneLeft: { lines: [], empty: true },
+      cleared: ["5", "1", "3"],
+    });
+  });
+
+  it("rejects the Problems view without its filters", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => render(<FileReview path={PATH} source={SOURCE} view="problems" onViewChange={vi.fn()} findings={FINDINGS} />)).toThrow(/needs `problemFilters`/);
   });
 
   it("rejects the Problems view when no findings were given", () => {
@@ -107,7 +157,7 @@ describe("FileReview on a code file", () => {
 
   function renderCode(props: Partial<FileReviewProps> = {}) {
     const onViewChange = vi.fn();
-    const view = render(<FileReview path={GO_PATH} source={GO} view="source" onViewChange={onViewChange} {...props} />);
+    const view = render(<WithProblemFilters path={GO_PATH} source={GO} view="source" onViewChange={onViewChange} {...props} />);
     return { ...view, onViewChange };
   }
 
@@ -120,7 +170,8 @@ describe("FileReview on a code file", () => {
 
   it("opens a problem in the source listing", () => {
     const { onViewChange } = renderCode({ findings: [GO_FINDING], view: "problems" });
-    fireEvent.click(screen.getByTitle("Open in source"));
+    fireEvent.click(screen.getByRole("button", { name: "Problem actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Open in source" }));
     expect(onViewChange).toHaveBeenCalledWith("source");
   });
 

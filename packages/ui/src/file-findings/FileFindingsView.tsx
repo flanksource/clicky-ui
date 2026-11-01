@@ -1,3 +1,4 @@
+import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Icon } from "../data/Icon";
 import { Tree } from "../data/Tree";
@@ -7,6 +8,7 @@ import { SplitPane } from "../layout/SplitPane";
 import { cn } from "../lib/utils";
 import { groupFindingsByFile } from "./adapters";
 import { FileReview, type FileReviewView } from "./file-review/FileReview";
+import type { ProblemFilters } from "./file-review/problem-filters";
 import { countFindingsBySeverity, FINDING_SEVERITIES } from "./severity-counts";
 import {
   fileRefKey,
@@ -27,10 +29,13 @@ export type FileFindingsViewProps = {
   /** The open file's tab. A code file has no Preview, so "preview" shows its Source. Controlled. */
   view: FileReviewView;
   onViewChange: (view: FileReviewView) => void;
+  /** Severity and issue-type filters on the Problems tab. Controlled. */
+  problemFilters: ProblemFilters;
+  onProblemFiltersChange: (filters: ProblemFilters) => void;
   /** Fetches a file's text. A rejection is shown to the reader in full. */
   loadFile: (file: FileRef) => Promise<string>;
-  /** Extra controls under each finding's thread, e.g. an ignore action. */
-  renderFindingActions?: ((finding: FileFinding) => ReactNode) | undefined;
+  /** Contextual menu items for each finding in Problems, Source and Preview. */
+  getFindingActions?: ((finding: FileFinding) => DropdownMenuItem[]) | undefined;
   /** Initial width percentage of the file tree. */
   defaultSplit?: number | undefined;
   className?: string | undefined;
@@ -124,8 +129,13 @@ function FileViewer({
   onLineChange,
   view,
   onViewChange,
-  renderFindingActions,
-}: Pick<FileFindingsViewProps, "line" | "onLineChange" | "view" | "onViewChange" | "renderFindingActions"> & {
+  problemFilters,
+  onProblemFiltersChange,
+  getFindingActions,
+}: Pick<
+  FileFindingsViewProps,
+  "line" | "onLineChange" | "view" | "onViewChange" | "problemFilters" | "onProblemFiltersChange" | "getFindingActions"
+> & {
   file: FileRef;
   findings: readonly FileFinding[];
   state: LoadState | null;
@@ -158,9 +168,11 @@ function FileViewer({
         view={shown}
         onViewChange={onViewChange}
         findings={findings}
+        problemFilters={problemFilters}
+        onProblemFiltersChange={onProblemFiltersChange}
         line={line}
         onLineChange={onLineChange}
-        renderFindingActions={renderFindingActions}
+        getFindingActions={getFindingActions}
         className="h-full p-density-2"
       />
     );
@@ -194,8 +206,10 @@ export function FileFindingsView({
   onLineChange,
   view,
   onViewChange,
+  problemFilters,
+  onProblemFiltersChange,
   loadFile,
-  renderFindingActions,
+  getFindingActions,
   defaultSplit = 28,
   className,
 }: FileFindingsViewProps) {
@@ -235,7 +249,9 @@ export function FileFindingsView({
       onLineChange={onLineChange}
       view={view}
       onViewChange={onViewChange}
-      renderFindingActions={renderFindingActions}
+      problemFilters={problemFilters}
+      onProblemFiltersChange={onProblemFiltersChange}
+      getFindingActions={getFindingActions}
     />
   );
 

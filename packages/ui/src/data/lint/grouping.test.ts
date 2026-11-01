@@ -52,7 +52,7 @@ describe("buildLintTree linter-rule-file", () => {
     ]);
     const [errcheckFile] = linter!.children![0]!.children!;
     expect(errcheckFile).toMatchObject({
-      name: "pkg > server > handler.go",
+      name: "pkg/server/handler.go",
       kind: "lint-file",
       file: "pkg/server/handler.go",
       target_path: "pkg/server/handler.go",
@@ -75,7 +75,7 @@ describe("buildLintTree linter-rule-file", () => {
   it("assigns unique URL-safe route paths and resolves them back to nodes", () => {
     const tree = buildLintTree({ results: [golangci], grouping: "linter-rule-file", filters: none });
     const leaf = findLintNode(tree, "golangci-lint/errcheck/pkg-server-handler-go");
-    expect(leaf?.name).toBe("pkg > server > handler.go");
+    expect(leaf?.name).toBe("pkg/server/handler.go");
     expect(findLintNode(tree, "golangci-lint/nope")).toBeNull();
     expect(findLintNode(tree, "")).toBeNull();
   });
@@ -107,10 +107,10 @@ describe("buildLintTree linter-file", () => {
     expect(linter!.children!.map((c) => c.name)).toEqual(["pkg"]);
     const pkg = linter!.children![0]!;
     expect(pkg.kind).toBe("lint-folder");
-    expect(pkg.children!.map((c) => c.name)).toEqual(["server", "store > db.go"]);
+    expect(pkg.children!.map((c) => c.name)).toEqual(["server", "store/db.go"]);
     const server = pkg.children![0]!;
     expect(server.children!.map((c) => [c.name, c.kind])).toEqual([
-      ["routes > api.go", "lint-file"],
+      ["routes/api.go", "lint-file"],
       ["handler.go", "lint-file"],
     ]);
     expect(server.children![1]!.violations).toHaveLength(2);
@@ -125,7 +125,7 @@ describe("buildLintTree file-linter-rule", () => {
       { linter: "beta", work_dir: "/r", violations: violation("/r/pkg/a.go", "b-rule") },
     ];
     const [file] = buildLintTree({ results, grouping: "file-linter-rule", filters: none });
-    expect(file).toMatchObject({ name: "pkg > a.go", kind: "lint-file", file: "pkg/a.go" });
+    expect(file).toMatchObject({ name: "pkg/a.go", kind: "lint-file", file: "pkg/a.go" });
     expect(file!.children!.map((c) => [c.name, c.kind])).toEqual([
       ["alpha", "linter"],
       ["beta", "linter"],
@@ -258,7 +258,7 @@ describe("multiple work dirs", () => {
     const tree = buildLintTree({ results: [golangci, eslint], grouping: "linter-file", filters: none });
     const esl = tree.find((n) => n.name === "eslint")!;
     expect(esl.children![0]).toMatchObject({
-      name: "gavel > web > src > App.tsx",
+      name: "gavel/web/src/App.tsx",
       file: "gavel/web/src/App.tsx",
       target_path: "src/App.tsx",
       work_dir: "/repo/gavel/web",

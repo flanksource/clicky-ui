@@ -1,17 +1,13 @@
 import { Icon } from "../Icon";
-import { Badge } from "../Badge";
 import { cn } from "../../lib/utils";
 import { UiClock, UiFileCode, UiFolder, UiTag, UiWrench } from "../../icons";
 import { LintSeverityIcon, OutcomeIcon, ToolIcon } from "../test-runner/MarkIcons";
 import { toolMark } from "../test-runner/marks";
 import { formatTestDuration } from "../test-runner/status";
-import { linterToolName, lintNodeCount, lintNodeSeverity } from "./stats";
-import type { LintNode, LintSeverity } from "./types";
-
-const COUNT_TONE = { error: "danger", warning: "warning", info: "info" } as const satisfies Record<
-  LintSeverity,
-  "danger" | "warning" | "info"
->;
+import { linterToolName, lintNodeCount } from "./stats";
+import { cachedAge, type LintAction, type LintNode } from "./types";
+import { LintRowIgnoreMenu } from "./LintIgnoreMenu";
+import type { IgnoreHandler } from "./ignore-menu-items";
 
 /** The error of a linter that failed to run: its error leaf's text. */
 function failedToRunMessage(node: LintNode): string | undefined {
@@ -45,13 +41,31 @@ function NodeIcon({ node }: { node: LintNode }) {
 }
 
 /** One lint tree row: kind glyph, name, trailing note, and a violation count coloured by worst severity. */
-export function LintTreeNode({ node, selected }: { node: LintNode; selected: boolean }) {
+export function LintTreeNode({
+  node,
+  selected,
+  actions = [],
+  onIgnore,
+  ignoreBusy = false,
+}: {
+  node: LintNode;
+  selected: boolean;
+  /** Ignore actions offered from the row's "⋯" and right-click menus; needs `onIgnore`. */
+  actions?: readonly LintAction[];
+  onIgnore?: IgnoreHandler | undefined;
+  ignoreBusy?: boolean | undefined;
+}) {
   const count = node.kind === "linter-error" ? 0 : lintNodeCount(node);
   const failedMessage = failedToRunMessage(node);
   const failedToRun = failedMessage !== undefined;
   const note = node.skipped ? node.message : failedToRun ? "failed to run" : undefined;
   const noteTitle = failedToRun ? failedMessage : note;
-  const duration = node.kind === "linter" && !node.linter?.status && node.linter?.duration ? formatTestDuration(node.linter.duration) : "";
+  const cached = node.kind === "linter" ? cachedAge(node.linter) : undefined;
+  const duration = cached
+    ? `cached · ${cached.replace(/ ago$/, "")}`
+    : node.kind === "linter" && !node.linter?.status && node.linter?.duration
+      ? formatTestDuration(node.linter.duration)
+      : "";
   return (
     <>
       <NodeIcon node={node} />
@@ -81,9 +95,10 @@ export function LintTreeNode({ node, selected }: { node: LintNode; selected: boo
       {duration && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{duration}</span>}
       {count > 0 && (
         <span className="flex shrink-0" title={`${count} violation${count === 1 ? "" : "s"}`}>
-          <Badge tone={COUNT_TONE[lintNodeSeverity(node)]} variant="solid" size="xxs" count={count} />
+          <span className="text-xs tabular-nums text-muted-foreground">{count}</span>
         </span>
       )}
+      {onIgnore && <LintRowIgnoreMenu actions={actions} onIgnore={onIgnore} busy={ignoreBusy} label={node.name} />}
     </>
   );
 }

@@ -40,6 +40,8 @@ describe("@flanksource/clicky-ui/file-findings entry", () => {
         onLineChange={() => undefined}
         view="rendered"
         onViewChange={() => undefined}
+        problemFilters={{ severity: new Map(), type: new Map() }}
+        onProblemFiltersChange={() => undefined}
         loadFile={() => Promise.resolve("# Guide\n\nA long line.\n")}
       />,
     );
