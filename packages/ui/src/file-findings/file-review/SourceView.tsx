@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
+import { ProblemActions } from "../../data/diagnostics/ProblemActions";
 import type { HighlightedLine } from "../../data/code-highlight";
 import { Icon } from "../../data/Icon";
 import { tokenStyle } from "../../data/token-style";
@@ -62,7 +63,7 @@ export function SourceView({
   selected,
   onSelect,
   onFocus,
-  renderFindingActions,
+  getFindingActions,
 }: {
   source: string;
   tokens: readonly HighlightedLine[] | null;
@@ -74,7 +75,7 @@ export function SourceView({
   selected: string | null;
   onSelect: (finding: FileFinding) => void;
   onFocus: (anchor: string | null) => void;
-  renderFindingActions?: ((finding: FileFinding) => ReactNode) | undefined;
+  getFindingActions?: ((finding: FileFinding) => DropdownMenuItem[]) | undefined;
 }) {
   return (
     <ol className="py-2 font-mono text-xs leading-5">
@@ -168,7 +169,7 @@ export function SourceView({
                     <span className="text-foreground">{f.message}</span>
                     <span className="text-muted-foreground">{f.source} {f.rule}</span>
                   </button>
-                  {renderFindingActions?.(f)}
+                  {getFindingActions && <ProblemActions items={getFindingActions(f)} />}
                 </span>
               ))}
             </span>

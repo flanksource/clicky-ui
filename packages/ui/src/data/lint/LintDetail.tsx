@@ -1,27 +1,31 @@
+import { violationMenuItems, type ViolationProps } from "./violation-menu-items";
+import { ProblemRow } from "../diagnostics/ProblemRow";
 import type { ReactNode } from "react";
-import { Button } from "../../components/button";
 import { CopyButton } from "../../components/CopyButton";
 import { Icon } from "../Icon";
 import { cn } from "../../lib/utils";
-import { UiEyeClosed, UiListChecks } from "../../icons";
+import { UiListChecks } from "../../icons";
 import { LintSeverityIcon, ToolIcon } from "../test-runner/MarkIcons";
 import { formatTestDuration } from "../test-runner/status";
 import {
   collectFolderLintStats,
   folderPattern,
   lintNodeActions,
-  violationIgnoreActions,
 } from "./actions";
 import { isLinterErrored, linterToolName, lintNodeCount, severityOf } from "./stats";
 import { OpenInFilesLink, type OpenFileTarget } from "../OpenInFilesLink";
 import { relPath } from "./paths";
-import type { LintAction, LintNode, LinterResult, Violation } from "./types";
+import { ViolationSnippet, type LintSourceLoader } from "./ViolationSnippet";
+import { IgnoreActionsMenu } from "./LintIgnoreMenu";
+import { cachedAge, type LintAction, type LintNode, type LinterResult, type Violation } from "./types";
 
-type HostActionProps = {
+export type HostActionProps = {
   onIgnore?: ((action: LintAction) => void | Promise<void>) | undefined;
   ignoreBusy?: boolean | undefined;
   /** Adds an "Open in Files" link to each violation that names a file. */
   onOpenFile?: ((target: OpenFileTarget) => void) | undefined;
+  /** Loads a violation's file so its card shows the flagged lines with context. */
+  loadSource?: LintSourceLoader | undefined;
 };
 
 type RenderRun = (result: LinterResult) => ReactNode;
@@ -49,58 +53,6 @@ function Pre({ children, tone }: { children: ReactNode; tone?: "error" }) {
     >
       {children}
     </pre>
-  );
-}
-
-function IgnoreButton({
-  action,
-  onIgnore,
-  disabled,
-}: {
-  action: LintAction;
-  onIgnore: (action: LintAction) => void | Promise<void>;
-  disabled: boolean;
-}) {
-  const subtle = action.variant === "subtle";
-  return (
-    <Button
-      type="button"
-      size="sm"
-      variant="outline"
-      className={cn(
-        "h-6 gap-1 px-2 text-xs",
-        subtle
-          ? "text-muted-foreground"
-          : "border-amber-500/50 bg-amber-500/10 text-amber-800 hover:bg-amber-500/20 dark:text-amber-300",
-      )}
-      title={action.title}
-      disabled={disabled}
-      onClick={(event) => {
-        event.stopPropagation();
-        void onIgnore(action);
-      }}
-    >
-      <Icon icon={UiEyeClosed} className="text-xs" />
-      {action.label}
-    </Button>
-  );
-}
-
-function ActionList({ actions, onIgnore, ignoreBusy }: HostActionProps & { actions: LintAction[] }) {
-  if (!onIgnore || actions.length === 0) return null;
-  return (
-    <Section title="Actions">
-      <div className="flex flex-wrap gap-1.5">
-        {actions.map((action) => (
-          <IgnoreButton
-            key={action.key}
-            action={action}
-            onIgnore={onIgnore}
-            disabled={Boolean(ignoreBusy) || (Boolean(action.disabledWithoutWorkDir) && !action.req.work_dir)}
-          />
-        ))}
-      </div>
-    </Section>
   );
 }
 
@@ -141,60 +93,16 @@ function ViolationLocations({
   );
 }
 
-function ViolationCard({
-  violation,
-  linter,
-  file,
-  workDir,
-  showFile,
-  onIgnore,
-  ignoreBusy,
-  onOpenFile,
-}: HostActionProps & {
-  violation: Violation;
-  linter: string;
-  /** The file an ignore rule targets; empty when the violation has none. */
-  file: string;
-  workDir: string;
-  showFile?: boolean;
-}) {
-  const rule = violation.rule?.method ?? "";
-  const ignores = onIgnore ? violationIgnoreActions({ violation, linter, file, workDir }) : [];
-  return (
-    <div className="rounded border border-border bg-card p-2" data-lint-violation="">
-      <div className="flex items-start gap-2">
-        <LintSeverityIcon severity={severityOf(violation)} className="mt-0.5 text-base" />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2 font-mono text-xs text-muted-foreground">
-            <span>{violationLocation(violation, Boolean(showFile))}</span>
-            {rule && <span className="text-foreground">[{rule}]</span>}
-            {onOpenFile && file && (
-              <OpenInFilesLink
-                target={{ file, ...(workDir ? { workDir } : {}), ...(violation.line ? { line: violation.line } : {}) }}
-                onOpenFile={onOpenFile}
-              />
-            )}
-          </div>
-          {violation.message && (
-            <div className="mt-0.5 whitespace-pre-wrap text-sm">{violation.message}</div>
-          )}
-          {(violation.locations?.length ?? 0) > 1 && (
-            <ViolationLocations violation={violation} workDir={workDir} onOpenFile={onOpenFile} />
-          )}
-          {violation.code && (
-            <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 font-mono text-xs">{violation.code}</pre>
-          )}
-          {ignores.length > 0 && onIgnore && (
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {ignores.map((action) => (
-                <IgnoreButton key={action.key} action={action} onIgnore={onIgnore} disabled={Boolean(ignoreBusy)} />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+export function ViolationDetail({ violation, file, workDir, loadSource, onOpenFile, showFile, showMessage = true }: ViolationProps & { showMessage?: boolean }) {
+  return <div className="space-y-2" data-lint-violation-detail="">
+    {showFile && <p className="break-all font-mono text-xs text-muted-foreground">{violationLocation(violation, true)}</p>}
+    <ViolationSnippet violation={violation} file={file} workDir={workDir} loadSource={loadSource} showMessage={showMessage} />
+    {(violation.locations?.length ?? 0) > 1 && <ViolationLocations violation={violation} workDir={workDir} onOpenFile={onOpenFile} />}
+  </div>;
+}
+
+export function ViolationCard(props: ViolationProps & { expanded?: boolean; onExpandedChange?: (expanded: boolean) => void }) {
+  return <div data-lint-violation=""><ProblemRow {...(props.expanded !== undefined ? { expanded: props.expanded } : {})} {...(props.onExpandedChange ? { onExpandedChange: props.onExpandedChange } : {})} message={props.violation.message ?? ""} severity={severityOf(props.violation)} metadata={`${props.linter} ${props.violation.rule?.method ?? ""}`} location={violationLocation(props.violation, Boolean(props.showFile))} actions={violationMenuItems(props)}><ViolationDetail {...props} showMessage={false} /></ProblemRow></div>;
 }
 
 function groupViolationsByRule(violations: readonly Violation[]): Array<{ rule: string; violations: Violation[] }> {
@@ -233,9 +141,18 @@ function resultStatusLabel(result: LinterResult): [label: string, tone: string] 
 function ResultStatus({ result }: { result: LinterResult }) {
   const [label, tone] = resultStatusLabel(result);
   const count = (result.violations ?? []).length;
+  const cached = cachedAge(result);
   return (
     <div className="flex flex-wrap gap-3 text-sm">
       <span className={tone}>{label}</span>
+      {cached && result.cache && (
+        <span
+          className="text-muted-foreground"
+          title={`${result.cache.source} fingerprint ${result.cache.fingerprint ?? "unknown"}`}
+        >
+          cached · linted {cached}
+        </span>
+      )}
       <span className="text-muted-foreground">
         {count} violation{count === 1 ? "" : "s"}
       </span>
@@ -314,12 +231,7 @@ function NoFileViolations({
   );
 }
 
-function LinterDetail({
-  node,
-  actions,
-  renderRun,
-  ...ignore
-}: HostActionProps & { node: LintNode; actions: LintAction[]; renderRun?: RenderRun | undefined }) {
+function LinterDetail({ node, renderRun }: { node: LintNode; renderRun?: RenderRun | undefined }) {
   const result = node.linter;
   const linter = node.linterName ?? result?.linter ?? "";
   const workDir = node.work_dir ?? result?.work_dir ?? "";
@@ -328,7 +240,6 @@ function LinterDetail({
     <>
       {result && <ResultDetails result={result} workDir={workDir} />}
       {run && <Section title="Run">{run}</Section>}
-      <ActionList actions={actions} {...ignore} />
       {result?.error && (
         <Section title="Error">
           <Pre tone="error">{result.error}</Pre>
@@ -361,12 +272,7 @@ function LinterErrorDetail({ node }: { node: LintNode }) {
   );
 }
 
-function FolderDetail({
-  node,
-  results,
-  actions,
-  ...ignore
-}: HostActionProps & { node: LintNode; results: readonly LinterResult[]; actions: LintAction[] }) {
+function FolderDetail({ node, results }: { node: LintNode; results: readonly LinterResult[] }) {
   const stats = node.ruleName
     ? []
     : collectFolderLintStats(node, results).filter((s) => !node.linterName || s.linter === node.linterName);
@@ -380,7 +286,6 @@ function FolderDetail({
           )}
         </div>
       </Section>
-      <ActionList actions={actions} {...ignore} />
       {node.ruleName ? (
         <Section title="Scope">
           <div className="space-y-1 text-sm">
@@ -411,7 +316,7 @@ function FolderDetail({
   );
 }
 
-function FileDetail({ node, actions, ...ignore }: HostActionProps & { node: LintNode; actions: LintAction[] }) {
+function FileDetail({ node, ...ignore }: HostActionProps & { node: LintNode }) {
   const violations = node.violations ?? [];
   return (
     <>
@@ -423,7 +328,6 @@ function FileDetail({ node, actions, ...ignore }: HostActionProps & { node: Lint
           )}
         </div>
       </Section>
-      <ActionList actions={actions} {...ignore} />
       {violations.length > 0 && (
         <Section title="Violations">
           <div className="space-y-2">
@@ -444,7 +348,7 @@ function FileDetail({ node, actions, ...ignore }: HostActionProps & { node: Lint
   );
 }
 
-function RuleDetail({ node, actions, ...ignore }: HostActionProps & { node: LintNode; actions: LintAction[] }) {
+function RuleDetail({ node, ...ignore }: HostActionProps & { node: LintNode }) {
   const violations = node.violations ?? [];
   const linter = node.linterName ?? "";
   const workDir = node.work_dir ?? "";
@@ -459,7 +363,6 @@ function RuleDetail({ node, actions, ...ignore }: HostActionProps & { node: Lint
           <Mono>{node.file}</Mono>
         </Section>
       )}
-      <ActionList actions={actions} {...ignore} />
       {violations.length > 0 && (
         <Section title="Violations">
           <div className="space-y-2">
@@ -491,7 +394,12 @@ const KIND_LABEL: Record<LintNode["kind"], string> = {
   "linter-error": "Linter error",
 };
 
-function DetailHeader({ node }: { node: LintNode }) {
+function DetailHeader({
+  node,
+  actions,
+  onIgnore,
+  ignoreBusy,
+}: Pick<HostActionProps, "onIgnore" | "ignoreBusy"> & { node: LintNode; actions: LintAction[] }) {
   const count = node.kind === "linter-error" ? 0 : lintNodeCount(node);
   return (
     <div
@@ -514,6 +422,11 @@ function DetailHeader({ node }: { node: LintNode }) {
           {count} violation{count === 1 ? "" : "s"}
         </span>
       )}
+      {onIgnore && actions.length > 0 && (
+        <div className="ml-auto shrink-0" data-lint-node-actions="">
+          <IgnoreActionsMenu actions={actions} onIgnore={onIgnore} busy={Boolean(ignoreBusy)} align="right" />
+        </div>
+      )}
     </div>
   );
 }
@@ -534,7 +447,15 @@ export type LintDetailPanelProps = HostActionProps & {
  * The right pane for a lint node: what it covers, the findings beneath it and,
  * when the host provides `onIgnore`, the ignore actions that fit its scope.
  */
-export function LintDetailPanel({ node, results, onIgnore, ignoreBusy, onOpenFile, renderRun }: LintDetailPanelProps) {
+export function LintDetailPanel({
+  node,
+  results,
+  onIgnore,
+  ignoreBusy,
+  onOpenFile,
+  loadSource,
+  renderRun,
+}: LintDetailPanelProps) {
   if (!node) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -545,19 +466,16 @@ export function LintDetailPanel({ node, results, onIgnore, ignoreBusy, onOpenFil
       </div>
     );
   }
-  const ignore = { onIgnore, ignoreBusy, onOpenFile };
-  const actions = lintNodeActions(node, results);
+  const ignore = { onIgnore, ignoreBusy, onOpenFile, loadSource };
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <DetailHeader node={node} />
+      <DetailHeader node={node} actions={lintNodeActions(node, results)} onIgnore={onIgnore} ignoreBusy={ignoreBusy} />
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-density-4">
-        {node.kind === "linter" && <LinterDetail node={node} actions={actions} renderRun={renderRun} {...ignore} />}
+        {node.kind === "linter" && <LinterDetail node={node} renderRun={renderRun} />}
         {node.kind === "linter-error" && <LinterErrorDetail node={node} />}
-        {node.kind === "lint-folder" && <FolderDetail node={node} results={results} actions={actions} {...ignore} />}
-        {node.kind === "lint-file" && <FileDetail node={node} actions={actions} {...ignore} />}
-        {(node.kind === "lint-rule" || node.kind === "lint-rule-group") && (
-          <RuleDetail node={node} actions={actions} {...ignore} />
-        )}
+        {node.kind === "lint-folder" && <FolderDetail node={node} results={results} />}
+        {node.kind === "lint-file" && <FileDetail node={node} {...ignore} />}
+        {(node.kind === "lint-rule" || node.kind === "lint-rule-group") && <RuleDetail node={node} {...ignore} />}
       </div>
     </div>
   );

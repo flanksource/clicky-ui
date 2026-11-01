@@ -5,6 +5,7 @@
 
 import type { FilterState } from "../test-runner/filterState";
 import type { LintSeverity } from "../test-runner/marks";
+import { formatRelativeTime } from "../cells/timestamp-format";
 
 export type { LintSeverity };
 
@@ -70,6 +71,8 @@ export type LinterResult = {
    * `running`. Absent once it has finished, so a finished result never carries it.
    */
   status?: LinterStatus;
+  /** Where the result came from when its linter answered from its own cache (gavel linters.ResultProvenance). */
+  cache?: LintResultProvenance;
   /** The prompt run that produced (or is producing) this result, for hosts that can follow it. */
   run_id?: string;
   /** The agent session behind that run, kept so a replayed snapshot still names it. */
@@ -77,6 +80,23 @@ export type LinterResult = {
 };
 
 export type LinterStatus = "pending" | "running";
+
+export type LintResultProvenance = {
+  /** What `fingerprint` is computed from: "build" (the linter's input digest) or "uir" (a UIR symbol closure). */
+  source: string;
+  fingerprint?: string;
+  /** When the oldest reused entry was linted. */
+  stored_at: string;
+  /** True only when the whole result came from the cache. */
+  hit: boolean;
+};
+
+/** A full cache hit's age, e.g. "3h ago"; undefined for a fresh or partly cached result. */
+export function cachedAge(result: LinterResult | undefined, now: Date = new Date()): string | undefined {
+  const cache = result?.cache;
+  if (!cache?.hit) return undefined;
+  return formatRelativeTime(new Date(cache.stored_at), now);
+}
 
 export type LintGrouping = "linter-rule-file" | "linter-file" | "file-linter-rule" | "summary";
 

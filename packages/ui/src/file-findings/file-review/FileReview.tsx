@@ -1,3 +1,5 @@
+import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
+import { ProblemActions } from "../../data/diagnostics/ProblemActions";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Button } from "../../components/button";
 import { highlightToLines, languageFromPath, type HighlightedLine } from "../../data/code-highlight";
@@ -20,6 +22,7 @@ import { layoutCards, type AnchorMode, type Box } from "./geometry";
 import { useAnchorBoxes, useCardHeights, useNarrow } from "./hooks";
 import { SEVERITY_MARK, SEVERITY_RANK, severityOf, squiggle, type Severity } from "./marks";
 import { ProblemsList } from "./ProblemsList";
+import type { ProblemFilters } from "./problem-filters";
 import {
   QUOTE_PREFIX,
   describeQuote,
@@ -132,6 +135,9 @@ export type FileReviewProps = {
   onViewChange: (view: FileReviewView) => void;
   /** Lint findings: a severity rail and squiggle on each flagged block, read-only threads, and a Problems tab. */
   findings?: readonly FileFinding[] | undefined;
+  /** Severity and issue-type filters on the Problems tab. Controlled; needed with the "problems" view. */
+  problemFilters?: ProblemFilters | undefined;
+  onProblemFiltersChange?: ((filters: ProblemFilters) => void) | undefined;
   /** People's comments: quote highlights, threads and author avatars. Without it the document has no comment UI. */
   comments?: FileReviewComments | undefined;
   /** Draw a quote as its exact text, or as the whole block holding it. */
@@ -160,8 +166,8 @@ export type FileReviewProps = {
   line?: number | undefined;
   /** Called with a finding's line when the reader picks it. */
   onLineChange?: ((line: number) => void) | undefined;
-  /** Extra controls on each finding's thread and Source message, e.g. an ignore action. */
-  renderFindingActions?: ((finding: FileFinding) => ReactNode) | undefined;
+  /** Contextual actions for a finding in Problems, Source and Preview. Return an empty array when no host actions apply. */
+  getFindingActions?: ((finding: FileFinding) => DropdownMenuItem[]) | undefined;
   /** Host controls in the header row, e.g. lint, save or revert buttons. */
   toolbar?: ReactNode;
   /** Sizes the frame; the document and sidebar scroll inside it. Defaults to a fixed 520px pane. */
@@ -198,6 +204,8 @@ export function FileReview({
   view,
   onViewChange,
   findings: findingsProp,
+  problemFilters,
+  onProblemFiltersChange,
   comments,
   mode = "text",
   selectToComment = false,
@@ -208,7 +216,7 @@ export function FileReview({
   blame,
   line,
   onLineChange,
-  renderFindingActions,
+  getFindingActions,
   toolbar,
   className,
 }: FileReviewProps) {
@@ -216,6 +224,8 @@ export function FileReview({
   const findings = findingsProp ?? NO_FINDINGS;
   const prose = isMarkdownPath(path);
   if (view === "problems" && !lint) throw new Error("FileReview: view \"problems\" needs `findings`");
+  if (view === "problems" && (!problemFilters || !onProblemFiltersChange))
+    throw new Error("FileReview: view \"problems\" needs `problemFilters` and `onProblemFiltersChange`");
   if (view === "preview" && !prose) throw new Error(`FileReview: view "preview" needs a markdown file, got ${path}`);
   const [showBlame, setShowBlame] = useState(false);
   const [showFindings, setShowFindings] = useState(true);
@@ -240,9 +250,11 @@ export function FileReview({
   const blamed = useMemo(() => (blaming ? blameLines(blame, sourceLines.length) : null), [blaming, blame, sourceLines.length]);
   const theme = useResolvedTheme();
   const listing = view === "source" && !editing;
+  // Source and the Problems context blocks both colour their lines with the same tokens.
+  const tokenized = listing || view === "problems";
   const [tokens, setTokens] = useState<{ source: string; lines: HighlightedLine[] | null } | null>(null);
   useEffect(() => {
-    if (!listing) return;
+    if (!tokenized) return;
     let current = true;
     const shiki = theme === "dark" ? "github-dark" : "github-light";
     void highlightToLines(source, { lang: languageFromPath(path), theme: shiki }).then(
@@ -251,7 +263,7 @@ export function FileReview({
     return () => {
       current = false;
     };
-  }, [listing, source, path, theme]);
+  }, [tokenized, source, path, theme]);
   // Tokens of an earlier text would colour the wrong characters; show plain text until the new ones arrive.
   const sourceTokens = tokens?.source === source ? tokens.lines : null;
   const [align, setAlign] = useState<SidebarAlign>("line");
@@ -277,12 +289,12 @@ export function FileReview({
   // findingsToComments keeps the findings' order, so a thread's id leads back to its finding.
   const findingById = useMemo(() => new Map(findingComments.map((c, i) => [c.id, findings[i]!])), [findingComments, findings]);
   const renderRootDetails = useMemo(() => {
-    if (!renderFindingActions) return undefined;
+    if (!getFindingActions) return undefined;
     return (comment: Comment) => {
       const finding = findingById.get(comment.id);
-      return finding ? renderFindingActions(finding) : null;
+      return finding ? <ProblemActions items={getFindingActions(finding)} /> : null;
     };
-  }, [renderFindingActions, findingById]);
+  }, [getFindingActions, findingById]);
   const filtered = useMemo(
     () => all.filter((c) => c.parentId || filter === "all" || (c.author?.kind ?? "user") === filter),
     [all, filter],
@@ -700,7 +712,7 @@ export function FileReview({
             Blame
           </Button>
         )}
-        {comments && onLayoutChange && prose && (
+        {comments && onLayoutChange && prose && view !== "problems" && (
           <DropdownMenu
             align="right"
             icon={UiDotsVertical}
@@ -772,7 +784,7 @@ export function FileReview({
                 setFocused(lineAnchor(f.line));
                 onLineChange?.(f.line);
               }}
-              renderFindingActions={renderFindingActions}
+              getFindingActions={getFindingActions}
               onFocus={setFocused}
             />
             {draft?.surface === "source" && renderDraft(draft, sourceWidth)}
@@ -796,7 +808,18 @@ export function FileReview({
             )}
           </div>
         )}
-        {view === "problems" && <ProblemsList source={source} findings={findings} onOpen={openFinding} openLabel={prose ? "Open in preview" : "Open in source"} />}
+        {view === "problems" && problemFilters && onProblemFiltersChange && (
+          <ProblemsList
+            source={source}
+            tokens={sourceTokens}
+            findings={findings}
+            filters={problemFilters}
+            onFiltersChange={onProblemFiltersChange}
+            onOpen={openFinding}
+            openLabel={prose ? "Open in preview" : "Open in source"}
+            getFindingActions={getFindingActions}
+          />
+        )}
         {/* Hidden rather than unmounted, so anchor boxes stay measured and a picked finding scrolls straight to its line. */}
         {prose && (
         <div className={cn("flex", narrow ? "flex-col gap-4 p-4" : "h-full", view !== "preview" && "hidden")}>

@@ -6,6 +6,7 @@ import type { Test } from "../data/test-runner/types";
 import { lintFindings, testFindings } from "./adapters";
 import { FileFindingsView } from "./FileFindingsView";
 import type { FileReviewView } from "./file-review/FileReview";
+import { emptyProblemFilters, type ProblemFilters } from "./file-review/problem-filters";
 import type { FileRef } from "./types";
 
 const WORK_DIR = "/repo/gavel";
@@ -98,6 +99,7 @@ function Harness({ initialFile = null, initialView = "preview" }: { initialFile?
   const [file, setFile] = useState<FileRef | null>(initialFile);
   const [line, setLine] = useState<number | undefined>(undefined);
   const [view, setView] = useState<FileReviewView>(initialView);
+  const [problemFilters, setProblemFilters] = useState<ProblemFilters>(emptyProblemFilters);
   return (
     <div className="h-[640px]">
         <FileFindingsView
@@ -111,6 +113,8 @@ function Harness({ initialFile = null, initialView = "preview" }: { initialFile?
           onLineChange={setLine}
           view={view}
           onViewChange={setView}
+          problemFilters={problemFilters}
+          onProblemFiltersChange={setProblemFilters}
           loadFile={async ({ file: path }) => sourceFor(path)}
         />
     </div>

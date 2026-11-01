@@ -4,6 +4,7 @@ import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import type { Comment, CommentCallbacks } from "../../comments/comment-types";
 import { MonacoProvider } from "../../monaco/MonacoProvider";
 import { FileReview, type FileReviewLayout, type FileReviewProps, type FileReviewView } from "./FileReview";
+import { emptyProblemFilters, type ProblemFilters } from "./problem-filters";
 import { CODE_FILE, CODE_SOURCE, LONG_DOC, SHORT_DOC, type DocFixture } from "./FileReview.fixtures";
 import { quoteAnchor } from "./quote-anchor";
 import { locateSource, sourceAnchor } from "./source-anchor";
@@ -48,6 +49,7 @@ type HarnessProps = Partial<Omit<FileReviewProps, "comments" | "findings">> & {
 function Harness({ fixture = SHORT_DOC, withComments = false, withFindings = false, withBlame = false, editable = false, onCreate, ...props }: HarnessProps) {
   const [view, setView] = useState<FileReviewView>(props.view ?? "preview");
   const [layout, setLayout] = useState<FileReviewLayout>(props.layout ?? "margin");
+  const [problemFilters, setProblemFilters] = useState<ProblemFilters>(emptyProblemFilters);
   const [source, setSource] = useState(fixture.source);
   const comments = useLocalComments(fixture.comments, onCreate);
   const review = (
@@ -60,7 +62,7 @@ function Harness({ fixture = SHORT_DOC, withComments = false, withFindings = fal
       layout={layout}
       onLayoutChange={setLayout}
       {...(withComments ? { comments } : {})}
-      {...(withFindings ? { findings: fixture.findings } : {})}
+      {...(withFindings ? { findings: fixture.findings, problemFilters, onProblemFiltersChange: setProblemFilters } : {})}
       {...(withBlame ? { blame: fixture.blame } : {})}
       {...(editable ? { onSourceChange: setSource } : {})}
     />
@@ -130,6 +132,19 @@ export const LintOnly: Story = {
     const canvas = within(canvasElement);
     expect(canvas.getAllByRole("tab").map((tab) => tab.textContent?.replace(/\d+$/, ""))).toEqual(["Preview", "Source", "Problems"]);
     expect(canvasElement.querySelectorAll("[data-problem-line]")).toHaveLength(SHORT_DOC.findings.length);
+  },
+};
+
+/** Host actions are typed menu items shared by Problems, Source and Preview. */
+export const ContextualProblemActions: Story = {
+  args: {
+    withFindings: true,
+    view: "problems",
+    getFindingActions: (finding) => [{ label: "Copy rule ID", onSelect: () => { void navigator.clipboard.writeText(finding.rule ?? finding.source); } }],
+  },
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getAllByRole("button", { name: "Problem actions" })[0]!);
+    await expect(within(document.body).getByRole("menuitem", { name: "Copy rule ID" })).toBeVisible();
   },
 };
 

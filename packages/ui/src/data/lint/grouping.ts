@@ -2,7 +2,7 @@
 // from gavel's testrunner/ui utils.ts. Differences from the original:
 //   - a linter that failed to run is shown under every grouping (gavel only
 //     showed it in `summary`), so a broken linter never reads as a clean run;
-//   - single-child folder chains are really collapsed ("pkg > sub > a.go");
+//   - single-child folder chains are really collapsed ("pkg/sub/a.go");
 //     gavel's collapser never fired because folder nodes always carry a
 //     passed/failed flag;
 //   - file-scoped rule leaves in `file-linter-rule` carry their work_dir, so
@@ -29,7 +29,8 @@ import type {
 
 type Draft = Omit<LintNode, "route_path" | "children"> & { children?: Draft[] };
 
-type FlatViolation = {
+/** A violation with its linter and paths resolved, as every view lists it. */
+export type FlatViolation = {
   linter: string;
   result: LinterResult;
   v: Violation;
@@ -81,7 +82,8 @@ function sortedKeys<V>(map: Map<string, V>): string[] {
 // ---------------------------------------------------------------------------
 // Flattening
 
-function flattenLint(results: readonly LinterResult[], filters: LintFilters): FlatViolation[] {
+/** Every violation the filters keep, with work-dir-relative and display paths. */
+export function flattenLint(results: readonly LinterResult[], filters: LintFilters): FlatViolation[] {
   const visible = results.filter((r) => matchesFilterState(r.linter, filters.linter));
   const multiRoot = new Set(visible.flatMap((r) => (r.work_dir ? [normalizeLintPath(r.work_dir)] : []))).size > 1;
   const out: FlatViolation[] = [];
@@ -617,12 +619,12 @@ function nestChildLinters(roots: Draft[], results: readonly LinterResult[], filt
 function joinChainNames(parent: string, child: string): string {
   const p = parent.trim();
   const c = child.trim();
-  return p && c ? `${p} > ${c}` : p || c;
+  return p && c ? `${p.replace(/\/+$/, "")}/${c.replace(/^\/+/, "")}` : p || c;
 }
 
 /**
  * Folds a folder (a node of `folderKind`) that has a single child into that
- * child: `pkg > sub > a.go`. Generic so other path trees can reuse it.
+ * child: `pkg/sub/a.go`. Generic so other path trees can reuse it.
  */
 export function collapseFolderChains<N extends { name: string; kind: string; children?: N[] | undefined }>(
   nodes: N[],
