@@ -8,6 +8,20 @@ const UNIT_OPTIONS = [
 ];
 
 describe("Combobox option trailing content", () => {
+  it("keeps metadata inside a responsive option's text column and preserves selection", () => {
+    const onChange = vi.fn();
+    render(<Combobox value="" onChange={onChange} options={[{
+      value: "feature", label: "feature/a-branch-with-a-long-name", layout: "responsive",
+      trailing: <span>12 commits · 8 uncommitted</span>,
+    }]} />);
+    fireEvent.focus(screen.getByRole("combobox"));
+    const option = screen.getByRole("option");
+    const text = option.querySelector('[data-slot="combobox-option-text"]');
+    expect(text).toContainElement(screen.getByText("12 commits · 8 uncommitted"));
+    fireEvent.mouseDown(option);
+    expect(onChange).toHaveBeenCalledWith("feature");
+  });
+
   it("pins the trailing node to the right of a single-line option row", () => {
     render(
       <Combobox value="" onChange={vi.fn()} options={UNIT_OPTIONS} allowCustomValue={false} />,
