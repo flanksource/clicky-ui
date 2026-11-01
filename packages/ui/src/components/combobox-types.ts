@@ -10,11 +10,14 @@ export type ComboboxOption = {
   description?: string;
   /** Places metadata beside the label on a single line rather than below it. */
   descriptionLayout?: "stacked" | "inline";
+  /** Wraps long labels and stacks metadata in narrow menus, with inline rows when space permits. */
+  layout?: "responsive";
   /**
    * Node pinned to the right edge of the option row — a rendered preview of
    * what the choice produces, a count, a badge. Keeps the row single-line, so
    * prefer it over `description` when the secondary content is a value rather
-   * than a sentence. Not searchable (use `label`, `description` or `title` for
+   * than a sentence. With `layout: "responsive"`, moves below the label in narrow menus.
+   * Not searchable (use `label`, `description` or `title` for
    * anything that must match a query), and ignored in tristate mode, whose row
    * is a full-width pill.
    */

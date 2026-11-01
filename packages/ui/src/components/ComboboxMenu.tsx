@@ -76,6 +76,7 @@ export function ComboboxMenu({
     >
       {header}
       <div
+        className={cn(filtered.some(option => option.layout === "responsive") && "@container/combobox-options")}
         id={header ? listId : undefined}
         role={header ? "listbox" : undefined}
         aria-label={header ? ariaLabel : undefined}
@@ -151,7 +152,7 @@ export function ComboboxMenu({
                 className={cn(
                   "flex cursor-pointer rounded-sm py-1.5 text-sm",
                   multiple ? "gap-2 px-2" : "gap-1.5 px-1.5",
-                  option.description && option.descriptionLayout !== "inline" ? "items-start" : "items-center",
+                  option.layout === "responsive" ? "items-start @min-[28rem]/combobox-options:items-center" : option.description && option.descriptionLayout !== "inline" ? "items-start" : "items-center",
                   index === highlighted && "bg-accent",
                   selected && !tristate && "font-medium",
                   option.disabled && "cursor-not-allowed opacity-50",
@@ -188,12 +189,12 @@ export function ComboboxMenu({
                     <LabelIcon
                       icon={option.icon}
                       className={cn(
-                        "text-sm text-muted-foreground",
+                        "shrink-0 text-sm text-muted-foreground",
                         option.description && option.descriptionLayout !== "inline" && "mt-1",
                       )}
                     />
                     <ComboboxOptionText option={option} />
-                    {option.trailing != null && (
+                    {option.trailing != null && option.layout !== "responsive" && (
                       // Capped and truncating rather than `shrink-0`: in a menu
                       // clamped by the viewport edge the label is what identifies
                       // the option, so the preview yields first.
@@ -259,10 +260,16 @@ export function ComboboxMenu({
 }
 
 function ComboboxOptionText({ option }: { option: ComboboxOption }) {
+  const responsive = option.layout === "responsive";
   return (
-    <span data-slot="combobox-option-text" className={cn("min-w-0 flex-1", option.descriptionLayout === "inline" && "flex items-center gap-2")}>
-      <span className="block min-w-0 truncate">{option.label}</span>
-      <ComboboxOptionDescription description={option.description} inline={option.descriptionLayout === "inline"} />
+    <span data-slot="combobox-option-text" className={cn("min-w-0 flex-1", responsive ? "flex flex-col gap-1 @min-[28rem]/combobox-options:flex-row @min-[28rem]/combobox-options:items-center @min-[28rem]/combobox-options:gap-2" : option.descriptionLayout === "inline" && "flex items-center gap-2")}>
+      <span className={cn("block min-w-0", responsive ? "whitespace-normal [overflow-wrap:anywhere] @min-[28rem]/combobox-options:flex-1 @min-[28rem]/combobox-options:truncate" : "truncate")}>{option.label}</span>
+      <ComboboxOptionDescription description={option.description} inline={option.descriptionLayout === "inline"} responsive={responsive} />
+      {responsive && option.trailing != null && (
+        <span className="min-w-0 text-xs font-normal text-muted-foreground @min-[28rem]/combobox-options:ml-auto @min-[28rem]/combobox-options:max-w-[55%] @min-[28rem]/combobox-options:truncate @min-[28rem]/combobox-options:pl-2 @min-[28rem]/combobox-options:text-right">
+          {option.trailing}
+        </span>
+      )}
     </span>
   );
 }
@@ -270,12 +277,14 @@ function ComboboxOptionText({ option }: { option: ComboboxOption }) {
 function ComboboxOptionDescription({
   description,
   inline = false,
+  responsive = false,
 }: {
   description: string | undefined;
   inline?: boolean;
+  responsive?: boolean;
 }) {
   return description ? (
-    <span className={cn("text-xs font-normal leading-4 text-muted-foreground", inline ? "min-w-0 max-w-[55%] shrink-0 truncate" : "mt-0.5 block whitespace-pre-line")}>
+    <span className={cn("text-xs font-normal leading-4 text-muted-foreground", responsive ? "min-w-0 whitespace-normal [overflow-wrap:anywhere] @min-[28rem]/combobox-options:max-w-[55%] @min-[28rem]/combobox-options:shrink-0 @min-[28rem]/combobox-options:truncate" : inline ? "min-w-0 max-w-[55%] shrink-0 truncate" : "mt-0.5 block whitespace-pre-line")}>
       {description}
     </span>
   ) : null;

@@ -444,6 +444,8 @@ export {
   type HoverCardPlacement,
 } from "./overlay/HoverCard";
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
+export { LocalPathPicker, type LocalPathPickerProps } from "./components/LocalPathPicker";
+export { isLocalHostname, type LocalPathLoader, type LocalPathListing } from "./components/local-path";
 export {
   ConfirmDialog,
   type ConfirmDialogProps,
