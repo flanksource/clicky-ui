@@ -103,6 +103,34 @@ describe("ProgressBars", () => {
     expect(screen.getByText("over last 1h")).toBeInTheDocument();
   });
 
+  it.each([
+    ["default", 4 * ONE_CORE],
+    ["cell", undefined],
+  ] as const)(
+    "%s variant shows an error in place of the reading, labelled and as the only hover row",
+    async (variant, max) => {
+      const message = 'unknown series "cpu.usage"';
+      const { container } = render(
+        <ProgressBars
+          variant={variant}
+          title="CPU"
+          usage={2.3 * ONE_CORE}
+          stats={{ min: 1000, max: 3000, avg: 2075 }}
+          error={new Error(message)}
+          {...(max !== undefined ? { max } : {})}
+        />,
+      );
+
+      const widget = screen.getByLabelText(`CPU: ${message}`);
+      expect(widget).toHaveTextContent(message);
+      expect(screen.queryByText("2.3 cores")).not.toBeInTheDocument();
+
+      fireEvent.mouseEnter(container.firstElementChild as HTMLElement);
+      expect(await screen.findByText("Error")).toBeInTheDocument();
+      expect(screen.queryByText("Current")).not.toBeInTheDocument();
+    },
+  );
+
   it("does not wrap in a hover card when hoverCard is false", () => {
     const { container } = render(
       <ProgressBars

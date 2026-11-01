@@ -40,6 +40,7 @@ export type ConnectionDashboardItem = {
   updatedAt: string;
   /** A virtual or read-only connection: the service answers 405 to saving or deleting it. */
   readOnly?: boolean;
+  source?: string;
   /** Problems loading the connection (e.g. an invalid file); it cannot be used until they are fixed. */
   warnings?: string[];
 };

@@ -12,7 +12,7 @@ const meta: Meta<typeof ProgressBars> = {
     docs: {
       description: {
         component:
-          "Quantised utilisation as a row of bars — one per unit of capacity (ceil of the limit) — filled by the usage, so the bar straddling the boundary is partially filled and trailing bars show headroom. Purely presentational: pass plain `usage`/`max` numbers (no data fetching). Defaults to CPU cores; pass `unit` (e.g. `{ perBar: 1 GiB, label: 'GB' }`) to render memory or any other capacity. `showValue` controls the caption, `orientation` switches the bars between vertical columns and horizontal rows, and an optional `stats` prop drives the hover card's min/max/avg rows. The pure `deriveProgressBars(usage, limit, perBar)` helper computes the model. (`TimeseriesCoreBars` wraps this with a live timeseries fetcher.)",
+          "Quantised utilisation as a row of bars — one per unit of capacity (ceil of the limit) — filled by the usage, so the bar straddling the boundary is partially filled and trailing bars show headroom. Purely presentational: pass plain `usage`/`max` numbers (no data fetching). Defaults to CPU cores; pass `unit` (e.g. `{ perBar: 1 GiB, label: 'GB' }`) to render memory or any other capacity. `showValue` controls the caption, `orientation` switches the bars between vertical columns and horizontal rows, an optional `stats` prop drives the hover card's min/max/avg rows, and an `error` replaces the reading with its message. The pure `deriveProgressBars(usage, limit, perBar)` helper computes the model. (`TimeseriesCoreBars` wraps this with a live timeseries fetcher.)",
       },
     },
   },
@@ -32,6 +32,7 @@ const meta: Meta<typeof ProgressBars> = {
     icon: { table: { disable: true } },
     unit: { table: { disable: true } },
     stats: { table: { disable: true } },
+    error: { table: { disable: true } },
     className: { table: { disable: true } },
   },
   render: (args) => (
@@ -134,6 +135,25 @@ export const CellVariants: Story = {
       </div>
     </div>
   ),
+};
+
+/**
+ * A failed read: `error` replaces the caption with the message in red, names it
+ * in the accessible label, and becomes the hover card's only row.
+ */
+export const WithError: Story = {
+  args: {
+    ...FourCores.args,
+    usage: undefined,
+    error: new Error('unknown series "cpu.usage"'),
+  },
+};
+
+export const CellWithError: Story = {
+  args: {
+    ...WithError.args,
+    variant: "cell",
+  },
 };
 
 /** Memory as one bar per GB via the `unit` prop: 2.5 GB used of 4 GB. */
