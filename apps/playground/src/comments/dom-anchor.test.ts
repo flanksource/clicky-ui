@@ -176,6 +176,23 @@ describe("cssPath", () => {
     const { content, hero } = mountPage();
     expect(cssPath(hero, content)).toBe('[data-comment-anchor="hero-card"]');
   });
+
+  it("keys a region on its empty data-* marker, so a banner inserted above it does not orphan it", () => {
+    document.body.innerHTML = `
+      <main id="artifact"><div><div class="tabs">tabs</div><div><div><div>title</div><div data-filter-bar="">pills</div></div></div></div></main>`;
+    const content = document.querySelector<HTMLElement>("#artifact")!;
+    const bar = content.querySelector("[data-filter-bar]")!;
+    const anchor = cssPath(bar, content);
+    content.insertAdjacentHTML("afterbegin", "<div>2 open comments no longer match</div>");
+    expect({ anchor, resolved: resolveAnchor(content, anchor) }).toEqual({ anchor: '[data-filter-bar=""]', resolved: bar });
+  });
+
+  it("never keys on tooling markers or valued data-* attributes", () => {
+    document.body.innerHTML = `
+      <main id="artifact"><div><span>a</span><span data-react-grab-frozen="" data-review-target="" data-state="open">b</span></div></main>`;
+    const content = document.querySelector<HTMLElement>("#artifact")!;
+    expect(cssPath(content.querySelector("[data-state]")!, content)).not.toMatch(/data-/);
+  });
 });
 
 describe("nearestHeading", () => {
