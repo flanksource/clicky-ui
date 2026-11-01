@@ -21,6 +21,11 @@ export default defineConfig({
       {
         extends: true,
         plugins: [storybookTest({ configDir, tags: { exclude: [BROWSER_TAG] } })],
+        // monaco-editor ships only a `module` entry, which Node resolution in jsdom
+        // can't load; collecting a browser-tagged Monaco story file still imports it.
+        resolve: {
+          alias: [{ find: /^monaco-editor$/, replacement: 'monaco-editor/esm/vs/editor/editor.api' }],
+        },
         test: {
           name: 'storybook',
           environment: 'jsdom',

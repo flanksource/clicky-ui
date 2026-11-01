@@ -113,6 +113,7 @@ export const Live: Story = {};
 export const Print: Story = { args: { static: true } };
 
 export const LargePlanSet: Story = {
+  tags: ["browser"],
   render: () => (
     <div className="w-48">
       <MatrixEnvHeader

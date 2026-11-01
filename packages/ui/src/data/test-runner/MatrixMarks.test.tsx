@@ -268,10 +268,10 @@ describe("MatrixEnvHeader", () => {
     expect(container.querySelector("[data-aside]")!.textContent).toBe("retried 2×");
   });
 
-  it("says an unavailable environment did not load, in the same three rows", () => {
+  it("says an unavailable environment did not load, beside its chip", () => {
     const { container } = render(<MatrixUnavailableEnvHeader context={ENV} />);
-    const rows = [...container.querySelector(`[data-env-header="${ENV}"]`)!.children].map((el) => el.textContent);
-    expect(rows).toEqual([ENV, "did not load", ""]);
+    const parts = [...container.querySelector(`[data-env-header="${ENV}"]`)!.children].map((el) => el.textContent);
+    expect(parts).toEqual([ENV, "did not load"]);
     expect(container.querySelector('[data-mark="error"]')).not.toBeNull();
   });
 });
