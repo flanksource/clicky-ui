@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +14,7 @@ import {
 } from "./agent-session-store";
 import { playgroundComments } from "./comments-server";
 import { readAll, writeAll, type StoredComment } from "./comments-store";
+import { createSource } from "./pages-store";
 import { StubCaptain } from "./testing/stub-captain";
 
 const SKILL_PATH = fileURLToPath(
@@ -26,6 +27,27 @@ const REPO_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const MODEL = "test-model-1";
 const RUNTIME = { spec: { model: MODEL, mode: "agent" } };
 const human = { name: "Reviewer", kind: "user" } as const;
+const WELCOME_SOURCE =
+  'export default () => <div data-review-id="toolbar">toolbar</div>;';
+
+/**
+ * Runs bash without blocking the event loop: the scripts curl the vite server
+ * that lives in this same worker, so a spawnSync would deadlock against it.
+ */
+function runBash(args: string[], input = "") {
+  return new Promise<{ status: number | null; stdout: string; stderr: string }>(
+    (resolve, reject) => {
+      const child = spawn("bash", args);
+      let stdout = "";
+      let stderr = "";
+      child.stdout.on("data", (chunk) => (stdout += chunk));
+      child.stderr.on("data", (chunk) => (stderr += chunk));
+      child.on("error", reject);
+      child.on("close", (status) => resolve({ status, stdout, stderr }));
+      child.stdin.end(input);
+    },
+  );
+}
 
 const first: StoredComment = {
   id: "first",
@@ -62,7 +84,11 @@ describe("playground shared agent session", () => {
       configFile: false,
       plugins: [
         playgroundAgentRuns(runs),
-        playgroundComments({ dir, onCreated: runs.autoRunComment }),
+        playgroundComments({
+          dir,
+          pagesDir: join(dir, "pages"),
+          onCreated: runs.autoRunComment,
+        }),
       ],
       server: { host: "127.0.0.1", port: 0 },
     });
@@ -78,6 +104,8 @@ describe("playground shared agent session", () => {
     mkdirSync(join(process.cwd(), ".tmp"), { recursive: true });
     dir = mkdtempSync(join(process.cwd(), ".tmp", "agent-runs-"));
     writeAll(dir, { welcome: [first, second] });
+    mkdirSync(join(dir, "pages"));
+    createSource(join(dir, "pages"), "welcome", WELCOME_SOURCE, ".tsx");
     captain = new StubCaptain();
     captainURL = await captain.listen();
     await startPlayground(captainURL);
@@ -150,11 +178,11 @@ describe("playground shared agent session", () => {
       const script = SESSION_TOOLS[name].exec
         .replaceAll("{{shq origin}}", `'${baseUrl}'`)
         .replaceAll("{{shq author}}", `'${MODEL}'`);
-      return spawnSync("bash", ["-c", script], { input: JSON.stringify(input), encoding: "utf8" });
+      return runBash(["-c", script], JSON.stringify(input));
     }
 
-    it("lists one page's unresolved threads", () => {
-      const listed = callTool("list_feedback", { page: "welcome" });
+    it("lists one page's unresolved threads", async () => {
+      const listed = await callTool("list_feedback", { page: "welcome" });
 
       expect(listed.status).toBe(0);
       const ids = (JSON.parse(listed.stdout) as { comments: StoredComment[] }).comments.map(
@@ -170,8 +198,8 @@ describe("playground shared agent session", () => {
         body: JSON.stringify({ author: { name: MODEL, kind: "agent" } }),
       });
 
-      const replied = callTool("reply_to_thread", { id: "first", body: "Bolded the heading; checked desktop and compact." });
-      const resolved = callTool("resolve_thread", { id: "first" });
+      const replied = await callTool("reply_to_thread", { id: "first", body: "Bolded the heading; checked desktop and compact." });
+      const resolved = await callTool("resolve_thread", { id: "first" });
 
       expect([replied.status, resolved.status]).toEqual([0, 0]);
       const reply = Object.values(readAll(dir))
@@ -184,8 +212,8 @@ describe("playground shared agent session", () => {
       expect(stored("first").status).toBe("resolved");
     });
 
-    it("fails with the API's reason when the thread cannot be resolved", () => {
-      const resolved = callTool("resolve_thread", { id: "missing" });
+    it("fails with the API's reason when the thread cannot be resolved", async () => {
+      const resolved = await callTool("resolve_thread", { id: "missing" });
 
       expect(resolved.status).not.toBe(0);
       expect(resolved.stderr).toContain('comment \\"missing\\" not found');
@@ -525,7 +553,11 @@ describe("playground shared agent session", () => {
       [
         "the comment is a review decision",
         { autoRun: true, runtime: RUNTIME },
-        { reviewDecision: "approved", anchor: '[data-review-id="toolbar"]' },
+        {
+          reviewDecision: "approved",
+          anchor: '[data-review-id="toolbar"]',
+          expectedSource: WELCOME_SOURCE,
+        },
       ],
     ])("does nothing when %s", async (_label, settings, body) => {
       await putSettings(settings);
@@ -657,7 +689,7 @@ describe("playground shared agent session", () => {
       const commands = /```sh\n([\s\S]*?)\n```/.exec(text)?.[1];
       if (!commands) throw new Error(`no sh block in:\n${text}`);
 
-      const result = spawnSync("bash", ["-euo", "pipefail", "-c", commands], { encoding: "utf8" });
+      const result = await runBash(["-euo", "pipefail", "-c", commands]);
 
       expect(result.status, result.stderr).toBe(0);
       expect(stored("first").status).toBe("resolved");

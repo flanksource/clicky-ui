@@ -56,3 +56,5 @@ packages/ui/src/generated/storybook/
 /.new
 /apps/playground/.facet/
 /pico.save
+/.tmp-comments.json
+.facet/

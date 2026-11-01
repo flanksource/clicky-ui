@@ -9,6 +9,7 @@ import {
   searchForWorkspaceRoot,
   type Alias,
 } from "vite";
+import { configDefaults } from "vitest/config";
 
 import {
   createAgentRuns,
@@ -215,8 +216,23 @@ export default defineConfig(({ mode }) => ({
     // The React artifact tests render through @testing-library, and the shared
     // setup stubs window.matchMedia — both need a DOM.
     environment: "jsdom",
-    pool: "vmThreads",
+    // .facet/ is a gitignored facet build tree whose src/ symlinks back into
+    // this app, so vitest would run every plugin test a second time through it.
+    exclude: [...configDefaults.exclude, ".facet/**", "src/pages/**"],
     maxWorkers: 2,
+    projects: [
+      {
+        extends: true,
+        test: { name: "app", exclude: ["plugins/**"], pool: "vmThreads" },
+      },
+      {
+        // The plugin tests boot a vite dev server; rolldown's native binding
+        // rejects RegExps created inside a vmThreads context, so they run in
+        // plain threads.
+        extends: true,
+        test: { name: "plugins", include: ["plugins/**/*.test.ts"], pool: "threads" },
+      },
+    ],
     setupFiles: ["./src/test/setup.ts"],
     server: {
       deps: {
