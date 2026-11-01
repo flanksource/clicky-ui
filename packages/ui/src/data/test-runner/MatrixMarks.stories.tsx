@@ -10,10 +10,15 @@ import {
   MatrixMark,
   MatrixMix,
   MatrixUnavailableEnvHeader,
+  type MatrixTick,
 } from "./MatrixMarks";
 
 const FINISHED: MatrixEnvCounts = { passed: 9, warned: 2, failed: 1, error: 0, running: 0, queued: 0, total: 12 };
 const RUNNING: MatrixEnvCounts = { passed: 4, warned: 1, failed: 0, error: 1, running: 2, queued: 4, total: 12 };
+
+const plans = (marks: MatrixTick["mark"][]): MatrixTick[] => marks.map((mark, i) => ({ label: `plan-${i + 1}`, mark }));
+const FINISHED_PLANS = plans(["passed", "passed", "warned", "passed", "passed", "failed", "passed", "passed", "warned", "passed", "passed", "passed"]);
+const RUNNING_PLANS = plans(["passed", "passed", "error", "passed", "warned", "passed", "running", "running", "pending", "pending", "pending", "pending"]);
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -59,6 +64,7 @@ function MatrixVocabulary({ static: isStatic }: { static: boolean }) {
             <MatrixEnvHeader
               context="staging"
               counts={FINISHED}
+              plans={FINISHED_PLANS}
               durationMs={3_780_000}
               running={false}
               static={isStatic}
@@ -70,7 +76,7 @@ function MatrixVocabulary({ static: isStatic }: { static: boolean }) {
             />
           </div>
           <div className="px-3 py-2">
-            <MatrixEnvHeader context="dev" counts={RUNNING} durationMs={252_000} running static={isStatic} />
+            <MatrixEnvHeader context="dev" counts={RUNNING} plans={RUNNING_PLANS} durationMs={252_000} running static={isStatic} />
           </div>
           <div className="px-3 py-2">
             <MatrixUnavailableEnvHeader context="uat" />

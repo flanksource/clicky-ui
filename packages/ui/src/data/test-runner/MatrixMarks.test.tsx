@@ -16,11 +16,20 @@ import {
   MatrixLegend,
   MatrixMark,
   MatrixMix,
+  MatrixHeatmap,
   MatrixUnavailableEnvHeader,
+  type MatrixTick,
 } from "./MatrixMarks";
 
 const ENV = "dev";
 const RUNNING_ENV: MatrixEnvCounts = { passed: 2, warned: 1, failed: 0, error: 0, running: 1, queued: 1, total: 5 };
+const RUNNING_PLANS: MatrixTick[] = [
+  { label: "smoke", mark: "passed" },
+  { label: "claims", mark: "warned" },
+  { label: "renewal", mark: "running" },
+  { label: "billing", mark: "pending" },
+  { label: "statement", mark: "passed" },
+];
 
 const mixOutcomes = (container: HTMLElement) =>
   [...container.querySelectorAll("[data-mix-outcome]")].map((el) => [el.getAttribute("data-mix-outcome"), el.getAttribute("aria-label")]);
@@ -84,6 +93,30 @@ describe("MatrixMix", () => {
   });
 });
 
+describe("MatrixHeatmap", () => {
+  const ticks = (container: HTMLElement) =>
+    [...container.querySelectorAll("[data-heatmap] [data-tick-outcome]")].map((el) => [el.getAttribute("data-tick-outcome"), el.getAttribute("title")]);
+
+  it("draws one tick per item in the given order, each titled with its position, label and outcome", () => {
+    const { container } = render(<MatrixHeatmap ticks={RUNNING_PLANS} unit="plans" />);
+    expect(ticks(container)).toEqual([
+      ["passed", "1. smoke · passed"],
+      ["warned", "2. claims · warned"],
+      ["running", "3. renewal · running"],
+      ["pending", "4. billing · pending"],
+      ["passed", "5. statement · passed"],
+    ]);
+    expect(container.querySelector("[data-heatmap]")?.getAttribute("aria-label")).toBe("5 plans");
+  });
+
+  it("fills a tick with its mark's bar colour, and a mark with no bar (pending, absent) with the muted track", () => {
+    const marks = ["failed", "pending", "absent"] as const;
+    const { container } = render(<MatrixHeatmap ticks={marks.map((mark) => ({ label: mark, mark }))} unit="steps" />);
+    const fills = [...container.querySelectorAll("[data-tick-outcome]")].map((el) => ["bg-red-600", "bg-muted"].filter((c) => el.classList.contains(c)));
+    expect(fills).toEqual([["bg-red-600"], ["bg-muted"], ["bg-muted"]]);
+  });
+});
+
 describe("static (print) mode", () => {
   const animated = (container: HTMLElement) => container.innerHTML.match(/animate-[a-z]+/g) ?? [];
   const everything = (isStatic: boolean) => (
@@ -91,7 +124,7 @@ describe("static (print) mode", () => {
       <MatrixMark mark="running" static={isStatic} />
       <MatrixMix counts={{ running: 2, passed: 1 }} unit="steps" static={isStatic} />
       <MatrixLegend static={isStatic} />
-      <MatrixEnvHeader context={ENV} counts={RUNNING_ENV} durationMs={61_000} running static={isStatic} />
+      <MatrixEnvHeader context={ENV} counts={RUNNING_ENV} plans={RUNNING_PLANS} durationMs={61_000} running static={isStatic} />
     </div>
   );
 
@@ -113,7 +146,7 @@ describe("static (print) mode", () => {
 
   it("never renders the chip link slot", () => {
     const { container } = render(
-      <MatrixEnvHeader context={ENV} counts={RUNNING_ENV} durationMs={0} running={false} static renderChip={(chip) => <a href="/run">{chip}</a>} />,
+      <MatrixEnvHeader context={ENV} counts={RUNNING_ENV} plans={RUNNING_PLANS} durationMs={0} running={false} static renderChip={(chip) => <a href="/run">{chip}</a>} />,
     );
     expect(container.querySelector("a")).toBeNull();
     expect(container.querySelector(`[data-env-chip="${ENV}"]`)).not.toBeNull();
@@ -169,7 +202,7 @@ describe("EmptyMatrixCell", () => {
 
 describe("MatrixEnvHeader", () => {
   it("shows the chip, finished/total plans with the elapsed time, and the plan verdict", () => {
-    const { container } = render(<MatrixEnvHeader context={ENV} counts={RUNNING_ENV} durationMs={61_000} running />);
+    const { container } = render(<MatrixEnvHeader context={ENV} counts={RUNNING_ENV} plans={RUNNING_PLANS} durationMs={61_000} running />);
     const progress = container.querySelector("[data-env-progress]")!;
     expect(progress.getAttribute("title")).toBe("3 of 5 plans finished");
     expect(progress.textContent).toBe("3/5 plans1m 01s");
@@ -182,11 +215,19 @@ describe("MatrixEnvHeader", () => {
     ]);
   });
 
-  it("colours the progress bar in plan-bar order", () => {
-    const counts: MatrixEnvCounts = { passed: 1, warned: 1, failed: 1, error: 1, running: 1, queued: 0, total: 5 };
-    const { container } = render(<MatrixEnvHeader context={ENV} counts={counts} durationMs={0} running={false} />);
-    const fills = [...container.querySelectorAll("[role=progressbar] > div")].map((el) => el.getAttribute("title"));
-    expect(fills).toEqual(["1 passed plans", "1 warned plans", "1 failed plans", "1 error plans", "1 running plans"]);
+  it("draws the plans' progress as a heatmap of one tick per plan in row order, not an aggregate bar", () => {
+    const { container } = render(<MatrixEnvHeader context={ENV} counts={RUNNING_ENV} plans={RUNNING_PLANS} durationMs={0} running />);
+    const progress = container.querySelector("[data-env-progress]")!;
+    expect({
+      ticks: [...progress.querySelectorAll("[data-tick-outcome]")].map((el) => el.getAttribute("data-tick-outcome")),
+      bar: progress.querySelector("[role=progressbar]"),
+    }).toEqual({ ticks: RUNNING_PLANS.map((p) => p.mark), bar: null });
+  });
+
+  it("throws when the plans disagree with the counts' total", () => {
+    expect(() => render(<MatrixEnvHeader context={ENV} counts={RUNNING_ENV} plans={RUNNING_PLANS.slice(1)} durationMs={0} running={false} />)).toThrow(
+      "dev header has 4 plan ticks but counts 5 plans",
+    );
   });
 
   it("wraps the chip in the host's link and puts the aside beside it", () => {
@@ -194,6 +235,7 @@ describe("MatrixEnvHeader", () => {
       <MatrixEnvHeader
         context={ENV}
         counts={RUNNING_ENV}
+        plans={RUNNING_PLANS}
         durationMs={0}
         running={false}
         renderChip={(chip) => <a href="/run/1">{chip}</a>}

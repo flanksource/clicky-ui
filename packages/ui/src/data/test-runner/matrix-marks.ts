@@ -46,9 +46,6 @@ export type MatrixCounts = Partial<Record<MatrixMarkKey, number>>;
 
 export const MATRIX_ORDER = Object.keys(MATRIX_MARKS) as readonly MatrixMarkKey[];
 
-/** The plan outcomes an environment header's progress bar fills, left to right. */
-export const MATRIX_PLAN_BAR = ["passed", "warned", "failed", "error", "running"] as const;
-
 /** One environment's plan totals, as its matrix column header reads them. */
 export type MatrixEnvCounts = {
   passed: number;
@@ -74,9 +71,9 @@ export function repeatsMark(counts: MatrixCounts, mark: MatrixMarkKey): boolean 
   return nonZero.length === 1 && nonZero[0] === mark;
 }
 
-/** A mark's progress-bar fill; static (print) drops its animate-* classes. */
-export function matrixBarClass(mark: (typeof MATRIX_PLAN_BAR)[number], isStatic: boolean): string {
-  const bar: string = MATRIX_MARKS[mark].bar;
+/** A mark's progress-bar fill, the muted track for one with none; static (print) drops its animate-* classes. */
+export function matrixBarClass(mark: MatrixMarkKey, isStatic: boolean): string {
+  const bar: string = (MATRIX_MARKS[mark] as MatrixMarkToken).bar ?? "bg-muted";
   return isStatic ? bar.split(" ").filter((c) => !c.startsWith("animate-")).join(" ") : bar;
 }
 
