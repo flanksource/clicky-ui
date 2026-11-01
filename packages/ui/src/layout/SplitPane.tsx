@@ -30,6 +30,12 @@ export type SplitPaneProps = {
    * a narrow column stacks even on a wide screen.
    */
   stackOnMobile?: boolean;
+  /**
+   * With `stackOnMobile`, pages the narrow split instead of stacking it: only
+   * this pane renders, at full height, and the other appears again once the
+   * split is 48rem wide. A list/detail host sets it from its selection.
+   */
+  mobilePane?: "left" | "right";
 };
 
 export function SplitPane({
@@ -42,7 +48,15 @@ export function SplitPane({
   rightClass,
   className,
   stackOnMobile = false,
+  mobilePane,
 }: SplitPaneProps) {
+  const paged = stackOnMobile && mobilePane !== undefined;
+  const narrowPane = (pane: "left" | "right") =>
+    !paged
+      ? undefined
+      : mobilePane === pane
+        ? "flex-1 @3xl/split-pane:block"
+        : "hidden @3xl/split-pane:block";
   const [split, setSplit] = useState(defaultSplit);
   const dragging = useRef(false);
   const container = useRef<HTMLDivElement>(null);
@@ -89,11 +103,16 @@ export function SplitPane({
             ? ({ "--split-pane-width": `${split}%` } as CSSProperties)
             : { width: `${split}%` }
         }
+        data-slot={stackOnMobile ? "split-pane-left" : undefined}
         className={cn(
           "min-h-0 overflow-y-auto bg-background",
           stackOnMobile &&
-            "w-full max-h-[40%] shrink-0 border-b border-border @3xl/split-pane:max-h-none @3xl/split-pane:border-b-0 @3xl/split-pane:w-[var(--split-pane-width)]",
+            "w-full shrink-0 @3xl/split-pane:w-[var(--split-pane-width)] @3xl/split-pane:flex-none",
+          stackOnMobile &&
+            !paged &&
+            "max-h-[40%] border-b border-border @3xl/split-pane:max-h-none @3xl/split-pane:border-b-0",
           leftClass,
+          narrowPane("left"),
         )}
       >
         {left}
@@ -113,11 +132,13 @@ export function SplitPane({
             ? ({ "--split-pane-width": `${100 - split}%` } as CSSProperties)
             : { width: `${100 - split}%` }
         }
+        data-slot={stackOnMobile ? "split-pane-right" : undefined}
         className={cn(
           "min-h-0 overflow-hidden bg-background",
           stackOnMobile &&
             "w-full flex-1 @3xl/split-pane:flex-none @3xl/split-pane:w-[var(--split-pane-width)]",
           rightClass,
+          narrowPane("right"),
         )}
       >
         {right}

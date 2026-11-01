@@ -50,9 +50,10 @@ function closedPayload(status: number, error?: string) {
 }
 
 // fetchLog records every POST subscribe / DELETE unsubscribe the hub issues,
-// and fetchResponses lets a test script a status per call (default 204).
+// and fetchResponses lets a test script a status (and optionally a body) per
+// call (default 204, no body).
 let fetchLog: { url: string; method: string; body?: unknown }[] = [];
-let fetchResponses: (number | (() => number))[] = [];
+let fetchResponses: (number | (() => number) | { status: number; body: string })[] = [];
 
 function installFetchMock() {
   vi.stubGlobal(
@@ -62,10 +63,19 @@ function installFetchMock() {
       const method = init?.method ?? "GET";
       fetchLog.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
       const scripted = fetchResponses.shift();
+      if (typeof scripted === "object") return new Response(scripted.body, { status: scripted.status });
       const status = typeof scripted === "function" ? scripted() : (scripted ?? 204);
       return new Response(null, { status });
     }),
   );
+}
+
+// errorMessages records what each error event a stream dispatches says: the
+// ErrorEvent message of a failed sub, or null for a bare transport-style event.
+function recordErrorMessages(stream: EventSourceLike): (string | null)[] {
+  const messages: (string | null)[] = [];
+  stream.addEventListener("error", (event) => messages.push(event instanceof ErrorEvent ? event.message : null));
+  return messages;
 }
 
 async function flush() {
@@ -271,10 +281,64 @@ describe("createEventHub", () => {
 
     expect(stream.readyState).toBe(2);
     expect(errored).toHaveBeenCalledTimes(1);
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("/api/todos/session/stream"), "boom");
+    expect(errorSpy).toHaveBeenCalledWith("[event-hub] /api/todos/session/stream failed (status 500): boom");
 
     await flush();
     expect(posts()).toHaveLength(1); // no retry
+  });
+
+  it.each([
+    // http.Error bodies end in a newline; the message drops only trailing whitespace.
+    ["the server's error text", closedPayload(400, 'unknown series "foo"\n'), 'unknown series "foo"'],
+    ["that no error text was sent", closedPayload(400), "sub closed with status 400 and no error message"],
+  ])("surfaces %s as the error event's message on a non-2xx __closed frame", async (_label, payload, expected) => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const open = createEventHub();
+    const stream = open("/api/v1/metrics/stream?id=foo");
+    const real = FakeRealEventSource.instances[0];
+    real.emit("__hello", helloPayload("conn-1"));
+    await flush();
+
+    const messages = recordErrorMessages(stream);
+    const onerror = vi.fn();
+    stream.onerror = onerror;
+    real.emit("s1/__closed", payload);
+
+    expect({
+      messages,
+      onerror: onerror.mock.calls.map(([event]) => (event as ErrorEvent).message),
+      readyState: stream.readyState,
+    }).toEqual({ messages: [expected], onerror: [expected], readyState: 2 });
+  });
+
+  it.each([
+    ["the server's JSON error", { status: 400, body: '{"error":"sub path \\"/x\\" must be under /api/"}\n' }, 'sub path "/x" must be under /api/'],
+    ["a non-JSON body verbatim", { status: 502, body: "Bad Gateway" }, "subscribe failed with status 502: Bad Gateway"],
+    ["that no body was sent", 403, "subscribe failed with status 403 and no error message"],
+  ])("surfaces %s as the error event's message when the subscribe request is refused", async (_label, response, expected) => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    fetchResponses = [response];
+    const open = createEventHub();
+    const stream = open("/x");
+    const messages = recordErrorMessages(stream);
+
+    FakeRealEventSource.instances[0].emit("__hello", helloPayload("conn-1"));
+    await vi.waitFor(() => expect(messages).toHaveLength(1));
+
+    expect({ messages, readyState: stream.readyState }).toEqual({ messages: [expected], readyState: 2 });
+  });
+
+  it("dispatches a bare (message-less) error event for a real connection drop", async () => {
+    const open = createEventHub();
+    const stream = open("/api/prs/stream");
+    const real = FakeRealEventSource.instances[0];
+    real.emit("__hello", helloPayload("conn-1"));
+    await flush();
+
+    const messages = recordErrorMessages(stream);
+    real.fail();
+
+    expect(messages).toEqual([null]);
   });
 
   it("marks every sub CONNECTING with an error on a real connection drop, then re-subscribes all of them on the next hello", async () => {

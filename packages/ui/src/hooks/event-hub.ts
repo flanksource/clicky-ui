@@ -143,11 +143,29 @@ export function createEventHub(options: EventHubOptions = {}): EventSourceFactor
     onBuildMismatch();
   }
 
-  function failSub(sub: Sub, message: string, cause?: unknown): void {
+  // failSub ends a sub for good. Its error event is an ErrorEvent whose
+  // `message` is what the server said (a __closed frame's `error`, or a refused
+  // subscribe's `{"error"}` body), so a consumer can show the real reason; a
+  // transport-style drop stays a bare Event, as native EventSource sends.
+  function failSub(sub: Sub, message: string, context: { status?: number; cause?: unknown } = {}): void {
     sub.readyState = READY_STATE_CLOSED;
-    dispatch(sub, "error", new Event("error"));
-    if (cause !== undefined) console.error(`[event-hub] ${message} for ${sub.url}:`, cause);
-    else console.error(`[event-hub] ${message} for ${sub.url}`);
+    dispatch(sub, "error", new ErrorEvent("error", { message }));
+    const status = context.status === undefined ? "" : ` (status ${context.status})`;
+    const line = `[event-hub] ${sub.url} failed${status}: ${message}`;
+    if (context.cause !== undefined) console.error(line, context.cause);
+    else console.error(line);
+  }
+
+  async function refusedSubscribeMessage(res: Response): Promise<string> {
+    const body = (await res.text()).trim();
+    if (body === "") return `subscribe failed with status ${res.status} and no error message`;
+    let error: unknown;
+    try {
+      error = (JSON.parse(body) as { error?: unknown }).error;
+    } catch {
+      // Not the hub's JSON error shape (e.g. a proxy's HTML/text page): show it verbatim.
+    }
+    return typeof error === "string" && error !== "" ? error : `subscribe failed with status ${res.status}: ${body}`;
   }
 
   async function postSub(sub: Sub): Promise<void> {
@@ -169,10 +187,12 @@ export function createEventHub(options: EventHubOptions = {}): EventSourceFactor
         return;
       }
       if (res.status === 404) return; // stale conn id; the next __hello retries
-      failSub(sub, `subscribe failed: ${res.status}`);
+      const message = await refusedSubscribeMessage(res);
+      if (stale()) return;
+      failSub(sub, message, { status: res.status });
     } catch (err) {
       if (stale()) return;
-      failSub(sub, "subscribe request failed", err);
+      failSub(sub, `subscribe request failed: ${err instanceof Error ? err.message : String(err)}`, { cause: err });
     }
   }
 
@@ -259,13 +279,15 @@ export function createEventHub(options: EventHubOptions = {}): EventSourceFactor
     sub.routedHandlers.set(eventName, handler);
   }
 
+  // A sub's __closed frame is clicky sse hubClosed: {"status": int,
+  // "error"?: string}, `error` being the handler's (≤500 byte) response body.
   function onSubClosed(sub: Sub, event: MessageEvent): void {
     if (sub.disposed) return;
     let payload: { status: number; error?: string };
     try {
       payload = JSON.parse(event.data) as { status: number; error?: string };
     } catch (err) {
-      failSub(sub, "closed frame was malformed", err);
+      failSub(sub, `sub closed with a malformed __closed frame: ${String(event.data)}`, { cause: err });
       return;
     }
     if (payload.status >= 200 && payload.status < 300) {
@@ -279,7 +301,11 @@ export function createEventHub(options: EventHubOptions = {}): EventSourceFactor
       }, RESUBSCRIBE_DELAY_MS);
       return;
     }
-    failSub(sub, `sub closed with status ${payload.status}`, payload.error);
+    // http.Error bodies end in a newline; only trailing whitespace is dropped.
+    const error = payload.error?.trimEnd() ?? "";
+    failSub(sub, error !== "" ? error : `sub closed with status ${payload.status} and no error message`, {
+      status: payload.status,
+    });
   }
 
   // routeClosed wires the sub's terminal frame: unlike every other name, its
