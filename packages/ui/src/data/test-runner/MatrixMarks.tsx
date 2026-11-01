@@ -6,11 +6,9 @@
 import type { ReactNode } from "react";
 import { UiClock, UiServer } from "../../icons";
 import { cn } from "../../lib/utils";
-import { ProgressBar } from "../ProgressBar";
 import {
   MATRIX_MARKS,
   MATRIX_ORDER,
-  MATRIX_PLAN_BAR,
   formatMatrixDuration,
   matrixBarClass,
   type MatrixCounts,
@@ -86,6 +84,32 @@ export function MatrixElapsed({ ms, running, clock = false }: MatrixElapsedProps
   );
 }
 
+/** One heatmap tick: an item (a plan, a step) and its outcome. */
+export type MatrixTick = { label: string; mark: MatrixMarkKey };
+
+export type MatrixHeatmapProps = {
+  /** In run order: where a run is and where it broke read left to right. */
+  ticks: readonly MatrixTick[];
+  unit: "steps" | "plans";
+  static?: boolean;
+};
+
+/** One tick per item, filled with its outcome's bar colour. */
+export function MatrixHeatmap({ ticks, unit, static: isStatic = false }: MatrixHeatmapProps) {
+  return (
+    <span className="flex h-3 min-w-10 flex-1 items-stretch gap-px" aria-label={`${ticks.length} ${unit}`} data-heatmap={unit}>
+      {ticks.map((tick, i) => (
+        <span
+          key={i}
+          title={`${i + 1}. ${tick.label} · ${MATRIX_MARKS[tick.mark].label}`}
+          className={cn("min-w-[3px] max-w-4 flex-1 rounded-[1px]", matrixBarClass(tick.mark, isStatic))}
+          data-tick-outcome={tick.mark}
+        />
+      ))}
+    </span>
+  );
+}
+
 export type EmptyMatrixCellProps = {
   /** The cell outcome: "queued", "absent", or "error" with detail "never started". Anything else throws. */
   outcome: string;
@@ -157,6 +181,8 @@ const HEADER_ROW = "flex h-5 min-w-0 items-center gap-2";
 export type MatrixEnvHeaderProps = {
   context: string;
   counts: MatrixEnvCounts;
+  /** Every plan the counts total, in row order, drawn as the progress heatmap. */
+  plans: readonly MatrixTick[];
   durationMs: number;
   /** The environment's run is still running: its elapsed time is still counting. */
   running: boolean;
@@ -169,9 +195,11 @@ export type MatrixEnvHeaderProps = {
 
 /**
  * One environment's column head in three fixed rows: its chip, the plans'
- * progress with the elapsed time, and the plan verdict naming its units.
+ * progress as a heatmap with the elapsed time, and the plan verdict naming
+ * its units.
  */
-export function MatrixEnvHeader({ context, counts, durationMs, running, renderChip, aside, static: isStatic = false }: MatrixEnvHeaderProps) {
+export function MatrixEnvHeader({ context, counts, plans, durationMs, running, renderChip, aside, static: isStatic = false }: MatrixEnvHeaderProps) {
+  if (plans.length !== counts.total) throw new Error(`${context} header has ${plans.length} plan ticks but counts ${counts.total} plans`);
   const done = counts.passed + counts.warned + counts.failed + counts.error;
   const chip = <EnvChip context={context} />;
   return (
@@ -181,13 +209,7 @@ export function MatrixEnvHeader({ context, counts, durationMs, running, renderCh
         {aside}
       </div>
       <div className={HEADER_ROW} title={`${done} of ${counts.total} plans finished`} data-env-progress="">
-        <span className="min-w-0 flex-1">
-          <ProgressBar
-            total={counts.total}
-            height="h-1.5"
-            segments={MATRIX_PLAN_BAR.map((key) => ({ count: counts[key], color: matrixBarClass(key, isStatic), label: `${MATRIX_MARKS[key].label} plans` }))}
-          />
-        </span>
+        <MatrixHeatmap ticks={plans} unit="plans" static={isStatic} />
         <span className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-foreground">
           {done}/{counts.total} plans
         </span>
