@@ -8,7 +8,12 @@ import {
   type ProgressBarsVariant,
 } from "./ProgressBars";
 import { seriesStats } from "./gauge-stats";
-import { defaultTimeseriesFetcher, latestValue, useTimeseriesQueries } from "./timeseries-query";
+import {
+  defaultTimeseriesFetcher,
+  latestValue,
+  soleSeries,
+  useTimeseriesQueries,
+} from "./timeseries-query";
 
 export interface TimeseriesCoreBarsProps {
   /** Common prefix; the value/max requests are `baseUrl + id` (unless a series has `load`). */
@@ -94,7 +99,10 @@ export function TimeseriesCoreBars({
     fetcher,
   });
 
-  const rawValue = latestValue(results[0]?.data);
+  const valueRead = soleSeries(value.id, results[0]);
+  const maxRead = maxSeries ? soleSeries(maxSeries.id, results[1]) : undefined;
+  const error = valueRead.error ?? maxRead?.error ?? null;
+  const rawValue = latestValue(valueRead.data);
   const usage =
     rawValue === undefined
       ? undefined
@@ -106,7 +114,7 @@ export function TimeseriesCoreBars({
   if (typeof max === "number") {
     limit = max;
   } else if (maxSeries) {
-    const rawMax = latestValue(results[1]?.data);
+    const rawMax = latestValue(maxRead?.data);
     limit =
       rawMax === undefined
         ? undefined
@@ -115,12 +123,13 @@ export function TimeseriesCoreBars({
           : rawMax;
   }
 
-  const stats = seriesStats(results[0]?.data?.points, value.transform);
+  const stats = seriesStats(valueRead.data?.points, value.transform);
 
   return (
     <ProgressBars
       usage={usage}
       stats={stats}
+      error={error}
       title={title}
       thresholds={thresholds}
       variant={variant}

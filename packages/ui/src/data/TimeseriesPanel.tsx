@@ -20,6 +20,7 @@ import { UiFullscreen } from "../icons";
 import { Icon, type StaticIconComponent } from "./Icon";
 import { assignAxes, latestOf } from "./TimeseriesPanel.axes";
 import {
+  expandServedSeries,
   mergeSeries,
   resolveBreakdown,
   resolveSeries,
@@ -34,6 +35,7 @@ import { defaultTimeseriesFetcher, useTimeseriesQueries } from "./timeseries-que
 export type { AxisAssignment, AxisOrientation, AxisSpec } from "./TimeseriesPanel.axes";
 export type {
   BreakdownItem,
+  DisplaySeries,
   MergedRow,
   ResolvedSeries,
   SeriesLoadContext,
@@ -43,6 +45,7 @@ export type {
   TimeseriesReferenceLine,
   TimeseriesResponse,
   TimeseriesSeries,
+  TimeseriesServerSeries,
 } from "./TimeseriesPanel.model";
 
 function formatClock(at: string): string {
@@ -74,18 +77,19 @@ export function TimeseriesPanel(props: TimeseriesPanelProps) {
 
   const [expanded, setExpanded] = useState(false);
 
-  const series = useMemo(() => resolveSeries(props), [props]);
+  const requested = useMemo(() => resolveSeries(props), [props]);
   const results = useTimeseriesQueries(
-    series.map((s) => ({ id: s.key, load: s.load })),
+    requested.map((s) => ({ id: s.key, load: s.load })),
     { baseUrl: props.baseUrl ?? "", range, refreshMs, fetcher },
   );
   const refs = referenceLines ?? [];
 
-  const isError = results.some((r) => r.isError);
-  const error = results.find((r) => r.isError)?.error;
-  const isLoading = results.some((r) => r.isLoading) && results.every((r) => !r.data);
-  const pointsBySeries = results.map((r) => r.data?.points);
-  const rows = useMemo(() => mergeSeries(series, pointsBySeries), [series, pointsBySeries]);
+  const error = results.find((r) => r.error)?.error ?? null;
+  const isError = error !== null;
+  const isLoading = results.some((r) => r.isLoading) && results.every((r) => !r.series);
+  const served = results.map((r) => r.series);
+  const { series, points } = useMemo(() => expandServedSeries(props, served), [props, served]);
+  const rows = useMemo(() => mergeSeries(series, points), [series, points]);
   const hasMirrored = series.some((s) => s.transform);
   const breakdown = useMemo(
     () => (isBreakdown ? resolveBreakdown(series, rows, total) : null),
@@ -122,10 +126,10 @@ export function TimeseriesPanel(props: TimeseriesPanelProps) {
         </span>
       </div>
       <div className="mt-2" style={breakdown ? undefined : { height }}>
-        {breakdown ? (
+        {error ? (
+          <PanelMessage>{error.message || "Failed to load metric"}</PanelMessage>
+        ) : breakdown ? (
           <BreakdownView total={breakdown.total} unit={unit} items={breakdown.items} />
-        ) : isError ? (
-          <PanelMessage>{(error as Error)?.message ?? "Failed to load metric"}</PanelMessage>
         ) : isLoading ? (
           <PanelMessage>Loading…</PanelMessage>
         ) : rows.length < 2 ? (

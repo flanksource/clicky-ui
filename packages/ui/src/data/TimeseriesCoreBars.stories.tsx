@@ -192,6 +192,17 @@ export const CellVariants: Story = {
   render: () => <CoreBarsCellVariants />,
 };
 
+/** A failed read is passed to ProgressBars' `error`, which shows the server's message. */
+export const FetchError: Story = {
+  args: {
+    ...FourCores.args,
+    value: { id: "cpu.missing" },
+    fetcher: async (url: string) => {
+      throw new Error(`GET ${url}: 404 unknown series "cpu.missing"`);
+    },
+  },
+};
+
 /** Memory as one bar per GB via the `unit` prop: 2.5 GB used of 4 GB. */
 export const MemoryGigabytes: Story = {
   args: {
