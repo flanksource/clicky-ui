@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { LintFilterBar } from "./LintFilterBar";
 import { emptyLintFilters, type LintFilters } from "./types";
 import { betterleaks, eslint, golangci } from "./LintResults.fixtures";
@@ -19,50 +19,67 @@ function renderBar(filters: LintFilters, results = [golangci, eslint]) {
   return { onFiltersChange, onGroupingChange };
 }
 
+function openFacet(name: string) {
+  fireEvent.click(screen.getByRole("button", { name: /^View Options/ }));
+  const menu = screen.getByRole("region", { name });
+  const options = Array.from(menu.querySelectorAll<HTMLElement>("[data-filter-option]"));
+  return {
+    menu,
+    values: options.map((o) => o.getAttribute("data-filter-option")),
+    texts: options.map((o) => o.textContent),
+  };
+}
+
 describe("LintFilterBar", () => {
   it("reports the grouping whose pill is clicked", () => {
     const { onGroupingChange } = renderBar(emptyLintFilters());
+    fireEvent.click(screen.getByRole("button", { name: /^View Options/ }));
     fireEvent.click(screen.getByTitle("Group by File · Linter · Rule"));
     expect(onGroupingChange).toHaveBeenCalledWith("file-linter-rule");
   });
 
-  it("hides a severity nobody reported until a severity filter is active", () => {
-    const results = [betterleaks];
+  it("offers only reported severities until a severity filter is active", () => {
     const { unmount } = render(
       <LintFilterBar
-        results={results}
+        results={[betterleaks]}
         grouping="summary"
         onGroupingChange={vi.fn()}
         filters={emptyLintFilters()}
         onFiltersChange={vi.fn()}
       />,
     );
-    expect(screen.getByTitle("Error: neutral. Click to include")).toBeInTheDocument();
-    expect(screen.queryByTitle("Warning: neutral. Click to include")).toBeNull();
+    expect(openFacet("Severity").values).toEqual(["error"]);
     unmount();
 
     const filters = emptyLintFilters();
     filters.severity.set("error", "include");
-    renderBar(filters, results);
-    expect(screen.getByTitle("Warning: neutral. Click to include")).toBeInTheDocument();
+    renderBar(filters, [betterleaks]);
+    expect(openFacet("Severity").values).toEqual(["error", "warning", "info"]);
+  });
+
+  it("includes a severity when its option is picked", () => {
+    const { onFiltersChange } = renderBar(emptyLintFilters());
+    fireEvent.click(within(openFacet("Severity").menu).getByText("Warning"));
+    expect(onFiltersChange).toHaveBeenLastCalledWith({ severity: new Map([["warning", "include"]]), linter: new Map() });
   });
 
   it("counts each linter's violations through the active severity filter", () => {
     const filters = emptyLintFilters();
     filters.severity.set("warning", "include");
     renderBar(filters);
-    // golangci-lint has one warning, eslint has one warning.
-    const golang = screen.getByTitle("golangci-lint: neutral. Click to include");
-    expect(golang.textContent).toContain("1");
-    const esl = screen.getByTitle("eslint: neutral. Click to include");
-    expect(esl.textContent).toContain("1");
+    // golangci-lint and eslint each report one warning.
+    const { values, texts } = openFacet("Linter");
+    expect(values).toEqual(["eslint", "golangci-lint"]);
+    expect(texts.every((t) => t?.includes("1"))).toBe(true);
   });
 
-  it("cycles a linter from excluded back to neutral", () => {
+  it("summarises included and excluded linters on the trigger and clears them", () => {
     const filters = emptyLintFilters();
     filters.linter.set("eslint", "exclude");
     const { onFiltersChange } = renderBar(filters);
-    fireEvent.click(screen.getByTitle("eslint: excluded. Click to clear"));
+    expect(screen.getByRole("button", { name: /^View Options/ })).toHaveTextContent("(1)");
+    openFacet("Linter");
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     expect(onFiltersChange).toHaveBeenCalledWith(emptyLintFilters());
   });
 });

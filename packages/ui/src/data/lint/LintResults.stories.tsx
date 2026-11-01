@@ -27,7 +27,7 @@ const meta: Meta<typeof LintResults> = {
     docs: {
       description: {
         component:
-          "Lint results as a filterable, groupable tree beside a detail pane, with optional ignore actions. Controlled: the host owns grouping, tri-state severity and linter filters, selection (a stable route path) and expand state, so all of it can live in the URL. A linter that failed to run is listed under its name with its error, never dropped. Ignore actions are descriptions handed to `onIgnore`; nothing is written by the component.",
+          "Lint results use compact rows with inline source expansion. View Options contains grouping and tri-state filters; ellipsis and context menus offer scoped actions. The grouped tree retains its detail pane. Controlled: the host owns grouping, tri-state severity and linter filters, selection (a stable route path) and expand state, so all of it can live in the URL. A linter that failed to run is listed under its name with its error, never dropped. Ignore actions are descriptions handed to `onIgnore`; nothing is written by the component.",
       },
     },
   },
@@ -187,7 +187,8 @@ export const IgnoreActions: Story = {
   render: () => <Harness withIgnore selected="golangci-lint/errcheck" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "Ignore rule errcheck everywhere" }));
+    await userEvent.click(within(canvasElement.querySelector<HTMLElement>("[data-lint-node-actions]")!).getByRole("button", { name: "Actions" }));
+    await userEvent.click(within(document.body).getByRole("menuitem", { name: "Ignore rule errcheck everywhere" }));
     await expect(await canvas.findByTestId("applied-ignore")).toHaveTextContent(
       '{"source":"golangci-lint","rule":"errcheck","work_dir":"/repo/gavel"}',
     );

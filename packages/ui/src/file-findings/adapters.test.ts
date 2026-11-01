@@ -208,9 +208,9 @@ describe("groupFindingsByFile", () => {
     expect(outline(tree)).toEqual([
       "pkg/ (4)",
       "  server/ (3)",
-      "    routes > api.go (1)",
+      "    routes/api.go (1)",
       "    handler.go (2)",
-      "  store > db.go (1)",
+      "  store/db.go (1)",
       "README.md (1)",
     ]);
   });
@@ -227,7 +227,7 @@ describe("groupFindingsByFile", () => {
   it("keeps the same relative path under two work dirs apart, labelled by work dir", () => {
     const tree = groupFindingsByFile([finding("src/App.tsx", "/repo/gavel/web"), finding("src/App.tsx", "/repo/gavel/ui")]);
 
-    expect(outline(tree)).toEqual(["gavel/ui > src > App.tsx (1)", "gavel/web > src > App.tsx (1)"]);
+    expect(outline(tree)).toEqual(["gavel/ui/src/App.tsx (1)", "gavel/web/src/App.tsx (1)"]);
     const keys = tree.map((n) => n.key);
     expect(new Set(keys).size).toBe(2);
   });

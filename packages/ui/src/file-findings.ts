@@ -16,6 +16,7 @@ export {
   type FileReviewProps,
   type FileReviewView,
 } from "./file-findings/file-review/FileReview";
+export { emptyProblemFilters, problemType, type ProblemFilters } from "./file-findings/file-review/problem-filters";
 export {
   QUOTE_PREFIX,
   describeQuote,
