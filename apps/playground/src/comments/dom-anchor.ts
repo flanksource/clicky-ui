@@ -43,6 +43,17 @@ const OVERLAY_ANCHOR =
 const OPT_IN_ATTR = "data-comment-anchor";
 const STABLE_ATTRS = new Set([OPT_IN_ATTR, "data-testid"]);
 const SEMANTIC_ATTRS = new Set(["role", "aria-label", "name"]);
+/** Attributes the playground and React Grab add themselves; they say nothing about the artifact. */
+const TOOLING_ATTR = /^data-(?:react-grab|review|comment|show-rejected)/;
+
+/**
+ * An empty `data-*` attribute marks a component's region (clicky-ui writes
+ * e.g. `data-lint-filter-bar=""`), so it names the element wherever it moves.
+ * A valued one carries state or row identity and would churn.
+ */
+function isMarkerAttr(name: string, value: string): boolean {
+  return name.startsWith("data-") && value === "" && !TOOLING_ATTR.test(name);
+}
 const ANONYMOUS_ROLES = new Set(["generic", "presentation", "none"]);
 const HEADING_SELECTORS = [
   "h1",
@@ -91,6 +102,7 @@ export function cssPath(target: Element, root: Element): string {
     className: () => false,
     attr: (name, value) =>
       STABLE_ATTRS.has(name) ||
+      isMarkerAttr(name, value) ||
       (SEMANTIC_ATTRS.has(name) && wordLikeAttr(name, value)),
   });
 }
