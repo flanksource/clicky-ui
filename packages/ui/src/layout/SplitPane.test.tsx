@@ -63,4 +63,23 @@ describe("SplitPane", () => {
     expect(parseFloat(left.style.getPropertyValue("--split-pane-width"))).toBeCloseTo(55);
     expect(parseFloat(right.style.getPropertyValue("--split-pane-width"))).toBeCloseTo(45);
   });
+
+  it.each([
+    { mobilePane: "left" as const, shown: "left", hidden: "right" },
+    { mobilePane: "right" as const, shown: "right", hidden: "left" },
+  ])("shows only the $mobilePane pane, full height, while its container is narrow", ({ mobilePane, shown, hidden }) => {
+    render(
+      <SplitPane
+        stackOnMobile
+        mobilePane={mobilePane}
+        left={<div data-testid="left">L</div>}
+        right={<div data-testid="right">R</div>}
+      />,
+    );
+
+    const shownPane = screen.getByTestId(shown).parentElement!;
+    expect(shownPane).toHaveClass("flex-1", "@3xl/split-pane:block");
+    expect(shownPane).not.toHaveClass("max-h-[40%]", "border-b");
+    expect(screen.getByTestId(hidden).parentElement).toHaveClass("hidden", "@3xl/split-pane:block");
+  });
 });

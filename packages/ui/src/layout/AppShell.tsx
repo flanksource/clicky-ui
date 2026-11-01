@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
-import { UiClose, UiMenu, UiSidebar } from "../icons";
+import { UiArrowLeft, UiClose, UiMenu, UiSidebar } from "../icons";
 import { useEscapeLayer } from "../overlay/modalStack";
 import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { SplitPane } from "./SplitPane";
@@ -161,6 +161,17 @@ export type AppShellProps = {
   bodySidebar?: ReactNode;
   /** bodySidebar width as a percent when present. Defaults to 24. */
   bodySplit?: number;
+  /**
+   * Pages a narrow body (under 48rem) between bodySidebar and body-main
+   * instead of stacking them: only this pane shows, full height. A list/detail
+   * host passes "main" while an item is selected and "sidebar" otherwise.
+   * Wide layouts always show both panes.
+   */
+  bodyPane?: "sidebar" | "main";
+  /** With `bodyPane="main"`, a narrow body shows a back bar that calls this (e.g. to clear the selection). */
+  onBodyBack?: () => void;
+  /** Label of the narrow back bar. Defaults to "Back". */
+  bodyBackLabel?: string;
   /** Main content (body-main); fills the remaining space and scrolls. */
   children: ReactNode;
   /** Centers content at responsive wide breakpoints, or allows it to fill the workspace. */
@@ -247,6 +258,9 @@ export function AppShell(props: AppShellProps) {
     bodyActions,
     bodySidebar,
     bodySplit = 24,
+    bodyPane,
+    onBodyBack,
+    bodyBackLabel = "Back",
     children,
     contentWidth = "contained",
     debugSlots = false,
@@ -532,6 +546,7 @@ export function AppShell(props: AppShellProps) {
         {bodySidebar !== undefined ? (
           <SplitPane
             stackOnMobile
+            {...(bodyPane ? { mobilePane: bodyPane === "sidebar" ? "left" : "right" } : {})}
             className="min-h-0 flex-1"
             defaultSplit={bodySplit}
             minLeft={12}
@@ -542,17 +557,34 @@ export function AppShell(props: AppShellProps) {
               </div>
             }
             right={
-              <main
-                data-slot="app-shell-main"
-                className={cn(
-                  "h-full min-h-0 min-w-0 overflow-auto",
-                  contentClassName,
+              <div className="flex h-full min-h-0 min-w-0 flex-col">
+                {bodyPane === "main" && onBodyBack && (
+                  <div
+                    data-slot="app-shell-body-back"
+                    className="shrink-0 border-b border-border px-density-2 @3xl/split-pane:hidden"
+                  >
+                    <button
+                      type="button"
+                      onClick={onBodyBack}
+                      className="inline-flex min-h-11 items-center gap-density-2 rounded-md px-density-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      <Icon icon={UiArrowLeft} className="h-4 w-4" />
+                      {bodyBackLabel}
+                    </button>
+                  </div>
                 )}
-              >
-                {children}
-              </main>
+                <main
+                  data-slot="app-shell-main"
+                  className={cn(
+                    "min-h-0 min-w-0 flex-1 overflow-auto",
+                    contentClassName,
+                  )}
+                >
+                  {children}
+                </main>
+              </div>
             }
-            leftClass="max-h-[40vh]"
+            {...(bodyPane ? {} : { leftClass: "max-h-[40vh]" })}
           />
         ) : (
           <main

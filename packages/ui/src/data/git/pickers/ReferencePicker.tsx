@@ -19,7 +19,7 @@ export function ReferencePicker<T>({ label, plural, option, custom, ...props }: 
   const data = usePickerItems(props);
   const options = data.items.map((item) => {
     const choice = option(item);
-    return { ...choice, descriptionLayout: "inline" as const,
+    return { ...choice, descriptionLayout: "inline" as const, layout: "responsive" as const,
       title: [choice.title ?? choice.label, choice.description].filter(Boolean).join("\n"),
       ...(props.optionTrailing ? { trailing: props.optionTrailing(item) } : {}) };
   });
