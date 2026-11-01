@@ -55,3 +55,4 @@ hack/
 packages/ui/src/generated/storybook/
 /.new
 /apps/playground/.facet/
+/pico.save
