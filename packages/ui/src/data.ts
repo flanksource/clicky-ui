@@ -280,7 +280,9 @@ export {
   resolveSeries,
   resolveBreakdown,
   mergeSeries,
+  expandServedSeries,
   type BreakdownItem,
+  type DisplaySeries,
   type MergedRow,
   type ResolvedSeries,
   type SeriesLoadContext,
@@ -289,7 +291,29 @@ export {
   type TimeseriesReferenceLine,
   type TimeseriesResponse,
   type TimeseriesSeries,
+  type TimeseriesServerSeries,
 } from "./data/TimeseriesPanel.model";
+export {
+  TimeseriesStreamProvider,
+  type TimeseriesStreamProviderProps,
+} from "./data/timeseries-stream-provider";
+export {
+  createTimeseriesStream,
+  EMPTY_TIMESERIES_STREAM_GROUP,
+  timeseriesStreamAddress,
+  timeseriesStreamGroupKey,
+  timeseriesStreamInterval,
+  timeseriesStreamUrl,
+  timeseriesWindowStart,
+  TimeseriesStreamContext,
+  useTimeseriesStream,
+  type TimeseriesStream,
+  type TimeseriesStreamFrame,
+  type TimeseriesStreamGroup,
+  type TimeseriesStreamGroupState,
+  type TimeseriesStreamOptions,
+  type TimeseriesStreamRegistration,
+} from "./data/timeseries-stream";
 export {
   assignAxes,
   latestOf,

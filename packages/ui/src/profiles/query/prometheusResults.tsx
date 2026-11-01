@@ -1,7 +1,11 @@
 import { TimeseriesPanel } from "../../data/TimeseriesPanel";
-import type { TimeseriesResponse, TimeseriesSeries } from "../../data/TimeseriesPanel.model";
+import type { TimeseriesPoint, TimeseriesSeries } from "../../data/TimeseriesPanel.model";
 import type { QueryBrowserResult } from "../../data/query-browser/QueryBrowser.types";
 import { useMemo, type ReactNode } from "react";
+
+// Each result's series load from its own rows, so the loader cache key
+// (`["timeseries", "load", id, range]`) must not repeat across results.
+let resultSeq = 0;
 
 export function PrometheusResults({
   result,
@@ -10,61 +14,42 @@ export function PrometheusResults({
   result: QueryBrowserResult;
   fallback: ReactNode;
 }) {
-  const chart = useMemo(
-    () => prometheusSeries(result.rows ?? []),
+  const series = useMemo(
+    () => prometheusSeries(result.rows ?? [], `prometheus-${++resultSeq}`),
     [result.rows],
   );
-  if (!chart) return fallback;
+  if (!series) return fallback;
   return (
     <div className="space-y-3">
-      <TimeseriesPanel
-        title="Prometheus query"
-        baseUrl="/query-browser/"
-        series={chart.series}
-        refreshMs={0}
-        height={240}
-        fetcher={async (url) => {
-          const id = url.split("?")[0]?.split("/").filter(Boolean).pop() ?? "";
-          return chart.responses[id] ?? { id, points: [] };
-        }}
-      />
+      <TimeseriesPanel title="Prometheus query" series={series} refreshMs={0} height={240} />
       {fallback}
     </div>
   );
 }
 
-function prometheusSeries(rows: Record<string, unknown>[]): {
-  series: TimeseriesSeries[];
-  responses: Record<string, TimeseriesResponse>;
-} | null {
-  const withTime = rows.filter(
-    (row) => row.timestamp != null && typeof row.value === "number",
-  );
+// Prometheus range rows carry `timestamp`; commons-db metric SQL rows carry
+// `time`. A row with both is read by `time`.
+const TIME_COLUMNS = ["time", "timestamp"] as const;
+
+function rowTime(row: Record<string, unknown>): unknown {
+  return row.time ?? row.timestamp;
+}
+
+function prometheusSeries(rows: Record<string, unknown>[], prefix: string): TimeseriesSeries[] | null {
+  const withTime = rows.filter((row) => rowTime(row) != null && typeof row.value === "number");
   if (withTime.length < 2) return null;
-  const groups = new Map<
-    string,
-    { label: string; points: { at: string; value: number }[] }
-  >();
+  const groups = new Map<string, TimeseriesPoint[]>();
   for (const row of withTime) {
     const labels = Object.entries(row)
-      .filter(([key]) => key !== "timestamp" && key !== "value")
+      .filter(([key]) => key !== "value" && !(TIME_COLUMNS as readonly string[]).includes(key))
       .sort(([a], [b]) => a.localeCompare(b));
-    const label =
-      labels.map(([key, value]) => `${key}=${String(value)}`).join(", ") ||
-      "value";
-    const group = groups.get(label) ?? { label, points: [] };
-    group.points.push({
-      at: new Date(String(row.timestamp)).toISOString(),
-      value: Number(row.value),
-    });
-    groups.set(label, group);
+    const label = labels.map(([key, value]) => `${key}=${String(value)}`).join(", ") || "value";
+    const points = groups.get(label) ?? [];
+    points.push({ at: new Date(String(rowTime(row))).toISOString(), value: Number(row.value) });
+    groups.set(label, points);
   }
-  const series: TimeseriesSeries[] = [];
-  const responses: Record<string, TimeseriesResponse> = {};
-  [...groups.values()].forEach((group, index) => {
-    const id = `series-${index}`;
-    series.push({ id, label: group.label });
-    responses[id] = { id, points: group.points };
+  return [...groups].map(([label, points], index) => {
+    const id = `${prefix}-${index}`;
+    return { id, label, load: async () => ({ id, points }) };
   });
-  return { series, responses };
 }

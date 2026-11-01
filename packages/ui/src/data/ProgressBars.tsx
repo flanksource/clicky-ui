@@ -77,6 +77,11 @@ export interface ProgressBarsProps {
   hoverCard?: boolean;
   /** Footer note in the hover card, e.g. the look-back window ("over last 1h"). */
   hoverFooter?: ReactNode;
+  /**
+   * A failed read. Its message replaces the caption (in red) and the accessible
+   * label's reading, and is the hover card's only row, as TimeseriesGauge shows one.
+   */
+  error?: Error | null;
   className?: string;
 }
 
@@ -135,6 +140,7 @@ export function ProgressBars({
   stats,
   hoverCard = true,
   hoverFooter,
+  error = null,
   className,
 }: ProgressBarsProps) {
   const perBar = unit?.perBar ?? 1000;
@@ -157,7 +163,7 @@ export function ProgressBars({
     : showCapacity
       ? `${usageText}/${capacityText} ${unitLabel}`
       : `${usageText} ${unitLabel}`;
-  const titleText = `${title}: ${compactCaption}`;
+  const titleText = `${title}: ${error ? error.message : compactCaption}`;
   const isCell = variant === "cell";
 
   // Hover card: surface current/min/max/avg/capacity in bar-units (stats are in
@@ -172,7 +178,9 @@ export function ProgressBars({
           ? "text-amber-500"
           : "text-emerald-500";
   const fmt = (n: number) => `${formatUnits(n)} ${unitLabel}`;
-  const hoverRows: GaugeHoverRow[] = model.hasUsage
+  const hoverRows: GaugeHoverRow[] = error
+    ? [{ label: "Error", value: error.message, tone: "text-red-500" }]
+    : model.hasUsage
     ? [
         { label: "Current", value: fmt(model.usageUnits), ...(pctTone ? { tone: pctTone } : {}) },
         ...(stats
@@ -248,7 +256,14 @@ export function ProgressBars({
       })}
     </span>
   );
-  const valueNode = showValue ? (
+  const valueNode = !showValue ? null : error ? (
+    <span
+      className={cn("min-w-0 max-w-full truncate text-red-500", isCell ? null : "text-xs")}
+      title={error.message}
+    >
+      {error.message}
+    </span>
+  ) : (
     <span
       className={cn(
         "shrink-0 font-semibold tabular-nums text-foreground",
@@ -257,7 +272,7 @@ export function ProgressBars({
     >
       {valueText}
     </span>
-  ) : null;
+  );
   const label =
     icon || showLabel ? (
       <span

@@ -11,6 +11,22 @@ export interface TimeseriesResponse {
   points: TimeseriesPoint[];
 }
 
+/**
+ * One series as the metrics stream serves it. `source` is the id a panel
+ * requested; one requested id can expand into several series (a profile
+ * grouped by pod, say), each with its own `id` (`<source>#<labels>`) and
+ * `labels`. For a plain metric id, `id === source`.
+ */
+export interface TimeseriesServerSeries {
+  id: string;
+  source: string;
+  label?: string;
+  labels?: Record<string, string>;
+  /** A `formatUnit` key, used when the panel series names no unit. */
+  unit?: string;
+  points: TimeseriesPoint[];
+}
+
 /** What a {@link SeriesLoader} receives from the widget polling it. */
 export interface SeriesLoadContext {
   /** The widget's look-back window, e.g. "1h". */
@@ -40,8 +56,15 @@ export interface TimeseriesSeries {
   id: string;
   /** Loads the series' points; when set, `baseUrl` and `fetcher` are not used. */
   load?: SeriesLoader;
-  /** Tooltip/legend label; defaults to the id. */
+  /** Tooltip/legend label; defaults to the `labels` values, then the id. */
   label?: string;
+  /** The series' label set, e.g. `{ pod: "api" }`; its values label the series when `label` is unset. */
+  labels?: Record<string, string>;
+  /**
+   * The requested id this series was expanded from, when one id answers with
+   * several series (see {@link TimeseriesServerSeries}). Unset on requested series.
+   */
+  source?: string;
   /**
    * Maps each point's value before plotting, e.g. writes pass `(v) => -v` to
    * render below the zero axis. Identity when omitted.
@@ -116,22 +139,92 @@ export interface ResolvedSeries {
   transform?: (value: number) => number;
   load?: SeriesLoader;
   current?: number;
+  labels?: Record<string, string>;
+  /** The requested id an expanded series came from; unset on requested series. */
+  source?: string;
+}
+
+/** The label-set values in key order, e.g. `{ pod: "api", ns: "x" }` → "x, api". */
+function labelValues(labels: Record<string, string> | undefined): string | undefined {
+  if (!labels) return undefined;
+  const values = Object.keys(labels)
+    .sort()
+    .map((key) => labels[key]);
+  return values.length > 0 ? values.join(", ") : undefined;
+}
+
+function requestedSeries(props: TimeseriesPanelProps): TimeseriesSeries[] {
+  return props.series ?? (props.url ? [{ id: props.url }] : []);
+}
+
+function resolveEntry(
+  s: TimeseriesSeries,
+  index: number,
+  props: TimeseriesPanelProps,
+  servedUnit?: string,
+): ResolvedSeries {
+  const unit = s.unit ?? servedUnit ?? props.unit;
+  return {
+    key: s.id,
+    url: (props.baseUrl ?? "") + s.id,
+    label: s.label ?? labelValues(s.labels) ?? s.id,
+    color: s.color ?? paletteColor(index),
+    ...(unit ? { unit } : {}),
+    ...(s.transform ? { transform: s.transform } : {}),
+    ...(s.load ? { load: s.load } : {}),
+    ...(s.current !== undefined ? { current: s.current } : {}),
+    ...(s.labels ? { labels: s.labels } : {}),
+    ...(s.source ? { source: s.source } : {}),
+  };
 }
 
 /** Normalises the single-url and baseUrl+series forms to one list. */
 export function resolveSeries(props: TimeseriesPanelProps): ResolvedSeries[] {
-  const base = props.baseUrl ?? "";
-  const list = props.series ?? (props.url ? [{ id: props.url }] : []);
-  return list.map((s, i) => ({
-    key: s.id,
-    url: base + s.id,
-    label: s.label ?? s.id,
-    color: s.color ?? paletteColor(i),
-    ...(s.unit ?? props.unit ? { unit: s.unit ?? props.unit } : {}),
-    ...(s.transform ? { transform: s.transform } : {}),
-    ...(s.load ? { load: s.load } : {}),
-    ...(s.current !== undefined ? { current: s.current } : {}),
-  }));
+  return requestedSeries(props).map((s, i) => resolveEntry(s, i, props));
+}
+
+/** The series a panel plots, index-aligned with each one's points (undefined while loading). */
+export interface DisplaySeries {
+  series: ResolvedSeries[];
+  points: (TimeseriesPoint[] | undefined)[];
+}
+
+/**
+ * Resolves what a panel plots from what its requested series were answered
+ * with (`served`, index-aligned with the requested series; undefined while a
+ * series is loading). A requested id answered by its own series alone keeps
+ * the panel's label, color and `current`; an id that expanded into several
+ * series plots each one, labelled by its `label` or label values. A series
+ * without a unit of its own takes the served unit, then the panel `unit`.
+ */
+export function expandServedSeries(
+  props: TimeseriesPanelProps,
+  served: readonly (readonly TimeseriesServerSeries[] | undefined)[],
+): DisplaySeries {
+  const series: ResolvedSeries[] = [];
+  const points: (TimeseriesPoint[] | undefined)[] = [];
+  requestedSeries(props).forEach((requested, i) => {
+    const answer = served[i];
+    const [first] = answer ?? [];
+    if (!answer || !first || (answer.length === 1 && first.id === requested.id)) {
+      series.push(resolveEntry(requested, series.length, props, first?.unit));
+      points.push(answer ? (first?.points ?? []) : undefined);
+      return;
+    }
+    for (const s of answer) {
+      const expanded: TimeseriesSeries = {
+        id: s.id,
+        source: requested.id,
+        ...(s.label ? { label: s.label } : {}),
+        ...(s.labels ? { labels: s.labels } : {}),
+        ...(requested.unit ? { unit: requested.unit } : {}),
+        ...(requested.transform ? { transform: requested.transform } : {}),
+      };
+      series.push(resolveEntry(expanded, series.length, props, s.unit));
+      points.push(s.points);
+    }
+  });
+  return { series, points };
 }
 
 /** One legend/bar row of the breakdown variant. */
