@@ -220,6 +220,38 @@ describe("AppShell", () => {
     expect(container.querySelector('[data-slot="app-shell-content"]')).toBeNull();
   });
 
+  it.each([
+    { bodyPane: "sidebar" as const, shown: "tree", hidden: "content", back: false },
+    { bodyPane: "main" as const, shown: "content", hidden: "tree", back: true },
+  ])(
+    "pages a narrow body to the $bodyPane pane, with a back bar only on the main pane",
+    ({ bodyPane, shown, hidden, back }) => {
+      const onBodyBack = vi.fn();
+      render(
+        <AppShell
+          bodySidebar={<nav>tree</nav>}
+          bodyPane={bodyPane}
+          onBodyBack={onBodyBack}
+          bodyBackLabel="Back to pull requests"
+        >
+          <p>content</p>
+        </AppShell>,
+      );
+
+      const pane = (text: string) => screen.getByText(text).closest('[data-slot="split-pane-left"], [data-slot="split-pane-right"]');
+      expect(pane(shown)).toHaveClass("flex-1", "@3xl/split-pane:block");
+      expect(pane(shown)).not.toHaveClass("max-h-[40vh]");
+      expect(pane(hidden)).toHaveClass("hidden", "@3xl/split-pane:block");
+
+      const backButton = screen.queryByRole("button", { name: "Back to pull requests" });
+      expect(backButton !== null).toBe(back);
+      if (!backButton) return;
+      expect(backButton.parentElement).toHaveClass("@3xl/split-pane:hidden");
+      fireEvent.click(backButton);
+      expect(onBodyBack).toHaveBeenCalledOnce();
+    },
+  );
+
   // Responsive variants are CSS-driven (`hidden @3xl/app-shell:flex`), so each slot must be
   // mounted exactly once — a second mount would fork its state and re-run its
   // effects. This asserts the mount count and that slot state survives a
