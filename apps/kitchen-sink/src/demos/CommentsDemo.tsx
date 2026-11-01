@@ -107,30 +107,28 @@ function useStore() {
   const idRef = useRef(0);
   const nextId = () => `gen-${(idRef.current += 1)}`;
   const callbacks: CommentCallbacks = {
-    onCreate: ({ body, anchor, facets }) =>
-      setComments((p) => [
-        ...p,
-        {
-          id: nextId(),
-          body,
-          createdAt: new Date().toISOString(),
-          author: ME,
-          status: "open",
-          anchor: anchor ?? null,
-          ...(facets ? { facets } : {}),
-        },
-      ]),
-    onReply: ({ parentId, body }) =>
-      setComments((p) => [
-        ...p,
-        {
-          id: nextId(),
-          body,
-          createdAt: new Date().toISOString(),
-          author: ME,
-          parentId,
-        },
-      ]),
+    onCreate: ({ body, anchor, facets }) => {
+      const comment: Comment = {
+        id: nextId(),
+        body,
+        createdAt: new Date().toISOString(),
+        author: ME,
+        status: "open",
+        anchor: anchor ?? null,
+        ...(facets ? { facets } : {}),
+      };
+      setComments((p) => [...p, comment]);
+    },
+    onReply: ({ parentId, body }) => {
+      const reply: Comment = {
+        id: nextId(),
+        body,
+        createdAt: new Date().toISOString(),
+        author: ME,
+        parentId,
+      };
+      setComments((p) => [...p, reply]);
+    },
     onUpdateStatus: (id, status) =>
       setComments((p) => p.map((c) => (c.id === id ? { ...c, status } : c))),
     onDelete: (id) =>
@@ -180,7 +178,7 @@ function RailFocusBar() {
 export function CommentsDemo() {
   const thread = useStore();
   const rail = useStore();
-  const [filters, setFilters] = useState<CommentFilters>(emptyCommentFilters());
+  const [filters, setFilters] = useState<CommentFilters>(emptyCommentFilters);
   const visible = applyCommentFilters(thread.comments, filters, CONFIG);
 
   return (

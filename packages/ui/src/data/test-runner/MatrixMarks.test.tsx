@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render } from "@testing-library/react";
+import { render, within } from "@testing-library/react";
 import {
   MATRIX_MARKS,
   formatMatrixDuration,
@@ -96,6 +96,28 @@ describe("MatrixMix", () => {
 describe("MatrixHeatmap", () => {
   const ticks = (container: HTMLElement) =>
     [...container.querySelectorAll("[data-heatmap] [data-tick-outcome]")].map((el) => [el.getAttribute("data-tick-outcome"), el.getAttribute("title")]);
+
+  it("exposes ordered plan names and outcomes as labelled list items", () => {
+    const { getByRole } = render(<MatrixHeatmap ticks={RUNNING_PLANS} unit="plans" />);
+    const list = getByRole("list", { name: "5 plans" });
+    expect(within(list).getAllByRole("listitem").map((item) => item.getAttribute("aria-label"))).toEqual([
+      "1. smoke · passed",
+      "2. claims · warned",
+      "3. renewal · running",
+      "4. billing · pending",
+      "5. statement · passed",
+    ]);
+  });
+
+  it("exposes an empty step heatmap without phantom items", () => {
+    const { getByRole } = render(<MatrixHeatmap ticks={[]} unit="steps" />);
+    expect(within(getByRole("list", { name: "0 steps" })).queryAllByRole("listitem")).toEqual([]);
+  });
+
+  it.each([false, true])("preserves outcome fills for printing (static: %s)", (isStatic) => {
+    const { container } = render(<MatrixHeatmap ticks={RUNNING_PLANS} unit="plans" static={isStatic} />);
+    expect(container.querySelector("[data-heatmap]")).toHaveClass("print:[print-color-adjust:exact]", "print:[-webkit-print-color-adjust:exact]");
+  });
 
   it("draws one tick per item in the given order, each titled with its position, label and outcome", () => {
     const { container } = render(<MatrixHeatmap ticks={RUNNING_PLANS} unit="plans" />);

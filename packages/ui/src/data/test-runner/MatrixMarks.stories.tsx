@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { ReactNode } from "react";
+import { expect, within } from "storybook/test";
 import { MATRIX_MARKS, MATRIX_ORDER, type MatrixEnvCounts } from "./matrix-marks";
 import {
   EmptyMatrixCell,
@@ -110,3 +111,30 @@ type Story = StoryObj<typeof meta>;
 export const Live: Story = {};
 
 export const Print: Story = { args: { static: true } };
+
+export const LargePlanSet: Story = {
+  render: () => (
+    <div className="w-48">
+      <MatrixEnvHeader
+        context="large-run"
+        counts={{ passed: 50, warned: 0, failed: 0, error: 0, running: 0, queued: 0, total: 50 }}
+        plans={Array.from({ length: 50 }, (_, i) => ({ label: `plan-${i + 1}`, mark: "passed" }))}
+        durationMs={3_780_000}
+        running={false}
+      />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const heatmap = within(canvasElement).getByRole("list", { name: "50 plans" });
+    const ticks = within(heatmap).getAllByRole("listitem");
+    await expect(ticks).toHaveLength(50);
+    await expect(getComputedStyle(heatmap).overflowX).toBe("auto");
+    await expect(heatmap.scrollWidth).toBeGreaterThan(heatmap.clientWidth);
+    await expect(ticks[0]!.getBoundingClientRect().width).toBeGreaterThanOrEqual(3);
+    const progress = heatmap.parentElement!;
+    await expect(heatmap.getBoundingClientRect().right).toBeLessThanOrEqual(progress.children[1]!.getBoundingClientRect().left);
+    await expect(progress.lastElementChild!.getBoundingClientRect().right).toBeLessThanOrEqual(progress.getBoundingClientRect().right + 1);
+    heatmap.scrollLeft = heatmap.scrollWidth;
+    await expect(ticks[49]!.getBoundingClientRect().right).toBeLessThanOrEqual(heatmap.getBoundingClientRect().right + 1);
+  },
+};

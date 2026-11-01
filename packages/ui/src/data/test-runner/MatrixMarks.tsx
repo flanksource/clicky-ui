@@ -97,10 +97,12 @@ export type MatrixHeatmapProps = {
 /** One tick per item, filled with its outcome's bar colour. */
 export function MatrixHeatmap({ ticks, unit, static: isStatic = false }: MatrixHeatmapProps) {
   return (
-    <span className="flex h-3 min-w-10 flex-1 items-stretch gap-px" aria-label={`${ticks.length} ${unit}`} data-heatmap={unit}>
+    <span role="list" {...(ticks.length > 0 ? { tabIndex: 0 } : {})} className="flex h-3 min-w-10 flex-1 items-stretch gap-px overflow-x-auto [scrollbar-width:none] print:[print-color-adjust:exact] print:[-webkit-print-color-adjust:exact]" aria-label={`${ticks.length} ${unit}`} data-heatmap={unit}>
       {ticks.map((tick, i) => (
         <span
           key={i}
+          role="listitem"
+          aria-label={`${i + 1}. ${tick.label} · ${MATRIX_MARKS[tick.mark].label}`}
           title={`${i + 1}. ${tick.label} · ${MATRIX_MARKS[tick.mark].label}`}
           className={cn("min-w-[3px] max-w-4 flex-1 rounded-[1px]", matrixBarClass(tick.mark, isStatic))}
           data-tick-outcome={tick.mark}
