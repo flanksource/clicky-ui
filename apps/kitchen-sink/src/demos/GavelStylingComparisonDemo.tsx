@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Badge,
   SearchInput,
@@ -131,31 +131,36 @@ function GavelSegmented({ value, onChange }: { value: string; onChange: (id: str
 }
 
 function GavelSearch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const id = useId();
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 9,
-        padding: "6px 12px",
-        background: G.surfaceAlt,
-        border: `1px solid ${G.border}`,
-        borderRadius: 8,
-        fontFamily: G.sans,
-      }}
-    >
-      <span style={{ color: G.faint, display: "inline-flex" }} aria-hidden>
-        ⌕
-      </span>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Search pull requests, branches, #id…"
-        style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 13, color: G.fg, fontFamily: "inherit", minWidth: 0 }}
-      />
-      <span style={{ fontFamily: G.mono, fontSize: 10.5, color: G.faint, border: `1px solid ${G.border}`, padding: "1px 5px", borderRadius: 4 }}>
-        ⌘K
-      </span>
+    <div className="space-y-1">
+      <label htmlFor={id} className="block text-xs font-medium">Search pull requests</label>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 9,
+          padding: "6px 12px",
+          background: G.surfaceAlt,
+          border: `1px solid ${G.border}`,
+          borderRadius: 8,
+          fontFamily: G.sans,
+        }}
+      >
+        <span style={{ color: G.faint, display: "inline-flex" }} aria-hidden>
+          ⌕
+        </span>
+        <input
+          id={id}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Search pull requests, branches, #id…"
+          style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 13, color: G.fg, fontFamily: "inherit", minWidth: 0 }}
+        />
+        <span style={{ fontFamily: G.mono, fontSize: 10.5, color: G.faint, border: `1px solid ${G.border}`, padding: "1px 5px", borderRadius: 4 }}>
+          ⌘K
+        </span>
+      </div>
     </div>
   );
 }

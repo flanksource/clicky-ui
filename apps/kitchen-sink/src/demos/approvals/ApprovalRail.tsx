@@ -28,7 +28,7 @@ import type { Approval, ApprovalCheck, ApprovalState } from "./types";
  * Category / severity as generic comment facets — the library owns the chips,
  * the demo only declares the vocabulary.
  */
-export const COMMENT_CONFIG: CommentConfig = {
+const COMMENT_CONFIG: CommentConfig = {
   statuses: [
     { value: "open", label: "Open", tone: "info", unresolved: true },
     { value: "resolved", label: "Resolved", tone: "success" },

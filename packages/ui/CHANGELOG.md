@@ -1,5 +1,27 @@
 # @flanksource/clicky-ui
 
+## Unreleased
+
+### Breaking change: MatrixEnvHeader plan heatmap
+
+`MatrixEnvHeader` now requires a `plans` prop containing one `{ label, mark }` tick per plan, in matrix row order. Pass the actual plan outcomes; aggregate counts alone cannot describe the heatmap. The number of ticks must equal `counts.total`, including pending plans, or the component throws. Use `mark: "pending"` for queued plans.
+
+TypeScript consumers must add `plans` to every `MatrixEnvHeader` call (and any wrapper props); the public `MatrixTick` type describes each tick. JavaScript consumers must supply the same array before upgrading, even without a compiler check: omitting `plans` fails at render time.
+
+```tsx
+import { MatrixEnvHeader } from "@flanksource/clicky-ui/data";
+
+<MatrixEnvHeader
+  context="dev"
+  counts={{ passed: 1, warned: 0, failed: 0, error: 0, running: 0, queued: 1, total: 2 }}
+  plans={[{ label: "smoke", mark: "passed" }, { label: "billing", mark: "pending" }]}
+  durationMs={42_000}
+  running
+/>;
+```
+
+The `MATRIX_PLAN_BAR` export has been removed. Use `MatrixHeatmap` with ordered ticks for per-plan progress, or the generic `ProgressBar` for aggregate progress.
+
 ## 0.2.0
 
 ### Minor Changes
