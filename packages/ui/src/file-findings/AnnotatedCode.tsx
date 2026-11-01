@@ -1,5 +1,7 @@
+import type { DropdownMenuItem } from "../overlay/DropdownMenu";
+import { ProblemActions } from "../data/diagnostics/ProblemActions";
 import type { editor as MonacoEditorApi, IDisposable } from "monaco-editor";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CommentProvider } from "../comments/CommentProvider";
 import { CommentSidePanel } from "../comments/CommentSidePanel";
 import { useCommentContext } from "../comments/comment-context";
@@ -31,7 +33,7 @@ export type AnnotatedCodeProps = {
   /** Called with a finding's first line when the reader clicks a line it covers. */
   onLineChange?: ((line: number) => void) | undefined;
   /** Extra controls under each finding's thread, e.g. an ignore action. */
-  renderFindingActions?: ((finding: FileFinding) => ReactNode) | undefined;
+  getFindingActions?: ((finding: FileFinding) => DropdownMenuItem[]) | undefined;
   /** Makes the editor editable and receives every edit; without it the editor is read-only. */
   onChange?: ((source: string) => void) | undefined;
   /** Shows each line's worst finding as `rule · message` after the line's text. */
@@ -140,7 +142,7 @@ function CodeBody({
   findings,
   line,
   onLineChange,
-  renderFindingActions,
+  getFindingActions,
   onChange,
   inlineChips,
   className,
@@ -245,7 +247,7 @@ function CodeBody({
           formatAnchorLabel={(anchor) => `line ${lineOfAnchor(anchor)}`}
           renderRootDetails={(comment) => {
             const finding = findingsById.get(comment.id);
-            return finding && renderFindingActions ? renderFindingActions(finding) : null;
+            return finding && getFindingActions ? <ProblemActions items={getFindingActions(finding)} /> : null;
           }}
         />
       </div>

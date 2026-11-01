@@ -153,7 +153,7 @@ function workDirRootNames(workDirs: readonly (string | undefined)[]): Map<string
 
 /**
  * The files that have findings as a path tree: folders before files, each level
- * sorted by name, single-child folders folded into one row (`pkg > sub > a.go`).
+ * sorted by name, single-child folders folded into one row (`pkg/sub/a.go`).
  * When the findings span several work dirs, each gets its own root folder.
  */
 export function groupFindingsByFile(findings: readonly FileFinding[]): FileTreeNode[] {

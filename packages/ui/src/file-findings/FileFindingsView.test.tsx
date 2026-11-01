@@ -11,6 +11,7 @@ vi.mock("../data/code-highlight", async (importOriginal) => ({
 
 import { FileFindingsView } from "./FileFindingsView";
 import type { FileReviewView } from "./file-review/FileReview";
+import { emptyProblemFilters, type ProblemFilters } from "./file-review/problem-filters";
 import type { FileFinding, FileRef } from "./types";
 
 const WORK_DIR = "/repo/gavel";
@@ -39,7 +40,7 @@ function Harness({
   onViewChange,
   onSelectFile,
   onLineChange,
-  renderFindingActions,
+  getFindingActions,
 }: {
   loadFile: (file: FileRef) => Promise<string>;
   initialFile?: FileRef | null;
@@ -47,11 +48,12 @@ function Harness({
   onViewChange?: (view: FileReviewView) => void;
   onSelectFile?: (file: FileRef) => void;
   onLineChange?: (line: number | undefined) => void;
-  renderFindingActions?: (finding: FileFinding) => React.ReactNode;
+  getFindingActions?: (finding: FileFinding) => import("../overlay/DropdownMenu").DropdownMenuItem[];
 }) {
   const [file, setFile] = useState<FileRef | null>(initialFile);
   const [view, setView] = useState<FileReviewView>(initialView);
   const [line, setLine] = useState<number | undefined>(undefined);
+  const [problemFilters, setProblemFilters] = useState<ProblemFilters>(emptyProblemFilters);
   return (
     <FileFindingsView
       findings={FINDINGS}
@@ -70,8 +72,10 @@ function Harness({
         onViewChange?.(next);
         setView(next);
       }}
+      problemFilters={problemFilters}
+      onProblemFiltersChange={setProblemFilters}
       loadFile={loadFile}
-      {...(renderFindingActions ? { renderFindingActions } : {})}
+      {...(getFindingActions ? { getFindingActions } : {})}
     />
   );
 }
@@ -95,8 +99,8 @@ describe("FileFindingsView", () => {
     render(<Harness loadFile={readFile} onSelectFile={onSelectFile} />);
 
     // Single-child folders are folded into their file's row.
-    const row = await screen.findByText("pkg > server > handler.go");
-    expect(screen.getByText("docs > guide.md")).toBeInTheDocument();
+    const row = await screen.findByText("pkg/server/handler.go");
+    expect(screen.getByText("docs/guide.md")).toBeInTheDocument();
     expect(screen.getAllByTitle("1 error")).toHaveLength(1);
     expect(screen.getAllByTitle("1 warning")).toHaveLength(2);
     expect(screen.getByText("Select a file to see its findings in context.")).toBeInTheDocument();
@@ -136,7 +140,7 @@ describe("FileFindingsView", () => {
         loadFile={readFile}
         initialFile={{ workDir: WORK_DIR, file: GO_FILE }}
         onLineChange={onLineChange}
-        renderFindingActions={(f) => <button type="button">Ignore {f.rule}</button>}
+        getFindingActions={(f) => [{ label: `Ignore ${f.rule}`, onSelect: vi.fn() }]}
       />,
     );
     await waitFor(() => expect(listedLines(container)).toBe(6));
@@ -144,7 +148,8 @@ describe("FileFindingsView", () => {
     const row = container.querySelector<HTMLElement>('[data-source-line="5"] [data-source-finding]')!;
     fireEvent.click(within(row).getByRole("button", { name: /Unused parameter/ }));
 
-    expect({ line: onLineChange.mock.calls.at(-1), action: within(row).getByRole("button", { name: "Ignore rule" }).textContent }).toEqual({
+    fireEvent.click(within(row).getByRole("button", { name: "Problem actions" }));
+    expect({ line: onLineChange.mock.calls.at(-1), action: screen.getByRole("menuitem", { name: "Ignore rule" }).textContent }).toEqual({
       line: [5],
       action: "Ignore rule",
     });

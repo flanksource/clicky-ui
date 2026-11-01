@@ -1,74 +1,225 @@
-import { useMemo, useState } from "react";
-import { Icon } from "../../data/Icon";
-import { cn } from "../../lib/utils";
-import { UiChevronDown, UiChevronRight } from "../../icons";
+import { useProblemExpansion } from "../../data/diagnostics/use-problem-expansion";
+import { useMemo } from "react";
+import type { HighlightedLine } from "../../data/code-highlight";
+import { HighlightedTokens } from "../../data/HighlightedTokens";
+import { matchesFilterState } from "../../data/test-runner/filterState";
+import { ProblemRow } from "../../data/diagnostics/ProblemRow";
+import { ProblemViewOptions } from "../../data/diagnostics/ProblemViewOptions";
+import { ProblemFacet } from "../../data/diagnostics/ProblemFacet";
+import { diagnosticKeys } from "../../data/diagnostics/diagnostic-identity";
+import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
+import { FINDING_SEVERITIES } from "../severity-counts";
 import type { FileFinding } from "../types";
-import { SEVERITY_MARK, bySeverityThenLine, severityOf, squiggleUnder } from "./marks";
+import { SEVERITY_MARK, bySeverityThenLine, squiggleUnder } from "./marks";
 
-/** Source lines shown above and below a finding's line when its Problems row is expanded. */
-const PROBLEM_CONTEXT_LINES = 3;
+import {
+  emptyProblemFilters,
+  problemType,
+  type ProblemFilters,
+} from "./problem-filters";
+const LABELS = { error: "Errors", warning: "Warnings", info: "Info" };
 
-/** One Problems row: the finding, its source line truncated to one line, and on expand the lines around it. */
-function ProblemRow({ finding, lines, onOpen, openLabel }: { finding: FileFinding; lines: readonly string[]; onOpen: (finding: FileFinding) => void; openLabel: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const mark = SEVERITY_MARK[severityOf(finding.severity)];
-  const first = Math.max(1, finding.line - PROBLEM_CONTEXT_LINES);
-  const last = Math.min(lines.length, finding.line + PROBLEM_CONTEXT_LINES);
-  const context = expanded ? lines.slice(first - 1, last).map((text, i) => ({ line: first + i, text })) : [];
-  return (
-    <li data-problem-line={finding.line}>
-      <div className="flex items-start gap-1 px-1.5 py-1.5 text-xs hover:bg-muted/50">
-        <button
-          type="button"
-          aria-expanded={expanded}
-          aria-label={expanded ? "Hide context" : "Show context"}
-          onClick={() => setExpanded((v) => !v)}
-          className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <Icon icon={expanded ? UiChevronDown : UiChevronRight} className="text-sm" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onOpen(finding)}
-          className="grid min-w-0 flex-1 grid-cols-[auto_2rem_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 text-left"
-          title={openLabel}
-        >
-          <Icon icon={mark.icon} className={cn("text-sm", mark.tone)} />
-          <span data-problem-ln className="text-right font-mono text-[11px] tabular-nums text-muted-foreground">{finding.line}</span>
-          <span className="truncate">{finding.message}</span>
-          <span className="font-mono text-[11px] text-muted-foreground">{finding.source} {finding.rule}</span>
-          {!expanded && (
-            <span data-problem-context="line" className="col-span-2 col-start-3 truncate font-mono text-[11px] text-muted-foreground">
-              {lines[finding.line - 1]?.trim() || " "}
-            </span>
-          )}
-        </button>
-      </div>
-      {expanded && (
-        <ol data-problem-context="block" className="mb-2 ml-8 mr-3 overflow-x-auto rounded border border-border bg-muted/30 py-1 font-mono text-[11px] leading-5">
-          {context.map(({ line, text }) => (
-            <li key={line} className="grid grid-cols-[2.5rem_1fr] pr-2">
-              <span className="select-none pr-2 text-right tabular-nums text-muted-foreground">{line}</span>
-              <span className="whitespace-pre">
-                <span style={line === finding.line ? squiggleUnder(mark.stroke) : undefined}>{text || " "}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </li>
-  );
+function count(
+  findings: readonly FileFinding[],
+  value: (finding: FileFinding) => string,
+) {
+  const counts = new Map<string, number>();
+  for (const finding of findings)
+    counts.set(value(finding), (counts.get(value(finding)) ?? 0) + 1);
+  return counts;
 }
 
-/** Every finding, worst first, as a VS Code-style Problems list; picking one opens it (`openLabel` names where). */
-export function ProblemsList({ source, findings, onOpen, openLabel }: { source: string; findings: readonly FileFinding[]; onOpen: (finding: FileFinding) => void; openLabel: string }) {
+export function ProblemsList({
+  source,
+  tokens,
+  findings,
+  filters,
+  onFiltersChange,
+  onOpen,
+  openLabel,
+  getFindingActions,
+}: {
+  source: string;
+  tokens: readonly HighlightedLine[] | null;
+  findings: readonly FileFinding[];
+  filters: ProblemFilters;
+  onFiltersChange: (next: ProblemFilters) => void;
+  onOpen: (finding: FileFinding) => void;
+  openLabel: string;
+  getFindingActions?:
+    | ((finding: FileFinding) => DropdownMenuItem[])
+    | undefined;
+}) {
   const lines = useMemo(() => source.split("\n"), [source]);
-  if (findings.length === 0) return <p className="p-6 text-center text-xs text-muted-foreground">No problems in this file.</p>;
+  const entries = useMemo(() => {
+    const keys = diagnosticKeys(
+      findings.map((f) => [
+        f.workDir,
+        f.file,
+        f.source,
+        f.rule,
+        f.line,
+        f.column,
+        f.endLine,
+        f.endColumn,
+        f.message,
+        f.severity,
+        f.kind,
+      ]),
+    );
+    return findings.map((finding, index) => ({ finding, key: keys[index]! }));
+  }, [findings]);
+  const keys = useMemo(() => entries.map((entry) => entry.key), [entries]);
+  const [expanded, setExpanded] = useProblemExpansion(keys);
+  const shown = entries
+    .filter(
+      ({ finding: f }) =>
+        matchesFilterState(f.severity, filters.severity) &&
+        matchesFilterState(problemType(f), filters.type),
+    )
+    .sort((a, b) => bySeverityThenLine(a.finding, b.finding));
+  const severityCounts = count(
+    findings.filter((f) => matchesFilterState(problemType(f), filters.type)),
+    (f) => f.severity,
+  );
+  const typeCounts = count(
+    findings.filter((f) => matchesFilterState(f.severity, filters.severity)),
+    problemType,
+  );
+  const types = [
+    ...new Set([...findings.map(problemType), ...filters.type.keys()]),
+  ].sort();
+  const active = filters.severity.size + filters.type.size;
   return (
-    <ul className="divide-y divide-border">
-      {[...findings].sort(bySeverityThenLine).map((f) => (
-        <ProblemRow key={`${f.line}:${f.rule}:${f.message}`} finding={f} lines={lines} onOpen={onOpen} openLabel={openLabel} />
-      ))}
-    </ul>
+    <>
+      <div
+        className="flex items-center justify-between border-b border-border p-1 text-xs"
+        data-problem-filters=""
+      >
+        <span className="px-2 text-muted-foreground">
+          {shown.length} of {findings.length} problems
+        </span>
+        <ProblemViewOptions active={active}>
+          <ProblemFacet
+            label="Severity"
+            options={FINDING_SEVERITIES.map((s) => ({
+              value: s,
+              label: LABELS[s],
+              count: severityCounts.get(s) ?? 0,
+            }))}
+            state={filters.severity}
+            onChange={(severity) =>
+              onFiltersChange({
+                ...filters,
+                severity: severity as ProblemFilters["severity"],
+              })
+            }
+          />
+          <ProblemFacet
+            label="Issue Type"
+            options={types.map((type) => ({
+              value: type,
+              label: type,
+              count: typeCounts.get(type) ?? 0,
+            }))}
+            state={filters.type}
+            onChange={(type) => onFiltersChange({ ...filters, type })}
+          />
+          <button
+            type="button"
+            className="text-xs text-muted-foreground"
+            disabled={!active}
+            onClick={() => onFiltersChange(emptyProblemFilters())}
+          >
+            Clear filters
+          </button>
+        </ProblemViewOptions>
+      </div>
+      {shown.length === 0 ? (
+        <p className="p-6 text-center text-xs text-muted-foreground">
+          {findings.length
+            ? "No problems match the current filters."
+            : "No problems in this file."}
+        </p>
+      ) : (
+        <ul>
+          {shown.map(({ finding: f, key }) => {
+            const first = Math.max(1, f.line - 3);
+            const last = Math.min(lines.length, (f.endLine ?? f.line) + 3);
+            return (
+              <li key={key} data-problem-line={f.line}>
+                <ProblemRow
+                  message={f.message}
+                  severity={f.severity}
+                  metadata={`${f.source} ${f.rule ?? ""}`}
+                  location={`${f.line}${f.column ? `:${f.column}` : ""}`}
+                  expanded={expanded.includes(key)}
+                  onExpandedChange={(open) =>
+                    setExpanded((current) => {
+                      const next = new Set(
+                        [...current].filter((id) =>
+                          entries.some((entry) => entry.key === id),
+                        ),
+                      );
+                      if (open) next.add(key);
+                      else next.delete(key);
+                      return [...next];
+                    })
+                  }
+                  actions={[
+                    { label: openLabel, onSelect: () => onOpen(f) },
+                    {
+                      label: "Copy description",
+                      onSelect: () => {
+                        void navigator.clipboard.writeText(f.message);
+                      },
+                    },
+                    ...(getFindingActions?.(f) ?? []),
+                  ]}
+                >
+                  {f.line > lines.length ? (
+                    <p role="alert">Source location is outside this file.</p>
+                  ) : (
+                    <ol
+                      data-problem-context="block"
+                      className="overflow-x-auto border-l border-border bg-muted/20 py-1 font-mono text-xs leading-5"
+                    >
+                      {lines.slice(first - 1, last).map((text, index) => {
+                        const line = first + index;
+                        return (
+                          <li
+                            key={line}
+                            className="grid min-w-max grid-cols-[2.5rem_1fr] gap-2 pr-2"
+                          >
+                            <span className="select-none text-right text-muted-foreground">
+                              {line}
+                            </span>
+                            <code
+                              className="whitespace-pre"
+                              style={
+                                line >= f.line && line <= (f.endLine ?? f.line)
+                                  ? squiggleUnder(
+                                      SEVERITY_MARK[f.severity].stroke,
+                                    )
+                                  : undefined
+                              }
+                            >
+                              <HighlightedTokens
+                                tokens={tokens?.[line - 1]}
+                                content={text || " "}
+                              />
+                            </code>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  )}
+                </ProblemRow>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
   );
 }

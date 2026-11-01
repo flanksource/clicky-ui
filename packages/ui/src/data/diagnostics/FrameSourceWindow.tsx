@@ -36,7 +36,7 @@ export function FrameSourceWindow({
    * `"neutral"` marks "the line that made this call" — a subtle theme-token
    * highlight with no red.
    */
-  focalTone?: "error" | "neutral";
+  focalTone?: "error" | "warning" | "info" | "neutral";
 }) {
   const lines = useMemo(() => frame.sourceLines ?? [], [frame.sourceLines]);
   const start = frame.sourceStartLine ?? 0;
@@ -67,8 +67,12 @@ export function FrameSourceWindow({
   if (lines.length === 0) return null;
 
   const neutralClassName = "bg-primary/10 font-semibold text-foreground";
-  const focalClassName =
-    focalTone === "neutral" ? neutralClassName : "bg-red-500/10 font-semibold text-red-800 dark:text-red-300";
+  const focalClassName = {
+    neutral: neutralClassName,
+    error: "bg-red-500/10 font-semibold text-red-800 dark:text-red-300",
+    warning: "bg-amber-500/10 font-semibold text-foreground",
+    info: "bg-sky-500/10 font-semibold text-foreground",
+  }[focalTone];
   const markerAt = new Map(markers?.map((marker) => [marker.line, marker.content]));
 
   return (
@@ -88,6 +92,7 @@ export function FrameSourceWindow({
           <div
             key={`${lineNumber}-${i}`}
             data-source-line={known ? lineNumber : undefined}
+            data-source-tone={isFocal ? focalTone : undefined}
             data-marked={marker === undefined ? undefined : "true"}
             className={[
               "grid min-w-max grid-cols-[3.5rem_minmax(24rem,1fr)] gap-3 px-2",
