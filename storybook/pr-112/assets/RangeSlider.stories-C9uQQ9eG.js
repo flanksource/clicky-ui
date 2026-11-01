@@ -1,8 +1,0 @@
-import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{t}from"./react-pByjoP3I.js";import{t as n}from"./jsx-runtime-BG4KOiPz.js";import{n as r,t as i}from"./RangeSlider-DtWjTJ20.js";function a({value:e,...t}){let[n,r]=(0,o.useState)(e);return(0,s.jsxs)(`div`,{className:`w-80 space-y-3`,children:[(0,s.jsx)(i,{...t,value:n,onChange:r}),(0,s.jsxs)(`div`,{className:`rounded-md border border-border bg-muted/30 px-3 py-2 font-mono text-xs`,children:[`[`,n[0],`, `,n[1],`]`]})]})}var o,s,c,l,u,d;function f(){return(f=e((()=>{o=t(),r(),s=n(),c={title:`Components/RangeSlider`,component:i,tags:[`autodocs`],render:e=>(0,s.jsx)(a,{...e}),parameters:{docs:{description:{component:'Dual-thumb range slider built from two overlaid native `<input type="range">` elements. The thumbs cannot cross; the filled segment between them reflects the selected `[lower, upper]` window. Fully controlled.'}}},argTypes:{min:{control:`number`},max:{control:`number`},step:{control:`number`},value:{control:!1},onChange:{control:!1}},args:{min:0,max:100,step:1,value:[20,70]}},l={},u={args:{min:0,max:1e3,step:50,value:[200,600]}},d=[`Default`,`Stepped`],l.parameters={...l.parameters,docs:{...l.parameters?.docs,source:{originalSource:`{}`,...l.parameters?.docs?.source}}},u.parameters={...u.parameters,docs:{...u.parameters?.docs,source:{originalSource:`{
-  args: {
-    min: 0,
-    max: 1000,
-    step: 50,
-    value: [200, 600]
-  }
-}`,...u.parameters?.docs?.source}}}})))()}f();export{l as Default,u as Stepped,d as __namedExportsOrder,c as default};
