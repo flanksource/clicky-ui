@@ -43,7 +43,7 @@ export function PromptPageHeader({
         ) : null}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg font-semibold leading-tight">
+            <h1 className="break-words text-lg font-semibold leading-tight">
               {entry.title}
             </h1>
             <PromptSourceBadge
@@ -83,7 +83,9 @@ export function PromptPageHeader({
             <dt className="text-muted-foreground">Runs as</dt>
             <dd
               className={
-                entry.effective.error ? "text-destructive" : "font-mono"
+                entry.effective.error
+                  ? "min-w-0 break-all text-destructive"
+                  : "min-w-0 break-all font-mono"
               }
             >
               {runtimeSummary(entry.effective)}
@@ -94,7 +96,7 @@ export function PromptPageHeader({
               ) : null}
             </dd>
             <dt className="text-muted-foreground">Runs from</dt>
-            <dd>
+            <dd className="min-w-0 break-all">
               {effective ? (
                 <>
                   {layerLabel(effective.origin)}

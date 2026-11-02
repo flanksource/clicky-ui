@@ -43,15 +43,15 @@ export function PromptLayerStrip({
             title={layer.path}
             onClick={() => onSelect(layer)}
             className={cn(
-              "flex min-w-44 flex-col gap-1 rounded-md border px-3 py-2 text-left text-xs transition",
+              "flex min-w-44 max-w-full flex-col gap-1 rounded-md border px-3 py-2 text-left text-xs transition",
               active
                 ? "border-primary bg-primary/5"
                 : "border-border hover:bg-muted",
             )}
           >
-            <span className="flex items-center gap-1.5 font-medium">
+            <span className="flex min-w-0 items-center gap-1.5 font-medium">
               <span className="text-muted-foreground">{index + 1}.</span>
-              <span>{layerLabel(layer.origin)}</span>
+              <span className="truncate">{layerLabel(layer.origin)}</span>
               {!layer.editable ? (
                 <UiLock
                   className="text-muted-foreground"

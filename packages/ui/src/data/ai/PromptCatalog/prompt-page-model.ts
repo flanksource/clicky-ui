@@ -82,7 +82,7 @@ export function isPromptPageDirty({
   layer: PromptCatalogLayer;
 }): boolean {
   if (isDraftDirty(draft, detail)) return true;
-  const initialSource = initialSaveSource(detail);
+  const initialSource = initialSaveSource(detail, layer);
   if (source !== initialSource) return true;
   return source === "file" && path !== defaultFilePath(entry, layer, detail);
 }
@@ -111,8 +111,14 @@ export function buildSavePayload(
   return { source, path: filePath, spec, body, baseRaw: detail.raw };
 }
 
-export function initialSaveSource(detail: PromptSpecDetail): PromptSaveSource {
-  return detail.source === "file" ? "file" : "inline";
+export function initialSaveSource(
+  detail: PromptSpecDetail,
+  layer?: PromptCatalogLayer,
+): PromptSaveSource {
+  const source = detail.source === "file" ? "file" : "inline";
+  return layer?.saveSources?.length && !layer.saveSources.includes(source)
+    ? layer.saveSources[0]!
+    : source;
 }
 
 // defaultFilePath is where a file override lands unless the user types a

@@ -39,6 +39,7 @@ export interface PromptCatalogLayer {
   source: "none" | "inline" | "file";
   filePath?: string | undefined;
   fields?: string[] | undefined;
+  saveSources?: Array<"inline" | "file"> | undefined;
 }
 
 // PromptCatalogRuntime is the model a prompt resolves to once compact

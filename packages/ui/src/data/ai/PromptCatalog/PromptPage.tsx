@@ -125,7 +125,7 @@ export function PromptPage({
     (detail: PromptSpecDetail, layer: PromptCatalogLayer) => {
       setState({ status: "ready", detail });
       setDraft(draftFor(detail));
-      setSaveSource(initialSaveSource(detail));
+      setSaveSource(initialSaveSource(detail, layer));
       setPath(defaultFilePath(entry, layer, detail));
       setSaveError("");
       setConflict(false);
@@ -358,6 +358,7 @@ export function PromptPage({
         </div>
         {state.status === "ready" && !readOnly ? (
           <PromptPageSaveBar
+            sources={selectedLayer.saveSources}
             source={saveSource}
             onSourceChange={setSaveSource}
             path={path}
