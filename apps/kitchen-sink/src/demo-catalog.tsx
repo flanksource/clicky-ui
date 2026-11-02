@@ -39,6 +39,7 @@ import { FilterPillDemo } from "./demos/FilterPillDemo";
 import { TimeRangeDemo } from "./demos/TimeRangeDemo";
 import { DataTableDemo } from "./demos/DataTableDemo";
 import { TraceLogsDemo } from "./demos/TraceLogsDemo";
+import { OtelTracesDemo } from "./demos/OtelTracesDemo";
 import { SortableHeaderDemo } from "./demos/SortableHeaderDemo";
 import { TabButtonDemo } from "./demos/TabButtonDemo";
 import { TabsDemo } from "./demos/TabsDemo";
@@ -360,6 +361,11 @@ export const DEMO_GROUPS: DemoGroup[] = [
         label: "Approvals",
         component: ApprovalsDemo,
         icon: UiGavel,
+      },
+      {
+        id: "otel-traces",
+        label: "OpenTelemetry traces",
+        component: OtelTracesDemo,
       },
       {
         id: "trace-logs",
