@@ -9,6 +9,45 @@ function BrokenPage(): never {
 }
 
 describe("ErrorWrapper", () => {
+  it("keeps host controls mounted and lets a custom fallback reset the failed subtree", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { rerender } = render(
+      <div>
+        <button>Host navigation</button>
+        <ErrorWrapper
+          renderFallback={({ report, reset }) => (
+            <div>
+              <pre>{report}</pre>
+              <button onClick={reset}>Retry page</button>
+            </div>
+          )}
+        >
+          <BrokenPage />
+        </ErrorWrapper>
+      </div>,
+    );
+    await waitFor(() =>
+      expect(screen.getByText(/React component stack:/)).toBeTruthy(),
+    );
+    expect(
+      screen.getByRole("button", { name: "Host navigation" }),
+    ).toBeTruthy();
+    rerender(
+      <div>
+        <button>Host navigation</button>
+        <ErrorWrapper
+          renderFallback={({ reset }) => (
+            <button onClick={reset}>Retry page</button>
+          )}
+        >
+          <p>Recovered page</p>
+        </ErrorWrapper>
+      </div>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry page" }));
+    expect(screen.getByText("Recovered page")).toBeTruthy();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -109,9 +148,7 @@ describe("ErrorWrapper", () => {
 
       const report = writeText.mock.calls[0]?.[0];
       expect(
-        report
-          ?.split("\n")
-          .find((line: string) => line.startsWith("Page: ")),
+        report?.split("\n").find((line: string) => line.startsWith("Page: ")),
       ).toBe(`Page: ${window.location.origin}/accounts/42`);
       expect(report).not.toEqual(expect.stringContaining("sk-live-secret"));
       expect(report).not.toEqual(expect.stringContaining("q=invoice"));

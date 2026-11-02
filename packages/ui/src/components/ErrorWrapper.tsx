@@ -20,6 +20,13 @@ import { Button } from "./button";
 export type ErrorWrapperProps = {
   children: ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  /** Render host-specific recovery actions without replacing ancestors of this boundary. */
+  renderFallback?: (failure: {
+    error: Error;
+    componentStack: string | null;
+    report: string;
+    reset: () => void;
+  }) => ReactNode;
 };
 
 type ErrorWrapperState = {
@@ -47,6 +54,17 @@ export class ErrorWrapper extends Component<
 
   override render(): ReactElement {
     if (this.state.error) {
+      if (this.props.renderFallback)
+        return (
+          <>
+            {this.props.renderFallback({
+              error: this.state.error,
+              componentStack: this.state.componentStack,
+              report: errorReport(this.state.error, this.state.componentStack),
+              reset: () => this.setState({ error: null, componentStack: null }),
+            })}
+          </>
+        );
       return (
         <ErrorFallback
           error={this.state.error}

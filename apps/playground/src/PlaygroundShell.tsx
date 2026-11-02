@@ -19,6 +19,7 @@ import {
 } from "@flanksource/clicky-ui";
 import { UiComment } from "@flanksource/clicky-ui/icons";
 import { CommentDashboard } from "./comments/CommentDashboard";
+import { PageErrorBoundary } from "./PageErrorBoundary";
 
 import {
   CommentOverlay,
@@ -439,6 +440,7 @@ export function PlaygroundShell({
                   “Unavailable” in the rail.
                 </Banner>
               )}
+              <PageErrorBoundary page={active.slug}>
               {active.kind === "markdown" ? (
                 view === "markdown" ? (
                   <Banner tone="danger">
@@ -492,6 +494,7 @@ export function PlaygroundShell({
               ) : (
                 null
               )}
+              </PageErrorBoundary>
             </div>
 
             {view === "preview" && annotations === "visible" && (

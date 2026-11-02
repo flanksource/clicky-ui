@@ -32,6 +32,7 @@ import { RunAgentDialog } from "./RunAgentDialog";
 import { PLAYGROUND_COMMENT_CONFIG } from "../comments/useComments";
 
 type AgentRunsContext = {
+  start: (comment: Comment) => Promise<void>;
   /** Menu entries for a comment's Assign menu. */
   extraAssignItems: (comment: Comment) => DropdownMenuItem[];
   /** The "sent to agent session" chip for a comment, or nothing. */
@@ -207,6 +208,7 @@ export function AgentRunsProvider({
   const value = useMemo<AgentRunsContext>(
     () => ({
       data,
+      start,
       openPanel,
       target: pageTarget,
       setTarget: changePageTarget,
