@@ -71,6 +71,7 @@ export type {
 
 export { OtelTraceDetail } from "./otel/OtelTraceDetail";
 export { OtelTraceSearch } from "./otel/OtelTraceSearch";
+export { OtelTraceTable, type OtelTraceTableProps } from "./otel/OtelTraceTable";
 export { searchParams as otelSearchParams, readSearchValues as readOtelSearchValues } from "./otel/api";
 export { durationOf as otelDurationOf } from "./otel/query";
 export type { Span as OtelSpan, Summary as OtelSummary, SearchForm as OtelSearchForm } from "./otel/api";

@@ -65,6 +65,7 @@ export function ProfileGeneralSection({ draft, onChange }: EditorSectionProps) {
             <option value="">Table (default)</option>
             <option value="table">Table</option>
             <option value="logs">Logs</option>
+            <option value="traces">Traces</option>
           </select>
         </EditorField>
         <EditorField label="Icon">

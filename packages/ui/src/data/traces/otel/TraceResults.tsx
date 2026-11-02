@@ -1,6 +1,6 @@
 import { ago, niceStep } from "./result-model";
 import { Badge } from "../../Badge";
-import { DataTable, type DataTableColumn } from "../../DataTable";
+import { DataTable, type DataTableColumn, type DataTableProps } from "../../DataTable";
 import { duration, type SearchResult, type Summary } from "./api";
 import { shortOperation } from "./query";
 
@@ -71,7 +71,7 @@ export function Scatter({ traces, onOpen }: { traces: Summary[]; onOpen: (id: st
 }
 
 /** The traces, newest first: what ran, when, how long against the slowest, and its span count. */
-export function ResultTable({ traces, href, onOpen, now }: { traces: Summary[]; href: (id: string) => string; onOpen: (id: string) => void; now: number }) {
+export function ResultTable({ traces, href, onOpen, now, tableProps = {} }: { traces: Summary[]; href: (id: string) => string; onOpen: (id: string) => void; now: number; tableProps?: Pick<DataTableProps<Summary>, "externalFilters" | "externalSearch" | "externalTimeRange" | "pagination" | "infinite" | "loading"> }) {
   const slowest = Math.max(1, ...traces.map(trace => trace.durationMs));
   const columns: DataTableColumn<Summary>[] = [
     {
@@ -110,6 +110,7 @@ export function ResultTable({ traces, href, onOpen, now }: { traces: Summary[]; 
   return (
     <div className="flex h-[28rem] min-h-0 flex-col">
       <DataTable
+        {...tableProps}
         data={traces}
         columns={columns}
         getRowId={trace => trace.traceId}
