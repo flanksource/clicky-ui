@@ -2,8 +2,22 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { LookupFetcher } from "../../components/json-schema-form-types";
 import { configureProfiles } from "../profileApi";
-import { ProfileSourceSection } from "./profileEditorSections";
+import { ProfileGeneralSection, ProfileSourceSection } from "./profileEditorSections";
 import { testProfileSchema } from "./testSchema";
+
+describe("ProfileGeneralSection", () => {
+  it("selects and restores the traces render mode without changing the source", () => {
+    const draft = { profile: "Service traces", provider: { type: "opentelemetry" }, render: "traces" };
+    const onChange = vi.fn();
+    render(<ProfileGeneralSection draft={draft} onChange={onChange} />);
+    const mode = screen.getByRole("combobox", { name: "Render mode" });
+    expect(mode).toHaveValue("traces");
+    fireEvent.change(mode, { target: { value: "logs" } });
+    expect(onChange).toHaveBeenLastCalledWith({ ...draft, render: "logs" });
+    fireEvent.change(mode, { target: { value: "traces" } });
+    expect(onChange).toHaveBeenLastCalledWith(draft);
+  });
+});
 
 describe("ProfileSourceSection", () => {
   beforeAll(() => configureProfiles({ schema: testProfileSchema }));
