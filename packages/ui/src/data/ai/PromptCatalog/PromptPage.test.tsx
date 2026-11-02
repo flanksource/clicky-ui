@@ -220,6 +220,35 @@ async function renderPage(
 }
 
 describe("PromptPage", () => {
+  it("saves file-only sources without offering inline configuration storage", async () => {
+    const adapter = makeAdapter();
+    const layer: PromptCatalogLayer = {
+      ...project,
+      filePath: "branch-merge.prompt",
+      saveSources: ["file"],
+    };
+    await renderPage(adapter, { entry: { ...entry, layers: [layer] } });
+    expect(screen.queryByRole("radio", { name: "Inline" })).toBeNull();
+    expect(
+      screen.getByRole("textbox", { name: "Prompt file path" }),
+    ).toHaveValue("branch-merge.prompt");
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Prompt document body" }),
+      { target: { value: "Resolve conflicts" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(adapter.saveDetail).toHaveBeenCalledWith(
+        expect.anything(),
+        layer,
+        expect.objectContaining({
+          source: "file",
+          path: "branch-merge.prompt",
+        }),
+      ),
+    );
+  });
+
   it("saves runtime bar edits and previews the same draft without losing stored settings", async () => {
     const adapter = makeAdapter();
     const stored = {

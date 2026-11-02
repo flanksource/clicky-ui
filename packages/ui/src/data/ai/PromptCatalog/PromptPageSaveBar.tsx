@@ -21,6 +21,7 @@ const SOURCE_OPTIONS: SegmentedOption<PromptSaveSource>[] = [
 ];
 
 export type PromptPageSaveBarProps = {
+  sources?: PromptSaveSource[] | undefined;
   source: PromptSaveSource;
   onSourceChange: (source: PromptSaveSource) => void;
   path: string;
@@ -40,6 +41,7 @@ export type PromptPageSaveBarProps = {
 // failure: it names the fix (reload) instead of inviting a retry that would
 // hit the same wall.
 export function PromptPageSaveBar({
+  sources,
   source,
   onSourceChange,
   path,
@@ -95,7 +97,11 @@ export function PromptPageSaveBar({
           <SegmentedControl
             size="sm"
             value={source}
-            options={SOURCE_OPTIONS}
+            options={
+              sources
+                ? SOURCE_OPTIONS.filter((option) => sources.includes(option.id))
+                : SOURCE_OPTIONS
+            }
             onChange={onSourceChange}
             aria-label="Save location"
           />
@@ -110,7 +116,7 @@ export function PromptPageSaveBar({
               onChange={(event) => onPathChange(event.currentTarget.value)}
             />
           ) : null}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
             {canRemove && !confirmingRemove ? (
               <Button
                 type="button"
