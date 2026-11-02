@@ -68,3 +68,10 @@ export type {
   TraceBodyText,
   TraceRow,
 } from "./types";
+
+export { OtelTraceDetail } from "./otel/OtelTraceDetail";
+export { OtelTraceSearch } from "./otel/OtelTraceSearch";
+export { searchParams as otelSearchParams, readSearchValues as readOtelSearchValues } from "./otel/api";
+export { durationOf as otelDurationOf } from "./otel/query";
+export type { Span as OtelSpan, Summary as OtelSummary, SearchForm as OtelSearchForm } from "./otel/api";
+export type { Trace as OtelTrace, SearchValues as OtelSearchValues, SearchResult as OtelSearchResult, Source as OtelSource } from "./otel/api";
