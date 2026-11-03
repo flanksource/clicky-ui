@@ -17,6 +17,7 @@ import {
 } from "./comments-store";
 import { promptResultComment } from "./prompt-result";
 import { LaunchClient, LaunchHttpError } from "./launch-client";
+import { fixedGavel, onDemandGavel } from "./gavel-launch-server";
 import {
   PromptAssociations,
   type PromptAssociation,
@@ -27,7 +28,8 @@ export const PROMPT_RUNS_ROUTE = "/__playground";
 export type PromptRunsOptions = {
   /** The `.playground` data directory holding comments.json. */
   dir: string;
-  gavelURL: string;
+  /** A running launch server; unset starts `gavel launch serve` over `workspace` when first needed. */
+  gavelURL?: string | undefined;
   workspace: string;
   /** Called for each result comment, e.g. the agent session's auto-run. */
   onCreated?: (event: CommentCreatedEvent) => Promise<void>;
@@ -175,17 +177,33 @@ function captainAuthor(promptName: string): StoredAuthor {
 
 export function createPromptRuns(options: PromptRunsOptions) {
   const { dir, onCreated } = options;
-  const gavel = new LaunchClient(options.gavelURL, options.workspace);
+  const endpoint = options.gavelURL
+    ? fixedGavel(options.gavelURL)
+    : onDemandGavel({ workspace: options.workspace });
+  const gavel = new LaunchClient(endpoint, options.workspace);
   const associations = new PromptAssociations(dir);
   const processing = new Set<string>();
-  let preparation:
-    | Promise<{ preparationId: string; directory: string }>
-    | undefined;
-  const workspace = () =>
-    (preparation ??= gavel.prepare().catch((cause: unknown) => {
-      preparation = undefined;
-      throw cause;
-    }));
+  type Preparation = {
+    preparationId: string;
+    directory: string;
+    generation: number;
+  };
+  let preparation: Promise<Preparation> | undefined;
+  // A preparation lives in the server that made it; after the endpoint starts
+  // a new server, prepare again.
+  const workspace = async (): Promise<Preparation> => {
+    preparation ??= gavel
+      .prepare()
+      .then((prepared) => ({ ...prepared, generation: gavel.generation }))
+      .catch((cause: unknown) => {
+        preparation = undefined;
+        throw cause;
+      });
+    const prepared = await preparation;
+    if (prepared.generation === gavel.generation) return prepared;
+    preparation = undefined;
+    return workspace();
+  };
   const publicRun = (entry: PromptAssociation): PromptRun => ({
     runId: entry.runId,
     promptId: entry.promptId,
@@ -380,6 +398,8 @@ export function createPromptRuns(options: PromptRunsOptions) {
   }
 
   return {
+    /** Stops the launch server the playground started, if any. */
+    close: () => endpoint.close(),
     resume: (logger: Logger) => {
       for (const entry of associations.all())
         if (entry.state === "running") void follow(entry, logger);
@@ -459,9 +479,11 @@ export function playgroundPromptRuns(runs: PromptRuns): Plugin {
     name: "playground-prompt-runs",
     configureServer(server) {
       register(server.middlewares, server.config.logger);
+      server.httpServer?.once("close", () => void runs.close());
     },
     configurePreviewServer(server) {
       register(server.middlewares, server.config.logger);
+      server.httpServer?.once("close", () => void runs.close());
     },
   };
 }

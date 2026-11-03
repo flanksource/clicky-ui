@@ -3,6 +3,10 @@ import type {
   CaptainPromptSummary,
 } from "./captain-client";
 import type { Violation } from "../../../packages/ui/src/data/lint/types";
+import type { GavelEndpoint } from "./gavel-launch-server";
+
+const describe = (cause: unknown) =>
+  cause instanceof Error ? cause.message : String(cause);
 
 export type LaunchSnapshot = {
   metadata: {
@@ -32,17 +36,36 @@ export class LaunchHttpError extends Error {
 
 export class LaunchClient {
   constructor(
-    readonly baseURL: string,
+    readonly endpoint: GavelEndpoint,
     readonly workspace: string,
   ) {}
-  private async json<T>(path: string, init?: RequestInit): Promise<T> {
+  /** Bumped each time the endpoint starts a new server; its preparations are gone with the old one. */
+  get generation() {
+    return this.endpoint.generation;
+  }
+  private async json<T>(
+    path: string,
+    init?: RequestInit,
+    retried = false,
+  ): Promise<T> {
+    let baseURL: string;
+    try {
+      baseURL = await this.endpoint.url();
+    } catch (cause) {
+      throw new LaunchHttpError(502, describe(cause));
+    }
     let response: Response;
     try {
-      response = await fetch(new URL(path, this.baseURL), init);
+      response = await fetch(new URL(path, baseURL), init);
     } catch (cause) {
+      // An on-demand server that has gone away is started again; every
+      // request is a read, a prepare or an idempotency-keyed start, so one
+      // retry is safe.
+      if (!retried && this.endpoint.unreachable())
+        return this.json(path, init, true);
       throw new LaunchHttpError(
         502,
-        `Cannot reach Gavel at ${this.baseURL}: ${cause instanceof Error ? cause.message : String(cause)}`,
+        `Cannot reach Gavel at ${baseURL}: ${describe(cause)}`,
       );
     }
     const value = (await response.json()) as { error?: string };
