@@ -86,15 +86,15 @@ describe("standaloneHtml", () => {
       standaloneHtml(card, "page-card", { x: 6, y: 4, width: 120, height: 30 }),
       "text/html",
     );
+    const clip = parsed.body.firstElementChild as HTMLElement;
 
     expect({
       theme: parsed.documentElement.dataset.theme,
       bodyClass: parsed.body.className,
       title: parsed.title,
       css: parsed.querySelector("style")?.textContent,
-      clip: (parsed.body.firstElementChild as HTMLElement).style.cssText,
-      offset: (parsed.body.firstElementChild?.firstElementChild as HTMLElement)
-        .style.margin,
+      clip: clip.style.cssText,
+      offset: (clip.firstElementChild as HTMLElement).style.margin,
       element: parsed.querySelector("section")?.outerHTML,
     }).toEqual({
       theme: "dark",

@@ -11,7 +11,7 @@
     "generate:api": "node scripts/generate-component-api.mjs"
   },
   "devDependencies": {
-    "@astrojs/starlight": "^0.36.0",
+    "@astrojs/starlight": "catalog:",
     "astro": "catalog:",
     "prettier": "catalog:",
     "react-docgen-typescript": "^2.4.0",

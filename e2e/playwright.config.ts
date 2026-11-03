@@ -19,7 +19,10 @@ export default defineConfig({
   // E2E_ALL_BROWSERS=1 to additionally exercise firefox/webkit (requires
   // `playwright install`).
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"], channel: "chrome" } },
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"], channel: "chrome" },
+    },
     ...(process.env.E2E_ALL_BROWSERS
       ? [
           { name: "firefox", use: { ...devices["Desktop Firefox"] } },
@@ -28,7 +31,9 @@ export default defineConfig({
       : []),
   ],
   webServer: {
-    command: "pnpm --filter kitchen-sink dev",
+    command: process.env.CI
+      ? "pnpm --filter kitchen-sink exec vite preview --port 5801 --strictPort"
+      : "pnpm --filter kitchen-sink dev",
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
