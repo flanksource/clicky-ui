@@ -244,6 +244,8 @@ Each result also records `promptRun: {promptId, promptName, runId, sessionId?, v
 | `POST` | `/__playground/prompt-runs` | Start a run: `{promptId, variables, presets, page, anchor, element, author}` (human author; element without screenshot) → `202 {run}` |
 | `GET`  | `/__playground/prompt-runs` | `{runs}` — recent runs, `state` `running`, `done` (with `commentId`), `empty` or `failed` (with `error`); kept in memory, so a playground restart forgets them |
 
+Prompts are discovered and run through Gavel's launch API (`gavel launch serve`). The playground starts it on demand: the first prompt request starts `gavel launch serve --root <repo> --local-root <repo> --addr 127.0.0.1:9330` (needs `gavel` on `PATH`), unless a launch server already answers there, as one another playground started does. The playground stops only the server it started, when it shuts down, and starts a new one if that one exits. Set `PLAYGROUND_GAVEL_URL` in `.env.local` to use a launch server you run yourself; the playground then never starts one, and an unreachable URL is a `502` naming it.
+
 ## How it fits together
 
 | Concern                          | Where                                                                |

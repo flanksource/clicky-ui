@@ -109,7 +109,7 @@ export default defineConfig(({ mode }) => ({
     playgroundPromptRuns(
       createPromptRuns({
         dir: playgroundDataDir,
-        gavelURL: localEnv.PLAYGROUND_GAVEL_URL ?? "http://localhost:9330",
+        gavelURL: localEnv.PLAYGROUND_GAVEL_URL,
         workspace: workspaceRoot,
         onCreated: agentRuns.autoRunComment,
       }),
