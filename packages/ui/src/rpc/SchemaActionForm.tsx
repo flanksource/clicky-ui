@@ -2,6 +2,7 @@ import {
   lazy,
   Suspense,
   useCallback,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -10,6 +11,9 @@ import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { Button } from "../components/button";
 import { JsonSchemaForm } from "../components/JsonSchemaForm";
 import { Tabs } from "../layout/Tabs";
+import Ajv from "ajv/dist/2020";
+import { applySchemaDefaults } from "../components/json-schema-form-defaults";
+import { rehydrateRefs } from "../components/json-schema-form-refs";
 import type {
   JsonSchemaObject,
   PreExtension,
@@ -48,6 +52,7 @@ export type FormActionsRenderer = (ctx: FormActionContext) => ReactNode;
 export type SchemaActionFormSlots = {
   body: ReactNode;
   footer?: ReactNode;
+  dirty?: boolean;
 };
 
 export type SchemaActionFormProps = {
@@ -129,14 +134,58 @@ export function SchemaActionForm({
   // previous dialog's retained model during deferred StrictMode-safe cleanup.
   const [editorId] = useState(() => ++schemaActionEditorSequence);
   const editorPath = `file:///clicky-schema-action-${editorId}.yaml`;
+  const validate = useMemo(
+    () =>
+      schemaQuery.data
+        ? new Ajv({
+            strict: false,
+            allErrors: true,
+            verbose: true,
+            validateFormats: false,
+          }).compile(schemaQuery.data)
+        : undefined,
+    [schemaQuery.data],
+  );
+  const validForm = validate?.(value) ?? true;
+  const formErrors = (validate?.errors ?? [])
+    .filter((e) => e.keyword !== "if")
+    .map((e) => ({
+      instancePath:
+        e.keyword === "required"
+          ? `${e.instancePath}/${e.params.missingProperty}`
+          : e.instancePath,
+      message:
+        e.keyword === "required"
+          ? "Required"
+          : ((e.keyword === "not"
+              ? (e.schema as { description?: string }).description
+              : undefined) ??
+            e.message ??
+            "Invalid value"),
+    }));
+  const baseline = useMemo(
+    () =>
+      schemaQuery.data
+        ? applySchemaDefaults(
+            rehydrateRefs(schemaQuery.data),
+            initialValue ?? {},
+          )
+        : (initialValue ?? {}),
+    [schemaQuery.data, initialValue],
+  );
+  const dirty =
+    JSON.stringify(value) !== JSON.stringify(baseline) ||
+    (view === "yaml" && yamlText !== stringifyYaml(value));
   const canSubmit =
-    !yamlError && (view !== "yaml" || yamlValidation.status === "valid");
+    validForm &&
+    !yamlError &&
+    (view !== "yaml" || yamlValidation.status === "valid");
   const handleValidationChange = useCallback((next: MonacoValidationState) => {
     setYamlValidation(next);
   }, []);
 
   function renderSlots(slots: SchemaActionFormSlots) {
-    if (renderLayout) return renderLayout(slots);
+    if (renderLayout) return renderLayout({ ...slots, dirty });
     return (
       <div className="space-y-4">
         {slots.body}
@@ -254,6 +303,7 @@ export function SchemaActionForm({
             schema={schema}
             value={value}
             onChange={setValue}
+            errors={formErrors}
             {...(formPre ? { pre: formPre } : {})}
             {...(formPost ? { post: formPost } : {})}
             {...(lookupFetcher ? { lookupFetcher } : {})}
