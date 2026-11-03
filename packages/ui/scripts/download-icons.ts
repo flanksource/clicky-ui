@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,13 +13,14 @@ import {
   incumbentSvgPaths,
   isIconifySpec,
   jetbrainsIconUrl,
+  kubernetesCommunitySvgPath,
+  readIconSelections,
   remoteSvgPath,
-  selectionsPath,
   validateJetbrainsCatalog,
   validateJetbrainsSvg,
   type IconSourceRequest,
-  type Selections,
 } from "./icon-sources";
+import { KUBERNETES_COMMUNITY_COMMIT } from "./resource-icon-catalog";
 
 const flanksourceIconsRawBase =
   "https://raw.githubusercontent.com/flanksource/flanksource-icons/main/svg";
@@ -74,6 +75,15 @@ async function downloadNonIconifySource(
   request: IconSourceRequest,
 ): Promise<boolean> {
   const { spec, consumerName } = request;
+  if (spec.startsWith("k8s-community:")) {
+    const path = kubernetesCommunitySvgPath(spec);
+    if (existsSync(path)) return false;
+    await downloadSvg(
+      `https://raw.githubusercontent.com/kubernetes/community/${KUBERNETES_COMMUNITY_COMMIT}/icons/svg/${spec.slice("k8s-community:".length)}.svg`,
+      path,
+    );
+    return true;
+  }
   if (spec === "incumbent" || spec.startsWith("incumbent:")) {
     const paths = incumbentSvgPaths(spec, consumerName);
     if (paths.some(existsSync)) return false;
@@ -123,9 +133,7 @@ async function downloadNonIconifySource(
 }
 
 export async function downloadIcons(): Promise<void> {
-  const selections = JSON.parse(
-    await readFile(selectionsPath, "utf8"),
-  ) as Selections;
+  const selections = await readIconSelections();
   const requests = iconSourceRequests(selections);
   const siteSpecs = [
     ...new Set(
