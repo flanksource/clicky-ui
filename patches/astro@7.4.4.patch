@@ -1,0 +1,28 @@
+diff --git a/dist/vite-plugin-astro/index.js b/dist/vite-plugin-astro/index.js
+index 03bc2ad8a4c5e5d2479b69d5b28c2b28efb7d3fe..44f9e501fee5b20f29c042679d7e10c82c4ceece 100644
+--- a/dist/vite-plugin-astro/index.js
++++ b/dist/vite-plugin-astro/index.js
+@@ -39,7 +39,10 @@ export default function astro({ settings, logger }) {
+ 					const parsedId = parseAstroRequest(id);
+ 					// Special edge case handling for Vite 6 beta, the style dependencies need to be registered here to take effect
+ 					// TODO: Remove this when Vite fixes it (https://github.com/vitejs/vite/pull/18103)
+-					const astroFilename = normalizePath(normalizeFilename(parsedId.filename, config.root));
++					// WORKAROUND(astro-pnpm-paths): Build module IDs include absolute paths in pnpm's global store.
++					// Correct fix: Only normalize browser-root URLs in development, preserving absolute build IDs upstream.
++					// Ref: discussed with user 2026-11-03
++					const astroFilename = normalizePath(server ? normalizeFilename(parsedId.filename, config.root) : parsedId.filename);
+ 					const compileMetadata = astroFileToCompileMetadata.get(astroFilename);
+ 					if (compileMetadata && parsedId.query.type === "style" && parsedId.query.index != null) {
+ 						const result = compileMetadata.css[parsedId.query.index];
+@@ -112,7 +115,10 @@ export default function astro({ settings, logger }) {
+ 					// Astro scripts and styles virtual module code comes from the main Astro compilation
+ 					// through the metadata from `astroFileToCompileMetadata`. It should always exist as Astro
+ 					// modules are compiled first, then its virtual modules.
+-					const filename = normalizePath(normalizeFilename(parsedId.filename, config.root));
++					// WORKAROUND(astro-pnpm-paths): Build module IDs include absolute paths in pnpm's global store.
++					// Correct fix: Only normalize browser-root URLs in development, preserving absolute build IDs upstream.
++					// Ref: discussed with user 2026-11-03
++					const filename = normalizePath(server ? normalizeFilename(parsedId.filename, config.root) : parsedId.filename);
+ 					let compileMetadata = astroFileToCompileMetadata.get(filename);
+ 					if (!compileMetadata) {
+ 						// If `compileMetadata` doesn't exist in dev, that means the virtual module may have been invalidated.
