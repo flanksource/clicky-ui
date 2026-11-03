@@ -170,6 +170,7 @@
     "check": "pnpm run build:icons && tsc -b --noEmit && pnpm run check:public-exports && pnpm run lint"
   },
   "dependencies": {
+    "ajv": "catalog:",
     "@codemirror/autocomplete": "catalog:",
     "@codemirror/commands": "catalog:",
     "@codemirror/lang-json": "catalog:",
@@ -208,7 +209,6 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "ai": "catalog:",
-    "ajv": "catalog:",
     "jsdom": "^26.0.0",
     "monaco-editor": "catalog:",
     "react": "^18.3.1",

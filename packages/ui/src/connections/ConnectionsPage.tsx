@@ -359,8 +359,8 @@ function ConnectionFormDialog({
       {...(lockedValues ? { lockedValues } : {})}
       {...(initialValue ? { initialValue } : {})}
       onSuccess={onSaved}
-      renderLayout={({ body, footer }) => (
-        <Modal open onClose={onClose} title={title} size="2xl" footer={footer}>
+      renderLayout={({ body, footer, dirty }) => (
+        <Modal open onClose={onClose} confirmClose={dirty === true} title={title} size="2xl" footer={footer}>
           <div className="space-y-4">
             {body}
             {notice}

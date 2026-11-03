@@ -63,6 +63,7 @@ export type DropdownMenuItem = {
 };
 
 export type DropdownMenuProps = {
+  role?: "menu" | "dialog";
   /** Trigger label. Ignored when `trigger` is provided. */
   label?: ReactNode;
   /** Icon shown before the trigger label. Ignored when `trigger` is provided. */
@@ -111,6 +112,7 @@ export function DropdownMenu(props: DropdownMenuProps) {
 }
 
 function DropdownMenuRoot({
+  role: popupRole = "menu",
   label,
   icon,
   hideChevron = false,
@@ -168,7 +170,7 @@ function DropdownMenuRoot({
   // menu correctly does dismiss the menu, which is harmless since closing the
   // menu does not unmount a Modal it doesn't own.
   const dismiss = useDismiss(context, { escapeKey: false });
-  const role = useRole(context, { role: "menu" });
+  const role = useRole(context, { role: popupRole });
   const listNav = useListNavigation(context, {
     listRef: elementsRef,
     activeIndex,
@@ -177,7 +179,7 @@ function DropdownMenuRoot({
   });
 
   const { getReferenceProps, getFloatingProps, getItemProps } = useInteractions(
-    [click, dismiss, role, listNav],
+    [click, dismiss, role, ...(popupRole === "menu" ? [listNav] : [])],
   );
 
   const closeMenu = () => {
@@ -205,7 +207,7 @@ function DropdownMenuRoot({
           <Slot
             ref={refs.setReference}
             className="inline-flex"
-            aria-haspopup="menu"
+            aria-haspopup={popupRole}
             aria-expanded={open}
             {...getReferenceProps()}
           >
@@ -219,7 +221,7 @@ function DropdownMenuRoot({
             variant={variant}
             size={size}
             title={title}
-            aria-haspopup="menu"
+            aria-haspopup={popupRole}
             aria-expanded={open}
             {...getReferenceProps()}
           >
@@ -242,7 +244,8 @@ function DropdownMenuRoot({
               <div
                 ref={refs.setFloating}
                 {...getFloatingProps()}
-                role="menu"
+                role={popupRole}
+                aria-modal={popupRole === "dialog" ? false : undefined}
                 aria-label={menuLabel}
                 {...(menuLabel ? { "aria-labelledby": undefined } : {})}
                 style={{ ...floatingStyles, zIndex: floatingZ }}

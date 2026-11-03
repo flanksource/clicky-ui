@@ -249,11 +249,12 @@ export function OperationActionBar({
     </>
   );
 
-  function renderActionDialog({ body, footer }: SchemaActionFormSlots) {
+  function renderActionDialog({ body, footer, dirty }: SchemaActionFormSlots) {
     if (!activeAction) return null;
     return (
       <Modal
         open
+        confirmClose={dirty === true}
         onClose={() => setActiveAction(null)}
         title={actionLabel(activeAction)}
         size="2xl"
