@@ -1,6 +1,7 @@
+import { useCommentState, useDiscardCommentDraft } from "../../comments/comment-persistence";
 import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
 import { ProblemActions } from "../../data/diagnostics/ProblemActions";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Button } from "../../components/button";
 import { highlightToLines, languageFromPath, type HighlightedLine } from "../../data/code-highlight";
 import { Icon } from "../../data/Icon";
@@ -11,6 +12,8 @@ import { DropdownMenu } from "../../overlay/DropdownMenu";
 import { cn } from "../../lib/utils";
 import { resolveCommentStage, selectCommentThreadsByStage } from "../../lib/comment-stage";
 import { CommentThread } from "../../comments/CommentThread";
+import { CommentRail } from "../../comments/CommentRail";
+import type { CommentDetailOptions } from "../../comments/comment-detail";
 import { DEFAULT_COMMENT_STATUSES, type Comment, type CommentCallbacks, type CommentConfig } from "../../comments/comment-types";
 import { getRoots, selectAnchorThreads } from "../../comments/comment-utils";
 import { UiCheck, UiDotsVertical, UiEye, UiFileCode, UiGitCommit, UiListChecks } from "../../icons";
@@ -62,7 +65,7 @@ type AuthorFilter = "all" | "user" | "agent";
 /** A selection offered for commenting: a Comment pill that morphs into a composer card once `expanded`. */
 type Draft = { anchor: string; label: string; position: CommentDraftPosition; expanded: boolean; surface: "preview" | "source" };
 
-const isMarkdownPath = (path: string) => /\.mdx?$/i.test(path);
+const isMarkdownPath = (path: string) => /\.(md|mdx|markdown)$/i.test(path);
 /** Anchors on quoted text: words in rendered markdown (`q:`) or characters in a source file (`s:`). */
 const isTextAnchor = (anchor: string) => anchor.startsWith(QUOTE_PREFIX) || anchor.startsWith(SOURCE_PREFIX);
 const quoteDraft = (locator: QuoteLocator) => ({ anchor: quoteAnchor(locator), label: describeQuote(locator) });
@@ -113,7 +116,7 @@ export type FileReviewView = "preview" | "source" | "problems";
 export type FileReviewLayout = "margin" | "inline";
 
 /** People's threads on the document and what they may do with them. */
-export type FileReviewComments = {
+export type FileReviewComments = CommentDetailOptions & {
   /** Every comment on the document; quote threads carry `q:` anchors from `quoteAnchor`. */
   items: Comment[];
   callbacks: CommentCallbacks;
@@ -122,6 +125,10 @@ export type FileReviewComments = {
 };
 
 export type FileReviewProps = {
+  sidebarWidth?: number;
+  onSidebarWidthChange?: (width: number) => void;
+  /** Host-owned resolution for relative Markdown links and images. */
+  resolveUrl?: ((url: string, kind: "link" | "image") => string) | undefined;
   /**
    * File path. Markdown (`.md`, `.mdx`) gets a rendered Preview, with an
    * `.mdx` file's frontmatter and ESM statements blanked; any other file is
@@ -199,6 +206,9 @@ const REVEAL_OFFSET = 48;
  * editable source.
  */
 export function FileReview({
+  sidebarWidth,
+  onSidebarWidthChange,
+  resolveUrl,
   path,
   source: raw,
   view,
@@ -266,11 +276,14 @@ export function FileReview({
   }, [tokenized, source, path, theme]);
   // Tokens of an earlier text would colour the wrong characters; show plain text until the new ones arrive.
   const sourceTokens = tokens?.source === source ? tokens.lines : null;
-  const [align, setAlign] = useState<SidebarAlign>("line");
-  const [focused, setFocused] = useState<string | null>(null);
+  const [align, setAlign] = useCommentState<SidebarAlign>(`file:${path}:align`, "line");
+  const [focused, setFocused] = useCommentState<string | null>(`file:${path}:focused`, null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [filter, setFilter] = useState<AuthorFilter>("all");
+  const discardCommentDraft = useDiscardCommentDraft();
+  const [savedDraft, saveDraft] = useCommentState<Omit<Draft, "position"> | null>(`file:${path}:selection`, null);
+  useEffect(() => { if (draft?.expanded) { const { position: _position, ...selection } = draft; saveDraft(selection); } }, [draft, saveDraft]);
+  const [filter, setFilter] = useCommentState<AuthorFilter>(`file:${path}:filter`, "all");
   const [editorLine, setEditorLine] = useState<number | undefined>(undefined);
   /** A finding picked from Source or Problems: the preview scrolls to it once its box is measured. */
   const [revealing, setRevealing] = useState<string | null>(null);
@@ -303,7 +316,7 @@ export function FileReview({
   const resolvedCount = getRoots(filtered).filter((c) => resolveCommentStage(config, c.status) !== "active").length;
   const threadAnchors = useMemo(() => [...new Set(getRoots(open).map((c) => c.anchor ?? ""))].filter(Boolean), [open]);
   // An expanded draft highlights its selection, but has no thread to place in the sidebar until posted.
-  const draftAnchor = draft?.expanded ? draft.anchor : null;
+  const draftAnchor = draft?.expanded ? draft.anchor : savedDraft?.anchor ?? null;
   const unposted = draftAnchor && !threadAnchors.includes(draftAnchor) ? draftAnchor : null;
   const anchors = useMemo(() => (unposted ? [...threadAnchors, unposted] : threadAnchors), [threadAnchors, unposted]);
   // A line with several findings shows its most severe one.
@@ -318,9 +331,22 @@ export function FileReview({
     return worst;
   }, [open]);
   const { boxes, height, width } = useAnchorBoxes({ origin, markdown, anchors, mode, visible: view === "preview" });
+  useEffect(() => {
+    if (draft || !savedDraft || savedDraft.surface !== "preview") return;
+    const box = boxes.get(savedDraft.anchor)?.[0];
+    if (box) setDraft({ ...savedDraft, position: { top: box.top, bottom: box.top + box.height, left: box.left + box.width / 2 } });
+  }, [boxes, draft, savedDraft]);
   const sourceOrigin = useRef<HTMLDivElement>(null);
   const [sourceWidth, setSourceWidth] = useState(0);
   const [sourceMarks, setSourceMarks] = useState<SourceMark[]>([]);
+  useEffect(() => {
+    if (draft || !savedDraft || savedDraft.surface !== "source" || !sourceOrigin.current) return;
+    const element = [...sourceOrigin.current.querySelectorAll<HTMLElement>("[data-source-comment]")].find((node) => markAnchors(node).includes(savedDraft.anchor));
+    if (!element) return;
+    const rect = element.getBoundingClientRect();
+    const base = sourceOrigin.current.getBoundingClientRect();
+    setDraft({ ...savedDraft, position: { top: rect.top - base.top, bottom: rect.bottom - base.top, left: rect.left - base.left + rect.width / 2 } });
+  }, [draft, savedDraft, sourceMarks]);
   // Source quotes (`s:`) resolve against the text; markdown quotes (`q:`) against the
   // rendered preview, which stays mounted while hidden.
   useLayoutEffect(() => {
@@ -606,7 +632,7 @@ export function FileReview({
     window.getSelection()?.removeAllRanges();
   }
 
-  const closeDraft = useCallback(() => setDraft(null), []);
+  const closeDraft = () => { if (draft) discardCommentDraft(draft.anchor); setDraft(null); saveDraft(null); };
 
   /** An open card follows its measured highlight, so a reflow (width, layout) keeps it beside the text. */
   function draftPosition(current: Draft): CommentDraftPosition {
@@ -635,6 +661,7 @@ export function FileReview({
         onCreate={async (input) => {
           await onCreate(input);
           setDraft(null);
+          saveDraft(null);
           setFocused(anchor);
         }}
       />
@@ -799,6 +826,7 @@ export function FileReview({
                 thread={selectAnchorThreads(open, sourceThread.anchor)}
                 config={config}
                 callbacks={callbacks}
+                detailOptions={comments}
                 pinned={focused === sourceThread.anchor}
                 onPin={() => setFocused(sourceThread.anchor)}
                 onClose={closeInlineThread}
@@ -883,7 +911,7 @@ export function FileReview({
               ));
             })}
             <div ref={markdown} data-annotated-markdown="" className="relative z-10 pl-4">
-              <Markdown sourceBlocks text={source} />
+              <Markdown sourceBlocks text={source} resolveUrl={resolveUrl} />
             </div>
             {comments && layout === "inline" && <InlineAuthors markdown={markdown} comments={open} focused={focused} onFocus={setFocused} />}
             {draft?.surface === "preview" && renderDraft(draft, width)}
@@ -898,6 +926,7 @@ export function FileReview({
                 config={config}
                 callbacks={isFindingAnchor(inlineAnchor) ? NO_CALLBACKS : callbacks}
                 renderRootDetails={renderRootDetails}
+                detailOptions={comments}
                 pinned={focused === inlineAnchor}
                 onPin={() => setFocused(inlineAnchor)}
                 onClose={closeInlineThread}
@@ -908,13 +937,12 @@ export function FileReview({
           </div>
           </div>
           {layout === "margin" && (
+            <CommentRail scrollRef={sidebarPane} stacked={narrow}
+              {...(sidebarWidth !== undefined ? { width: sidebarWidth } : {})}
+              {...(onSidebarWidthChange ? { onWidthChange: onSidebarWidthChange } : {})}>
             <div
-              ref={sidebarPane}
               data-comment-sidebar={narrow ? "below" : align}
-              className={cn(narrow ? "w-full" : "w-[316px] shrink-0 overflow-y-auto overscroll-contain border-l border-border py-4 pl-2 pr-4")}
-            >
-            <div
-              className={cn("relative", (narrow || align === "stack") && "space-y-2")}
+              className={cn("relative mx-2 my-4", (narrow || align === "stack") && "space-y-2")}
               style={sidebarScrolls && align === "line" ? { height: railHeight } : undefined}
             >
               {ordered.map((anchor) => {
@@ -939,6 +967,9 @@ export function FileReview({
                       {anchorLabel(anchor, boxes.has(anchor))}
                     </div>
                     <CommentThread
+                      {...(comments?.previewLines !== undefined ? { previewLines: comments.previewLines } : {})}
+                      {...(comments?.detailTabs ? { detailTabs: comments.detailTabs } : {})}
+                      {...(comments?.onMaximizedChange ? { onMaximizedChange: comments.onMaximizedChange } : {})}
                       comments={thread}
                       config={config}
                       anchor={anchor}
@@ -954,7 +985,7 @@ export function FileReview({
                 );
               })}
             </div>
-            </div>
+            </CommentRail>
           )}
         </div>
         )}

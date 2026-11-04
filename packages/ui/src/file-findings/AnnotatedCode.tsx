@@ -75,7 +75,8 @@ function markerSeverity(monaco: Monaco, severity: LintSeverity): number {
 }
 
 function modelPath(workDir: string | undefined, file: string): string {
-  return encodeURI(`file://${workDir ? (workDir.startsWith("/") ? workDir : `/${workDir}`) : ""}/${file}`);
+  const path = file.startsWith("/") ? file : `${workDir ?? ""}/${file}`;
+  return `file:///${path.replace(/^\/+/, "").split("/").map(encodeURIComponent).join("/")}`;
 }
 
 /** The editor-model markers for `findings`: the finding's range when it has one, else the rest of its line. */

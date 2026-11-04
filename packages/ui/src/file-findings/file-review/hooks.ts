@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { measureAnchors, type AnchorMode, type Box } from "./geometry";
 
 const NARROW_WIDTH = 640;
@@ -76,7 +76,11 @@ export function useAnchorBoxes({
       resizes.disconnect();
     };
   }, [origin, markdown, anchors, mode, visible]);
-  return { boxes, height, width };
+  const currentBoxes = useMemo(() => {
+    const current = new Set(anchors);
+    return new Map([...boxes].filter(([anchor]) => current.has(anchor)));
+  }, [boxes, anchors]);
+  return { boxes: currentBoxes, height, width };
 }
 
 export function useNarrow(ref: RefObject<HTMLDivElement | null>) {

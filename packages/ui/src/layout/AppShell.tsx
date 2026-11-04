@@ -69,6 +69,8 @@ export type AppShellNavGroup = {
    * have to be flattened to fit the rail.
    */
   groups?: AppShellNavGroup[];
+  /** Fetch immediate children when expanded; errors remain visible and can be retried by reopening. */
+  loadChildren?: () => Promise<{ groups?: AppShellNavGroup[]; items: AppShellNavItem[] }>;
   /**
    * Makes the group's own heading row a destination as well as a disclosure:
    * the label becomes a nav link and the chevron sits beside it as a separate
@@ -79,6 +81,8 @@ export type AppShellNavGroup = {
 };
 
 export type AppShellNavSection = {
+  /** Invalidate open lazy groups without resetting expansion or focus. */
+  childrenVersion?: string | number;
   /** Show a loading message instead of an empty tree while data is being fetched. */
   loading?: boolean;
   /** Optional controlled search for tree navigation. */

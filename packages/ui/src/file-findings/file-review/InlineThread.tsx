@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from "react";
 import { Icon } from "../../data/Icon";
 import { cn } from "../../lib/utils";
 import { CommentThread } from "../../comments/CommentThread";
+import type { CommentDetailOptions } from "../../comments/comment-detail";
 import type { Comment, CommentCallbacks, CommentConfig } from "../../comments/comment-types";
 import { UiClose } from "../../icons";
 
@@ -29,6 +30,7 @@ export function InlineThread({
   onPointerLeave,
   seamless = false,
   renderRootDetails,
+  detailOptions,
 }: {
   anchor: string;
   label: string;
@@ -47,6 +49,7 @@ export function InlineThread({
   seamless?: boolean;
   /** Extra content under a root comment, such as a finding's actions. */
   renderRootDetails?: ((comment: Comment) => ReactNode) | undefined;
+  detailOptions?: CommentDetailOptions | undefined;
 }) {
   // Posting closes the composer and drops focus out of the box, so Escape listens on the window.
   useEffect(() => {
@@ -93,6 +96,7 @@ export function InlineThread({
       )}
       <div className="max-h-[360px] overflow-y-auto">
         <CommentThread
+          {...detailOptions}
           comments={thread}
           config={config}
           anchor={anchor}

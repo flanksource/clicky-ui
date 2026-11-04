@@ -1,9 +1,5 @@
-import {
-  useCallback,
-  type CSSProperties,
-  type KeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
-} from "react";
+import { type CSSProperties } from "react";
+import { ResizeHandle } from "./ResizeHandle";
 import { UiChevronDown, UiChevronRight } from "../icons";
 import { cn } from "../lib/utils";
 import {
@@ -15,96 +11,6 @@ import {
 export type WorkspaceUpdate = (
   change: (current: WorkspaceLayoutState) => WorkspaceLayoutState,
 ) => void;
-
-type ResizeHandleProps = {
-  orientation: "horizontal" | "vertical";
-  value: number;
-  min: number;
-  max: number;
-  pointerFactor: number;
-  label: string;
-  testId: string;
-  className?: string;
-  onChange: (value: number) => void;
-};
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function WorkspaceResizeHandle(props: ResizeHandleProps) {
-  const {
-    orientation,
-    value,
-    min,
-    max,
-    pointerFactor,
-    label,
-    testId,
-    className,
-    onChange,
-  } = props;
-  const onPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      const start = orientation === "vertical" ? event.clientX : event.clientY;
-      const initial = value;
-      const onMove = (moveEvent: PointerEvent) => {
-        const current =
-          orientation === "vertical" ? moveEvent.clientX : moveEvent.clientY;
-        onChange(clamp(initial + (current - start) * pointerFactor, min, max));
-      };
-      const onUp = () => {
-        document.removeEventListener("pointermove", onMove);
-        document.removeEventListener("pointerup", onUp);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-      };
-      document.addEventListener("pointermove", onMove);
-      document.addEventListener("pointerup", onUp);
-      document.body.style.cursor =
-        orientation === "vertical" ? "col-resize" : "row-resize";
-      document.body.style.userSelect = "none";
-    },
-    [max, min, onChange, orientation, pointerFactor, value],
-  );
-
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const step = event.shiftKey ? 48 : 16;
-    const lowerKey = orientation === "vertical" ? "ArrowLeft" : "ArrowUp";
-    const upperKey = orientation === "vertical" ? "ArrowRight" : "ArrowDown";
-    if (event.key === "Home") onChange(min);
-    else if (event.key === "End") onChange(max);
-    else if (event.key === lowerKey)
-      onChange(clamp(value - step * pointerFactor, min, max));
-    else if (event.key === upperKey)
-      onChange(clamp(value + step * pointerFactor, min, max));
-    else return;
-    event.preventDefault();
-  };
-
-  return (
-    <div
-      role="separator"
-      tabIndex={0}
-      aria-label={label}
-      aria-orientation={orientation}
-      aria-valuemin={min}
-      aria-valuemax={max}
-      aria-valuenow={Math.round(value)}
-      data-testid={testId}
-      className={cn(
-        "absolute z-20 hidden bg-border transition-colors hover:bg-primary focus-visible:bg-primary focus-visible:outline-none @3xl/workspace:block",
-        orientation === "vertical"
-          ? "top-0 h-full w-1 cursor-col-resize"
-          : "left-0 h-1 w-full cursor-row-resize",
-        className,
-      )}
-      onPointerDown={onPointerDown}
-      onKeyDown={onKeyDown}
-    />
-  );
-}
 
 type PaneViewProps = {
   pane: WorkspacePaneSpec;
@@ -282,7 +188,7 @@ export function WorkspaceSideRegion({
                 nextPane &&
                 pane.resizable !== false &&
                 nextPane.resizable !== false && (
-                  <WorkspaceResizeHandle
+                  <ResizeHandle
                     orientation="horizontal"
                     // Seed from the pane's current flex basis (0 when unsized) so the
                     // drag starts where the divider actually is — no snap on first move.
@@ -292,7 +198,7 @@ export function WorkspaceSideRegion({
                     pointerFactor={stackPointerFactor}
                     label={`Resize ${typeof pane.label === "string" ? pane.label : pane.id}`}
                     testId={`workspace-resize-stack-${pane.id}`}
-                    className="bottom-0"
+                    className="bottom-0 hidden @3xl/workspace:block"
                     onChange={(height) =>
                       update((current) => ({
                         ...current,
@@ -308,7 +214,7 @@ export function WorkspaceSideRegion({
           );
         })}
       {canResize && (
-        <WorkspaceResizeHandle
+        <ResizeHandle
           orientation="vertical"
           value={width}
           min={min}
@@ -316,7 +222,7 @@ export function WorkspaceSideRegion({
           pointerFactor={location === "left" ? 1 : -1}
           label={`Resize ${location} workspace panes`}
           testId={`workspace-resize-${location}`}
-          className={location === "left" ? "right-0" : "left-0"}
+          className={cn("hidden @3xl/workspace:block", location === "left" ? "right-0" : "left-0")}
           onChange={(nextWidth) =>
             update((current) => ({
               ...current,
@@ -371,7 +277,7 @@ export function WorkspaceSingleRegion({
         }
       />
       {isBottom && !collapsed && pane.resizable !== false && (
-        <WorkspaceResizeHandle
+        <ResizeHandle
           orientation="horizontal"
           value={state.bottomHeight}
           min={pane.minHeight ?? 96}
@@ -379,7 +285,7 @@ export function WorkspaceSingleRegion({
           pointerFactor={-1}
           label={`Resize ${typeof pane.label === "string" ? pane.label : pane.id}`}
           testId="workspace-resize-bottom"
-          className="top-0"
+          className="top-0 hidden @3xl/workspace:block"
           onChange={(bottomHeight) =>
             update((current) => ({ ...current, bottomHeight }))
           }

@@ -44,4 +44,13 @@ describe("Button", () => {
     );
     expect(screen.getByRole("button", { name: "Saving" })).toBeDisabled();
   });
+
+  it("restores its normal label after loading finishes", () => {
+    const { rerender } = render(<Button loading loadingLabel="Sending…">Retry send</Button>);
+    expect(screen.getByRole("button", { name: "Sending…" })).toBeDisabled();
+
+    rerender(<Button loading={false} loadingLabel="Sending…">Retry send</Button>);
+
+    expect(screen.getByRole("button", { name: "Retry send" })).toBeEnabled();
+  });
 });

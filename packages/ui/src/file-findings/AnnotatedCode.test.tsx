@@ -6,6 +6,7 @@ const fake = vi.hoisted(() => {
   const model = { getLineCount: () => 50, getLineMaxColumn: () => 80 };
   const state = {
     value: "",
+    path: "",
     readOnly: undefined as boolean | undefined,
     onChange: undefined as ((value: string) => void) | undefined,
     decorations: [] as Array<{ range: unknown; options: Record<string, unknown> }>,
@@ -50,6 +51,7 @@ vi.mock("@monaco-editor/react", () => ({
   default: function FakeMonacoEditor({
     value,
     language,
+    path,
     options,
     onChange,
     beforeMount,
@@ -57,12 +59,14 @@ vi.mock("@monaco-editor/react", () => ({
   }: {
     value: string;
     language: string;
+    path: string;
     options: { readOnly: boolean };
     onChange: (value: string | undefined) => void;
     beforeMount?: (monaco: typeof fake.monaco) => void;
     onMount?: (editor: typeof fake.editor, monaco: typeof fake.monaco) => void;
   }) {
     fake.state.value = value;
+    fake.state.path = path;
     fake.state.readOnly = options.readOnly;
     fake.state.onChange = onChange;
     // @monaco-editor/react runs beforeMount ahead of creating the model, so the
@@ -125,6 +129,14 @@ beforeEach(() => {
 });
 
 describe("AnnotatedCode", () => {
+  it.each([
+    { path: "/repo/guide #1.md", workDir: undefined, expected: "file:///repo/guide%20%231.md" },
+    { path: "/repo/guide.md", workDir: "/other", expected: "file:///repo/guide.md" },
+    { path: "docs/guide.md", workDir: "/repo", expected: "file:///repo/docs/guide.md" },
+  ])("opens a valid editor URI for $path", async ({ expected, ...props }) => {
+    mount(props);
+    await waitFor(() => expect(fake.state.path).toBe(expected));
+  });
   it.each([
     ["web/src/App.tsx", "findings-typescript"],
     ["config/data.json", "findings-json"],

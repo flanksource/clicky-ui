@@ -165,6 +165,7 @@ export function ConnectionQueryWorkspace({
   };
   const compilation = useCompiledSearch({
     baseUrl: compileBaseUrl,
+    index: String(browserOptions.index ?? ""),
     search: search ?? {},
     ...(paramValues ? { params: paramValues } : {}),
     ...(paramRoles ? { roles: paramRoles } : {}),

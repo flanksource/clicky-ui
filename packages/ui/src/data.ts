@@ -612,6 +612,7 @@ export {
   CopyBadge,
   type ErrorDetailsProps,
 } from "./data/diagnostics/ErrorDetails";
+export { ActionError } from "./data/diagnostics/ActionError";
 export {
   normalizeErrorDiagnostics,
   parseDiagnosticsStackTrace,

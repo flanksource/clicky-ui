@@ -1,4 +1,10 @@
 export * from "./comments/comment-types";
+export type { CommentDetailOptions, CommentDetailTab } from "./comments/comment-detail";
+export { CommentRail, type CommentRailProps } from "./comments/CommentRail";
+export { useCommentRailWidth } from "./comments/use-comment-rail-width";
+export { CommentDraftPopover, type CommentDraftPopoverProps } from "./comments/CommentDraftPopover";
+export * from "./comments/comment-vocabulary";
+export { CommentEditor } from "./comments/CommentEditor";
 export * from "./comments/comment-utils";
 export {
   assignTargetItems,

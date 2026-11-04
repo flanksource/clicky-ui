@@ -385,6 +385,7 @@ export {
 export { ItemBadge, ItemGlyph } from "./components/json-schema-form-item-row";
 
 export { SplitPane, type SplitPaneProps } from "./layout/SplitPane";
+export { ResizeHandle, type ResizeHandleProps } from "./layout/ResizeHandle";
 export {
   Workspace,
   type WorkspaceProps,

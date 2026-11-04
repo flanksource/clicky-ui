@@ -17,6 +17,7 @@ export function profileEditorSchema(): JsonSchemaObject {
 }
 
 export const profileEditorSections = [
+  { id: "spans", label: "Spans", hint: "Canonical fields and attributes" },
   { id: "general", label: "General", hint: "Name, namespace, render mode" },
   {
     id: "source",
@@ -68,6 +69,7 @@ export function profileEditorSectionStatus({
     ? draft.processors.length
     : 0;
   return {
+    spans: {},
     general: { attention: !draft.profile?.trim() },
     source: {
       badge: draft.provider?.type || undefined,
@@ -204,6 +206,11 @@ export function profileSampleSignature(draft: ProfileWizardDraft): string {
   return JSON.stringify({
     provider: draft.provider ?? {},
     query: draft.query ?? "",
+    search:draft.search,
+    namespace: draft.namespace,
+    imports: draft.imports,
+    params: draft.params,
+    processors: draft.processors,
   });
 }
 
