@@ -46,6 +46,14 @@ const FILES: GitFileChangeItem[] = [
 ];
 
 describe("GitCommitList", () => {
+  it("derives native commit and file links from repository metadata", () => {
+    const repository = { provider: "gitlab" as const, web: "https://gitlab.example/acme/rules" };
+    const sha = COMMITS[0]!.sha;
+    render(<><GitCommitList commits={[{ ...COMMITS[0]!, repository }]} /><GitFileList files={[{ path: "rules/Plan A.xml", repository, commit: sha }]} /></>);
+    expect(screen.getByRole("link", { name: sha.slice(0, 7) })).toHaveAttribute("href", `${repository.web}/-/commit/${sha}`);
+    expect(screen.getByRole("link", { name: "Open rules/Plan A.xml" })).toHaveAttribute("href", `${repository.web}/-/blob/${sha}/rules/Plan%20A.xml`);
+  });
+
   it("groups commits by committed date", () => {
     render(<GitCommitList commits={COMMITS} />);
     expect(screen.getByText(/Commits on Jul 1, 2026/)).toBeInTheDocument();
@@ -180,6 +188,11 @@ describe("GitCommitList slots", () => {
 });
 
 describe("GitFileList", () => {
+  it("uses an explicit file href without requiring a commit", () => {
+    render(<GitFileList files={[{ path: "rule.xml", href: "https://review.example/rule", repository: { provider: "github", web: "https://github.example/acme/rules" } }]} />);
+    expect(screen.getByRole("link", { name: "Open rule.xml" })).toHaveAttribute("href", "https://review.example/rule");
+  });
+
   it("loads a file diff when a file row is expanded", async () => {
     const loadDiff = vi.fn().mockResolvedValue({
       diff: "@@ -1 +1 @@\n-github.com/jackc/pgx/v5 v5.7.4\n+github.com/jackc/pgx/v5 v5.7.5",
