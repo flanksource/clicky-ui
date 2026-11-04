@@ -6,6 +6,7 @@ import { useDensityValue } from "../hooks/use-density";
 import { UiRobotAi } from "../icons";
 import { modelProvider } from "../data/chat/ContextMeter.model";
 import { providerIcon, providerIconColor } from "../data/chat/provider-icons";
+import { AgentIdentity } from "../data/chat/AgentIdentity";
 import { authorDisplayName } from "./comment-utils";
 import type { CommentAuthor as CommentAuthorModel } from "./comment-types";
 
@@ -17,6 +18,19 @@ export type CommentAuthorAvatarProps = {
   /** Render only the glyph (no hover card). */
   bare?: boolean;
 };
+
+export function CommentAuthorName({ author }: { author: CommentAuthorModel | null }) {
+  if (author?.kind !== "agent") return <>{authorDisplayName(author)}</>;
+  return (
+    <AgentIdentity
+      hideIcon
+      model={author.model ?? author.name}
+      {...(author.model ? { label: author.name } : {})}
+      {...(author.effort ? { effort: author.effort } : {})}
+      {...(author.sessionId ? { identityId: author.sessionId } : {})}
+    />
+  );
+}
 
 /**
  * Renders a comment author's identity glyph: a person avatar for `user`
@@ -61,7 +75,7 @@ function AgentChip({
   size: number;
 }) {
   const icon = author.icon;
-  const provider = modelProvider(author.name);
+  const provider = modelProvider(author.model ?? author.name);
   return (
     <span
       role="img"

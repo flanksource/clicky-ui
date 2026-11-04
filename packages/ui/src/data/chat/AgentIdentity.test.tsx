@@ -15,3 +15,15 @@ it("retains unknown identity and effort without inventing provider metadata", ()
   expect(screen.getByLabelText("Future effort")).toHaveTextContent("future");
   expect(screen.getByLabelText("Future effort").querySelector("svg")).toBeNull();
 });
+
+it("keeps a supplied label while using session metadata for model and effort icons", () => {
+  render(
+    <AgentIdentityProvider identities={{ review: { model: "claude-opus-5-5", effort: "high" } }}>
+      <AgentIdentity label="markdown-review" identityId="review" />
+    </AgentIdentityProvider>,
+  );
+  expect(screen.getByText("markdown-review")).toBeInTheDocument();
+  expect(screen.queryByText("Opus 5.5")).not.toBeInTheDocument();
+  expect(screen.getByTitle("markdown-review · claude-opus-5-5 · high effort").querySelector("svg")).toHaveClass("text-[#C15F3C]");
+  expect(screen.getByLabelText("High effort").querySelector("svg")).not.toBeNull();
+});

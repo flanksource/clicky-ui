@@ -214,7 +214,7 @@ describe("playground prompt runs", () => {
     const secret = "private-association-canary";
     const records = new PromptAssociations(dir);
     records.protect(associationId, {
-      request: { element: ELEMENT, variables: { token: secret } },
+      request: { element: ELEMENT, variables: { token: secret }, spec: SPEC },
       launch: {
         preparationId: "prepared",
         config: { lint: {} },
@@ -315,7 +315,7 @@ describe("playground prompt runs", () => {
     });
   });
 
-  it("runs the prompt one-shot and records its violations as a captain-authored checklist comment", async () => {
+  it("runs the prompt one-shot and records its violations as a prompt-authored checklist comment", async () => {
     captain.nextSummary = {
       event: "done",
       data: { success: true, structuredOutput: { violations: VIOLATIONS } },
@@ -359,7 +359,14 @@ describe("playground prompt runs", () => {
       status: "open",
       anchor: ANCHOR,
       element: ELEMENT,
-      author: { name: "captain", kind: "agent", via: "prompt:diagram-smells" },
+      author: {
+        name: "diagram-smells",
+        kind: "agent",
+        model: SPEC.model,
+        effort: SPEC.effort,
+        sessionId: `session-of-${run.runId}`,
+        via: "prompt:diagram-smells",
+      },
       checklist: [
         {
           label:

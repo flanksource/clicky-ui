@@ -24,6 +24,7 @@ export {
 } from "./comments/CommentMarkdown";
 export {
   CommentAuthorAvatar,
+  CommentAuthorName,
   type CommentAuthorAvatarProps,
 } from "./comments/CommentAuthor";
 export {

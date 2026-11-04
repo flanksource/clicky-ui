@@ -92,6 +92,9 @@ export type CommentChecklistItem = {
 export type CommentAuthor = {
   id?: string;
   name: string;
+  /** Runtime identity when the author's display name differs from its model. */
+  model?: string;
+  effort?: string;
   kind?: CommentMentionKind;
   avatar?: string;
   /** Glyph override for `kind: "agent"` authors. */
