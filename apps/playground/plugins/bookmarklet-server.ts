@@ -16,6 +16,7 @@ import {
 export function playgroundBookmarklet(options: {
   root: string;
   dir: string;
+  compiled?: boolean;
 }): Plugin {
   let script = "";
   let bundleError: string | undefined;
@@ -140,7 +141,11 @@ export function playgroundBookmarklet(options: {
   return {
     name: "playground-bookmarklet",
     async configureServer(server) {
-      await bundle(true);
+      if (options.compiled) {
+        script = readFileSync(resolve(options.root, "dist", BOOKMARKLET_ROUTE.slice(1)), "utf8");
+      } else {
+        await bundle(true);
+      }
       server.middlewares.use(middleware);
       server.httpServer?.once("close", () => {
         void watcher?.close();

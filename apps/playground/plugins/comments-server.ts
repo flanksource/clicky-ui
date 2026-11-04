@@ -38,6 +38,7 @@ import { persistReviewDecision, type ReviewSourceRequest } from "./reviewable-st
 import { readExternalPages } from "./external-pages-store";
 import { externalUrl } from "../src/bookmarklet/model";
 import { PageStoreError } from "./pages-store";
+import { RepositoryDocuments } from "./repository-documents";
 
 export const COMMENTS_ROUTE = "/__playground/comments";
 
@@ -322,6 +323,7 @@ export function createRootComment(
   };
   try {
     const page = assertPage(rawPage);
+    if (page.startsWith("document:")) element.source = new RepositoryDocuments(dir).document(page).absolutePath;
     if (page.startsWith("external:")) {
       const target = readExternalPages(dir).find((entry) => entry.id === page);
       if (!element.pageUrl || !target?.urls.includes(externalUrl(element.pageUrl).url)) {

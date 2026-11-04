@@ -275,6 +275,7 @@ function handle(
           );
         }
         writeSource(pagesDir, slug, requireSource(body));
+        events.changed(pagePath(pagesDir, slug));
         sendJson(res, 200, { slug });
       });
 

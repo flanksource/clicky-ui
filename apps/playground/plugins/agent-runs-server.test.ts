@@ -125,6 +125,65 @@ describe("playground shared agent session", () => {
     });
   }
 
+  it("creates explicit targets without replacing automatic sessions and sends follow-up messages to their run", async () => {
+    expect((await run(first.id, { runtime: RUNTIME })).ok).toBe(true);
+    const automatic = onlySession();
+    const created = await fetch(
+      `${baseUrl}/__playground/agent-sessions/sessions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          page: "welcome",
+          project: REPO_ROOT,
+          runtime: RUNTIME,
+        }),
+      },
+    );
+    expect(created.status).toBe(201);
+    const { session } = (await created.json()) as { session: AgentSession };
+    expect(readAgentSessions(dir).sessions).toEqual([automatic, session]);
+    expect(readAgentSessions(dir).settings.targets?.["welcome"]).toEqual({
+      kind: "managed",
+      sessionId: session.sessionId,
+      label: `welcome · ${MODEL}`,
+    });
+    expect(stored(second.id).agentRun).toBeUndefined();
+    expect((await run(second.id, {})).ok).toBe(true);
+    expect(stored(second.id).agentRun?.sessionId).toBe(session.sessionId);
+    expect(
+      captain.callsTo("POST", new RegExp(`/runs/${session.runId}/message$`)),
+    ).toHaveLength(1);
+    expect(captain.callsTo("POST", /\/deliver$/)).toHaveLength(0);
+    captain.runs.get(session.runId)!.done = true;
+    expect((await run(second.id, {})).status).toBe(409);
+    expect(captain.callsTo("POST", /\/api\/v1\/prompt\/run$/)).toHaveLength(2);
+  });
+
+  it("preserves the selected target and comments when managed startup fails", async () => {
+    captain.nextRunFailure = {
+      status: 422,
+      body: { error: "runtime unavailable" },
+    };
+    const before = readAll(dir);
+    const created = await fetch(
+      `${baseUrl}/__playground/agent-sessions/sessions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          page: "welcome",
+          project: REPO_ROOT,
+          runtime: RUNTIME,
+        }),
+      },
+    );
+    expect(created.status).toBe(502);
+    expect(readAgentSessions(dir).sessions).toEqual([]);
+    expect(readAgentSessions(dir).settings.targets).toBeUndefined();
+    expect(readAll(dir)).toEqual(before);
+  });
+
   function stored(id: string): StoredComment {
     const found = Object.values(readAll(dir))
       .flat()
@@ -229,7 +288,12 @@ describe("playground shared agent session", () => {
     expect(starts).toHaveLength(1);
     const start = starts[0]?.body as {
       content: string;
-      variables: { instructions: string; message: string; origin: string; author: string };
+      variables: {
+        instructions: string;
+        message: string;
+        origin: string;
+        author: string;
+      };
       spec: { model: string };
       chat: boolean;
     };
@@ -438,9 +502,12 @@ describe("playground shared agent session", () => {
     const reader = (response.body as ReadableStream<Uint8Array>).getReader();
     // The stub keeps the stream open, so a buffering proxy would hang here.
     const { value } = await reader.read();
-    expect(new TextDecoder().decode(value)).toContain('event: entry');
+    expect(new TextDecoder().decode(value)).toContain("event: entry");
     expect(
-      captain.callsTo("GET", /^\/api\/captain\/sessions\/session-of-run-1\?follow=1&after=m0$/),
+      captain.callsTo(
+        "GET",
+        /^\/api\/captain\/sessions\/session-of-run-1\?follow=1&after=m0$/,
+      ),
     ).toHaveLength(1);
     await reader.cancel();
   });

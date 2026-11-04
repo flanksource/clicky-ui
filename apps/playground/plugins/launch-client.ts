@@ -19,6 +19,8 @@ export type LaunchSnapshot = {
   lint?: Array<{
     success: boolean;
     error?: string;
+    linter?: string;
+    work_dir?: string;
     session_id?: string;
     violations: Violation[];
   }>;
@@ -76,11 +78,11 @@ export class LaunchClient {
       );
     return value as T;
   }
-  prepare(): Promise<{ preparationId: string; directory: string }> {
+  prepare(workspace = this.workspace): Promise<{ preparationId: string; directory: string }> {
     return this.json("/api/launch/prepare", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspace: { cwd: this.workspace } }),
+      body: JSON.stringify({ workspace: { cwd: workspace } }),
     });
   }
   prompts(preparationId: string): Promise<{ prompts: CaptainPromptSummary[] }> {

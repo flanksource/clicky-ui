@@ -36,6 +36,7 @@ export function fixedGavel(url: string): GavelEndpoint {
 export type OnDemandGavelOptions = {
   /** The workspace Gavel prepares and stores runs under (`--root`, `--local-root`). */
   workspace: string;
+  localRoots?: string[];
   addr?: string;
   /** The gavel executable and any leading arguments. */
   command?: string[];
@@ -50,6 +51,7 @@ export type OnDemandGavelOptions = {
  */
 export function onDemandGavel({
   workspace,
+  localRoots = [workspace],
   addr = "127.0.0.1:9330",
   command = ["gavel"],
   readyTimeoutMs = 30_000,
@@ -65,7 +67,7 @@ export function onDemandGavel({
 
   async function start(): Promise<string> {
     if (await answers(url)) return url;
-    const proc = spawn(bin!, [...leading, "launch", "serve", "--root", workspace, "--local-root", workspace, "--addr", addr], {
+    const proc = spawn(bin!, [...leading, "launch", "serve", "--root", workspace, ...localRoots.flatMap((path) => ["--local-root", path]), "--addr", addr], {
       cwd: workspace,
       stdio: ["ignore", "ignore", "pipe"],
     });

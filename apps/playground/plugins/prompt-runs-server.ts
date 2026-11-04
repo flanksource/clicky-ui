@@ -5,19 +5,20 @@ import type { Connect, Logger, Plugin } from "vite";
 import type { CaptainPromptSummary } from "./captain-client";
 import { RequestError, describeError, sendError } from "./prompt-runs-errors";
 import {
-  createRootComment,
   readJsonBody,
   sendJson,
   type CommentCreatedEvent,
 } from "./comments-server";
 import {
   assertElementContext,
-  readAll,
   type StoredAuthor,
 } from "./comments-store";
-import { promptResultComment } from "./prompt-result";
+import { persistPromptResult } from "./prompt-run-results";
+import { prepareRepositoryFolder } from "./repository-folder";
+import { documentProblems, type DocumentLintSnapshot } from "./document-problems";
 import { LaunchClient, LaunchHttpError } from "./launch-client";
-import { fixedGavel, onDemandGavel } from "./gavel-launch-server";
+import { fixedGavel, onDemandGavel, type GavelEndpoint } from "./gavel-launch-server";
+import { RepositoryDocuments } from "./repository-documents";
 import {
   PromptAssociations,
   type PromptAssociation,
@@ -30,6 +31,7 @@ export type PromptRunsOptions = {
   dir: string;
   /** A running launch server; unset starts `gavel launch serve` over `workspace` when first needed. */
   gavelURL?: string | undefined;
+  endpoint?: GavelEndpoint;
   workspace: string;
   /** Called for each result comment, e.g. the agent session's auto-run. */
   onCreated?: (event: CommentCreatedEvent) => Promise<void>;
@@ -170,39 +172,22 @@ function requestOrigin(req: IncomingMessage): string {
   return `http://${host}`;
 }
 
-/** Captain authors the result; `via` names the prompt it came from. */
-function captainAuthor(promptName: string): StoredAuthor {
-  return { name: "captain", kind: "agent", via: `prompt:${promptName}` };
-}
-
 export function createPromptRuns(options: PromptRunsOptions) {
   const { dir, onCreated } = options;
-  const endpoint = options.gavelURL
+  const endpoint = options.endpoint ?? (options.gavelURL
     ? fixedGavel(options.gavelURL)
-    : onDemandGavel({ workspace: options.workspace });
+    : onDemandGavel({ workspace: options.workspace }));
   const gavel = new LaunchClient(endpoint, options.workspace);
   const associations = new PromptAssociations(dir);
   const processing = new Set<string>();
-  type Preparation = {
-    preparationId: string;
-    directory: string;
-    generation: number;
-  };
-  let preparation: Promise<Preparation> | undefined;
-  // A preparation lives in the server that made it; after the endpoint starts
-  // a new server, prepare again.
-  const workspace = async (): Promise<Preparation> => {
-    preparation ??= gavel
-      .prepare()
-      .then((prepared) => ({ ...prepared, generation: gavel.generation }))
-      .catch((cause: unknown) => {
-        preparation = undefined;
-        throw cause;
-      });
-    const prepared = await preparation;
-    if (prepared.generation === gavel.generation) return prepared;
-    preparation = undefined;
-    return workspace();
+  const preparationPages = new Map<string, { page: string; revision: string; files?: string[] }>();
+  const directoryFor = (page?: string) => page?.startsWith("document:") || page?.startsWith("folder:") ? new RepositoryDocuments(dir).document(page).repository.root : options.workspace;
+  const documentRevision = async (page: string) => {
+    const target = new RepositoryDocuments(dir).document(page);
+    const response = await fetch(new URL(`/api/workspace/file?${new URLSearchParams({ root: target.repository.root, path: target.path })}`, await endpoint.url()));
+    const file = await response.json() as { revision: string; error?: string };
+    if (!response.ok) throw new RequestError(file.error ?? "Cannot read document revision", response.status);
+    return file.revision;
   };
   const publicRun = (entry: PromptAssociation): PromptRun => ({
     runId: entry.runId,
@@ -235,54 +220,9 @@ export function createPromptRuns(options: PromptRunsOptions) {
     const request = associations.input<{ request: RunRequest }>(
       entry.associationId,
     ).request;
-    const results = snapshot.lint ?? [];
-    const failure =
-      snapshot.error ?? results.find((result) => !result.success)?.error;
-    const violations = results.flatMap((result) => result.violations ?? []);
-    const result = promptResultComment(entry.promptName, {
-      success: !failure || violations.length > 0,
-      structuredOutput: { violations },
-      ...(failure ? { error: failure } : {}),
-    });
-    if (result.kind !== "comment") {
-      entry.state = failure ? "failed" : result.kind;
-      if (failure) entry.error = failure;
-      associations.save(entry);
-      return entry;
-    }
-    const existing = (readAll(dir)[entry.page] ?? []).find(
-      (comment) =>
-        comment.promptRun?.runId === entry.runId &&
-        comment.anchor === entry.anchor,
-    );
-    const { kind: _kind, ...fields } = result;
-    const comment =
-      existing ??
-      createRootComment(dir, {
-        ...fields,
-        page: entry.page,
-        author: captainAuthor(entry.promptName),
-        anchor: entry.anchor,
-        element: request.element,
-        promptRun: {
-          promptId: entry.promptId,
-          promptName: entry.promptName,
-          runId: entry.runId,
-        },
-      }).comment;
-    entry.state = failure ? "failed" : "done";
-    entry.commentId = comment.id;
-    if (failure) entry.error = failure;
-    const notify = !entry.callbackSent;
-    entry.callbackSent = true;
+    const notifications = persistPromptResult({ dir, entry, snapshot, request });
     associations.save(entry);
-    if (notify)
-      await onCreated?.({
-        page: entry.page,
-        comment,
-        origin: entry.origin,
-        requestedBy: entry.requestedBy,
-      });
+    for (const event of notifications) await onCreated?.(event);
     return entry;
   }
 
@@ -334,6 +274,15 @@ export function createPromptRuns(options: PromptRunsOptions) {
       void follow(entry, logger);
       return publicRun(await reconcile(entry));
     }
+    const preparedDocument = preparationPages.get(request.preparationId);
+    if (request.page.startsWith("document:") && (preparedDocument?.page !== request.page || preparedDocument.revision !== await documentRevision(request.page))) throw new RequestError("Document changed; reload the prompt form before running", 409);
+    if (request.page.startsWith("folder:")) {
+      const current = await prepareRepositoryFolder({ dir, endpoint, page: request.page });
+      if (preparedDocument?.page !== request.page || preparedDocument.revision !== current.revision)
+        throw new RequestError("Folder contents changed; reload the prompt form before running", 409);
+      if (Object.hasOwn(request.variables, "files"))
+        throw new RequestError("Folder files are owned by the prepared review scope", 400);
+    }
     const { prompt: detail } = await gavel.prompt(
       request.preparationId,
       request.promptId,
@@ -344,6 +293,7 @@ export function createPromptRuns(options: PromptRunsOptions) {
       preparationId: request.preparationId,
       config: {
         lint: {
+          ...(preparedDocument?.files ? { files: preparedDocument.files } : {}),
           linters: [
             {
               id: "review",
@@ -363,11 +313,12 @@ export function createPromptRuns(options: PromptRunsOptions) {
         playgroundAssociation: request.associationId,
         page: request.page,
         anchor: request.anchor,
+        ...(preparedDocument ? { sourceRevision: preparedDocument.revision } : {}),
       },
     };
     entry = {
       associationId: request.associationId,
-      workspace: options.workspace,
+      workspace: directoryFor(request.page),
       origin,
       requestedBy: request.human,
       runId: `pending:${request.associationId}`,
@@ -377,6 +328,7 @@ export function createPromptRuns(options: PromptRunsOptions) {
       anchor: request.anchor,
       startedAt: new Date().toISOString(),
       state: "running",
+      ...(preparedDocument?.files ? { files: preparedDocument.files } : {}),
     };
     associations.protect(entry.associationId, { request, launch });
     associations.save(entry);
@@ -404,14 +356,36 @@ export function createPromptRuns(options: PromptRunsOptions) {
       for (const entry of associations.all())
         if (entry.state === "running") void follow(entry, logger);
     },
-    prompts: async (): Promise<CaptainPromptSummary[]> =>
-      (await gavel.prompts((await workspace()).preparationId)).prompts,
-    prompt: async (id: string) => {
-      const prepared = await gavel.prepare();
+    prompts: async (page?: string): Promise<CaptainPromptSummary[]> =>
+      (await gavel.prompts((await gavel.prepare(directoryFor(page))).preparationId)).prompts,
+    prompt: async (id: string, page?: string) => {
+      const prepared = await gavel.prepare(directoryFor(page));
+      if (page?.startsWith("document:")) preparationPages.set(prepared.preparationId, { page, revision: await documentRevision(page) });
+      const folder = page?.startsWith("folder:") ? await prepareRepositoryFolder({ dir, endpoint, page }) : undefined;
+      if (folder && page) preparationPages.set(prepared.preparationId, { page, revision: folder.revision, files: folder.files });
       return {
         ...(await gavel.prompt(prepared.preparationId, id)),
         preparationId: prepared.preparationId,
+        ...(folder ? { files: folder.files } : {}),
       };
+    },
+    problems: async () => {
+      const repositories = new RepositoryDocuments(dir).all();
+      if (!repositories.length) return {};
+      const plain: DocumentLintSnapshot[] = [];
+      let before = "";
+      while (true) {
+        const query = new URLSearchParams({ "label.documentLint": "plain", limit: "200", ...(before ? { before } : {}) });
+        const response = await fetch(new URL(`/api/runs?${query}`, await endpoint.url()));
+        const value = await response.json() as { runs: DocumentLintSnapshot[]; error?: string };
+        if (!response.ok) throw new LaunchHttpError(response.status, value.error ?? "Cannot load document lint results");
+        plain.push(...value.runs);
+        if (value.runs.length < 200) break;
+        const next = value.runs.at(-1)!.metadata.executionId;
+        if (next === before) throw new Error("Document lint pagination did not advance");
+        before = next;
+      }
+      return documentProblems({ repositories, prompts: associations.all(), plain });
     },
     start,
     runs: async (logger: Logger): Promise<PromptRun[]> => {
@@ -439,7 +413,8 @@ export function playgroundPromptRuns(runs: PromptRuns): Plugin {
       const single = PROMPT_ROUTE.exec(url.pathname);
       const isList = url.pathname === "/prompts";
       const isRuns = url.pathname === "/prompt-runs";
-      if (!(single || isList || isRuns)) {
+      const isProblems = url.pathname === "/document-problems";
+      if (!(single || isList || isRuns || isProblems)) {
         next();
         return;
       }
@@ -458,15 +433,17 @@ export function playgroundPromptRuns(runs: PromptRuns): Plugin {
               `${method} is not allowed; GET reads prompts and runs, POST /prompt-runs starts one`,
               405,
             );
+          } else if (isProblems) {
+            sendJson(res, 200, { results: await runs.problems() });
           } else if (isRuns) {
             sendJson(res, 200, { runs: await runs.runs(logger) });
           } else if (isList) {
-            sendJson(res, 200, { prompts: await runs.prompts() });
+            sendJson(res, 200, { prompts: await runs.prompts(url.searchParams.get("page") ?? undefined) });
           } else if (single) {
             sendJson(
               res,
               200,
-              await runs.prompt(decodeURIComponent(single[1] ?? "")),
+              await runs.prompt(decodeURIComponent(single[1] ?? ""), url.searchParams.get("page") ?? undefined),
             );
           }
         } catch (error) {
