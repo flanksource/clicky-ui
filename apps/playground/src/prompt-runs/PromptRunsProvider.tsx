@@ -11,6 +11,7 @@ import { DOCUMENT_ANCHOR, ToastProvider, useToast } from "@flanksource/clicky-ui
 
 import { fetchPromptRuns, type PromptRun } from "./prompt-runs-api";
 import { RunPromptDialog, type PromptTarget } from "./RunPromptDialog";
+import { refreshDocumentProblems } from "../documents/problems";
 
 type PromptRunsContext = {
   /** Opens the prompt dialog for an element from the right-click menu, or a whole page from its Lint button. */
@@ -33,7 +34,7 @@ function settledMessage(run: PromptRun): { message: string; tone: "success" | "i
   switch (run.state) {
     case "done":
       return {
-        message: `${run.promptName} finished; its findings are a comment on the ${run.anchor === DOCUMENT_ANCHOR ? "page" : "element"}.`,
+        message: run.page.startsWith("folder:") ? `${run.promptName} finished; findings are on the reviewed documents.` : `${run.promptName} finished; its findings are a comment on the ${run.anchor === DOCUMENT_ANCHOR ? "page" : "element"}.`,
         tone: "success",
       };
     case "empty":
@@ -67,6 +68,7 @@ function PromptRunWatcher({
                 durationMs: 0,
               });
             } else if (run.state !== "running") {
+              void refreshDocumentProblems();
               onSettled(runId);
               const { message, tone } = settledMessage(run);
               toast({ message, tone, ...(tone === "danger" ? { durationMs: 0 } : {}) });
