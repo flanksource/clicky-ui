@@ -7,6 +7,7 @@ import {
   type PageActivity,
   type SidebarFilter,
 } from "./sidebar-activity";
+import { isRecent } from "./sidebar-visibility";
 
 type RecentPage = {
   slug: string;
@@ -20,7 +21,6 @@ export function buildRecentSection({
   activity,
   query,
   filters,
-  activeSlug,
   pageHref,
   loading,
 }: {
@@ -28,7 +28,6 @@ export function buildRecentSection({
   activity: Map<string, PageActivity>;
   query: string;
   filters: SidebarFilter[];
-  activeSlug: string | undefined;
   pageHref: (slug: string) => string;
   loading: boolean;
 }): AppShellNavSection {
@@ -39,13 +38,13 @@ export function buildRecentSection({
     label: "Recent",
     loading,
     items: entries
-      .filter((page) => recent(page.slug) > 0)
+      .filter((page) => isRecent(activity.get(page.slug), now))
       .filter((page) =>
         `${page.title} ${page.slug} ${page.description ?? ""}`
           .toLowerCase()
           .includes(needle),
       )
-      .filter((page) => matchesActivity(activity.get(page.slug), filters, now))
+      .filter((page) => matchesActivity(activity.get(page.slug), filters))
       .sort(
         (left, right) =>
           recent(right.slug) - recent(left.slug) ||
@@ -61,7 +60,6 @@ export function buildRecentSection({
           key: `recent:${page.slug}`,
           icon: page.icon,
           to: pageHref(page.slug),
-          active: activeSlug === page.slug,
           label: (
             <span
               className="block min-w-0"
