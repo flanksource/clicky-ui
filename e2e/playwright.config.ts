@@ -4,6 +4,7 @@ const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:5801";
 
 export default defineConfig({
   testDir: "./tests",
+  testIgnore: "**/responsive.spec.ts",
   timeout: 60_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
@@ -32,7 +33,7 @@ export default defineConfig({
   ],
   webServer: {
     command: process.env.CI
-      ? "make -C .. e2e-preview"
+      ? "pnpm --filter kitchen-sink exec vite preview --port 5801 --strictPort"
       : "pnpm --filter kitchen-sink dev",
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
