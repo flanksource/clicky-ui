@@ -280,8 +280,8 @@ describe("aborted", () => {
     expect(outcomeFor({ name: "p", children: [leaf("f", { failed: true }), aborted] })).toBe("failed");
   });
 
-  it("has a danger tone and is listed after warned in the filter labels", () => {
-    expect(statusToneFor(aborted)).toBe("danger");
+  it("has a neutral tone and is listed after warned in the filter labels", () => {
+    expect(statusToneFor(aborted)).toBe("neutral");
     const keys = STATUS_LABELS.map((l) => l.key);
     expect(keys.indexOf("aborted")).toBe(keys.indexOf("warned") + 1);
   });
