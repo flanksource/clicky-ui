@@ -15,54 +15,31 @@ import {
 } from "../../icons";
 import type { IconComponent } from "../../icons/types";
 import { Checkbox } from "../../components/Checkbox";
-import { CodeDiff, type DiffLineTarget, type DiffLineWidget } from "../CodeDiff";
+import {
+  CodeDiff,
+  type DiffLineTarget,
+  type DiffLineWidget,
+} from "../CodeDiff";
 import { languageFromPath } from "../code-highlight";
-import { dateKey, formatFallbackTime, formatGitCommitDateHeader } from "./git-dates";
-
-export type GitDiffPayload = {
-  diff: string;
-  truncated?: boolean;
-  binary?: boolean;
-  path?: string;
-  commit?: string;
-};
-
-export type GitDiffLoader<T> = (item: T) => Promise<GitDiffPayload>;
-
-export type GitCommitItem = {
-  id?: string;
-  sha: string;
-  shortSha?: string;
-  title: string;
-  body?: string;
-  authorName?: string;
-  authorLogin?: string;
-  authorAvatarUrl?: string;
-  committedAt?: string;
-  additions?: number;
-  deletions?: number;
-  changedFiles?: number;
-  href?: string;
-};
-
-export type GitFileChangeStatus =
-  | "added"
-  | "modified"
-  | "deleted"
-  | "renamed"
-  | "copied"
-  | string;
-
-export type GitFileChangeItem = {
-  id?: string;
-  path: string;
-  previousPath?: string;
-  status?: GitFileChangeStatus;
-  additions?: number;
-  deletions?: number;
-  href?: string;
-  binary?: boolean;
-};
+import {
+  dateKey,
+  formatFallbackTime,
+  formatGitCommitDateHeader,
+} from "./git-dates";
+import type {
+  GitCommitItem,
+  GitDiffLoader,
+  GitDiffPayload,
+  GitFileChangeItem,
+} from "./types";
+import { gitWebLink } from "./git-links";
+export type {
+  GitCommitItem,
+  GitDiffLoader,
+  GitDiffPayload,
+  GitFileChangeItem,
+  GitFileChangeStatus,
+} from "./types";
 
 type DiffState = {
   loading: boolean;
@@ -111,7 +88,11 @@ type GitCommitListBaseProps<T extends GitCommitItem> = {
 // row navigates to the host's commit view instead of opening in place.
 type GitCommitListBody<T extends GitCommitItem> =
   | { loadDiff?: GitDiffLoader<T>; renderExpanded?: never; onOpen?: never }
-  | { renderExpanded: (commit: T) => ReactNode; loadDiff?: never; onOpen?: never }
+  | {
+      renderExpanded: (commit: T) => ReactNode;
+      loadDiff?: never;
+      onOpen?: never;
+    }
   | { onOpen: (commit: T) => void; loadDiff?: never; renderExpanded?: never };
 
 export type GitCommitListProps<T extends GitCommitItem = GitCommitItem> =
@@ -147,7 +128,10 @@ function isActivationKey(event: KeyboardEvent<HTMLDivElement>): boolean {
   return event.key === "Enter" || event.key === " ";
 }
 
-function groupCommits<T extends GitCommitItem>(commits: T[], enabled: boolean): CommitGroup<T>[] {
+function groupCommits<T extends GitCommitItem>(
+  commits: T[],
+  enabled: boolean,
+): CommitGroup<T>[] {
   if (!enabled) return [{ key: "all", label: "", commits }];
   const groups: CommitGroup<T>[] = [];
   const indexByKey = new Map<string, number>();
@@ -183,23 +167,42 @@ function statText(additions?: number, deletions?: number): ReactNode {
   return (
     <>
       <span aria-hidden>·</span>
-      {adds > 0 && <span className="text-emerald-600 dark:text-emerald-400">+{adds}</span>}
-      {dels > 0 && <span className="text-rose-600 dark:text-rose-400">-{dels}</span>}
+      {adds > 0 && (
+        <span className="text-emerald-600 dark:text-emerald-400">+{adds}</span>
+      )}
+      {dels > 0 && (
+        <span className="text-rose-600 dark:text-rose-400">-{dels}</span>
+      )}
     </>
   );
 }
 
-function useLazyDiff<T>(item: T, loader: GitDiffLoader<T> | undefined): [boolean, DiffState, () => void] {
+function useLazyDiff<T>(
+  item: T,
+  loader: GitDiffLoader<T> | undefined,
+): [boolean, DiffState, () => void] {
   const [expanded, setExpanded] = useState(false);
   const [state, setState] = useState<DiffState>(DIFF_INITIAL_STATE);
 
   function toggle() {
-    setExpanded(open => !open);
-    if (!expanded && loader && !state.payload && !state.loading && !state.error) {
+    setExpanded((open) => !open);
+    if (
+      !expanded &&
+      loader &&
+      !state.payload &&
+      !state.loading &&
+      !state.error
+    ) {
       setState({ loading: true, payload: null, error: "" });
       loader(item)
-        .then(payload => setState({ loading: false, payload, error: "" }))
-        .catch(error => setState({ loading: false, payload: null, error: messageFromError(error) }));
+        .then((payload) => setState({ loading: false, payload, error: "" }))
+        .catch((error) =>
+          setState({
+            loading: false,
+            payload: null,
+            error: messageFromError(error),
+          }),
+        );
     }
   }
 
@@ -234,7 +237,12 @@ export function GitDiffPanel({
 }: GitDiffPanelProps) {
   if (loading) {
     return (
-      <div className={cn("border-t border-border bg-muted/40 px-3 py-3 text-xs text-muted-foreground", className)}>
+      <div
+        className={cn(
+          "border-t border-border bg-muted/40 px-3 py-3 text-xs text-muted-foreground",
+          className,
+        )}
+      >
         Loading diff...
       </div>
     );
@@ -242,7 +250,12 @@ export function GitDiffPanel({
 
   if (error) {
     return (
-      <div className={cn("border-t border-border bg-rose-50 px-3 py-3 text-xs text-rose-700 dark:bg-rose-950/30 dark:text-rose-300", className)}>
+      <div
+        className={cn(
+          "border-t border-border bg-rose-50 px-3 py-3 text-xs text-rose-700 dark:bg-rose-950/30 dark:text-rose-300",
+          className,
+        )}
+      >
         {error}
       </div>
     );
@@ -250,7 +263,12 @@ export function GitDiffPanel({
 
   if (payload?.binary) {
     return (
-      <div className={cn("border-t border-border bg-muted/40 px-3 py-3 text-xs text-muted-foreground", className)}>
+      <div
+        className={cn(
+          "border-t border-border bg-muted/40 px-3 py-3 text-xs text-muted-foreground",
+          className,
+        )}
+      >
         Binary file not shown.
       </div>
     );
@@ -258,7 +276,12 @@ export function GitDiffPanel({
 
   if (!payload?.diff) {
     return (
-      <div className={cn("border-t border-border bg-muted/40 px-3 py-3 text-xs text-muted-foreground", className)}>
+      <div
+        className={cn(
+          "border-t border-border bg-muted/40 px-3 py-3 text-xs text-muted-foreground",
+          className,
+        )}
+      >
         {emptyLabel}
       </div>
     );
@@ -308,14 +331,31 @@ function CommitRow<T extends GitCommitItem>({
   selected: boolean;
   slots: CommitRowSlots<T>;
 }) {
-  const { loadDiff, renderExpanded, onOpen, renderTime, renderBadges, renderSubtitle, onToggleSelect } = slots;
+  const {
+    loadDiff,
+    renderExpanded,
+    onOpen,
+    renderTime,
+    renderBadges,
+    renderSubtitle,
+    onToggleSelect,
+  } = slots;
   const [expandedState, diffState, toggle] = useLazyDiff(commit, loadDiff);
   const expanded = !onOpen && expandedState;
   const author = displayAuthor(commit);
-  const canExpand = Boolean(onOpen || loadDiff || renderExpanded || commit.body);
+  const href =
+    commit.href ??
+    (commit.repository
+      ? gitWebLink(commit.repository, { commit: commit.sha })
+      : undefined);
+  const canExpand = Boolean(
+    onOpen || loadDiff || renderExpanded || commit.body,
+  );
   const activate = onOpen ? () => onOpen(commit) : toggle;
   const selectable = onToggleSelect !== undefined;
-  const selectBlocked = selectable ? slots.selectBlockReason?.(commit) || undefined : undefined;
+  const selectBlocked = selectable
+    ? slots.selectBlockReason?.(commit) || undefined
+    : undefined;
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (!canExpand || !isActivationKey(event)) return;
@@ -329,14 +369,23 @@ function CommitRow<T extends GitCommitItem>({
       data-selected={selectable ? String(selected) : undefined}
       className={cn(selectable && selected && "bg-primary/5")}
     >
-      <div className={cn("flex items-start transition-colors", canExpand && "hover:bg-muted/70")}>
+      <div
+        className={cn(
+          "flex items-start transition-colors",
+          canExpand && "hover:bg-muted/70",
+        )}
+      >
         {selectable && (
           <span className="flex shrink-0 pl-3 pt-3.5" title={selectBlocked}>
             <Checkbox
               checked={selected}
               disabled={Boolean(selectBlocked)}
               onChange={() => onToggleSelect(commit)}
-              aria-label={slots.selectLabel ? slots.selectLabel(commit) : `Select commit ${shortSha(commit)}`}
+              aria-label={
+                slots.selectLabel
+                  ? slots.selectLabel(commit)
+                  : `Select commit ${shortSha(commit)}`
+              }
             />
           </span>
         )}
@@ -357,7 +406,10 @@ function CommitRow<T extends GitCommitItem>({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              <span className="min-w-0 truncate font-medium text-foreground" title={commit.title}>
+              <span
+                className="min-w-0 truncate font-medium text-foreground"
+                title={commit.title}
+              >
                 {commit.title}
               </span>
               {renderBadges?.(commit)}
@@ -365,7 +417,10 @@ function CommitRow<T extends GitCommitItem>({
             {renderSubtitle?.(commit)}
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-muted-foreground">
               {commit.authorAvatarUrl && (
-                <AvatarImage src={commit.authorAvatarUrl} alt={author || "Commit author"} />
+                <AvatarImage
+                  src={commit.authorAvatarUrl}
+                  alt={author || "Commit author"}
+                />
               )}
               {author && <span>{author}</span>}
               {commit.committedAt && (
@@ -373,7 +428,9 @@ function CommitRow<T extends GitCommitItem>({
                   <span aria-hidden>·</span>
                   <span className="inline-flex items-center gap-1">
                     <UiClock className="h-3 w-3" />
-                    {renderTime ? renderTime(commit.committedAt) : formatFallbackTime(commit.committedAt)}
+                    {renderTime
+                      ? renderTime(commit.committedAt)
+                      : formatFallbackTime(commit.committedAt)}
                   </span>
                 </>
               )}
@@ -386,19 +443,21 @@ function CommitRow<T extends GitCommitItem>({
               )}
             </div>
           </div>
-          {commit.href ? (
+          {href ? (
             <a
-              href={commit.href}
+              href={href}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-0.5 inline-flex shrink-0 items-center gap-1 font-mono text-cyan-600 hover:underline"
-              onClick={event => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
             >
               {shortSha(commit)}
               <UiLinkExternal className="h-3 w-3" />
             </a>
           ) : (
-            <span className="mt-0.5 shrink-0 font-mono text-cyan-600">{shortSha(commit)}</span>
+            <span className="mt-0.5 shrink-0 font-mono text-cyan-600">
+              {shortSha(commit)}
+            </span>
           )}
           {canExpand && (
             <span className="mt-1 shrink-0">
@@ -442,7 +501,10 @@ export function GitCommitList<T extends GitCommitItem = GitCommitItem>(
     className,
     selectedShas,
   } = props;
-  const groups = useMemo(() => groupCommits(commits, groupByDate), [commits, groupByDate]);
+  const groups = useMemo(
+    () => groupCommits(commits, groupByDate),
+    [commits, groupByDate],
+  );
   const slots: CommitRowSlots<T> = {
     loadDiff: props.loadDiff,
     renderExpanded: props.renderExpanded,
@@ -457,12 +519,21 @@ export function GitCommitList<T extends GitCommitItem = GitCommitItem>(
   };
 
   if (commits.length === 0) {
-    return <div className={cn("py-4 text-xs text-muted-foreground", className)}>{emptyLabel}</div>;
+    return (
+      <div className={cn("py-4 text-xs text-muted-foreground", className)}>
+        {emptyLabel}
+      </div>
+    );
   }
 
   return (
-    <div className={cn("overflow-hidden rounded-md border border-border", className)}>
-      {groups.map(group => (
+    <div
+      className={cn(
+        "overflow-hidden rounded-md border border-border",
+        className,
+      )}
+    >
+      {groups.map((group) => (
         <section key={group.key} aria-label={group.label || "Commits"}>
           {group.label && (
             <div className="border-b border-border bg-muted/60 px-3 py-2 text-xs font-semibold text-foreground">
@@ -470,7 +541,7 @@ export function GitCommitList<T extends GitCommitItem = GitCommitItem>(
             </div>
           )}
           <div className="divide-y divide-border">
-            {group.commits.map(commit => (
+            {group.commits.map((commit) => (
               <CommitRow
                 key={commit.id || commit.sha}
                 commit={commit}
@@ -498,25 +569,54 @@ function normalizedStatus(status?: string): string {
 function statusView(status?: string): StatusView {
   switch (normalizedStatus(status)) {
     case "added":
-      return { label: "Added", icon: UiFilePlus, iconClassName: "text-emerald-600 dark:text-emerald-400" };
+      return {
+        label: "Added",
+        icon: UiFilePlus,
+        iconClassName: "text-emerald-600 dark:text-emerald-400",
+      };
     case "deleted":
-      return { label: "Deleted", icon: UiRemove, iconClassName: "text-rose-600 dark:text-rose-400" };
+      return {
+        label: "Deleted",
+        icon: UiRemove,
+        iconClassName: "text-rose-600 dark:text-rose-400",
+      };
     case "renamed":
-      return { label: "Renamed", icon: UiFileCode, iconClassName: "text-sky-600 dark:text-sky-400" };
+      return {
+        label: "Renamed",
+        icon: UiFileCode,
+        iconClassName: "text-sky-600 dark:text-sky-400",
+      };
     case "copied":
-      return { label: "Copied", icon: UiCode2, iconClassName: "text-sky-600 dark:text-sky-400" };
+      return {
+        label: "Copied",
+        icon: UiCode2,
+        iconClassName: "text-sky-600 dark:text-sky-400",
+      };
     default:
-      return { label: "Modified", icon: UiFile, iconClassName: "text-amber-600 dark:text-amber-400" };
+      return {
+        label: "Modified",
+        icon: UiFile,
+        iconClassName: "text-amber-600 dark:text-amber-400",
+      };
   }
 }
 
 function splitPath(path: string): { directory: string; basename: string } {
   const index = path.lastIndexOf("/");
   if (index < 0) return { directory: "", basename: path };
-  return { directory: `${path.slice(0, index)}/`, basename: path.slice(index + 1) };
+  return {
+    directory: `${path.slice(0, index)}/`,
+    basename: path.slice(index + 1),
+  };
 }
 
-function DiffBars({ additions = 0, deletions = 0 }: { additions?: number; deletions?: number }) {
+function DiffBars({
+  additions = 0,
+  deletions = 0,
+}: {
+  additions?: number;
+  deletions?: number;
+}) {
   const total = additions + deletions;
   const maxBars = 5;
   const addBars = total > 0 ? Math.round((additions / total) * maxBars) : 0;
@@ -524,12 +624,20 @@ function DiffBars({ additions = 0, deletions = 0 }: { additions?: number; deleti
   return (
     <span className="inline-flex gap-px" aria-hidden>
       {Array.from({ length: addBars }).map((_, index) => (
-        <span key={`a${index}`} className="inline-block h-2 w-1.5 rounded-sm bg-emerald-500" />
+        <span
+          key={`a${index}`}
+          className="inline-block h-2 w-1.5 rounded-sm bg-emerald-500"
+        />
       ))}
       {Array.from({ length: delBars }).map((_, index) => (
-        <span key={`d${index}`} className="inline-block h-2 w-1.5 rounded-sm bg-rose-500" />
+        <span
+          key={`d${index}`}
+          className="inline-block h-2 w-1.5 rounded-sm bg-rose-500"
+        />
       ))}
-      {total === 0 && <span className="inline-block h-2 w-1.5 rounded-sm bg-muted-foreground/30" />}
+      {total === 0 && (
+        <span className="inline-block h-2 w-1.5 rounded-sm bg-muted-foreground/30" />
+      )}
     </span>
   );
 }
@@ -547,6 +655,15 @@ function FileRow({
   const status = statusView(file.status);
   const StatusIcon = status.icon;
   const path = splitPath(file.path);
+  if (file.href === undefined && file.repository && !file.commit)
+    throw new Error(
+      `Git file "${file.path}" requires a commit for its repository link`,
+    );
+  const href =
+    file.href ??
+    (file.repository && file.commit
+      ? gitWebLink(file.repository, { commit: file.commit, file: file.path })
+      : undefined);
   const canExpand = Boolean(loadDiff);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -570,7 +687,9 @@ function FileRow({
         <StatusIcon className={cn("h-4 w-4 shrink-0", status.iconClassName)} />
         <div className="min-w-0 flex-1">
           <div className="truncate font-mono text-foreground" title={file.path}>
-            {path.directory && <span className="text-muted-foreground">{path.directory}</span>}
+            {path.directory && (
+              <span className="text-muted-foreground">{path.directory}</span>
+            )}
             <span>{path.basename}</span>
           </div>
           {file.previousPath && (
@@ -579,7 +698,9 @@ function FileRow({
             </div>
           )}
         </div>
-        <span className="shrink-0 text-[11px] text-muted-foreground">{status.label}</span>
+        <span className="shrink-0 text-[11px] text-muted-foreground">
+          {status.label}
+        </span>
         <span className="shrink-0 tabular-nums text-emerald-600 dark:text-emerald-400">
           +{file.additions ?? 0}
         </span>
@@ -587,16 +708,20 @@ function FileRow({
           -{file.deletions ?? 0}
         </span>
         <DiffBars
-          {...(file.additions !== undefined ? { additions: file.additions } : {})}
-          {...(file.deletions !== undefined ? { deletions: file.deletions } : {})}
+          {...(file.additions !== undefined
+            ? { additions: file.additions }
+            : {})}
+          {...(file.deletions !== undefined
+            ? { deletions: file.deletions }
+            : {})}
         />
-        {file.href && (
+        {href && (
           <a
-            href={file.href}
+            href={href}
             target="_blank"
             rel="noopener noreferrer"
             className="shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={event => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
             aria-label={`Open ${file.path}`}
           >
             <UiLinkExternal className="h-3.5 w-3.5" />
@@ -613,7 +738,9 @@ function FileRow({
           loading={diffState.loading}
           payload={diffState.payload}
           error={diffState.error}
-          {...(diffMaxHeightClassName ? { maxHeightClassName: diffMaxHeightClassName } : {})}
+          {...(diffMaxHeightClassName
+            ? { maxHeightClassName: diffMaxHeightClassName }
+            : {})}
         />
       )}
     </div>
@@ -628,13 +755,22 @@ export function GitFileList({
   diffMaxHeightClassName,
 }: GitFileListProps) {
   if (files.length === 0) {
-    return <div className={cn("py-4 text-xs text-muted-foreground", className)}>{emptyLabel}</div>;
+    return (
+      <div className={cn("py-4 text-xs text-muted-foreground", className)}>
+        {emptyLabel}
+      </div>
+    );
   }
 
   return (
-    <div className={cn("overflow-hidden rounded-md border border-border", className)}>
+    <div
+      className={cn(
+        "overflow-hidden rounded-md border border-border",
+        className,
+      )}
+    >
       <div className="divide-y divide-border">
-        {files.map(file => (
+        {files.map((file) => (
           <FileRow
             key={file.id || file.path}
             file={file}
@@ -659,13 +795,20 @@ export function GitChangedFilesSummary({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-center gap-2 text-xs text-muted-foreground", className)}>
+    <div
+      className={cn(
+        "flex items-center gap-2 text-xs text-muted-foreground",
+        className,
+      )}
+    >
       <span className="inline-flex items-center gap-1 font-medium">
         <UiDiff className="h-3.5 w-3.5" />
         {files} file{files === 1 ? "" : "s"} changed
       </span>
       <span aria-hidden>·</span>
-      <span className="text-emerald-600 dark:text-emerald-400">+{additions}</span>
+      <span className="text-emerald-600 dark:text-emerald-400">
+        +{additions}
+      </span>
       <span className="text-rose-600 dark:text-rose-400">-{deletions}</span>
     </div>
   );

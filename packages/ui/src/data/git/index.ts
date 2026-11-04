@@ -13,6 +13,9 @@ export {
   type GitFileListProps,
 } from "./GitChangeList";
 export { formatGitCommitDateHeader } from "./git-dates";
+export * from "./types";
+export { gitWebLink, shortSha } from "./git-links";
+export { GitLink, type GitLinkProps } from "./GitLink";
 export * from "./pickers/types";
 export * from "./pickers/GitPickers";
 export * from "./pickers/GitSourcePicker";
