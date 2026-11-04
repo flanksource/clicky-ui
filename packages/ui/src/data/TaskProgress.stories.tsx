@@ -68,6 +68,46 @@ export const Running: Story = {
   },
 };
 
+export const NestedGitReads: Story = {
+  args: {
+    snapshots: [
+      {
+        id: "comparison",
+        groupId: "comparison",
+        type: "group",
+        name: "Compare environments",
+        status: "running",
+      },
+      {
+        id: "source",
+        groupId: "source",
+        parentGroupId: "comparison",
+        type: "group",
+        name: "Load Git source",
+        status: "running",
+      },
+      {
+        id: "refs",
+        groupId: "source",
+        type: "task",
+        name: "Resolve branch",
+        status: "success",
+        description: "Using cached result",
+      },
+      {
+        id: "tree",
+        groupId: "source",
+        type: "task",
+        name: "Read pinned tree",
+        status: "running",
+        description: "Waiting for shared read",
+        progress: 3,
+        maxValue: 5,
+      },
+    ],
+  },
+};
+
 export const WaitingForAnswer: Story = {
   args: {
     snapshots: run("running", [
@@ -80,7 +120,8 @@ export const WaitingForAnswer: Story = {
             id: "p-lock",
             kind: "select",
             state: "pending",
-            title: "Stale git lock detected: .git/index.lock (age 12s, 0 bytes, no process has it open). Remove and retry?",
+            title:
+              "Stale git lock detected: .git/index.lock (age 12s, 0 bytes, no process has it open). Remove and retry?",
             schema: {
               type: "object",
               properties: {
@@ -127,10 +168,18 @@ export const CopyRunDetails: Story = {
         duration: "15.298s",
         error: "export ASAUTHCOMPANYPAGEBUTTONLIMIT: context canceled",
         logs: [
-          { level: "error", message: "export ASAUTHCOMPANYPAGEBUTTONLIMIT: context canceled" },
+          {
+            level: "error",
+            message: "export ASAUTHCOMPANYPAGEBUTTONLIMIT: context canceled",
+          },
         ],
       },
-      { name: "Verify dev", status: "canceled", duration: "15.899s", error: "dependency failed" },
+      {
+        name: "Verify dev",
+        status: "canceled",
+        duration: "15.899s",
+        error: "dependency failed",
+      },
     ]),
   },
   play: async ({ canvasElement }) => {
@@ -138,14 +187,21 @@ export const CopyRunDetails: Story = {
     // Real chromium denies writeText without the clipboard-write permission,
     // so stub it and assert the affordance rather than the OS clipboard.
     const writeText = fn();
-    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
 
     await userEvent.click(canvas.getByRole("button", { name: "Copy" }));
 
     await expect(writeText).toHaveBeenCalledWith(
-      expect.stringContaining("export ASAUTHCOMPANYPAGEBUTTONLIMIT: context canceled"),
+      expect.stringContaining(
+        "export ASAUTHCOMPANYPAGEBUTTONLIMIT: context canceled",
+      ),
     );
-    await expect(canvas.getByRole("button", { name: "Copied" })).toBeInTheDocument();
+    await expect(
+      canvas.getByRole("button", { name: "Copied" }),
+    ).toBeInTheDocument();
   },
 };
 

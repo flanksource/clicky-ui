@@ -1,6 +1,7 @@
 import { useState, type MouseEvent, type ReactNode } from "react";
 import { Icon } from "../Icon";
 import { cn } from "../../lib/utils";
+import { copyText as copyToClipboard } from "../../components/clipboard";
 import {
   UiCheck,
   UiChevronRight,
@@ -57,24 +58,20 @@ export function ErrorDetails({
   const copyDiagnostics = async (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    if (!navigator.clipboard?.writeText) {
-      setCopyState("failed");
-      return;
-    }
     try {
-      await navigator.clipboard.writeText(diagnosticReport(diagnostics, title));
+      await copyToClipboard(diagnosticReport(diagnostics, title));
       setCopyState("copied");
     } catch {
       setCopyState("failed");
     }
   };
   return (
-    <details className={cn("group rounded-md border border-destructive/30 bg-destructive/5", className)}>
-      <summary className="flex cursor-pointer list-none items-start gap-2 p-3">
+    <details className={cn("group min-w-0 rounded-md border border-destructive/30 bg-destructive/5", className)}>
+      <summary className="flex cursor-pointer list-none flex-wrap items-start gap-2 p-3">
         <Icon icon={UiWarningTriangle} className="mt-0.5 shrink-0 text-destructive" />
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-destructive">{title}</div>
-          <div className="mt-1 whitespace-pre-wrap text-sm text-destructive">
+          <div className="break-words text-sm font-semibold text-destructive">{title}</div>
+          <div className="mt-1 whitespace-pre-wrap break-words text-sm text-destructive">
             {diagnostics.message}
           </div>
         </div>

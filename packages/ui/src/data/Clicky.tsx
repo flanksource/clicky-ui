@@ -2277,7 +2277,7 @@ function normalizeClickyNodeStyle(node: ClickyNode): ClickyNode {
   return { ...node, style: { ...node.style, className: normalized } };
 }
 
-function ClickyNodeRenderer({ node: rawNode }: ClickyNodeViewProps) {
+export function ClickyNodeRenderer({ node: rawNode }: ClickyNodeViewProps) {
   if (!rawNode) return null;
   // Every node passes through here (children/items/fields recurse back into
   // this same component), so normalizing once at the entry point covers the

@@ -10,7 +10,12 @@ export interface LogEntry {
   message: string;
 }
 
-export type TaskControlAction = "start" | "stop" | "restart" | "drain" | "retry";
+export type TaskControlAction =
+  | "start"
+  | "stop"
+  | "restart"
+  | "drain"
+  | "retry";
 
 export interface TaskWorkProgress {
   total: number;
@@ -117,6 +122,8 @@ export interface TaskSnapshot {
   maxValue?: number;
   /** Stable parent-run id (tasks) or the run's own id (groups). */
   groupId?: string;
+  /** Stable parent group id when this snapshot is a nested group. */
+  parentGroupId?: string;
   kind?: string;
   labels?: Record<string, string>;
   owner?: string;

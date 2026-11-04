@@ -27,6 +27,19 @@ function renderTree(props: Partial<Parameters<typeof TreeNode<Node>>[0]> = {}) {
 }
 
 describe("TreeNode", () => {
+  it("refreshes lazy children on reopening and host invalidation without remounting the row", async () => {
+    const loadChildren = vi.fn().mockResolvedValueOnce([{ id: "first", label: "First" }]).mockResolvedValueOnce([{ id: "second", label: "Second" }]).mockResolvedValueOnce([{ id: "third", label: "Third" }]);
+    const props = { node: { id: "folder", label: "Folder", lazy: true }, getKey: (node: Node) => node.id, getChildren: (node: Node) => node.children, hasMoreChildren: (node: Node) => Boolean(node.lazy), loadChildren, reloadOnOpen: true, renderRow: ({ node }: { node: Node }) => <span>{node.label}</span> };
+    const { rerender } = render(<TreeNode {...props} getChildrenVersion={() => 0} />);
+    await screen.findByText("First");
+    const row = screen.getByText("Folder");
+    fireEvent.click(row); fireEvent.click(row);
+    await screen.findByText("Second");
+    rerender(<TreeNode {...props} getChildrenVersion={() => 1} />);
+    await screen.findByText("Third");
+    expect(screen.getByText("Folder")).toBe(row);
+    expect(loadChildren).toHaveBeenCalledTimes(3);
+  });
   it("shares controlled expansion between two trees, including nested nodes", () => {
     function ControlledTrees() {
       const [expanded, setExpanded] = useState(new Set(["root"]));

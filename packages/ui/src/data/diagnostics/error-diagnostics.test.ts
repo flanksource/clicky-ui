@@ -30,6 +30,11 @@ describe("parseDiagnosticsStackTrace", () => {
 });
 
 describe("normalizeErrorDiagnostics", () => {
+  it("preserves structured diagnostics carried by an Error", () => {
+    const diagnostics = { message: "review failed", context: [["Review", "facet-reference-security-layers"]], details: [{ label: "Response", value: "ambiguous source" }] };
+    const error = Object.assign(new Error("review failed"), { diagnostics });
+    expect(normalizeErrorDiagnostics(error)).toMatchObject(diagnostics);
+  });
   // Mirrors entity.ErrorResponse on the Go side: hint and details are part of
   // the wire format, so dropping them loses the two fields that most often say
   // what to do next and what actually ran.

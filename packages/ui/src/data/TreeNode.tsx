@@ -71,6 +71,10 @@ export type TreeNodeProps<T> = {
    * and reopened. Required for any node `hasMoreChildren` returns true for.
    */
   loadChildren?: (node: T) => Promise<T[]>;
+  /** Refresh lazy children on each manual reopen, retaining the row and its children while loading. */
+  reloadOnOpen?: boolean;
+  /** Host-controlled invalidation; open nodes refresh when their version changes. */
+  getChildrenVersion?: (node: T) => string | number;
   /**
    * Marks a node as a **secondary child** of its parent. Secondary
    * children keep the full tree structure (they render, they can be
@@ -115,6 +119,8 @@ export function TreeNode<T>({
   isSecondary,
   hasMoreChildren,
   loadChildren,
+  reloadOnOpen = false,
+  getChildrenVersion,
 }: TreeNodeProps<T>) {
   if (getExpanded && !onExpandedChange) throw new Error("Controlled tree expansion requires onExpandedChange");
   // Lazily-fetched children take precedence over the synchronous ones once a
@@ -129,7 +135,7 @@ export function TreeNode<T>({
   const lazyUnloaded = (hasMoreChildren?.(node) ?? false) && loadedChildren === null;
   // The chevron shows when there is something to reveal: either real children
   // are present, or the node is lazy and has not been loaded yet.
-  const expandable = hasChildren || lazyUnloaded;
+  const expandable = hasChildren || lazyUnloaded || Boolean(reloadOnOpen && hasMoreChildren?.(node));
   // A node opts out of bulk expand-all in two distinct cases:
   //
   //  1. The node itself is secondary (its edge from the parent is
@@ -188,21 +194,25 @@ export function TreeNode<T>({
   const loadRequested = useRef(false);
   const nodeKey = getKey(node);
   const loadKeyRef = useRef(nodeKey);
+  const loadGeneration = useRef(0);
+  const childrenVersion = getChildrenVersion?.(node);
+  const previousChildrenVersion = useRef(childrenVersion);
 
   function loadLazyChildren() {
     if (!loadChildren || loadRequested.current) return;
     loadRequested.current = true;
+    const generation = ++loadGeneration.current;
     loadKeyRef.current = nodeKey;
     setLoading(true);
     setError(null);
     loadChildren(node)
       .then((kids) => {
-        if (loadKeyRef.current !== nodeKey) return;
+        if (loadKeyRef.current !== nodeKey || generation !== loadGeneration.current) return;
         setLoadedChildren(kids);
         setLoading(false);
       })
       .catch((err) => {
-        if (loadKeyRef.current !== nodeKey) return;
+        if (loadKeyRef.current !== nodeKey || generation !== loadGeneration.current) return;
         // Surfaced to renderRow via ctx.error; allow a retry on re-toggle.
         loadRequested.current = false;
         setError(err);
@@ -223,6 +233,17 @@ export function TreeNode<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, lazyUnloaded, error]);
 
+  useEffect(() => {
+    if (!getChildrenVersion || previousChildrenVersion.current === childrenVersion) return;
+    previousChildrenVersion.current = childrenVersion;
+    loadRequested.current = false;
+    if (isOpen && hasMoreChildren?.(node)) loadLazyChildren();
+    // The host version, rather than callback identity, invalidates this node.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [childrenVersion]);
+
+  useEffect(() => () => { loadGeneration.current++; loadRequested.current = false; }, []);
+
   function toggle() {
     if (!expandable) return;
     if (isOnRevealPath) {
@@ -233,7 +254,8 @@ export function TreeNode<T>({
       return;
     }
     const next = !ownOpen;
-    if (next && lazyUnloaded) loadLazyChildren();
+    if (next && reloadOnOpen && hasMoreChildren?.(node)) loadRequested.current = false;
+    if (next && (lazyUnloaded || reloadOnOpen)) loadLazyChildren();
     if (getExpanded) onExpandedChange!(node, next);
     else setOpen(next);
   }
@@ -327,6 +349,8 @@ export function TreeNode<T>({
               {...(isSecondary ? { isSecondary } : {})}
               {...(hasMoreChildren ? { hasMoreChildren } : {})}
               {...(loadChildren ? { loadChildren } : {})}
+              reloadOnOpen={reloadOnOpen}
+              {...(getChildrenVersion ? { getChildrenVersion } : {})}
             />
           ))}
         </div>
