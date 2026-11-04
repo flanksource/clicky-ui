@@ -19,6 +19,7 @@ export function profileSamplePayload(options: ProfileSamplePayloadOptions) {
   return {
     profile,
     params: options.params ?? {},
+    ...(Array.isArray(draft.processors) && draft.processors.length ? {previewProcessors:true} : {}),
     ...(request.filters ? { filters: request.filters } : {}),
     ...(options.filterColumns
       ? { filterColumns: options.filterColumns }

@@ -1,9 +1,4 @@
 import { useCommentState, useDiscardCommentDraft } from "../../comments/comment-persistence";
-import { ELEMENT_PREFIX, captureLocators, elementAnchor } from "../../comments/anchoring/dom-anchor";
-import { PATCH_PREFIX, isPatchAnchor } from "../../comments/anchoring/patch-anchor";
-import type { ScreenshotTarget } from "../../comments/annotation-screenshot";
-import { elementLabel, useElementPicker } from "../../comments/element-picker";
-import type { SourceComments } from "../../monaco/source-comments";
 import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
 import { ProblemActions } from "../../data/diagnostics/ProblemActions";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
@@ -20,16 +15,7 @@ import { resolveCommentStage, selectCommentThreadsByStage } from "../../lib/comm
 import { CommentThread } from "../../comments/CommentThread";
 import { CommentRail } from "../../comments/CommentRail";
 import type { CommentDetailOptions } from "../../comments/comment-detail";
-import {
-  DEFAULT_COMMENT_STATUSES,
-  DOCUMENT_ANCHOR,
-  type Comment,
-  type CommentCallbacks,
-  type CommentConfig,
-  type CommentCreateAction,
-  type CommentCreateInput,
-} from "../../comments/comment-types";
-import { assignmentMenuItems } from "../../comments/comment-assign";
+import { DEFAULT_COMMENT_STATUSES, type Comment, type CommentCallbacks, type CommentConfig } from "../../comments/comment-types";
 import { getRoots, selectAnchorThreads } from "../../comments/comment-utils";
 import { UiCheck, UiComment, UiDotsVertical, UiEye, UiFileCode, UiGitCommit, UiListChecks } from "../../icons";
 import { FINDINGS_COMMENT_CONFIG, findingsToComments, lineAnchor } from "../findings-comments";
@@ -92,8 +78,8 @@ type Draft = { anchor: string; label: string; position: CommentDraftPosition; ex
 const NO_POSITION: CommentDraftPosition = { top: 0, bottom: 0, left: 0 };
 
 const isMarkdownPath = (path: string) => /\.(md|mdx|markdown)$/i.test(path);
-/** Anchors that highlight text in Source: quoted words (`q:`), source characters (`s:`) or whole lines (`r:`). */
-const isTextAnchor = (anchor: string) => anchor.startsWith(QUOTE_PREFIX) || anchor.startsWith(SOURCE_PREFIX) || anchor.startsWith(PATCH_PREFIX);
+/** Anchors on quoted text: words in rendered markdown (`q:`) or characters in a source file (`s:`). */
+const isTextAnchor = (anchor: string) => anchor.startsWith(QUOTE_PREFIX) || anchor.startsWith(SOURCE_PREFIX);
 const quoteDraft = (locator: QuoteLocator) => ({ anchor: quoteAnchor(locator), label: describeQuote(locator) });
 
 function boxClass({ mode, active }: { mode: AnchorMode; active: boolean }) {
@@ -174,7 +160,7 @@ export type FileReviewCommentTargets = {
 
 /** People's threads on the document and what they may do with them. */
 export type FileReviewComments = CommentDetailOptions & {
-  /** Every comment on the document; `q:` quote, `s:` source, `r:` patch and `e:` element threads carry the anchors from `quoteAnchor`, `sourceAnchor`, `patchAnchor` and `elementAnchor`. */
+  /** Every comment on the document; quote threads carry `q:` anchors from `quoteAnchor`. */
   items: Comment[];
   /**
    * How a text selection is anchored. "quote" (default) anchors on the selected
@@ -396,13 +382,9 @@ export function FileReview({
   const [focused, setFocused] = useCommentState<string | null>(`file:${path}:focused`, null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
-  /** A new comment on the whole file is being written, in the file-level list. */
-  const [fileDraft, setFileDraft] = useState(false);
-  /** The element an `e:` draft was picked on, so a screenshot can capture it. */
-  const draftElement = useRef<Element | null>(null);
   const discardCommentDraft = useDiscardCommentDraft();
   const [savedDraft, saveDraft] = useCommentState<Omit<Draft, "position"> | null>(`file:${path}:selection`, null);
-  useEffect(() => { if (draft?.expanded && draft.surface !== "edit") { const { position: _position, ...selection } = draft; saveDraft(selection); } }, [draft, saveDraft]);
+  useEffect(() => { if (draft?.expanded) { const { position: _position, ...selection } = draft; saveDraft(selection); } }, [draft, saveDraft]);
   const [filter, setFilter] = useCommentState<AuthorFilter>(`file:${path}:filter`, "all");
   const [editorLine, setEditorLine] = useState<number | undefined>(undefined);
   /** A finding picked from Source or Problems: the preview scrolls to it once its box is measured. */
@@ -539,7 +521,7 @@ export function FileReview({
     }
     return worst;
   }, [open]);
-  const { boxes, height, width } = useAnchorBoxes({ origin, markdown, anchors, mode, patchRanges, visible: view === "preview" });
+  const { boxes, height, width } = useAnchorBoxes({ origin, markdown, anchors, mode, visible: view === "preview" });
   useEffect(() => {
     if (draft || !savedDraft || savedDraft.surface !== "preview") return;
     const box = boxes.get(savedDraft.anchor)?.[0];
@@ -857,7 +839,7 @@ export function FileReview({
     window.getSelection()?.removeAllRanges();
   }
 
-  const closeDraft = () => { if (draft) discardCommentDraft(draft.anchor); draftElement.current = null; setDraft(null); saveDraft(null); };
+  const closeDraft = () => { if (draft) discardCommentDraft(draft.anchor); setDraft(null); saveDraft(null); };
 
   /** An open card follows its measured highlight, so a reflow (width, layout) keeps it beside the text. */
   function draftPosition(current: Draft): CommentDraftPosition {
@@ -1230,8 +1212,7 @@ export function FileReview({
                 thread={selectAnchorThreads(open, sourceThread.anchor)}
                 config={config}
                 callbacks={callbacks}
-                renderRootDetails={renderRootDetails}
-                detailOptions={peopleThreads}
+                detailOptions={comments}
                 pinned={focused === sourceThread.anchor}
                 onPin={() => setFocused(sourceThread.anchor)}
                 onClose={closeInlineThread}
@@ -1334,7 +1315,7 @@ export function FileReview({
                 config={config}
                 callbacks={isFindingAnchor(inlineAnchor) ? NO_CALLBACKS : callbacks}
                 renderRootDetails={renderRootDetails}
-                detailOptions={isFindingAnchor(inlineAnchor) ? findingThreads : peopleThreads}
+                detailOptions={comments}
                 pinned={focused === inlineAnchor}
                 onPin={() => setFocused(inlineAnchor)}
                 onClose={closeInlineThread}
@@ -1400,7 +1381,9 @@ export function FileReview({
                       {anchorLabel({ anchor, found: boxes.has(anchor), placements: patchPlacements, raw })}
                     </div>
                     <CommentThread
-                      {...(isFindingAnchor(anchor) ? findingThreads : peopleThreads)}
+                      {...(comments?.previewLines !== undefined ? { previewLines: comments.previewLines } : {})}
+                      {...(comments?.detailTabs ? { detailTabs: comments.detailTabs } : {})}
+                      {...(comments?.onMaximizedChange ? { onMaximizedChange: comments.onMaximizedChange } : {})}
                       comments={thread}
                       config={config}
                       anchor={anchor}

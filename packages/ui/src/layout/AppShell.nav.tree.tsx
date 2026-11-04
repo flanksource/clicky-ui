@@ -46,6 +46,12 @@ export function NavTree({ section, groupState, dragState, renderItem }: {
   }, [selected?.key, path, groupState]);
   const expanded = (node: NavNode) => Boolean(node.group && (node.group.forceExpanded || !groupState.isCollapsed(node.key, node.group.defaultCollapsed ?? false)));
   return <Tree roots={roots} getKey={(node) => node.key} getChildren={(node) => node.children}
+    hasMoreChildren={(node) => Boolean(node.group?.loadChildren)}
+    loadChildren={async (node) => {
+      if (!node.group?.loadChildren) return node.children;
+      const children = await node.group.loadChildren();
+      return [...(children.groups ?? []).map(groupNode), ...children.items.map(itemNode)];
+    }} reloadOnOpen getChildrenVersion={() => section.childrenVersion ?? 0}
     ariaLabel={section.label ?? "Navigation"} getAriaLabel={(node) => node.label} selected={selected}
     getExpanded={expanded} onExpandedChange={(node, open) => {
       if (node.group && !node.group.forceExpanded && expanded(node) !== open) groupState.toggle(node.key, node.group.defaultCollapsed ?? false);
@@ -54,7 +60,7 @@ export function NavTree({ section, groupState, dragState, renderItem }: {
     {...(section.search ? { searchQuery: section.search.value, onSearchQueryChange: section.search.onChange } : {})}
     getSearchText={(node) => node.item?.searchText ?? `${node.label} ${node.key}`} toolbarClassName="bg-sidebar supports-[backdrop-filter]:bg-sidebar text-sidebar-foreground border-sidebar-border"
     rowClass={() => "rounded-md py-0 pr-0 text-sidebar-foreground hover:bg-sidebar-accent"}
-    renderRow={({ node, toggle }) => <NavTreeRow node={node} toggle={toggle} dragState={dragState} renderItem={renderItem} />}
+    renderRow={({ node, toggle, loading, error }) => <><NavTreeRow node={node} toggle={toggle} dragState={dragState} renderItem={renderItem} />{loading && <span role="status" className="text-xs">Loading…</span>}{error != null && <span role="alert" className="text-xs text-destructive">{error instanceof Error ? error.message : String(error)}</span>}</>}
     empty={<p role={section.loading ? "status" : undefined} className="px-2 py-4 text-xs text-sidebar-foreground/70">{section.loading ? "Loading navigation…" : "No matching pages."}</p>} />;
 }
 

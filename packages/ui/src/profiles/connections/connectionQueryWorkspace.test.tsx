@@ -10,7 +10,10 @@ import {
   structuredSearchRequest,
   supportsQueryBuilder,
 } from "./connectionQueryWorkspaceModel";
-import { EsCompileRequest } from "../elasticsearch/esQueryCompile";
+import {
+  compileRequestBody,
+  type EsCompileRequest,
+} from "../elasticsearch/esQueryCompile";
 
 // The compile request only leaves the browser once effects run, which server
 // rendering never does — so the wiring is asserted on what the hook was handed.
@@ -261,4 +264,23 @@ describe("ConnectionQueryWorkspace compilation", () => {
     expect(inputs.length).toBeGreaterThan(0);
     expect(inputs[0]?.params).toBeUndefined();
   });
+
+  it.each(["logstash-*", "logs-2026.11.03"])(
+    "includes the selected index %s when compiling a time filter",
+    (index) => {
+      const inputs = renderWorkspace({
+        options: { index },
+        search: { timeField: "@timestamp" },
+        paramValues: { since: "now-1h" },
+        paramRoles: { since: "time-from" },
+      });
+      expect(inputs.length).toBeGreaterThan(0);
+      expect(JSON.parse(compileRequestBody(inputs[0]!))).toEqual({
+        index,
+        search: { timeField: "@timestamp" },
+        params: { since: "now-1h" },
+        roles: { since: "time-from" },
+      });
+    },
+  );
 });

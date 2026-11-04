@@ -1,4 +1,6 @@
 import { JsonSchemaForm } from "../../components/JsonSchemaForm";
+import { ProfileCanonicalQuery } from "./profileCanonicalQuery";
+import type { JsonSchemaObject } from "../../components/json-schema-form-types";
 import type {
   FormLayout,
   LookupFetcher,
@@ -108,7 +110,7 @@ export function ProfileSourceSection({
   const connectionID = profileConnectionID(draft.provider?.connection ?? "");
   const providerType = draft.provider?.type ?? "";
   return (
-    <div className="grid h-full min-h-0 gap-4">
+    <div className="grid h-full min-h-0 min-w-0 grid-cols-1 gap-4">
       <SectionCard
         title="Source"
         description="Select the provider and saved connection. Connection credentials remain server-side."
@@ -160,7 +162,8 @@ export function ProfileSourceSection({
           </p>
         ) : null}
       </SectionCard>
-      {connectionID ? (
+      {(providerType==="opensearch" || providerType==="opentelemetry") ? <ProfileCanonicalQuery draft={draft} onChange={onChange} onSample={onSample}/> : null}
+      {draft.search ? null : connectionID ? (
         <ProfileWizardQueryStep
           key={connectionID}
           connectionID={connectionID}
@@ -211,6 +214,7 @@ export function ProfileSourceSection({
 }
 
 export function ProfileSchemaSection({
+  schema,
   draft,
   keys,
   title,
@@ -223,6 +227,7 @@ export function ProfileSchemaSection({
   onChange,
 }: EditorSectionProps & {
   keys: string[];
+  schema?: JsonSchemaObject;
   title: string;
   description: string;
   idPrefix: string;
@@ -260,7 +265,7 @@ export function ProfileSchemaSection({
     <SectionCard title={title} description={description}>
       <JsonSchemaForm
         idPrefix={idPrefix}
-        schema={profileSchemaProjection(keys)}
+        schema={schema ?? profileSchemaProjection(keys)}
         value={Object.fromEntries(
           keys.flatMap((key) =>
             Object.prototype.hasOwnProperty.call(draft, key)

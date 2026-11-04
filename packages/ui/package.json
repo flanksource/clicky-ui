@@ -22,6 +22,7 @@
   "type": "module",
   "sideEffects": [
     "**/*.css",
+    "./src/styles.ts",
     "./src/styles/**"
   ],
   "main": "./dist/index.cjs",
@@ -175,7 +176,6 @@
     "check": "pnpm run build:icons && tsc -b --noEmit && pnpm run check:public-exports && pnpm run lint"
   },
   "dependencies": {
-    "ajv": "catalog:",
     "@codemirror/autocomplete": "catalog:",
     "@codemirror/commands": "catalog:",
     "@codemirror/lang-json": "catalog:",
@@ -186,11 +186,11 @@
     "@flanksource/icons": "catalog:",
     "@floating-ui/react": "catalog:",
     "@lexical/react": "catalog:",
-    "@medv/finder": "catalog:",
     "@monaco-editor/react": "catalog:",
     "@radix-ui/react-compose-refs": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.1",
     "@tanstack/react-virtual": "^3.13.12",
+    "ajv": "catalog:",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "country-flag-icons": "catalog:",
@@ -199,7 +199,6 @@
     "jotai": "catalog:",
     "jsonc-parser": "catalog:",
     "lexical": "catalog:",
-    "modern-screenshot": "catalog:",
     "monaco-yaml": "catalog:",
     "tailwind-merge": "catalog:",
     "yaml": "catalog:"

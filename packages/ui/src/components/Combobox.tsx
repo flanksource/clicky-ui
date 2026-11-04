@@ -61,6 +61,7 @@ export function Combobox(props: ComboboxProps) {
     suffix,
     prefix,
     footer,
+    menuHeader,
   } = props;
   const multiple = props.multiple === true;
   const menuSearch = !multiple && props.searchPlacement === "menu";
@@ -91,7 +92,12 @@ export function Combobox(props: ComboboxProps) {
   const labelRef = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
   const floatingZ = useFloatingZIndex();
-  const menuPos = useComboboxMenuPosition({ open, anchorRef, listRef, ...(props.menuWidth !== undefined ? { menuWidth: props.menuWidth } : {}) });
+  const menuPos = useComboboxMenuPosition({
+    open,
+    anchorRef,
+    listRef,
+    ...(props.menuWidth !== undefined ? { menuWidth: props.menuWidth } : {}),
+  });
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState(-1);
   const labelWidth = useComboboxLabelWidth(label, labelRef);
@@ -545,16 +551,21 @@ export function Combobox(props: ComboboxProps) {
           footer={footer}
           ariaLabel={ariaLabel}
           header={
-            menuSearch ? (
-              <ComboboxMenuSearch
-                inputRef={inputRef}
-                value={query}
-                ariaLabel={ariaLabel}
-                listId={listId}
-                highlighted={highlighted}
-                onChange={setQuery}
-                onKeyDown={onKeyDown}
-              />
+            menuSearch || menuHeader ? (
+              <>
+                {menuHeader}
+                {menuSearch ? (
+                  <ComboboxMenuSearch
+                    inputRef={inputRef}
+                    value={query}
+                    ariaLabel={ariaLabel}
+                    listId={listId}
+                    highlighted={highlighted}
+                    onChange={setQuery}
+                    onKeyDown={onKeyDown}
+                  />
+                ) : null}
+              </>
             ) : undefined
           }
           hasOptions={options.length > 0}

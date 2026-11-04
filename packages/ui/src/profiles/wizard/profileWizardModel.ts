@@ -1,6 +1,7 @@
 import type { JsonSchemaObject } from "../../components/json-schema-form-types";
 import { profileSchema } from "../profileApi";
 import type { ProfileRowLimits } from "../connections/connectionBrowserModel";
+import type { EsSearch } from "../elasticsearch/esQueryBuilderModel";
 
 /** How a column is filtered at the backend; every field overrides an inference
  *  the server would otherwise make from the column itself. */
@@ -129,6 +130,7 @@ export type ProfileWizardDraft = Record<string, unknown> & {
   icon?: string | undefined;
   provider?: ProfileProvider | undefined;
   query?: string | undefined;
+  search?: EsSearch | undefined;
   columns?: ProfileColumn[] | undefined;
   /** The inputs a run binds — by name in the query, the provider options or the
    *  connection. The query workspace previews against their defaults. */
@@ -459,7 +461,9 @@ export function profileWizardErrorMessage(
  */
 export function profileWizardHasQuery(draft: ProfileWizardDraft): boolean {
   return Boolean(
-    draft.query?.trim() || draft.provider?.options?.search !== undefined,
+    draft.query?.trim() ||
+    draft.search !== undefined ||
+    draft.provider?.options?.search !== undefined,
   );
 }
 

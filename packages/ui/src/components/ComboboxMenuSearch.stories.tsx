@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { Combobox } from "./Combobox";
+import { Button } from "./button";
 
 const OPTIONS = [
   { value: "primary", label: "Primary database", group: "Live" },
@@ -39,5 +40,16 @@ export const Grouped: Story = {
         />
       </div>
     );
+  },
+};
+
+export const HeaderAction: Story = {
+  render: () => {
+    const [value, setValue] = useState("primary");
+    const [created, setCreated] = useState(false);
+    return <div className="w-64 space-y-2">
+      <Combobox ariaLabel="Database" searchPlacement="menu" options={OPTIONS} value={value} onChange={setValue} allowCustomValue={false} menuHeader={<Button size="sm" variant="outline" onClick={() => setCreated(true)}>New database…</Button>} />
+      {created && <p role="status">Creation requested</p>}
+    </div>;
   },
 };

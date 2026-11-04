@@ -119,6 +119,8 @@ type ComboboxBaseProps = {
   prefix?: ReactNode;
   /** Non-interactive content pinned below the option rows. */
   footer?: ReactNode;
+  /** Controls rendered above popup options, outside the listbox. */
+  menuHeader?: ReactNode;
 };
 
 export type ComboboxSingleProps = ComboboxBaseProps & {

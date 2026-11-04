@@ -27,6 +27,7 @@ describe("profile editor model", () => {
 
   it("defines a custom sectioned workspace independent of the schema layout", () => {
     expect(profileEditorSections.map((section) => section.id)).toEqual([
+      "spans",
       "general",
       "source",
       "columns",

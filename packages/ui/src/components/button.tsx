@@ -31,7 +31,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref,
   ) => {
     const Comp = asChild ? Slot : "button";
-    const content = loadingLabel !== undefined ? loadingLabel : children;
+    const content = loading && loadingLabel !== undefined ? loadingLabel : children;
 
     if (asChild) {
       return (

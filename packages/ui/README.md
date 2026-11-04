@@ -392,6 +392,29 @@ storage access, and icons imported from unapproved libraries or faked with
 emoji. See [`oxlint-plugins/README.md`](./oxlint-plugins/README.md) for the full
 guide.
 
+## Resizable comment rails and detail tabs
+
+Wrap a sidebar in `CommentRail` to get a persistent, accessible right-edge pane. Pointer dragging, arrow keys, Shift+arrows and Home/End resize within 280–640px, constrained by the surrounding document. Use `stacked` to follow a host's narrow-layout breakpoint. Optional `width` and `onWidthChange` make the width controlled; otherwise the origin-wide preference persists in localStorage. FileReview exposes the corresponding `sidebarWidth` and `onSidebarWidthChange` props and preserves independent document/rail scrolling.
+
+```tsx
+import { CommentRail, CommentSidePanel } from "@flanksource/clicky-ui/comments";
+
+<CommentRail>
+  <CommentSidePanel
+    className="w-full"
+    previewLines={3}
+    detailTabs={[
+      { id: "capture", label: "Capture", render: thread => <Capture comment={thread[0]!} /> },
+      { id: "agents", label: "Agents", render: thread => <ThreadAgents comments={thread} /> },
+    ]}
+  />
+</CommentRail>
+```
+
+`previewLines` limits rendered body lines and exposes Show more / Show less only on overflow. Maximized bodies are always full. `detailTabs` are host-owned slots mounted only while selected; keep network and application context in those adapters. `onMaximizedChange(open)` lets an embedded host coordinate its available space. The same options pass through CommentThread, CommentThreadList and FileReview's `comments` configuration. Maximized threads retain the existing reply draft in a pinned footer across tabs and failed sends. `threadToMarkdown` adds the canonical Markdown preview tab.
+
+`AgentIdentity` from `@flanksource/clicky-ui/chat` accepts `model`, `provider`, `effort` and an optional fallback `label`. It reuses the provider colors, short model formatter and effort glyph catalog. `AgentIdentityProvider` supplies known runtime metadata by `identityId` without changing stored comment authors. Unknown identities/effort remain visible rather than being guessed. The interactive `Comments/Review details` Storybook story demonstrates rails, previews, detail tabs and scrolling drafts.
+
 ## Comments in an external document
 
 `CommentProvider` accepts `onScrollToAnchor(anchor, options)` and `getAnchorTop(anchor)` for hosts whose annotated document lives outside the rail's frame. `onScrollToAnchor` must return whether the anchor is available and navigation was dispatched; `getAnchorTop` returns its current viewport offset, or `null` when unavailable. Supplying a navigation delegate replaces local DOM scrolling. Without these callbacks the provider retains its registered-element behavior. Use `CommentSidePanel` with `focusedAlignment="flow"` for a detached rail, and synchronize selection and highlighting through `useCommentContext`.
