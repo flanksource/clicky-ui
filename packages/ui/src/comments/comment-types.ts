@@ -1,3 +1,4 @@
+import type { CommentVocabulary, CommentVocabularyItem } from "./comment-vocabulary";
 import type { ReactNode } from "react";
 import type { StaticIconComponent } from "../data/Icon";
 
@@ -171,6 +172,7 @@ export type Comment = {
   agentRun?: CommentAgentRun;
   /** facet.key → selected option value. */
   facets?: Record<string, string>;
+  vocabularyRefs?: CommentVocabularyItem[];
   refs?: CommentRefGroup[];
   checklist?: CommentChecklistItem[];
 };
@@ -229,6 +231,7 @@ export type CommentCallbacks = {
 /** Static configuration shared across the comment components. */
 export type CommentConfig = {
   /** Selectable statuses; the first `unresolved` one is the default for new comments. */
+  vocabulary?: CommentVocabulary;
   statuses: CommentStatusConfig[];
   /** Classification axes (category/severity/etc.). */
   facets?: CommentFacet[];

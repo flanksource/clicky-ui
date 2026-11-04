@@ -20,7 +20,8 @@ import {
 
 /** Human-readable name for an author, falling back to "Unknown". */
 export function authorDisplayName(author: CommentAuthor | null): string {
-  return author?.name?.trim() || "Unknown";
+  const name = author?.name?.trim() || "Unknown";
+  return author?.kind === "agent" && modelProvider(name) ? shortContextModelName(name) : name;
 }
 
 /** Maps a CommentTone onto the Badge component's tone vocabulary. */
@@ -357,3 +358,4 @@ export function buildThreadListHandlers(
   }
   return handlers;
 }
+import { modelProvider, shortContextModelName } from "../data/chat/ContextMeter.model";

@@ -1,9 +1,14 @@
 import { Fragment, type ReactNode } from "react";
+import type { CommentVocabulary, CommentVocabularyItem } from "./comment-vocabulary";
+import { VocabularyChip } from "./VocabularyChip";
+import { vocabularyHref } from "./comment-vocabulary";
 import { cn } from "../lib/utils";
 
 export type CommentMarkdownProps = {
   /** Raw comment body in lightweight markdown. */
   text: string;
+  vocabulary?: CommentVocabulary;
+  vocabularyRefs?: readonly CommentVocabularyItem[];
   /** Classes applied to the rendered wrapper. */
   className?: string;
 };
@@ -64,7 +69,7 @@ function tokenizeInline(text: string): InlineToken[] {
   return tokens;
 }
 
-function InlineText({ text }: { text: string }) {
+function InlineText({ text, vocabulary, vocabularyRefs }: CommentMarkdownProps) {
   return (
     <>
       {tokenizeInline(text).map((token, index) => {
@@ -87,7 +92,9 @@ function InlineText({ text }: { text: string }) {
                 {token.text}
               </code>
             );
-          case "link":
+          case "link": {
+            const item = vocabularyRefs?.find(entry => vocabularyHref(entry) === token.href) ?? vocabulary?.items.find(entry => vocabularyHref(entry) === token.href);
+            if (item) return <VocabularyChip key={key} item={item} {...(vocabulary ? { vocabulary } : {})} />;
             return (
               <a
                 key={key}
@@ -99,6 +106,7 @@ function InlineText({ text }: { text: string }) {
                 {token.text}
               </a>
             );
+          }
           default:
             return <Fragment key={key}>{token.text}</Fragment>;
         }
@@ -107,13 +115,13 @@ function InlineText({ text }: { text: string }) {
   );
 }
 
-function renderParagraph(lines: string[], key: string): ReactNode {
+function renderParagraph(lines: string[], key: string, options: Pick<CommentMarkdownProps, "vocabulary" | "vocabularyRefs">): ReactNode {
   return (
     <p key={key}>
       {lines.map((line, index) => (
         <Fragment key={index}>
           {index > 0 && <br />}
-          <InlineText text={line} />
+          <InlineText text={line} {...options} />
         </Fragment>
       ))}
     </p>
@@ -133,7 +141,7 @@ function renderCode(lines: string[], key: string): ReactNode {
  * inline code, safe links, bullet lists, and fenced code blocks. For richer
  * rendering pass a `renderBody` to the card instead.
  */
-export function CommentMarkdown({ text, className }: CommentMarkdownProps) {
+export function CommentMarkdown({ text, className, ...options }: CommentMarkdownProps) {
   const rawLines = String(text ?? "")
     .replace(/\r\n?/g, "\n")
     .split("\n");
@@ -144,7 +152,7 @@ export function CommentMarkdown({ text, className }: CommentMarkdownProps) {
 
   function flushParagraph() {
     if (paragraph.length > 0) {
-      blocks.push(renderParagraph(paragraph, `p-${blocks.length}`));
+      blocks.push(renderParagraph(paragraph, `p-${blocks.length}`, options));
       paragraph = [];
     }
   }
@@ -155,7 +163,7 @@ export function CommentMarkdown({ text, className }: CommentMarkdownProps) {
         <ul key={`ul-${blocks.length}`} className="list-disc space-y-0.5 pl-4">
           {list.map((item, index) => (
             <li key={index}>
-              <InlineText text={item} />
+              <InlineText text={item} {...options} />
             </li>
           ))}
         </ul>,

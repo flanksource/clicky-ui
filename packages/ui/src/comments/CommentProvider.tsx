@@ -7,6 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { CommentPersistenceBoundary } from "./CommentPersistenceBoundary";
+import { useCommentState } from "./comment-persistence";
 import { deriveAnchorCounts, deriveAnchorMeta } from "./comment-utils";
 import {
   CommentContext,
@@ -48,6 +50,8 @@ export type CommentProviderProps = CommentCallbacks & {
    * visible, so the reader is not asked to open it a second time.
    */
   initialRailMode?: CommentRailMode;
+  /** Recover comment UI and drafts in this tab under a document-specific key. */
+  persistenceKey?: string;
 };
 
 /**
@@ -56,7 +60,11 @@ export type CommentProviderProps = CommentCallbacks & {
  * `registerAnchor` so the side panel can scroll-align to them). Owns no
  * fetching — `comments` and the callbacks are controlled by the consumer.
  */
-export function CommentProvider({
+export function CommentProvider(props: CommentProviderProps) {
+  return <CommentPersistenceBoundary key={props.persistenceKey ?? "ephemeral"} {...(props.persistenceKey ? { scope: props.persistenceKey } : {})}><CommentProviderInner {...props} /></CommentPersistenceBoundary>;
+}
+
+function CommentProviderInner({
   children,
   comments,
   config,
@@ -76,14 +84,10 @@ export function CommentProvider({
   onMention,
   initialRailMode = "closed",
 }: CommentProviderProps) {
-  const [railMode, setRailMode] = useState<CommentRailMode>(initialRailMode);
-  const [focusedAnchor, setFocusedAnchor] = useState<CommentAnchor | null>(
-    null
-  );
-  const [highlightAnchor, setHighlightAnchor] = useState<CommentAnchor | null>(
-    null
-  );
-  const railModeRef = useRef<CommentRailMode>(initialRailMode);
+  const [railMode, setRailMode] = useCommentState<CommentRailMode>("rail", initialRailMode);
+  const [focusedAnchor, setFocusedAnchor] = useCommentState<CommentAnchor | null>("focused-anchor", null);
+  const [highlightAnchor, setHighlightAnchor] = useState<CommentAnchor | null>(null);
+  const railModeRef = useRef<CommentRailMode>(railMode);
   const onRailModeChangeRef = useRef(onRailModeChange);
   const onScrollToAnchorRef = useRef(onScrollToAnchor);
   const externalAnchorTopRef = useRef(externalAnchorTop);

@@ -1,3 +1,4 @@
+import { setCommentDraft } from "../test/comment-editor";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import * as clipboard from "../components/clipboard";
@@ -9,6 +10,10 @@ import {
 } from "./comment-types";
 
 const config: CommentConfig = { statuses: DEFAULT_COMMENT_STATUSES };
+
+// jsdom has no layout for selection ranges used by the focused Lexical editor.
+Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: () => new DOMRect() });
+Object.defineProperty(Range.prototype, "getClientRects", { configurable: true, value: () => [] });
 
 const comments: Comment[] = [
   {
@@ -142,8 +147,8 @@ describe("CommentThreadList", () => {
       expect(replyButtons).toHaveLength(2);
       fireEvent.click(replyButtons[index]);
 
-      const input = screen.getByPlaceholderText("Write a reply…");
-      fireEvent.change(input, { target: { value: "answering inline" } });
+      const input = screen.getByRole("textbox", { name: "Write a reply…" });
+      setCommentDraft(input, "answering inline");
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: "Send" }));
       });
@@ -176,7 +181,7 @@ describe("CommentThreadList", () => {
     fireEvent.click(screen.getAllByTestId("comment-card")[0]!);
     fireEvent.click(screen.getByRole("button", { name: "Reply" }));
     const input = screen.getByTestId("comment-reply-input");
-    fireEvent.change(input, { target: { value: "thanks" } });
+    setCommentDraft(input, "thanks");
     await act(async () => {
       fireEvent.keyDown(input, { key: "Enter" });
     });
@@ -199,9 +204,7 @@ describe("CommentThreadList", () => {
 
     fireEvent.click(screen.getAllByTestId("comment-card")[0]!);
     fireEvent.click(screen.getByRole("button", { name: "Reply" }));
-    fireEvent.change(screen.getByTestId("comment-reply-input"), {
-      target: { value: "Posted once" },
-    });
+    setCommentDraft(screen.getByTestId("comment-reply-input"), "Posted once");
     const send = screen.getByRole("button", { name: "Send" });
     fireEvent.click(send);
     fireEvent.click(send);
