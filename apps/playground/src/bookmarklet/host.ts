@@ -20,6 +20,7 @@ import {
   type HostState,
 } from "./model";
 import { mountHost } from "./host-dom";
+import { sidebarWidth } from "./host-resize";
 
 declare global {
   interface Window {
@@ -54,6 +55,7 @@ function install() {
   let closed = false;
   let capturing = false;
   let screenshotRequested = false;
+  let picking = false;
   let selectionVersion = 0;
   let state: HostState = {
     url: location.href,
@@ -62,7 +64,7 @@ function install() {
   const send = (message: HostMessage) =>
     ui.frame.contentWindow?.postMessage(envelope(session, message), origin);
   const ui = mountHost(frameUrl.href, (anchor) =>
-    send({ type: "focus", anchor }),
+    send({ type: "focus", anchor }), width => send({ type: "sidebar-width", width }),
   );
   const existing = window.__REACT_GRAB__;
   const api: ReactGrabAPI =
@@ -79,6 +81,7 @@ function install() {
   const plugin = `playground-bookmarklet-${session}`;
 
   async function select(element: Element, screenshot = false) {
+    picking = false;
     if (
       ui.root.contains(element) ||
       element.closest("[data-react-grab-ignore]")
@@ -137,14 +140,15 @@ function install() {
   api.registerPlugin({
     name: plugin,
     hooks: {
+      transformActionContext(context) {
+        return { ...context, enterPromptMode: () => { void select(context.element); } };
+      },
       onDeactivate() {
+        picking = false;
         if (!capturing) ui.frame.hidden = false;
       },
       onElementSelect(element) {
-        if (
-          api.getToolbarState()?.defaultAction !== "playground-external-comment"
-        )
-          return;
+        if (!picking) return;
         const screenshot = screenshotRequested;
         screenshotRequested = false;
         void select(element, screenshot);
@@ -152,15 +156,6 @@ function install() {
       },
     },
     actions: [
-      {
-        id: "playground-external-comment",
-        label: "Comment",
-        onAction: (context) => {
-          context.hideContextMenu();
-          context.cleanup();
-          return select(context.element);
-        },
-      },
       {
         id: "playground-external-screenshot",
         label: "Comment with screenshot",
@@ -172,7 +167,7 @@ function install() {
       },
     ],
   });
-  api.setToolbarState({ defaultAction: "playground-external-comment" });
+  api.setToolbarState({ defaultAction: "comment" });
 
   function onMessage(event: MessageEvent) {
     if (event.origin !== origin || event.source !== ui.frame.contentWindow)
@@ -181,17 +176,26 @@ function install() {
     if (!message) return;
     switch (message["type"]) {
       case "ready":
+        try { ui.layout(sidebarWidth(message["width"]), false); }
+        catch (cause) { send({ type: "error", error: String(cause) }); return; }
         ready = true;
         ui.root.shadowRoot?.querySelector(".error")?.remove();
         send({ type: "state", state });
+        break;
+      case "sidebar-layout":
+        try {
+          if (typeof message["maximized"] !== "boolean") throw new Error("Invalid detail mode");
+          ui.layout(sidebarWidth(message["width"]), message["maximized"]);
+        } catch (cause) { send({ type: "error", error: String(cause) }); }
         break;
       case "close":
         close();
         break;
       case "pick":
+        picking = true;
         screenshotRequested = message["screenshot"] === true;
         ui.frame.hidden = true;
-        api.setToolbarState({ defaultAction: "playground-external-comment" });
+        api.setToolbarState({ defaultAction: "comment" });
         api.activate();
         break;
       case "page":

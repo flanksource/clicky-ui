@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { ActionError } from "@flanksource/clicky-ui";
+import { useEffect, useState } from "react";
 import {
   Button,
   CommentThreadList,
@@ -17,7 +18,7 @@ import {
 
 import { findPage, pageTitle, pages } from "../registry";
 import { externalPage } from "../bookmarklet/external-catalog";
-import { CommentCapture } from "./CommentCapture";
+import { useCommentDetails } from "./useCommentDetails";
 import type { PageComment } from "./useComments";
 
 export type ResolvedReviewItem = PageComment & { parentId?: null };
@@ -55,6 +56,7 @@ export type PlaygroundCommentReviewProps = {
   onCommentAndReopen: (id: string, body: string) => Promise<void>;
   onReply: (parent: Comment, body: string) => Promise<void>;
   onExit: () => void;
+  onMaximizedChange?: (open: boolean) => void;
 };
 
 export function PlaygroundCommentReview({
@@ -69,9 +71,12 @@ export function PlaygroundCommentReview({
   onCommentAndReopen,
   onReply,
   onExit,
+  onMaximizedChange,
 }: PlaygroundCommentReviewProps) {
+  const detailTabs = useCommentDetails();
   const [pending, setPending] = useState<"close" | "reopen" | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>(null);
+  useEffect(() => { setError(null); }, [selectedId]);
   const [reopenDrafts, setReopenDrafts] = useState<Record<string, string>>({});
   const queue = resolvedReviewQueue(allComments);
   const index = queue.findIndex((comment) => comment.id === selectedId);
@@ -91,7 +96,7 @@ export function PlaygroundCommentReview({
     const body = reopenDraft.trim();
     if (action === "reopen" && !body) return;
     setPending(action);
-    setError("");
+    setError(null);
     try {
       await (action === "close"
         ? onClose(selected.id)
@@ -102,7 +107,7 @@ export function PlaygroundCommentReview({
       });
       onSelect(nextAfterAction);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(cause);
     } finally {
       setPending(null);
     }
@@ -111,7 +116,7 @@ export function PlaygroundCommentReview({
   return (
     <aside
       aria-label="Resolved comment review"
-      className="flex h-full w-full max-w-[380px] flex-col"
+      className="flex h-full w-full flex-col"
     >
       <header className="space-y-2 border-b border-border pb-density-3">
         <div className="flex items-center gap-2">
@@ -183,9 +188,9 @@ export function PlaygroundCommentReview({
               config={config}
               compact
               defaultExpanded
-              renderRootDetails={(comment) => (
-                <CommentCapture comment={comment} />
-              )}
+              previewLines={3}
+              detailTabs={detailTabs}
+              {...(onMaximizedChange ? { onMaximizedChange } : {})}
               onReply={onReply}
               {...(threadToMarkdown ? { threadToMarkdown } : {})}
             />
@@ -200,11 +205,7 @@ export function PlaygroundCommentReview({
             </p>
           </div>
         )}
-        {error && (
-          <p role="alert" className="mt-3 text-xs text-destructive">
-            {error}
-          </p>
-        )}
+        {error !== null && <ActionError error={error} context={selected ? [["Artifact", selected.page], ["Comment", selected.id]] : []} />}
       </div>
 
       {selected && (

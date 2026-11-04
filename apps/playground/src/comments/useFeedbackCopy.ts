@@ -4,6 +4,7 @@ import type { Comment } from "@flanksource/clicky-ui/comments";
 
 import { folderForPage, pages, type PageEntry } from "../registry";
 import { externalPage } from "../bookmarklet/external-catalog";
+import { pageSourcePath } from "../documents/review-target";
 import type { ExternalPage } from "../bookmarklet/model";
 import { writeClipboard } from "./clipboard";
 import {
@@ -45,7 +46,7 @@ export function useFeedbackCopy({
       },
       pagePath: (page: string) => {
         if (!page.startsWith("external:"))
-          return `apps/playground/src/pages/${page}.tsx`;
+          return pageSourcePath(page);
         const url = externalPage(page)?.urls[0];
         if (!url)
           throw new Error(`External page ${page} is missing from the catalog`);

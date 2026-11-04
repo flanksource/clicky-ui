@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { readPage, writePage } from "./page-api";
+import { useDocumentSource, type RepositorySource } from "../documents/useDocumentSource";
 
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
@@ -34,7 +35,9 @@ export type PageSource = {
  * rewrites the file, which Vite picks up — the preview refreshes itself, so
  * there is no client-side "apply" step.
  */
-export function useSource(slug: string | undefined, enabled: boolean): PageSource {
+export function useSource(slug: string | undefined, enabled: boolean): RepositorySource {
+  const document = slug?.startsWith("document:") === true;
+  const repositorySource = useDocumentSource(document && enabled ? slug : undefined);
   const [draft, setDraft] = useState("");
   const [saved, setSaved] = useState("");
   const [path, setPath] = useState<string | null>(null);
@@ -44,7 +47,7 @@ export function useSource(slug: string | undefined, enabled: boolean): PageSourc
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!slug || !enabled) return;
+    if (!slug || !enabled || document) return;
 
     let cancelled = false;
     setLoading(true);
@@ -67,7 +70,7 @@ export function useSource(slug: string | undefined, enabled: boolean): PageSourc
     return () => {
       cancelled = true;
     };
-  }, [enabled, slug]);
+  }, [enabled, slug, document]);
 
   const save = useCallback(async () => {
     if (!slug) return false;
@@ -87,7 +90,7 @@ export function useSource(slug: string | undefined, enabled: boolean): PageSourc
 
   const revert = useCallback(() => setDraft(saved), [saved]);
 
-  return {
+  return document ? repositorySource : {
     draft,
     setDraft,
     path: loadedSlug === slug ? path : null,

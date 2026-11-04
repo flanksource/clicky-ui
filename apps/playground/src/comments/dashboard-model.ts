@@ -77,6 +77,7 @@ export function filterDashboardComments(
         comment.author?.name ?? "Anonymous",
         comment.assignee?.name ?? "",
         comment.element?.componentName ?? "",
+        comment.element?.source ?? "",
         status.replaceAll("_", " "),
       ]
         .join(" ")

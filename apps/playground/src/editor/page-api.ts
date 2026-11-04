@@ -24,8 +24,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!(response.headers.get("content-type") ?? "").includes("application/json")) {
     throw new Error(
-      "Page filesystem actions only work under `vite dev` — the playground-sources " +
-        "middleware is not part of the production build.",
+      "Page filesystem actions require a live playground server. Start `pnpm run playground:prod` or `pnpm run dev:playground`.",
     );
   }
   const payload = (await response.json()) as T & { error?: string };

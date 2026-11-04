@@ -1,6 +1,7 @@
 import { commentsToMarkdown, groupByPage } from "./markdown";
 import type { DashboardState } from "./dashboard-state";
 import { COMMENTS_ROUTE, type PageComment } from "./useComments";
+import { pageSourcePath } from "../documents/review-target";
 
 export function dashboardCopy({
   comments,
@@ -41,7 +42,7 @@ export function dashboardCopy({
     pagePath: (page) =>
       page.startsWith("external:")
         ? page
-        : `apps/playground/src/pages/${page}.tsx`,
+        : pageSourcePath(page),
     screenshotUrl: (path) => new URL(path, origin).href,
     commentActionUrls: (id) => ({
       reply: `${origin}${COMMENTS_ROUTE}/${encodeURIComponent(id)}/replies`,

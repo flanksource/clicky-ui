@@ -5,6 +5,7 @@ import {
   type PathTreeNode,
 } from "@flanksource/clicky-ui";
 import { externalPage } from "../bookmarklet/external-catalog";
+import { repositoryById } from "../documents/catalog";
 import {
   findPage,
   humanizeSlug,
@@ -36,7 +37,9 @@ function pageTreeNode(node: PathTreeNode<PageTreeEntry>): FilterTreeNode {
   const slug = node.items.find((entry) => entry.slug)?.slug;
   const label = slug
     ? pageLabel(slug)
-    : node.key === EXTERNAL_PAGES_ROOT
+      : node.key.startsWith("document:") && !node.key.includes("/")
+        ? repositoryById(node.key.slice("document:".length))?.name ?? node.label
+      : node.key === EXTERNAL_PAGES_ROOT
       ? "External pages"
       : children.length > 0
         ? humanizeSlug(node.label)
@@ -150,7 +153,7 @@ export function dashboardFilters({
         label:
           value === EXTERNAL_PAGES_ROOT
             ? "External pages"
-            : humanizeSlug(value),
+            : value.startsWith("document:") ? repositoryById(value.slice("document:".length))?.name ?? value : humanizeSlug(value),
       })),
     },
     {

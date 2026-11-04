@@ -7,8 +7,9 @@ import {
   ThemeProvider,
   useCommentContext,
   type CommentScrollOptions,
+  useCommentRailWidth,
 } from "@flanksource/clicky-ui";
-import { CommentCapture } from "../comments/CommentCapture";
+import { useCommentDetails } from "../comments/useCommentDetails";
 import {
   PLAYGROUND_COMMENT_CONFIG,
   request,
@@ -30,9 +31,20 @@ import {
 import { sendToHost, useHostBridge } from "./useHostBridge";
 
 type PageSession = { page: ExternalPage; state: HostState };
+let detailOpen = false;
+
+function maximizeHost(open: boolean) {
+  detailOpen = open;
+  const stored = localStorage.getItem("playground.bookmarklet.width");
+  sendToHost({ type: "sidebar-layout", width: stored === null ? 400 : Number(stored), maximized: open });
+}
 
 export function BookmarkletPanel() {
+  const [sidebarWidth] = useCommentRailWidth(400, "playground.bookmarklet.width");
   const bridge = useHostBridge();
+  useEffect(() => {
+    if (window.parent !== window) sendToHost({ type: "sidebar-layout", width: sidebarWidth, maximized: detailOpen });
+  }, [sidebarWidth]);
   const [sessions, setSessions] = useState<Record<string, PageSession>>({});
   const [active, setActive] = useState<string>();
   const [candidates, setCandidates] = useState<ExternalPage[]>([]);
@@ -251,6 +263,7 @@ function SessionRail({
   };
   return (
     <CommentProvider
+      persistenceKey={page.id}
       comments={comments.comments}
       config={PLAYGROUND_COMMENT_CONFIG}
       initialRailMode="all"
@@ -307,6 +320,7 @@ function RailContents({
 }) {
   const ctx = useCommentContext();
   const agentRuns = useAgentRuns();
+  const detailTabs = useCommentDetails();
   const [review, setReview] = useState(false);
   const [selected, setSelected] = useState<string>();
   const labels = Object.fromEntries(
@@ -395,6 +409,7 @@ function RailContents({
       </div>
       {review ? (
         <PlaygroundCommentReview
+          onMaximizedChange={maximizeHost}
           allComments={comments}
           selectedId={selected}
           config={ctx.config}
@@ -420,6 +435,9 @@ function RailContents({
         />
       ) : (
         <CommentSidePanel
+          previewLines={3}
+          detailTabs={detailTabs}
+          onMaximizedChange={maximizeHost}
           compact
           focusedAlignment="flow"
           className="!w-full"
@@ -434,12 +452,7 @@ function RailContents({
             },
           ]}
           extraAssignItems={agentRuns.extraAssignItems}
-          renderRootDetails={(comment) => (
-            <>
-              <CommentCapture comment={comment} />
-              {agentRuns.renderRunDetails(comment)}
-            </>
-          )}
+          renderRootDetails={agentRuns.renderRunDetails}
           threadToMarkdown={markdown}
         />
       )}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   cn,
+  ActionError,
   useCommentAnchorActionsOptional,
   useCommentContextOptional,
   type CommentRating,
@@ -89,7 +90,7 @@ function ReviewActions({
   onDiscard?: () => void;
 }) {
   const context = useCommentContextOptional();
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>(null);
   const ratings =
     context?.comments.filter(
       (comment) =>
@@ -101,7 +102,7 @@ function ReviewActions({
 
   async function rate(rating: CommentRating) {
     if (!context) return;
-    setError("");
+    setError(null);
     try {
       if (ownRating?.rating === rating && context.callbacks.onDelete) {
         if (!ownRating.body.trim()) {
@@ -113,7 +114,7 @@ function ReviewActions({
         await context.callbacks.onCreate?.({ anchor, body: "", rating });
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(cause);
     }
   }
 
@@ -156,11 +157,7 @@ function ReviewActions({
           <UiTrash className="size-3.5" />
         </button>
       )}
-      {error && (
-        <span role="alert" className="text-xs text-destructive">
-          Rating failed: {error}
-        </span>
-      )}
+      {error !== null && <ActionError error={error} title="Rating failed" context={[["Anchor", anchor]]} />}
     </div>
   );
 }

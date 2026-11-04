@@ -98,7 +98,7 @@ export function useReactGrabComments(options: {
             onAction: copyScreenshot,
           },
           {
-            id: "playground-comment",
+            id: "comment",
             label: "Comment",
             enabled,
             onAction: (context) => select(context, false),
@@ -119,7 +119,7 @@ export function useReactGrabComments(options: {
           },
         ],
       });
-      grab.setToolbarState({ defaultAction: "playground-comment" });
+      grab.setToolbarState({ defaultAction: "comment" });
       registered = true;
     };
 
