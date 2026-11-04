@@ -1,6 +1,8 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useMemo, type Dispatch, type SetStateAction } from "react";
+import { VocabularyStatus } from "../vocabularies/VocabularyStatus";
 import {
   AppShell,
+  type AppShellNavDrag,
   Button,
   CommentSidePanel,
   useCommentContext,
@@ -18,11 +20,20 @@ import { PlaygroundCommentReview } from "../comments/PlaygroundCommentReview";
 import { useFeedbackCopy } from "../comments/useFeedbackCopy";
 import { resolvedReviewQueue } from "../comments/PlaygroundCommentReview";
 import type { PageComment } from "../comments/useComments";
-import { usePlaygroundNavigation } from "../usePlaygroundNavigation";
+import { usePlaygroundNavigation, type PageActionState } from "../usePlaygroundNavigation";
 import { usePageFolders } from "../editor/usePageFolders";
 import { useSidebarState } from "../sidebar-state";
-import { usePageActivity } from "../sidebar-activity";
+import { mergeActivity, usePageActivity } from "../sidebar-activity";
 import { PlaygroundSidebarControls } from "../PlaygroundSidebarControls";
+
+// Module-level so the identities stay stable across renders and don't rebuild the nav sections.
+const EXTERNAL_PAGE_DRAG: AppShellNavDrag = {
+  canDrag: () => false,
+  onDrop: () => { throw new Error("Page dragging is unavailable from an external page"); },
+};
+const rejectExternalPageAction: Dispatch<SetStateAction<PageActionState | null>> = () => {
+  throw new Error("Source actions are unavailable from an external page");
+};
 
 export function ExternalWorkspace({
   id,
@@ -49,11 +60,12 @@ export function ExternalWorkspace({
   const [sidebar, setSidebar] = useSidebarState();
   const activity = usePageActivity();
   const folders = usePageFolders();
-  const sections = usePlaygroundNavigation({ activeSlug: id, feedback: activity.feedback, age: sidebar.age,
-    query: sidebar.query, onQueryChange: (query) => setSidebar({ query }), sort: sidebar.sort, filters: sidebar.filters, updates: activity.updates, loading: commentsLoading,
+  const activityMap = useMemo(() => mergeActivity(activity.feedback, activity.updates), [activity.feedback, activity.updates]);
+  const onQueryChange = useCallback((query: string) => setSidebar({ query }, { replace: true }), [setSidebar]);
+  const { sections, metadataError } = usePlaygroundNavigation({ activeSlug: id, activity: activityMap, age: sidebar.age,
+    query: sidebar.query, onQueryChange, sort: sidebar.sort, filters: sidebar.filters, loading: activity.loading,
     folders: folders.folders, pageHref, actionsDisabled: true, disabledReason: "Open an artifact page to manage its source",
-    drag: { canDrag: () => false, onDrop: () => { throw new Error("Page dragging is unavailable from an external page"); } },
-    setPageAction: () => { throw new Error("Source actions are unavailable from an external page"); },
+    drag: EXTERNAL_PAGE_DRAG, setPageAction: rejectExternalPageAction,
   });
   const page = catalog.pages.find((entry) => entry.id === id);
   const ctx = useCommentContext();
@@ -78,9 +90,10 @@ export function ExternalWorkspace({
       contentWidth="full"
       sidebarWidth={300}
       collapsedStorageKey="playground:sidebar:collapsed"
-      sidebarHeader={<PlaygroundSidebarControls activeSlug={id} activity={activity} state={sidebar} onChange={setSidebar} error={activity.error ?? folders.error} />}
+      sidebarHeader={<><PlaygroundSidebarControls activeSlug={id} activityMap={activityMap} state={sidebar} onChange={setSidebar} commentsError={activity.commentsError} updatesError={activity.updatesError} />{[{ source: "folders", message: folders.error }, { source: "metadata", message: metadataError }].map(({ source, message }) => message !== null && <p key={source} role="alert" className="py-density-1 text-xs text-destructive [[data-collapsed=true]_&]:hidden">{message}</p>)}</>}
       actions={
         <>
+          <VocabularyStatus />
           <PlaygroundAgentInstructions />
           <AgentSessionButton />
           <BookmarkletInstall />
