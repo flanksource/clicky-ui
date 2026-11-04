@@ -11,6 +11,8 @@ import {
 import { SessionInspector, SessionTail } from "@flanksource/clicky-ui/ai";
 import { UiStop } from "@flanksource/clicky-ui/icons";
 import { cn } from "@flanksource/clicky-ui/utils";
+import { AgentTargetPicker } from "./AgentTargetPicker";
+import { RuntimeIdentity } from "./RuntimeIdentity";
 
 import {
   agentSessionSrc,
@@ -33,7 +35,7 @@ const GROUPING_OPTIONS: { id: AgentSessionGrouping; label: string; title: string
 ];
 
 function sessionLabel(session: AgentSession): string {
-  return session.page ?? "Shared";
+  return session.label ?? session.page ?? "Shared";
 }
 
 function SettingsRow({
@@ -67,7 +69,7 @@ function SettingsRow({
       </div>
       <div className="ml-auto flex items-center gap-2 text-xs">
         <span className="text-muted-foreground">Runtime</span>
-        <span className="font-medium">{settings.runtime?.spec.model ?? "not set"}</span>
+        <span className="font-medium">{settings.runtime ? <RuntimeIdentity runtime={settings.runtime} /> : "not set"}</span>
         <Button size="sm" variant="ghost" disabled={busy} onClick={onChangeRuntime}>
           Change…
         </Button>
@@ -109,7 +111,7 @@ function SessionRow({
           {session.state}
         </Badge>
         <span className="truncate text-xs text-muted-foreground">
-          {session.runtime.spec.model} · started{" "}
+          <RuntimeIdentity runtime={session.runtime} /> · started{" "}
           <Timestamp value={session.startedAt} format="relative" />
         </span>
       </button>
@@ -165,8 +167,7 @@ function SessionDetail({
       )}
       {!running && (
         <p className="text-xs text-muted-foreground">
-          This session is over. The next thread for it starts a replacement with the
-          configured runtime.
+          {session.purpose === "target" ? "This session is over. Choose another comment target or create a new session." : "This session is over. The next thread for it starts a replacement with the configured runtime."}
         </p>
       )}
       <SessionTail
@@ -193,6 +194,7 @@ function SessionDetail({
  */
 export function AgentSessionPanel({
   open,
+  page,
   data,
   focusSessionId,
   error,
@@ -204,6 +206,7 @@ export function AgentSessionPanel({
   onClose,
 }: {
   open: boolean;
+  page?: string;
   data: AgentSessionsFile | null;
   /** Session to select when the panel opens, e.g. from a thread's chip. */
   focusSessionId: string | null;
@@ -236,6 +239,13 @@ export function AgentSessionPanel({
       size={inspecting && selected ? "2xl" : "lg"}
     >
       <div className="space-y-3 text-sm">
+        {open && page && (
+          <section aria-label="Page agent target" className="space-y-2 rounded-md border border-border p-3">
+            <p className="break-all text-xs text-muted-foreground">Comments for <strong className="font-medium text-foreground">{page}</strong></p>
+            <AgentTargetPicker key={page} />
+            <p className="text-xs text-muted-foreground">Applies to future sends and auto-run comments on this page. Existing threads are not resent.</p>
+          </section>
+        )}
         {error && (
           <p role="alert" className="text-xs text-destructive">
             {error}

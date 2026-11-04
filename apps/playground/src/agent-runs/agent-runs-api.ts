@@ -6,6 +6,7 @@ import type {
   AgentSessionsFile,
   AgentTarget,
   CaptainAgentTarget,
+  SessionAgentTarget,
 } from "../../plugins/agent-session-store";
 import type { CaptainSessionOption } from "../../plugins/agent-runs-server";
 import { request } from "../comments/useComments";
@@ -18,11 +19,31 @@ export type {
   AgentSessionsFile,
   AgentTarget,
   CaptainAgentTarget,
+  SessionAgentTarget,
   CaptainSessionOption,
 };
 
 export const AGENT_SESSIONS_ROUTE = "/__playground/agent-sessions";
 export const AGENT_PROXY_ROUTE = "/__playground/agent-runs";
+
+export type AgentProject = { value: string; label: string; path: string };
+export function fetchAgentProjects(): Promise<{
+  projects: AgentProject[];
+  defaultProject: string;
+}> {
+  return request(`${AGENT_SESSIONS_ROUTE}/projects`);
+}
+export function createAgentSession(options: {
+  page: string;
+  project: string;
+  runtime: AgentSessionRuntime;
+}): Promise<{ session: AgentSession; settings: AgentSessionSettings }> {
+  return request(`${AGENT_SESSIONS_ROUTE}/sessions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(options),
+  });
+}
 
 export function agentSessionSrc(sessionId: string): string {
   return `${AGENT_PROXY_ROUTE}/sessions/${encodeURIComponent(sessionId)}`;

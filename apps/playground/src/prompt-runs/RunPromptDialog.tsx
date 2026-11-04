@@ -271,6 +271,7 @@ function PromptForm({
   const [runError, setRunError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [elementFile, setElementFile] = useState<string[]>([]);
+  const [folderFiles, setFolderFiles] = useState<string[]>();
   // `files` gets the Browse… picker; a string argument holds space-separated paths, an array one per item.
   const filesPost = useMemo<PostExtension>(
     () => (field, nodes) => {
@@ -286,7 +287,7 @@ function PromptForm({
             value={paths}
             multiple
             suggested={elementFile}
-            loadFiles={api.fetchWorkspaceFiles}
+            loadFiles={() => api.fetchWorkspaceFiles(target.page)}
             disabled={busy}
             onChange={(next) =>
               field.onChange(
@@ -297,7 +298,7 @@ function PromptForm({
         ),
       };
     },
-    [api.fetchWorkspaceFiles, busy, elementFile],
+    [api.fetchWorkspaceFiles, busy, elementFile, target.page],
   );
 
   useEffect(() => {
@@ -306,7 +307,7 @@ function PromptForm({
     setDetail({ status: "loading" });
     setRunError(null);
     Promise.all([
-      atStage("prompt", api.fetchPrompt(promptId)),
+      atStage("prompt", api.fetchPrompt(promptId, target.page)),
       atStage("element", target.element),
     ]).then(
       ([next, element]) => {
@@ -324,13 +325,23 @@ function PromptForm({
         setPromptVersion(next.prompt.version);
         setPreparationId(next.preparationId);
         const files =
-          target.files ?? [sourceFile(element.source)].filter(Boolean);
+          next.files ?? target.files ?? [sourceFile(element.source)].filter(Boolean);
         const seeded = seedPromptForm({
           schema: next.variablesSchema,
           element,
           page: target.page,
           files,
         });
+        if (next.files) {
+          const properties = seeded.schema["properties"] as Record<string, unknown> | undefined;
+          seeded.schema = {
+            ...seeded.schema,
+            properties: Object.fromEntries(Object.entries(properties ?? {}).filter(([key]) => key !== "files")),
+            required: Array.isArray(seeded.schema["required"]) ? seeded.schema["required"].filter((key: unknown) => key !== "files") : [],
+          };
+          delete seeded.variables["files"];
+        }
+        setFolderFiles(next.files);
         setDetail({
           status: "ready",
           schema: seeded.schema as JsonSchemaObject,
@@ -413,6 +424,14 @@ function PromptForm({
 
   return (
     <div className="space-y-4 text-sm">
+      {folderFiles && (
+        <details className="rounded border border-border p-3">
+          <summary>{folderFiles.length} Markdown files in this folder and its subfolders</summary>
+          <ul className="mt-2 max-h-48 overflow-auto font-mono text-xs">
+            {folderFiles.map((file) => <li key={file}>{file}</li>)}
+          </ul>
+        </details>
+      )}
       <div className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
         <Field label="Prompt" htmlFor="prompt-run-prompt">
           <Combobox
@@ -585,7 +604,7 @@ export function RunPromptPanel({
     let cancelled = false;
     setList({ status: "loading" });
     Promise.all([
-      atStage("prompts", api.fetchPrompts()),
+      atStage("prompts", api.fetchPrompts(target.page)),
       atStage("runtimes", loadRuntimeCatalog(api)),
     ]).then(
       ([prompts, runtimes]) =>

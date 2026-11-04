@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button, Modal } from "@flanksource/clicky-ui";
 import {
   SpecRuntimeBar,
@@ -9,7 +9,10 @@ import {
 } from "@flanksource/clicky-ui/ai";
 import type { ChatModel } from "@flanksource/clicky-ui/chat";
 
-import type { AgentSessionGrouping, AgentSessionRuntime } from "./agent-runs-api";
+import type {
+  AgentSessionGrouping,
+  AgentSessionRuntime,
+} from "./agent-runs-api";
 import {
   availableRuntimeCatalog,
   fetchModelCatalog,
@@ -21,17 +24,35 @@ function describeError(cause: unknown): string {
 }
 
 /** `run` starts a session for a thread; `configure` only saves the runtime new sessions use. */
-export type RunAgentDialogMode = "run" | "configure";
+export type RunAgentDialogMode = "run" | "configure" | "create";
 
 const COPY: Record<
   RunAgentDialogMode,
   { title: string; submit: string; busy: string }
 > = {
-  run: { title: "Run agent", submit: "Start session and run", busy: "Starting…" },
-  configure: { title: "Agent runtime", submit: "Save runtime", busy: "Saving…" },
+  create: {
+    title: "New agent session",
+    submit: "Create session",
+    busy: "Creating…",
+  },
+  run: {
+    title: "Run agent",
+    submit: "Start session and run",
+    busy: "Starting…",
+  },
+  configure: {
+    title: "Agent runtime",
+    submit: "Save runtime",
+    busy: "Saving…",
+  },
 };
 
-function intro(mode: RunAgentDialogMode, grouping: AgentSessionGrouping): string {
+function intro(
+  mode: RunAgentDialogMode,
+  grouping: AgentSessionGrouping,
+): string {
+  if (mode === "create")
+    return "Create a managed Captain session and use it for this page's comments. Existing comments are not sent.";
   if (mode === "configure") {
     return "Every new agent session starts with this runtime. Sessions already running keep theirs.";
   }
@@ -49,7 +70,10 @@ function initialValue(
 ): AISpecRuntimeValue {
   if (current) return current.spec as AISpecRuntimeValue;
   const mode = families[0]?.modes[0];
-  return { mode: "agent", ...(mode?.defaultModel ? { model: mode.defaultModel } : {}) };
+  return {
+    mode: "agent",
+    ...(mode?.defaultModel ? { model: mode.defaultModel } : {}),
+  };
 }
 
 function RuntimeChooser({
@@ -124,6 +148,8 @@ export function RunAgentDialog({
   busy,
   onRun,
   onClose,
+  fields,
+  canSubmit = true,
 }: {
   open: boolean;
   mode: RunAgentDialogMode;
@@ -134,6 +160,8 @@ export function RunAgentDialog({
   busy: boolean;
   onRun: (runtime: AgentSessionRuntime) => void;
   onClose: () => void;
+  fields?: ReactNode;
+  canSubmit?: boolean;
 }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -171,16 +199,21 @@ export function RunAgentDialog({
           Captain reports no available agent runtime.
         </p>
       ) : (
-        <RuntimeChooser
-          catalog={catalog}
-          current={current}
-          mode={mode}
-          grouping={grouping}
-          busy={busy}
-          error={error}
-          onRun={onRun}
-          onCancel={onClose}
-        />
+        <>
+          {fields}
+          {!canSubmit ? null : (
+            <RuntimeChooser
+              catalog={catalog}
+              current={current}
+              mode={mode}
+              grouping={grouping}
+              busy={busy}
+              error={error}
+              onRun={onRun}
+              onCancel={onClose}
+            />
+          )}
+        </>
       )}
     </Modal>
   );
