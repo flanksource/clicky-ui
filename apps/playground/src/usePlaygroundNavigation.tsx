@@ -20,12 +20,11 @@ import {
   UiTrash,
 } from "@flanksource/clicky-ui/icons";
 
-import type { FeedbackActivity } from "../plugins/comment-activity";
 import type { PageAction } from "./editor/PageManagement";
-import { buildPlaygroundNavSections } from "./navigation";
+import { buildPlaygroundNavSections, navigableFolders } from "./navigation";
 import { buildRecentSection } from "./recent-navigation";
 import { useExternalCatalog } from "./bookmarklet/external-catalog";
-import { mergeActivity, matchesActivity, type SidebarSort, type SidebarFilter } from "./sidebar-activity";
+import { matchesActivity, type PageActivity, type SidebarSort, type SidebarFilter } from "./sidebar-activity";
 import { visibleByAge } from "./sidebar-visibility";
 import {
   loadMetadata,
@@ -45,13 +44,12 @@ export type PageActionState = {
 
 export function usePlaygroundNavigation({
   activeSlug,
-  feedback,
+  activity,
   age,
   query,
   onQueryChange,
   sort,
   filters,
-  updates,
   loading,
   folders,
   pageHref,
@@ -61,13 +59,12 @@ export function usePlaygroundNavigation({
   setPageAction,
 }: {
   activeSlug: string | undefined;
-  feedback: Record<string, FeedbackActivity>;
+  activity: Map<string, PageActivity>;
   age: "recent" | "all";
   query: string;
   onQueryChange: (query: string) => void;
   sort: SidebarSort;
   filters: SidebarFilter[];
-  updates: Record<string, string>;
   loading: boolean;
   folders: string[];
   pageHref: (slug: string) => string;
@@ -75,16 +72,19 @@ export function usePlaygroundNavigation({
   disabledReason: string | undefined;
   drag: AppShellNavDrag;
   setPageAction: Dispatch<SetStateAction<PageActionState | null>>;
-}): AppShellNavSection[] {
+}): { sections: AppShellNavSection[]; metadataError: string | null } {
   const metaVersion = useSyncExternalStore(
     subscribeMeta,
     getMetaVersion,
     getMetaVersion,
   );
   const external = useExternalCatalog();
-  const activity = useMemo(() => mergeActivity(feedback, updates), [feedback, updates]);
-  const entries = pages();
-  const visible = entries.filter((page) => visibleByAge({ slug: page.slug, age, query, activeSlug, activity: activity.get(page.slug) }));
+  // pages() reads the registry store, which metaVersion tracks.
+  const entries = useMemo(() => pages(), [metaVersion]);
+  const visible = useMemo(
+    () => entries.filter((page) => visibleByAge({ slug: page.slug, age, query, activeSlug, activity: activity.get(page.slug) })),
+    [entries, age, query, activeSlug, activity],
+  );
   const metadataKey = (!activeSlug ? entries : visible).map((page) => page.slug).join("\n");
   const [metadataError, setMetadataError] = useState<string | null>(null);
   useEffect(() => {
@@ -97,9 +97,8 @@ export function usePlaygroundNavigation({
   }, [metadataKey]);
   const openCommentCounts = useMemo(() => new Map([...activity].map(([slug, value]) => [slug, value.openCount])), [activity]);
 
-  return useMemo(
+  const sections = useMemo<AppShellNavSection[]>(
     () => [
-      ...(metadataError ? [{ label: "Metadata error", items: [{ key: "metadata-error", label: <span role="alert">{metadataError}</span>, to: pageHref(activeSlug ?? "") }] }] : []),
       buildRecentSection({
         entries: [
           ...visible.map((page) => ({
@@ -118,11 +117,10 @@ export function usePlaygroundNavigation({
         activity,
         query,
         filters,
-        activeSlug,
         pageHref,
         loading,
       }),
-      ...buildPlaygroundNavSections(visible, age === "all" && !query ? folders : folders.filter((folder) => visible.some((page) => page.slug.startsWith(`${folder}/`))), {
+      ...buildPlaygroundNavSections(visible, navigableFolders(folders, entries, visible), {
         activeSlug,
         query,
         activity: sort === "none" ? new Map([...activity].map(([slug, value]) => [slug, { ...value, updated: Math.max(value.updated, value.commented) }])) : activity,
@@ -202,7 +200,7 @@ export function usePlaygroundNavigation({
               .toLowerCase()
               .includes(query.toLowerCase()),
           )
-          .filter((page) => visibleByAge({ slug: page.id, age, query, activeSlug, activity: activity.get(page.id) }) && matchesActivity(activity.get(page.id), filters, Date.now()))
+          .filter((page) => visibleByAge({ slug: page.id, age, query, activeSlug, activity: activity.get(page.id) }) && matchesActivity(activity.get(page.id), filters))
           .sort((left, right) => sort === "none"
             ? Math.max(activity.get(right.id)?.updated ?? 0, activity.get(right.id)?.commented ?? 0) - Math.max(activity.get(left.id)?.updated ?? 0, activity.get(left.id)?.commented ?? 0)
             : (activity.get(right.id)?.[sort] ?? 0) - (activity.get(left.id)?.[sort] ?? 0))
@@ -218,8 +216,7 @@ export function usePlaygroundNavigation({
     ],
     [
       activeSlug,
-      feedback,
-  age,
+      age,
       activity,
       sort,
       filters,
@@ -230,8 +227,8 @@ export function usePlaygroundNavigation({
       drag,
       folders,
       metaVersion,
-      metadataKey,
-      metadataError,
+      entries,
+      visible,
       external.pages,
       openCommentCounts,
       pageHref,
@@ -239,6 +236,7 @@ export function usePlaygroundNavigation({
       setPageAction,
     ],
   );
+  return { sections, metadataError };
 }
 
 function commentBadge(count: number) {

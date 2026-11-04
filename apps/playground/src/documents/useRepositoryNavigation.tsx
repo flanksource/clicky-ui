@@ -16,11 +16,17 @@ import {
   RepositoryFolderSettings,
   RepositoryPicker,
 } from "./RepositoryDialogs";
-import {
-  documentPath,
-  type DirectoryEntry,
-  type DocumentRepository,
+import type {
+  DirectoryEntry,
+  DocumentRepository,
+  RepositoryFolder,
 } from "./types";
+import {
+  containingFolder,
+  directoryCacheKey,
+  navigationTarget,
+  revealPaths,
+} from "./repository-navigation";
 import { OpenRepositoryDocument } from "./OpenRepositoryDocument";
 
 export function useRepositoryNavigation({
@@ -46,28 +52,37 @@ export function useRepositoryNavigation({
     setVersion((value) => value + 1);
   };
   useEffect(() => {
-    window.addEventListener("focus", refresh);
     window.addEventListener("playground:documents-refresh", refresh);
     return () => {
-      window.removeEventListener("focus", refresh);
       window.removeEventListener("playground:documents-refresh", refresh);
     };
   }, []);
-  const load = async (
-    repository: DocumentRepository,
-    path: string,
-    overrides: string[],
-    overrideDirectory = ".",
-  ) => {
-    const target = activeSlug?.startsWith(`document:${repository.id}/`)
-      ? documentPath(activeSlug).path
-      : undefined;
+  const [navigationError, setNavigationError] = useState<string | null>(null);
+  const activeTarget = navigationTarget(activeSlug);
+  const activePathIn = (repository: DocumentRepository) =>
+    activeTarget?.repositoryId === repository.id ? activeTarget.path : undefined;
+  const requestCounters = useRef(new Map<string, number>());
+  const load = async ({
+    repository,
+    path,
+    folder,
+    isCancelled = () => false,
+  }: {
+    repository: DocumentRepository;
+    path: string;
+    folder: RepositoryFolder;
+    isCancelled?: () => boolean;
+  }) => {
+    const target = activePathIn(repository);
+    const key = directoryCacheKey({ repositoryId: repository.id, path, folder });
+    const requestId = (requestCounters.current.get(key) ?? 0) + 1;
+    requestCounters.current.set(key, requestId);
     const entries = (
       await directoryEntries({
         root: repository.root,
         path,
-        overrides,
-        overrideDirectory,
+        overrides: folder.overrides,
+        overrideDirectory: folder.path,
         includeIgnored: Boolean(target),
       })
     ).filter(
@@ -76,56 +91,53 @@ export function useRepositoryNavigation({
         target === entry.path ||
         target?.startsWith(`${entry.path}/`),
     );
-    cache.current.set(
-      JSON.stringify([repository.id, path, overrides, overrideDirectory]),
-      entries,
-    );
+    if (isCancelled() || requestCounters.current.get(key) !== requestId)
+      return entries;
+    cache.current.set(key, entries);
     renderCache((value) => value + 1);
     return entries;
   };
   useEffect(() => {
-    refresh();
-    void refreshDocumentProblems();
-    if (!activeSlug?.startsWith("document:")) return;
-    const target = documentPath(activeSlug);
+    setNavigationError(null);
+    if (activeSlug?.startsWith("document:")) void refreshDocumentProblems();
+    const target = navigationTarget(activeSlug);
+    if (!target) return;
     const repository = catalog.repositories.find(
       (repo) => repo.id === target.repositoryId,
     );
     if (!repository) return;
+    const folder = containingFolder(repository.folders, target.path);
+    if (!folder) return;
     let cancelled = false;
     void (async () => {
-      const segments = target.path.split("/").slice(0, -1);
-      for (let index = 0; index <= segments.length; index++) {
+      for (const path of revealPaths({ folder, target })) {
         if (cancelled) return;
-        const path = segments.slice(0, index).join("/") || ".";
-        await load(
-          repository,
-          path,
-          repository.folders.find((folder) => folder.path === ".")?.overrides ??
-            [],
-        );
+        await load({ repository, path, folder, isCancelled: () => cancelled });
       }
+      if (!cancelled) setNavigationError(null);
     })().catch((cause: unknown) => {
-      if (!cancelled) setNavigationError(String(cause));
+      if (!cancelled)
+        setNavigationError(cause instanceof Error ? cause.message : String(cause));
     });
     return () => {
       cancelled = true;
     };
   }, [activeSlug, catalog.repositories]);
-  const [navigationError, setNavigationError] = useState<string | null>(null);
-  const group = (
-    repository: DocumentRepository,
-    path: string,
-    overrides: string[],
-    prefix: string,
-  ): AppShellNavGroup => {
-    const current = activeSlug?.startsWith(`document:${repository.id}/`)
-      ? documentPath(activeSlug).path
-      : undefined;
+  const group = ({
+    repository,
+    path,
+    folder,
+  }: {
+    repository: DocumentRepository;
+    path: string;
+    folder: RepositoryFolder;
+  }): AppShellNavGroup => {
+    const prefix = folder.path;
+    const current = activePathIn(repository);
     const children = (entries: DirectoryEntry[]) => ({
       groups: entries
         .filter((entry) => entry.directory)
-        .map((entry) => group(repository, entry.path, overrides, prefix)),
+        .map((entry) => group({ repository, path: entry.path, folder })),
       items: entries
         .filter((entry) => !entry.directory)
         .map((entry): AppShellNavItem => {
@@ -140,22 +152,24 @@ export function useRepositoryNavigation({
           };
         }),
     });
+    const folderId = `folder:${repository.id}/${path}`;
     return {
       key: `${prefix}:${repository.id}/${path}`,
       label: path === "." ? repository.name : path.split("/").at(-1)!,
+      item: { key: `${prefix}:${folderId}`, label: path === "." ? repository.name : path.split("/").at(-1)!, to: pageHref(folderId), active: activeSlug === folderId, icon: UiFolder },
       icon: UiFolder,
       badge: <DocumentProblemBadge repositoryId={repository.id} path={path} folder />,
       defaultCollapsed: true,
-      ...(current && (path === "." || current.startsWith(`${path}/`))
+      ...(current && ((path === "." && current !== ".") || current.startsWith(`${path}/`))
         ? { forceExpanded: true }
         : {}),
       ...children(
         cache.current.get(
-          JSON.stringify([repository.id, path, overrides, prefix]),
+          directoryCacheKey({ repositoryId: repository.id, path, folder }),
         ) ?? [],
       ),
       loadChildren: async () =>
-        children(await load(repository, path, overrides, prefix)),
+        children(await load({ repository, path, folder })),
       contextMenu: [
         { label: "Refresh", onSelect: refresh },
         {
@@ -183,7 +197,7 @@ export function useRepositoryNavigation({
     childrenVersion: version,
     groups: catalog.repositories.flatMap((repo) =>
       repo.folders.map((folder) =>
-        group(repo, folder.path, folder.overrides, folder.path),
+        group({ repository: repo, path: folder.path, folder }),
       ),
     ),
     items: [],
@@ -191,7 +205,7 @@ export function useRepositoryNavigation({
   return {
     section,
     controls: (
-      <>
+      <div className="[[data-collapsed=true]_&]:hidden">
         <div className="flex gap-2 p-2">
           <Button size="sm" variant="outline" onClick={() => setPicker(true)}>
             Add repository
@@ -205,6 +219,10 @@ export function useRepositoryNavigation({
             {catalog.error ?? navigationError ?? problems.error}
           </p>
         )}
+      </div>
+    ),
+    dialogs: (
+      <>
         {picker && <RepositoryPicker onClose={() => setPicker(false)} />}
         {settings && (
           <RepositoryFolderSettings
