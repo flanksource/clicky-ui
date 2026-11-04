@@ -31,6 +31,10 @@ function renderRow(node: Test) {
 }
 
 describe("TestTreeNode count badges", () => {
+  it("uses a neutral badge for aborted children", () => {
+    renderRow({ name: "plan", children: [{ name: "not run", aborted: true, skipped: true }] });
+    expect(screen.getByText("1").parentElement).toHaveClass("bg-muted", "text-foreground");
+  });
   // A subtree of warnings only (a lint rule, a soft-failing suite) still has a
   // size worth showing; without a warned badge its row carried no count at all.
   it("shows a warned count on a container whose leaves are all warned", () => {
@@ -41,6 +45,12 @@ describe("TestTreeNode count badges", () => {
 });
 
 describe("TestTreeNode message line", () => {
+  it("renders an aborted skipped step with a neutral name and icon, preserving its reason", () => {
+    renderRow({ name: "customer activity ManageBenefitLoanTermRates", aborted: true, skipped: true, message: "skipped (run aborted)" });
+    expect(screen.getByText("customer activity ManageBenefitLoanTermRates")).toHaveClass("text-muted-foreground");
+    expect(screen.getByRole("img", { name: "Aborted" })).toHaveClass("text-muted-foreground");
+    expect(screen.getByText("skipped (run aborted)")).toHaveAttribute("title", "skipped (run aborted)");
+  });
   it.each([{ pending: true }, { running: true }])("shows preparation messages for an active task %o", (flags) => {
     renderRow({ name: "Resolve schemas", framework: "task", message: "Waiting for Connect database", ...flags } as Test);
     expect(screen.getByText("Waiting for Connect database")).toBeTruthy();

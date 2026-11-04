@@ -41,6 +41,7 @@ describe("TestRunSummary", () => {
     ];
     render(<TestRunSummary tests={tests} done now={0} startTime={0} endTime={1000} />);
     expect(screen.getByLabelText("1 aborted")).toHaveTextContent("1");
+    expect(screen.getByLabelText("1 aborted")).toHaveClass("text-muted-foreground");
     expect(screen.getByLabelText("1 skipped")).toHaveTextContent("1");
   });
 
