@@ -61,7 +61,7 @@ export type CommentProviderProps = CommentCallbacks & {
  * fetching — `comments` and the callbacks are controlled by the consumer.
  */
 export function CommentProvider(props: CommentProviderProps) {
-  return <CommentPersistenceBoundary {...(props.persistenceKey ? { scope: props.persistenceKey } : {})}><CommentProviderInner {...props} /></CommentPersistenceBoundary>;
+  return <CommentPersistenceBoundary key={props.persistenceKey ?? "ephemeral"} {...(props.persistenceKey ? { scope: props.persistenceKey } : {})}><CommentProviderInner {...props} /></CommentPersistenceBoundary>;
 }
 
 function CommentProviderInner({
@@ -88,14 +88,6 @@ function CommentProviderInner({
   const [railMode, setRailMode] = useCommentState<CommentRailMode>("rail", initialRailMode);
   const [focusedAnchor, setFocusedAnchor] = useCommentState<CommentAnchor | null>("focused-anchor", null);
   const [highlightAnchor, setHighlightAnchor] = useState<CommentAnchor | null>(null);
-  // A new persistence scope keeps the subtree mounted: scoped state comes from the new store, the transient highlight resets.
-  const [highlightScope, setHighlightScope] = useState(persistenceKey);
-  if (highlightScope !== persistenceKey) {
-    setHighlightScope(persistenceKey);
-    setHighlightAnchor(null);
-  }
-  // The stable actions below must write to the current scope's store, not the one they were created with.
-  const scopedSetters = useRef({ setRailMode, setFocusedAnchor });
   const railModeRef = useRef<CommentRailMode>(railMode);
   const onRailModeChangeRef = useRef(onRailModeChange);
   const onScrollToAnchorRef = useRef(onScrollToAnchor);

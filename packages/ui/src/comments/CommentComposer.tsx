@@ -1,5 +1,5 @@
 import { ActionError } from "../data/diagnostics/ActionError";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useCommentState } from "./comment-persistence";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
@@ -140,8 +140,6 @@ export function CommentComposer({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const submittingRef = useRef(false);
-  const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [savedMentions, setSavedMentions] = useCommentState<CommentMention[]>(`${draftKey}:mentions`, []);
   const mentionsRef = useRef<Map<string, CommentMention>>(new Map(savedMentions.map((mention) => [mention.id, mention])));
 
@@ -187,13 +185,6 @@ export function CommentComposer({
       for (const mention of mentions) onMention?.(mention, { body: text });
       if (collapsible) setOpen(false);
     } catch (cause) {
-      if (!mounted.current) return;
-      setBody(snapshot.body);
-      setFacets(snapshot.facets);
-      setRating(snapshot.rating);
-      mentionsRef.current = new Map(snapshot.mentions.map(mention => [mention.id, mention]));
-      setSavedMentions(snapshot.mentions);
-      setOpen(true);
       setError(cause);
     } finally {
       submittingRef.current = false;
@@ -220,13 +211,12 @@ export function CommentComposer({
       className="relative rounded-2xl border border-border bg-muted/25 px-3 pt-3 pb-10 shadow-sm transition-[border-color,box-shadow] focus-within:border-primary/40 focus-within:shadow-md [@media(pointer:coarse)]:pb-2"
     >
       <CommentEditor
-        disabled={submitting}
         {...(config.vocabulary ? { vocabulary: config.vocabulary } : {})}
         value={body}
         onChange={setBody}
         mentionables={config.mentionables ?? []}
         onMentionSelect={(m) => { mentionsRef.current.set(m.id, m); setSavedMentions([...mentionsRef.current.values()]); }}
-        onSubmit={() => void submit(createActions?.[0]?.id)}
+        onSubmit={() => void submit()}
         onCancel={() => {
           if (submittingRef.current) return;
           reset();

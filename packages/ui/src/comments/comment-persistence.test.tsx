@@ -83,7 +83,7 @@ it("restores a composer's body and rating and clears them only after successful 
   expect(screen.getByTestId("comment-compose-input")).toHaveTextContent(
     "Keep my rating and text",
   );
-  fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
+  fireEvent.click(screen.getByTestId("comment-compose-send"));
   await screen.findByTestId("comment-compose-input");
   expect(onCreate).toHaveBeenCalledWith(
     expect.objectContaining({

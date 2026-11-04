@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { PlainTextPlugin } from "@lexical/react/LexicalPlainTextPlugin";
@@ -64,20 +64,14 @@ function importBody(body: string, vocabulary?: CommentVocabulary) {
 function EditorBehavior(props: Props) {
   const [editor] = useLexicalComposerContext();
   const lastValue = useRef(props.value);
-  // The highlighted result belongs to its query: a new query starts at the first result.
-  const [menu, setMenu] = useState<{ query: string | null; activeIndex: number }>({ query: null, activeIndex: 0 });
-  const { query, activeIndex } = menu;
-  const setQuery = (next: string | null) => setMenu(previous => (previous.query === next ? previous : { query: next, activeIndex: 0 }));
-  const setActiveIndex = (index: number) => setMenu(previous => ({ ...previous, activeIndex: index }));
+  const [query, setQuery] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
   const listId = useId();
   const floatingZ = useFloatingZIndex();
   const { refs, floatingStyles } = useFloating({ strategy: "fixed", middleware: [offset(6), flip(), shift({ padding: 8 })], whileElementsMounted: autoUpdate });
-  const vocabularyItems = props.vocabulary?.items;
-  const { choices, results } = useMemo(() => {
-    const choices: VocabularyChoice[] = query === null ? [] : vocabularyChoices(vocabularyItems ?? [], query);
-    const people = query === null || query.includes("/") ? [] : props.mentionables.filter(person => person.name.toLowerCase().includes(query.toLowerCase()));
-    return { choices, results: [...choices, ...people.map(person => ({ label: `@${person.name}`, person }))] };
-  }, [query, vocabularyItems, props.mentionables]);
+  const choices: VocabularyChoice[] = query === null ? [] : vocabularyChoices(props.vocabulary?.items ?? [], query);
+  const people = query === null || query.includes("/") ? [] : props.mentionables.filter(person => person.name.toLowerCase().includes(query.toLowerCase()));
+  const results = [...choices, ...people.map(person => ({ label: `@${person.name}`, person }))];
   const open = query !== null;
 
   useEffect(() => {
@@ -122,7 +116,7 @@ function EditorBehavior(props: Props) {
       const node = $isRangeSelection(selection) && selection.isCollapsed() ? selection.anchor.getNode() : null;
       const match = $isTextNode(node) && $isRangeSelection(selection) ? node.getTextContent().slice(0, selection.anchor.offset).match(/(?:^|\s)@([\w./-]*)$/) : null;
       const next = match?.[1] ?? null;
-      setQuery(next);
+      setQuery(previous => { if (previous !== next) setActiveIndex(0); return next; });
       const range = window.getSelection();
       if (next !== null && range?.rangeCount && range.getRangeAt(0).getBoundingClientRect) {
         const rect = range.getRangeAt(0).getBoundingClientRect();
@@ -157,10 +151,7 @@ function EditorBehavior(props: Props) {
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setQuery(null); return true; }
       if (["ArrowUp", "ArrowDown", "Enter", "Tab"].includes(event.key)) {
         event.preventDefault(); event.stopPropagation();
-        if (event.key === "ArrowUp" || event.key === "ArrowDown") {
-          const step = event.key === "ArrowDown" ? 1 : -1;
-          setMenu(previous => ({ ...previous, activeIndex: (previous.activeIndex + step + results.length) % Math.max(1, results.length) }));
-        }
+        if (event.key === "ArrowUp" || event.key === "ArrowDown") setActiveIndex(index => (index + (event.key === "ArrowDown" ? 1 : -1) + results.length) % Math.max(1, results.length));
         else choose(activeIndex);
         return true;
       }

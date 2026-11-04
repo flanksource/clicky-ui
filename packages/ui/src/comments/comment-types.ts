@@ -1,4 +1,3 @@
-import type { CommentScreenshotCapture } from "./annotation-types";
 import type { CommentVocabulary, CommentVocabularyItem } from "./comment-vocabulary";
 import type { ReactNode } from "react";
 import type { StaticIconComponent } from "../data/Icon";

@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { copyText } from "../components/clipboard";
 import { Context, createStore, type Store } from "./comment-persistence";
 
@@ -9,7 +9,7 @@ export function CommentPersistenceBoundary({
   scope?: string;
   children: ReactNode;
 }) {
-  const store = useMemo(() => (scope ? createStore(scope) : null), [scope]);
+  const [store] = useState(() => (scope ? createStore(scope) : null));
   return (
     <Context.Provider value={store}>
       {children}

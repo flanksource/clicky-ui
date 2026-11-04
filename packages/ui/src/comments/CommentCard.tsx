@@ -29,6 +29,7 @@ import {
 } from "./CommentCardParts";
 import { CommentMarkdown } from "./CommentMarkdown";
 import { CommentPreview } from "./CommentPreview";
+import { AgentIdentity } from "../data/chat/AgentIdentity";
 import {
   assignmentMenuItems,
   type CommentActionRunner,
@@ -230,9 +231,9 @@ function CommentBody(props: CommentCardProps) {
       <div className="flex items-start gap-2.5">
         <CommentAuthorAvatar author={comment.author} />
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
-            <span className="min-w-0 truncate text-xs font-semibold text-foreground">
-              <CommentAuthorName author={comment.author} />
+          <div className="flex min-w-0 items-baseline gap-1.5">
+            <span className="truncate text-xs font-semibold text-foreground">
+              {comment.author?.kind === "agent" ? <AgentIdentity hideIcon model={comment.author.name} {...(comment.author.sessionId ? { identityId: comment.author.sessionId } : {})} /> : authorDisplayName(comment.author)}
             </span>
             {date && (
               <span
