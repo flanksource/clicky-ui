@@ -292,6 +292,10 @@ export class CaptainClient {
     return sessions;
   }
 
+  listProjects(): Promise<{ projects: { value: string; label: string; path: string }[] }> {
+    return this.json("/api/captain/projects", { method: "GET" });
+  }
+
   /**
    * Delivers text into a live session captain did not launch, through its own
    * channel; captain refuses (409/422) rather than resume a session that is not live.

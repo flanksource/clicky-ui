@@ -7,6 +7,8 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import type { Violation } from "../../../packages/ui/src/data/lint/types";
+import { VOCABULARY_ITEMS } from "../src/vocabularies/catalog";
+import { vocabularyReferences, type CommentVocabularyItem } from "../../../packages/ui/src/comments/comment-vocabulary";
 import { externalUrl } from "../src/bookmarklet/model";
 
 import {
@@ -108,6 +110,7 @@ export type StoredComment = {
   agentRun?: StoredAgentRun;
   element?: CommentElementContext;
   checklist?: StoredChecklistItem[];
+  vocabularyRefs?: CommentVocabularyItem[];
   refs?: StoredRefGroup[];
   promptRun?: StoredPromptRun;
   /** The lint findings a prompt run reported, kept verbatim. */
@@ -536,6 +539,9 @@ export function addComment(
   comment: StoredComment,
 ): StoredComment {
   assertPage(page);
+  const { vocabularyRefs: _untrustedRefs, ...fields } = comment;
+  const vocabularyRefs = vocabularyReferences(comment.body, VOCABULARY_ITEMS);
+  comment = vocabularyRefs.length ? { ...fields, vocabularyRefs } : fields;
   assertComment(comment);
 
   const data = readAll(dir);
@@ -584,7 +590,7 @@ export function patchComment(
     if (entry.id !== id) return entry;
     const updated: StoredComment = {
       ...entry,
-      ...(patch.body !== undefined ? { body: patch.body } : {}),
+      ...(patch.body !== undefined ? { body: patch.body, vocabularyRefs: vocabularyReferences(patch.body, VOCABULARY_ITEMS) } : {}),
       ...(patch.status !== undefined ? { status: patch.status } : {}),
       ...(patch.rating !== undefined ? { rating: patch.rating } : {}),
       ...(patch.updatedAt !== undefined ? { updatedAt: patch.updatedAt } : {}),
@@ -602,6 +608,7 @@ export function patchComment(
       ...(patch.agentRun ? { agentRun: patch.agentRun } : {}),
     };
     if (patch.agentRun === null) delete updated.agentRun;
+    if (updated.vocabularyRefs?.length === 0) delete updated.vocabularyRefs;
     if (patch.closedAt === null) delete updated.closedAt;
     if (patch.closedBy === null) delete updated.closedBy;
     if (patch.assignee === null) delete updated.assignee;

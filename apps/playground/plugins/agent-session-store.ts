@@ -32,10 +32,20 @@ export type AgentSessionRuntime = {
  * playground's own session. `sessionId` is captain's session id; `label` is
  * what the picker showed, kept for chips once the session has ended.
  */
-export type CaptainAgentTarget = { kind: "captain"; sessionId: string; label: string };
+export type CaptainAgentTarget = {
+  kind: "captain";
+  sessionId: string;
+  label: string;
+};
+export type ManagedAgentTarget = {
+  kind: "managed";
+  sessionId: string;
+  label: string;
+};
+export type SessionAgentTarget = CaptainAgentTarget | ManagedAgentTarget;
 
 /** Where a page's threads go; `playground` is the playground's own session. */
-export type AgentTarget = { kind: "playground" } | CaptainAgentTarget;
+export type AgentTarget = { kind: "playground" } | SessionAgentTarget;
 
 export type AgentSessionSettings = {
   /** Send every new top-level human comment to its agent session on creation. */
@@ -44,7 +54,7 @@ export type AgentSessionSettings = {
   /** Runtime every new session starts with. */
   runtime?: AgentSessionRuntime;
   /** Per-page captain targets; a page without one uses the playground session. */
-  targets?: Record<string, CaptainAgentTarget>;
+  targets?: Record<string, SessionAgentTarget>;
 };
 
 /**
@@ -52,6 +62,9 @@ export type AgentSessionSettings = {
  * playground restart keeps talking to the same live session.
  */
 export type AgentSession = {
+  purpose?: "target";
+  cwd?: string;
+  label?: string;
   runId: string;
   sessionId: string;
   /** The page this session serves, or `null` for the shared session. */
@@ -107,7 +120,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isRuntime(value: unknown): value is AgentSessionRuntime {
-  return isRecord(value) && isRecord(value["spec"]) && typeof value["spec"]["model"] === "string";
+  return (
+    isRecord(value) &&
+    isRecord(value["spec"]) &&
+    typeof value["spec"]["model"] === "string"
+  );
 }
 
 export function isCaptainTarget(value: unknown): value is CaptainAgentTarget {
@@ -121,7 +138,21 @@ export function isCaptainTarget(value: unknown): value is CaptainAgentTarget {
 }
 
 function isTargets(value: unknown): boolean {
-  return value === undefined || (isRecord(value) && Object.values(value).every(isCaptainTarget));
+  return (
+    value === undefined ||
+    (isRecord(value) && Object.values(value).every(isSessionTarget))
+  );
+}
+
+export function isSessionTarget(value: unknown): value is SessionAgentTarget {
+  return (
+    isCaptainTarget(value) ||
+    (isRecord(value) &&
+      value["kind"] === "managed" &&
+      typeof value["sessionId"] === "string" &&
+      value["sessionId"] !== "" &&
+      typeof value["label"] === "string")
+  );
 }
 
 function isSession(value: unknown): value is AgentSession {
@@ -129,6 +160,10 @@ function isSession(value: unknown): value is AgentSession {
     isRecord(value) &&
     typeof value["runId"] === "string" &&
     typeof value["sessionId"] === "string" &&
+    (value["purpose"] === undefined ||
+      (value["purpose"] === "target" &&
+        typeof value["cwd"] === "string" &&
+        typeof value["label"] === "string")) &&
     (value["page"] === null || typeof value["page"] === "string") &&
     typeof value["startedAt"] === "string" &&
     isRuntime(value["runtime"]) &&
@@ -136,13 +171,18 @@ function isSession(value: unknown): value is AgentSession {
   );
 }
 
-function assertAgentSessionsFile(value: unknown, file: string): AgentSessionsFile {
+function assertAgentSessionsFile(
+  value: unknown,
+  file: string,
+): AgentSessionsFile {
   const settings = isRecord(value) ? value["settings"] : undefined;
   const sessions = isRecord(value) ? value["sessions"] : undefined;
   if (
     !isRecord(settings) ||
     typeof settings["autoRun"] !== "boolean" ||
-    !AGENT_SESSION_GROUPINGS.includes(settings["grouping"] as AgentSessionGrouping) ||
+    !AGENT_SESSION_GROUPINGS.includes(
+      settings["grouping"] as AgentSessionGrouping,
+    ) ||
     (settings["runtime"] !== undefined && !isRuntime(settings["runtime"])) ||
     !isTargets(settings["targets"]) ||
     !Array.isArray(sessions) ||
