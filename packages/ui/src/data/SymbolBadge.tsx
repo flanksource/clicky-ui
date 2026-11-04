@@ -56,6 +56,7 @@ export function SymbolBadge({
         "max-w-full items-baseline gap-1.5 rounded-md align-baseline text-[12px] leading-4",
         style === "badge" && "border-transparent",
         style === "badge-outline" && "border-current",
+        style !== "inline" && icon !== undefined && "pl-1",
         style === "inline" && "rounded-none border-0 p-0",
         colorClass,
         className,

@@ -4,10 +4,8 @@ import type { DataTableProps } from "../../DataTable";
 import { OtelTraceDetail } from "./OtelTraceDetail";
 import { ResultTable } from "./TraceResults";
 import type { Span, Summary } from "./api";
-import { spanTraces, traceRoot } from "./span-traces";
+import { spanTraces } from "./span-traces";
 import { DataTable, type DataTableColumn } from "../../DataTable";
-import { ServerTimingBadge } from "../../ServerTimingBadge";
-import type { ServerTimingMetric } from "../../server-timing";
 
 export type OtelTraceTableProps = Pick<
   DataTableProps<Summary>,
@@ -17,12 +15,6 @@ export type OtelTraceTableProps = Pick<
   | "pagination"
   | "infinite"
   | "loading"
-  | "menuActions"
-  | "sort"
-  | "onSortChange"
-  | "manualSort"
-  | "cellFilters"
-  | "onCellFilterChange"
 > & {
   spans: readonly Span[];
   listing?: {
@@ -49,62 +41,49 @@ export function OtelTraceTable({
   onSelectTrace,
   onSelectSpan,
   traceHref,
-  renderTraceTitle,
-  serverTiming,
   ...tableProps
 }: OtelTraceTableProps) {
-  const listingRows = listing?.rows;
   const result = useMemo(() => {
     try {
-      const traces = spanTraces(spans);
-      // One row per trace, at its root span's position in the loaded rows: those
-      // arrive in the server's sort, which the listing must keep. The detail
-      // view does not use them, so they are only mapped while listing.
-      const rows =
-        listingRows && !selectedTraceId
-          ? traces
-              .map((trace) => {
-                const root = traceRoot(trace.spans);
-                const position = listingRows.findIndex((row) => {
-                  const span = row._trace as Span | undefined;
-                  return span?.traceId === root.traceId && span.spanId === root.spanId;
-                });
-                if (position < 0)
-                  throw new Error(`Trace ${root.traceId} is missing its mapped root row`);
-                return { position, row: { ...listingRows[position]!, _traceId: trace.summary.traceId } };
-              })
-              .sort((a, b) => a.position - b.position)
-              .map(({ row }) => row)
-          : undefined;
-      return { traces, rows };
+      return { traces: spanTraces(spans) };
     } catch (error) {
       return { error: error instanceof Error ? error.message : String(error) };
     }
-  }, [spans, listingRows, selectedTraceId]);
+  }, [spans]);
   const selected = result.traces?.find(
     (trace) => trace.summary.traceId === selectedTraceId,
   );
+  const listingRows =
+    listing &&
+    result.traces?.map((trace) => {
+      const ids = new Set(trace.spans.map((span) => span.spanId));
+      const root = trace.spans.find(
+        (span) => !span.parentId || !ids.has(span.parentId),
+      )!;
+      const source = listing?.rows.find((row) => {
+        const span = row._trace as Span | undefined;
+        return span?.traceId === root.traceId && span.spanId === root.spanId;
+      });
+      if (!source)
+        throw new Error(`Trace ${root.traceId} is missing its mapped root row`);
+      return { ...source, _traceId: trace.summary.traceId };
+    });
   return (
-    // A flex column so the listing's DataTable fills a bounded parent: its body
-    // scrolls and the pagination footer stays on screen.
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-      <p className="shrink-0 text-sm text-muted-foreground">
+    <div className="min-h-0 min-w-0 space-y-3">
+      <p className="text-sm text-muted-foreground">
         Traces from loaded rows. Filters and paging can leave traces incomplete.
       </p>
       {result.error ? (
         <p role="alert">Cannot render traces: {result.error}</p>
       ) : selectedTraceId ? (
         <>
-          {!renderTraceTitle && (
-            <Button variant="link" className="self-start" onClick={() => onSelectTrace()}>
-              Back to traces
-            </Button>
-          )}
+          <Button variant="link" onClick={() => onSelectTrace()}>
+            Back to traces
+          </Button>
           {selected ? (
             <OtelTraceDetail
               trace={selected}
               {...(selectedSpanId ? { selectedSpanId } : {})}
-              {...(renderTraceTitle ? { renderTitle: renderTraceTitle } : {})}
               onSelectSpan={onSelectSpan}
             />
           ) : (
@@ -117,10 +96,7 @@ export function OtelTraceTable({
       ) : listing ? (
         <DataTable
           {...tableProps}
-          {...(serverTiming?.length
-            ? { filterBarProps: { trailing: <ServerTimingBadge metrics={serverTiming} /> } }
-            : {})}
-          data={result.rows!}
+          data={listingRows!}
           columns={listing.columns}
           autoFilter={false}
           getRowId={(row) => String(row._traceId)}

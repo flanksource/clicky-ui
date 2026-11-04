@@ -124,4 +124,20 @@ describe("ErrorDetails", () => {
     expect(await screen.findByRole("button", { name: "Copy failed" })).toBeInTheDocument();
     expect(screen.getByText(diagnostics.message).closest("details")).not.toHaveAttribute("open");
   });
+
+  it("copies through the shared text-copy path when the Clipboard API is unavailable", async () => {
+    Reflect.deleteProperty(navigator, "clipboard");
+    const execCommand = vi.fn().mockReturnValue(true);
+    Object.defineProperty(document, "execCommand", { value: execCommand, configurable: true });
+    try {
+      render(<ErrorDetails diagnostics={diagnostics} />);
+      fireEvent.click(screen.getByRole("button", { name: "Copy error details" }));
+
+      expect(await screen.findByRole("button", { name: "Copied" })).toBeInTheDocument();
+      expect(execCommand).toHaveBeenCalledWith("copy");
+      expect(screen.getByText(diagnostics.message).closest("details")).not.toHaveAttribute("open");
+    } finally {
+      Reflect.deleteProperty(document, "execCommand");
+    }
+  });
 });
