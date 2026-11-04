@@ -120,6 +120,7 @@ export interface TaskSnapshot {
   progress?: number;
   /** Progress denominator; 0/undefined means the task has no bounded progress. */
   maxValue?: number;
+  progressMetrics?: { unit?: string; bytes?: number; bytesPerSecond?: number };
   /** Stable parent-run id (tasks) or the run's own id (groups). */
   groupId?: string;
   /** Stable parent group id when this snapshot is a nested group. */

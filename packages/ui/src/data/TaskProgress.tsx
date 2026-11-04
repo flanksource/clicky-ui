@@ -16,6 +16,7 @@ import {
   UiWarningTriangle,
 } from "../icons";
 import { cn } from "../lib/utils";
+import { formatBytes, formatBytesPerSecond } from "../lib/format";
 import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { Icon } from "./Icon";
 import { ProgressBar } from "./ProgressBar";
@@ -246,7 +247,7 @@ function TaskGroupCard({
               g.status === "running" && "animate-spin",
             )}
           />
-          <span className="truncate">{g.name}</span>
+          <span className="break-words">{g.name}</span>
           {progress && (
             <span className="shrink-0 text-xs text-muted-foreground">
               {progress}
@@ -398,10 +399,8 @@ function TaskRow({
   // Bounded per-task progress (e.g. records emitted in a phase): render an x/y
   // count, a percentage, and a thin bar while the task runs.
   const done = t.progress ?? 0;
-  // Only surface bounded progress once work has actually started — an untouched
-  // task should not render a "0/100 · 0%" placeholder.
   const hasProgress =
-    typeof t.maxValue === "number" && t.maxValue > 0 && done > 0;
+    typeof t.maxValue === "number" && t.maxValue > 0;
   const pct = hasProgress
     ? Math.round((done / (t.maxValue as number)) * 100)
     : 0;
@@ -425,9 +424,9 @@ function TaskRow({
         )}
       />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
-            <span className="truncate">{t.name}</span>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <span className="flex min-w-0 flex-1 basis-full items-center gap-1.5 text-sm font-medium sm:basis-auto">
+            <span className="break-words">{t.name}</span>
             {t.error && (
               <span className="truncate text-xs font-normal text-red-500">
                 {t.error}
@@ -476,7 +475,7 @@ function TaskRow({
           </div>
         </div>
         {(t.description || hasProgress) && (
-          <div className="mt-0.5 flex items-center gap-2">
+          <div className="mt-0.5 flex flex-wrap items-center gap-2">
             {t.description && (
               <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                 {t.description}
@@ -484,9 +483,16 @@ function TaskRow({
             )}
             {hasProgress && (
               <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                {done}/{t.maxValue} · {pct}%
+                {done}/{t.maxValue}{t.progressMetrics?.unit ? ` ${t.progressMetrics.unit}` : ""} · {pct}%
               </span>
             )}
+          </div>
+        )}
+        {t.progressMetrics && (
+          <div className="text-xs tabular-nums text-muted-foreground">
+            {!hasProgress && t.progressMetrics.unit && `${done} ${t.progressMetrics.unit} · `}
+            {(t.progressMetrics.bytes ?? 0) > 0 && formatBytes(t.progressMetrics.bytes)}
+            {(t.progressMetrics.bytesPerSecond ?? 0) > 0 && ` · ${formatBytesPerSecond(t.progressMetrics.bytesPerSecond)}`}
           </div>
         )}
         {hasProgress && t.status === "running" && (
