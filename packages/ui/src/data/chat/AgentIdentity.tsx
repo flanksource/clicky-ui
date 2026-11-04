@@ -30,7 +30,7 @@ export function AgentIdentity({ model: suppliedModel, provider: suppliedProvider
   const Effort = effort ? effortLevelIcon(effort) : undefined;
   return <span className={cn("inline-flex min-w-0 items-center gap-1.5", className)} title={[label, model, provider, effort && `${effort} effort`].filter(Boolean).join(" · ")}>
     {!hideIcon && <Icon icon={providerIcon(family) ?? UiRobotAi} className={cn("size-3.5 shrink-0", providerIconColor(family))} />}
-    {!iconOnly && <span className="truncate">{model ? modelProvider(model) ? shortContextModelName(model) : model : label ?? provider ?? "Agent"}</span>}
+    {!iconOnly && <span className="truncate">{label ?? (model ? modelProvider(model) ? shortContextModelName(model) : model : provider ?? "Agent")}</span>}
     {effort && <span title={`${effortLevelLabel(effort)} effort`} aria-label={`${effortLevelLabel(effort)} effort`}>
       {Effort ? <Effort className={cn("size-3.5", effortLevelColor(effort))} /> : <span className="text-xs">{effort}</span>}
     </span>}

@@ -16,7 +16,10 @@ export function persistPromptResult({
   dir: string;
   entry: PromptAssociation;
   snapshot: LaunchSnapshot;
-  request: { element: Record<string, unknown> };
+  request: {
+    element: Record<string, unknown>;
+    spec: { model: string; effort?: unknown };
+  };
 }) {
   const notifications: CommentCreatedEvent[] = [];
   const results: LinterResult[] = (snapshot.lint ?? []).map((lint) => ({
@@ -26,6 +29,7 @@ export function persistPromptResult({
   const failure =
     snapshot.error ?? results.find((result) => !result.success)?.error;
   const violations = results.flatMap((result) => result.violations ?? []);
+  const sessionId = results.find((result) => result.session_id)?.session_id;
   const folder = entry.page.startsWith("folder:")
     ? new RepositoryDocuments(dir).document(entry.page)
     : undefined;
@@ -68,8 +72,11 @@ export function persistPromptResult({
         page,
         anchor: entry.anchor,
         author: {
-          name: "captain",
+          name: entry.promptName,
           kind: "agent",
+          model: request.spec.model,
+          ...(typeof request.spec.effort === "string" ? { effort: request.spec.effort } : {}),
+          ...(sessionId ? { sessionId } : {}),
           via: `prompt:${entry.promptName}`,
         },
         element: folder
@@ -82,6 +89,7 @@ export function persistPromptResult({
           promptId: entry.promptId,
           promptName: entry.promptName,
           runId: entry.runId,
+          ...(sessionId ? { sessionId } : {}),
         },
       }).comment;
     entry.commentId ??= comment.id;

@@ -6,6 +6,7 @@ import { useDensityValue } from "../hooks/use-density";
 import { UiRobotAi } from "../icons";
 import { modelProvider } from "../data/chat/ContextMeter.model";
 import { providerIcon, providerIconColor } from "../data/chat/provider-icons";
+import { AgentIdentity } from "../data/chat/AgentIdentity";
 import { authorDisplayName } from "./comment-utils";
 import type { CommentAuthor as CommentAuthorModel } from "./comment-types";
 
@@ -74,7 +75,7 @@ function AgentChip({
   size: number;
 }) {
   const icon = author.icon;
-  const provider = modelProvider(author.name);
+  const provider = modelProvider(author.model ?? author.name);
   return (
     <span
       role="img"

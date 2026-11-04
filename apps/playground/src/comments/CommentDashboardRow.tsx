@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   CommentAuthorAvatar,
+  CommentAuthorName,
   CommentMarkdown,
   DropdownMenu,
   HoverCard,
@@ -92,7 +93,7 @@ export function CommentDashboardEntry({
         <div className="flex items-center gap-2">
           <CommentAuthorAvatar author={comment.author} size="md" />
           <span className="text-sm font-medium">
-            {comment.author?.kind === "agent" ? <AgentIdentity hideIcon model={comment.author.name} {...(comment.author.sessionId ? { identityId: comment.author.sessionId } : {})} /> : comment.author?.name ?? "Anonymous"}
+            <CommentAuthorName author={comment.author} />
           </span>
           <Timestamp
             value={comment.createdAt}
@@ -335,4 +336,3 @@ export function CommentDashboardActions({
     </div>
   );
 }
-import { AgentIdentity } from "@flanksource/clicky-ui/chat";

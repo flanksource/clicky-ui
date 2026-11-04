@@ -46,6 +46,8 @@ export type ReviewDecision = (typeof REVIEW_DECISIONS)[number];
 export type StoredAuthor = {
   id?: string;
   name: string;
+  model?: string;
+  effort?: string;
   kind?: "user" | "agent";
   /** The agent that posted on `name`'s behalf, when another agent wrote the text. */
   via?: string;

@@ -141,7 +141,9 @@ export async function fetchComments(
   const { comments } = await request<{ comments: PageComment[] }>(
     query === "" ? COMMENTS_ROUTE : `${COMMENTS_ROUTE}?${query}`,
   );
-  return comments;
+  return comments.map((comment) => comment.promptRun && comment.author
+    ? { ...comment, author: { ...comment.author, name: comment.promptRun.promptName } }
+    : comment);
 }
 
 export type PlaygroundComments = {
