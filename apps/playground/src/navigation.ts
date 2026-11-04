@@ -54,7 +54,7 @@ function filterValues(
 ): NavNodeValue[] {
   const needle = options.query.trim().toLowerCase();
   const filters = options.filters ?? [];
-  entries = entries.filter((entry) => matchesActivity(options.activity?.get(entry.slug), filters, Date.now()));
+  entries = entries.filter((entry) => matchesActivity(options.activity?.get(entry.slug), filters));
   if (filters.length) folders = folders.filter((folder) => entries.some((entry) => isWithin(entry.slug, folder)));
   if (!needle) {
     return [
@@ -129,12 +129,13 @@ function compareNodes(options: BuildNavOptions) {
     left: PathTreeNode<NavNodeValue>,
     right: PathTreeNode<NavNodeValue>,
   ) => {
-    if (isFolder(left) !== isFolder(right)) return isFolder(left) ? -1 : 1;
     if (options.sort && options.sort !== "none") {
-      const rank = (node: PathTreeNode<NavNodeValue>) => Math.max(0, ...descendantPages(node).map((page) => options.activity?.get(page.slug)?.[options.sort as "updated" | "commented" | "resolved"] ?? 0));
+      const sort = options.sort;
+      const rank = (node: PathTreeNode<NavNodeValue>) => Math.max(0, ...descendantPages(node).map((page) => options.activity?.get(page.slug)?.[sort] ?? 0));
       const difference = rank(right) - rank(left);
       if (difference) return difference;
     }
+    if (isFolder(left) !== isFolder(right)) return isFolder(left) ? -1 : 1;
     return (
       nodeOrder(left, options) - nodeOrder(right, options) ||
       left.label.localeCompare(right.label)
@@ -163,6 +164,23 @@ function navItem(
         }
       : {}),
   };
+}
+
+/** Folders to show: those holding a visible page, plus truly empty ones (no registry page anywhere below). */
+export function navigableFolders(
+  folders: readonly string[],
+  allPages: readonly PageEntry[],
+  visiblePages: readonly PageEntry[],
+): string[] {
+  return folders.filter(
+    (folder) =>
+      visiblePages.some((page) => page.slug.startsWith(`${folder}/`)) ||
+      !allPages.some((page) => page.slug.startsWith(`${folder}/`)),
+  );
+}
+
+function navOrder(nodes: readonly PathTreeNode<NavNodeValue>[]): string[] {
+  return nodes.filter((node) => isFolder(node) || pageFor(node)).map((node) => node.key);
 }
 
 function navGroup(
@@ -196,6 +214,7 @@ function navGroup(
         pageFor(child) ? [navItem(pageFor(child)!, options)] : [],
       ),
     groups,
+    order: navOrder(node.children),
     ...(page ? { item: navItem(page, options, pageContextMenu) } : {}),
     ...(folderContextMenu
       ? {
@@ -231,6 +250,7 @@ export function buildPlaygroundNavSections(
           pageFor(node) ? [navItem(pageFor(node)!, options)] : [],
         ),
       groups: nodes.filter(isFolder).map((node) => navGroup(node, options)),
+      order: navOrder(nodes),
     },
   ];
 }
