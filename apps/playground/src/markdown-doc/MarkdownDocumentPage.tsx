@@ -11,6 +11,8 @@ import { PlaygroundBanner as Banner } from "../PlaygroundShellParts";
 import type { AnnotationVisibility, PlaygroundView } from "../route";
 import { useBlame } from "./blame-api";
 import { usePageLint, type LintRun } from "./lint-api";
+import { useProblemFilters } from "./useProblemFilters";
+import { useCommentDetails } from "../comments/useCommentDetails";
 
 export type MarkdownDocumentView = Extract<PlaygroundView, "preview" | "source" | "problems">;
 
@@ -39,8 +41,10 @@ function runError(run: LintRun): string | null {
  */
 export function MarkdownDocumentPage({ slug, view, onViewChange, source, annotations, onLint }: MarkdownDocumentPageProps) {
   const ctx = useCommentContext();
+  const detailTabs = useCommentDetails();
   const { runs, results, run } = usePageLint(slug);
   const [layout, setLayout] = useState<FileReviewLayout>("margin");
+  const [problemFilters, setProblemFilters] = useProblemFilters();
   const { path, ready, draft, dirty, saving } = source;
   const blameState = useBlame(ready ? path : null, ready && !dirty ? draft : null);
   // git reads the file on disk; only blame that describes the text on screen is shown.
@@ -58,8 +62,8 @@ export function MarkdownDocumentPage({ slug, view, onViewChange, source, annotat
     [path, results],
   );
   const comments = useMemo(
-    () => ({ items: ctx.comments, callbacks: ctx.callbacks, config: ctx.config }),
-    [ctx.comments, ctx.callbacks, ctx.config],
+    () => ({ items: ctx.comments, callbacks: ctx.callbacks, config: ctx.config, previewLines: 3, detailTabs }),
+    [ctx.comments, ctx.callbacks, ctx.config, detailTabs],
   );
   const runId = (runs.prompt.status === "done" ? runs.prompt.results : []).find((result) => result.run_id)?.run_id;
 
@@ -149,6 +153,8 @@ export function MarkdownDocumentPage({ slug, view, onViewChange, source, annotat
           view={view}
           onViewChange={onViewChange}
           findings={findings}
+          problemFilters={problemFilters}
+          onProblemFiltersChange={setProblemFilters}
           {...(annotations === "visible" ? { comments } : {})}
           selectToComment
           authorFilter

@@ -7,7 +7,7 @@ export function CommentCapture({
   comment: Comment & { element?: CommentElementContext };
 }) {
   const element = comment.element;
-  if (!element) return null;
+  if (!element) return <p className="text-sm text-muted-foreground">No capture was recorded for this comment.</p>;
 
   return (
     <div className="space-y-2 px-1 text-xs">
@@ -33,10 +33,10 @@ export function CommentCapture({
           Screenshot unavailable ({element.screenshot.reason})
         </p>
       ) : null}
-      <details className="rounded-md border border-border bg-muted/30 px-2 py-1.5">
-        <summary className="cursor-pointer font-medium text-foreground">
+      <section className="rounded-md border border-border bg-muted/30 px-2 py-1.5">
+        <h3 className="font-medium text-foreground">
           Capture context
-        </summary>
+        </h3>
         {element.pageUrl && (
           <a
             className="mt-2 block break-all text-primary underline"
@@ -60,7 +60,7 @@ export function CommentCapture({
         <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-all text-muted-foreground">
           {element.html}
         </pre>
-      </details>
+      </section>
     </div>
   );
 }

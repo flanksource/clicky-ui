@@ -8,6 +8,7 @@ import {
 } from "react";
 import {
   Button,
+  ActionError,
   DropdownMenu,
   InputField,
   Modal,
@@ -31,6 +32,8 @@ import {
   type Box,
 } from "../comments/dom-anchor";
 import { writeClipboard } from "../comments/clipboard";
+import { LIVE_SERVER } from "../live-server";
+import { request } from "../comments/useComments";
 import {
   copyElement,
   downloadElement,
@@ -69,15 +72,10 @@ function latestDecision(
 }
 
 async function sourceRequest(slug: string): Promise<string> {
-  const response = await fetch(
+  const payload = await request<{ source: string }>(
     `${SOURCES_ROUTE}?slug=${encodeURIComponent(slug)}`,
   );
-  const payload = (await response.json()) as {
-    source?: string;
-    error?: string;
-  };
-  if (!response.ok || typeof payload.source !== "string")
-    throw new Error(payload.error ?? "Could not read page source");
+  if (typeof payload.source !== "string") throw new Error("Could not read page source");
   return payload.source;
 }
 
@@ -85,14 +83,11 @@ async function mutateSource(
   method: "POST" | "DELETE",
   body: Record<string, unknown>,
 ): Promise<void> {
-  const response = await fetch(`${SOURCES_ROUTE}/reviewables`, {
+  await request(`${SOURCES_ROUTE}/reviewables`, {
     method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const payload = (await response.json()) as { error?: string };
-  if (!response.ok)
-    throw new Error(payload.error ?? `${method} reviewable source failed`);
 }
 
 export function ReviewProvider({
@@ -112,10 +107,12 @@ export function ReviewProvider({
 }) {
   const context = useCommentContext();
   const [items, setItems] = useState<Reviewable[]>([]);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<unknown>(null);
+  const [dialogError, setDialogError] = useState<unknown>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  useEffect(() => { setDialogError(null); }, [pending?.id, pending?.kind, page]);
   const frameRef = useRef<number | null>(null);
   const current = useRef({ page, active, sourceDirty, contentRef, scrollRef });
   current.current = { page, active, sourceDirty, contentRef, scrollRef };
@@ -204,7 +201,7 @@ export function ReviewProvider({
   };
 
   const approve = async (id: string) => {
-    setError("");
+    setError(null);
     try {
       if (sourceDirty) throw new Error("Save or revert the source before reviewing an element");
       await context.callbacks.onCreate?.({
@@ -213,7 +210,7 @@ export function ReviewProvider({
         reviewDecision: "approved",
       });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(cause);
     }
   };
 
@@ -241,7 +238,7 @@ export function ReviewProvider({
     const { id, kind } = pending;
     if (kind !== "delete" && !draft.trim()) return;
     setBusy(true);
-    setError("");
+    setDialogError(null);
     try {
       if (sourceDirty) throw new Error("Save or revert the source before reviewing an element");
       if (kind === "delete") {
@@ -281,7 +278,7 @@ export function ReviewProvider({
         setDraft("");
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setDialogError(cause);
     } finally {
       setBusy(false);
     }
@@ -290,9 +287,9 @@ export function ReviewProvider({
   const exportItems = (id: string, element: HTMLElement): DropdownMenuItem[] => {
     const title = `${page.replace(/[^A-Za-z0-9_-]+/g, "-")}-${id.replace(/:/g, "-")}`;
     const run = (action: Promise<void>) => {
-      setError("");
+      setError(null);
       action.catch((cause: unknown) =>
-        setError(cause instanceof Error ? cause.message : String(cause)),
+        setError(cause),
       );
     };
     return [
@@ -350,7 +347,7 @@ export function ReviewProvider({
                 await latest.current.mark(action.element);
               } catch (cause) {
                 latest.current.setError(
-                  cause instanceof Error ? cause.message : String(cause),
+                  cause,
                 );
               }
             },
@@ -485,7 +482,7 @@ export function ReviewProvider({
                       ? "Save or revert source first"
                       : "Delete source and feedback"
                   }
-                  disabled={sourceDirty || !import.meta.env.DEV}
+                  disabled={sourceDirty || !LIVE_SERVER}
                   onClick={() => setPending({ id, kind: "delete" })}
                 >
                   <UiTrash className="size-3.5" />
@@ -495,14 +492,7 @@ export function ReviewProvider({
           })}
         </div>
       )}
-      {error && (
-        <div
-          role="alert"
-          className="absolute bottom-2 left-2 z-50 max-w-lg rounded-md border border-destructive bg-background p-2 text-xs text-destructive"
-        >
-          {error}
-        </div>
-      )}
+      {error !== null && <ActionError error={error} context={[["Artifact", page]]} className="absolute bottom-2 left-2 max-w-lg bg-background" />}
       <Modal
         open={pending !== null}
         onClose={() => {
@@ -541,6 +531,7 @@ export function ReviewProvider({
           </div>
         }
       >
+        {dialogError !== null && pending && <ActionError error={dialogError} title="Review failed" context={[["Artifact", page], ["Review", pending.id], ["Operation", pending.kind]]} className="mb-3" />}
         {pending?.kind === "delete" ? (
           <p className="text-sm">
             Remove {pending.id} from {page} source and delete its associated

@@ -41,12 +41,14 @@ export type AnchorState = {
   top?: number;
 };
 export type HostMessage =
+  | { type: "sidebar-width"; width: number }
   | { type: "state"; state: HostState }
   | { type: "anchors"; anchors: AnchorState[] }
   | { type: "focus"; anchor: string }
   | { type: "error"; error: string };
 export type PanelMessage =
-  | { type: "ready" }
+  | { type: "ready"; width: number }
+  | { type: "sidebar-layout"; width: number; maximized: boolean }
   | { type: "close" }
   | { type: "pick"; screenshot?: boolean }
   | { type: "page" }

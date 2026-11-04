@@ -11,7 +11,7 @@ export type { FileBlame };
 export async function fetchBlame(path: string): Promise<FileBlame> {
   const response = await fetch(`${BLAME_ROUTE}?${new URLSearchParams({ path })}`);
   if (!(response.headers.get("content-type") ?? "").includes("application/json")) {
-    throw new Error("Blame only works under `vite dev`; the playground-blame middleware is not part of the build.");
+    throw new Error("Blame requires a live playground server. Start `pnpm run playground:prod` or `pnpm run dev:playground`.");
   }
   const payload = (await response.json()) as FileBlame | { error: string };
   if (!response.ok || "error" in payload) throw new Error("error" in payload ? payload.error : `GET ${BLAME_ROUTE} failed (${response.status})`);

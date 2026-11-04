@@ -1,3 +1,4 @@
+import { vocabularyHref } from "../../../../packages/ui/src/comments/comment-vocabulary";
 // Relative imports, not the `@flanksource/clicky-ui/comments` alias: the
 // playground's Vite plugins build the same thread markdown for agent runs, and
 // the plugin bundle cannot resolve that alias.
@@ -67,10 +68,11 @@ function renderSection(
   const capturedUrl = page.startsWith("external:")
     ? comments.find((comment) => comment.element?.pageUrl)?.element?.pageUrl
     : undefined;
+  const capturedSource = page.startsWith("document:") ? comments.find((comment) => comment.element?.source)?.element?.source : undefined;
   const out = [
     `## Playground feedback — ${page.split("/").at(-1) ?? page}`,
     `- URL: ${capturedUrl ?? pageUrl(page)}`,
-    `- source: \`${capturedUrl ?? pagePath(page)}\``,
+    `- source: \`${capturedUrl ?? capturedSource ?? pagePath(page)}\``,
     "",
   ];
 
@@ -156,6 +158,15 @@ function renderSection(
     }
     for (const group of root.refs ?? []) {
       out.push(`- ${group.label}: ${group.items.map((item) => `\`${item}\``).join(", ")}`);
+    }
+    const vocabularyRefs = new Map([root, ...(replies.get(root.id) ?? [])].flatMap(comment =>
+      (comment.vocabularyRefs ?? []).map(item => [`${item.catalog}:${item.id}`, item] as const)));
+    if (vocabularyRefs.size) {
+      out.push("", "**Vocabulary references:**");
+      for (const item of vocabularyRefs.values()) {
+        out.push(`- ${item.catalog}:${item.id}: ${item.description}`, `  - Preview: ${new URL(vocabularyHref(item), pageUrl(page)).href}`);
+        for (const reference of item.references) out.push(`  - ${reference}`);
+      }
     }
     for (const reply of sortReplies(replies.get(root.id) ?? [])) {
       out.push(

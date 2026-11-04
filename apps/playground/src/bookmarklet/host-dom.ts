@@ -1,7 +1,8 @@
 import { describeElement, resolveAnchor } from "../comments/dom-anchor";
 import type { AnchorState } from "./model";
+import { mountSidebarResize } from "./host-resize";
 
-export function mountHost(frameUrl: string, focus: (anchor: string) => void) {
+export function mountHost(frameUrl: string, focus: (anchor: string) => void, onWidth: (width: number) => void) {
   const root = document.createElement("div");
   root.id = "playground-grabber";
   root.setAttribute("data-react-grab-ignore", "");
@@ -10,6 +11,9 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void) {
   style.textContent = `
     :host { all: initial; position: fixed; inset: 0; pointer-events: none; z-index: 2147483646; }
     iframe { position: absolute; inset: 0 0 0 auto; width: min(400px, 100vw); height: 100%; border: 0; background: white; box-shadow: 0 0 16px #0003; pointer-events: auto; }
+    .resize { position: absolute; top: 0; height: 100%; width: 5px; background: #8886; cursor: col-resize; pointer-events: auto; touch-action: none; }
+    .resize:hover, .resize:focus-visible { background: #2563eb; outline: 2px solid white; }
+    .resize[hidden], iframe[hidden] ~ .resize { display: none; }
     .pin { position: absolute; pointer-events: auto; min-width: 22px; height: 22px; padding: 0 4px; border: 1px solid #fff; border-radius: 12px; color: white; background: #2563eb; font: 600 12px system-ui; cursor: pointer; transform: translate(-50%, -50%); }
     .highlight { position: absolute; border: 2px solid #2563eb; background: #2563eb18; box-sizing: border-box; pointer-events: none; }
     .error { position: absolute; top: 12px; left: 12px; max-width: 480px; padding: 12px; background: #fff; color: #991b1b; border: 1px solid currentColor; font: 14px system-ui; pointer-events: auto; }
@@ -21,7 +25,8 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void) {
   const highlight = document.createElement("div");
   highlight.className = "highlight";
   highlight.hidden = true;
-  shadow.append(style, pins, highlight, frame);
+  const sizing = mountSidebarResize(frame, onWidth);
+  shadow.append(style, pins, highlight, frame, sizing.handle);
   document.documentElement.append(root);
   let anchors: string[] = [];
   let selected: string | null = null;
@@ -84,6 +89,7 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void) {
   return {
     root,
     frame,
+    layout: sizing.layout,
     update(next: string[], callback: typeof onAnchors) {
       anchors = next;
       onAnchors = callback;
@@ -105,6 +111,7 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void) {
       error.textContent = message;
     },
     close() {
+      sizing.close();
       observer.disconnect();
       resize.disconnect();
       cancelAnimationFrame(pending);

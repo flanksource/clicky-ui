@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useCommentRailWidth } from "@flanksource/clicky-ui/comments";
+import { sidebarWidth } from "./host-resize";
 import {
   bridgeMessage,
   envelope,
@@ -50,6 +52,7 @@ function parseSelection(input: unknown): Selection | undefined {
 }
 
 export function useHostBridge() {
+  const [width, setWidth] = useCommentRailWidth(400, "playground.bookmarklet.width");
   const [state, setState] = useState<HostState>();
   const [anchors, setAnchors] = useState<AnchorState[]>([]);
   const [focus, setFocus] = useState<string>();
@@ -73,7 +76,9 @@ export function useHostBridge() {
       const message = bridgeMessage(event.data, session);
       if (!message) return;
       try {
-        if (message["type"] === "state") {
+        if (message["type"] === "sidebar-width") {
+          setWidth(sidebarWidth(message["width"]));
+        } else if (message["type"] === "state") {
           const input = message["state"] as Record<string, unknown> | undefined;
           if (
             !input ||
@@ -136,7 +141,7 @@ export function useHostBridge() {
       }
     };
     window.addEventListener("message", receive);
-    sendToHost({ type: "ready" });
+    sendToHost({ type: "ready", width });
     return () => window.removeEventListener("message", receive);
   }, []);
   return { state, anchors, focus, error };
