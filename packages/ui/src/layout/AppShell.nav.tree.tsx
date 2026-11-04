@@ -14,8 +14,23 @@ function itemNode(item: AppShellNavItem): NavNode {
   return { key: item.key, label: typeof item.label === "string" ? item.label : item.key, item, children: [] };
 }
 
+type NavChildren = { groups?: AppShellNavGroup[]; items?: AppShellNavItem[]; order?: string[] };
+
+function childNodes({ groups = [], items = [], order }: NavChildren): NavNode[] {
+  const defaults = [...groups.map(groupNode), ...items.map(itemNode)];
+  if (!order) return defaults;
+  const byKey = new Map(defaults.map((node) => [node.key, node]));
+  const ordered = order.map((key) => {
+    const node = byKey.get(key);
+    if (!node) throw new Error(`Navigation order key "${key}" matches no item or group, or is repeated; expected each of: ${defaults.map((n) => n.key).join(", ")}`);
+    byKey.delete(key);
+    return node;
+  });
+  return [...ordered, ...defaults.filter((node) => byKey.has(node.key))];
+}
+
 function groupNode(group: AppShellNavGroup): NavNode {
-  return { key: group.key, label: group.label, group, ...(group.item ? { item: group.item } : {}), children: [...(group.groups ?? []).map(groupNode), ...group.items.map(itemNode)] };
+  return { key: group.key, label: group.label, group, ...(group.item ? { item: group.item } : {}), children: childNodes(group) };
 }
 
 function activePath(nodes: NavNode[]): NavNode[] | null {
@@ -33,7 +48,7 @@ export function NavTree({ section, groupState, dragState, renderItem }: {
   dragState: NavDragState;
   renderItem: RenderItem;
 }) {
-  const roots = useMemo(() => [...(section.groups ?? []).map(groupNode), ...(section.items ?? []).map(itemNode)], [section.groups, section.items]);
+  const roots = useMemo(() => childNodes(section), [section.groups, section.items, section.order]);
   const path = useMemo(() => activePath(roots), [roots]);
   const selected = path?.at(-1) ?? null;
   const revealedKey = useRef<string | undefined>(undefined);
@@ -49,8 +64,7 @@ export function NavTree({ section, groupState, dragState, renderItem }: {
     hasMoreChildren={(node) => Boolean(node.group?.loadChildren)}
     loadChildren={async (node) => {
       if (!node.group?.loadChildren) return node.children;
-      const children = await node.group.loadChildren();
-      return [...(children.groups ?? []).map(groupNode), ...children.items.map(itemNode)];
+      return childNodes(await node.group.loadChildren());
     }} reloadOnOpen getChildrenVersion={() => section.childrenVersion ?? 0}
     ariaLabel={section.label ?? "Navigation"} getAriaLabel={(node) => node.label} selected={selected}
     getExpanded={expanded} onExpandedChange={(node, open) => {

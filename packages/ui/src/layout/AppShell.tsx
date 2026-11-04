@@ -69,8 +69,15 @@ export type AppShellNavGroup = {
    * have to be flattened to fit the rail.
    */
   groups?: AppShellNavGroup[];
+  /**
+   * Render order of this group's children, as keys of `items` and `groups`,
+   * interleaving the two. Tree variant only. Children whose keys are omitted
+   * follow in the default order (groups, then items); a key matching no child
+   * throws.
+   */
+  order?: string[];
   /** Fetch immediate children when expanded; errors remain visible and can be retried by reopening. */
-  loadChildren?: () => Promise<{ groups?: AppShellNavGroup[]; items: AppShellNavItem[] }>;
+  loadChildren?: () => Promise<{ groups?: AppShellNavGroup[]; items: AppShellNavItem[]; order?: string[] }>;
   /**
    * Makes the group's own heading row a destination as well as a disclosure:
    * the label becomes a nav link and the chevron sits beside it as a separate
@@ -94,6 +101,13 @@ export type AppShellNavSection = {
    *  clusters (provider surfaces, per-ledger journals) belong here so they can
    *  be folded away; a collapsed rail flattens them back to plain items. */
   groups?: AppShellNavGroup[];
+  /**
+   * Render order of the section's children, as keys of `items` and `groups`,
+   * interleaving the two. Tree variant only; absent keeps groups before items.
+   * Children whose keys are omitted follow in the default order; a key
+   * matching no child throws.
+   */
+  order?: string[];
   /**
    * How the groups read.
    *
