@@ -94,6 +94,13 @@ export type TreeNodeProps<T> = {
   isSecondary?: (node: T) => boolean;
 };
 
+function mergeChildrenByKey<T>(loaded: T[], sync: T[] | undefined, getKey: (node: T) => TreeKey): T[] {
+  if (!sync?.length) return loaded;
+  const current = new Map(sync.map((child) => [getKey(child), child]));
+  const loadedKeys = new Set(loaded.map(getKey));
+  return [...loaded.map((child) => current.get(getKey(child)) ?? child), ...sync.filter((child) => !loadedKeys.has(getKey(child)))];
+}
+
 export function TreeNode<T>({
   node,
   depth = 0,
@@ -123,14 +130,16 @@ export function TreeNode<T>({
   getChildrenVersion,
 }: TreeNodeProps<T>) {
   if (getExpanded && !onExpandedChange) throw new Error("Controlled tree expansion requires onExpandedChange");
-  // Lazily-fetched children take precedence over the synchronous ones once a
-  // load has resolved; until then `loadedChildren` is null and we fall back to
-  // getChildren. A node can be "lazy" (hasMoreChildren) with no sync children.
+  // Lazily-fetched children are the base set once a load has resolved; until
+  // then `loadedChildren` is null and we use getChildren. A node can be "lazy"
+  // (hasMoreChildren) with no sync children. The loaded copy is a snapshot, so
+  // the host's current sync children win by key (fresh `active`, `to`, ...) and
+  // sync-only children are appended rather than hidden behind the stale snapshot.
   const [loadedChildren, setLoadedChildren] = useState<T[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const syncChildren = getChildren(node);
-  const children = loadedChildren ?? syncChildren;
+  const children = loadedChildren === null ? syncChildren : mergeChildrenByKey(loadedChildren, syncChildren, getKey);
   const hasChildren = (children?.length ?? 0) > 0;
   const lazyUnloaded = (hasMoreChildren?.(node) ?? false) && loadedChildren === null;
   // The chevron shows when there is something to reveal: either real children
