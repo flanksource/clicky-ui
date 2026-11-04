@@ -13,7 +13,9 @@ import { AgentRunsProvider } from "./agent-runs/AgentRunsProvider";
 import { PromptRunsProvider } from "./prompt-runs/PromptRunsProvider";
 import { PLAYGROUND_COMMENT_CONFIG, useComments } from "./comments/useComments";
 import { PlaygroundShell } from "./PlaygroundShell";
+import { VocabularyReference } from "./vocabularies/VocabularyReference";
 import { ExternalWorkspace } from "./bookmarklet/ExternalWorkspace";
+import { allowDocumentNavigation } from "./documents/navigation-guard";
 import {
   fallbackPageSlug,
   findPage,
@@ -29,6 +31,7 @@ import {
 
 export function App() {
   const [route, navigateRoute] = useHistoryRoute<PlaygroundRoute>({
+    beforeNavigate: (next) => allowDocumentNavigation(next.page),
     parse: (_pathname, search) => {
       const parsed = parsePlaygroundRoute(
         search,
@@ -62,9 +65,11 @@ export function App() {
 
   return (
     <ThemeProvider>
+      {new URLSearchParams(window.location.search).has("vocabulary") ? <VocabularyReference id={new URLSearchParams(window.location.search).get("vocabulary")!} /> : <>
       <DensityProvider>
         <RouterProvider adapter={router}>
           <CommentProvider
+            persistenceKey={route.page || "__dashboard"}
             comments={comments.comments}
             config={PLAYGROUND_COMMENT_CONFIG}
             resolveAnchor={strictAnchorResolver}
@@ -141,6 +146,7 @@ export function App() {
           </CommentProvider>
         </RouterProvider>
       </DensityProvider>
+      </>}
     </ThemeProvider>
   );
 }
