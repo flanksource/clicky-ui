@@ -12,21 +12,25 @@ import {
 import {
   AppShell,
   CommentSidePanel,
+  CommentRail,
   DOCUMENT_ANCHOR,
   cn,
   useCommentContext,
   useFloatingZIndex,
+  useMediaQuery,
 } from "@flanksource/clicky-ui";
 import { UiComment } from "@flanksource/clicky-ui/icons";
+import { CommentDraftPopover } from "@flanksource/clicky-ui/comments";
 import { CommentDashboard } from "./comments/CommentDashboard";
 import { PageErrorBoundary } from "./PageErrorBoundary";
+import { LIVE_SERVER } from "./live-server";
 
 import {
   CommentOverlay,
   DialogCommentOverlay,
 } from "./comments/CommentOverlay";
 import { useReactGrabComments } from "./comments/useReactGrabComments";
-import { CommentCapture } from "./comments/CommentCapture";
+import { useCommentDetails } from "./comments/useCommentDetails";
 import { PlaygroundCommentReview } from "./comments/PlaygroundCommentReview";
 import { useResolvedCommentReview } from "./comments/useResolvedCommentReview";
 import { AnnotationVisibilityProvider } from "./annotations";
@@ -46,7 +50,8 @@ import {
 import { ReviewProvider } from "./review/ReviewProvider";
 import { PlaygroundSidebarControls } from "./PlaygroundSidebarControls";
 import { useSidebarState } from "./sidebar-state";
-import { usePageActivity } from "./sidebar-activity";
+import { mergeActivity, usePageActivity } from "./sidebar-activity";
+import { useRepositoryNavigation } from "./documents/useRepositoryNavigation";
 
 // Monaco is several megabytes and only ever needed once someone opens the
 // editor, so it must not sit in the entry chunk.
@@ -61,15 +66,18 @@ const MarkdownDocumentPage = lazy(() =>
     default: module.MarkdownDocumentPage,
   })),
 );
+const RepositoryDocumentPage = lazy(() => import("./documents/RepositoryDocumentPage").then((module) => ({ default: module.RepositoryDocumentPage })));
+const RepositoryFolderPage = lazy(() => import("./documents/RepositoryFolderPage").then((module) => ({ default: module.RepositoryFolderPage })));
 import { useFeedbackCopy } from "./comments/useFeedbackCopy";
 import { useAgentRuns } from "./agent-runs/AgentRunsProvider";
+import { RunningSessionBars } from "./agent-runs/RunningSessionBars";
 import { usePromptRuns } from "./prompt-runs/PromptRunsProvider";
 import {
   type PageComment,
   type PlaygroundComments,
 } from "./comments/useComments";
 import { useDomAnchors } from "./comments/useDomAnchors";
-import { overlayLabel } from "./comments/dom-anchor";
+import { describeElement, overlayLabel } from "./comments/dom-anchor";
 import { describeMarkdown, parseMarkdownAnchor } from "./comments/markdown-anchor";
 import { screenshotCaptureSupported } from "./comments/screenshot";
 import {
@@ -152,22 +160,34 @@ export function PlaygroundShell({
 }: PlaygroundShellProps) {
   const ctx = useCommentContext();
   const agentRuns = useAgentRuns();
+  const detailTabs = useCommentDetails();
+  const stackedComments = useMediaQuery("(max-width: 767px)");
   const { openPrompt } = usePromptRuns();
   const [sidebar, setSidebar] = useSidebarState();
   const activity = usePageActivity();
   const [editing, setEditing] = useState(false);
   const [pageAction, setPageAction] = useState<PageActionState | null>(null);
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const [commentDraft, setCommentDraft] = useState<{ page: string; anchor: string; element: HTMLElement } | null>(null);
+  const activeDraft = commentDraft?.page === active?.slug && view === "preview" && annotations === "visible" ? commentDraft : null;
+  useEffect(() => { setCommentDraft(null); }, [active?.slug, view, annotations]);
   const markdownPage = active?.kind === "markdown";
+  const folderPage = active?.kind === "folder";
+  const repositoryDocument = active?.slug.startsWith("document:") === true;
+  const repositoryNavigation = useRepositoryNavigation({ activeSlug: active?.slug, pageHref });
   // A markdown page is always its own editor, so its source is always loaded.
-  const source = useSource(active?.slug, editing || markdownPage);
+  const source = useSource(active?.slug, !folderPage && (editing || markdownPage));
   const pageFolders = usePageFolders();
-  const filesystemActionsDisabled = !import.meta.env.DEV || source.dirty || activity.loading || activity.error !== null;
-  const filesystemActionsDisabledReason = !import.meta.env.DEV
-    ? "Page filesystem actions are only available under vite dev"
+  const activityMap = useMemo(() => mergeActivity(activity.feedback, activity.updates), [activity.feedback, activity.updates]);
+  const onQueryChange = useCallback((query: string) => setSidebar({ query }, { replace: true }), [setSidebar]);
+  const filesystemActionsDisabled = !LIVE_SERVER || source.dirty || !activity.updatesReady;
+  const filesystemActionsDisabledReason = !LIVE_SERVER
+    ? "Page filesystem actions require a live playground server"
     : source.dirty
       ? "Save or revert the source before changing pages"
-      : activity.error ?? (activity.loading ? "Loading feedback counts…" : undefined);
+      : !activity.updatesReady
+        ? activity.updatesError ?? "Loading page update dates…"
+        : undefined;
 
   // The provider's comments are typed without the element context the
   // locators live in; the same page's comments from the API carry it.
@@ -191,16 +211,15 @@ export function PlaygroundShell({
     onNavigate,
   });
 
-  const navSections = usePlaygroundNavigation({
+  const { sections: navSections, metadataError } = usePlaygroundNavigation({
     activeSlug: active?.slug,
-    feedback: activity.feedback,
+    activity: activityMap,
     age: sidebar.age,
     query: sidebar.query,
-    onQueryChange: (query) => setSidebar({ query }),
+    onQueryChange,
     sort: sidebar.sort,
     filters: sidebar.filters,
-    updates: activity.updates,
-    loading: commentsLoading || activity.loading,
+    loading: activity.loading,
     folders: pageFolders.folders,
     pageHref,
     actionsDisabled: filesystemActionsDisabled,
@@ -220,7 +239,7 @@ export function PlaygroundShell({
 
   useReactGrabComments({
     contentRef,
-    enabled: view === "preview" && Boolean(active) && !markdownPage,
+    enabled: view === "preview" && Boolean(active) && !markdownPage && !folderPage,
     onSelect: ({ anchor, element, screenshot }) => {
       if (!(element instanceof HTMLElement)) {
         throw new Error(
@@ -230,7 +249,8 @@ export function PlaygroundShell({
       onPrepareCommentSelection(anchor, element, screenshot);
       ctx.registerAnchor(anchor, null);
       ctx.registerAnchor(anchor, element);
-      ctx.focusAnchor(anchor);
+      if (!active) throw new Error("Comment selection needs an open page");
+      setCommentDraft({ page: active.slug, anchor, element });
     },
     onPrompt: ({ anchor, element }) => {
       if (!active) {
@@ -271,7 +291,7 @@ export function PlaygroundShell({
   const activeMeta = active ? pageMeta(active) : undefined;
   const pageGuidance = usePageGuidance(active, activeTitle);
   const railVisible =
-    Boolean(active) && view === "preview" &&
+    Boolean(active) && !folderPage && view === "preview" &&
     // A markdown page shows its own threads; only the resolved-review queue needs the rail there.
     (!markdownPage || review === "resolved") &&
     (annotations === "visible" || review === "resolved") &&
@@ -310,7 +330,7 @@ export function PlaygroundShell({
       ? { filesystemActionsDisabledReason }
       : {}),
     onNewPage: (action) => setPageAction({ action }),
-    active: Boolean(active),
+    active: Boolean(active) && !folderPage,
     markdownPage,
     editing,
     sourceDirty: source.dirty,
@@ -318,7 +338,7 @@ export function PlaygroundShell({
     reviewActive: review === "resolved",
     reviewCount: Object.values(activity.feedback).reduce((count, page) => count + page.resolvedCount, 0),
     onToggleReview: () => review === "resolved" ? onReviewExit() : onReviewNavigate(active?.slug ?? ""),
-    onCommentWholePage: () => ctx.focusAnchor(DOCUMENT_ANCHOR),
+    onCommentWholePage: () => { setCommentDraft(null); ctx.focusAnchor(DOCUMENT_ANCHOR); },
     feedbackCopied: feedback.copied,
     onCopyFeedback: feedback.copyFeedback,
     feedbackCopyActions: feedback.copyActions,
@@ -337,7 +357,7 @@ export function PlaygroundShell({
           </span>
         </>
       }
-      sidebarHeader={<PlaygroundSidebarControls activeSlug={active?.slug} activity={activity} state={sidebar} onChange={setSidebar} error={activity.error} />}
+      sidebarHeader={<>{repositoryNavigation.controls}<PlaygroundSidebarControls activeSlug={active?.slug} activityMap={activityMap} state={sidebar} onChange={setSidebar} commentsError={activity.commentsError} updatesError={activity.updatesError} />{metadataError && <p role="alert" className="py-density-1 text-xs text-destructive [[data-collapsed=true]_&]:hidden">{metadataError}</p>}</>}
       sidebarWidth={300}
       actions={
         <>
@@ -363,7 +383,7 @@ export function PlaygroundShell({
           }
         : {})}
       toolbarClassName="@3xl/app-shell:hidden [@media(pointer:coarse)]:[&_button]:min-h-11 [@media(pointer:coarse)]:[&_button]:min-w-11"
-      navSections={[{ items: [{ key: "comments", label: "Comments", icon: UiComment, to: pageHref(""), active: !active }] }, ...navSections]}
+      navSections={[{ items: [{ key: "comments", label: "Comments", icon: UiComment, to: pageHref(""), active: !active }] }, repositoryNavigation.section, ...navSections]}
       collapsedStorageKey="playground:sidebar:collapsed"
       contentClassName="overflow-hidden"
       contentWidth="full"
@@ -387,7 +407,7 @@ export function PlaygroundShell({
       }
       bodyHeader={active ? <PlaygroundBodyHeader active={active} /> : undefined}
       bodyActions={
-        active ? (
+        active && !repositoryDocument && !folderPage ? (
           <PageActions
             disabled={filesystemActionsDisabled}
             disabledReason={filesystemActionsDisabledReason}
@@ -396,7 +416,9 @@ export function PlaygroundShell({
         ) : undefined
       }
     >
-      {!active ? <CommentDashboard comments={allComments} loading={commentsLoading} error={commentsError} pageHref={pageHref} /> : <div className="flex h-full min-h-0 flex-col md:flex-row">
+      {!active ? <CommentDashboard comments={allComments} loading={commentsLoading} error={commentsError} pageHref={pageHref} /> : <div className="flex h-full min-h-0 flex-col">
+        <RunningSessionBars key={active.slug} page={active.slug} />
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <div
           ref={attachScrollRef}
           className="relative min-w-0 flex-1 overflow-auto"
@@ -404,13 +426,13 @@ export function PlaygroundShell({
           <ReviewProvider
             page={active?.slug ?? ""}
             active={
-              view === "preview" && annotations === "visible" && Boolean(active) && !markdownPage
+              view === "preview" && annotations === "visible" && Boolean(active) && !markdownPage && !folderPage
             }
             sourceDirty={source.dirty}
             contentRef={contentRef}
             scrollRef={ctx.contentRef}
           >
-            <div ref={contentRef} data-review-content data-show-rejected={showRejected} className={cn("min-w-0 p-density-4", markdownPage && "h-full")}>
+            <div ref={contentRef} data-review-content data-show-rejected={showRejected} className={cn("min-w-0 p-density-4", (markdownPage || folderPage) && "h-full")}>
               {pageFolders.error && (
                 <Banner tone="danger">{pageFolders.error}</Banner>
               )}
@@ -441,7 +463,11 @@ export function PlaygroundShell({
                 </Banner>
               )}
               <PageErrorBoundary page={active.slug}>
-              {active.kind === "markdown" ? (
+              {active.kind === "folder" ? (
+                <Suspense fallback={<p role="status">Loading folder problems…</p>}>
+                  <RepositoryFolderPage key={active.slug} id={active.slug} onNavigate={onNavigate} />
+                </Suspense>
+              ) : active.kind === "markdown" ? (
                 view === "markdown" ? (
                   <Banner tone="danger">
                     view=markdown is the guidance export of a .tsx page; a
@@ -454,7 +480,10 @@ export function PlaygroundShell({
                       <p className="text-sm text-muted-foreground">Loading…</p>
                     }
                   >
-                    <MarkdownDocumentPage
+                    {repositoryDocument ? <RepositoryDocumentPage slug={active.slug} view={view} onViewChange={onViewChange} source={source} annotations={annotations} onLint={(file, promptId) => {
+                      if (!contentRef.current) throw new Error("AI review needs the document mounted");
+                      openPrompt({ page: active.slug, anchor: DOCUMENT_ANCHOR, element: onCaptureSelection(DOCUMENT_ANCHOR, contentRef.current), files: [file], ...(promptId ? { promptId } : {}) });
+                    }} /> : <MarkdownDocumentPage
                       slug={active.slug}
                       view={view}
                       onViewChange={onViewChange}
@@ -471,7 +500,7 @@ export function PlaygroundShell({
                           files: [file],
                         });
                       }}
-                    />
+                    />}
                   </Suspense>
                 )
               ) : unsupportedView ? (
@@ -519,14 +548,15 @@ export function PlaygroundShell({
         </div>
 
         {railVisible && (
-          <div
-            data-comment-rail
+          <CommentRail
+            stacked={stackedComments}
             // Stacked under the artifact on a phone: tall enough for a focused
             // thread and its composer, with room under it for the fixed
             // react-grab toolbar so it never covers the rail's controls.
-            className="relative max-h-[max(15rem,45dvh)] shrink-0 overflow-y-auto border-t border-border bg-background p-density-3 pb-16 md:max-h-none md:border-l md:border-t-0 md:pb-density-3"
+            className="max-h-[max(15rem,45dvh)] md:max-h-none"
             {...(railOverDialog ? { style: { zIndex: floatingZIndex } } : {})}
           >
+            <div className="p-density-3 pb-16 md:pb-density-3">
             {review === "resolved" && (commentsLoading || commentsError) ? <p role="status">{commentsError ?? "Loading resolved feedback…"}</p> : review === "resolved" ? (
               <PlaygroundCommentReview
                 allComments={allComments}
@@ -559,7 +589,10 @@ export function PlaygroundShell({
               />
             ) : (
               <CommentSidePanel
-                className="w-full md:w-[320px]"
+                hideComposer={Boolean(activeDraft)}
+                className="w-full"
+                previewLines={3}
+                detailTabs={detailTabs}
                 focusedAlignment="anchor"
                 anchorLabels={labels}
                 formatAnchorLabel={shortAnchorLabel}
@@ -572,17 +605,31 @@ export function PlaygroundShell({
                 ]}
                 threadToMarkdown={feedback.threadToMarkdown}
                 extraAssignItems={agentRuns.extraAssignItems}
-                renderRootDetails={(comment) => (
-                  <>
-                    <CommentCapture comment={comment} />
-                    {agentRuns.renderRunDetails(comment)}
-                  </>
-                )}
+                renderRootDetails={agentRuns.renderRunDetails}
               />
             )}
-          </div>
+            </div>
+          </CommentRail>
         )}
+        </div>
       </div>}
+      {activeDraft && <CommentDraftPopover
+        key={activeDraft.anchor}
+        reference={activeDraft.element}
+        anchor={activeDraft.anchor}
+        label={labels[activeDraft.anchor] ?? describeElement(activeDraft.element)}
+        config={ctx.config}
+        {...(ctx.callbacks.onMention ? { onMention: ctx.callbacks.onMention } : {})}
+        onDiscard={() => setCommentDraft(null)}
+        createActions={[{ id: "plain", label: "Post comment" }, ...(screenshotCaptureSupported() ? [{ id: "screenshot", label: "Post with screenshot" }] : [])]}
+        onCreate={async (input, action) => {
+          if (!ctx.callbacks.onCreate) throw new Error("Comment creation is not configured");
+          await ctx.callbacks.onCreate(input, action);
+          setCommentDraft(current => current === activeDraft ? null : current);
+          ctx.focusAnchor(activeDraft.anchor);
+        }}
+      />}
+      {repositoryNavigation.dialogs}
       <PageManagementDialogs
         action={pageAction?.action ?? null}
         active={actionPage}
