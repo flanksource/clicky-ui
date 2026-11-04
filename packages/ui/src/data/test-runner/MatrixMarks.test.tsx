@@ -277,6 +277,11 @@ describe("MatrixEnvHeader", () => {
 });
 
 describe("MatrixMark", () => {
+  it("keeps aborted glyphs and progress bars neutral", () => {
+    const { container } = render(<MatrixMark mark="aborted" />);
+    expect(container.querySelector("svg")).toHaveClass("text-muted-foreground");
+    expect(matrixBarClass("aborted", true)).not.toMatch(/red|danger/);
+  });
   it("titles the glyph with its label unless label is empty", () => {
     const titled = render(<MatrixMark mark="absent" />).container.querySelector("svg")!;
     const untitled = render(<MatrixMark mark="absent" label="" />).container.querySelector("svg")!;

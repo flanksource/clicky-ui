@@ -54,7 +54,7 @@ export function TestRunSummary({
     { count: t.skipped, color: "bg-slate-400", label: "skipped" },
     { count: t.failed, color: "bg-red-500", label: "failed" },
     { count: t.warned, color: "bg-amber-400", label: "warned" },
-    { count: t.aborted, color: "bg-red-300", label: "aborted" },
+    { count: t.aborted, color: "bg-slate-400", label: "aborted" },
     { count: t.timedout, color: "bg-amber-500", label: "timed out" },
     { count: t.running, color: "bg-blue-400", label: "running" },
     { count: t.pending, color: "bg-muted-foreground/40", label: "queued" },
