@@ -22,6 +22,10 @@ import {
 } from "./registry";
 
 describe("default page", () => {
+  it("resolves repository folder deep links without falling back to a component page", () => {
+    const slug = "folder:00000000-0000-0000-0000-000000000001/docs/nested";
+    expect(findPage(slug)).toMatchObject({ kind: "folder", slug, title: "nested", group: "Repositories" });
+  });
   it("opens the tracked Welcome page independently of glob order", () => {
     expect(DEFAULT_PAGE_SLUG).toBe("welcome");
     expect(PAGES.some((entry) => entry.slug === DEFAULT_PAGE_SLUG)).toBe(true);

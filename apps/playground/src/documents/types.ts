@@ -25,6 +25,25 @@ export type DocumentLease = {
   file: DocumentFile;
 };
 
+export type FolderLintScope = { files: string[]; revision: string };
+
+export function folderPath(id: string): { repositoryId: string; path: string } {
+  const match = /^folder:([\da-f-]{36})\/(.+)$/.exec(id);
+  if (!match?.[1] || !match[2])
+    throw new Error(`Invalid folder identity: ${id}`);
+  const path = match[2];
+  if (
+    (path !== "." &&
+      path
+        .split("/")
+        .some((part) => !part || [".", "..", ".git"].includes(part))) ||
+    ["\\", "\0", "\r", "\n"].some((character) => path.includes(character))
+  ) {
+    throw new Error("Folder path must stay inside its repository");
+  }
+  return { repositoryId: match[1], path };
+}
+
 export function documentPath(id: string): {
   repositoryId: string;
   path: string;

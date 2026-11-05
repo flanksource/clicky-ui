@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Button, InputField, Modal } from "@flanksource/clicky-ui";
+import { ActionError, Button, InputField, Modal } from "@flanksource/clicky-ui";
 import {
   addRepository,
   directoryEntries,
   documentJson,
+  documentError,
   GAVEL_ROUTE,
   saveFolder,
 } from "./api";
@@ -15,7 +16,7 @@ export function RepositoryPicker({ onClose }: { onClose: () => void }) {
   const [entries, setEntries] = useState<DirectoryEntry[]>([]);
   const [selectable, setSelectable] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -35,7 +36,7 @@ export function RepositoryPicker({ onClose }: { onClose: () => void }) {
       if (children.status === "fulfilled") setEntries(children.value);
       else {
         setEntries([]);
-        setError(String(children.reason));
+        setError(documentError(children.reason));
       }
       setSelectable(repository.status === "fulfilled");
       setLoading(false);
@@ -60,7 +61,7 @@ export function RepositoryPicker({ onClose }: { onClose: () => void }) {
                 onClose();
               })
               .catch((cause: unknown) => {
-                setError(String(cause));
+                setError(documentError(cause));
                 setLoading(false);
               });
           }}
@@ -88,9 +89,7 @@ export function RepositoryPicker({ onClose }: { onClose: () => void }) {
         <code className="break-all text-xs">{path}</code>
       </div>
       {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
+        <ActionError title="Repository request failed" error={error} context={[["Directory", path]]} />
       )}
       {loading ? (
         <p role="status">Loading directories…</p>
@@ -136,7 +135,7 @@ export function RepositoryFolderSettings({
     rules: string;
     entries: DirectoryEntry[];
   }>();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
   const overrides = rules.split("\n").filter((rule) => rule !== "");
   return (
@@ -160,7 +159,7 @@ export function RepositoryFolderSettings({
                 overrideDirectory: path,
               })
                 .then((entries) => setPreview({ rules, entries }))
-                .catch((cause: unknown) => setError(String(cause)))
+                .catch((cause: unknown) => setError(documentError(cause)))
                 .finally(() => setBusy(false));
             }}
           >
@@ -178,7 +177,7 @@ export function RepositoryFolderSettings({
                   );
                   onClose();
                 })
-                .catch((cause: unknown) => setError(String(cause)))
+                .catch((cause: unknown) => setError(documentError(cause)))
                 .finally(() => setBusy(false));
             }}
           >
@@ -205,9 +204,7 @@ export function RepositoryFolderSettings({
         Preview before saving.
       </p>
       {error && (
-        <p role="alert" className="text-destructive">
-          {error}
-        </p>
+        <ActionError title="Folder settings failed" error={error} context={[["Repository", repository.root], ["Folder", path]]} />
       )}
       {preview && (
         <ul className="max-h-72 space-y-1 overflow-auto text-xs">

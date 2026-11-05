@@ -38,6 +38,143 @@ function prompt(overrides: Partial<PromptAssociation>): PromptAssociation {
 }
 
 describe("document problem projections", () => {
+  it.each([undefined, "[]", '["docs-other/guide.md"]', '["../outside.md"]'])(
+    "rejects invalid folder execution file scope %s",
+    (files) => {
+      expect(() =>
+        documentProblems({
+          repositories: [repository],
+          prompts: [],
+          plain: [
+            {
+              metadata: {
+                executionId: "invalid-scope",
+                labels: {
+                  page: `folder:${repository.id}/docs`,
+                  ...(files ? { files } : {}),
+                },
+              },
+              status: { state: "completed", running: false },
+              lint: [{ linter: "markdownlint", violations: [] }],
+            },
+          ],
+        }),
+      ).toThrow();
+    },
+  );
+  it("keeps newer file results when projecting an older repository-wide run", () => {
+    const sibling = `document:${repository.id}/other/guide.md`;
+    const result = documentProblems({
+      repositories: [repository],
+      prompts: [],
+      plain: [
+        {
+          metadata: { executionId: "new-file", labels: { page: document } },
+          status: { state: "completed", running: false },
+          lint: [
+            {
+              linter: "vale",
+              violations: [{ file: "docs/guide.md", message: "New issue" }],
+            },
+          ],
+        },
+        {
+          metadata: {
+            executionId: "old-root",
+            labels: {
+              page: `folder:${repository.id}/.`,
+              files: JSON.stringify(["docs/guide.md", "other/guide.md"]),
+            },
+          },
+          status: { state: "completed", running: false },
+          lint: [
+            {
+              linter: "markdownlint",
+              work_dir: repository.root,
+              violations: [
+                { file: "docs/guide.md", message: "Old issue" },
+                { file: "other/guide.md", message: "Other issue" },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(
+      Object.fromEntries(
+        Object.entries(result).map(([id, entry]) => [
+          id,
+          entry.plain.flatMap((lint) => lint.violations ?? []),
+        ]),
+      ),
+    ).toEqual({
+      [document]: [{ file: "docs/guide.md", message: "New issue" }],
+      [sibling]: [{ file: "other/guide.md", message: "Other issue" }],
+    });
+  });
+  it("projects folder lint onto descendants and replaces older file findings including clean results", () => {
+    const nested = `document:${repository.id}/docs/nested/setup.md`;
+    const sibling = `document:${repository.id}/docs-other/guide.md`;
+    const result = documentProblems({
+      repositories: [repository],
+      prompts: [],
+      plain: [
+        {
+          metadata: {
+            executionId: "folder",
+            labels: {
+              page: `folder:${repository.id}/docs`,
+              files: JSON.stringify(["docs/guide.md", "docs/nested/setup.md"]),
+            },
+          },
+          status: { state: "completed", running: false },
+          lint: [
+            {
+              linter: "markdownlint",
+              work_dir: repository.root,
+              violations: [
+                { file: "docs/nested/setup.md", message: "Nested issue" },
+              ],
+            },
+          ],
+        },
+        {
+          metadata: { executionId: "old", labels: { page: document } },
+          status: { state: "completed", running: false },
+          lint: [
+            {
+              linter: "markdownlint",
+              violations: [{ file: "docs/guide.md", message: "Old issue" }],
+            },
+          ],
+        },
+        {
+          metadata: { executionId: "sibling", labels: { page: sibling } },
+          status: { state: "completed", running: false },
+          lint: [
+            {
+              linter: "vale",
+              violations: [
+                { file: "docs-other/guide.md", message: "Sibling issue" },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(
+      Object.fromEntries(
+        Object.entries(result).map(([id, entry]) => [
+          id,
+          entry.plain.flatMap((lint) => lint.violations ?? []),
+        ]),
+      ),
+    ).toEqual({
+      [document]: [],
+      [nested]: [{ file: "docs/nested/setup.md", message: "Nested issue" }],
+      [sibling]: [{ file: "docs-other/guide.md", message: "Sibling issue" }],
+    });
+  });
   it("replaces overlapping results per prompt and file, clears clean reruns, and retains other linters", () => {
     const clean = prompt({
       page: document,

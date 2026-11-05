@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Button, InputField, Modal } from "@flanksource/clicky-ui";
+import { ActionError, Button, InputField, Modal } from "@flanksource/clicky-ui";
 import { documentPath, type DocumentRepository } from "./types";
-import { documentJson, workspaceURL } from "./api";
+import { documentError, documentJson, workspaceURL } from "./api";
 
 export function OpenRepositoryDocument({
   repository,
@@ -14,7 +14,7 @@ export function OpenRepositoryDocument({
 }) {
   const [path, setPath] = useState("");
   const [verified, setVerified] = useState<string>();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
   return (
     <Modal
@@ -36,7 +36,7 @@ export function OpenRepositoryDocument({
                 await documentJson(workspaceURL("file", repository.root, path));
                 setVerified(id);
               })()
-                .catch((cause: unknown) => setError(String(cause)))
+                .catch((cause: unknown) => setError(documentError(cause)))
                 .finally(() => setBusy(false));
             }}
           >
@@ -71,9 +71,7 @@ export function OpenRepositoryDocument({
         Explicit paths can open files hidden by ignore rules.
       </p>
       {error && (
-        <p role="alert" className="mt-2 text-destructive">
-          {error}
-        </p>
+        <ActionError title="Document unavailable" error={error} context={[["Repository", repository.root], ["File", path]]} className="mt-2" />
       )}
     </Modal>
   );

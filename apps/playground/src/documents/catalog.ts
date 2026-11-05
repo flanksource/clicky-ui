@@ -1,10 +1,10 @@
 import { useEffect, useSyncExternalStore } from "react";
-import type { MarkdownPageEntry } from "../registry";
-import { repositories, documentJson, workspaceURL } from "./api";
-import { documentPath, type DocumentRepository } from "./types";
+import type { FolderPageEntry, MarkdownPageEntry } from "../registry";
+import { repositories, documentError, documentJson, workspaceURL } from "./api";
+import { documentPath, folderPath, type DocumentRepository } from "./types";
 
 let catalog: DocumentRepository[] = [];
-let catalogError: string | null = null;
+let catalogError: Error | null = null;
 let version = 0;
 const listeners = new Set<() => void>();
 const entries = new Map<string, MarkdownPageEntry>();
@@ -18,7 +18,7 @@ export async function refreshRepositories() {
     catalogError = null;
     emit();
   } catch (cause) {
-    catalogError = cause instanceof Error ? cause.message : String(cause);
+    catalogError = documentError(cause);
     emit();
   }
 }
@@ -57,6 +57,20 @@ export function repositoryPage(id: string): MarkdownPageEntry {
   };
   entries.set(id, entry);
   return entry;
+}
+export function repositoryFolderPage(id: string): FolderPageEntry {
+  const parsed = folderPath(id);
+  return {
+    kind: "folder",
+    slug: id,
+    path: parsed.path,
+    title:
+      parsed.path === "."
+        ? (repositoryById(parsed.repositoryId)?.name ?? "Repository")
+        : parsed.path.split("/").at(-1)!,
+    group: "Repositories",
+    loadGuidance: async () => ({ blocks: [] }),
+  };
 }
 export function useRepositoryCatalog() {
   useSyncExternalStore(

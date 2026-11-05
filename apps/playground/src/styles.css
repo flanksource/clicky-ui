@@ -15,7 +15,7 @@
 @source "./pages";
 @source inline("{rounded-xl,overflow-hidden,shadow-lg,border-2,border-solid,p-2,px-3,py-2,p-3,text-center,text-white,text-xs,font-bold}");
 
-/* The AppShell-based playground chrome is full-height; let it fill the viewport. */
+/* The Workspace-based playground chrome is full-height; let it fill the viewport. */
 html,
 body,
 #app {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PageSource } from "../editor/useSource";
-import { documentJson, GAVEL_ROUTE, jsonBody, workspaceURL } from "./api";
+import { documentError, documentJson, GAVEL_ROUTE, jsonBody, workspaceURL } from "./api";
 import { reconcileDocument, type DocumentBuffer } from "./document-state";
 import type { DocumentFile, DocumentLease, DocumentRepository } from "./types";
 import { setDocumentDirty } from "./navigation-guard";
@@ -17,7 +17,7 @@ export function useDocumentSource(id: string | undefined): RepositorySource {
     buffer: DocumentBuffer;
     repository: DocumentRepository;
   }>();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | string | null>(null);
   const [saving, setSaving] = useState(false);
   const [live, setLive] = useState("Loading document…");
   const stateRef = useRef(state);
@@ -34,7 +34,7 @@ export function useDocumentSource(id: string | undefined): RepositorySource {
     setError(null);
     const fail = (cause: unknown) => {
       if (!disposed)
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError(documentError(cause));
     };
     const reconcile = (file: DocumentFile) => {
       if (disposed || !target) return;
@@ -241,7 +241,7 @@ export function useDocumentSource(id: string | undefined): RepositorySource {
       window.dispatchEvent(new Event("playground:documents-refresh"));
       return true;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(documentError(cause));
       return false;
     } finally {
       setSaving(false);

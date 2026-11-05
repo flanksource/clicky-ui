@@ -1,42 +1,19 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const registry = vi.hoisted(() => {
-  const initial = ["active", "recent-page", "old-open", "old-quiet"];
-  const state = { slugs: [...initial], version: 0, listeners: new Set<() => void>() };
-  return {
-    state,
-    reset: () => { state.slugs = [...initial]; state.version = 0; },
-    add: (slug: string) => { state.slugs = [...state.slugs, slug]; state.version += 1; state.listeners.forEach((listener) => listener()); },
-  };
-});
-const externalPages = vi.hoisted(() => [{ id: "external-old" }]);
-
-vi.mock("./registry", () => ({
-  pages: () => registry.state.slugs.map((slug) => ({ slug })),
-  getMetaVersion: () => registry.state.version,
-  subscribeMeta: (listener: () => void) => { registry.state.listeners.add(listener); return () => { registry.state.listeners.delete(listener); }; },
-}));
-vi.mock("./bookmarklet/external-catalog", () => ({ useExternalCatalog: () => ({ pages: externalPages }) }));
-
 import { PlaygroundSidebarControls } from "./PlaygroundSidebarControls";
-import type { PageActivity } from "./sidebar-activity";
 import type { SidebarState } from "./sidebar-state";
 
 const base: SidebarState = { sort: "none", filters: [], query: "", age: "recent" };
-const activity = (overrides: Partial<PageActivity>): PageActivity => ({ updated: 0, commented: 0, resolved: 0, openCount: 0, resolvedCount: 0, ...overrides });
-const activityMap = new Map<string, PageActivity>([
-  ["recent-page", activity({ updated: Date.now() })],
-  ["old-open", activity({ openCount: 1 })],
-]);
+const OLDER = 3;
 
 function renderControls(overrides: Partial<Parameters<typeof PlaygroundSidebarControls>[0]> = {}) {
   const onChange = vi.fn();
-  render(<PlaygroundSidebarControls state={base} onChange={onChange} activityMap={activityMap} commentsError={null} updatesError={null} activeSlug="active" {...overrides} />);
+  render(<PlaygroundSidebarControls state={base} onChange={onChange} olderCount={OLDER} commentsError={null} updatesError={null} {...overrides} />);
   return onChange;
 }
 
-afterEach(() => { cleanup(); registry.reset(); });
+afterEach(() => { cleanup(); });
 
 describe("PlaygroundSidebarControls", () => {
   it("labels the sort options by the activity they rank", () => {
@@ -45,20 +22,25 @@ describe("PlaygroundSidebarControls", () => {
     expect(labels).toEqual(["Latest activity", "Source edited", "Last commented", "Last resolved"]);
   });
 
-  it("counts older pages excluding the active page, recent pages and externally-listed older pages included", () => {
+  it("shows the older count the navigation root reported", () => {
     renderControls();
-    expect(screen.getByRole("button", { name: "Show older (3)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: `Show older (${OLDER})` })).toBeTruthy();
   });
 
-  it("recounts older pages when the registry gains a page", () => {
-    renderControls();
-    act(() => registry.add("added-old"));
-    expect(screen.getByRole("button", { name: "Show older (4)" })).toBeTruthy();
+  it("does not guess a count before the navigation root has loaded", () => {
+    renderControls({ olderCount: undefined });
+    expect(screen.getByRole("button", { name: "Show older" })).toBeTruthy();
   });
 
-  it("applies status filters to the older count", () => {
-    renderControls({ state: { ...base, filters: ["open"] } });
-    expect(screen.getByRole("button", { name: "Show older (1)" })).toBeTruthy();
+  it("toggles between the recent-only and all views", () => {
+    const onChange = renderControls();
+    fireEvent.click(screen.getByRole("button", { name: `Show older (${OLDER})` }));
+    expect(onChange).toHaveBeenCalledWith({ age: "all" });
+  });
+
+  it("disables the age toggle while a search is active", () => {
+    renderControls({ state: { ...base, query: "diagrams" } });
+    expect((screen.getByRole("button", { name: `Show older (${OLDER})` }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("shows Reset view when only age is all and resets to defaults", () => {
