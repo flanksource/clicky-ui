@@ -4,10 +4,13 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
+
+import { sourceHash } from "./source-hash";
 
 /**
  * Reads and writes artifact sources under `src/pages/`.
@@ -42,7 +45,7 @@ export function assertSlug(slug: unknown): string {
   return slug;
 }
 
-function resolvedInside(rootDir: string, relativePath: string): string {
+export function resolvedInside(rootDir: string, relativePath: string): string {
   const root = resolve(rootDir);
   const full = resolve(root, relativePath);
   if (!full.startsWith(root + sep)) {
@@ -54,7 +57,7 @@ function resolvedInside(rootDir: string, relativePath: string): string {
   return full;
 }
 
-function assertSafeParents(rootDir: string, parentDir: string): void {
+export function assertSafeParents(rootDir: string, parentDir: string): void {
   const root = resolve(rootDir);
   let current = root;
   for (const segment of relative(root, parentDir).split(sep).filter(Boolean)) {
@@ -203,9 +206,69 @@ export function writeSource(
 
   const file = pagePath(pagesDir, slug, extension);
   mkdirSync(dirname(file), { recursive: true });
+  writeAtomic(file, source);
+}
+
+function writeAtomic(file: string, source: string): void {
   const tmp = `${file}.tmp`;
   writeFileSync(tmp, source, "utf8");
   renameSync(tmp, file);
+}
+
+/** Module and stylesheet files under `src/pages/` that the editor may open, including `_` helpers. */
+export const PAGES_FILE_EXTENSIONS = [".ts", ".tsx", ".css"] as const;
+
+/**
+ * The absolute path of an existing editable file `rel` (forward slashes, relative
+ * to `pagesDir`). Refuses absolute paths, `..`, backslashes, empty segments,
+ * other extensions, symlinks at any segment and anything whose realpath escapes
+ * `pagesDir`. The returned path is lexical, matching what module resolution yields.
+ */
+export function pagesFilePath(pagesDir: string, rel: unknown): string {
+  if (typeof rel !== "string" || rel === "") throw new PageStoreError("a file path is required", 400);
+  if (isAbsolute(rel) || rel.includes("\\") || rel.split("/").some((s) => s === "" || s === "." || s === "..")) {
+    throw new PageStoreError(
+      `invalid file path ${JSON.stringify(rel)} — expected a forward-slash path relative to src/pages without "." or ".." segments`,
+      400,
+    );
+  }
+  if (!(PAGES_FILE_EXTENSIONS as readonly string[]).includes(extname(rel))) {
+    throw new PageStoreError(`${rel} is not an editable file — expected one of ${PAGES_FILE_EXTENSIONS.join(", ")}`, 400);
+  }
+  const full = resolvedInside(pagesDir, rel);
+  assertSafeParents(pagesDir, dirname(full));
+  if (!existsSync(full)) throw new PageStoreError(`${rel} does not exist`, 404);
+  const stat = lstatSync(full);
+  if (stat.isSymbolicLink()) throw new PageStoreError(`refusing to traverse symbolic link ${full}`, 400);
+  if (!stat.isFile()) throw new PageStoreError(`${rel} is not a file`, 400);
+  if (!realpathSync(full).startsWith(realpathSync(pagesDir) + sep)) {
+    throw new PageStoreError(`refusing to touch "${rel}": it resolves outside ${pagesDir}`, 400);
+  }
+  return full;
+}
+
+export function readPagesFile(pagesDir: string, rel: string): { file: string; source: string; hash: string } {
+  const source = readFileSync(pagesFilePath(pagesDir, rel), "utf8");
+  return { file: rel, source, hash: sourceHash(source) };
+}
+
+/** Writes `rel` only if its on-disk content still hashes to `expectedHash`, else 409. */
+export function writePagesFile(
+  pagesDir: string,
+  rel: string,
+  source: unknown,
+  expectedHash: unknown,
+): { file: string; hash: string } {
+  if (typeof source !== "string") throw new PageStoreError("file source must be a string", 400);
+  if (typeof expectedHash !== "string" || expectedHash === "") {
+    throw new PageStoreError("the hash the file was opened at is required", 400);
+  }
+  const file = pagesFilePath(pagesDir, rel);
+  if (sourceHash(readFileSync(file, "utf8")) !== expectedHash) {
+    throw new PageStoreError(`${rel} changed since it was opened — reload it before saving`, 409);
+  }
+  writeAtomic(file, source);
+  return { file: rel, hash: sourceHash(source) };
 }
 
 /** Creates a new artifact of the given file type, refusing to clobber an existing one. */

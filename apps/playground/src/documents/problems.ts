@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from "react";
 import type { DocumentProblems } from "../../plugins/document-problems";
-import { documentJson } from "./api";
+import { documentError, documentJson } from "./api";
 
-let snapshot: { results: DocumentProblems; error: string | null } = {
+let snapshot: { results: DocumentProblems; error: Error | null } = {
   results: {},
   error: null,
 };
@@ -18,7 +18,7 @@ export function refreshDocumentProblems(): Promise<void> {
     .catch((cause: unknown) => {
       snapshot = {
         ...snapshot,
-        error: cause instanceof Error ? cause.message : String(cause),
+        error: documentError(cause),
       };
     })
     .finally(() => {

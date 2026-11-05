@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, useCommentContext } from "@flanksource/clicky-ui";
+import { ActionError, Button, useCommentContext } from "@flanksource/clicky-ui";
 import {
   FileReview,
   lintFindings,
@@ -16,6 +16,8 @@ import { useDocumentBlame } from "./useDocumentBlame";
 import { useProblemFilters } from "../markdown-doc/useProblemFilters";
 import { useDocumentProblems } from "./problems";
 import { useCommentDetails } from "../comments/useCommentDetails";
+import { LintDialog } from "./LintDialog";
+import { useLintFindings } from "./useLintFindings";
 
 export function RepositoryDocumentPage({
   slug,
@@ -30,6 +32,8 @@ export function RepositoryDocumentPage({
   const detailTabs = useCommentDetails();
   const [layout, setLayout] = useState<FileReviewLayout>("margin");
   const [problemFilters, setProblemFilters] = useProblemFilters();
+  const [lintDialog, setLintDialog] = useState(false);
+  const [linters, setLinters] = useState(["markdownlint", "vale"]);
   const target = documentPath(slug);
   const lint = useDocumentLint({
     id: slug,
@@ -52,18 +56,25 @@ export function RepositoryDocumentPage({
     }),
     [context.comments, context.callbacks, context.config, detailTabs],
   );
+  const results = useMemo(
+    () => [
+      ...(lint.run?.lint ?? problems.results[slug]?.plain ?? []),
+      ...(problems.results[slug]?.prompt ?? []),
+    ],
+    [lint.run?.lint, problems.results, slug],
+  );
+  const review = useLintFindings({ root: source.repository?.root, results });
   const findings = useMemo(
     () =>
-      lintFindings([
-        ...lint.results,
-        ...(problems.results[slug]?.prompt ?? []),
-      ])
+      lintFindings(review.results)
         .filter(
           (finding) =>
-            finding.file === target.path || finding.file === source.path,
+            finding.file === target.path ||
+            finding.file === source.path ||
+            `${finding.workDir}/${finding.file}` === source.path,
         )
         .map((finding) => ({ ...finding, file: source.path! })),
-    [lint.results, problems.results, slug, target.path, source.path],
+    [review.results, target.path, source.path],
   );
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -91,15 +102,7 @@ export function RepositoryDocumentPage({
       className="flex h-full min-h-0 flex-col gap-2"
       data-repository-document={slug}
     >
-      {[source.error, lint.error].filter(Boolean).map((error) => (
-        <p
-          role="alert"
-          key={error}
-          className="rounded border border-destructive/30 bg-destructive/5 p-2 text-sm text-destructive"
-        >
-          {error}
-        </p>
-      ))}
+      {([["Load document", source.error], ["Lint document", lint.error], ["Review findings", review.error]] as const).map(([operation, error]) => error && <ActionError key={operation} error={error} title="Repository review failed" context={[["Operation", operation], ["Document", slug]]} />)}
       {source.conflict && (
         <p role="alert" className="rounded border border-border p-2 text-sm">
           The file changed on disk. Your draft is preserved. Copy it before
@@ -120,6 +123,7 @@ export function RepositoryDocumentPage({
             view={view}
             onViewChange={onViewChange}
             findings={findings}
+            getFindingActions={review.getFindingActions}
             problemFilters={problemFilters}
             onProblemFiltersChange={setProblemFilters}
             {...(annotations === "visible" ? { comments } : {})}
@@ -154,9 +158,9 @@ export function RepositoryDocumentPage({
                   disabled={
                     source.dirty || lint.starting || lint.run?.status.running
                   }
-                  onClick={() => void lint.relint()}
+                  onClick={() => setLintDialog(true)}
                 >
-                  Lint
+                  Run lint…
                 </Button>
                 <Button
                   size="sm"
@@ -176,6 +180,7 @@ export function RepositoryDocumentPage({
                   </Button>
                 )}
                 <span role="status">{source.live}</span>
+                {review.status && <span role="status">{review.status}</span>}
                 {blame?.note && (
                   <span className="text-muted-foreground">{blame.note}</span>
                 )}
@@ -201,6 +206,23 @@ export function RepositoryDocumentPage({
             className="min-h-0 flex-1"
           />
         </MonacoProvider>
+      )}
+      {lintDialog && source.repository && (
+        <LintDialog
+          root={source.repository.root}
+          path={target.path}
+          page={slug}
+          selected={linters}
+          onPrompt={(promptId) => {
+            setLintDialog(false);
+            onLint(target.path, promptId);
+          }}
+          onRun={async (next) => {
+            await lint.relint(next);
+            setLinters(next);
+          }}
+          onClose={() => setLintDialog(false)}
+        />
       )}
     </div>
   );

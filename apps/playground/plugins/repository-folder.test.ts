@@ -1,3 +1,4 @@
+import { configureTestComments } from "./testing/comments-store";
 // @vitest-environment node
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
@@ -6,7 +7,7 @@ import { createLogger } from "vite";
 import { RepositoryDocuments } from "./repository-documents";
 import { createPromptRuns } from "./prompt-runs-server";
 import { PromptAssociations } from "./prompt-associations";
-import { readAll } from "./comments-store";
+import { readAll } from "./testing/comments-store";
 import { StubCaptain } from "./testing/stub-captain";
 import { prepareRepositoryFolder } from "./repository-folder";
 import { fixedGavel } from "./gavel-launch-server";
@@ -22,6 +23,7 @@ describe("repository folder prompt lint", () => {
   it("rejects folder traversal and folders without visible Markdown files", async () => {
     mkdirSync(resolve(".tmp"), { recursive: true });
     const dir = mkdtempSync(resolve(".tmp/folder-lint-"));
+    configureTestComments(dir);
     temporary.push(dir);
     const store = new RepositoryDocuments(dir);
     const repo = store.add({ root: "/enabled/repo", name: "repo" });
@@ -37,13 +39,11 @@ describe("repository folder prompt lint", () => {
     expect(store.document(`folder:${repo.id}/.`).path).toBe(".");
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response("[]", {
-            headers: { "Content-Type": "application/json" },
-          }),
-        ),
+      vi.fn().mockResolvedValue(
+        new Response("[]", {
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
     );
     await expect(
       prepareRepositoryFolder({
@@ -56,6 +56,7 @@ describe("repository folder prompt lint", () => {
   it("prepares visible Markdown descendants, scopes the launch, and retains per-file findings after restart", async () => {
     mkdirSync(resolve(".tmp"), { recursive: true });
     const dir = mkdtempSync(resolve(".tmp/folder-lint-"));
+    configureTestComments(dir);
     temporary.push(dir);
     const repository = new RepositoryDocuments(dir).add({
       root: "/enabled/repo",
@@ -78,6 +79,7 @@ describe("repository folder prompt lint", () => {
     const gavelURL = await captain.listen();
     const realFetch = globalThis.fetch;
     let revision = "original";
+    let promptProject: string | undefined;
     const listings: string[] = [];
     vi.stubGlobal(
       "fetch",
@@ -86,7 +88,15 @@ describe("repository folder prompt lint", () => {
         if (!url.pathname.startsWith("/api/workspace/"))
           return realFetch(input, init);
         let value: unknown;
-        if (url.pathname.endsWith("/entries")) {
+        if (url.pathname.endsWith("/directories")) {
+          const path = url.searchParams.get("path");
+          value =
+            promptProject && path === promptProject
+              ? [{ name: ".captain", directory: true }]
+              : promptProject && path === `${promptProject}/.captain`
+                ? [{ name: "prompts", directory: true }]
+                : [];
+        } else if (url.pathname.endsWith("/entries")) {
           const body = JSON.parse(String(init?.body)) as {
             path: string;
             includeIgnored?: boolean;
@@ -139,7 +149,7 @@ describe("repository folder prompt lint", () => {
     try {
       const detail = await runs.prompt("clarity", page);
       expect(detail).toMatchObject({
-        files: ["docs/guide.md", "docs/nested/setup.mdx"],
+        files: ["guide.md", "nested/setup.mdx"],
       });
       expect(listings).toEqual(["docs", "docs/nested"]);
       const request = {
@@ -179,13 +189,13 @@ describe("repository folder prompt lint", () => {
       await runs.start(request, "http://localhost", createLogger("silent"));
       expect(
         captain.callsTo("POST", /^\/api\/launch\/prepare$/)[0]?.body,
-      ).toEqual({ workspace: { cwd: repository.root } });
+      ).toEqual({ workspace: { cwd: `${repository.root}/docs` } });
       expect(
         captain.callsTo("POST", /^\/api\/launch\/lint$/)[0]?.body,
       ).toMatchObject({
         config: {
           lint: {
-            files: ["docs/guide.md", "docs/nested/setup.mdx"],
+            files: ["guide.md", "nested/setup.mdx"],
             linters: [{ options: { variables: { input: "Check clarity" } } }],
           },
         },
@@ -205,9 +215,83 @@ describe("repository folder prompt lint", () => {
         ]?.prompt.flatMap((result) => result.violations ?? []),
       ).toMatchObject([{ message: "Use active voice" }]);
       expect(
-        readAll(dir)[`document:${repository.id}/docs/nested/setup.mdx`],
+        (await readAll(dir))[`document:${repository.id}/docs/nested/setup.mdx`],
       ).toHaveLength(1);
-      expect(readAll(dir)[page]).toBeUndefined();
+      expect((await readAll(dir))[page]).toBeUndefined();
+      const documentPage = `document:${repository.id}/docs/nested/setup.mdx`;
+      await runs.prompts(documentPage);
+      expect(
+        captain.callsTo("POST", /^\/api\/launch\/prepare$/).at(-1)?.body,
+      ).toEqual({
+        workspace: { cwd: `${repository.root}/docs/nested` },
+      });
+      const documentDetail = await runs.prompt("clarity", documentPage);
+      expect(documentDetail.defaultFiles).toEqual(["setup.mdx"]);
+      await runs.start(
+        {
+          ...request,
+          variables: { files: ["setup.mdx"] },
+          associationId: crypto.randomUUID(),
+          preparationId: documentDetail.preparationId,
+          page: documentPage,
+        },
+        "http://localhost",
+        createLogger("silent"),
+      );
+      expect(
+        captain.callsTo("POST", /^\/api\/launch\/lint$/).at(-1)?.body,
+      ).toMatchObject({
+        config: {
+          lint: {
+            linters: [{ options: { variables: { files: ["setup.mdx"] } } }],
+          },
+        },
+      });
+      await vi.waitFor(() =>
+        expect(
+          new PromptAssociations(dir)
+            .all()
+            .every((entry) => entry.state !== "running"),
+        ).toBe(true),
+      );
+      promptProject = repository.root;
+      const projectDetail = await runs.prompt("clarity", documentPage);
+      expect(
+        captain.callsTo("POST", /^\/api\/launch\/prepare$/).at(-1)?.body,
+      ).toEqual({ workspace: { cwd: repository.root } });
+      expect(projectDetail).toMatchObject({
+        directory: repository.root,
+        defaultFiles: ["docs/nested/setup.mdx"],
+      });
+      await runs.start(
+        {
+          ...request,
+          variables: { files: projectDetail.defaultFiles },
+          associationId: crypto.randomUUID(),
+          preparationId: projectDetail.preparationId,
+          page: documentPage,
+        },
+        "http://localhost",
+        createLogger("silent"),
+      );
+      expect(
+        captain.callsTo("POST", /^\/api\/launch\/lint$/).at(-1)?.body,
+      ).toMatchObject({
+        config: {
+          lint: {
+            linters: [
+              { options: { variables: { files: ["docs/nested/setup.mdx"] } } },
+            ],
+          },
+        },
+      });
+      await vi.waitFor(() =>
+        expect(
+          new PromptAssociations(dir)
+            .all()
+            .every((entry) => entry.state !== "running"),
+        ).toBe(true),
+      );
     } finally {
       await captain.close();
     }

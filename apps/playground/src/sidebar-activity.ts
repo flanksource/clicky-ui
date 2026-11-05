@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import updatedAtBuild from "virtual:playground-page-activity";
 import { assertFeedbackActivity, type FeedbackActivity } from "../plugins/comment-activity";
 import { LIVE_SERVER } from "./live-server";
+import { ACTIVITY_REFRESH_EVENT, FEEDBACK_UPDATED_EVENT, NAVIGATION_REFRESH_EVENT } from "./navigation/refresh";
+
+const ACTIVITY_EVENTS = ["focus", FEEDBACK_UPDATED_EVENT, ACTIVITY_REFRESH_EVENT, NAVIGATION_REFRESH_EVENT] as const;
 
 export type SidebarSort = "none" | "updated" | "commented" | "resolved";
 export type SidebarFilter = "open" | "resolved";
@@ -67,10 +70,11 @@ export function usePageActivity() {
     };
     const onRefresh = () => { void refresh(); };
     onRefresh();
-    const timer = window.setInterval(() => { if (document.visibilityState === "visible") onRefresh(); }, 5000);
-    window.addEventListener("focus", onRefresh);
-    window.addEventListener("playground-feedback-updated", onRefresh);
-    return () => { controller.abort(); window.clearInterval(timer); window.removeEventListener("focus", onRefresh); window.removeEventListener("playground-feedback-updated", onRefresh); };
+    // Event-driven: the sidebar tree reads its own activity from the navigation route, so what
+    // is left here (Recent, the review count, the page-action gate) refreshes when something
+    // it shows could have changed instead of on a timer.
+    for (const event of ACTIVITY_EVENTS) window.addEventListener(event, onRefresh);
+    return () => { controller.abort(); for (const event of ACTIVITY_EVENTS) window.removeEventListener(event, onRefresh); };
   }, []);
   return { updates, feedback, loading, commentsError, updatesError, updatesReady };
 }

@@ -5,7 +5,7 @@ import type { Plugin } from "vite";
 const ID = "virtual:playground-page-activity";
 const RESOLVED = `\0${ID}`;
 
-function pageUpdates(pagesDir: string): Record<string, string> {
+export function pageUpdates(pagesDir: string): Record<string, string> {
   const updates: Record<string, string> = {};
   function walk(directory: string, prefix: string) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {

@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import type { StaticIconComponent } from "@flanksource/clicky-ui";
 import type { ExtractedGuidance } from "../plugins/markdown-model";
+import { repositoryPage, repositoryFolderPage } from "./documents/catalog";
 
 /** Optional per-page presentation metadata layered over filename-derived defaults. */
 export type PageMeta = {
@@ -44,7 +45,9 @@ export type MarkdownPageEntry = PageEntryBase & {
   loadSource: SourceLoader;
 };
 
-export type PageEntry = ComponentPageEntry | MarkdownPageEntry;
+export type FolderPageEntry = PageEntryBase & { kind: "folder"; path: string };
+
+export type PageEntry = ComponentPageEntry | MarkdownPageEntry | FolderPageEntry;
 
 const PAGES_PREFIX = "./pages/";
 const ROOT_GROUP = "Pages";
@@ -143,6 +146,7 @@ export function buildRegistry(
 }
 
 function pageFileOf(entry: PageEntry): string {
+  if (entry.kind === "folder") return entry.path;
   return entry.kind === "markdown" ? entry.file : `${entry.slug}.tsx`;
 }
 
@@ -214,6 +218,8 @@ export function findPage(
   slug: string | null | undefined,
 ): PageEntry | undefined {
   if (!slug) return undefined;
+  if (slug.startsWith("document:")) return repositoryPage(slug);
+  if (slug.startsWith("folder:")) return repositoryFolderPage(slug);
   return pages().find((entry) => entry.slug === slug);
 }
 
@@ -304,7 +310,7 @@ const pendingMeta = new Map<string, Promise<void>>();
 
 export async function loadMetadata(entries: readonly PageEntry[]): Promise<void> {
   await Promise.all(entries.map((entry) => {
-    if (entry.kind === "markdown" || metaCache.has(entry.slug)) return;
+    if (entry.kind !== "component" || metaCache.has(entry.slug)) return;
     const pending = pendingMeta.get(entry.slug);
     if (pending) return pending;
     const loader = projectedMeta[`./pages/${globSlugFor(entry.slug)}.tsx`];

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LinterResult } from "@flanksource/clicky-ui";
-import { documentJson, GAVEL_ROUTE, jsonBody } from "./api";
+import { documentError, documentJson, GAVEL_ROUTE, jsonBody } from "./api";
 import { refreshDocumentProblems } from "./problems";
+import type { FolderLintScope } from "./types";
 
 type Run = {
   metadata: { executionId: string; labels: Record<string, string> };
@@ -9,20 +10,22 @@ type Run = {
   lint?: LinterResult[];
   error?: string;
 };
-const admissions = new Map<string, Promise<Run>>();
+const admissions = new Map<string, Promise<Run | undefined>>();
 export function useDocumentLint({
   id,
   root,
   path,
   revision,
+  prepare,
 }: {
   id: string;
   root: string | undefined;
   path: string;
   revision: string | undefined;
+  prepare?: () => Promise<FolderLintScope>;
 }) {
   const [run, setRun] = useState<Run>();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Error | string | null>(null);
   const [starting, setStarting] = useState(false);
   const stream = useRef<EventSource | undefined>(undefined);
   const scope = useRef("");
@@ -30,7 +33,10 @@ export function useDocumentLint({
   const watch = useCallback((next: Run) => {
     stream.current?.close();
     setRun(next);
-    if (!next.status.running) { void refreshDocumentProblems(); return; }
+    if (!next.status.running) {
+      void refreshDocumentProblems();
+      return;
+    }
     const events = new EventSource(
       `${GAVEL_ROUTE}/api/runs/${next.metadata.executionId}/stream`,
     );
@@ -38,7 +44,10 @@ export function useDocumentLint({
     events.onmessage = (event: MessageEvent<string>) => {
       const updated = JSON.parse(event.data) as Run;
       setRun(updated);
-      if (!updated.status.running) { events.close(); void refreshDocumentProblems(); }
+      if (!updated.status.running) {
+        events.close();
+        void refreshDocumentProblems();
+      }
     };
     events.addEventListener("done", () => events.close());
     events.onerror = () => {
@@ -49,18 +58,35 @@ export function useDocumentLint({
     };
   }, []);
   const launch = useCallback(
-    async (reuse: boolean) => {
-      if (!root || !revision) return;
+    async ({
+      reuse,
+      linters = [],
+      expectedScope,
+    }: {
+      reuse: boolean;
+      linters?: string[];
+      expectedScope?: FolderLintScope;
+    }) => {
+      if (!root || (!revision && !prepare)) return;
       setStarting(true);
       setError(null);
       const key = `${id}\0${revision}`;
       const admit = async () => {
         if (reuse) {
           const existing = await documentJson<{ runs: Run[] }>(
-            `${GAVEL_ROUTE}/api/runs?${new URLSearchParams({ "label.page": id, "label.sourceRevision": revision, "label.documentLint": "plain" })}`,
+            `${GAVEL_ROUTE}/api/runs?${new URLSearchParams({ "label.page": id, ...(revision ? { "label.sourceRevision": revision } : {}), "label.documentLint": "plain" })}`,
           );
-          if (existing.runs[0]) return existing.runs[0];
+          return existing.runs[0];
         }
+        if (!linters.length) throw new Error("Choose at least one linter");
+        const prepared = await prepare?.();
+        if (expectedScope && expectedScope.revision !== prepared?.revision)
+          throw new Error(
+            "Folder contents changed; reopen the lint dialog before running",
+          );
+        const currentRevision = prepared?.revision ?? revision;
+        if (!currentRevision)
+          throw new Error("Lint requires a source revision");
         const { executionId } = await documentJson<{ executionId: string }>(
           `${GAVEL_ROUTE}/api/launch/lint`,
           {
@@ -68,20 +94,18 @@ export function useDocumentLint({
               workspace: { cwd: root },
               config: {
                 lint: {
-                  files: [path],
-                  linters: [
-                    {
-                      id: "markdown",
-                      linter: "markdownlint",
-                      options: { fix: false },
-                    },
-                    { id: "prose", linter: "vale", options: { fix: false } },
-                  ],
+                  files: prepared?.files ?? [path],
+                  linters: linters.map((linter) => ({
+                    id: linter,
+                    linter,
+                    options: { fix: false },
+                  })),
                 },
               },
               labels: {
                 page: id,
-                sourceRevision: revision,
+                sourceRevision: currentRevision,
+                ...(prepared ? { files: JSON.stringify(prepared.files) } : {}),
                 documentLint: "plain",
               },
             }),
@@ -100,19 +124,20 @@ export function useDocumentLint({
           if (reuse) admissions.set(key, pending);
         }
         const next = await pending;
-        if (scope.current === key) watch(next);
+        if (next && scope.current === key) watch(next);
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : String(cause));
+        setError(documentError(cause));
+        if (!reuse) throw cause;
       } finally {
         admissions.delete(key);
         setStarting(false);
       }
     },
-    [id, root, path, revision, watch],
+    [id, root, path, revision, prepare, watch],
   );
   useEffect(() => {
     scope.current = `${id}\0${revision}`;
-    void launch(true);
+    void launch({ reuse: true });
     return () => {
       scope.current = "";
       stream.current?.close();
@@ -127,8 +152,15 @@ export function useDocumentLint({
       run?.error ??
       (failedLinter ? `${failedLinter.linter}: ${failedLinter.error}` : null),
     results: run?.lint ?? [],
-    stale: Boolean(run && run.metadata.labels["sourceRevision"] !== revision),
-    relint: () => launch(false),
+    stale: Boolean(
+      revision && run && run.metadata.labels["sourceRevision"] !== revision,
+    ),
+    relint: (linters: string[], expectedScope?: FolderLintScope) =>
+      launch({
+        reuse: false,
+        linters,
+        ...(expectedScope ? { expectedScope } : {}),
+      }),
     stop: async () => {
       if (run) {
         try {
@@ -137,7 +169,7 @@ export function useDocumentLint({
             { method: "POST" },
           );
         } catch (cause) {
-          setError(String(cause));
+          setError(documentError(cause));
         }
       }
     },

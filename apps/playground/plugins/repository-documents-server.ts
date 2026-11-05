@@ -2,6 +2,7 @@ import type { Connect, Plugin } from "vite";
 import { readJsonBody, sendJson } from "./comments-server";
 import type { GavelEndpoint } from "./gavel-launch-server";
 import { RepositoryDocuments } from "./repository-documents";
+import { prepareRepositoryFolder } from "./repository-folder";
 import type {
   DocumentRepository,
   RepositoryFolder,
@@ -48,6 +49,17 @@ export function playgroundRepositoryDocuments({
     middlewares.use("/__playground/documents", (req, res) => {
       void (async () => {
         const url = new URL(req.url ?? "/", "http://playground.local");
+        if (url.pathname === "/scope" && req.method === "GET") {
+          const scope = await prepareRepositoryFolder({
+            dir,
+            endpoint,
+            page: url.searchParams.get("id") ?? "",
+          });
+          return sendJson(res, 200, {
+            files: scope.files,
+            revision: scope.revision,
+          });
+        }
         if (url.pathname === "/repositories" && req.method === "GET")
           return sendJson(res, 200, store.all());
         if (url.pathname === "/repositories" && req.method === "POST") {

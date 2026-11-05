@@ -1,10 +1,20 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { useDocumentSource } from "./useDocumentSource";
+import { normalizeErrorDiagnostics } from "@flanksource/clicky-ui";
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+});
+
+it("retains the repository response diagnostics for the document's error wrapper", async () => {
+  const body = "<html>Workspace server offline</html>";
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { status: 503, headers: { "Content-Type": "text/html" } })));
+  const { result } = renderHook(() => useDocumentSource("document:repo/guide.md"));
+  await waitFor(() => expect(result.current.error).toBeInstanceOf(Error));
+  expect(normalizeErrorDiagnostics(result.current.error)).toMatchObject({ details: [{ label: "Response", value: body }], context: expect.arrayContaining([["Status", "503"]]) });
+  expect(result.current.ready).toBe(false);
 });
 
 it("clears a disconnected watch error when a new lease reconciles the document", async () => {

@@ -1,3 +1,4 @@
+import { configureTestComments } from "./testing/comments-store";
 import {
   existsSync,
   mkdirSync,
@@ -11,7 +12,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { addComment, readAll } from "./comments-store";
+import { addComment, readAll } from "./testing/comments-store";
 import { deleteFolder, deletePage, movePage } from "./page-management-store";
 import { createSource, readSource, sourceExists } from "./pages-store";
 
@@ -32,6 +33,7 @@ describe("page management", () => {
     mkdirSync(scratchRoot, { recursive: true });
     pagesDir = mkdtempSync(join(scratchRoot, "managed-pages-"));
     commentsDir = mkdtempSync(join(scratchRoot, "managed-comments-"));
+    configureTestComments(commentsDir);
   });
 
   afterEach(() => {
@@ -39,9 +41,9 @@ describe("page management", () => {
     rmSync(commentsDir, { recursive: true, force: true });
   });
 
-  it("renames the path and title while moving every comment to the new slug", () => {
+  it("renames the path and title while moving every comment to the new slug", async () => {
     createSource(pagesDir, "old-page", SOURCE, ".tsx");
-    addComment(commentsDir, "old-page", {
+    await addComment(commentsDir, "old-page", {
       id: "comment-1",
       body: "Keep this feedback",
       createdAt: "2026-08-22T00:00:00.000Z",
@@ -57,7 +59,7 @@ describe("page management", () => {
     });
 
     expect(
-      movePage({
+      await movePage({
         sourceRoot: pagesDir,
         pagesDir,
         commentsDir,
@@ -78,7 +80,7 @@ describe("page management", () => {
     expect(readSource(pagesDir, "designs/renamed-page")).toContain(
       "<h1>Body stays old</h1>",
     );
-    expect(readAll(commentsDir)).toEqual({
+    expect(await readAll(commentsDir)).toEqual({
       "designs/renamed-page": [
         expect.objectContaining({
           id: "comment-1",
@@ -92,10 +94,10 @@ describe("page management", () => {
     });
   });
 
-  it("moves a page without rewriting its source when title is omitted", () => {
+  it("moves a page without rewriting its source when title is omitted", async () => {
     createSource(pagesDir, "drafts/old-page", SOURCE, ".tsx");
 
-    movePage({
+    await movePage({
       sourceRoot: pagesDir,
       pagesDir,
       commentsDir,
@@ -106,49 +108,49 @@ describe("page management", () => {
     expect(readSource(pagesDir, "approved/old-page")).toBe(SOURCE);
   });
 
-  it("rejects derived metadata before moving the page or its comments", () => {
+  it("rejects derived metadata before moving the page or its comments", async () => {
     const derived = 'export const meta = pageMetadata("old-page");\n';
     createSource(pagesDir, "old-page", derived, ".tsx");
-    addComment(commentsDir, "old-page", {
+    await addComment(commentsDir, "old-page", {
       id: "comment-1",
       body: "Keep this feedback",
       createdAt: "2026-08-22T00:00:00.000Z",
       author: { name: "Reviewer", kind: "user" },
     });
 
-    expect(() =>
+    await expect(
       movePage({
-        sourceRoot: pagesDir,
-        pagesDir,
-        commentsDir,
-        slug: "old-page",
-        nextSlug: "renamed-page",
-        title: "Renamed page",
-      }),
-    ).toThrow(/simple string-literal meta\.title/);
+                sourceRoot: pagesDir,
+                pagesDir,
+                commentsDir,
+                slug: "old-page",
+                nextSlug: "renamed-page",
+                title: "Renamed page",
+              }),
+    ).rejects.toThrow(/simple string-literal meta\.title/);
     expect(readSource(pagesDir, "old-page")).toBe(derived);
     expect(existsSync(join(pagesDir, "renamed-page.tsx"))).toBe(false);
-    expect(readAll(commentsDir)).toHaveProperty("old-page");
+    expect(await readAll(commentsDir)).toHaveProperty("old-page");
   });
 
-  it("refuses a destination conflict without changing either page", () => {
+  it("refuses a destination conflict without changing either page", async () => {
     createSource(pagesDir, "old-page", SOURCE, ".tsx");
     createSource(pagesDir, "taken", "taken", ".tsx");
 
-    expect(() =>
+    await expect(
       movePage({
-        sourceRoot: pagesDir,
-        pagesDir,
-        commentsDir,
-        slug: "old-page",
-        nextSlug: "taken",
-      }),
-    ).toThrow(/already exists/);
+                sourceRoot: pagesDir,
+                pagesDir,
+                commentsDir,
+                slug: "old-page",
+                nextSlug: "taken",
+              }),
+    ).rejects.toThrow(/already exists/);
     expect(readSource(pagesDir, "old-page")).toBe(SOURCE);
     expect(readSource(pagesDir, "taken")).toBe("taken");
   });
 
-  it("rebases the moved page and updates incoming imports and page links", () => {
+  it("rebases the moved page and updates incoming imports and page links", async () => {
     const source = [
       'import { DesignSystemPage } from "../design-system/DesignSystemPage";',
       'import { fixture } from "./_access-review-decisions/fixture";',
@@ -165,7 +167,7 @@ describe("page management", () => {
     );
 
     expect(
-      movePage({
+      await movePage({
         sourceRoot: pagesDir,
         pagesDir,
         commentsDir,
@@ -193,12 +195,12 @@ describe("page management", () => {
     );
   });
 
-  it("updates JavaScript-style imports that resolve to a moved TSX page", () => {
+  it("updates JavaScript-style imports that resolve to a moved TSX page", async () => {
     createSource(pagesDir, "review", SOURCE, ".tsx");
     const consumer = join(pagesDir, "consumer.tsx");
     writeFileSync(consumer, 'import OldPage from "./review.js";\n');
 
-    movePage({
+    await movePage({
       sourceRoot: pagesDir,
       pagesDir,
       commentsDir,
@@ -211,14 +213,14 @@ describe("page management", () => {
     );
   });
 
-  it("leaves an import of a separate JavaScript file intact", () => {
+  it("leaves an import of a separate JavaScript file intact", async () => {
     createSource(pagesDir, "review", SOURCE, ".tsx");
     writeFileSync(join(pagesDir, "review.js"), "export default 'separate';\n");
     const consumer = join(pagesDir, "consumer.tsx");
     const source = 'import value from "./review.js";\n';
     writeFileSync(consumer, source);
 
-    movePage({
+    await movePage({
       sourceRoot: pagesDir,
       pagesDir,
       commentsDir,
@@ -229,7 +231,7 @@ describe("page management", () => {
     expect(readFileSync(consumer, "utf8")).toBe(source);
   });
 
-  it("updates module and page references while preserving unrelated strings and asset paths", () => {
+  it("updates module and page references while preserving unrelated strings and asset paths", async () => {
     createSource(
       pagesDir,
       "review",
@@ -254,7 +256,7 @@ describe("page management", () => {
       ].join("\n"),
     );
 
-    movePage({
+    await movePage({
       sourceRoot: pagesDir,
       pagesDir,
       commentsDir,
@@ -280,7 +282,7 @@ describe("page management", () => {
     );
   });
 
-  it("rebases import.meta.glob patterns and the keys that index their results", () => {
+  it("rebases import.meta.glob patterns and the keys that index their results", async () => {
     createSource(
       pagesDir,
       "gavel/brand",
@@ -295,13 +297,15 @@ describe("page management", () => {
     );
 
     expect(
-      movePage({
-        sourceRoot: pagesDir,
-        pagesDir,
-        commentsDir,
-        slug: "gavel/brand",
-        nextSlug: "flanksource/brand",
-      }).updatedReferences,
+      (
+        await movePage({
+          sourceRoot: pagesDir,
+          pagesDir,
+          commentsDir,
+          slug: "gavel/brand",
+          nextSlug: "flanksource/brand",
+        })
+      ).updatedReferences,
     ).toBe(5);
     expect(readSource(pagesDir, "flanksource/brand")).toBe(
       [
@@ -314,7 +318,7 @@ describe("page management", () => {
     );
   });
 
-  it("rolls back the page and rewritten references when a write fails", () => {
+  it("rolls back the page and rewritten references when a write fails", async () => {
     createSource(pagesDir, "review", SOURCE, ".tsx");
     const consumer = join(pagesDir, "consumer.ts");
     const consumerSource = [
@@ -323,27 +327,27 @@ describe("page management", () => {
     ].join("\n");
     writeFileSync(consumer, consumerSource);
 
-    expect(() =>
+    await expect(
       movePage({
-        sourceRoot: pagesDir,
-        pagesDir,
-        commentsDir,
-        slug: "review",
-        nextSlug: "approved/review",
-        writeReference: (file, source) => {
-          if (source.includes("approved/review"))
-            throw new Error("simulated write failure");
-          writeFileSync(file, source);
-        },
-      }),
-    ).toThrow(/page move failed and was rolled back/);
+                sourceRoot: pagesDir,
+                pagesDir,
+                commentsDir,
+                slug: "review",
+                nextSlug: "approved/review",
+                writeReference: (file, source) => {
+                  if (source.includes("approved/review"))
+                    throw new Error("simulated write failure");
+                  writeFileSync(file, source);
+                },
+              }),
+    ).rejects.toThrow(/page move failed and was rolled back/);
     expect(sourceExists(pagesDir, "review")).toBe(true);
     expect(sourceExists(pagesDir, "approved/review")).toBe(false);
     expect(readSource(pagesDir, "review")).toBe(SOURCE);
     expect(readFileSync(consumer, "utf8")).toBe(consumerSource);
   });
 
-  it("deletes a folder with its pages, nested folders and feedback", () => {
+  it("deletes a folder with its pages, nested folders and feedback", async () => {
     createSource(pagesDir, "trust/signoff", SOURCE, ".tsx");
     createSource(pagesDir, "trust/nested/review", SOURCE, ".tsx");
     createSource(pagesDir, "designs/keep", SOURCE, ".tsx");
@@ -356,7 +360,7 @@ describe("page management", () => {
       ["trust/nested/review", "comment-2"],
       ["designs/keep", "comment-3"],
     ] as const) {
-      addComment(commentsDir, slug, {
+      await addComment(commentsDir, slug, {
         id,
         body: "Feedback",
         createdAt: "2026-08-22T00:00:00.000Z",
@@ -364,63 +368,67 @@ describe("page management", () => {
       });
     }
 
-    expect(deleteFolder({ pagesDir, commentsDir, folder: "trust" })).toEqual({
+    expect(
+      await deleteFolder({ pagesDir, commentsDir, folder: "trust" }),
+    ).toEqual({
       folder: "trust",
       deletedPages: ["trust/nested/review", "trust/signoff"],
       deletedComments: 2,
     });
     expect(existsSync(join(pagesDir, "trust"))).toBe(false);
     expect(sourceExists(pagesDir, "designs/keep")).toBe(true);
-    expect(Object.keys(readAll(commentsDir))).toEqual(["designs/keep"]);
+    expect(Object.keys(await readAll(commentsDir))).toEqual(["designs/keep"]);
     // The holding area used during the delete must not survive beside pages.
     expect(readdirSync(pagesDir)).toEqual(["designs"]);
   });
 
-  it("refuses to delete a folder that does not exist", () => {
-    expect(() =>
+  it("refuses to delete a folder that does not exist", async () => {
+    await expect(
       deleteFolder({ pagesDir, commentsDir, folder: "missing" }),
-    ).toThrow(/folder "missing" does not exist/);
+    ).rejects.toThrow(/folder "missing" does not exist/);
   });
 
-  it("puts the folder back when the comment rewrite fails", () => {
+  it("puts the folder back when the comment rewrite fails", async () => {
     createSource(pagesDir, "trust/signoff", SOURCE, ".tsx");
-    addComment(commentsDir, "trust/signoff", {
+    await addComment(commentsDir, "trust/signoff", {
       id: "comment-1",
       body: "Feedback",
       createdAt: "2026-08-22T00:00:00.000Z",
       author: { name: "Reviewer", kind: "user" },
     });
 
-    expect(() =>
+    await expect(
       deleteFolder({
-        pagesDir,
-        commentsDir,
-        folder: "trust",
-        writeComments: () => {
-          throw new Error("simulated write failure");
-        },
-      }),
-    ).toThrow(/folder deletion failed and was rolled back/);
+                pagesDir,
+                commentsDir,
+                folder: "trust",
+                writeComments: () => {
+                  throw new Error("simulated write failure");
+                },
+              }),
+    ).rejects.toThrow(/folder deletion failed and was rolled back/);
     expect(sourceExists(pagesDir, "trust/signoff")).toBe(true);
     expect(readSource(pagesDir, "trust/signoff")).toBe(SOURCE);
-    expect(readAll(commentsDir)["trust/signoff"]).toHaveLength(1);
+    expect((await readAll(commentsDir))["trust/signoff"]).toHaveLength(1);
   });
 
-  it("deletes the page and all feedback without leaving a backup", () => {
+  it("deletes the page and all feedback without leaving a backup", async () => {
     createSource(pagesDir, "old-page", SOURCE, ".tsx");
-    addComment(commentsDir, "old-page", {
+    await addComment(commentsDir, "old-page", {
       id: "comment-1",
       body: "Delete with the page",
       createdAt: "2026-08-22T00:00:00.000Z",
       author: { name: "Reviewer", kind: "user" },
     });
 
-    expect(deletePage({ pagesDir, commentsDir, slug: "old-page" })).toEqual({
+    expect(
+      await deletePage({ pagesDir, commentsDir, slug: "old-page" }),
+    ).toEqual({
       slug: "old-page",
       deletedComments: 1,
     });
     expect(existsSync(join(pagesDir, "old-page.tsx"))).toBe(false);
-    expect(readAll(commentsDir)).toEqual({});
+    expect(await readAll(commentsDir)).toEqual({});
     expect(readdirSync(pagesDir)).toEqual([]);
   });
 });

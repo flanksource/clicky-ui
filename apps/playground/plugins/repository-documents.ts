@@ -9,6 +9,7 @@ import {
 import { isAbsolute, join, posix } from "node:path";
 import {
   documentPath,
+  folderPath,
   type DocumentRepository,
   type RepositoryFolder,
 } from "../src/documents/types";
@@ -67,7 +68,7 @@ export class RepositoryDocuments {
   }
   document(id: string) {
     const { repositoryId, path } = id.startsWith("folder:")
-      ? this.folderPath(id)
+      ? folderPath(id)
       : documentPath(id);
     const repository = this.all().find((entry) => entry.id === repositoryId);
     if (!repository) throw new Error("Repository not registered");
@@ -76,12 +77,6 @@ export class RepositoryDocuments {
       path,
       absolutePath: posix.join(repository.root, path),
     };
-  }
-  private folderPath(id: string) {
-    const match = /^folder:([\da-f-]{36})\/(.+)$/.exec(id);
-    if (!match?.[1] || !match[2] || ["\0", "\r", "\n"].some((character) => match[2]!.includes(character))) throw new Error("Invalid folder identity");
-    this.validateFolder({ path: match[2], overrides: [] });
-    return { repositoryId: match[1], path: match[2] };
   }
   private validateFolder(folder: RepositoryFolder): void {
     if (

@@ -4,6 +4,7 @@ import { ErrorWrapper, setFallbackIconProvider } from "@flanksource/clicky-ui";
 import { clickyIconProvider } from "@flanksource/clicky-ui/icons";
 import { FlanksourceIcon } from "@flanksource/clicky-ui/connections";
 import { BookmarkletPanel } from "./bookmarklet/BookmarkletPanel";
+import { VocabularyProvider } from "./vocabularies/config";
 import "@flanksource/clicky-ui/styles.css";
 import "./styles.css";
 const bookmarklet =
@@ -30,7 +31,9 @@ if (!root) throw new Error("#app root not found");
 createRoot(root).render(
   <ErrorWrapper>
     <Suspense fallback={<p>Loading playground…</p>}>
-      {bookmarklet ? <BookmarkletPanel /> : <App />}
+      <VocabularyProvider>
+        {bookmarklet ? <BookmarkletPanel /> : <App />}
+      </VocabularyProvider>
     </Suspense>
   </ErrorWrapper>,
 );
