@@ -103,7 +103,7 @@ export default [
     "type": "box",
     "id": "box/pill",
     "label": "box/pill",
-    "description": "Small node, member or tag",
+    "description": "Small node, member or tag; a single line of icon and title, never a description body",
     "references": [
       "apps/playground/src/vocabularies/facet/specimens/vocabulary/vocabulary.tsx#BoxStyles"
     ],
@@ -152,5 +152,17 @@ export default [
       "apps/playground/src/vocabularies/facet/specimens/vocabulary/vocabulary.tsx#BoxStyles"
     ],
     "section": "box-styles"
+  },
+  {
+    "catalog": "facet",
+    "type": "box",
+    "id": "box/aws",
+    "label": "box/aws",
+    "description": "draw.io AWS look: square 1px border and title in one colour, a filled icon tile in the top-left corner; for scopes such as namespaces and AWS groups",
+    "references": [
+      "apps/playground/src/vocabularies/facet/specimens/vocabulary/layouts.tsx#NodeShowcase",
+      "apps/playground/src/vocabularies/facet/specimens/vocabulary/aws-groups.tsx#AwsBox"
+    ],
+    "section": "node-showcase"
   }
 ];

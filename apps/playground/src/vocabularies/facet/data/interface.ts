@@ -92,7 +92,7 @@ export default [
     "type": "interface",
     "id": "interface/k8s-service-account",
     "label": "interface/k8s-service-account",
-    "description": "Projected service account token authenticates the pod",
+    "description": "Projected service account token authenticates the pod; the service account is a tags/edge on the pod and the line carries the protocol (HTTPS)",
     "references": [
       "apps/playground/src/vocabularies/facet/specimens/vocabulary/protocols-and-elements.tsx#ProtocolInterfaces"
     ],
@@ -103,7 +103,7 @@ export default [
     "type": "interface",
     "id": "interface/aws-workload-identity",
     "label": "interface/aws-workload-identity",
-    "description": "Pod exchanges its token for IAM role credentials (IRSA / Pod Identity)",
+    "description": "Pod exchanges its token for IAM role credentials (IRSA / Pod Identity); service account and assumed role are tags/edge on the boxes and the line carries the protocol (HTTPS)",
     "references": [
       "apps/playground/src/vocabularies/facet/specimens/vocabulary/protocols-and-elements.tsx#ProtocolInterfaces"
     ],

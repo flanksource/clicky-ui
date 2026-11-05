@@ -34,4 +34,6 @@ import group31 from "./data/order";
 import group32 from "./data/link";
 import group33 from "./data/product";
 import group34 from "./data/heading";
-export const FACET_VOCABULARY = [...group0, ...group1, ...group2, ...group3, ...group4, ...group5, ...group6, ...group7, ...group8, ...group9, ...group10, ...group11, ...group12, ...group13, ...group14, ...group15, ...group16, ...group17, ...group18, ...group19, ...group20, ...group21, ...group22, ...group23, ...group24, ...group25, ...group26, ...group27, ...group28, ...group29, ...group30, ...group31, ...group32, ...group33, ...group34] satisfies (CommentVocabularyItem & { section: string })[];
+import group35 from "./data/aws";
+import group36 from "./data/k8s";
+export const FACET_VOCABULARY = [...group0, ...group1, ...group2, ...group3, ...group4, ...group5, ...group6, ...group7, ...group8, ...group9, ...group10, ...group11, ...group12, ...group13, ...group14, ...group15, ...group16, ...group17, ...group18, ...group19, ...group20, ...group21, ...group22, ...group23, ...group24, ...group25, ...group26, ...group27, ...group28, ...group29, ...group30, ...group31, ...group32, ...group33, ...group34, ...group35, ...group36] satisfies (CommentVocabularyItem & { section: string })[];

@@ -4,6 +4,8 @@ import { BOX_STYLES, BoxNode, ContainerNode, DiagramStyleProvider, PLACEMENT_SHA
 
 import { UiServerProcess } from "@flanksource/clicky-ui/icons";
 
+import { AwsIamRole, K8SNamespace, K8SPod, K8SServiceaccount } from "@flanksource/icons/mi";
+
 import { LAYOUT_CATALOG } from "../layouts/catalog";
 
 import { LINKS, ORDERS, OTHER_STACKS, PLACEMENTS, SCHEMES, SLOTS, THEMES, type LayoutTaxonomy, type Placement, type Scheme, type Theme } from "../layouts/taxonomy";
@@ -18,6 +20,8 @@ import { THEME_STYLES } from "../layouts/themes";
 
 import { useVocabularySample } from "./sample-context";
 import { Sheet, Swatch } from "./common";
+import { AWS_GROUPS, AwsBox, AwsGroup, awsBox, type AwsGroupKind } from "./aws-groups";
+import { AWS_IAM_RED, EdgeTagged, K8S_BLUE, type EdgeTagSpec } from "./edge-tag";
 
 import { ROLES } from "./roles";
 const { new: BLUE, existing: GREEN, store: VIOLET, action: ORANGE, muted: GREY, security: ROSE } = ROLES;
@@ -187,12 +191,12 @@ export function LayoutSchemes() {
   );
 }
 
-function ThemedSwatch({ name, note, children }: { name: string; note?: string; children: ReactNode }) {
+function ThemedSwatch({ name, note, span = 1, children }: { name: string; note?: string; span?: number; children: ReactNode }) {
   const visible = useVocabularySample(name);
   const { palette } = useDiagramStyle();
   if (!visible) return null;
   return (
-    <div data-vocabulary-name={name} data-vocabulary-note={note} className="flex min-w-0 flex-col gap-1.5">
+    <div data-vocabulary-name={name} data-vocabulary-note={note} className="flex min-w-0 flex-col gap-1.5" style={{ gridColumn: `span ${span}` }}>
       <div className="flex min-h-[120px] items-center justify-center overflow-x-auto rounded-md border border-slate-200 p-3" style={{ backgroundColor: palette?.containerTint ?? "#f8fafc" }}>{children}</div>
       <code className="text-[10px] font-semibold text-slate-800">{name}</code>
       {note && <div className="text-[9.5px] leading-tight text-slate-500">{note}</div>}
@@ -205,10 +209,13 @@ export function NodeShowcase() {
     <div className="space-y-6">
       <Sheet columns={4} intro="Box styles with no palette or density of their own: switch theme/… and density in the toolbar and every box follows. A palette, density or compact prop on a node still wins.">
         {BOX_STYLES.map((variant) => (
-          <ThemedSwatch key={variant} name={`box/${variant}`}>
-            <BoxNode variant={variant} title="Run API" description="Validates requests" shadow="shadow-none" {...(variant === "tile" || variant === "pill" ? { icon: <UiServerProcess className="h-4 w-4" /> } : {})} />
+          <ThemedSwatch key={variant} name={`box/${variant}`} {...(variant === "pill" ? { note: "Single line: icon and title only, never a description body" } : {})}>
+            <BoxNode variant={variant} title="Run API" {...(variant === "pill" ? {} : { description: "Validates requests" })} shadow="shadow-none" {...(variant === "tile" || variant === "pill" ? { icon: <UiServerProcess className="h-4 w-4" /> } : {})} />
           </ThemedSwatch>
         ))}
+        <ThemedSwatch name="box/aws" note="draw.io AWS look: square 1px border and title in one colour, a filled icon tile in the top-left corner. Use for scopes (namespaces, AWS groups)">
+          <AwsBox box={awsBox(BLUE.header, <UiServerProcess />)} title="Run API"><span className="text-[10px] text-slate-500">Validates requests</span></AwsBox>
+        </ThemedSwatch>
       </Sheet>
       <Sheet columns={2} intro="Placement-aware nodes. Each swatch wraps the same group and three members in a DiagramStyleProvider with one layout/… placement; with no variant set, the container picks its style and direction and the members their box style from facet's PLACEMENT_SHAPES.">
         {(Object.keys(PLACEMENTS) as Placement[]).map((placement) => {
@@ -224,9 +231,101 @@ export function NodeShowcase() {
           );
         })}
       </Sheet>
+      <Sheet columns={3} intro="Cloud and Kubernetes scopes. AWS scopes use the draw.io AWS group shapes (mxgraph.aws4.group) with draw.io's own icons: a square outline in the scope colour with its icon in the top-left corner. Namespaces inside a cluster use the same look as box/aws in Kubernetes blue, and pods are box/accent (box-density/detailed for spec figures). The nesting reads the same in every figure: account › region › EKS cluster › namespace › pod. Availability zones place nodes and subnets, never namespaces; workload identity is tags/edge on the workload, not a container or a box.">
+        <ThemedSwatch name="aws/account" note="Ownership, billing and IAM boundary; the outermost scope · draw.io group_account, solid #CD2264">
+          <AwsGroup kind="account" title="acme-prod"><Member title="Workloads" /></AwsGroup>
+        </ThemedSwatch>
+        <ThemedSwatch name="aws/region" note="Regional scope inside an account · draw.io group_region, dashed #00A4A6, flag icon">
+          <AwsGroup kind="region" title="us-east-1"><Member title="Regional services" /></AwsGroup>
+        </ThemedSwatch>
+        <ThemedSwatch name="aws/availability-zone" note="Isolated location inside a region; wraps subnets or node groups · draw.io availability zone, dashed #147EBA, no icon">
+          <AwsGroup kind="availability-zone" title="us-east-1a"><Member title="Node group" /></AwsGroup>
+        </ThemedSwatch>
+        <ThemedSwatch name="k8s/eks-cluster" note="Regional control plane spanning zones · draw.io-style group with the EKS tile, solid #ED7100">
+          <AwsGroup kind="eks-cluster" title="payments-eks"><Member title="Namespaces" /></AwsGroup>
+        </ThemedSwatch>
+        <ThemedSwatch name="k8s/namespace" note="Logical scope inside one cluster · box/aws in Kubernetes blue #326CE5 with the namespace tile">
+          <AwsBox box={NAMESPACE_BOX} title="payments"><Pod /></AwsBox>
+        </ThemedSwatch>
+        <ThemedSwatch name="k8s/pod" note="A pod is box/accent; add box-density/detailed fields only in spec figures">
+          <div className="flex flex-wrap items-start justify-center gap-2"><Pod fields={false} /><Pod /></div>
+        </ThemedSwatch>
+        <ThemedSwatch name="aws/workload-identity" span={2} note="The identity a workload runs as is tags/edge on its box: the service account and the IAM role it assumes through STS (IRSA / Pod Identity)">
+          <Pod fields={false} identity />
+        </ThemedSwatch>
+        <ThemedSwatch name="aws/eks-topology" span={2} note="Canonical nesting: account › region › EKS cluster › namespace › pod, with the workload identity as tags/edge on the pod">
+          <AwsGroup kind="account" title="acme-prod">
+            <AwsGroup kind="region" title="us-east-1">
+              <AwsGroup kind="eks-cluster" title="payments-eks">
+                <AwsBox box={NAMESPACE_BOX} title="payments"><Pod fields={false} identity /></AwsBox>
+              </AwsGroup>
+            </AwsGroup>
+          </AwsGroup>
+        </ThemedSwatch>
+      </Sheet>
+      <Sheet columns={3} intro="The rest of the draw.io AWS group shapes, with the stroke, fill and font colours of draw.io's AWS4 sidebar. Title a group with the instance it scopes, not the group type. Network scopes nest vpc › subnet › security group; compute groups wrap the instances they manage.">
+        {(Object.keys(GROUP_EXAMPLES) as (keyof typeof GROUP_EXAMPLES)[]).map((kind) => (
+          <ThemedSwatch key={kind} name={`aws/${kind}`} note={`draw.io ${AWS_GROUPS[kind].label}`}>
+            <AwsGroup kind={kind} title={GROUP_EXAMPLES[kind][0]}><Member title={GROUP_EXAMPLES[kind][1]} /></AwsGroup>
+          </ThemedSwatch>
+        ))}
+      </Sheet>
     </div>
   );
 }
+
+type Mark = typeof K8SPod;
+
+const Logo = ({ mark: MarkIcon }: { mark: Mark }) => (
+  <span className="inline-flex h-4 w-4 shrink-0 [&>svg]:h-full [&>svg]:w-full"><MarkIcon /></span>
+);
+
+const Member = ({ title, mark }: { title: string; mark?: Mark }) => (
+  <BoxNode title={title} compact shadow="shadow-none" {...(mark ? { icon: <Logo mark={mark} /> } : {})} />
+);
+
+/** Every draw.io group outside the account › region › zone › cluster scopes: [group title, member]. */
+const GROUP_EXAMPLES = {
+  "aws-cloud": ["AWS Cloud", "Managed services"],
+  "aws-cloud-alt": ["AWS Cloud", "Managed services"],
+  vpc: ["prod-vpc", "Subnets"],
+  "private-subnet": ["10.0.1.0/24", "App servers"],
+  "public-subnet": ["10.0.0.0/24", "Load balancer"],
+  "security-group": ["sg-web", "Web tier"],
+  "auto-scaling-group": ["web-asg", "Instances"],
+  "ec2-instance-contents": ["i-0a12", "Agent"],
+  "spot-fleet": ["batch-fleet", "Workers"],
+  "elastic-beanstalk": ["web-env", "App"],
+  "step-functions-workflow": ["orders-sfn", "Steps"],
+  "iot-greengrass": ["edge-core", "Components"],
+  "iot-greengrass-deployment": ["edge-rollout", "Components"],
+  "server-contents": ["db-host", "Processes"],
+  "corporate-data-center": ["HQ datacenter", "Legacy apps"],
+  "generic-group": ["Shared", "Members"],
+} satisfies Partial<Record<AwsGroupKind, [string, string]>>;
+
+const POD_FIELDS = [["image", "checkout:1.4"], ["ready", "2/2"], ["node", "ip-10-0-1-12"]];
+
+/**
+ * box/accent, with the box-density/detailed field table when `fields` is on.
+ * The logo and title go in `title` rather than `icon`, which facet's BoxNode centres; logos sit top-left.
+ */
+const Pod = ({ fields = true, identity = false }: { fields?: boolean; identity?: boolean }) => (
+  <EdgeTagged tags={identity ? WORKLOAD_IDENTITY : []}>
+    <BoxNode variant="accent" title={<span className="flex items-center gap-2"><Logo mark={K8SPod} />checkout</span>} compact shadow="shadow-none">
+      {fields && POD_FIELDS.map(([k, v]) => (
+        <div key={k} className="flex justify-between gap-3 border-b border-slate-100 text-[9px]"><span className="text-slate-500">{k}</span><b className="font-mono text-slate-800">{v}</b></div>
+      ))}
+    </BoxNode>
+  </EdgeTagged>
+);
+
+const NAMESPACE_BOX = awsBox(K8S_BLUE, <K8SNamespace />);
+
+const WORKLOAD_IDENTITY: EdgeTagSpec[] = [
+  { label: "checkout-sa", icon: K8SServiceaccount, color: K8S_BLUE },
+  { label: "checkout-role", icon: AwsIamRole, color: AWS_IAM_RED },
+];
 
 export function LayoutThemes() {
   return (
