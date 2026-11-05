@@ -48,6 +48,9 @@ type AgentRunsContext = {
   /** The live captain session `page`'s threads go to; undefined for the playground session. */
   target: SessionAgentTarget | undefined;
   createSession: (project: string, runtime: AgentSessionRuntime) => Promise<void>;
+  busy: boolean;
+  changeSettings: (patch: Partial<AgentSessionSettings>) => void;
+  configureRuntime: () => void;
   /** Points `page`'s threads at a target; rejects when no `page` was given. */
   setTarget: (target: AgentTarget) => Promise<void>;
 };
@@ -224,6 +227,9 @@ export function AgentRunsProvider({
     () => ({
       data,
       error: panelError,
+      busy,
+      changeSettings,
+      configureRuntime: () => openDialog({ mode: "configure", enableAutoRun: false }),
       createSession: async (project, runtime) => {
         if (!page) throw new Error("Select a page before creating a session");
         await createAgentSession({ page, project, runtime });
@@ -256,7 +262,7 @@ export function AgentRunsProvider({
           </div>
         ) : null,
     }),
-    [changePageTarget, data, panelError, hasRuntime, openPanel, pageTarget, retry, start, page, refresh],
+    [busy, changeSettings, openDialog, changePageTarget, data, panelError, hasRuntime, openPanel, pageTarget, retry, start, page, refresh],
   );
 
   const submitRuntime = (runtime: AgentSessionRuntime) => {
@@ -320,34 +326,10 @@ export function AgentRunsProvider({
         error={panelError}
         busy={busy}
         onClose={() => setPanel(null)}
-        onSettings={changeSettings}
-        onChangeRuntime={() => openDialog({ mode: "configure", enableAutoRun: false })}
         onStop={(runId) => act(() => stopAgentSession(runId))}
         onForget={(runId) => act(() => forgetAgentSession(runId))}
       />
       </AgentIdentityProvider>
     </AgentRuns.Provider>
-  );
-}
-
-/** Toolbar button that opens the agent sessions panel. */
-export function AgentSessionButton() {
-  const { data, openPanel } = useAgentRuns();
-  const running = data?.sessions.filter((session) => session.state === "running") ?? [];
-  return (
-    <button
-      type="button"
-      onClick={() => openPanel()}
-      title={
-        data && data.sessions.length > 0
-          ? `Agent sessions: ${running.length} running of ${data.sessions.length}${data.settings.autoRun ? " · auto-run on" : ""}`
-          : "No agent session yet"
-      }
-      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-    >
-      <UiRobotAi className="size-3.5" />
-      Agent sessions
-      {running.length > 0 && <span className="size-1.5 rounded-full bg-emerald-500" />}
-    </button>
   );
 }

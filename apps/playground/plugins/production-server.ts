@@ -1,6 +1,6 @@
 import { realpathSync } from "node:fs";
 import { createRequire } from "node:module";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { build, type Plugin, type ViteDevServer } from "vite";
 import { liveRegistry, sharedImports } from "./production-registry";
 import {
@@ -44,7 +44,9 @@ export function playgroundProduction(options: ProductionOptions): Plugin {
         );
       }
     },
-    async resolveId(source, importer) {
+    async resolveId(source, importer, options) {
+      // The compiled shell is a browser bundle; server-side loads (ssrLoadModule) resolve shared imports from source.
+      if (options.ssr) return;
       if (source.startsWith(assetBase)) return { id: source, external: true };
       if (source.startsWith(sharedPrefix)) return source;
       if (modules.has(source)) return sharedPrefix + source;
@@ -94,6 +96,9 @@ async function compileShell({
     index: resolve(root, "index.html"),
   };
   const require = createRequire(resolve(root, "package.json"));
+  const reactPackages = ["react", "react-dom"].map(
+    (name) => dirname(realpathSync(require.resolve(`${name}/package.json`))) + "/",
+  );
   const reactEntries = new Map<string, string>();
   const aliases = new Map<string, string>();
   for (const [index, specifier] of specifiers.entries()) {
@@ -127,6 +132,17 @@ async function compileShell({
     base: assetBase,
     define: { "import.meta.env.PLAYGROUND_LIVE": "true" },
     plugins: [
+      {
+        // WORKAROUND(live-visual-edit-preview): compile react and react-dom from their development builds so the otherwise production shell keeps overrideProps for live visual edits.
+        // Correct fix: re-render an edited page from its written source (re-import and remount), which needs no development-only React API.
+        // Ref: requested by user 2026-11-05
+        name: "playground-production-react-development",
+        enforce: "pre",
+        transform(code, id) {
+          if (!reactPackages.some((dir) => id.startsWith(dir))) return;
+          return { code: code.replaceAll("process.env.NODE_ENV", '"development"'), map: null };
+        },
+      },
       {
         name: "playground-production-shell",
         enforce: "pre",

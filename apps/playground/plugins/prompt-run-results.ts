@@ -7,7 +7,7 @@ import { problemFile } from "./document-problems";
 import { RepositoryDocuments } from "./repository-documents";
 import { LaunchHttpError, type LaunchSnapshot } from "./launch-client";
 
-export function persistPromptResult({
+export async function persistPromptResult({
   dir,
   entry,
   snapshot,
@@ -59,7 +59,7 @@ export function persistPromptResult({
       structuredOutput: { violations: findings },
     });
     if (result.kind !== "comment") continue;
-    const existing = (readAll(dir)[page] ?? []).find(
+    const existing = ((await readAll(dir))[page] ?? []).find(
       (comment) =>
         comment.promptRun?.runId === entry.runId &&
         comment.anchor === entry.anchor,
@@ -67,7 +67,7 @@ export function persistPromptResult({
     const { kind: _kind, ...fields } = result;
     const comment =
       existing ??
-      createRootComment(dir, {
+      (await createRootComment(dir, {
         ...fields,
         page,
         anchor: entry.anchor,
@@ -91,7 +91,7 @@ export function persistPromptResult({
           runId: entry.runId,
           ...(sessionId ? { sessionId } : {}),
         },
-      }).comment;
+      })).comment;
     entry.commentId ??= comment.id;
     if (!entry.callbackSent)
       notifications.push({

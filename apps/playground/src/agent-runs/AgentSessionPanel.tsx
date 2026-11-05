@@ -3,8 +3,6 @@ import {
   Badge,
   Button,
   Modal,
-  SegmentedControl,
-  Switch,
   Timestamp,
   type BadgeTone,
 } from "@flanksource/clicky-ui";
@@ -17,8 +15,6 @@ import { RuntimeIdentity } from "./RuntimeIdentity";
 import {
   agentSessionSrc,
   type AgentSession,
-  type AgentSessionGrouping,
-  type AgentSessionSettings,
   type AgentSessionsFile,
 } from "./agent-runs-api";
 
@@ -29,53 +25,8 @@ const STATE_TONE: Record<AgentSession["state"], BadgeTone> = {
   failed: "danger",
 };
 
-const GROUPING_OPTIONS: { id: AgentSessionGrouping; label: string; title: string }[] = [
-  { id: "shared", label: "Shared", title: "One session handles comments from every page" },
-  { id: "page", label: "Per page", title: "Each page's comments go to that page's own session" },
-];
-
 function sessionLabel(session: AgentSession): string {
   return session.label ?? session.page ?? "Shared";
-}
-
-function SettingsRow({
-  settings,
-  busy,
-  onSettings,
-  onChangeRuntime,
-}: {
-  settings: AgentSessionSettings;
-  busy: boolean;
-  onSettings: (patch: Partial<AgentSessionSettings>) => void;
-  onChangeRuntime: () => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-border px-3 py-2">
-      <Switch
-        checked={settings.autoRun}
-        disabled={busy}
-        onChange={(autoRun) => onSettings({ autoRun })}
-        label="Auto-run new comments"
-      />
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">Sessions</span>
-        <SegmentedControl
-          size="sm"
-          aria-label="Session grouping"
-          value={settings.grouping}
-          options={GROUPING_OPTIONS.map((option) => ({ ...option, disabled: busy }))}
-          onChange={(grouping) => onSettings({ grouping })}
-        />
-      </div>
-      <div className="ml-auto flex items-center gap-2 text-xs">
-        <span className="text-muted-foreground">Runtime</span>
-        <span className="font-medium">{settings.runtime ? <RuntimeIdentity runtime={settings.runtime} /> : "not set"}</span>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={onChangeRuntime}>
-          Change…
-        </Button>
-      </div>
-    </div>
-  );
 }
 
 function SessionRow({
@@ -189,8 +140,7 @@ function SessionDetail({
 }
 
 /**
- * The playground's agent sessions: auto-run, grouping and runtime settings,
- * every stored session with its controls, and a live tail of the selected one.
+ * Stored sessions with their controls and a live tail of the selected one.
  */
 export function AgentSessionPanel({
   open,
@@ -199,8 +149,6 @@ export function AgentSessionPanel({
   focusSessionId,
   error,
   busy,
-  onSettings,
-  onChangeRuntime,
   onStop,
   onForget,
   onClose,
@@ -212,8 +160,6 @@ export function AgentSessionPanel({
   focusSessionId: string | null;
   error: string | null;
   busy: boolean;
-  onSettings: (patch: Partial<AgentSessionSettings>) => void;
-  onChangeRuntime: () => void;
   onStop: (runId: string) => void;
   onForget: (runId: string) => void;
   onClose: () => void;
@@ -230,6 +176,16 @@ export function AgentSessionPanel({
     sessions.find((session) => session.sessionId === focusSessionId) ??
     sessions.find((session) => session.state === "running") ??
     sessions[0];
+
+  if (open && focusSessionId && !sessions.some(session => session.sessionId === focusSessionId)) {
+    return <Modal open={open} onClose={onClose} title="Agent session" size="2xl">
+      <p className="mb-2 break-all font-mono text-xs text-muted-foreground">{focusSessionId}</p>
+      <p className="mb-2 text-xs text-muted-foreground">Activity appears when a transcript is available.</p>
+      <div className="h-[65vh] min-h-0 overflow-hidden">
+        <SessionInspector key={focusSessionId} src={agentSessionSrc(focusSessionId)} layout="compact" />
+      </div>
+    </Modal>;
+  }
 
   return (
     <Modal
@@ -251,18 +207,10 @@ export function AgentSessionPanel({
             {error}
           </p>
         )}
-        {data && (
-          <SettingsRow
-            settings={data.settings}
-            busy={busy}
-            onSettings={onSettings}
-            onChangeRuntime={onChangeRuntime}
-          />
-        )}
         {sessions.length === 0 ? (
           <p className="text-muted-foreground">
             No agent session yet. Choose <strong>Run agent</strong> from a
-            comment&apos;s Assign menu, or turn on <strong>Auto-run new comments</strong>,
+            comment&apos;s Assign menu, or turn on <strong>Auto-run new comments</strong> in the Agent menu,
             to start one; later comments are sent into the same session (one per
             page with <strong>Per page</strong>).
           </p>

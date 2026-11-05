@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
 
-import { readAll, writeAll } from "./comments-store";
+import { readAll, writeAll, addComment, removeComment } from "./comments-store";
 import type { StoredComment } from "./comments-store";
 import { recordReviewDecision } from "./review-decisions";
-import { stageScreenshotRemoval } from "./comments-screenshots";
 import {
   PageStoreError,
   pagePath,
@@ -20,10 +19,10 @@ export function reviewAnchor(reviewId: string): string {
   return `[data-review-id="${reviewId}"]`;
 }
 
-export function persistReviewDecision(
+export async function persistReviewDecision(
   request: ReviewSourceRequest,
   decision: StoredComment,
-): StoredComment {
+): Promise<StoredComment> {
   const reviewId = /^\[data-review-id="([A-Za-z][A-Za-z0-9:_-]*)"\]$/.exec(
     decision.anchor ?? "",
   )?.[1];
@@ -34,15 +33,27 @@ export function persistReviewDecision(
     reviewId,
     decision.reviewDecision === "rejected",
   );
-  const previous = readAll(request.commentsDir);
-  const comments = recordReviewDecision(previous[request.slug] ?? [], decision);
+  const previous = await readAll(request.commentsDir);
+  recordReviewDecision(previous[request.slug] ?? [], decision);
+  currentSource(request);
+  let stored: StoredComment | undefined;
   try {
     writeSource(request.pagesDir, request.slug, source);
-    writeAll(request.commentsDir, { ...previous, [request.slug]: comments });
+    stored = await addComment(request.commentsDir, request.slug, decision);
+    const withStored = {
+      ...previous,
+      [request.slug]: [...(previous[request.slug] ?? []), stored],
+    };
+    const comments = recordReviewDecision(previous[request.slug] ?? [], stored);
+    await writeAll(
+      request.commentsDir,
+      { ...previous, [request.slug]: comments },
+      withStored,
+    );
   } catch (cause) {
     try {
       writeSource(request.pagesDir, request.slug, current);
-      writeAll(request.commentsDir, previous);
+      if (stored) await removeComment(request.commentsDir, stored.id);
     } catch (rollbackError) {
       throw new AggregateError(
         [cause, rollbackError],
@@ -51,8 +62,10 @@ export function persistReviewDecision(
     }
     throw cause;
   }
-  const result = comments.at(-1);
-  if (!result) throw new Error("review decision was not persisted");
+  const result = (await readAll(request.commentsDir))[request.slug]?.find(
+    (c) => c.id === stored?.id,
+  );
+  if (!result) throw new Error("Review decision was not persisted");
   return result;
 }
 
@@ -96,15 +109,15 @@ export function markReviewable(
   return { reviewId, source };
 }
 
-export function deleteReviewable(
+export async function deleteReviewable(
   request: ReviewSourceRequest & {
     reviewId: string;
     associatedCommentIds: string[];
   },
-): { removedComments: number; source: string } {
+): Promise<{ removedComments: number; source: string }> {
   const current = currentSource(request);
   const source = deleteReviewableSource(current, request.reviewId);
-  const all = readAll(request.commentsDir);
+  const all = await readAll(request.commentsDir);
   const pageComments = all[request.slug] ?? [];
   const requestedIds = new Set(request.associatedCommentIds);
   for (const id of requestedIds) {
@@ -133,21 +146,19 @@ export function deleteReviewable(
       (comment.parentId && doomedRoots.has(comment.parentId)),
   );
   const next = pageComments.filter((comment) => !doomed.includes(comment));
-  const screenshots = stageScreenshotRemoval(request.commentsDir, doomed);
+  currentSource(request);
   try {
     writeSource(request.pagesDir, request.slug, source);
     if (doomed.length > 0) {
-      all[request.slug] = next;
-      writeAll(request.commentsDir, all);
+      await writeAll(
+        request.commentsDir,
+        { ...all, [request.slug]: next },
+        all,
+      );
     }
   } catch (cause) {
     try {
       writeSource(request.pagesDir, request.slug, current);
-      if (doomed.length > 0) {
-        all[request.slug] = pageComments;
-        writeAll(request.commentsDir, all);
-      }
-      screenshots.rollback();
     } catch (rollbackError) {
       throw new AggregateError(
         [cause, rollbackError],
@@ -156,6 +167,5 @@ export function deleteReviewable(
     }
     throw cause;
   }
-  screenshots.commit();
   return { removedComments: doomed.length, source };
 }

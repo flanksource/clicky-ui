@@ -1,5 +1,7 @@
 import { readFileSync, statSync } from "node:fs";
 import { RepositoryDocuments } from "./repository-documents";
+import { cwdInSessionScope, sessionScopeDirectory } from "./session-scope";
+import { pageInSessionScope } from "../src/agent-runs/session-scope";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import type { Connect, Logger, Plugin } from "vite";
@@ -55,7 +57,7 @@ export const AGENT_SESSIONS_ROUTE = "/__playground/agent-sessions";
 export const AGENT_PROXY_ROUTE = "/__playground/agent-runs";
 
 export type AgentRunsOptions = {
-  /** The `.playground` data directory holding comments.json and agent-sessions.json. */
+  /** The `.playground` directory for agent-session settings and host metadata. */
   dir: string;
   /** Captain's base URL, e.g. `http://localhost:9020`. */
   captainURL: string;
@@ -241,6 +243,9 @@ function parseSettingsPatch(body: Record<string, unknown>): SettingsPatch {
  */
 export type CaptainSessionOption = {
   id: string;
+  captainId?: string;
+  status?: string;
+  detailAvailable?: boolean;
   source: string;
   title: string;
   cwd?: string;
@@ -253,6 +258,9 @@ export function captainSessionOption(record: CaptainLiveSession): CaptainSession
   const prompt = record.initialPrompt?.trim().split("\n")[0];
   return {
     id: record.id,
+    ...(record.key ? { captainId: record.key } : {}),
+    ...(record.live?.status ? { status: record.live.status } : {}),
+    ...(record.detailAvailable !== undefined ? { detailAvailable: record.detailAvailable } : {}),
     source: record.source,
     title: record.title || record.slug || prompt || record.id,
     ...(record.cwd ? { cwd: record.cwd } : {}),
@@ -359,8 +367,8 @@ type ThreadMessageOptions = {
   author: StoredAuthor;
 };
 
-function threadMarkdown(options: ThreadMessageOptions): string {
-  const thread = readPage(options.dir, options.page).filter(
+async function threadMarkdown(options: ThreadMessageOptions): Promise<string> {
+  const thread = (await readPage(options.dir, options.page)).filter(
     (entry) => entry.id === options.rootId || entry.parentId === options.rootId,
   ) as PlaygroundComment[];
   return commentsToMarkdown(
@@ -369,11 +377,11 @@ function threadMarkdown(options: ThreadMessageOptions): string {
   );
 }
 
-function threadMessage(options: ThreadMessageOptions): string {
+async function threadMessage(options: ThreadMessageOptions): Promise<string> {
   const identity = JSON.stringify({ name: options.author.name, kind: "agent" });
   return [
     `Handle this playground feedback thread. It is already acknowledged for you as ${identity}: do not acknowledge it again. Reply with what you changed and how you verified it using reply_to_thread, then resolve the thread with resolve_thread.`,
-    threadMarkdown(options),
+    await threadMarkdown(options),
   ].join("\n\n");
 }
 
@@ -382,7 +390,7 @@ function threadMessage(options: ThreadMessageOptions): string {
  * session tools, so it calls the thread's reply and resolve URLs itself, as
  * the author it was acknowledged as.
  */
-function captainThreadMessage(options: ThreadMessageOptions): string {
+async function captainThreadMessage(options: ThreadMessageOptions): Promise<string> {
   const author = JSON.stringify({ name: options.author.name, kind: "agent" });
   const base = `${options.origin}/__playground/comments/${encodeURIComponent(options.rootId)}`;
   return [
@@ -393,7 +401,7 @@ function captainThreadMessage(options: ThreadMessageOptions): string {
       `curl -sS --fail-with-body -X POST -H 'Content-Type: application/json' --data '{}' '${base}/resolve'`,
       "```",
     ].join("\n"),
-    threadMarkdown(options),
+    await threadMarkdown(options),
   ].join("\n\n");
 }
 
@@ -444,20 +452,20 @@ function sameAgent(left: StoredAuthor | undefined, right: StoredAuthor): boolean
 }
 
 /** Hands a root to the agent: human assignment if needed, then the agent's acknowledgement. */
-function claimForAgent(options: {
+async function claimForAgent(options: {
   dir: string;
   comment: StoredComment;
   human: StoredAuthor;
   agent: StoredAuthor;
-}): void {
+}): Promise<void> {
   const { dir, comment, human, agent } = options;
   if (!sameAgent(comment.assignee, agent)) {
-    assignComment(dir, comment.id, human, agent);
+    await assignComment(dir, comment.id, human, agent);
   }
-  acknowledgeComment(dir, comment.id, agent);
+  await acknowledgeComment(dir, comment.id, agent);
   // Acknowledgement is idempotent for the holder, so a repeat run (or an agent
   // that acknowledged first) leaves the previous session id on record.
-  patchComment(dir, comment.id, { assignee: agent, acknowledgedBy: agent });
+  await patchComment(dir, comment.id, { assignee: agent, acknowledgedBy: agent });
 }
 
 /** A root handed to the playground's own session, or delivered into a live captain one. */
@@ -465,8 +473,8 @@ type ThreadHandoff =
   | { comment: StoredComment; session: AgentSession }
   | { comment: StoredComment; delivery: CaptainDeliverResult };
 
-function setAgentRun(dir: string, id: string, run: StoredAgentRun): void {
-  patchComment(dir, id, { agentRun: run });
+async function setAgentRun(dir: string, id: string, run: StoredAgentRun): Promise<void> {
+  await patchComment(dir, id, { agentRun: run });
 }
 
 export function createAgentRuns(options: AgentRunsOptions) {
@@ -583,8 +591,16 @@ export function createAgentRuns(options: AgentRunsOptions) {
   }
 
   /** Every live captain session, projected for the target picker. */
-  async function captainSessions(): Promise<CaptainSessionOption[]> {
-    return (await captain.listLiveSessions()).map(captainSessionOption);
+  async function captainSessions(page?: string): Promise<CaptainSessionOption[]> {
+    const directory = page ? sessionScopeDirectory({ page, dir, cwd }) : undefined;
+    const stored = readAgentSessions(dir);
+    const linked = new Set(page ? [
+      ...Object.entries(stored.settings.targets ?? {}).filter(([key]) => pageInSessionScope(key, page)).map(([, target]) => target.sessionId),
+      ...stored.sessions.filter(session => session.page && pageInSessionScope(session.page, page)).map(session => session.sessionId),
+    ] : []);
+    return (await captain.listLiveSessions())
+      .filter(session => !directory || linked.has(session.id) || (session.key && linked.has(session.key)) || (session.cwd && cwdInSessionScope(session.cwd, directory)))
+      .map(captainSessionOption);
   }
 
   async function projects() {
@@ -692,8 +708,8 @@ export function createAgentRuns(options: AgentRunsOptions) {
       via: "captain",
     });
     const requestedAt = new Date().toISOString();
-    claimForAgent({ dir, comment, human: request.human, agent: author });
-    setAgentRun(dir, comment.id, {
+    await claimForAgent({ dir, comment, human: request.human, agent: author });
+    await setAgentRun(dir, comment.id, {
       sessionId: target.sessionId,
       requestedAt,
       state: "queued",
@@ -703,10 +719,10 @@ export function createAgentRuns(options: AgentRunsOptions) {
     try {
       delivery = await captain.deliver(
         target.sessionId,
-        captainThreadMessage({ dir, page, rootId: comment.id, origin, author }),
+        await captainThreadMessage({ dir, page, rootId: comment.id, origin, author }),
       );
     } catch (error) {
-      setAgentRun(dir, comment.id, {
+      await setAgentRun(dir, comment.id, {
         sessionId: target.sessionId,
         requestedAt,
         state: "error",
@@ -715,13 +731,13 @@ export function createAgentRuns(options: AgentRunsOptions) {
       });
       throw error;
     }
-    setAgentRun(dir, comment.id, {
+    await setAgentRun(dir, comment.id, {
       sessionId: target.sessionId,
       requestedAt,
       state: delivery.status === "queued" ? "queued" : "sent",
       target: { label: target.label, channel: delivery.channel },
     });
-    return { comment: findComment(dir, comment.id)!.comment, delivery };
+    return { comment: (await findComment(dir, comment.id))!.comment, delivery };
   }
 
   /** Points a page's threads at a live captain session, or back at the playground's. */
@@ -754,7 +770,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
     request: RunRequest,
     origin: string,
   ): Promise<ThreadHandoff> {
-    const found = findComment(dir, id);
+    const found = await findComment(dir, id);
     if (!found) throw new CommentHttpError(`comment "${id}" not found`, 404);
     if (found.comment.parentId) {
       throw new CommentHttpError("only a thread root can be sent to an agent", 409);
@@ -838,11 +854,11 @@ export function createAgentRuns(options: AgentRunsOptions) {
           author,
           page,
         }),
-        message: message(author),
+        message: await message(author),
         origin,
         author,
       });
-      claimForAgent({
+      await claimForAgent({
         dir,
         comment: found.comment,
         human: request.human,
@@ -852,29 +868,29 @@ export function createAgentRuns(options: AgentRunsOptions) {
           via: "playground",
         }),
       });
-      setAgentRun(dir, id, {
+      await setAgentRun(dir, id, {
         sessionId: started.sessionId,
         requestedAt,
         state: "sent",
       });
-      return { comment: findComment(dir, id)!.comment, session: started };
+      return { comment: (await findComment(dir, id))!.comment, session: started };
     }
 
-    claimForAgent({ dir, comment: found.comment, human: request.human, agent: author });
-    setAgentRun(dir, id, {
+    await claimForAgent({ dir, comment: found.comment, human: request.human, agent: author });
+    await setAgentRun(dir, id, {
       sessionId: session.sessionId,
       requestedAt,
       state: "queued",
     });
     try {
-      const sent = await captain.sendMessage(session.runId, message(author));
-      setAgentRun(dir, id, {
+      const sent = await captain.sendMessage(session.runId, await message(author));
+      await setAgentRun(dir, id, {
         sessionId: session.sessionId,
         requestedAt,
         state: sent.status === "queued" ? "queued" : "sent",
       });
     } catch (error) {
-      setAgentRun(dir, id, {
+      await setAgentRun(dir, id, {
         sessionId: session.sessionId,
         requestedAt,
         state: "error",
@@ -882,7 +898,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
       });
       throw error;
     }
-    return { comment: findComment(dir, id)!.comment, session };
+    return { comment: (await findComment(dir, id))!.comment, session };
   }
 
   function runOnComment(
@@ -919,9 +935,9 @@ export function createAgentRuns(options: AgentRunsOptions) {
     try {
       await serialized(() => sendThread(comment.id, { human }, origin));
     } catch (error) {
-      const run = findComment(dir, comment.id)?.comment.agentRun;
+      const run = (await findComment(dir, comment.id))?.comment.agentRun;
       if (run?.state !== "error") {
-        setAgentRun(dir, comment.id, {
+        await setAgentRun(dir, comment.id, {
           ...(run?.sessionId ? { sessionId: run.sessionId } : {}),
           requestedAt: new Date().toISOString(),
           state: "error",
@@ -1177,7 +1193,7 @@ export function playgroundAgentRuns(runs: AgentRuns): Plugin {
             if (method !== "GET") {
               throw new RequestError("GET lists the live captain sessions", 405);
             }
-            sendJson(res, 200, { sessions: await runs.captainSessions() });
+            sendJson(res, 200, { sessions: await runs.captainSessions(url.searchParams.get("page") ?? undefined) });
           } else if (entry) {
             if (method !== "DELETE") {
               throw new RequestError("DELETE ends and forgets an agent session", 405);

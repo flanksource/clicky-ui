@@ -78,6 +78,7 @@ export class StubCaptain {
     };
 
     if (method === "POST" && path === "/api/launch/prepare") return json(200,{preparationId:"prepared",directory:"/workspace"});
+    if (method === "POST" && path === "/api/launch/lint/filter") return json(200, body?.["results"]);
     if (method === "GET" && path === "/api/launch/prompts") {
       const query = new URL(url,"http://stub.local").searchParams;
       const key = query.get("prompt");

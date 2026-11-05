@@ -1,3 +1,4 @@
+import { configureTestComments } from "./testing/comments-store";
 // @vitest-environment node
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -9,7 +10,7 @@ import { PromptAssociations } from "./prompt-associations";
 
 import { createAgentRuns, playgroundAgentRuns } from "./agent-runs-server";
 import { playgroundComments } from "./comments-server";
-import { readAll, type StoredComment } from "./comments-store";
+import { readAll, type StoredComment } from "./testing/comments-store";
 import { CaptainHttpError, CaptainUnreachableError } from "./captain-client";
 import {
   createPromptRuns,
@@ -125,6 +126,7 @@ describe("playground prompt runs", () => {
   beforeEach(async () => {
     mkdirSync(join(process.cwd(), ".tmp"), { recursive: true });
     dir = mkdtempSync(join(process.cwd(), ".tmp", "prompt-runs-"));
+    configureTestComments(dir);
     captain = new StubCaptain();
     captain.prompts = [DIAGRAM_SMELLS];
     captainURL = await captain.listen();
@@ -201,8 +203,8 @@ describe("playground prompt runs", () => {
     return found as PromptRun;
   }
 
-  function pageComments(): StoredComment[] {
-    return readAll(dir)[PAGE] ?? [];
+  async function pageComments(): Promise<StoredComment[]> {
+    return (await readAll(dir))[PAGE] ?? [];
   }
 
   it("recovers a durably queued association with protected inputs and creates one result comment", async () => {
@@ -252,7 +254,7 @@ describe("playground prompt runs", () => {
         associationId,
       ).request.variables.token,
     ).toBe(secret);
-    expect(pageComments()).toHaveLength(1);
+    expect(await pageComments()).toHaveLength(1);
     const reopened = createPromptRuns({
       dir,
       gavelURL: captainURL,
@@ -263,7 +265,7 @@ describe("playground prompt runs", () => {
       { state: "done" },
     ]);
     expect(captain.callsTo("POST", /^\/api\/launch\/lint$/)).toHaveLength(1);
-    expect(pageComments()).toHaveLength(1);
+    expect(await pageComments()).toHaveLength(1);
   });
 
   it("lists captain's prompts and derives a prompt's argument schema from its template", async () => {
@@ -353,7 +355,7 @@ describe("playground prompt runs", () => {
 
     const done = await settled(run.runId);
     expect(done.state).toBe("done");
-    const [comment] = pageComments();
+    const [comment] = await pageComments();
     expect(comment).toMatchObject({
       id: done.commentId,
       status: "open",
@@ -405,7 +407,8 @@ describe("playground prompt runs", () => {
     await settled(run.runId);
 
     await vi.waitFor(
-      () => expect(pageComments()[0]?.agentRun?.state).toBe("sent"),
+      async () =>
+        expect((await pageComments())[0]?.agentRun?.state).toBe("sent"),
       {
         timeout: 3000,
       },
@@ -413,7 +416,7 @@ describe("playground prompt runs", () => {
     const chat = captain.callsTo("POST", /^\/api\/v1\/prompt\/run$/);
     expect(chat).toHaveLength(1);
     expect(JSON.stringify(chat[0]?.body)).toContain("Label overflows its box.");
-    expect(pageComments()[0]).toMatchObject({
+    expect((await pageComments())[0]).toMatchObject({
       status: "in_progress",
       assignee: { name: "m-1", kind: "agent" },
     });
@@ -437,7 +440,7 @@ describe("playground prompt runs", () => {
     captain.nextSummary = summary;
     const { run } = (await (await startRun()).json()) as { run: PromptRun };
     expect(await settled(run.runId)).toMatchObject(expected);
-    expect(pageComments()).toEqual([]);
+    expect(await pageComments()).toEqual([]);
   });
 
   it.each([

@@ -1,10 +1,11 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { checkGavelCompatibility } from "./gavel-compatibility";
 
 /** Where the playground reaches Gavel's launch API (`gavel launch serve`). */
 export type GavelEndpoint = {
-  /** The base URL of a launch server that answers. */
-  url(): Promise<string>;
+  /** The launch server URL; `start: false` only reads its configured address. */
+  url(options?: { start?: boolean }): Promise<string>;
   /**
    * Called when a request could not reach `url()`. Returns true when asking
    * `url()` again may help: an on-demand endpoint whose server is gone starts
@@ -14,7 +15,28 @@ export type GavelEndpoint = {
   /** How many servers this endpoint has started; a new one forgets the old one's preparations. */
   readonly generation: number;
   close(): Promise<void>;
+  /** Present when the playground starts the server itself; absent for a server run elsewhere. */
+  readonly managed?: ManagedGavel;
 };
+
+/** The `gavel launch serve` process an on-demand endpoint owns. */
+export type ManagedGavel = {
+  /** The pid of the running server this endpoint started, or undefined when none is running. */
+  pid(): number | undefined;
+  /**
+   * Stops the server this endpoint started, if any, and starts a new one (picking up a rebuilt
+   * binary). Rejects with GavelOwnershipError when another process serves the address.
+   */
+  restart(): Promise<string>;
+};
+
+/** A server the playground did not start answers at its launch address, so it cannot restart it. */
+export class GavelOwnershipError extends Error {
+  constructor(url: string) {
+    super(`Another process serves Gavel at ${url}; the playground did not start it, so restart it where it was started.`);
+    this.name = "GavelOwnershipError";
+  }
+}
 
 const PROBE = "/api/launch?schema";
 
@@ -66,7 +88,7 @@ export function onDemandGavel({
   const alive = (proc: ChildProcess | undefined) => !!proc && proc.exitCode === null && proc.signalCode === null;
 
   async function start(): Promise<string> {
-    if (await answers(url)) return url;
+    if (await answers(url)) { await checkGavelCompatibility(url); return url; }
     const proc = spawn(bin!, [...leading, "launch", "serve", "--root", workspace, ...localRoots.flatMap((path) => ["--local-root", path]), "--addr", addr], {
       cwd: workspace,
       stdio: ["ignore", "ignore", "pipe"],
@@ -103,6 +125,7 @@ export function onDemandGavel({
     };
     try {
       await Promise.race([poll(), failed]);
+      await checkGavelCompatibility(url);
     } catch (error) {
       proc.kill();
       throw error;
@@ -111,16 +134,56 @@ export function onDemandGavel({
     return url;
   }
 
+  async function stop() {
+    const proc = child;
+    child = undefined;
+    if (!alive(proc)) return;
+    const exited = new Promise((resolve) => proc!.once("exit", resolve));
+    proc!.kill("SIGTERM");
+    const stopped = await Promise.race([exited.then(() => true), sleep(5000).then(() => false)]);
+    if (!stopped) {
+      proc!.kill("SIGKILL");
+      await exited;
+    }
+  }
+
+  /** Callers reach the server through `ready`, so a pending start, its failure, or a restart is shared by all of them. */
+  function track(pending: Promise<string>) {
+    const tracked = pending.catch((error: unknown) => {
+      if (ready === tracked) ready = undefined;
+      throw error;
+    });
+    ready = tracked;
+    return tracked;
+  }
+
+  let restarting = 0;
+  async function restart(): Promise<string> {
+    const previous = ready;
+    restarting++;
+    try {
+      return await track((async () => {
+        // A start still in flight owns the child this restart has to stop.
+        await previous?.catch(() => undefined);
+        const pid = child?.pid;
+        await stop();
+        if (await answers(url)) throw new GavelOwnershipError(url);
+        if (pid !== undefined) log(`stopped gavel launch serve (pid ${pid}) for restart`);
+        return start();
+      })());
+    } finally {
+      restarting--;
+    }
+  }
+
   const stopOnExit = () => child?.kill();
   process.once("exit", stopOnExit);
 
   return {
-    url: () =>
-      (ready ??= start().catch((error: unknown) => {
-        ready = undefined;
-        throw error;
-      })),
+    url: (options) => options?.start === false ? Promise.resolve(url) : (ready ?? track(start())),
     unreachable: () => {
+      // During a restart `ready` already resolves to the new server; dropping it would start a second one.
+      if (restarting > 0) return true;
       if (alive(child)) return false;
       ready = undefined;
       return true;
@@ -128,19 +191,14 @@ export function onDemandGavel({
     get generation() {
       return generation;
     },
+    managed: {
+      pid: () => (alive(child) ? child!.pid : undefined),
+      restart,
+    },
     close: async () => {
       process.off("exit", stopOnExit);
-      const proc = child;
-      child = undefined;
       ready = undefined;
-      if (!alive(proc)) return;
-      const exited = new Promise((resolve) => proc!.once("exit", resolve));
-      proc!.kill("SIGTERM");
-      const stopped = await Promise.race([exited.then(() => true), sleep(5000).then(() => false)]);
-      if (!stopped) {
-        proc!.kill("SIGKILL");
-        await exited;
-      }
+      await stop();
     },
   };
 }

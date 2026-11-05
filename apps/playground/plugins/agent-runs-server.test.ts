@@ -6,14 +6,22 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createServer, type ViteDevServer } from "vite";
 
-import { createAgentRuns, playgroundAgentRuns, SESSION_TOOLS } from "./agent-runs-server";
+import {
+  createAgentRuns,
+  playgroundAgentRuns,
+  SESSION_TOOLS,
+} from "./agent-runs-server";
 import {
   readAgentSessions,
   type AgentSession,
   type AgentSessionsFile,
 } from "./agent-session-store";
 import { playgroundComments } from "./comments-server";
-import { readAll, writeAll, type StoredComment } from "./comments-store";
+import {
+  readAll,
+  writeAll,
+  type StoredComment,
+} from "./testing/comments-store";
 import { createSource } from "./pages-store";
 import { StubCaptain } from "./testing/stub-captain";
 
@@ -50,6 +58,7 @@ function runBash(args: string[], input = "") {
 }
 
 const first: StoredComment = {
+  version: 1,
   id: "first",
   body: "Make the heading bolder {{not-a-template}}",
   createdAt: "2026-10-18T09:00:00.000Z",
@@ -103,7 +112,7 @@ describe("playground shared agent session", () => {
   beforeEach(async () => {
     mkdirSync(join(process.cwd(), ".tmp"), { recursive: true });
     dir = mkdtempSync(join(process.cwd(), ".tmp", "agent-runs-"));
-    writeAll(dir, { welcome: [first, second] });
+    await writeAll(dir, { welcome: [first, second] });
     mkdirSync(join(dir, "pages"));
     createSource(join(dir, "pages"), "welcome", WELCOME_SOURCE, ".tsx");
     captain = new StubCaptain();
@@ -148,9 +157,11 @@ describe("playground shared agent session", () => {
       sessionId: session.sessionId,
       label: `welcome · ${MODEL}`,
     });
-    expect(stored(second.id).agentRun).toBeUndefined();
+    expect((await stored(second.id)).agentRun).toBeUndefined();
     expect((await run(second.id, {})).ok).toBe(true);
-    expect(stored(second.id).agentRun?.sessionId).toBe(session.sessionId);
+    expect((await stored(second.id)).agentRun?.sessionId).toBe(
+      session.sessionId,
+    );
     expect(
       captain.callsTo("POST", new RegExp(`/runs/${session.runId}/message$`)),
     ).toHaveLength(1);
@@ -165,7 +176,7 @@ describe("playground shared agent session", () => {
       status: 422,
       body: { error: "runtime unavailable" },
     };
-    const before = readAll(dir);
+    const before = await readAll(dir);
     const created = await fetch(
       `${baseUrl}/__playground/agent-sessions/sessions`,
       {
@@ -181,11 +192,11 @@ describe("playground shared agent session", () => {
     expect(created.status).toBe(502);
     expect(readAgentSessions(dir).sessions).toEqual([]);
     expect(readAgentSessions(dir).settings.targets).toBeUndefined();
-    expect(readAll(dir)).toEqual(before);
+    expect(await readAll(dir)).toEqual(before);
   });
 
-  function stored(id: string): StoredComment {
-    const found = Object.values(readAll(dir))
+  async function stored(id: string): Promise<StoredComment> {
+    const found = Object.values(await readAll(dir))
       .flat()
       .find((entry) => entry.id === id);
     if (!found) throw new Error(`comment ${id} missing`);
@@ -215,7 +226,10 @@ describe("playground shared agent session", () => {
         page,
         body: "Align the toolbar",
         author: human,
-        element: { source: `src/pages/${page}.tsx:1`, html: "<div>toolbar</div>" },
+        element: {
+          source: `src/pages/${page}.tsx:1`,
+          html: "<div>toolbar</div>",
+        },
         ...body,
       }),
     });
@@ -224,16 +238,22 @@ describe("playground shared agent session", () => {
   }
 
   /** Auto-run happens after the 201, so poll until the comment records its hand-off. */
-  async function settledRun(id: string) {
-    await vi.waitFor(() => expect(stored(id).agentRun?.state).toMatch(/sent|queued|error/), {
-      timeout: 3000,
-    });
-    return stored(id).agentRun;
+  async function settledRun(id: string, expected: "sent" | "error") {
+    await vi.waitFor(
+      async () => expect((await stored(id)).agentRun?.state).toBe(expected),
+      {
+        timeout: 3000,
+      },
+    );
+    return (await stored(id)).agentRun;
   }
 
   describe("session tools", () => {
     /** Runs a tool's script as captain does: variables shell-quoted by shq, input on stdin. */
-    function callTool(name: keyof typeof SESSION_TOOLS, input: Record<string, unknown>) {
+    function callTool(
+      name: keyof typeof SESSION_TOOLS,
+      input: Record<string, unknown>,
+    ) {
       const script = SESSION_TOOLS[name].exec
         .replaceAll("{{shq origin}}", `'${baseUrl}'`)
         .replaceAll("{{shq author}}", `'${MODEL}'`);
@@ -244,9 +264,9 @@ describe("playground shared agent session", () => {
       const listed = await callTool("list_feedback", { page: "welcome" });
 
       expect(listed.status).toBe(0);
-      const ids = (JSON.parse(listed.stdout) as { comments: StoredComment[] }).comments.map(
-        (comment) => comment.id,
-      );
+      const ids = (
+        JSON.parse(listed.stdout) as { comments: StoredComment[] }
+      ).comments.map((comment) => comment.id);
       expect(ids).toEqual(["first", "second"]);
     });
 
@@ -257,18 +277,21 @@ describe("playground shared agent session", () => {
         body: JSON.stringify({ author: { name: MODEL, kind: "agent" } }),
       });
 
-      const replied = await callTool("reply_to_thread", { id: "first", body: "Bolded the heading; checked desktop and compact." });
+      const replied = await callTool("reply_to_thread", {
+        id: "first",
+        body: "Bolded the heading; checked desktop and compact.",
+      });
       const resolved = await callTool("resolve_thread", { id: "first" });
 
       expect([replied.status, resolved.status]).toEqual([0, 0]);
-      const reply = Object.values(readAll(dir))
+      const reply = Object.values(await readAll(dir))
         .flat()
         .find((entry) => entry.parentId === "first");
       expect(reply).toMatchObject({
         body: "Bolded the heading; checked desktop and compact.",
         author: { name: MODEL, kind: "agent" },
       });
-      expect(stored("first").status).toBe("resolved");
+      expect((await stored("first")).status).toBe("resolved");
     });
 
     it("fails with the API's reason when the thread cannot be resolved", async () => {
@@ -307,7 +330,9 @@ describe("playground shared agent session", () => {
     expect(start.variables.message).toContain(
       "Make the heading bolder {{not-a-template}}",
     );
-    expect(start.variables.message).toContain("/__playground/comments/first/replies");
+    expect(start.variables.message).toContain(
+      "/__playground/comments/first/replies",
+    );
     expect(start.variables.instructions).toContain("clicky-ui-playground");
     expect(start.variables.instructions).toContain(`"name":"${MODEL}"`);
 
@@ -324,7 +349,7 @@ describe("playground shared agent session", () => {
       ],
     });
 
-    const root = stored("first");
+    const root = await stored("first");
     const agent = {
       name: MODEL,
       kind: "agent",
@@ -354,13 +379,13 @@ describe("playground shared agent session", () => {
     expect(JSON.stringify(messages[0]?.body)).toContain(
       "Tighten the footer spacing",
     );
-    expect(stored("second")).toMatchObject({
+    expect(await stored("second")).toMatchObject({
       status: "in_progress",
       assignee: { name: MODEL, kind: "agent", sessionId: "session-of-run-1" },
       agentRun: { sessionId: "session-of-run-1", state: "queued" },
     });
-    expect(stored("first").agentRun?.sessionId).toBe(
-      stored("second").agentRun?.sessionId,
+    expect((await stored("first")).agentRun?.sessionId).toBe(
+      (await stored("second")).agentRun?.sessionId,
     );
   });
 
@@ -386,7 +411,9 @@ describe("playground shared agent session", () => {
       runtime: RUNTIME,
       state: "running",
     });
-    expect(stored("second").agentRun?.sessionId).toBe("session-of-run-2");
+    expect((await stored("second")).agentRun?.sessionId).toBe(
+      "session-of-run-2",
+    );
   });
 
   it("asks for a runtime when no session has ever run", async () => {
@@ -396,7 +423,7 @@ describe("playground shared agent session", () => {
       /runtime/,
     );
     expect(captain.calls).toHaveLength(0);
-    expect(stored("first").agentRun).toBeUndefined();
+    expect((await stored("first")).agentRun).toBeUndefined();
   });
 
   it("stops and forgets one session on DELETE; the next run starts a fresh one", async () => {
@@ -427,10 +454,12 @@ describe("playground shared agent session", () => {
     expect(((await response.json()) as { error: string }).error).toContain(
       captainURL,
     );
-    expect(stored("first")).toEqual(first);
+    expect(await stored("first")).toEqual(first);
     expect(readAgentSessions(dir).sessions).toEqual([]);
 
-    const proxied = await fetch(`${baseUrl}/__playground/agent-runs/runs/run-1`);
+    const proxied = await fetch(
+      `${baseUrl}/__playground/agent-runs/runs/run-1`,
+    );
     expect(proxied.status).toBe(502);
     expect(((await proxied.json()) as { error: string }).error).toContain(
       captainURL,
@@ -444,7 +473,7 @@ describe("playground shared agent session", () => {
     });
     expect(agent.status).toBe(403);
 
-    writeAll(dir, { welcome: [{ ...first, status: "resolved" }] });
+    await writeAll(dir, { welcome: [{ ...first, status: "resolved" }] });
     const resolved = await run("first", { runtime: RUNTIME });
     expect(resolved.status).toBe(409);
     expect(captain.calls).toHaveLength(0);
@@ -452,13 +481,16 @@ describe("playground shared agent session", () => {
 
   it("marks the thread done when the agent resolves it", async () => {
     await run("first", { runtime: RUNTIME });
-    const resolve = await fetch(`${baseUrl}/__playground/comments/first/resolve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
+    const resolve = await fetch(
+      `${baseUrl}/__playground/comments/first/resolve`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
     expect(resolve.status).toBe(200);
-    expect(stored("first")).toMatchObject({
+    expect(await stored("first")).toMatchObject({
       status: "resolved",
       agentRun: { sessionId: "session-of-run-1", state: "done" },
     });
@@ -466,9 +498,12 @@ describe("playground shared agent session", () => {
 
   it("proxies stop to captain and records the session as stopped", async () => {
     await run("first", { runtime: RUNTIME });
-    const stop = await fetch(`${baseUrl}/__playground/agent-runs/runs/run-1/stop`, {
-      method: "POST",
-    });
+    const stop = await fetch(
+      `${baseUrl}/__playground/agent-runs/runs/run-1/stop`,
+      {
+        method: "POST",
+      },
+    );
     expect(stop.status).toBe(202);
     expect(captain.callsTo("POST", /\/runs\/run-1\/stop$/)).toHaveLength(1);
     expect(onlySession()).toMatchObject({
@@ -486,7 +521,9 @@ describe("playground shared agent session", () => {
 
     (captain.runs.get("run-1") as { done: boolean }).done = true;
     const ended = await fetch(`${baseUrl}/__playground/agent-sessions`);
-    expect(((await ended.json()) as AgentSessionsFile).sessions[0]).toMatchObject({
+    expect(
+      ((await ended.json()) as AgentSessionsFile).sessions[0],
+    ).toMatchObject({
       state: "ended",
       endedAt: expect.any(String),
     });
@@ -529,8 +566,11 @@ describe("playground shared agent session", () => {
     const pricingFirst: StoredComment = { ...first, id: "pricing-first" };
     const pricingSecond: StoredComment = { ...second, id: "pricing-second" };
 
-    beforeEach(() => {
-      writeAll(dir, { welcome: [first, second], pricing: [pricingFirst, pricingSecond] });
+    beforeEach(async () => {
+      await writeAll(dir, {
+        welcome: [first, second],
+        pricing: [pricingFirst, pricingSecond],
+      });
     });
 
     it("shares one session across pages in shared grouping", async () => {
@@ -556,14 +596,23 @@ describe("playground shared agent session", () => {
         'agent session for playground page "pricing"',
       );
       expect(
-        readAgentSessions(dir).sessions.map(({ page, runId }) => ({ page, runId })),
+        readAgentSessions(dir).sessions.map(({ page, runId }) => ({
+          page,
+          runId,
+        })),
       ).toEqual([
         { page: "welcome", runId: "run-1" },
         { page: "pricing", runId: "run-2" },
       ]);
-      expect(captain.callsTo("POST", /\/runs\/run-2\/message$/)).toHaveLength(1);
-      expect(captain.callsTo("POST", /\/runs\/run-1\/message$/)).toHaveLength(0);
-      expect(stored("pricing-second").agentRun?.sessionId).toBe("session-of-run-2");
+      expect(captain.callsTo("POST", /\/runs\/run-2\/message$/)).toHaveLength(
+        1,
+      );
+      expect(captain.callsTo("POST", /\/runs\/run-1\/message$/)).toHaveLength(
+        0,
+      );
+      expect((await stored("pricing-second")).agentRun?.sessionId).toBe(
+        "session-of-run-2",
+      );
     });
   });
 
@@ -599,11 +648,11 @@ describe("playground shared agent session", () => {
       await putSettings({ autoRun: true, runtime: RUNTIME });
       const created = await createRoot("welcome", {});
 
-      expect(await settledRun(created.id)).toMatchObject({
+      expect(await settledRun(created.id, "sent")).toMatchObject({
         sessionId: "session-of-run-1",
         state: "sent",
       });
-      expect(stored(created.id)).toMatchObject({
+      expect(await stored(created.id)).toMatchObject({
         status: "in_progress",
         assignee: { name: MODEL, kind: "agent" },
       });
@@ -639,7 +688,7 @@ describe("playground shared agent session", () => {
       await captain.close();
       const created = await createRoot("welcome", {});
 
-      const run = await settledRun(created.id);
+      const run = await settledRun(created.id, "error");
       expect(run).toMatchObject({ state: "error" });
       expect(run?.error).toContain(captainURL);
       expect(run).not.toHaveProperty("sessionId");
@@ -649,7 +698,11 @@ describe("playground shared agent session", () => {
   describe("captain session target", () => {
     const LIVE_ID = "captain-live-1";
     const LIVE_MODEL = "claude-opus-5-5";
-    const target = { kind: "captain", sessionId: LIVE_ID, label: "Fix toolbar · claude" };
+    const target = {
+      kind: "captain",
+      sessionId: LIVE_ID,
+      label: "Fix toolbar · claude",
+    };
     const liveRow = {
       id: LIVE_ID,
       source: "claude",
@@ -659,17 +712,24 @@ describe("playground shared agent session", () => {
       live: {
         pid: 4242,
         active: true,
-        environment: { CLAUDE_CODE_SESSION_ID: "provider-1", CMUX_SURFACE_ID: "surface-1" },
+        environment: {
+          CLAUDE_CODE_SESSION_ID: "provider-1",
+          CMUX_SURFACE_ID: "surface-1",
+        },
         surface: { surfaceId: "surface-1" },
       },
     };
 
     /** The text of the one delivery captain received. */
     function deliveredText(): string {
-      const delivered = captain.callsTo("POST", /^\/api\/captain\/sessions\/captain-live-1\/deliver$/);
+      const delivered = captain.callsTo(
+        "POST",
+        /^\/api\/captain\/sessions\/captain-live-1\/deliver$/,
+      );
       expect(delivered).toHaveLength(1);
       const body = delivered[0]?.body as { text?: unknown } | undefined;
-      if (typeof body?.text !== "string") throw new Error(`delivery without text: ${JSON.stringify(body)}`);
+      if (typeof body?.text !== "string")
+        throw new Error(`delivery without text: ${JSON.stringify(body)}`);
       return body.text;
     }
 
@@ -686,7 +746,9 @@ describe("playground shared agent session", () => {
     });
 
     it("lists live captain sessions without their process environment", async () => {
-      const response = await fetch(`${baseUrl}/__playground/agent-sessions/captain`);
+      const response = await fetch(
+        `${baseUrl}/__playground/agent-sessions/captain`,
+      );
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
@@ -701,14 +763,20 @@ describe("playground shared agent session", () => {
           },
         ],
       });
-      expect(captain.callsTo("GET", /^\/api\/captain\/sessions\/live\?all=true/)).toHaveLength(1);
+      expect(
+        captain.callsTo("GET", /^\/api\/captain\/sessions\/live\?all=true/),
+      ).toHaveLength(1);
     });
 
     it("stores a page's captain target and clears it back to the playground session", async () => {
       expect((await putTarget("welcome", target)).status).toBe(200);
-      expect(readAgentSessions(dir).settings.targets).toEqual({ welcome: target });
+      expect(readAgentSessions(dir).settings.targets).toEqual({
+        welcome: target,
+      });
 
-      expect((await putTarget("welcome", { kind: "playground" })).status).toBe(200);
+      expect((await putTarget("welcome", { kind: "playground" })).status).toBe(
+        200,
+      );
       expect(readAgentSessions(dir).settings.targets).toEqual({});
     });
 
@@ -736,8 +804,13 @@ describe("playground shared agent session", () => {
       expect(text).toContain(`${baseUrl}/__playground/comments/first/resolve`);
       expect(text).toContain(`{"name":"${LIVE_MODEL}","kind":"agent"}`);
 
-      const agent = { name: LIVE_MODEL, kind: "agent", via: "captain", sessionId: LIVE_ID };
-      expect(stored("first")).toMatchObject({
+      const agent = {
+        name: LIVE_MODEL,
+        kind: "agent",
+        via: "captain",
+        sessionId: LIVE_ID,
+      };
+      expect(await stored("first")).toMatchObject({
         status: "in_progress",
         assignee: agent,
         acknowledgedBy: agent,
@@ -759,8 +832,10 @@ describe("playground shared agent session", () => {
       const result = await runBash(["-euo", "pipefail", "-c", commands]);
 
       expect(result.status, result.stderr).toBe(0);
-      expect(stored("first").status).toBe("resolved");
-      const reply = Object.values(readAll(dir)).flat().find((entry) => entry.parentId === "first");
+      expect((await stored("first")).status).toBe("resolved");
+      const reply = Object.values(await readAll(dir))
+        .flat()
+        .find((entry) => entry.parentId === "first");
       expect(reply?.author).toMatchObject({ name: LIVE_MODEL, kind: "agent" });
     });
 
@@ -771,10 +846,12 @@ describe("playground shared agent session", () => {
       const response = await run("first", {});
 
       expect(response.status).toBe(409);
-      expect(((await response.json()) as { error: string }).error).toContain("no longer live");
-      expect(stored("first")).toMatchObject({ status: "open" });
-      expect(stored("first")).not.toHaveProperty("assignee");
-      expect(stored("first")).not.toHaveProperty("agentRun");
+      expect(((await response.json()) as { error: string }).error).toContain(
+        "no longer live",
+      );
+      expect(await stored("first")).toMatchObject({ status: "open" });
+      expect(await stored("first")).not.toHaveProperty("assignee");
+      expect(await stored("first")).not.toHaveProperty("agentRun");
     });
 
     it("refuses a runtime for a page that sends to captain", async () => {
@@ -790,7 +867,10 @@ describe("playground shared agent session", () => {
 
       const created = await createRoot("welcome", {});
 
-      expect(await settledRun(created.id)).toMatchObject({ sessionId: LIVE_ID, state: "sent" });
+      expect(await settledRun(created.id, "sent")).toMatchObject({
+        sessionId: LIVE_ID,
+        state: "sent",
+      });
       expect(captain.callsTo("POST", /\/api\/v1\/prompt\/run/)).toHaveLength(0);
     });
 
@@ -801,7 +881,9 @@ describe("playground shared agent session", () => {
 
       expect(response.status).toBe(202);
       expect(captain.callsTo("POST", /\/deliver$/)).toHaveLength(0);
-      expect(stored("first").agentRun).toMatchObject({ sessionId: "session-of-run-1" });
+      expect((await stored("first")).agentRun).toMatchObject({
+        sessionId: "session-of-run-1",
+      });
     });
   });
 });

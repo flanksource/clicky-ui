@@ -76,6 +76,7 @@ export function CommentDashboardEntry({
   replies: Comment[];
 }) {
   const agentRuns = useAgentRuns();
+  const { config } = useCommentContext();
   const status = PLAYGROUND_COMMENT_CONFIG.statuses.find(
     (entry) => entry.value === (comment.status ?? "open"),
   );
@@ -155,7 +156,7 @@ export function CommentDashboardEntry({
           <CommentMarkdown
             text={comment.body}
             {...(comment.vocabularyRefs ? { vocabularyRefs: comment.vocabularyRefs } : {})}
-            {...(PLAYGROUND_COMMENT_CONFIG.vocabulary ? { vocabulary: PLAYGROUND_COMMENT_CONFIG.vocabulary } : {})}
+            {...(config.vocabulary ? { vocabulary: config.vocabulary } : {})}
             className="text-sm leading-relaxed"
           />
           {comment.element?.componentName && (
