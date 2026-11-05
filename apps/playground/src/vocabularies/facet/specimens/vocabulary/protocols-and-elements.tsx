@@ -15,7 +15,6 @@ import {
   UiGitBranch,
   UiGlobe,
   UiGraph,
-  UiIdentificationCard,
   UiKey,
   UiKubePod,
   UiLock,
@@ -24,20 +23,21 @@ import {
   UiPulse,
   UiQueue,
   UiRobotAi,
-  UiSealCheck,
   UiServer,
   UiServerProcess,
   UiShieldCheck,
   UiSwap,
   UiTable,
-  UiUserGear,
   UiUsersThree,
   UiWrench,
 } from "@flanksource/clicky-ui/icons";
 
 import { Arrow, BoxNode, ContainerNode, DEFAULT_NODE_PALETTE, Diagram } from "@flanksource/facet";
 
+import { AwsIamRole, Certificate, Jwt, K8SServiceaccount, Openid } from "@flanksource/icons/mi";
+
 import { Sheet, Swatch } from "./common";
+import { AWS_IAM_RED, EdgeTagged, K8S_BLUE, type EdgeTagSpec } from "./edge-tag";
 
 import { ROLES } from "./roles";
 
@@ -82,17 +82,20 @@ const ENDPOINTS: Record<string, { icon: Glyph; color: string }> = {
   "AWS STS": { icon: UiCloud, color: ROLES.cloud.header },
 };
 
+/** A brand mark keeps its own colours; only the box size follows the caller. */
+const mark = (Mark: typeof Jwt): Glyph => function BrandMark({ className }) {
+  return <span className={`inline-flex [&>svg]:h-full [&>svg]:w-full ${className ?? ""}`}><Mark /></span>;
+};
+
 const LINKS: Record<string, Glyph> = {
   HTTPS: UiLock,
   gRPC: UiFunction,
   GraphQL: UiGraph,
   AMQP: UiEnvelope,
   SQL: UiTable,
-  OIDC: UiIdentificationCard,
-  mTLS: UiSealCheck,
-  "JWT bearer": UiKey,
-  "SA token": UiUserGear,
-  "Web identity": UiShieldCheck,
+  OIDC: mark(Openid),
+  mTLS: mark(Certificate),
+  "JWT bearer": mark(Jwt),
   "GET /items": UiGlobe,
   WebSocket: UiSwap,
   "SSE events": UiPulse,
@@ -136,16 +139,24 @@ function IconToneSwitch({ value, onChange }: { value: IconTone; onChange: (tone:
   );
 }
 
-function LinkSample({ left, right, label, both = false, tone }: { left: string; right: string; label: string; both?: boolean; tone: IconTone }) {
+const SERVICE_ACCOUNT: EdgeTagSpec = { label: "sa/checkout", icon: K8SServiceaccount, color: K8S_BLUE };
+const IAM_ROLE: EdgeTagSpec = { label: "role/checkout", icon: AwsIamRole, color: AWS_IAM_RED };
+
+/** The identity a box runs as is tags/edge on its top border; the protocol stays on the line. */
+function LinkSample({ left, right, label, both = false, tone, leftTags = [], rightTags = [] }: { left: string; right: string; label: string; both?: boolean; tone: IconTone; leftTags?: EdgeTagSpec[]; rightTags?: EdgeTagSpec[] }) {
   const leftIcon = endpointIcon(left, tone);
   const rightIcon = endpointIcon(right, tone);
   return (
     <Diagram className="w-full">
       {(id) => (
         <>
-          <div className="flex items-center justify-between gap-16 py-5">
-            <BoxNode id={id("left")} variant="outlined" title={left} {...(leftIcon ? { icon: leftIcon } : {})} palette={PALETTES.external} compact shadow="shadow-none" />
-            <BoxNode id={id("right")} variant="tinted" title={right} {...(rightIcon ? { icon: rightIcon } : {})} palette={PALETTES.service} compact shadow="shadow-none" />
+          <div className="flex items-end justify-between gap-16 py-5">
+            <EdgeTagged tags={leftTags}>
+              <BoxNode id={id("left")} variant="outlined" title={left} {...(leftIcon ? { icon: leftIcon } : {})} palette={PALETTES.external} compact shadow="shadow-none" />
+            </EdgeTagged>
+            <EdgeTagged tags={rightTags}>
+              <BoxNode id={id("right")} variant="tinted" title={right} {...(rightIcon ? { icon: rightIcon } : {})} palette={PALETTES.service} compact shadow="shadow-none" />
+            </EdgeTagged>
           </div>
           <Arrow
             from={id("left")}
@@ -183,8 +194,8 @@ export function ProtocolInterfaces() {
       <Swatch name="interface/oidc" note="OpenID Connect identity interaction" height={100}><LinkSample left="Client" right="IdP" label="OIDC" tone={tone} /></Swatch>
       <Swatch name="interface/mtls" note="Both peers present certificates on one TLS session" height={100}><LinkSample left="Service" right="Peer" label="mTLS" both tone={tone} /></Swatch>
       <Swatch name="interface/jwt" note="Signed bearer token the API validates per request" height={100}><LinkSample left="Client" right="API" label="JWT bearer" tone={tone} /></Swatch>
-      <Swatch name="interface/k8s-service-account" note="Projected service account token authenticates the pod" height={100}><LinkSample left="Pod" right="Kube API" label="SA token" tone={tone} /></Swatch>
-      <Swatch name="interface/aws-workload-identity" note="Pod exchanges its token for IAM role credentials (IRSA / Pod Identity)" height={100}><LinkSample left="Pod" right="AWS STS" label="Web identity" tone={tone} /></Swatch>
+      <Swatch name="interface/k8s-service-account" note="Projected service account token authenticates the pod; the service account is a tags/edge on the pod, HTTPS is the line" height={100}><LinkSample left="Pod" right="Kube API" label="HTTPS" leftTags={[SERVICE_ACCOUNT]} tone={tone} /></Swatch>
+      <Swatch name="interface/aws-workload-identity" note="Pod exchanges its token for IAM role credentials (IRSA / Pod Identity); service account and assumed role are tags/edge, HTTPS is the line" height={100}><LinkSample left="Pod" right="AWS STS" label="HTTPS" leftTags={[SERVICE_ACCOUNT]} rightTags={[IAM_ROLE]} tone={tone} /></Swatch>
     </Sheet>
   );
 }
