@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   isFailedOrWarn,
   taskGroupErrorCount,
@@ -33,7 +33,8 @@ const MEASURE: TaskSnapshot = {
   type: "task",
   groupId: "g1",
   status: "success",
-  duration: "527ms",
+  startedAt: "2026-08-31T05:01:31Z",
+  finishedAt: "2026-08-31T05:01:31.527Z",
   description: "1 scheme · 2 clients · 1 policy",
 };
 
@@ -43,10 +44,11 @@ const EXPORT: TaskSnapshot = {
   type: "task",
   groupId: "g1",
   status: "failed",
-  duration: "15.298s",
+  startedAt: "2026-08-31T05:01:32Z",
+  finishedAt: "2026-08-31T05:01:47.298Z",
   error: "export ASAUTHCOMPANYPAGEBUTTONLIMIT: context canceled",
   message: "export ASAUTHCOMPANYPAGEBUTTONLIMIT: context canceled",
-  logs: [{ level: "error", message: "export ASAUTHCOMPANYPAGEBUTTONLIMIT: context canceled" }],
+  logs: [{ seq: 1, level: "error", message: "export ASAUTHCOMPANYPAGEBUTTONLIMIT: context canceled", time: "2026-08-31T05:01:47Z" }],
 };
 
 const VERIFY: TaskSnapshot = {
@@ -55,7 +57,8 @@ const VERIFY: TaskSnapshot = {
   type: "task",
   groupId: "g1",
   status: "canceled",
-  duration: "15.899s",
+  startedAt: "2026-08-31T05:01:32Z",
+  finishedAt: "2026-08-31T05:01:47.899Z",
   error: "dependency failed",
 };
 
@@ -112,7 +115,7 @@ describe("taskGroupMarkdown", () => {
 
   it("carries a failing task's error and its log lines", () => {
     const md = taskGroupMarkdown(GROUP, TASKS);
-    expect(md).toContain("## Export from dev — failed (15.298s)");
+    expect(md).toContain("## Export from dev — failed (15.3 s)");
     expect(md).toContain("error: export ASAUTHCOMPANYPAGEBUTTONLIMIT: context canceled");
     expect(md).toContain("logs:\n  error export ASAUTHCOMPANYPAGEBUTTONLIMIT: context canceled");
   });
@@ -181,8 +184,24 @@ describe("taskGroupErrorCount", () => {
 describe("taskMarkdown", () => {
   it("renders one task without any group context", () => {
     const md = taskMarkdown(EXPORT);
-    expect(md).toContain("## Export from dev — failed (15.298s)");
+    expect(md).toContain("## Export from dev — failed (15.3 s)");
     expect(md).not.toContain("# Clone scheme");
+  });
+
+  it("counts a running task's duration up to the moment it is copied", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.parse("2026-08-31T05:03:02Z"));
+    try {
+      const { finishedAt: _finishedAt, ...running } = EXPORT;
+      expect(taskMarkdown({ ...running, status: "running" })).toContain("## Export from dev — running (1.5 min)");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("leaves the duration out of a task that never started", () => {
+    const { startedAt: _startedAt, finishedAt: _finishedAt, ...pending } = EXPORT;
+    expect(taskMarkdown({ ...pending, status: "pending" })).toContain("## Export from dev — pending\n");
   });
 
   it("keeps the description of a task that has one", () => {

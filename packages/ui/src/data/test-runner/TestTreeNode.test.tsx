@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
 import { TestTreeNode } from "./TestTreeNode";
 import { TestRunnerProvider } from "./context";
 import { createTestRunnerRegistry } from "./adapter";
@@ -99,5 +99,36 @@ describe("TestTreeNode framework mark", () => {
     step.unmount();
     const test = renderRow(spec as Test);
     expect(test.container.querySelector('svg[aria-label="Playwright"]')).not.toBeNull();
+  });
+});
+
+describe("TestTreeNode duration", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.parse("2026-10-15T07:00:05Z"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("ticks a running task node from its started timestamp", () => {
+    renderRow({ name: "install", framework: "task", running: true, started: "2026-10-15T07:00:00Z" } as Test);
+    expect(screen.getByText("5.0s")).toBeTruthy();
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(screen.getByText("7.0s")).toBeTruthy();
+  });
+
+  it("shows a finished node's reported duration, not the time since it started", () => {
+    renderRow({ name: "install", passed: true, started: "2026-10-15T07:00:00Z", duration: 1.5e9 } as Test);
+    expect(screen.getByText("1.5s")).toBeTruthy();
+    expect(screen.queryByText("5.0s")).toBeNull();
+  });
+
+  it("shows no duration for a running node that has neither started nor a duration", () => {
+    const { container } = renderRow({ name: "install", running: true } as Test);
+    expect(container.textContent).not.toMatch(/\d(ms|s)$/);
   });
 });

@@ -1,3 +1,4 @@
+import { elapsedMs, formatDuration } from "../lib/format";
 import { shellCommandLine } from "../lib/shell-command";
 import { stripTrailingNewlines } from "../lib/string";
 import { isTaskExecDetails } from "./task-exec-details";
@@ -55,7 +56,8 @@ function execCommandSection({ command, args, cwd, ...rest }: {
 }
 
 function taskSection(t: TaskSnapshot): string[] {
-  const lines = [`## ${t.name} — ${t.status}${t.duration ? ` (${t.duration})` : ""}`];
+  const elapsed = elapsedMs(t.startedAt, t.finishedAt, Date.now());
+  const lines = [`## ${t.name} — ${t.status}${elapsed === undefined ? "" : ` (${formatDuration(elapsed)})`}`];
   if (t.description) lines.push(t.description);
   if (t.error) lines.push(`error: ${t.error}`);
   // `message` carries the latest log line; only worth repeating when it differs.

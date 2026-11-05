@@ -1,4 +1,5 @@
 import { Icon } from "../Icon";
+import { ElapsedDuration } from "../ElapsedDuration";
 import { Badge } from "../Badge";
 import { IconButton } from "../../components/IconButton";
 import { UiClass, UiRefresh, UiStop } from "../../icons";
@@ -62,6 +63,7 @@ export function TestTreeNode({ node, selected }: { node: Test; selected: boolean
   const fwNode = fwAdapter?.renderFrameworkIcon?.({ node, runner });
   const leadingAdapter = runner.adapters.resolveRowLeading(node, runner);
   const dur = node.duration || (hasChildren ? totalDuration(node) : 0);
+  const live = !!node.running && !!node.started && !node.duration;
   const canRerun = !!runner.onRerun && node.framework !== "task";
   const canStop = !!runner.onStop && !!node.can_stop && !!node.task_id;
   const showMessage = status && (MESSAGE_STATUSES.has(status) || (node.framework === "task" && (status === "running" || status === "pending")));
@@ -115,8 +117,15 @@ export function TestTreeNode({ node, selected }: { node: Test; selected: boolean
         </span>
       )}
 
-      {dur > 0 && (
-        <span className="shrink-0 text-xs text-muted-foreground">{formatTestDuration(dur)}</span>
+      {live ? (
+        <ElapsedDuration
+          startedAt={node.started}
+          finishedAt={undefined}
+          format={(ms) => formatTestDuration(ms * 1e6)}
+          className="shrink-0 text-xs text-muted-foreground"
+        />
+      ) : (
+        dur > 0 && <span className="shrink-0 text-xs text-muted-foreground">{formatTestDuration(dur)}</span>
       )}
 
       {hasChildren && <CountBadges node={node} />}

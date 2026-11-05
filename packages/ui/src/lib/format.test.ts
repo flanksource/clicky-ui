@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CLICKY_COLUMN_FORMAT_OPTIONS,
   CLICKY_COLUMN_UNIT_OPTIONS,
+  elapsedMs,
   formatBytes,
   formatBytesPerSecond,
   formatDuration,
@@ -83,6 +84,26 @@ describe("formatDuration", () => {
 
   it("accepts seconds input", () => {
     expect(formatDuration(90, { from: "s" })).toBe("1.5 min");
+  });
+});
+
+describe("elapsedMs", () => {
+  const startedAt = "2026-10-15T07:00:00Z";
+  const now = Date.parse("2026-10-15T07:00:42.500Z");
+
+  it.each([
+    ["not started", undefined, undefined, undefined],
+    ["finished", startedAt, "2026-10-15T07:02:00.250Z", 120_250],
+    ["running", startedAt, undefined, 42_500],
+    ["finished earlier than the client clock", startedAt, "2026-10-15T07:00:10Z", 10_000],
+    ["running with a client clock behind the server", "2026-10-15T07:01:00Z", undefined, 0],
+  ])("%s", (_name, started, finished, want) => {
+    expect(elapsedMs(started, finished, now)).toBe(want);
+  });
+
+  it("names the field and value of a malformed timestamp", () => {
+    expect(() => elapsedMs("yesterday", undefined, now)).toThrow('startedAt "yesterday"');
+    expect(() => elapsedMs(startedAt, "soon", now)).toThrow('finishedAt "soon"');
   });
 });
 

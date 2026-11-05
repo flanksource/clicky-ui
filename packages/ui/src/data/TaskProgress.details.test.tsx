@@ -132,7 +132,7 @@ describe("TaskProgress details", () => {
           status: "success",
           exitCode: 0,
           started: "2026-08-10T12:00:00Z",
-          duration: 2_500_000_000,
+          finished: "2026-08-10T12:00:02.500Z",
           scanId: "scan-1",
           endpointCount: 3,
           findings: 4,
@@ -147,7 +147,7 @@ describe("TaskProgress details", () => {
     expect(screen.getByText("/opt/recon/bin/nuclei -target 'api value' -stats")).toBeInTheDocument();
     expect(screen.getByText("pid 321")).toBeInTheDocument();
     expect(screen.getByText("exit 0")).toBeInTheDocument();
-    expect(screen.getByText("2.5s")).toBeInTheDocument();
+    expect(screen.getByText("2.5 s")).toBeInTheDocument();
     expect(screen.getByText("scanId")).toBeInTheDocument();
     const details = within(screen.getByRole("region", { name: "Execution details" }));
     expect(details.getByText("scan-1")).toBeInTheDocument();
