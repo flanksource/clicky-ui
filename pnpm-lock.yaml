@@ -129,6 +129,9 @@ catalogs:
     astro:
       specifier: ^7.4.4
       version: 7.4.4
+    bippy:
+      specifier: 0.6.1
+      version: 0.6.1
     country-flag-icons:
       specifier: ^1.6.20
       version: 1.6.20
@@ -153,6 +156,9 @@ catalogs:
     lexical:
       specifier: 0.35.0
       version: 0.35.0
+    magic-string:
+      specifier: ^1.4.5
+      version: 1.4.5
     modern-screenshot:
       specifier: ^4.7.0
       version: 4.7.0
@@ -247,7 +253,7 @@ importers:
     devDependencies:
       '@astrojs/starlight':
         specifier: 'catalog:'
-        version: 0.42.8(astro@7.4.4(patch_hash=4f83739aa34f5510a128b2635675c2f1143df5d40f725a2eceae2a97f3b58963)(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1))(typescript@5.9.3)
+        version: 0.42.8(astro@7.4.4(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1))(typescript@5.9.3)
       astro:
         specifier: 'catalog:'
         version: 7.4.4(patch_hash=4f83739aa34f5510a128b2635675c2f1143df5d40f725a2eceae2a97f3b58963)(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1)
@@ -266,6 +272,9 @@ importers:
       '@flanksource/clicky-ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@flanksource/facet':
+        specifier: 'catalog:'
+        version: 0.1.74(@ai-sdk/react@3.0.201(react@18.3.1)(zod@4.6.7))(@babel/core@7.29.0(supports-color@8.1.1))(@babel/template@7.28.6)(@mdxeditor/editor@4.0.4(@codemirror/language@6.12.4)(@lezer/highlight@1.2.3)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(supports-color@8.1.1))(@shikijs/langs@1.29.2)(@shikijs/themes@1.29.2)(@shikijs/transformers@1.29.2)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(ai@6.0.199(zod@4.6.7))(immer@11.1.8)(react-dom@18.3.1(react@18.3.1))(react-is@17.0.2)(react-rnd@10.5.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(streamdown@2.5.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(supports-color@8.1.1))(tailwindcss@4.3.3)
       '@flanksource/icons':
         specifier: 'catalog:'
         version: 1.0.65(react@18.3.1)
@@ -348,6 +357,9 @@ importers:
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.99.2(react@18.3.1)
+      bippy:
+        specifier: 'catalog:'
+        version: 0.6.1(react@18.3.1)
       dom-accessibility-api:
         specifier: 'catalog:'
         version: 0.6.3
@@ -397,6 +409,9 @@ importers:
       jsdom:
         specifier: 'catalog:'
         version: 26.1.0(supports-color@8.1.1)
+      magic-string:
+        specifier: 'catalog:'
+        version: 1.4.5
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.3
@@ -418,6 +433,9 @@ importers:
       '@flanksource/clicky-ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@flanksource/facet':
+        specifier: 'catalog:'
+        version: 0.1.74(@ai-sdk/react@3.0.201(react@18.3.1)(zod@4.6.7))(@babel/core@7.29.0(supports-color@8.1.1))(@babel/template@7.28.6)(@mdxeditor/editor@4.0.4(@codemirror/language@6.12.4)(@lezer/highlight@1.2.3)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(supports-color@8.1.1))(@shikijs/langs@1.29.2)(@shikijs/themes@1.29.2)(@shikijs/transformers@1.29.2)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(ai@6.0.199(zod@4.6.7))(immer@11.1.8)(react-dom@18.3.1(react@18.3.1))(react-is@17.0.2)(react-rnd@10.5.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(streamdown@2.5.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(supports-color@8.1.1))(tailwindcss@4.3.3)
       react:
         specifier: 'catalog:'
         version: 18.3.1
@@ -524,9 +542,6 @@ importers:
       '@lexical/react':
         specifier: 'catalog:'
         version: 0.35.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(yjs@13.6.31)
-      '@medv/finder':
-        specifier: 'catalog:'
-        version: 4.0.2
       '@monaco-editor/react':
         specifier: 'catalog:'
         version: 4.7.0(monaco-editor@0.48.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -6590,11 +6605,11 @@ snapshots:
       github-slugger: 2.0.0
       satteri: 0.10.5
 
-  '@astrojs/mdx@8.1.2(@astrojs/markdown-satteri@0.4.6)(astro@7.4.4(patch_hash=4f83739aa34f5510a128b2635675c2f1143df5d40f725a2eceae2a97f3b58963)(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1))':
+  '@astrojs/mdx@8.1.2(@astrojs/markdown-satteri@0.4.6)(astro@7.4.4(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1))':
     dependencies:
       '@astrojs/internal-helpers': 0.13.0
       '@astrojs/markdown-satteri': 0.4.6
-      astro: 7.4.4(patch_hash=4f83739aa34f5510a128b2635675c2f1143df5d40f725a2eceae2a97f3b58963)(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1)
+      astro: 7.4.4(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1)
       es-module-lexer: 3.0.4
 
   '@astrojs/prism@4.1.2':
@@ -6606,17 +6621,17 @@ snapshots:
       sitemap: 9.0.1
       zod: 4.6.7
 
-  '@astrojs/starlight@0.42.8(astro@7.4.4(patch_hash=4f83739aa34f5510a128b2635675c2f1143df5d40f725a2eceae2a97f3b58963)(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1))(typescript@5.9.3)':
+  '@astrojs/starlight@0.42.8(astro@7.4.4(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1))(typescript@5.9.3)':
     dependencies:
       '@astrojs/markdown-satteri': 0.4.6
-      '@astrojs/mdx': 8.1.2(@astrojs/markdown-satteri@0.4.6)(astro@7.4.4(patch_hash=4f83739aa34f5510a128b2635675c2f1143df5d40f725a2eceae2a97f3b58963)(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1))
+      '@astrojs/mdx': 8.1.2(@astrojs/markdown-satteri@0.4.6)(astro@7.4.4(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1))
       '@astrojs/sitemap': 3.7.4
       '@pagefind/default-ui': 1.6.0
       '@types/hast': 3.0.5
       '@types/js-yaml': 4.0.9
       '@types/mdast': 4.0.4
-      astro: 7.4.4(patch_hash=4f83739aa34f5510a128b2635675c2f1143df5d40f725a2eceae2a97f3b58963)(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1)
-      astro-expressive-code: 0.44.3(astro@7.4.4(patch_hash=4f83739aa34f5510a128b2635675c2f1143df5d40f725a2eceae2a97f3b58963)(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1))
+      astro: 7.4.4(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1)
+      astro-expressive-code: 0.44.3(astro@7.4.4(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1))
       bcp-47: 2.1.2
       hast-util-format: 1.1.0
       hast-util-select: 6.0.4
@@ -7101,7 +7116,7 @@ snapshots:
   '@emnapi/core@1.11.0':
     dependencies:
       '@emnapi/wasi-threads': 1.2.2
-      tslib: 2.8.1
+      tslib: 2.9.1
     optional: true
 
   '@emnapi/core@1.11.1':
@@ -7113,18 +7128,18 @@ snapshots:
   '@emnapi/core@1.11.3':
     dependencies:
       '@emnapi/wasi-threads': 1.2.3
-      tslib: 2.8.1
+      tslib: 2.9.1
     optional: true
 
   '@emnapi/core@1.9.2':
     dependencies:
       '@emnapi/wasi-threads': 1.2.1
-      tslib: 2.8.1
+      tslib: 2.9.1
     optional: true
 
   '@emnapi/runtime@1.11.0':
     dependencies:
-      tslib: 2.8.1
+      tslib: 2.9.1
     optional: true
 
   '@emnapi/runtime@1.11.1':
@@ -7134,17 +7149,17 @@ snapshots:
 
   '@emnapi/runtime@1.11.3':
     dependencies:
-      tslib: 2.8.1
+      tslib: 2.9.1
     optional: true
 
   '@emnapi/runtime@1.9.2':
     dependencies:
-      tslib: 2.8.1
+      tslib: 2.9.1
     optional: true
 
   '@emnapi/wasi-threads@1.2.1':
     dependencies:
-      tslib: 2.8.1
+      tslib: 2.9.1
     optional: true
 
   '@emnapi/wasi-threads@1.2.2':
@@ -7154,7 +7169,7 @@ snapshots:
 
   '@emnapi/wasi-threads@1.2.3':
     dependencies:
-      tslib: 2.8.1
+      tslib: 2.9.1
     optional: true
 
   '@esbuild/aix-ppc64@0.28.0':
@@ -7287,7 +7302,7 @@ snapshots:
       recharts: 3.8.1(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react-is@17.0.2)(react@18.3.1)(redux@5.0.1)
       tailwind-merge: 3.6.0
       tailwindcss: 4.3.3
-      yaml: 2.8.3
+      yaml: 2.9.1
     optionalDependencies:
       '@ai-sdk/react': 3.0.201(react@18.3.1)(zod@4.6.7)
       '@mdxeditor/editor': 4.0.4(@codemirror/language@6.12.4)(@lezer/highlight@1.2.3)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(supports-color@8.1.1)(yjs@13.6.31)
@@ -7313,7 +7328,7 @@ snapshots:
       '@codemirror/state': 6.7.0
       '@codemirror/view': 6.43.4
       '@flanksource/clicky-ui': 0.3.36(@ai-sdk/react@3.0.201(react@18.3.1)(zod@4.6.7))(@babel/core@7.29.0(supports-color@8.1.1))(@babel/template@7.28.6)(@mdxeditor/editor@4.0.4(@codemirror/language@6.12.4)(@lezer/highlight@1.2.3)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(supports-color@8.1.1))(@shikijs/langs@1.29.2)(@shikijs/themes@1.29.2)(@shikijs/transformers@1.29.2)(@types/react@19.2.17)(ai@6.0.199(zod@4.6.7))(marked@15.0.12)(monaco-editor@0.55.1)(react-dom@18.3.1(react@18.3.1))(react-rnd@10.5.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(recharts@3.8.1(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react-is@17.0.2)(react@18.3.1))(shiki@1.29.2)(streamdown@2.5.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(supports-color@8.1.1))(tailwindcss@4.3.3)
-      '@flanksource/icons': 1.0.63(react@18.3.1)
+      '@flanksource/icons': 1.0.65(react@18.3.1)
       '@floating-ui/react': 0.27.19(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@iconify/react': 5.2.1(react@18.3.1)
       '@monaco-editor/react': 4.7.0(monaco-editor@0.55.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -7347,7 +7362,7 @@ snapshots:
       shiki: 1.29.2
       source-map-support: 0.5.21
       tailwind-merge: 2.6.1
-      yaml: 2.8.3
+      yaml: 2.9.1
     transitivePeerDependencies:
       - '@ai-sdk/react'
       - '@babel/core'
@@ -8853,8 +8868,8 @@ snapshots:
       '@shikijs/engine-oniguruma': 1.29.2
       '@shikijs/types': 1.29.2
       '@shikijs/vscode-textmate': 10.0.2
-      '@types/hast': 3.0.4
-      hast-util-to-html: 9.0.5
+      '@types/hast': 3.0.5
+      hast-util-to-html: 9.0.6
 
   '@shikijs/core@4.5.0':
     dependencies:
@@ -8916,7 +8931,7 @@ snapshots:
   '@shikijs/types@1.29.2':
     dependencies:
       '@shikijs/vscode-textmate': 10.0.2
-      '@types/hast': 3.0.4
+      '@types/hast': 3.0.5
 
   '@shikijs/types@4.5.0':
     dependencies:
@@ -8984,7 +8999,7 @@ snapshots:
       '@storybook/builder-vite': 10.6.3(storybook@10.6.3(@types/react@19.2.17)(prettier@3.8.3)(react@18.3.1))(vite@8.3.5(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.8.3))
       '@storybook/react': 10.6.3(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(storybook@10.6.3(@types/react@19.2.17)(prettier@3.8.3)(react@18.3.1))(supports-color@8.1.1)(typescript@5.9.3)
       empathic: 2.0.0
-      magic-string: 1.4.3
+      magic-string: 1.4.5
       react: 18.3.1
       react-docgen: 8.0.3(supports-color@8.1.1)
       react-dom: 18.3.1(react@18.3.1)
@@ -9581,7 +9596,7 @@ snapshots:
       jsonc-parser: 3.3.1
       picocolors: 1.1.1
       prompts: 2.4.2
-      yaml: 2.8.3
+      yaml: 2.9.1
 
   ai@6.0.199(zod@4.6.7):
     dependencies:
@@ -9653,9 +9668,9 @@ snapshots:
       estree-walker: 3.0.3
       js-tokens: 10.0.0
 
-  astro-expressive-code@0.44.3(astro@7.4.4(patch_hash=4f83739aa34f5510a128b2635675c2f1143df5d40f725a2eceae2a97f3b58963)(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1)):
+  astro-expressive-code@0.44.3(astro@7.4.4(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1)):
     dependencies:
-      astro: 7.4.4(patch_hash=4f83739aa34f5510a128b2635675c2f1143df5d40f725a2eceae2a97f3b58963)(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1)
+      astro: 7.4.4(@types/node@24.12.2)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.1)
       rehype-expressive-code: 0.44.3
       url-extras: 0.1.0
 

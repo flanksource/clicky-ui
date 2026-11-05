@@ -8,11 +8,12 @@
     "build": "pnpm --filter @flanksource/clicky-ui build:icons && pnpm --filter @flanksource/clicky-ui build:storybook-schemas && storybook build",
     "serve": "pnpm --filter @flanksource/clicky-ui build:icons && pnpm --filter @flanksource/clicky-ui build:storybook-schemas && storybook build && vite preview --host 0.0.0.0 --port 5270 --strictPort --outDir storybook-static",
     "test": "pnpm --filter @flanksource/clicky-ui build:icons && pnpm --filter @flanksource/clicky-ui build:storybook-schemas && vitest run",
-    "lint": "oxlint .storybook --deny-warnings",
+    "lint": "oxlint .storybook stories --deny-warnings",
     "check": "tsc -b --noEmit && pnpm run lint"
   },
   "dependencies": {
     "@flanksource/clicky-ui": "workspace:*",
+    "@flanksource/facet": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

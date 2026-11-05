@@ -11,6 +11,7 @@
     "dev:kitchensink": "pnpm --filter kitchen-sink dev",
     "dev:kitchen-sink": "pnpm --filter kitchen-sink dev",
     "dev:playground": "pnpm --filter playground dev",
+    "playground:prod": "pnpm --filter playground playground:prod",
     "build": "pnpm --filter @flanksource/clicky-ui build",
     "build:docs": "pnpm --filter docs build",
     "serve:docs": "pnpm --filter docs preview",
