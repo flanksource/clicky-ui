@@ -8,8 +8,8 @@ import type { TaskRunMeta, TaskSnapshot } from "./TaskSnapshot";
 
 // A supervised process, streamed the way clicky actually streams one: the output
 // travels as `event: output` deltas and is stripped from every `event: task`
-// frame, while the task frame itself changes on almost every tick because its
-// duration and resource sample do. That combination is what used to make the
+// frame, while the task frame itself keeps changing because its resource sample
+// is re-read on every tick. That combination is what used to make the
 // stdout tab appear and then disappear about once a second, and this story is
 // the browser-level guard against it coming back.
 
@@ -49,13 +49,13 @@ const groupFrame: TaskSnapshot = {
   running: 1,
 };
 
-const taskFrame = (duration: string, sampledAt: string): TaskSnapshot => ({
+const taskFrame = (sampledAt: string): TaskSnapshot => ({
   id: "agent-task",
   name: "run agent",
   type: "task",
   status: "running",
   groupId: "run-agent",
-  duration,
+  startedAt: "2026-06-02T12:00:00Z",
   details: processDetails(sampledAt),
 });
 
@@ -78,7 +78,7 @@ class ScriptedEventSource {
       ? [[0, "runs", RUNS]]
       : [
           [0, "task", groupFrame],
-          [0, "task", taskFrame("1s", "2026-06-02T12:00:01Z")],
+          [0, "task", taskFrame("2026-06-02T12:00:01Z")],
           [20, "output", {
             id: "agent-task",
             groupId: "run-agent",
@@ -87,10 +87,10 @@ class ScriptedEventSource {
             offset: 0,
             reset: true,
           }],
-          // Nothing but a changed duration and a fresh resource sample — exactly
+          // Nothing but a fresh resource sample — exactly
           // the frame that used to wipe the accumulated output.
-          [120, "task", taskFrame("2s", "2026-06-02T12:00:02Z")],
-          [220, "task", taskFrame("3s", "2026-06-02T12:00:03Z")],
+          [120, "task", taskFrame("2026-06-02T12:00:02Z")],
+          [220, "task", taskFrame("2026-06-02T12:00:03Z")],
           [320, "output", {
             id: "agent-task",
             groupId: "run-agent",
@@ -98,7 +98,7 @@ class ScriptedEventSource {
             data: SECOND_CHUNK,
             offset: FIRST_CHUNK.length,
           }],
-          [420, "task", taskFrame("4s", "2026-06-02T12:00:04Z")],
+          [420, "task", taskFrame("2026-06-02T12:00:04Z")],
         ];
     for (const [delay, type, data] of script) {
       this.timers.push(

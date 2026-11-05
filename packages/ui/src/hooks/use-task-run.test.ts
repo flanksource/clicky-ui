@@ -124,7 +124,7 @@ describe("useTaskRun (SSE)", () => {
   // The regression this whole accumulator exists for. clicky strips output from
   // every task frame and sends it only as deltas, and it never re-sends what a
   // client has already been given. A supervised task's snapshot changes on almost
-  // every poll (its duration ticks, its resource sample is re-read), so if the
+  // every poll (its resource sample is re-read), so if the
   // accumulated output lived on the snapshot object it would be destroyed roughly
   // once a second — the stdout tab appearing, then vanishing, for the whole run.
   it("keeps accumulated output when a later task frame replaces the snapshot", async () => {
@@ -140,15 +140,48 @@ describe("useTaskRun (SSE)", () => {
     });
 
     // A new task frame for the same task, carrying no stdout key at all.
-    act(() => es.emit("task", { ...taskSnap("running"), duration: "2s", description: "linking" }));
+    act(() => es.emit("task", { ...taskSnap("running"), startedAt: "2026-10-15T07:00:00Z", description: "linking" }));
 
     await waitFor(() => {
       expect(result.current.snapshots.find((s) => s.id === "t1")).toMatchObject({
         description: "linking",
-        duration: "2s",
+        startedAt: "2026-10-15T07:00:00Z",
         stdout: "building\n",
       });
     });
+  });
+
+  it("accumulates logs frames onto a task frame that carries no logs", async () => {
+    const { result } = renderHook(() => useTaskRun({ id: "g1" }));
+    const es = MockEventSource.last!;
+    const log = (seq: number) => ({ seq, level: "info", message: `line ${seq}`, time: "2026-10-15T07:00:00Z" });
+    const logsOf = () => result.current.snapshots.find((s) => s.id === "t1")?.logs;
+
+    act(() => {
+      es.emit("task", taskSnap("running"));
+      es.emit("logs", { id: "t1", groupId: "g1", entries: [log(1), log(2)], reset: true });
+    });
+    await waitFor(() => expect(logsOf()).toEqual([log(1), log(2)]));
+
+    act(() => es.emit("logs", { id: "t1", groupId: "g1", entries: [log(2), log(3)] }));
+    await waitFor(() => expect(logsOf()).toEqual([log(1), log(2), log(3)]));
+
+    // The next task frame replaces the snapshot and must not take the logs with it.
+    act(() => es.emit("task", { ...taskSnap("running"), description: "linking" }));
+    await waitFor(() => expect(result.current.snapshots.find((s) => s.id === "t1")?.description).toBe("linking"));
+    expect(logsOf()).toEqual([log(1), log(2), log(3)]);
+
+    act(() => es.emit("logs", { id: "t1", groupId: "g1", entries: [log(9)], reset: true }));
+    await waitFor(() => expect(logsOf()).toEqual([log(9)]));
+  });
+
+  it("reports an unparseable logs frame instead of dropping it silently", async () => {
+    const { result } = renderHook(() => useTaskRun({ id: "g1" }));
+    const es = MockEventSource.last!;
+
+    act(() => es.emit("logs", { id: "t1", entries: "not-a-list" }));
+
+    await waitFor(() => expect(result.current.status).toBe("invalid task logs data"));
   });
 
   it("holds output that arrives before its task frame", async () => {

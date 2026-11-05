@@ -180,6 +180,30 @@ export function formatDuration(
   return `${intl(ms / 3_600_000)} h`;
 }
 
+/**
+ * Milliseconds a run has taken, derived from its timestamps — the counterpart of
+ * the Go `Duration()` methods, since the wire carries no duration. Not started
+ * is `undefined`; finished is `finishedAt - startedAt`; running is `now -
+ * startedAt`. Clamped at 0 so a client clock behind the server's never shows a
+ * negative span. A malformed timestamp throws: these strings are clicky-produced.
+ */
+export function elapsedMs(
+  startedAt: string | undefined,
+  finishedAt: string | undefined,
+  now: number,
+): number | undefined {
+  if (!startedAt) return undefined;
+  const start = parseTimestamp("startedAt", startedAt);
+  const end = finishedAt ? parseTimestamp("finishedAt", finishedAt) : now;
+  return Math.max(0, end - start);
+}
+
+function parseTimestamp(field: string, value: string): number {
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms)) throw new Error(`elapsedMs: malformed ${field} ${JSON.stringify(value)}`);
+  return ms;
+}
+
 // formatters keyed by Grafana unit identifier. Keys not present here fall through
 // to the raw-suffix path in formatUnit.
 const UNIT_FORMATTERS: Record<string, (v: number) => string> = {

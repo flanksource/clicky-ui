@@ -5,8 +5,10 @@ import {
   type TaskSnapshot,
 } from "../data/TaskSnapshot";
 import {
+  applyTaskLogsDelta,
   applyTaskOutputDelta,
   emptyTaskStreams,
+  type TaskLogsDelta,
   type TaskOutputDelta,
   type TaskStreams,
   withTaskStreams,
@@ -133,6 +135,15 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
       }));
     };
 
+    // Logs ride the same per-task accumulator as output, for the same reason:
+    // `task` frames carry none, and the server never re-sends what it has sent.
+    const mergeLogs = (delta: TaskLogsDelta) => {
+      setStreamsById((prev) => ({
+        ...prev,
+        [delta.id]: applyTaskLogsDelta(prev[delta.id] ?? emptyTaskStreams, delta),
+      }));
+    };
+
     // Polling fallback transport.
     if (forcePoll || headersKey !== "{}" || !hasEventSource()) {
       let stopped = false;
@@ -185,6 +196,15 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
         mergeOutput(JSON.parse((e as MessageEvent).data) as TaskOutputDelta);
       } catch {
         setStatus("invalid task output data");
+      }
+    });
+    es.addEventListener("logs", (e) => {
+      try {
+        const delta = JSON.parse((e as MessageEvent).data) as TaskLogsDelta;
+        if (!Array.isArray(delta.entries)) throw new Error("logs frame has no entries array");
+        mergeLogs(delta);
+      } catch {
+        setStatus("invalid task logs data");
       }
     });
     es.addEventListener("done", () => {

@@ -18,6 +18,11 @@ export interface Test {
   framework?: string;
   /** Duration in nanoseconds. */
   duration?: number;
+  /**
+   * RFC3339Nano start time, set on running nodes that come from tasks. Such a
+   * node carries no `duration`; a viewer derives the live elapsed time from this.
+   */
+  started?: string;
   skipped?: boolean;
   failed?: boolean;
   passed?: boolean;

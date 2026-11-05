@@ -21,7 +21,7 @@ const RUN: TaskSnapshot[] = [
     failed: 1,
     running: 1,
   },
-  { id: "t1", name: "rebuild idx_a", type: "task", groupId: "g1", status: "success", duration: "1.2s" },
+  { id: "t1", name: "rebuild idx_a", type: "task", groupId: "g1", status: "success", startedAt: "2026-10-15T07:00:00Z", finishedAt: "2026-10-15T07:00:01.200Z" },
   {
     id: "t2",
     name: "update stats",
@@ -29,7 +29,7 @@ const RUN: TaskSnapshot[] = [
     groupId: "g1",
     status: "failed",
     error: "timeout",
-    logs: [{ level: "error", message: "boom" }],
+    logs: [{ seq: 1, level: "error", message: "boom", time: "2026-10-15T07:00:00Z" }],
   },
   { id: "t3", name: "reorg idx_b", type: "task", groupId: "g1", status: "running" },
   { id: "t4", name: "update all stats", type: "task", groupId: "g1", status: "pending" },
@@ -145,8 +145,8 @@ describe("TaskProgress", () => {
         groupId: "g",
         status: "warning",
         logs: [
-          { level: "info", message: "starting" },
-          { level: "warn", message: "skipped: index already optimal" },
+          { seq: 1, level: "info", message: "starting", time: "2026-10-15T07:00:00Z" },
+          { seq: 2, level: "warn", message: "skipped: index already optimal", time: "2026-10-15T07:00:01Z" },
         ],
       },
     ];

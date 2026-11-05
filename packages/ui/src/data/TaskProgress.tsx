@@ -19,6 +19,7 @@ import { cn } from "../lib/utils";
 import { formatBytes, formatBytesPerSecond } from "../lib/format";
 import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { Icon } from "./Icon";
+import { ElapsedDuration } from "./ElapsedDuration";
 import { ProgressBar } from "./ProgressBar";
 import { TaskProcessDetailsView } from "./TaskProcessDetails";
 import { TaskExecDetailsView } from "./TaskExecDetails";
@@ -453,11 +454,11 @@ function TaskRow({
           </span>
           {header}
           <div className="flex shrink-0 items-center gap-1">
-            {t.duration && (
-              <span className="text-xs text-muted-foreground">
-                {t.duration}
-              </span>
-            )}
+            <ElapsedDuration
+              startedAt={t.startedAt}
+              finishedAt={t.finishedAt}
+              className="text-xs text-muted-foreground"
+            />
             <CopyButton
               value={() => taskMarkdown(t)}
               label={`Copy ${t.name}`}
@@ -519,8 +520,8 @@ function TaskRow({
         )}
         {expanded && hasLogs && (
           <div className="mt-1 ml-1 max-h-48 space-y-0.5 overflow-y-auto border-l-2 pl-2">
-            {logs.map((l, i) => (
-              <div key={i} className={cn("text-xs", logLevelColor(l.level))}>
+            {logs.map((l) => (
+              <div key={l.seq} className={cn("text-xs", logLevelColor(l.level))}>
                 <span className="mr-1 font-mono text-muted-foreground">
                   {l.level.substring(0, 3)}
                 </span>

@@ -3,8 +3,7 @@ import type { ReactNode } from "react";
 import { hashKey, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
 import { cn } from "../lib/utils";
-import { formatDuration } from "../lib/format";
-import { useResourceClock } from "../hooks/use-resource-clock";
+import { ElapsedDuration } from "./ElapsedDuration";
 import { useTaskRun, useTaskRuns } from "../hooks/use-task-run";
 import type { FilterBarFilter } from "../components/FilterBar";
 import { Icon } from "./Icon";
@@ -92,7 +91,13 @@ const startedColumn: DataTableColumn<RunTableRow> = { key: "startedAt", label: "
 const durationColumn: DataTableColumn<RunTableRow> = {
   key: "duration", label: "Duration", sortable: true,
   accessor: (row) => row.startedAt ? Date.parse(row.finishedAt ?? new Date().toISOString()) - Date.parse(row.startedAt) : null,
-  render: (_, row) => <RunDuration startedAt={row.startedAt} finishedAt={row.finishedAt} />,
+  render: (_, row) => (
+    <ElapsedDuration
+      startedAt={row.startedAt}
+      finishedAt={row.finishedAt}
+      fallback={<span className="text-muted-foreground">—</span>}
+    />
+  ),
 };
 const runColumns: DataTableColumn<RunTableRow>[] = [
   { key: "name", label: "Run", sortable: true, grow: true, minWidth: 220 },
@@ -249,12 +254,6 @@ export function TaskManager({
       )}
     />
   );
-}
-
-function RunDuration({ startedAt, finishedAt }: { startedAt: string | undefined; finishedAt: string | undefined }) {
-  const now = useResourceClock(!!startedAt && !finishedAt);
-  if (!startedAt) return <span className="text-muted-foreground">—</span>;
-  return <span className="tabular-nums">{formatDuration(Math.max(0, (finishedAt ? Date.parse(finishedAt) : now) - Date.parse(startedAt)))}</span>;
 }
 
 function applicationLabel(kind: string): string {
