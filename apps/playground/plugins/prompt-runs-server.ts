@@ -1,5 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import { isDeepStrictEqual } from "node:util";
+import { join, relative } from "node:path";
 import type { Connect, Logger, Plugin } from "vite";
 
 import type { CaptainPromptSummary } from "./captain-client";
@@ -19,6 +20,7 @@ import { documentProblems, type DocumentLintSnapshot } from "./document-problems
 import { LaunchClient, LaunchHttpError } from "./launch-client";
 import { fixedGavel, onDemandGavel, type GavelEndpoint } from "./gavel-launch-server";
 import { RepositoryDocuments } from "./repository-documents";
+import { repositoryPromptDirectory } from "./repository-prompt-directory";
 import {
   PromptAssociations,
   type PromptAssociation,
@@ -27,7 +29,7 @@ import {
 export const PROMPT_RUNS_ROUTE = "/__playground";
 
 export type PromptRunsOptions = {
-  /** The `.playground` data directory holding comments.json. */
+  /** The `.playground` directory for prompt associations and host metadata. */
   dir: string;
   /** A running launch server; unset starts `gavel launch serve` over `workspace` when first needed. */
   gavelURL?: string | undefined;
@@ -180,8 +182,15 @@ export function createPromptRuns(options: PromptRunsOptions) {
   const gavel = new LaunchClient(endpoint, options.workspace);
   const associations = new PromptAssociations(dir);
   const processing = new Set<string>();
-  const preparationPages = new Map<string, { page: string; revision: string; files?: string[] }>();
-  const directoryFor = (page?: string) => page?.startsWith("document:") || page?.startsWith("folder:") ? new RepositoryDocuments(dir).document(page).repository.root : options.workspace;
+  const preparationPages = new Map<string, { page: string; revision: string; directory: string; files?: string[] }>();
+  const directoryFor = async (page?: string) => {
+    if (!page?.startsWith("document:") && !page?.startsWith("folder:")) return options.workspace;
+    return repositoryPromptDirectory({ dir, endpoint, page });
+  };
+  const scopedFiles = ({ page, files, directory }: { page: string; files: string[]; directory: string }) => {
+    const target = new RepositoryDocuments(dir).document(page);
+    return files.map((file) => relative(directory, join(target.repository.root, file)));
+  };
   const documentRevision = async (page: string) => {
     const target = new RepositoryDocuments(dir).document(page);
     const response = await fetch(new URL(`/api/workspace/file?${new URLSearchParams({ root: target.repository.root, path: target.path })}`, await endpoint.url()));
@@ -220,7 +229,7 @@ export function createPromptRuns(options: PromptRunsOptions) {
     const request = associations.input<{ request: RunRequest }>(
       entry.associationId,
     ).request;
-    const notifications = persistPromptResult({ dir, entry, snapshot, request });
+    const notifications = await persistPromptResult({ dir, entry, snapshot, request });
     associations.save(entry);
     for (const event of notifications) await onCreated?.(event);
     return entry;
@@ -280,20 +289,21 @@ export function createPromptRuns(options: PromptRunsOptions) {
       const current = await prepareRepositoryFolder({ dir, endpoint, page: request.page });
       if (preparedDocument?.page !== request.page || preparedDocument.revision !== current.revision)
         throw new RequestError("Folder contents changed; reload the prompt form before running", 409);
-      if (Object.hasOwn(request.variables, "files"))
-        throw new RequestError("Folder files are owned by the prepared review scope", 400);
     }
+    if (preparedDocument?.files && Object.hasOwn(request.variables, "files"))
+      throw new RequestError("Review files are owned by the prepared review scope", 400);
     const { prompt: detail } = await gavel.prompt(
       request.preparationId,
       request.promptId,
     );
     if (detail.version !== request.promptVersion)
       throw new RequestError("Prompt changed; reload it before running", 409);
+    const directory = preparedDocument?.directory ?? await directoryFor(request.page);
     const launch = {
       preparationId: request.preparationId,
       config: {
         lint: {
-          ...(preparedDocument?.files ? { files: preparedDocument.files } : {}),
+          ...(preparedDocument?.files ? { files: scopedFiles({ page: request.page, files: preparedDocument.files, directory }) } : {}),
           linters: [
             {
               id: "review",
@@ -318,7 +328,7 @@ export function createPromptRuns(options: PromptRunsOptions) {
     };
     entry = {
       associationId: request.associationId,
-      workspace: directoryFor(request.page),
+      workspace: directory,
       origin,
       requestedBy: request.human,
       runId: `pending:${request.associationId}`,
@@ -357,16 +367,20 @@ export function createPromptRuns(options: PromptRunsOptions) {
         if (entry.state === "running") void follow(entry, logger);
     },
     prompts: async (page?: string): Promise<CaptainPromptSummary[]> =>
-      (await gavel.prompts((await gavel.prepare(directoryFor(page))).preparationId)).prompts,
+      (await gavel.prompts((await gavel.prepare(await directoryFor(page))).preparationId)).prompts,
     prompt: async (id: string, page?: string) => {
-      const prepared = await gavel.prepare(directoryFor(page));
-      if (page?.startsWith("document:")) preparationPages.set(prepared.preparationId, { page, revision: await documentRevision(page) });
+      const directory = await directoryFor(page);
+      const prepared = await gavel.prepare(directory);
+      if (page?.startsWith("document:")) preparationPages.set(prepared.preparationId, { page, directory, revision: await documentRevision(page) });
       const folder = page?.startsWith("folder:") ? await prepareRepositoryFolder({ dir, endpoint, page }) : undefined;
-      if (folder && page) preparationPages.set(prepared.preparationId, { page, revision: folder.revision, files: folder.files });
+      if (folder && page) preparationPages.set(prepared.preparationId, { page, directory, revision: folder.revision, files: folder.files });
+      const files = preparationPages.get(prepared.preparationId)?.files;
       return {
         ...(await gavel.prompt(prepared.preparationId, id)),
         preparationId: prepared.preparationId,
-        ...(folder ? { files: folder.files } : {}),
+        ...(page?.startsWith("document:") || page?.startsWith("folder:") ? { directory } : {}),
+        ...(page && files ? { files: scopedFiles({ page, files, directory }) } : {}),
+        ...(page?.startsWith("document:") ? { defaultFiles: scopedFiles({ page, files: [new RepositoryDocuments(dir).document(page).path], directory }) } : {}),
       };
     },
     problems: async () => {
@@ -375,17 +389,30 @@ export function createPromptRuns(options: PromptRunsOptions) {
       const plain: DocumentLintSnapshot[] = [];
       let before = "";
       while (true) {
-        const query = new URLSearchParams({ "label.documentLint": "plain", limit: "200", ...(before ? { before } : {}) });
-        const response = await fetch(new URL(`/api/runs?${query}`, await endpoint.url()));
-        const value = await response.json() as { runs: DocumentLintSnapshot[]; error?: string };
-        if (!response.ok) throw new LaunchHttpError(response.status, value.error ?? "Cannot load document lint results");
+        const value = await gavel.listRuns({ labels: { documentLint: "plain" }, limit: 200, before });
         plain.push(...value.runs);
         if (value.runs.length < 200) break;
         const next = value.runs.at(-1)!.metadata.executionId;
         if (next === before) throw new Error("Document lint pagination did not advance");
         before = next;
       }
-      return documentProblems({ repositories, prompts: associations.all(), plain });
+      const problems = documentProblems({ repositories, prompts: associations.all(), plain });
+      for (const repo of repositories) {
+        const entries = Object.entries(problems).filter(([id]) => id.startsWith(`document:${repo.id}/`));
+        const results = entries.flatMap(([, entry]) => [...entry.plain, ...entry.prompt]);
+        if (!results.length) continue;
+        const { preparationId } = await gavel.prepare(repo.root);
+        const filtered = await gavel.filterLint(preparationId, results);
+        let offset = 0;
+        for (const [, entry] of entries) {
+          const plainEnd = offset + entry.plain.length;
+          const promptEnd = plainEnd + entry.prompt.length;
+          entry.plain = filtered.slice(offset, plainEnd);
+          entry.prompt = filtered.slice(plainEnd, promptEnd);
+          offset = promptEnd;
+        }
+      }
+      return problems;
     },
     start,
     runs: async (logger: Logger): Promise<PromptRun[]> => {

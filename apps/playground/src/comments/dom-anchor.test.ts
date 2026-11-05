@@ -49,6 +49,16 @@ describe("commentAnchor", () => {
     ]);
   });
 
+  it("keys SVG elements inside the artifact on a selector that resolves back to them", () => {
+    content.innerHTML = `<svg viewBox="0 0 10 10"><g><rect width="4" height="4"></rect><text>zone</text></g></svg>`;
+    const text = content.querySelector("text")!;
+    const anchor = commentAnchor(text, content)!;
+    expect([overlayLabel(anchor), resolveAnchor(content, anchor)]).toEqual([
+      null,
+      text,
+    ]);
+  });
+
   it("keys elements in a portaled titled dialog on the dialog label", () => {
     const step = document.querySelector('[data-step="9"]')!;
     const anchor = commentAnchor(step, content)!;

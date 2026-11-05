@@ -3,6 +3,7 @@ import {
   assertPage,
   assertStatus,
   readAll,
+  readPage,
   type ListedComment,
   type StoredComment,
 } from "./comments-store";
@@ -62,11 +63,14 @@ function selectThreads(
   return list.filter((entry) => kept.has(entry.id));
 }
 
-export function listComments(
+export async function listComments(
   dir: string,
   filter: CommentFilter = {},
-): ListedComment[] {
-  const data = readAll(dir);
+): Promise<ListedComment[]> {
+  const data =
+    filter.page === undefined
+      ? await readAll(dir)
+      : { [filter.page]: await readPage(dir, filter.page) };
   const pages =
     filter.page === undefined ? Object.keys(data).sort() : [filter.page];
   return pages.flatMap((page) => {

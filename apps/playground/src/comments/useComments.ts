@@ -33,7 +33,6 @@ import { MARKDOWN_ROOT } from "./markdown-anchor";
 import { captureElementContext, captureElementHtml } from "./element-context";
 import { captureScreenshot } from "./screenshot";
 
-import { PLAYGROUND_VOCABULARY } from "../vocabularies/config";
 import { pageSourcePath } from "../documents/review-target";
 
 export const COMMENTS_ROUTE = "/__playground/comments";
@@ -68,7 +67,6 @@ export const PLAYGROUND_ASSIGNEES: NonNullable<CommentConfig["assignees"]> = [
 ];
 
 export const PLAYGROUND_COMMENT_CONFIG: CommentConfig = {
-  vocabulary: PLAYGROUND_VOCABULARY,
   statuses: DEFAULT_COMMENT_STATUSES,
   assignees: PLAYGROUND_ASSIGNEES,
 };
@@ -102,9 +100,7 @@ export async function request<T>(url: string, init?: RequestInit): Promise<T> {
   if (
     !(response.headers.get("content-type") ?? "").includes("application/json")
   ) {
-    throw new Error(
-      "The playground comments API returned a non-JSON response. Run the playground with vite dev or vite preview.",
-    );
+    throw new ApiError(response.status, { message: "The playground API returned a non-JSON response. Start a live playground server.", context: [["Method", init?.method ?? "GET"], ["Endpoint", url], ["Status", String(response.status)]], details: [{ label: "Response", value: await response.text() }] });
   }
   const payload = (await response.json()) as T & { error?: string };
   if (!response.ok) {

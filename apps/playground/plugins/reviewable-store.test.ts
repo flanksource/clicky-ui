@@ -1,9 +1,14 @@
+import { configureTestComments } from "./testing/comments-store";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as commentStore from "./comments-store";
 
-import { readAll, writeAll, type StoredComment } from "./comments-store";
+import {
+  readAll,
+  writeAll,
+  type StoredComment,
+} from "./testing/comments-store";
 import { createSource, readSource } from "./pages-store";
 import {
   deleteReviewable,
@@ -20,12 +25,13 @@ afterEach(() => {
 });
 
 describe("source-backed review decisions", () => {
-  it("persists rejection and approval with source conflict checks and rollback", () => {
+  it("persists rejection and approval with source conflict checks and rollback", async () => {
     mkdirSync(join(process.cwd(), ".tmp"), { recursive: true });
     const root = mkdtempSync(join(process.cwd(), ".tmp", "decision-"));
     roots.push(root);
     const pagesDir = join(root, "pages");
     const commentsDir = join(root, "comments");
+    configureTestComments(commentsDir);
     mkdirSync(pagesDir);
     mkdirSync(commentsDir);
     const source =
@@ -48,15 +54,15 @@ describe("source-backed review decisions", () => {
       status: "open",
       reviewDecision: "rejected",
     };
-    persistReviewDecision(request, rejection);
+    const savedRejection = await persistReviewDecision(request, rejection);
     const rejected = readSource(pagesDir, "review");
     expect(rejected).toContain('className="existing rejected"');
-    expect(readAll(commentsDir).review).toMatchObject([
-      { id: "reject", reviewDecision: "rejected" },
+    expect((await readAll(commentsDir)).review).toMatchObject([
+      { id: savedRejection.id, reviewDecision: "rejected" },
     ]);
-    expect(() =>
+    await expect(
       persistReviewDecision(request, { ...rejection, id: "stale" }),
-    ).toThrow(/changed since selection/);
+    ).rejects.toThrow(/changed since selection/);
     const approval: StoredComment = {
       ...rejection,
       id: "approve",
@@ -66,16 +72,22 @@ describe("source-backed review decisions", () => {
     vi.spyOn(commentStore, "writeAll").mockImplementationOnce(() => {
       throw new Error("disk unavailable");
     });
-    expect(() =>
-      persistReviewDecision({ ...request, expectedSource: rejected }, approval),
-    ).toThrow("disk unavailable");
+    await expect(
+      persistReviewDecision(
+                { ...request, expectedSource: rejected },
+                approval,
+              ),
+    ).rejects.toThrow("disk unavailable");
     expect(readSource(pagesDir, "review")).toBe(rejected);
-    expect(readAll(commentsDir).review).toHaveLength(1);
-    persistReviewDecision({ ...request, expectedSource: rejected }, approval);
+    expect((await readAll(commentsDir)).review).toHaveLength(1);
+    const savedApproval = await persistReviewDecision(
+      { ...request, expectedSource: rejected },
+      { ...approval, id: "approve-retry" },
+    );
     expect(readSource(pagesDir, "review")).toContain('className="existing"');
-    expect(readAll(commentsDir).review).toMatchObject([
-      { id: "reject", status: "closed" },
-      { id: "approve", status: "closed" },
+    expect((await readAll(commentsDir)).review).toMatchObject([
+      { id: savedRejection.id, status: "closed" },
+      { id: savedApproval.id, status: "closed" },
     ]);
   });
 });
@@ -87,6 +99,7 @@ describe("delete reviewable", () => {
     roots.push(root);
     const pagesDir = join(root, "pages");
     const commentsDir = join(root, "comments");
+    configureTestComments(commentsDir);
     mkdirSync(pagesDir);
     mkdirSync(commentsDir);
     const source =
@@ -115,12 +128,13 @@ describe("delete reviewable", () => {
     ).toThrow(/changed since selection/);
   });
 
-  it("removes the selected literal row and its review thread while preserving other variants", () => {
+  it("removes the selected literal row and its review thread while preserving other variants", async () => {
     mkdirSync(join(process.cwd(), ".tmp"), { recursive: true });
     const root = mkdtempSync(join(process.cwd(), ".tmp", "reviewable-"));
     roots.push(root);
     const pagesDir = join(root, "pages");
     const commentsDir = join(root, "comments");
+    configureTestComments(commentsDir);
     mkdirSync(pagesDir);
     mkdirSync(commentsDir);
     const source = `const variants = [{ id: "first", reviewId: "review-first" }, { id: "second", reviewId: "review-second" }];
@@ -142,7 +156,7 @@ export default function Page() { return <main>{variants.map((variant) => <sectio
         ? { element: { source: "review.tsx", html: "<section />" } }
         : {}),
     });
-    writeAll(commentsDir, {
+    await writeAll(commentsDir, {
       review: [
         comment("first", '[data-review-id="review-first"]'),
         comment("reply", '[data-review-id="review-first"]', "first"),
@@ -150,7 +164,7 @@ export default function Page() { return <main>{variants.map((variant) => <sectio
       ],
     });
 
-    const result = deleteReviewable({
+    const result = await deleteReviewable({
       pagesDir,
       commentsDir,
       slug: "review",
@@ -162,8 +176,8 @@ export default function Page() { return <main>{variants.map((variant) => <sectio
     expect(result.removedComments).toBe(2);
     expect(readSource(pagesDir, "review")).not.toContain('id: "first"');
     expect(readSource(pagesDir, "review")).toContain('id: "second"');
-    expect(readAll(commentsDir).review?.map((entry) => entry.id)).toEqual([
-      "second",
-    ]);
+    expect(
+      (await readAll(commentsDir)).review?.map((entry) => entry.id),
+    ).toEqual(["second"]);
   });
 });

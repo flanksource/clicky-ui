@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { cn } from "@flanksource/clicky-ui";
+import { ActionError, cn } from "@flanksource/clicky-ui";
 import { MonacoEditor, MonacoProvider, type Monaco } from "@flanksource/clicky-ui/monaco";
 import type { editor } from "monaco-editor";
 
@@ -7,13 +7,17 @@ import { configureTsx, getMonacoWorker } from "./monaco-setup";
 import type { PageSource } from "./useSource";
 
 export type SourceEditorProps = {
-  slug: string;
+  /** The edited file relative to the playground root, e.g. `src/pages/notes.tsx`; also keys the Monaco model. */
+  file: string;
   source: PageSource;
+  /** 1-based line to scroll to and place the cursor on, e.g. a diagram node's call site. */
+  revealLine?: number | undefined;
   onClose: () => void;
 };
 
-export function SourceEditor({ slug, source, onClose }: SourceEditorProps) {
+export function SourceEditor({ file, source, revealLine, onClose }: SourceEditorProps) {
   const { draft, setDraft, dirty, ready, saving, error, save, revert } = source;
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   // Monaco binds its ⌘S action once on mount, so route it through a ref that
   // always points at the current save closure.
@@ -21,6 +25,14 @@ export function SourceEditor({ slug, source, onClose }: SourceEditorProps) {
   useEffect(() => {
     saveRef.current = save;
   }, [save]);
+
+  useEffect(() => {
+    const instance = editorRef.current;
+    if (!ready || revealLine === undefined || !instance) return;
+    instance.revealLineInCenter(revealLine);
+    instance.setPosition({ lineNumber: revealLine, column: 1 });
+    instance.focus();
+  }, [ready, revealLine]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -33,16 +45,20 @@ export function SourceEditor({ slug, source, onClose }: SourceEditorProps) {
   }, []);
 
   const handleMount = (instance: editor.IStandaloneCodeEditor, monaco: Monaco) => {
+    editorRef.current = instance;
     instance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       void saveRef.current();
     });
+    if (revealLine === undefined) return;
+    instance.revealLineInCenter(revealLine);
+    instance.setPosition({ lineNumber: revealLine, column: 1 });
   };
 
   return (
     <div className="flex h-full min-h-0 flex-col border-r border-border">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-density-3 py-density-2">
         <span className="truncate font-mono text-xs text-muted-foreground">
-          src/pages/{slug}.tsx
+          {file}
         </span>
         {dirty && (
           <span
@@ -88,12 +104,7 @@ export function SourceEditor({ slug, source, onClose }: SourceEditorProps) {
       </div>
 
       {error && (
-        <p
-          role="alert"
-          className="shrink-0 border-b border-destructive/40 bg-destructive/10 px-density-3 py-density-2 text-xs text-destructive"
-        >
-          {error}
-        </p>
+        <ActionError error={error} title="Source unavailable" context={[["File", file]]} className="shrink-0 px-density-3 py-density-2 text-xs" />
       )}
 
       {!ready ? (
@@ -105,7 +116,7 @@ export function SourceEditor({ slug, source, onClose }: SourceEditorProps) {
               value={draft}
               onChange={setDraft}
               language="typescript"
-              path={`file:///src/pages/${slug}.tsx`}
+              path={`file:///${file}`}
               height="100%"
               beforeMount={configureTsx}
               onMount={handleMount}

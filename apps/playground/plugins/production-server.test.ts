@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import {
   mkdir,
   mkdtemp,
@@ -9,6 +10,8 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 import { createServer, type ViteDevServer } from "vite";
 import { expect, it, vi } from "vitest";
 import { playgroundMarkdown } from "./markdown-vite-plugin";
@@ -32,6 +35,10 @@ it("serves a compiled shell with shared React, live page discovery and reloads",
       writeFile(
         resolve(root, "vendor/render.ts"),
         'export { renderToStaticMarkup } from "react-dom/server";',
+      ),
+      writeFile(
+        resolve(root, "vendor/client.ts"),
+        'export { createRoot } from "react-dom/client";',
       ),
       writeFile(
         resolve(root, "index.html"),
@@ -64,6 +71,8 @@ it("serves a compiled shell with shared React, live page discovery and reloads",
         'import Missing from "./does-not-exist"; export default Missing;',
       ),
     ]);
+    // As scripts/playground-prod.mjs: dependencies compile their production builds.
+    vi.stubEnv("NODE_ENV", "production");
     server = await createServer({
       configFile: false,
       root,
@@ -97,6 +106,21 @@ it("serves a compiled shell with shared React, live page discovery and reloads",
       "utf8",
     );
     expect(compiled).toContain("__PLAYGROUND_FILES__");
+    // Follow a page's react-dom/client import to the compiled chunk, then evaluate it with plain Node
+    // as the browser would, with a DevTools hook installed first.
+    const client = await (await fetch(new URL("vendor/client.ts", origin))).text();
+    const shared = client.match(/from\s*"([^"]*playground-compiled:react-dom\/client)"/)?.[1];
+    if (!shared) throw new Error(`react-dom/client is not served from the compiled shell:\n${client}`);
+    const facade = await (await fetch(new URL(shared, origin))).text();
+    const chunk = facade.match(/from\s*"\/__playground\/dist\/([^"]+)"/)?.[1];
+    if (!chunk) throw new Error(`compiled react-dom/client has no chunk:\n${facade}`);
+    const probe = `
+      const renderers = [];
+      globalThis.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { supportsFiber: true, inject: (renderer) => renderers.push(renderer), checkDCE() {} };
+      await import(${JSON.stringify(pathToFileURL(resolve(root, "dist", chunk)).href)});
+      console.log(JSON.stringify(renderers.map((renderer) => typeof renderer.overrideProps)));`;
+    const { stdout } = await promisify(execFile)(process.execPath, ["--input-type=module", "--eval", probe]);
+    expect(JSON.parse(stdout)).toEqual(["function"]);
     const before = await stat(resolve(root, "dist/index.html"));
     const page = await (
       await fetch(new URL("src/pages/welcome.tsx", origin))
@@ -108,6 +132,8 @@ it("serves a compiled shell with shared React, live page discovery and reloads",
       await fetch(new URL("vendor/render.ts", origin))
     ).text();
     expect(renderer).toContain("playground-compiled:");
+    const rendered = await server.ssrLoadModule("/src/pages/welcome.tsx");
+    expect([typeof rendered["useState"], typeof rendered["token"]]).toEqual(["function", "object"]);
     const guidance = await fetch(
       new URL("src/pages/welcome.tsx?playground-markdown", origin),
     );
@@ -129,6 +155,7 @@ it("serves a compiled shell with shared React, live page discovery and reloads",
       before.mtimeMs,
     );
   } finally {
+    vi.unstubAllEnvs();
     await server?.close();
     await rm(root, { recursive: true, force: true });
   }

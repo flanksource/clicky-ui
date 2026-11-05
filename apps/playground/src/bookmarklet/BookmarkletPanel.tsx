@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useVocabulary } from "../vocabularies/context";
+import { VocabularyStatus } from "../vocabularies/VocabularyStatus";
 import {
   Button,
   CommentProvider,
@@ -136,6 +138,7 @@ export function BookmarkletPanel() {
             >
               Playground comments
             </h1>
+            <VocabularyStatus />
             <Button
               size="sm"
               variant="ghost"
@@ -236,6 +239,8 @@ function SessionRail({
   anchors,
   focus,
 }: PageSession & { visible: boolean; anchors: AnchorState[]; focus?: string }) {
+  const { vocabulary } = useVocabulary();
+  const commentConfig = useMemo(() => ({ ...PLAYGROUND_COMMENT_CONFIG, ...(vocabulary ? { vocabulary } : {}) }), [vocabulary]);
   const content = useRef<HTMLDivElement>(null);
   const comments = useComments(page.id, content, {
     enabled: visible,
@@ -265,7 +270,7 @@ function SessionRail({
     <CommentProvider
       persistenceKey={page.id}
       comments={comments.comments}
-      config={PLAYGROUND_COMMENT_CONFIG}
+      config={commentConfig}
       initialRailMode="all"
       onCreate={comments.create}
       onReply={comments.reply}

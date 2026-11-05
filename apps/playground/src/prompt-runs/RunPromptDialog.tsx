@@ -61,6 +61,7 @@ export type PromptTarget = {
   element: Promise<CommentElementCaptureContext>;
   /** The files the prompt targets; defaults to the element's source file. */
   files?: string[];
+  promptId?: string;
 };
 
 /** The captain calls the dialog makes; the playground page swaps in stubs. */
@@ -271,6 +272,7 @@ function PromptForm({
   const [runError, setRunError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [elementFile, setElementFile] = useState<string[]>([]);
+  const [directory, setDirectory] = useState<string>();
   const [folderFiles, setFolderFiles] = useState<string[]>();
   // `files` gets the Browse… picker; a string argument holds space-separated paths, an array one per item.
   const filesPost = useMemo<PostExtension>(
@@ -287,7 +289,7 @@ function PromptForm({
             value={paths}
             multiple
             suggested={elementFile}
-            loadFiles={() => api.fetchWorkspaceFiles(target.page)}
+            loadFiles={() => api.fetchWorkspaceFiles(target.page, directory)}
             disabled={busy}
             onChange={(next) =>
               field.onChange(
@@ -298,7 +300,7 @@ function PromptForm({
         ),
       };
     },
-    [api.fetchWorkspaceFiles, busy, elementFile, target.page],
+    [api.fetchWorkspaceFiles, busy, elementFile, target.page, directory],
   );
 
   useEffect(() => {
@@ -324,8 +326,9 @@ function PromptForm({
         }
         setPromptVersion(next.prompt.version);
         setPreparationId(next.preparationId);
+        setDirectory(next.directory);
         const files =
-          next.files ?? target.files ?? [sourceFile(element.source)].filter(Boolean);
+          next.files ?? next.defaultFiles ?? target.files ?? [sourceFile(element.source)].filter(Boolean);
         const seeded = seedPromptForm({
           schema: next.variablesSchema,
           element,
@@ -432,7 +435,7 @@ function PromptForm({
           </ul>
         </details>
       )}
-      <div className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="grid grid-cols-1 gap-3">
         <Field label="Prompt" htmlFor="prompt-run-prompt">
           <Combobox
             id="prompt-run-prompt"
@@ -699,6 +702,7 @@ export function RunPromptDialog({
         <RunPromptPanel
           key={target.anchor}
           target={target}
+          defaultPromptId={target.promptId ?? ""}
           {...(api ? { api } : {})}
           onStarted={onStarted}
           onClose={onClose}

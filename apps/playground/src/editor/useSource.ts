@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { readPage, writePage } from "./page-api";
+import { readPage, readPagesFile, writePage, writePagesFile } from "./page-api";
 import { useDocumentSource, type RepositorySource } from "../documents/useDocumentSource";
+
+const FILE_TARGET = "file:";
+
+/** Source target for a page module or helper file under `src/pages/` (relative path), as `useSource` accepts it. */
+export const fileSourceTarget = (file: string) => `${FILE_TARGET}${file}`;
+
+/** The pages-relative file behind a `file:` target, or undefined for a page slug. */
+export const sourceTargetFile = (target: string | undefined) =>
+  target?.startsWith(FILE_TARGET) ? target.slice(FILE_TARGET.length) : undefined;
 
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
@@ -24,23 +33,26 @@ export type PageSource = {
   ready: boolean;
   loading: boolean;
   saving: boolean;
-  error: string | null;
+  error: Error | string | null;
   /** Resolves true once the draft is on disk, false when the write failed (see `error`). */
   save: () => Promise<boolean>;
   revert: () => void;
 };
 
 /**
- * Loads one artifact's source and saves it back through the dev-server. Saving
- * rewrites the file, which Vite picks up — the preview refreshes itself, so
- * there is no client-side "apply" step.
+ * Loads one artifact's source — a page slug, a `document:` repository document,
+ * or a `file:` page helper — and saves it back through the dev-server. Saving
+ * rewrites the file; the preview picks it up on the next reload. A helper save
+ * is refused with a 409 when the file changed since it was loaded.
  */
 export function useSource(slug: string | undefined, enabled: boolean): RepositorySource {
   const document = slug?.startsWith("document:") === true;
+  const file = sourceTargetFile(slug);
   const repositorySource = useDocumentSource(document && enabled ? slug : undefined);
   const [draft, setDraft] = useState("");
   const [saved, setSaved] = useState("");
   const [path, setPath] = useState<string | null>(null);
+  const [hash, setHash] = useState<string | null>(null);
   const [loadedSlug, setLoadedSlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -51,11 +63,14 @@ export function useSource(slug: string | undefined, enabled: boolean): Repositor
 
     let cancelled = false;
     setLoading(true);
-    void readPage(slug)
-      .then(({ source, path }) => {
+    const load: Promise<{ source: string; path: string; hash: string | null }> =
+      file === undefined ? readPage(slug).then((page) => ({ ...page, hash: null })) : readPagesFile(file);
+    void load
+      .then(({ source, path, hash }) => {
         if (cancelled) return;
         setSaved(source);
         setPath(path);
+        setHash(hash);
         setDraft(source);
         setLoadedSlug(slug);
         setError(null);
@@ -70,13 +85,18 @@ export function useSource(slug: string | undefined, enabled: boolean): Repositor
     return () => {
       cancelled = true;
     };
-  }, [enabled, slug, document]);
+  }, [enabled, slug, document, file]);
 
   const save = useCallback(async () => {
     if (!slug) return false;
     setSaving(true);
     try {
-      await writePage(slug, draft);
+      if (file === undefined) {
+        await writePage(slug, draft);
+      } else {
+        if (hash === null) throw new Error(`${file} has not finished loading, so it cannot be saved yet`);
+        setHash((await writePagesFile(file, draft, hash)).hash);
+      }
       setSaved(draft);
       setError(null);
       return true;
@@ -86,7 +106,7 @@ export function useSource(slug: string | undefined, enabled: boolean): Repositor
     } finally {
       setSaving(false);
     }
-  }, [draft, slug]);
+  }, [draft, slug, file, hash]);
 
   const revert = useCallback(() => setDraft(saved), [saved]);
 

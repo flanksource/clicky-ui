@@ -24,7 +24,9 @@ const PROMPTS_ROUTE = "/__playground/prompts";
 const PROMPT_RUNS_ROUTE = "/__playground/prompt-runs";
 
 export type PromptDetailResponse = {
+  directory?: string;
   files?: string[];
+  defaultFiles?: string[];
   preparationId: string;
   prompt: CaptainPromptDetail;
   variablesSchema: Record<string, unknown>;
@@ -49,12 +51,16 @@ export async function fetchPromptRuns(): Promise<PromptRun[]> {
 }
 
 /** The checkout's files for the file / git picker, changed files first. */
-export async function fetchWorkspaceFiles(page?: string): Promise<WorkspaceFile[]> {
+export async function fetchWorkspaceFiles(page?: string, directory?: string): Promise<WorkspaceFile[]> {
   if (page?.startsWith("document:")) {
     const target = await documentJson<{ repository: DocumentRepository; path: string }>(`/__playground/documents/target?${new URLSearchParams({ id: page })}`);
     const path = target.path.split("/").slice(0, -1).join("/") || ".";
     const children = await directoryEntries({ root: target.repository.root, path, overrides: [], includeIgnored: true });
-    return children.filter((entry) => !entry.directory).map((entry) => ({ path: entry.path }));
+    return children.filter((entry) => !entry.directory).map((entry) => {
+      const absolute = `${target.repository.root}/${entry.path}`;
+      if (directory && !absolute.startsWith(`${directory}/`)) throw new Error("Prompt file is outside its prepared directory");
+      return { path: directory ? absolute.slice(directory.length + 1) : entry.name };
+    });
   }
   const { files } = await request<{ files: WorkspaceFile[] }>(
     WORKSPACE_FILES_ROUTE,

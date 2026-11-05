@@ -69,9 +69,9 @@ export async function updateAgentSessionSettings(
 }
 
 /** Live captain sessions a page's threads can be delivered into. */
-export async function fetchCaptainSessions(): Promise<CaptainSessionOption[]> {
+export async function fetchCaptainSessions(page?: string): Promise<CaptainSessionOption[]> {
   const { sessions } = await request<{ sessions: CaptainSessionOption[] }>(
-    `${AGENT_SESSIONS_ROUTE}/captain`,
+    `${AGENT_SESSIONS_ROUTE}/captain${page ? `?${new URLSearchParams({ page })}` : ""}`,
   );
   return sessions;
 }

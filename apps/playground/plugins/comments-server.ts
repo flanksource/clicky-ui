@@ -1,3 +1,11 @@
+import {
+  requireText,
+  requireAuthor,
+  requireAssignee,
+  optionalText,
+  assertOnlyFields,
+  draft,
+} from "./comments-input";
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Connect, Logger, Plugin } from "vite";
@@ -16,10 +24,7 @@ import { listComments, parseCommentFilter } from "./comments-query";
 import { commentActivity } from "./comment-activity";
 import {
   assertScreenshotCapture,
-  discardScreenshot,
   persistScreenshot,
-  serveScreenshot,
-  stageScreenshotRemoval,
 } from "./comments-screenshots";
 import {
   addComment,
@@ -34,9 +39,14 @@ import {
   type StoredAuthor,
   type StoredComment,
 } from "./comments-store";
-import { persistReviewDecision, type ReviewSourceRequest } from "./reviewable-store";
+import {
+  persistReviewDecision,
+  type ReviewSourceRequest,
+} from "./reviewable-store";
 import { readExternalPages } from "./external-pages-store";
 import { externalUrl } from "../src/bookmarklet/model";
+import { commentsClient } from "./comments-client";
+import { LaunchHttpError } from "./launch-client";
 import { PageStoreError } from "./pages-store";
 import { RepositoryDocuments } from "./repository-documents";
 
@@ -46,7 +56,7 @@ export type CommentRoute =
   | "list"
   | "activity"
   | "schema"
-  | "screenshot"
+  | "attachment"
   | "create"
   | "reply"
   | "acknowledge"
@@ -98,9 +108,8 @@ export function matchRoute(
     if (second === "close") return { route: "close", id: first };
     if (second === "reopen") return { route: "reopen", id: first };
   }
-  if (segments.length === 2 && first === "screenshots" && method === "GET") {
-    return { route: "screenshot", id: second ?? "" };
-  }
+  if (segments.length === 3 && second === "attachments" && method === "GET")
+    return { route: "attachment", id: first };
   return undefined;
 }
 
@@ -146,135 +155,20 @@ export function sendJson(
   res.end(JSON.stringify(payload));
 }
 
-function requireText(body: Record<string, unknown>, key: string): string {
-  const value = body[key];
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`"${key}" is required and must be a non-empty string`);
-  }
-  return value;
-}
-
-/**
- * Authorship is never inferred: a reply that silently shows up as "You" when an
- * agent wrote it is worse than a 400 naming the missing field.
- */
-function requireAuthor(body: Record<string, unknown>): StoredAuthor {
-  return parseAuthor(body["author"], "author");
-}
-
-function parseAuthor(value: unknown, field: "author" | "assignee"): StoredAuthor {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(
-      `"${field}" is required, e.g. {"name":"Claude","kind":"agent"}`,
-    );
-  }
-  const candidate = value as Record<string, unknown>;
-  const name = candidate["name"];
-  if (typeof name !== "string" || name.trim() === "") {
-    throw new Error(`"${field}.name" is required and must be a non-empty string`);
-  }
-  const kind = candidate["kind"];
-  if (kind !== undefined && kind !== "user" && kind !== "agent") {
-    throw new Error(`"${field}.kind" must be "user" or "agent"`);
-  }
-  const via = optionalAuthorText(candidate, "via", field);
-  const sessionId = optionalAuthorText(candidate, "sessionId", field);
-  const cost = candidate["cost"];
-  if (cost !== undefined && (typeof cost !== "number" || !Number.isFinite(cost) || cost < 0)) {
-    throw new Error(`"${field}.cost" must be a non-negative number of USD`);
-  }
-  return {
-    name,
-    ...(kind === undefined ? {} : { kind }),
-    ...(via === undefined ? {} : { via }),
-    ...(sessionId === undefined ? {} : { sessionId }),
-    ...(cost === undefined ? {} : { cost }),
-  };
-}
-
-function optionalAuthorText(
-  author: Record<string, unknown>,
-  key: "via" | "sessionId",
-  field: string,
-): string | undefined {
-  const value = author[key];
-  if (value === undefined) return undefined;
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`"${field}.${key}" must be a non-empty string when present`);
-  }
-  return value;
-}
-
-/** `null` clears the assignee; omitting the field is a caller bug, not a clear. */
-function requireAssignee(body: Record<string, unknown>): StoredAuthor | null {
-  if (!("assignee" in body)) {
-    throw new Error(
-      '"assignee" is required: an object like {"name":"Claude","kind":"agent"}, or null to unassign',
-    );
-  }
-  return body["assignee"] === null
-    ? null
-    : parseAuthor(body["assignee"], "assignee");
-}
-
-function optionalText(
-  body: Record<string, unknown>,
-  key: string,
-): string | undefined {
-  const value = body[key];
-  if (value === undefined || value === null) return undefined;
-  if (typeof value !== "string") throw new Error(`"${key}" must be a string`);
-  return value;
-}
-
-function assertOnlyFields(
-  body: Record<string, unknown>,
-  allowed: readonly string[],
-): void {
-  const unexpected = Object.keys(body).find((key) => !allowed.includes(key));
-  if (unexpected) {
-    throw new Error(
-      `request body has unexpected field ${JSON.stringify(unexpected)}`,
-    );
-  }
-}
-
-/** The server owns identity and creation time so two callers cannot collide. */
-function draft(body: Record<string, unknown>, text: string): StoredComment {
-  return {
-    id: randomUUID(),
-    createdAt: new Date().toISOString(),
-    body: text,
-    author: requireAuthor(body),
-  };
-}
-
-function persistElementContext(
-  dir: string,
-  id: string,
-  input: unknown,
-): CommentElementContext {
-  if (input === null || typeof input !== "object" || Array.isArray(input)) {
-    throw new Error("every root comment requires element context");
-  }
+function persistElementContext(input: unknown): CommentElementContext {
+  if (input === null || typeof input !== "object" || Array.isArray(input))
+    throw new Error("Every root comment requires element context");
   const candidate = input as Record<string, unknown>;
-  const screenshot =
-    candidate["screenshot"] === undefined
-      ? undefined
-      : persistScreenshot(
-          dir,
-          id,
-          assertScreenshotCapture(candidate["screenshot"]),
-        );
-  try {
-    return assertElementContext({
-      ...candidate,
-      ...(screenshot ? { screenshot } : {}),
-    });
-  } catch (cause) {
-    if (screenshot) discardScreenshot(dir, id, screenshot);
-    throw cause;
-  }
+  return assertElementContext({
+    ...candidate,
+    ...(candidate.screenshot
+      ? {
+          screenshot: persistScreenshot(
+            assertScreenshotCapture(candidate.screenshot),
+          ),
+        }
+      : {}),
+  });
 }
 
 /** A root just stored by `POST /__playground/comments` or a prompt run (not a review decision). */
@@ -290,7 +184,13 @@ export type CommentCreatedEvent = {
 /** What a new root is made of; `element` is the raw capture, screenshot included. */
 export type RootCommentInput = Pick<
   StoredComment,
-  "body" | "rating" | "reviewDecision" | "checklist" | "refs" | "promptRun" | "lint"
+  | "body"
+  | "rating"
+  | "reviewDecision"
+  | "checklist"
+  | "refs"
+  | "promptRun"
+  | "lint"
 > & {
   page: unknown;
   author: StoredAuthor;
@@ -304,13 +204,20 @@ export type RootCommentInput = Pick<
  * page's URL, and records a review decision in place of an earlier one. The
  * screenshot is removed again when anything fails.
  */
-export function createRootComment(
+export async function createRootComment(
   dir: string,
   input: RootCommentInput,
-): { page: string; comment: StoredComment } {
-  const { page: rawPage, author, anchor, element: rawElement, source, ...fields } = input;
+): Promise<{ page: string; comment: StoredComment }> {
+  const {
+    page: rawPage,
+    author,
+    anchor,
+    element: rawElement,
+    source,
+    ...fields
+  } = input;
   const id = randomUUID();
-  const element = persistElementContext(dir, id, rawElement);
+  const element = persistElementContext(rawElement);
   const stored: StoredComment = {
     ...fields,
     id,
@@ -321,26 +228,34 @@ export function createRootComment(
     anchor: anchor ?? null,
     element,
   };
-  try {
-    const page = assertPage(rawPage);
-    if (page.startsWith("document:")) element.source = new RepositoryDocuments(dir).document(page).absolutePath;
-    if (page.startsWith("external:")) {
-      const target = readExternalPages(dir).find((entry) => entry.id === page);
-      if (!element.pageUrl || !target?.urls.includes(externalUrl(element.pageUrl).url)) {
-        throw new Error(
-          "External comment capture URL must belong to its registered comment set",
-        );
-      }
+  const page = assertPage(rawPage);
+  if (page.startsWith("document:"))
+    element.source = new RepositoryDocuments(dir).document(page).absolutePath;
+  if (page.startsWith("external:")) {
+    const target = readExternalPages(dir).find((entry) => entry.id === page);
+    if (
+      !element.pageUrl ||
+      !target?.urls.includes(externalUrl(element.pageUrl).url)
+    ) {
+      throw new Error(
+        "External comment capture URL must belong to its registered comment set",
+      );
     }
-    if (!stored.reviewDecision) {
-      return { page, comment: addComment(dir, page, stored) };
-    }
-    if (!source) throw new Error("review decisions require expectedSource and a local source page");
-    return { page, comment: persistReviewDecision({ ...source, commentsDir: dir, slug: page }, stored) };
-  } catch (cause) {
-    stageScreenshotRemoval(dir, [stored]).commit();
-    throw cause;
   }
+  if (!stored.reviewDecision) {
+    return { page, comment: await addComment(dir, page, stored) };
+  }
+  if (!source)
+    throw new Error(
+      "review decisions require expectedSource and a local source page",
+    );
+  return {
+    page,
+    comment: await persistReviewDecision(
+      { ...source, commentsDir: dir, slug: page },
+      stored,
+    ),
+  };
 }
 
 export type PlaygroundCommentsOptions = {
@@ -350,13 +265,13 @@ export type PlaygroundCommentsOptions = {
   onCreated?: (event: CommentCreatedEvent) => Promise<void>;
 };
 
-function handle(
+async function handle(
   dir: string,
   pagesDir: string | undefined,
   req: IncomingMessage,
   res: ServerResponse,
   created: (event: CommentCreatedEvent) => void,
-): Promise<void> | void {
+): Promise<void> {
   const url = new URL(req.url ?? "/", "http://playground.local");
   const matched = matchRoute(req.method ?? "", url.pathname);
   if (!matched) {
@@ -368,23 +283,45 @@ function handle(
 
   switch (route) {
     case "activity":
-      return sendJson(res, 200, { pages: commentActivity(listComments(dir)) });
-    case "screenshot":
-      if (!serveScreenshot(dir, url.pathname, res)) {
-        return sendJson(res, 404, { error: `screenshot "${id}" not found` });
+      return sendJson(res, 200, {
+        pages: commentActivity(await listComments(dir)),
+      });
+    case "attachment": {
+      const client = commentsClient(dir);
+      const target = new URL(
+        "/api/v1/comments" + url.pathname,
+        await client.endpoint.url(),
+      );
+      const response = await fetch(target, {
+        headers: { "X-Gavel-Comment-Scope": client.scope },
+      });
+      if (!response.ok)
+        throw new LaunchHttpError(response.status, await response.text());
+      res.statusCode = response.status;
+      for (const header of [
+        "content-type",
+        "content-length",
+        "content-disposition",
+        "etag",
+        "x-content-type-options",
+      ]) {
+        const value = response.headers.get(header);
+        if (value) res.setHeader(header, value);
       }
+      res.setHeader("Cache-Control", "no-store");
+      res.end(Buffer.from(await response.arrayBuffer()));
       return;
-
+    }
     case "list":
       return sendJson(res, 200, {
-        comments: listComments(dir, parseCommentFilter(url.searchParams)),
+        comments: await listComments(dir, parseCommentFilter(url.searchParams)),
       });
 
     case "schema":
       return sendJson(res, 200, { tools: COMMENT_TOOLS });
 
     case "create":
-      return readJsonBody(req).then((body) => {
+      return readJsonBody(req).then(async (body) => {
         assertOnlyFields(body, [
           "page",
           "body",
@@ -399,9 +336,10 @@ function handle(
         if (!host) throw new Error("request has no Host header");
         const rating = optionalText(body, "rating");
         const reviewDecision = optionalText(body, "reviewDecision");
-        if (reviewDecision && !pagesDir) throw new Error("local source review is not configured");
+        if (reviewDecision && !pagesDir)
+          throw new Error("local source review is not configured");
         const anchor = optionalText(body, "anchor");
-        const { page, comment } = createRootComment(dir, {
+        const { page, comment } = await createRootComment(dir, {
           page: body["page"],
           body: optionalText(body, "body") ?? "",
           author: requireAuthor(body),
@@ -410,7 +348,13 @@ function handle(
           ...(rating === undefined ? {} : { rating: assertRating(rating) }),
           ...(reviewDecision === undefined
             ? {}
-            : { reviewDecision: assertReviewDecision(reviewDecision), source: { pagesDir: pagesDir as string, expectedSource: requireText(body, "expectedSource") } }),
+            : {
+                reviewDecision: assertReviewDecision(reviewDecision),
+                source: {
+                  pagesDir: pagesDir as string,
+                  expectedSource: requireText(body, "expectedSource"),
+                },
+              }),
         });
         sendJson(res, 201, comment);
         if (!comment.reviewDecision) {
@@ -419,52 +363,61 @@ function handle(
       });
 
     case "reply":
-      return readJsonBody(req).then((body) => {
+      return readJsonBody(req).then(async (body) => {
         assertOnlyFields(body, ["body", "author"]);
         sendJson(
           res,
           201,
-          addReply(dir, id, draft(body, requireText(body, "body"))),
+          await addReply(dir, id, draft(body, requireText(body, "body"))),
         );
       });
 
     case "acknowledge":
-      return readJsonBody(req).then((body) => {
+      return readJsonBody(req).then(async (body) => {
         assertOnlyFields(body, ["author"]);
-        sendJson(res, 200, acknowledgeComment(dir, id, requireAuthor(body)));
+        sendJson(
+          res,
+          200,
+          await acknowledgeComment(dir, id, requireAuthor(body)),
+        );
       });
 
     case "assign":
-      return readJsonBody(req).then((body) => {
+      return readJsonBody(req).then(async (body) => {
         assertOnlyFields(body, ["author", "assignee"]);
         sendJson(
           res,
           200,
-          assignComment(dir, id, requireAuthor(body), requireAssignee(body)),
+          await assignComment(
+            dir,
+            id,
+            requireAuthor(body),
+            requireAssignee(body),
+          ),
         );
       });
 
     case "resolve":
-      return readJsonBody(req).then((body) => {
+      return readJsonBody(req).then(async (body) => {
         assertOnlyFields(body, []);
-        sendJson(res, 200, resolveComment(dir, id));
+        sendJson(res, 200, await resolveComment(dir, id));
       });
 
     case "close":
-      return readJsonBody(req).then((body) => {
+      return readJsonBody(req).then(async (body) => {
         assertOnlyFields(body, ["author"]);
-        sendJson(res, 200, closeComment(dir, id, requireAuthor(body)));
+        sendJson(res, 200, await closeComment(dir, id, requireAuthor(body)));
       });
 
     case "reopen":
-      return readJsonBody(req).then((body) => {
+      return readJsonBody(req).then(async (body) => {
         assertOnlyFields(body, ["author", "body"]);
         const actor = requireAuthor(body);
         const replyBody = optionalText(body, "body");
         sendJson(
           res,
           200,
-          reopenComment(
+          await reopenComment(
             dir,
             id,
             actor,
@@ -481,7 +434,7 @@ function handle(
       });
 
     case "update":
-      return readJsonBody(req).then((body) => {
+      return readJsonBody(req).then(async (body) => {
         // Status is not editable here: acknowledge, assign, resolve, close and
         // reopen are the only ways to move a thread between stages.
         assertOnlyFields(body, ["body", "rating"]);
@@ -497,17 +450,16 @@ function handle(
             : { rating: assertRating(nextRating) }),
           updatedAt: new Date().toISOString(),
         };
-        sendJson(res, 200, patchComment(dir, id, patch));
+        sendJson(res, 200, await patchComment(dir, id, patch));
       });
 
     case "delete":
-      return sendJson(res, 200, { removed: removeComment(dir, id) });
+      return sendJson(res, 200, { removed: await removeComment(dir, id) });
   }
 }
 
 /**
- * Persists playground feedback to `<dir>/comments.json` so notes survive a
- * reload and stay readable in-repo by a coding agent, and exposes the same data
+ * Persists playground feedback through Gavel comments and exposes the same data
  * as an API a model can call — `GET <route>/schema` describes every endpoint
  * available to agents. Human-only lifecycle routes remain UI-owned.
  * The middleware runs in both Vite development and local build preview.
@@ -516,10 +468,18 @@ export function playgroundComments(options: PlaygroundCommentsOptions): Plugin {
   return {
     name: "playground-comments",
     configureServer(server) {
-      registerCommentsMiddleware(server.middlewares, server.config.logger, options);
+      registerCommentsMiddleware(
+        server.middlewares,
+        server.config.logger,
+        options,
+      );
     },
     configurePreviewServer(server) {
-      registerCommentsMiddleware(server.middlewares, server.config.logger, options);
+      registerCommentsMiddleware(
+        server.middlewares,
+        server.config.logger,
+        options,
+      );
     },
   };
 }
@@ -550,8 +510,19 @@ function registerCommentsMiddleware(
         }
         sendJson(
           res,
-          error instanceof CommentHttpError ? error.statusCode : error instanceof PageStoreError ? error.statusCode : 400,
-          { error: message },
+          error instanceof LaunchHttpError
+            ? error.status
+            : error instanceof CommentHttpError
+              ? error.statusCode
+              : error instanceof PageStoreError
+                ? error.statusCode
+                : 400,
+          {
+            error: message,
+            ...(error instanceof LaunchHttpError && error.diagnostics
+              ? error.diagnostics
+              : {}),
+          },
         );
       }
     })();
