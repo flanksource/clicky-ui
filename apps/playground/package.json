@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @flanksource/clicky-ui build:icons && vite dev",
+    "playground:prod": "node scripts/playground-prod.mjs",
     "build": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && vite build",
     "preview": "vite preview",
     "lint": "oxlint src plugins vite.config.ts --deny-warnings",
@@ -18,6 +19,7 @@
     "@iconify/react": "catalog:",
     "@medv/finder": "catalog:",
     "@tanstack/react-query": "catalog:",
+    "bippy": "catalog:",
     "dom-accessibility-api": "catalog:",
     "modern-screenshot": "catalog:",
     "monaco-editor": "catalog:",
@@ -36,6 +38,7 @@
     "@vitejs/plugin-react": "catalog:",
     "css.escape": "catalog:",
     "jsdom": "catalog:",
+    "magic-string": "catalog:",
     "tailwindcss": "catalog:",
     "ts-morph": "catalog:",
     "typescript": "catalog:",
