@@ -27,6 +27,7 @@ import type {
 import type {
   StoredComment,
   StoredPromptRun,
+  StoredStyleEdit,
 } from "../../plugins/comments-store";
 import { overlayLabel, resolveAnchor } from "./dom-anchor";
 import { MARKDOWN_ROOT } from "./markdown-anchor";
@@ -76,8 +77,14 @@ export type PlaygroundComment = Comment & {
   element?: CommentElementContext;
   promptRun?: StoredPromptRun;
   lint?: StoredComment["lint"];
+  styleEdit?: StoredStyleEdit;
 };
 export type PageComment = PlaygroundComment & { page: string };
+
+/** What the playground posts for a new root: the library's input plus the refused style edit being requested. */
+export type PlaygroundCommentCreateInput = CommentCreateInput & {
+  styleEdit?: StoredStyleEdit;
+};
 
 /**
  * The root an anchor's locators are computed against. Dialog anchors get none:
@@ -148,7 +155,7 @@ export type PlaygroundComments = {
   loading: boolean;
   /** Surfaced as a banner — a broken backend must never look like "no comments". */
   error: string | null;
-  create: (input: CommentCreateInput, actionId?: string) => Promise<void>;
+  create: (input: PlaygroundCommentCreateInput, actionId?: string) => Promise<void>;
   /** Captures an element's source, HTML and locators as the comments store them. */
   captureSelection: (
     anchor: string,
@@ -301,7 +308,7 @@ export function useComments(
   );
 
   const create = useCallback(
-    (input: CommentCreateInput, actionId = "plain") =>
+    (input: PlaygroundCommentCreateInput, actionId = "plain") =>
       mutate(
         async () => {
           if (actionId !== "plain" && actionId !== "screenshot") {
@@ -317,6 +324,7 @@ export function useComments(
               author: PLAYGROUND_COMMENT_AUTHOR,
               anchor: input.anchor ?? null,
               ...(input.rating ? { rating: input.rating } : {}),
+              ...(input.styleEdit ? { styleEdit: input.styleEdit } : {}),
               element,
             });
             return;
@@ -382,6 +390,7 @@ export function useComments(
             author: PLAYGROUND_COMMENT_AUTHOR,
             anchor,
             ...(input.rating ? { rating: input.rating } : {}),
+            ...(input.styleEdit ? { styleEdit: input.styleEdit } : {}),
             ...(input.reviewDecision
               ? { reviewDecision: input.reviewDecision }
               : {}),

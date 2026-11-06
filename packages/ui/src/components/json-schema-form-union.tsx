@@ -15,8 +15,11 @@ export function UnionControl({ field, fieldId, ctx }: { field: FieldControl; fie
   const prop = { ...base, ...branch, title: field.label };
   const nodes = ctx.render.renderFieldNodes({ key: field.key, prop, required: field.required,
     value: field.value, onChange: field.onChange, instancePath: ctx.instancePath }, ctx);
+  const inferFromValue = branches.every((item) =>
+    ["string", "number", "integer", "boolean"].includes(branchType(item)) && Object.keys(item).every((key) => key === "type"),
+  );
   return <div className="flex min-w-0 flex-col gap-2">
-    <Select id={`${fieldId}-variant`} aria-label={`${field.label} format`} value={String(selected)} disabled={ctx.readOnly || field.readOnly}
+    {!inferFromValue && <Select id={`${fieldId}-variant`} aria-label={`${field.label} format`} value={String(selected)} disabled={ctx.readOnly || field.readOnly}
       options={branches.map((item, i) => ({ value: String(i), label: item.title && branches.filter((other) => other.title === item.title).length === 1 ? item.title : `${item.title ?? "Variant"} (${branchType(item)} ${i + 1})` }))}
       onChange={(event) => {
         const next = Number(event.target.value);
@@ -25,7 +28,7 @@ export function UnionControl({ field, fieldId, ctx }: { field: FieldControl; fie
         drafts.current.set(selected, field.value);
         setPreferred(next);
         field.onChange(drafts.current.has(next) ? drafts.current.get(next) : seedUnionBranch(target));
-      }} />
+      }} />}
     {branchType(branch) === "null" ? <code>null</code> : nodes?.value}
   </div>;
 }

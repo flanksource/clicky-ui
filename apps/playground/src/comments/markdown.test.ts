@@ -4,6 +4,7 @@ import { DOCUMENT_ANCHOR, type Comment } from "@flanksource/clicky-ui/comments";
 import { commentsForFolder, commentsToMarkdown, groupByPage } from "./markdown";
 import type { PageComment } from "./useComments";
 import type { CommentElementContext } from "../../plugins/comments-model";
+import type { StoredStyleEdit } from "../../plugins/comments-store";
 
 const BUTTON_ANCHOR = ":scope > div:nth-child(1) > button:nth-child(2)";
 const HEADING_ANCHOR = ":scope > h1:nth-child(1)";
@@ -227,6 +228,42 @@ describe("commentsToMarkdown", () => {
     expect(markdown).toContain(
       '**HTML:**\n```html\n<button class="btn-primary">Approve</button>\n```',
     );
+  });
+
+  it("tells the agent the refused style edit: element, source line, each attribute change and why it was refused", () => {
+    const styled = comment({
+      id: "c1",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      body: "Change fill of <rect>",
+    }) as Comment & { styleEdit: StoredStyleEdit };
+    styled.styleEdit = {
+      marker: "flanksource/_diagrams/call-path.tsx:42:7#3@0123456789ab",
+      tag: "rect",
+      changes: [
+        { attribute: "fill", from: "#fff", to: "#eef" },
+        { attribute: "width", from: 12, to: 40.5 },
+        { attribute: "strokeWidth", from: null, to: 2 },
+      ],
+      refusal: {
+        reason: "computed",
+        file: "flanksource/_diagrams/call-path.tsx",
+        line: 44,
+        column: 9,
+        message: "x is computed there, so it cannot be changed visually; open the source and edit it by hand",
+      },
+    };
+
+    const markdown = commentsToMarkdown(page("welcome", [styled]), MARKDOWN_OPTIONS);
+
+    expect(markdown.split("\n").slice(6, 13)).toEqual([
+      "- status: open",
+      "- You: Change fill of <rect>",
+      "- style edit: `<rect>` at `apps/playground/src/pages/flanksource/_diagrams/call-path.tsx:42`",
+      "  - fill: `#fff` → `#eef`",
+      "  - width: `12` → `40.5`",
+      "  - strokeWidth: (not set) → `2`",
+      "  - not applied automatically (computed) at `apps/playground/src/pages/flanksource/_diagrams/call-path.tsx:44:9`: x is computed there, so it cannot be changed visually; open the source and edit it by hand",
+    ]);
   });
 
   it("names a markdown block by its section, text and captured line instead of its anchor", () => {

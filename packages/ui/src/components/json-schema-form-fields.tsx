@@ -3,6 +3,7 @@ import { cn } from "../lib/utils";
 import { formatDateTimeRelative } from "../data/cells/timestamp-format";
 import { Combobox } from "./Combobox";
 import { DateField } from "./DateField";
+import { ColorSwatch } from "./json-schema-form-color";
 import { RadioGroupControl, SegmentedEnumControl } from "./json-schema-form-enum-choice";
 import { GridControl } from "./json-schema-form-grid";
 import { LookupTreeControl } from "./json-schema-form-lookup-tree";
@@ -84,8 +85,15 @@ export function StringControl({
   readOnly: boolean;
   size: FormSize;
 }) {
+  // format:"color" prefixes the text input with a native color picker bound to the
+  // same value; a consumer-set `prefix` wins if both are present.
+  const prefix =
+    field.prefix ??
+    (field.schema.format === "color" ? (
+      <ColorSwatch label={field.label} value={toText(field.value)} disabled={readOnly} onPick={field.onChange} />
+    ) : undefined);
   return (
-    <FieldAdornmentWrapper prefix={field.prefix} suffix={field.suffix}>
+    <FieldAdornmentWrapper prefix={prefix} suffix={field.suffix}>
       <input
         id={fieldId}
         // format:"password" masks secret material (API keys, client secrets);
@@ -94,7 +102,7 @@ export function StringControl({
         autoComplete={field.schema.format === "password" ? "new-password" : undefined}
         data-jsf-input
         {...fieldAriaProps(field, fieldId)}
-        className={cn(inputClass(size), field.prefix && "pl-8", field.suffix && "pr-8", field.inputClassName)}
+        className={cn(inputClass(size), prefix && "pl-8", field.suffix && "pr-8", field.inputClassName)}
         value={toText(field.value)}
         disabled={readOnly}
         placeholder={defaultPlaceholder(field.schema)}

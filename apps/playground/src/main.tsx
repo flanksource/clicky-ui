@@ -12,7 +12,7 @@ const bookmarklet =
 const App = lazy(() =>
   import("./App").then((module) => ({ default: module.App })),
 );
-if (!bookmarklet) void import("react-grab");
+if (!bookmarklet) void import("@flanksource/react-grab");
 
 // Schema-driven surfaces carry icons as runtime strings (x-enum-icons, x-icon,
 // <Icon name="...">), which no import can resolve. Registering this package's

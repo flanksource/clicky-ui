@@ -39,8 +39,8 @@ it("overrides the call-site component's props and re-renders every instance", as
   expect(liveOverrideSupport()).toEqual({ supported: true });
   const nodes = Array.from(container.querySelectorAll(`[data-editable-source="${MARKER}"]`));
 
-  await act(async () => overrideCallSite(nodes, MARKER, "tone", "card"));
-  await act(async () => overrideCallSite(nodes, MARKER, "title", "Run Gateway"));
+  await act(async () => overrideCallSite(nodes, MARKER, { tone: "card" }));
+  await act(async () => overrideCallSite(nodes, MARKER, { title: "Run Gateway" }));
 
   expect(
     Array.from(container.querySelectorAll("[data-box-style]"), (box) => [
@@ -84,7 +84,7 @@ it("keeps a reverted prop reverted when a different prop is overridden next", as
     ["tone", "card"], ["tone", "outlined"], ["title", "Run Core"],
   ];
   for (const [prop, value] of steps) {
-    await act(async () => overrideCallSite(nodes, MARKER, prop, value));
+    await act(async () => overrideCallSite(nodes, MARKER, { [prop]: value }));
     await act(async () => tick());
   }
 
@@ -92,11 +92,37 @@ it("keeps a reverted prop reverted when a different prop is overridden next", as
   expect([box?.getAttribute("data-box-style"), box?.querySelector("[data-editable-text='title']")?.textContent]).toEqual(["outlined", "Run Core"]);
 });
 
+it("overrides a host element's attribute props and reverts them, including one the source never wrote", async () => {
+  const { overrideCallSite } = await import("./react-override");
+  const container = await renderWithHook(() => (
+    <svg>
+      <rect data-editable-source={MARKER} x={10} width={80} fill="#eeeeee" />
+      <rect data-editable-source={OTHER_MARKER} x={10} width={80} fill="#eeeeee" />
+    </svg>
+  ));
+  const [target, untouched] = Array.from(container.querySelectorAll("rect")) as [SVGRectElement, SVGRectElement];
+  const attributes = (rect: SVGRectElement) => ({ fill: rect.getAttribute("fill"), stroke: rect.getAttribute("stroke"), width: rect.getAttribute("width") });
+
+  // Several attributes in one call: separate overrideProps calls before a re-render would drop all but the last.
+  await act(async () => overrideCallSite([target], MARKER, { fill: "#ff0000", stroke: "#00ff00", width: 120 }));
+  const previewed = { target: attributes(target), untouched: attributes(untouched) };
+
+  await act(async () => overrideCallSite([target], MARKER, { fill: "#eeeeee", stroke: undefined, width: 80 }));
+
+  expect({ previewed, reverted: attributes(target) }).toEqual({
+    previewed: {
+      target: { fill: "#ff0000", stroke: "#00ff00", width: "120" },
+      untouched: { fill: "#eeeeee", stroke: null, width: "80" },
+    },
+    reverted: { fill: "#eeeeee", stroke: null, width: "80" },
+  });
+});
+
 it("throws with context when the node has no component carrying the marker", async () => {
   const { overrideCallSite } = await import("./react-override");
   const container = await renderWithHook(({ BoxNode }) => <BoxNode id="a" title="A" variant="card" />);
-  expect(() => overrideCallSite([container.firstElementChild!], MARKER, "variant", "ghost")).toThrow(
-    /no component with data-editable-source/,
+  expect(() => overrideCallSite([container.firstElementChild!], MARKER, { variant: "ghost" })).toThrow(
+    /no component or element with data-editable-source/,
   );
 });
 
@@ -110,7 +136,7 @@ it("reports live preview unsupported without a hook or a renderer", async () => 
     expect(liveOverrideSupport()).toEqual({ supported: false, reason: expect.stringMatching(/no registered renderer/) });
     hooked.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { renderers: new Map([[1, {}]]) };
     expect(liveOverrideSupport()).toEqual({ supported: false, reason: expect.stringMatching(/production build/) });
-    expect(() => overrideCallSite([document.body], MARKER, "variant", "ghost")).toThrow(/cannot override variant live/);
+    expect(() => overrideCallSite([document.body], MARKER, { variant: "ghost" })).toThrow(/cannot override variant live/);
   } finally {
     hooked.__REACT_DEVTOOLS_GLOBAL_HOOK__ = original;
   }

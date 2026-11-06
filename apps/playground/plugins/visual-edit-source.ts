@@ -6,7 +6,14 @@ import { validSource } from "./reviewable-source";
 export type VisualRefusalReason = "computed" | "spread" | "not-found" | "unchanged" | "entity";
 
 export type VisualEdited = { status: "edited"; source: string; line: number; column: number };
-export type VisualRefused = { status: "refused"; reason: VisualRefusalReason; line: number; column: number };
+export type VisualRefused = {
+  status: "refused";
+  reason: VisualRefusalReason;
+  line: number;
+  column: number;
+  /** The attribute that refused an `attributes` edit. */
+  attribute?: string;
+};
 export type TextCandidate = { id: string; file: string; line: number; column: number; context: string };
 export type VisualAmbiguous = { status: "ambiguous"; candidates: TextCandidate[] };
 
@@ -69,11 +76,27 @@ function isLiteral(node: ts.Node | undefined): node is Literal {
   return node !== undefined && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node));
 }
 
-/** The literal a JSX attribute holds as `a="x"`, `a={"x"}` or ``a={`x`}``; undefined when it is computed. */
-function attributeLiteral(attribute: ts.JsxAttribute): Literal | undefined {
+/** A scalar a JSX attribute can hold literally: a string, or a numeric/boolean expression (`{12}`, `{-3.5}`, `{true}`). */
+type ScalarLiteral = Literal | ts.NumericLiteral | ts.PrefixUnaryExpression | ts.TrueLiteral | ts.FalseLiteral;
+
+function isScalarLiteral(node: ts.Node | undefined): node is ScalarLiteral {
+  if (node === undefined) return false;
+  if (isLiteral(node) || ts.isNumericLiteral(node)) return true;
+  if (node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword) return true;
+  return ts.isPrefixUnaryExpression(node) && node.operator === ts.SyntaxKind.MinusToken && ts.isNumericLiteral(node.operand);
+}
+
+/** The literal a JSX attribute holds as `a="x"`, `a={"x"}`, ``a={`x`}``, `a={12}`, `a={-3.5}` or `a={true}`; undefined when it is computed. */
+function attributeLiteral(attribute: ts.JsxAttribute): ScalarLiteral | undefined {
   const value = attribute.initializer;
   if (isLiteral(value)) return value;
-  return value && ts.isJsxExpression(value) && isLiteral(value.expression) ? value.expression : undefined;
+  return value && ts.isJsxExpression(value) && isScalarLiteral(value.expression) ? value.expression : undefined;
+}
+
+/** The string literal of an attribute, undefined when it is computed or not a string (the text/style edit paths only rewrite strings). */
+function attributeStringLiteral(attribute: ts.JsxAttribute): Literal | undefined {
+  const literal = attributeLiteral(attribute);
+  return isLiteral(literal) ? literal : undefined;
 }
 
 function findAttribute(opening: EditableOpeningNode, sourceFile: ts.SourceFile, name: string) {
@@ -123,11 +146,77 @@ export function setStyleProp(source: string, ordinal: number, prop: "variant" | 
   if (spread) return refused(sourceFile, "spread", spread.getStart(sourceFile));
   if (!attribute) return edited(sourceFile, { start: opening.insertAt, end: opening.insertAt, text: ` ${prop}="${value}"` }, opening.start);
 
-  const literal = attributeLiteral(attribute);
+  const literal = attributeStringLiteral(attribute);
   if (!literal) return refused(sourceFile, "computed", attribute.getStart(sourceFile));
   if (literal.text === value) return refused(sourceFile, "unchanged", attribute.getStart(sourceFile));
   const edit = replaceLiteral(sourceFile, literal, value);
   return edit === "entity" ? refused(sourceFile, "entity", literal.getStart(sourceFile)) : edited(sourceFile, edit, literal.getStart(sourceFile));
+}
+
+const ATTRIBUTE_NAME = /^[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*$/;
+
+function sameScalar(literal: ScalarLiteral, to: string | number): boolean {
+  if (typeof to === "string") return isLiteral(literal) && literal.text === to;
+  const text = isLiteral(literal) ? literal.text : literal.getText();
+  return text.trim() !== "" && Number(text) === to;
+}
+
+function scalarText(value: string | number): string {
+  return typeof value === "number" ? `{${value}}` : attributeValue(value, '"');
+}
+
+/**
+ * Sets literal attributes on the `ordinal`-th editable element: replaces a literal in place (a
+ * string keeps its quote style, a number is written as `{n}`) and inserts missing ones after the
+ * last attribute. All or nothing: the first attribute that is computed, shadowed by a later spread
+ * or entity-encoded refuses the whole edit and is named in `attribute`. Attributes that already
+ * hold the requested value are skipped; when none would change the edit is refused as unchanged.
+ */
+export function setAttributes(source: string, ordinal: number, values: Record<string, string | number>): VisualEdited | VisualRefused {
+  const entries = Object.entries(values);
+  if (entries.length === 0) throw new Error("setAttributes needs at least one attribute");
+  for (const [name, value] of entries) {
+    if (!ATTRIBUTE_NAME.test(name)) throw new Error(`invalid attribute name ${JSON.stringify(name)}`);
+    if (typeof value === "number" && !Number.isFinite(value)) throw new Error(`invalid value for ${name}: ${value} is not a finite number`);
+    if (typeof value === "string" && value === "") throw new Error(`invalid value for ${name}: expected a non-empty string`);
+  }
+  const sourceFile = parseTsx(source, "page.tsx");
+  const opening = openingAt(sourceFile, ordinal);
+  const edits: TextEdit[] = [];
+  const inserts: string[] = [];
+  let firstUnchanged: VisualRefused | undefined;
+
+  for (const [name, to] of entries) {
+    const { index, attribute, properties } = findAttribute(opening, sourceFile, name);
+    const refuse = (reason: VisualRefusalReason, at: number): VisualRefused => ({ ...refused(sourceFile, reason, at), attribute: name });
+    const spread = properties.find((p, i) => ts.isJsxSpreadAttribute(p) && i > index);
+    if (spread) return refuse("spread", spread.getStart(sourceFile));
+    if (!attribute) {
+      inserts.push(` ${name}=${scalarText(to)}`);
+      continue;
+    }
+    const literal = attributeLiteral(attribute);
+    if (!literal) return refuse("computed", attribute.getStart(sourceFile));
+    if (sameScalar(literal, to)) {
+      firstUnchanged ??= refuse("unchanged", attribute.getStart(sourceFile));
+      continue;
+    }
+    if (typeof to === "string" && isLiteral(literal)) {
+      const edit = replaceLiteral(sourceFile, literal, to);
+      if (edit === "entity") return refuse("entity", literal.getStart(sourceFile));
+      edits.push(edit);
+      continue;
+    }
+    const initializer = attribute.initializer!;
+    edits.push({ start: initializer.getStart(sourceFile), end: initializer.end, text: scalarText(to) });
+  }
+
+  if (inserts.length > 0) edits.push({ start: opening.insertAt, end: opening.insertAt, text: inserts.join("") });
+  if (edits.length === 0) return firstUnchanged!;
+  const ordered = edits.sort((a, b) => b.start - a.start);
+  const text = ordered.reduce((current, edit) => splice(current, edit), sourceFile.text);
+  const at = inserts.length > 0 && ordered.length === 1 ? opening.start : ordered[ordered.length - 1]!.start;
+  return { status: "edited", source: validSource(text), ...position(sourceFile, at) };
 }
 
 function isNonDisplayLiteral(node: Literal): boolean {
@@ -211,7 +300,7 @@ export function setText(input: SetTextInput): SetTextOutcome {
   if (from === to) return refuse("unchanged");
 
   const { attribute } = findAttribute(opening, callSite, prop);
-  const literal = attribute && attributeLiteral(attribute);
+  const literal = attribute && attributeStringLiteral(attribute);
   if (literal && literal.text === from) return done(callSite, callSiteFile, replaceLiteral(callSite, literal, to), literal.getStart(callSite));
 
   if (prop === "title" && BRAND_COMPONENTS.has(opening.tag) && !attribute) {

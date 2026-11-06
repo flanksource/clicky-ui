@@ -35,7 +35,7 @@ describe("playground comment lifecycle API", () => {
     configureTestComments(dir);
     server = await createServer({
       configFile: false,
-      plugins: [playgroundComments({ dir })],
+      plugins: [playgroundComments({ dir, pagesDir: join(dir, "pages") })],
       server: { host: "127.0.0.1", port: 0 },
     });
     await server.listen();
@@ -105,6 +105,97 @@ describe("playground comment lifecycle API", () => {
     expect(deleted.status).toBe(200);
     expect((await fetch(new URL(screenshot.url, baseUrl))).status).toBe(404);
     expect(await readAll(dir)).toEqual({});
+  });
+
+  describe("style edit requests", () => {
+    const hash = "0123456789ab";
+    const styleEdit = {
+      marker: `flanksource/_d/call-path.tsx:42:7#3@${hash}`,
+      tag: "rect",
+      changes: [
+        { attribute: "fill", from: "#fff", to: "#eef" },
+        { attribute: "strokeWidth", from: null, to: 2 },
+      ],
+      refusal: {
+        reason: "computed",
+        file: "flanksource/_d/call-path.tsx",
+        line: 44,
+        column: 9,
+        message: "flanksource/_d/call-path.tsx:44:9: x is computed there",
+      },
+    };
+    const create = (extra: Record<string, unknown>) =>
+      fetch(`${baseUrl}/__playground/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          page: "sample",
+          body: "Change fill of <rect> from #fff to #eef",
+          author: human,
+          element: { source: "sample.tsx", html: "<rect></rect>" },
+          ...extra,
+        }),
+      });
+    const gavelTarget = async (id: string) =>
+      (await configureTestComments(dir).request<{ target: Record<string, unknown> }>(`/${id}`)).target;
+
+    it("stores the styleEdit and sends a code-range selector derived from its marker to Gavel", async () => {
+      const response = await create({ styleEdit });
+
+      expect(response.status).toBe(201);
+      const root = (await response.json()) as StoredComment;
+      expect(root.styleEdit).toEqual(styleEdit);
+      expect(await gavelTarget(root.id)).toMatchObject({
+        uri: expect.stringMatching(/\/page\/sample$/),
+        kind: "playground-page",
+        selector: {
+          kind: "code-range",
+          version: 1,
+          path: "pages/flanksource/_d/call-path.tsx",
+          revision: hash,
+          startLine: 42,
+          endLine: 42,
+        },
+      });
+      expect((await readAll(dir)).sample?.[0]?.styleEdit).toEqual(styleEdit);
+    });
+
+    it("sends no selector for a comment without a styleEdit", async () => {
+      const root = (await (await create({})).json()) as StoredComment;
+
+      expect(await gavelTarget(root.id)).not.toHaveProperty("selector");
+    });
+
+    it("refuses a client-supplied selector instead of trusting it", async () => {
+      const response = await create({
+        styleEdit,
+        selector: { kind: "code-range", version: 1, path: "etc/passwd", revision: hash, startLine: 1, endLine: 1 },
+      });
+
+      expect(response.status).toBe(400);
+      expect(await readAll(dir)).toEqual({});
+    });
+
+    it.each([
+      ["a missing refusal", { ...styleEdit, refusal: undefined }, /styleEdit requires "refusal"/],
+      ["an unexpected field", { ...styleEdit, extra: 1 }, /unexpected field "extra"/],
+      ["a malformed marker", { ...styleEdit, marker: "nope" }, /malformed data-editable-source/],
+      ["no changes", { ...styleEdit, changes: [] }, /changes must be a non-empty array/],
+      ["a change without a target value", { ...styleEdit, changes: [{ attribute: "fill", from: "a" }] }, /changes\[0\] requires "to"/],
+      ["a non-finite value", { ...styleEdit, changes: [{ attribute: "x", from: 1, to: Number.POSITIVE_INFINITY }] }, /finite number|non-empty string/],
+      ["an object value", { ...styleEdit, changes: [{ attribute: "x", from: { a: 1 }, to: 1 }] }, /changes\[0\]\.from must be a non-empty string/],
+      ["an attribute that is not a name", { ...styleEdit, changes: [{ attribute: 'x" onload="', from: 1, to: 2 }] }, /is not an attribute name/],
+      ["a fractional refusal line", { ...styleEdit, refusal: { ...styleEdit.refusal, line: 1.5 } }, /refusal\.line must be a positive integer/],
+      ["a tag that is not a name", { ...styleEdit, tag: "<rect>" }, /is not an element name/],
+      ["a marker outside the pages directory", { ...styleEdit, marker: `../../outside.tsx:1:1#0@${hash}` }, /outside the pages directory/],
+      ["a string", "rect", /styleEdit must be an object/],
+    ])("answers 400 for %s and stores nothing", async (_name, bad, message) => {
+      const response = await create({ styleEdit: bad });
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: expect.stringMatching(message) });
+      expect(await readAll(dir)).toEqual({});
+    });
   });
 
   it("serves activity without bodies or capture context", async () => {

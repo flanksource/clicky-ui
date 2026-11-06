@@ -2,15 +2,19 @@ import MagicString from "magic-string";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import type { Plugin } from "vite";
 
+import { SVG_EDITABLE_TAGS } from "../src/visual-edit/svg-schemas";
 import { editableOpenings } from "./editable-jsx";
 import { EDITABLE_SOURCE_ATTRIBUTE, formatEditableSource } from "./editable-source-marker";
 import { sourceHash } from "./source-hash";
 
+/** Cheap pre-check ahead of the parse: an intrinsic SVG shape opening anywhere in the file. */
+const INTRINSIC_SVG_OPENING = new RegExp(`<(?:${SVG_EDITABLE_TAGS.join("|")})(?=[\\s/>])`);
+
 /**
- * Appends `data-editable-source` to every facet box/container opening in
- * `src/pages/**.tsx`, so rendered DOM can be traced back to the call site that
- * wrote it. Runs ahead of the JSX transform and appends after all attributes so
- * the marker wins over spreads.
+ * Appends `data-editable-source` to every facet box/container opening and every
+ * intrinsic SVG shape opening in `src/pages/**.tsx`, so rendered DOM can be
+ * traced back to the call site that wrote it. Runs ahead of the JSX transform
+ * and appends after all attributes so the marker wins over spreads.
  */
 export function playgroundEditableSource(options: { pagesDir: string }): Plugin {
   const root = resolve(options.pagesDir);
@@ -19,7 +23,7 @@ export function playgroundEditableSource(options: { pagesDir: string }): Plugin 
     enforce: "pre",
     transform(code, id) {
       if (id.includes("?") || !id.endsWith(".tsx") || !isAbsolute(id) || !id.startsWith(root + sep)) return null;
-      if (!code.includes("@flanksource/facet")) return null;
+      if (!code.includes("@flanksource/facet") && !INTRINSIC_SVG_OPENING.test(code)) return null;
       const openings = editableOpenings(code, id);
       if (openings.length === 0) return null;
       const file = relative(root, id).split(sep).join("/");

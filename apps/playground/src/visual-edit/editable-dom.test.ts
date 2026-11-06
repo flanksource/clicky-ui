@@ -1,6 +1,6 @@
 import { BOX_STYLES, CONTAINER_STYLES, DIAGRAM_ROLES } from "@flanksource/facet";
 import { afterEach, expect, it } from "vitest";
-import { describeEditable, findEditableRoots, instancesOf, styleOptions } from "./editable-dom";
+import { describeEditable, editableTargetOf, findEditableRoots, instancesOf, isEditableVisible, styleOptions } from "./editable-dom";
 
 const SHARED = "flanksource/_facet-diagrams/cells.tsx:12:7#0@aaaaaaaaaaaa";
 const ZONE = "flanksource/_facet-diagrams/cells.tsx:30:3#1@aaaaaaaaaaaa";
@@ -29,7 +29,7 @@ it("parses editable roots, their markers, text parts and call-site instances", (
       <div data-editable-box="variant" data-box-style="ghost"><div data-editable-text="title">Library</div></div>
     </div>`);
 
-  const summary = findEditableRoots(root).map((node) => ({
+  const summary = findEditableRoots(root).map((node) => node.kind === "svg" ? { kind: node.kind, tag: node.tag } : ({
     kind: node.kind,
     styleProp: node.styleProp,
     value: node.value,
@@ -76,7 +76,7 @@ it("parses editable roots, their markers, text parts and call-site instances", (
     },
     { kind: "box", styleProp: "variant", value: "ghost", marker: null, parts: [["title", "Library"]], unavailable: true },
   ]);
-  expect(instancesOf(root, SHARED).map((node) => node.value)).toEqual(["outlined", "card"]);
+  expect(instancesOf(root, SHARED).map((node) => node.kind === "svg" ? node.tag : node.value)).toEqual(["outlined", "card"]);
 });
 
 it("explains why a node without a call-site marker is not editable", () => {
@@ -97,4 +97,39 @@ it("returns the facet style vocabularies per kind and prop", () => {
   ]);
   expect(styleOptions("container", "role")).toBe(DIAGRAM_ROLES);
   expect(() => styleOptions("box", "color" as "variant")).toThrow(/no style options/);
+});
+
+it("discovers SVG and Facet targets in source order while excluding SVG resources and unmarked shapes", () => {
+  const root = mount(`<div data-editable-box="variant" data-box-style="card" data-editable-source="${SHARED}">
+    <svg><defs><marker><path data-editable-source="${ZONE}" /></marker></defs>
+      <g id="group" data-editable-source="${ZONE}"><rect id="rect" data-editable-source="${SHARED}" />
+      <text id="text" data-editable-source="${ZONE}"><tspan id="span">Cache</tspan></text><path id="icon" /></g>
+      <path id="unmarked" /></svg></div>`);
+  expect(findEditableRoots(root).map(node => [node.kind, node.element.id])).toEqual([
+    ["box", ""], ["svg", "group"], ["svg", "rect"], ["svg", "text"],
+  ]);
+  expect(["rect", "span", "icon", "unmarked"].map(id => editableTargetOf(document.getElementById(id)!, root)?.element.id)).toEqual([
+    "rect", "text", "group", "",
+  ]);
+  expect(editableTargetOf(root.querySelector("defs path")!, root)).toBeNull();
+  expect(editableTargetOf(document.body, root)).toBeNull();
+});
+
+it("keeps identical SVG shapes with independent source markers independently editable", () => {
+  const root = mount(`<svg><rect data-editable-source="${SHARED}" x="10"/><rect data-editable-source="${ZONE}" x="10"/></svg>`);
+  expect(instancesOf(root, SHARED).map(node => [node.kind, node.markerValue])).toEqual([["svg", SHARED]]);
+});
+
+it("fails on a malformed SVG source marker", () => {
+  const root = mount('<svg><rect data-editable-source="broken" /></svg>');
+  expect(() => findEditableRoots(root)).toThrow();
+});
+
+it("excludes hidden and zero-size targets from visible discovery", () => {
+  const root = mount(`<svg><g style="visibility:hidden"><rect id="hidden" data-editable-source="${SHARED}" /></g>
+    <rect id="zero" data-editable-source="${ZONE}" /><rect id="visible" data-editable-source="${ZONE}" /></svg>`);
+  for (const node of root.querySelectorAll("rect")) {
+    Object.defineProperty(node, "getClientRects", { value: () => [new DOMRect(0, 0, node.id === "zero" ? 0 : 10, 10)] });
+  }
+  expect(findEditableRoots(root).filter(node => isEditableVisible(node.element)).map(node => node.element.id)).toEqual(["visible"]);
 });

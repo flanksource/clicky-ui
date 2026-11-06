@@ -5,6 +5,7 @@ import {
   type CommentVocabularyItem,
 } from "../../../packages/ui/src/comments/comment-vocabulary";
 import { externalUrl } from "../src/bookmarklet/model";
+import { parseEditableSource } from "./editable-source-marker";
 
 import {
   COMMENT_ELEMENT_HTML_LIMIT,
@@ -15,7 +16,7 @@ import {
   type CommentLocator,
 } from "./comments-model";
 import { assertStoredScreenshot } from "./comments-screenshots";
-import { commentsClient } from "./comments-client";
+import { commentsClient, type CodeRangeSelector } from "./comments-client";
 export {
   readAll,
   readPage,
@@ -93,6 +94,31 @@ export type StoredPromptRun = {
   variables?: Record<string, unknown>;
 };
 
+/** One attribute a visual style edit wanted to set; `from` is null when the element did not carry it. */
+export type StoredStyleChange = {
+  attribute: string;
+  from: string | number | null;
+  to: string | number;
+};
+
+/**
+ * A visual edit Design mode could not write back (its value is computed in
+ * code, spread, ...), asked of an agent instead. `marker` is the element's
+ * `data-editable-source`; the refusal is the visual-edits server's 422.
+ */
+export type StoredStyleEdit = {
+  marker: string;
+  tag: string;
+  changes: StoredStyleChange[];
+  refusal: {
+    reason: string;
+    file: string;
+    line: number;
+    column: number;
+    message: string;
+  };
+};
+
 export type StoredComment = {
   id: string;
   version?: number;
@@ -121,6 +147,8 @@ export type StoredComment = {
   promptRun?: StoredPromptRun;
   /** The lint findings a prompt run reported, kept verbatim. */
   lint?: { violations: Violation[] };
+  /** The refused visual style edit this comment asks an agent to make. */
+  styleEdit?: StoredStyleEdit;
 };
 
 /** Page slug → the comments left on that page. */
@@ -361,9 +389,82 @@ function isStringArray(value: unknown): value is string[] {
   );
 }
 
-/** Checklist, refs, prompt provenance and lint findings: only prompt runs write them. */
+function assertExactKeys(
+  value: unknown,
+  keys: readonly string[],
+  what: string,
+): Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${what} must be an object`);
+  }
+  const record = value as Record<string, unknown>;
+  const unexpected = Object.keys(record).find((key) => !keys.includes(key));
+  if (unexpected !== undefined) {
+    throw new Error(`${what} has unexpected field ${JSON.stringify(unexpected)}`);
+  }
+  const missing = keys.find((key) => !(key in record));
+  if (missing !== undefined) throw new Error(`${what} requires "${missing}"`);
+  return record;
+}
+
+const STYLE_EDIT_NAME = /^[A-Za-z][A-Za-z0-9.-]*$/;
+const STYLE_EDIT_TEXT_LIMIT = 4000;
+
+function assertStyleText(value: unknown, what: string): string {
+  if (typeof value !== "string" || value === "" || value.length > STYLE_EDIT_TEXT_LIMIT) {
+    throw new Error(`${what} must be a non-empty string of at most ${STYLE_EDIT_TEXT_LIMIT} characters`);
+  }
+  return value;
+}
+
+function assertStyleScalar(value: unknown, what: string): string | number {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error(`${what} must be a finite number`);
+    return value;
+  }
+  return assertStyleText(value, what);
+}
+
+function assertPosition(value: unknown, what: string): number {
+  if (!Number.isInteger(value) || (value as number) < 1) {
+    throw new Error(`${what} must be a positive integer`);
+  }
+  return value as number;
+}
+
+/** Strict validation of a `styleEdit`; the marker must parse as a `data-editable-source`. */
+export function assertStyleEdit(input: unknown): StoredStyleEdit {
+  const edit = assertExactKeys(input, ["marker", "tag", "changes", "refusal"], "styleEdit");
+  const marker = assertStyleText(edit["marker"], "styleEdit.marker");
+  parseEditableSource(marker);
+  const tag = assertStyleText(edit["tag"], "styleEdit.tag");
+  if (!STYLE_EDIT_NAME.test(tag)) throw new Error(`styleEdit.tag ${JSON.stringify(tag)} is not an element name`);
+  const changes = edit["changes"];
+  if (!Array.isArray(changes) || changes.length === 0) {
+    throw new Error("styleEdit.changes must be a non-empty array of {attribute, from, to}");
+  }
+  changes.forEach((entry, index) => {
+    const change = assertExactKeys(entry, ["attribute", "from", "to"], `styleEdit.changes[${index}]`);
+    const attribute = assertStyleText(change["attribute"], `styleEdit.changes[${index}].attribute`);
+    if (!STYLE_EDIT_NAME.test(attribute)) {
+      throw new Error(`styleEdit.changes[${index}].attribute ${JSON.stringify(attribute)} is not an attribute name`);
+    }
+    if (change["from"] !== null) assertStyleScalar(change["from"], `styleEdit.changes[${index}].from`);
+    assertStyleScalar(change["to"], `styleEdit.changes[${index}].to`);
+  });
+  const refusal = assertExactKeys(edit["refusal"], ["reason", "file", "line", "column", "message"], "styleEdit.refusal");
+  assertStyleText(refusal["reason"], "styleEdit.refusal.reason");
+  assertStyleText(refusal["file"], "styleEdit.refusal.file");
+  assertPosition(refusal["line"], "styleEdit.refusal.line");
+  assertPosition(refusal["column"], "styleEdit.refusal.column");
+  assertStyleText(refusal["message"], "styleEdit.refusal.message");
+  return input as StoredStyleEdit;
+}
+
+/** Checklist, refs, prompt provenance and lint findings (only prompt runs write them), and the style edit a user asked for. */
 function assertStructuredFields(candidate: Record<string, unknown>): void {
-  const { checklist, refs, promptRun, lint } = candidate;
+  const { checklist, refs, promptRun, lint, styleEdit } = candidate;
+  if (styleEdit !== undefined) assertStyleEdit(styleEdit);
   if (
     checklist !== undefined &&
     !(
@@ -488,6 +589,7 @@ export async function addComment(
   dir: string,
   page: string,
   comment: StoredComment,
+  selector?: CodeRangeSelector,
 ): Promise<StoredComment> {
   assertPage(page);
   const { vocabularyRefs: _untrusted, ...fields } = comment;
@@ -499,5 +601,5 @@ export async function addComment(
     ? { ...fields, vocabularyRefs }
     : fields;
   assertComment(validated);
-  return commentsClient(dir).add(page, validated);
+  return commentsClient(dir).add(page, validated, selector);
 }

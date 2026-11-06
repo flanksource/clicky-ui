@@ -75,27 +75,39 @@ function isComposite(fiber: Fiber): boolean {
   return typeof fiber.type === "function" || (typeof fiber.type === "object" && fiber.type !== null);
 }
 
-/** The topmost component whose props carry this marker: the call-site element, not the component it renders. */
+function isHost(fiber: Fiber): boolean {
+  return typeof fiber.type === "string";
+}
+
+/**
+ * The topmost fiber whose props carry this marker: the call-site element, not the component it renders.
+ * An intrinsic element written directly in a page (an SVG `<rect>`) has no component above it, so its
+ * own host fiber is the call site.
+ */
 function callSiteFiber(node: Element, markerValue: string): Fiber {
   let match: Fiber | null = null;
   for (let fiber: Fiber | null = fiberOf(node); fiber; fiber = fiber.return) {
-    if (isComposite(fiber) && fiber.memoizedProps?.[EDITABLE_SOURCE_ATTRIBUTE] === markerValue) match = fiber;
+    if ((isComposite(fiber) || isHost(fiber)) && fiber.memoizedProps?.[EDITABLE_SOURCE_ATTRIBUTE] === markerValue) match = fiber;
   }
   if (!match) {
-    throw new Error(`no component with ${EDITABLE_SOURCE_ATTRIBUTE}=${JSON.stringify(markerValue)} above <${node.localName}>`);
+    throw new Error(`no component or element with ${EDITABLE_SOURCE_ATTRIBUTE}=${JSON.stringify(markerValue)} above <${node.localName}>`);
   }
   return currentFiber(match);
 }
 
-/** Sets `prop` on the call-site element of every node, re-rendering them without touching the source. */
-export function overrideCallSite(nodes: Element[], markerValue: string, prop: string, value: unknown): void {
+/**
+ * Sets `props` on the call-site element of every node, re-rendering them without touching the source. An
+ * `undefined` value removes the prop. All props go in one overrideProps call: each call starts from the
+ * fiber's committed props, so a second call before the re-render would discard the first.
+ */
+export function overrideCallSite(nodes: Element[], markerValue: string, props: Record<string, unknown>): void {
   const found = findRenderer();
-  if (!("renderer" in found)) throw new Error(`cannot override ${prop} live: ${found.reason}`);
+  if (!("renderer" in found)) throw new Error(`cannot override ${Object.keys(props).join(", ")} live: ${found.reason}`);
   for (const node of nodes) {
     const fiber = callSiteFiber(node, markerValue);
     // WORKAROUND(live-visual-edit-preview): re-render the edited facet node through the React DevTools renderer's overrideProps, because HMR/Fast Refresh are off in the playground.
     // Correct fix: enable Fast Refresh/HMR for page modules so written source re-renders itself.
     // Ref: discussed with user 2026-11-04
-    found.renderer.overrideProps(fiber, [prop], value);
+    found.renderer.overrideProps(fiber, [], { ...fiber.memoizedProps, ...props });
   }
 }

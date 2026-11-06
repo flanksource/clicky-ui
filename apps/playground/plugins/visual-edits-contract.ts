@@ -5,7 +5,9 @@ export type VisualEditStyleProp = "variant" | "role";
 
 export type VisualEdit =
   | { kind: "style"; prop: VisualEditStyleProp; value: string }
-  | { kind: "text"; prop: string; from: string; to: string };
+  | { kind: "text"; prop: string; from: string; to: string }
+  /** Literal SVG attributes keyed by JSX prop name; validated server-side against the schema of the marker's tag. */
+  | { kind: "attributes"; values: Record<string, string | number> };
 
 export type VisualEditRequest = {
   /** Page slug of the page being viewed. */
@@ -37,6 +39,15 @@ export type VisualEditResponse =
       hash: string;
     }
   | { status: "stale"; error: string; file: string }
-  | { status: "refused"; error: string; reason: string; file: string; line: number; column: number }
+  | {
+      status: "refused";
+      error: string;
+      reason: string;
+      file: string;
+      line: number;
+      column: number;
+      /** The attribute that refused an `attributes` edit. */
+      attribute?: string;
+    }
   | { status: "ambiguous"; error: string; candidates: VisualEditCandidate[] }
   | { status: "invalid"; error: string };

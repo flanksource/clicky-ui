@@ -14,13 +14,13 @@ if (
   throw new Error("--port must be an integer between 1 and 65535");
 }
 
-const icons = spawnSync(
+const editor = spawnSync(
   "pnpm",
-  ["--filter", "@flanksource/clicky-ui", "build:icons"],
+  ["run", "prepare:editor"],
   { stdio: "inherit" },
 );
-if (icons.error) throw icons.error;
-if (icons.status !== 0) process.exit(icons.status ?? 1);
+if (editor.error) throw editor.error;
+if (editor.status !== 0) process.exit(editor.status ?? 1);
 
 const { createServer } = await import("vite");
 const server = await createServer({

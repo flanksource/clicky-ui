@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { editableOpenings } from "./editable-jsx";
-import { findTextCandidates, setStyleProp, setText } from "./visual-edit-source";
+import { findTextCandidates, setAttributes, setStyleProp, setText } from "./visual-edit-source";
 
 const IMPORT = 'import { BoxNode, BrandBox, ContainerNode as Group, Tile } from "@flanksource/facet";\n';
 const page = (body: string) => `${IMPORT}${body}`;
@@ -62,6 +62,91 @@ describe("setStyleProp", () => {
     const tags = (text: string) => editableOpenings(text, "page.tsx").map(({ tag, ordinal }) => `${ordinal}:${tag}`);
 
     expect(tags(out)).toEqual(tags(source));
+  });
+});
+
+describe("setAttributes", () => {
+  const svg = (shape: string) => `export default () => <svg>${shape}</svg>;`;
+
+  it.each([
+    ['fill="#fff"', { fill: "#eef" }, 'fill="#eef"'],
+    ["fill='#fff'", { fill: "#eef" }, "fill='#eef'"],
+    ['fill={"#fff"}', { fill: "#eef" }, 'fill={"#eef"}'],
+    ["fill={`#fff`}", { fill: "#eef" }, "fill={`#eef`}"],
+    ["width={12}", { width: 40 }, "width={40}"],
+    ["width={-3.5}", { width: 0.25 }, "width={0.25}"],
+    ['width="12"', { width: 40 }, "width={40}"],
+    ['width={"12"}', { width: -7.5 }, "width={-7.5}"],
+    ["fill={true}", { fill: "red" }, 'fill="red"'],
+    ["opacity={1}", { opacity: 0.5 }, "opacity={0.5}"],
+  ])("replaces the literal in %s with %j", (before, values, after) => {
+    const out = edited(setAttributes(svg(`<rect ${before} />`), 0, values));
+
+    expect(out).toBe(svg(`<rect ${after} />`));
+  });
+
+  it("replaces several attributes and inserts missing ones after the last attribute in one edit", () => {
+    const source = svg('<rect x={1} fill="#000" /><circle r={2} />');
+
+    expect(edited(setAttributes(source, 0, { x: 5, fill: "#111", y: 9, stroke: "#222" }))).toBe(
+      svg('<rect x={5} fill="#111" y={9} stroke="#222" /><circle r={2} />'),
+    );
+    expect(edited(setAttributes(source, 1, { cx: 3 }))).toBe(svg('<rect x={1} fill="#000" /><circle r={2} cx={3} />'));
+  });
+
+  it("inserts after the tag name when there are no attributes, and on a non-self-closing shape", () => {
+    expect(edited(setAttributes(svg("<g></g>"), 0, { opacity: 0.5 }))).toBe(svg("<g opacity={0.5}></g>"));
+  });
+
+  it("targets the ordinal-th element in the sequence shared with facet tags", () => {
+    const source = page('export default () => <><BoxNode title="T" /><svg><rect width={1} /></svg></>;');
+
+    expect(edited(setAttributes(source, 1, { width: 2 }))).toBe(page('export default () => <><BoxNode title="T" /><svg><rect width={2} /></svg></>;'));
+  });
+
+  it.each([
+    ["x={zone.x}", { x: 3 }, "computed", "x"],
+    ["x={zone.x} fill=\"#000\"", { fill: "#fff", x: 3 }, "computed", "x"],
+    ['fill="#000" {...rest}', { fill: "#fff" }, "spread", "fill"],
+    ["{...rest}", { opacity: 0.5 }, "spread", "opacity"],
+    ['fill="R&amp;D"', { fill: "red" }, "entity", "fill"],
+    ["x", { x: 3 }, "computed", "x"],
+  ])("refuses `%s` for %j as %s naming %s", (attributes, values, reason, attribute) => {
+    expect(setAttributes(svg(`<rect ${attributes} />`), 0, values)).toMatchObject({ status: "refused", reason, attribute, line: 1 });
+  });
+
+  it("refuses the whole edit at the first refused attribute, even after other attributes could change", () => {
+    const source = svg('<rect fill="#000" x={zone.x} />');
+
+    expect(setAttributes(source, 0, { fill: "#fff", x: 3 })).toMatchObject({ status: "refused", reason: "computed", attribute: "x", column: 45 });
+  });
+
+  it("allows a spread before the attribute but not after it", () => {
+    expect(edited(setAttributes(svg('<rect {...p} fill="a" />'), 0, { fill: "b" }))).toBe(svg('<rect {...p} fill="b" />'));
+  });
+
+  it("skips attributes that already hold the value, and refuses as unchanged when nothing would change", () => {
+    const source = svg('<rect x={1} width="12" />');
+
+    expect(edited(setAttributes(source, 0, { x: 1, width: 12, y: 2 }))).toBe(svg('<rect x={1} width="12" y={2} />'));
+    expect(setAttributes(source, 0, { x: 1, width: 12 })).toMatchObject({ status: "refused", reason: "unchanged", attribute: "x" });
+  });
+
+  it("throws on invalid names and values", () => {
+    const source = svg("<rect />");
+
+    expect(() => setAttributes(source, 0, {})).toThrow(/at least one attribute/);
+    expect(() => setAttributes(source, 0, { 'x" onload="': 1 })).toThrow(/invalid attribute name/);
+    expect(() => setAttributes(source, 0, { x: Number.NaN })).toThrow(/finite number/);
+    expect(() => setAttributes(source, 0, { fill: "" })).toThrow(/non-empty string/);
+    expect(() => setAttributes(source, 5, { x: 1 })).toThrow(/no editable element with ordinal 5/);
+  });
+
+  it("keeps ordinals stable after an edit", () => {
+    const source = page('export default () => <svg><rect x={1} /><Group><BoxNode /></Group><circle /></svg>;');
+    const tags = (text: string) => editableOpenings(text, "page.tsx").map(({ tag, ordinal }) => `${ordinal}:${tag}`);
+
+    expect(tags(edited(setAttributes(source, 0, { x: 2, y: 3 })))).toEqual(tags(source));
   });
 });
 

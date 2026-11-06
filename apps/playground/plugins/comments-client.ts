@@ -35,6 +35,7 @@ export function configureComments({
   const client = new CommentsClient(
     endpoint,
     `gavel://workspace/${createHash("sha256").update(workspace).digest("hex")}`,
+    workspace,
   );
   clients.set(dir, client);
   return client;
@@ -44,17 +45,31 @@ export function commentsClient(dir: string): CommentsClient {
   if (!client) throw new Error(`Gavel comments are not configured for ${dir}`);
   return client;
 }
+/** Gavel's `code-range` selector (gavel/comments/selectors.go): a line range of a file at a source revision. */
+export type CodeRangeSelector = {
+  kind: "code-range";
+  version: 1;
+  /** Relative to the workspace root, forward slashes. */
+  path: string;
+  revision: string;
+  startLine: number;
+  endLine: number;
+};
+
 export class CommentsClient {
   constructor(
     readonly endpoint: GavelEndpoint,
     readonly scope: string,
+    /** The workspace root the scope was derived from; code-range paths are relative to it. */
+    readonly workspace: string,
   ) {}
-  target(page: string): Target {
+  target(page: string, selector?: CodeRangeSelector): Target & { selector?: CodeRangeSelector } {
     return {
       uri: `${this.scope}/page/${encodeURIComponent(page)}`,
       scopeUri: this.scope,
       kind: "playground-page",
       label: page,
+      ...(selector === undefined ? {} : { selector }),
     };
   }
   async request<T>(
@@ -160,7 +175,11 @@ export class CommentsClient {
         )
       : [];
   }
-  async add(page: string, comment: StoredComment): Promise<StoredComment> {
+  async add(
+    page: string,
+    comment: StoredComment,
+    selector?: CodeRangeSelector,
+  ): Promise<StoredComment> {
     const screenshot = comment.element?.screenshot;
     const dataUrl =
       screenshot?.status === "captured" && screenshot.url.startsWith("data:")
@@ -175,7 +194,7 @@ export class CommentsClient {
       {
         method: "POST",
         body: JSON.stringify({
-          target: this.target(page),
+          target: this.target(page, selector),
           bodyMarkdown: bodyFor(comment),
           workflowId: "human-review",
           requestId: comment.id,
