@@ -1,10 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { ContextMenuActionContext, Plugin, ReactGrabAPI } from "react-grab";
+import type { ContextMenuActionContext, Plugin, ReactGrabAPI } from "@flanksource/react-grab";
 import { useRef } from "react";
 import { useReactGrabComments } from "./useReactGrabComments";
 
-vi.mock("react-grab", () => ({ commentPlugin: { name: "comment" } }));
+vi.mock("@flanksource/react-grab", () => ({ commentPlugin: { name: "comment" } }));
 afterEach(() => { delete window.__REACT_GRAB__; });
 
 it("opens a left-click selection directly while preserving the context-menu action", () => {

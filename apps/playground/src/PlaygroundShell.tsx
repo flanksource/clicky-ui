@@ -30,6 +30,12 @@ import {
   DialogCommentOverlay,
 } from "./comments/CommentOverlay";
 import { useReactGrabComments } from "./comments/useReactGrabComments";
+import { useReactGrabStyle } from "./visual-edit/useReactGrabStyle";
+import { useEditableSelection } from "./visual-edit/useEditableSelection";
+import type { EditableRoot } from "./visual-edit/editable-dom";
+import { styleEditBody } from "./visual-edit/style-edit-comment";
+import type { StyleChangeRequest } from "./visual-edit/SvgStylePanel";
+import type { StoredStyleEdit } from "../plugins/comments-store";
 import { useCommentDetails } from "./comments/useCommentDetails";
 import { PlaygroundCommentReview } from "./comments/PlaygroundCommentReview";
 import { useResolvedCommentReview } from "./comments/useResolvedCommentReview";
@@ -72,6 +78,7 @@ const MarkdownDocumentPage = lazy(() =>
 );
 const RepositoryDocumentPage = lazy(() => import("./documents/RepositoryDocumentPage").then((module) => ({ default: module.RepositoryDocumentPage })));
 const VisualEditOverlay = lazy(() => import("./visual-edit/VisualEditOverlay").then((module) => ({ default: module.VisualEditOverlay })));
+const SvgStylePanel = lazy(() => import("./visual-edit/SvgStylePanel").then((module) => ({ default: module.SvgStylePanel })));
 const RepositoryFolderPage = lazy(() => import("./documents/RepositoryFolderPage").then((module) => ({ default: module.RepositoryFolderPage })));
 import { useFeedbackCopy } from "./comments/useFeedbackCopy";
 import { useAgentRuns } from "./agent-runs/AgentRunsProvider";
@@ -79,10 +86,11 @@ import { RunningSessionBars } from "./agent-runs/RunningSessionBars";
 import { usePromptRuns } from "./prompt-runs/PromptRunsProvider";
 import {
   type PageComment,
+  type PlaygroundCommentCreateInput,
   type PlaygroundComments,
 } from "./comments/useComments";
 import { useDomAnchors } from "./comments/useDomAnchors";
-import { describeElement, overlayLabel } from "./comments/dom-anchor";
+import { commentAnchor, describeElement, overlayLabel } from "./comments/dom-anchor";
 import { describeMarkdown, parseMarkdownAnchor } from "./comments/markdown-anchor";
 import { screenshotCaptureSupported } from "./comments/screenshot";
 import {
@@ -176,8 +184,7 @@ export function PlaygroundShell({
   useEffect(() => { setEditTarget((target) => (target?.kind === "file" ? null : target)); }, [active?.slug]);
   // Design mode writes the same files Monaco edits, so the two never run together.
   const [designing, setDesigning] = useState(false);
-  const [visualPending, setVisualPending] = useState(false);
-  useEffect(() => { setDesigning(false); setVisualPending(false); }, [active?.slug]);
+  useEffect(() => { setDesigning(false); }, [active?.slug]);
   const [pageAction, setPageAction] = useState<PageActionState | null>(null);
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const [commentDraft, setCommentDraft] = useState<{ page: string; anchor: string; element: Element } | null>(null);
@@ -190,6 +197,10 @@ export function PlaygroundShell({
   // A markdown page is always its own editor, so its source is always loaded.
   const editFile = editTarget?.kind === "file" && active?.kind === "component" ? editTarget : undefined;
   const source = useSource(editFile ? fileSourceTarget(editFile.file) : active?.slug, !folderPage && (editing || markdownPage));
+  const visualEnabled = LIVE_SERVER && view === "preview" && active?.kind === "component" && !editing && !source.dirty;
+  const visualSelection = useEditableSelection({ page: active?.slug, enabled: visualEnabled });
+  const visualPending = visualSelection.pending;
+  const styleTarget = visualSelection.selected?.node.kind === "svg" ? visualSelection.selected : null;
   const pageFolders = usePageFolders();
   const activityMap = useMemo(() => mergeActivity(activity.feedback, activity.updates), [activity.feedback, activity.updates]);
   const onQueryChange = useCallback((query: string) => setSidebar({ query }, { replace: true }), [setSidebar]);
@@ -285,6 +296,26 @@ export function PlaygroundShell({
       });
     },
   });
+
+  const selectVisualTarget = useCallback((target: EditableRoot | null) => {
+    visualSelection.select(target);
+    if (visualEnabled && !visualPending) setDesigning(true);
+  }, [visualSelection.select, visualEnabled, visualPending]);
+  useReactGrabStyle({ contentRef, onSelectTarget: selectVisualTarget, onBeforeCssEdit: visualSelection.beginCssEdit });
+  const requestStyleChange = useCallback(async (styleEdit: StoredStyleEdit): Promise<StyleChangeRequest> => {
+    const content = contentRef.current;
+    const element = styleTarget?.node.element;
+    if (!element || !content) throw new Error("Request change needs the styled element mounted on the page");
+    const anchor = commentAnchor(element, content);
+    if (anchor === null) throw new Error(`The styled <${element.localName}> cannot be anchored to a comment`);
+    if (!ctx.callbacks.onCreate) throw new Error("Comment creation is not configured");
+    onPrepareCommentSelection(anchor, element);
+    ctx.registerAnchor(anchor, null);
+    ctx.registerAnchor(anchor, element);
+    const input: PlaygroundCommentCreateInput = { body: styleEditBody(styleEdit), anchor, styleEdit };
+    await ctx.callbacks.onCreate(input);
+    return { onFocusThread: () => ctx.focusAnchor(anchor) };
+  }, [contentRef, ctx, onPrepareCommentSelection, styleTarget]);
 
   const feedback = useFeedbackCopy({ active, comments: ctx.comments, labels });
   const { selectItem: selectReviewItem } =
@@ -542,13 +573,37 @@ export function PlaygroundShell({
               </PageErrorBoundary>
             </div>
 
-            {designing && view === "preview" && active.kind === "component" && (
+            {!designing && visualSelection.notice && <div role="status" className="p-2 text-sm">{visualSelection.notice}</div>}
+            {designing && visualEnabled && active.kind === "component" && (
               <Suspense fallback={null}>
                 <VisualEditOverlay
                   root={contentRef.current}
                   page={active.slug}
-                  onPendingChange={setVisualPending}
+                  onPendingChange={visualSelection.onFacetPendingChange}
+                  selected={visualSelection.selected?.node.element ?? null}
+                  pending={visualPending}
+                  selectionNotice={visualSelection.notice}
+                  onSelect={selectVisualTarget}
                   onOpenSource={({ file, line }) => {
+                    setDesigning(false);
+                    visualSelection.close();
+                    setEditTarget({ kind: "file", file, line });
+                  }}
+                />
+              </Suspense>
+            )}
+            {visualEnabled && styleTarget?.node.element.isConnected && active.kind === "component" && contentRef.current && (
+              <Suspense fallback={null}>
+                <SvgStylePanel
+                  key={styleTarget.key}
+                  element={styleTarget.node.element}
+                  root={contentRef.current}
+                  page={active.slug}
+                  requestStyleChange={requestStyleChange}
+                  onPendingChange={visualSelection.onSvgPendingChange}
+                  onClose={visualSelection.close}
+                  onOpenSource={({ file, line }) => {
+                    visualSelection.close();
                     setDesigning(false);
                     setEditTarget({ kind: "file", file, line });
                   }}

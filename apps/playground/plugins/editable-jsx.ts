@@ -1,5 +1,6 @@
 import ts from "typescript";
 
+import { isSvgEditableTag, type SvgEditableTag } from "../src/visual-edit/svg-schemas";
 import { EDITABLE_SOURCE_ATTRIBUTE } from "./editable-source-marker";
 
 export {
@@ -13,8 +14,8 @@ export const EDITABLE_COMPONENTS = ["BoxNode", "ContainerNode", "BrandBox", "Bra
 export type EditableComponent = (typeof EDITABLE_COMPONENTS)[number];
 
 export type EditableOpening = {
-  /** The facet component the tag resolves to, whatever it is renamed to locally. */
-  tag: EditableComponent;
+  /** The facet component the tag resolves to (whatever it is renamed to locally), or the intrinsic SVG tag. */
+  tag: EditableComponent | SvgEditableTag;
   ordinal: number;
   line: number;
   column: number;
@@ -58,13 +59,17 @@ function facetBindings(sourceFile: ts.SourceFile) {
   return { named, namespaces };
 }
 
-/** Every editable facet opening in source order, with the AST node for callers that edit it. */
+/**
+ * Every editable opening in source order, with the AST node for callers that edit it: facet
+ * components and intrinsic SVG shapes share one ordinal sequence, which the compile-time
+ * injector and the write-back server both derive from this function.
+ */
 export function editableOpeningNodes(sourceFile: ts.SourceFile): EditableOpeningNode[] {
   const { named, namespaces } = facetBindings(sourceFile);
   const found: EditableOpeningNode[] = [];
 
-  const resolveTag = (name: ts.JsxTagNameExpression): EditableComponent | undefined => {
-    if (ts.isIdentifier(name)) return named.get(name.text);
+  const resolveTag = (name: ts.JsxTagNameExpression): EditableComponent | SvgEditableTag | undefined => {
+    if (ts.isIdentifier(name)) return isSvgEditableTag(name.text) ? name.text : named.get(name.text);
     if (ts.isPropertyAccessExpression(name) && ts.isIdentifier(name.expression) && ts.isIdentifier(name.name)) {
       return namespaces.has(name.expression.text) && isEditableComponent(name.name.text) ? name.name.text : undefined;
     }

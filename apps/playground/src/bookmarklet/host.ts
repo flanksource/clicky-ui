@@ -1,5 +1,5 @@
-import { init } from "react-grab/core";
-import type { ReactGrabAPI } from "react-grab";
+import { init } from "@flanksource/react-grab/core";
+import type { ReactGrabAPI } from "@flanksource/react-grab";
 import {
   captureElementContext,
   captureElementHtml,

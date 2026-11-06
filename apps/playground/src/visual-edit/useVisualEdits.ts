@@ -4,28 +4,76 @@ import type { VisualEdit, VisualEditCandidate, VisualEditResponse } from "../../
 import { overrideCallSite } from "./react-override";
 import { postVisualEdit } from "./visual-edits-api";
 
+type AttributeEdit = Extract<VisualEdit, { kind: "attributes" }>;
+
+/** The value an attribute had before an edit; `null` when the element did not carry it. */
+export type AttributeSnapshot = Record<string, string | number | null>;
+
 export type VisualEditCommit = {
   markerValue: string;
   /** Every DOM instance whose preview should change with the source. */
   nodes: Element[];
-  edit: VisualEdit;
-  /** The value the preview shows now, restored when the write fails. */
-  previous: string;
-};
+} & (
+  | {
+      edit: Exclude<VisualEdit, AttributeEdit>;
+      /** The value the preview shows now, restored when the write fails. */
+      previous: string;
+    }
+  | {
+      edit: AttributeEdit;
+      /** Every attribute of `edit.values` as it was, restored when the write fails. */
+      previous: AttributeSnapshot;
+    }
+);
+
+export type VisualEditRefusal = Extract<VisualEditResponse, { status: "refused" }>;
 
 export type VisualEditFailure = {
   title: string;
   error: Error;
   /** Where to open the source, when the server named a location. */
   location: { file: string; line: number } | null;
+  /** The server's refusal, when the edit was refused rather than failed. */
+  refusal: VisualEditRefusal | null;
 };
 
 export type SavedVisualEdit = { edit: VisualEdit; file: string; path: string; line: number; hash: string };
 
+/** How a commit ended; the failure itself is in `failure`, the candidates in `candidates`. */
+export type VisualEditOutcome = "applied" | "failed" | "ambiguous";
+
 type Status = "idle" | "saving" | "ambiguous";
 
-function overrideValue({ edit }: VisualEditCommit): { prop: string; value: string } {
-  return edit.kind === "style" ? { prop: edit.prop, value: edit.value } : { prop: edit.prop, value: edit.to };
+/** A missing attribute is previewed (and restored) as `undefined`, which removes the prop. */
+function previewProps({ edit }: VisualEditCommit): Record<string, unknown> {
+  switch (edit.kind) {
+    case "style":
+      return { [edit.prop]: edit.value };
+    case "text":
+      return { [edit.prop]: edit.to };
+    case "attributes":
+      return edit.values;
+  }
+}
+
+function revertProps(commit: VisualEditCommit): Record<string, unknown> {
+  const { edit, previous } = commit;
+  if (typeof previous === "string") {
+    if (edit.kind === "attributes") throw new Error("an attributes edit needs the previous value of every attribute");
+    return { [edit.prop]: previous };
+  }
+  if (edit.kind !== "attributes") throw new Error(`a ${edit.kind} edit needs its previous value as a string`);
+  return Object.fromEntries(Object.keys(edit.values).map((name) => [name, previous[name] ?? undefined]));
+}
+
+/** Sets each prop on the call site of `nodes`; with `undefined` a prop is removed. Returns the failure, if any. */
+function overrideProps(nodes: Element[], markerValue: string, props: Record<string, unknown>): Error | null {
+  try {
+    overrideCallSite(nodes, markerValue, props);
+    return null;
+  } catch (error) {
+    return error as Error;
+  }
 }
 
 /** One in-flight visual edit at a time; with `live`, the preview changes before the write and reverts if it fails. */
@@ -43,24 +91,20 @@ export function useVisualEdits({ page, live }: { page: string; live: boolean }) 
     setStatus("idle");
     setCandidates([]);
     if (!live || !current) return null;
-    try {
-      overrideCallSite(current.nodes, current.markerValue, overrideValue(current).prop, current.previous);
-      return null;
-    } catch (error) {
-      return error as Error;
-    }
+    return overrideProps(current.nodes, current.markerValue, revertProps(current));
   }, [live]);
 
-  const fail = useCallback((title: string, error: Error, location: VisualEditFailure["location"]) => {
+  const fail = useCallback((title: string, error: Error, location: VisualEditFailure["location"], refusal: VisualEditRefusal | null = null) => {
     const revertError = abandon();
     setFailure({
       title,
       error: revertError ? new Error(`${error.message}; reverting the preview also failed: ${revertError.message}`) : error,
       location,
+      refusal,
     });
   }, [abandon]);
 
-  const send = useCallback(async (current: VisualEditCommit, choose?: string) => {
+  const send = useCallback(async (current: VisualEditCommit, choose?: string): Promise<VisualEditOutcome> => {
     setStatus("saving");
     setFailure(null);
     let response: VisualEditResponse;
@@ -73,7 +117,7 @@ export function useVisualEdits({ page, live }: { page: string; live: boolean }) 
       });
     } catch (error) {
       fail("Edit failed", error as Error, null);
-      return;
+      return "failed";
     }
     switch (response.status) {
       case "applied":
@@ -81,38 +125,36 @@ export function useVisualEdits({ page, live }: { page: string; live: boolean }) 
         setStatus("idle");
         setCandidates([]);
         setLastSaved({ edit: current.edit, file: response.file, path: response.path, line: response.line, hash: response.hash });
-        return;
+        return "applied";
       case "ambiguous":
         setCandidates(response.candidates);
         setStatus("ambiguous");
-        return;
+        return "ambiguous";
       case "stale": {
         const { line } = parseEditableSource(current.markerValue);
         fail("Source changed", new Error(response.error), { file: response.file, line });
-        return;
+        return "failed";
       }
       case "refused":
-        fail("Edit refused", new Error(`${response.error} (${response.reason})`), { file: response.file, line: response.line });
-        return;
+        fail("Edit refused", new Error(`${response.error} (${response.reason})`), { file: response.file, line: response.line }, response);
+        return "failed";
       case "invalid":
         fail("Invalid edit", new Error(response.error), null);
-        return;
+        return "failed";
     }
   }, [fail, page]);
 
-  const commit = useCallback(async (next: VisualEditCommit) => {
+  const commit = useCallback(async (next: VisualEditCommit): Promise<VisualEditOutcome> => {
     if (attempt.current) throw new Error("a visual edit is already in flight");
     attempt.current = next;
     if (live) {
-      try {
-        const { prop, value } = overrideValue(next);
-        overrideCallSite(next.nodes, next.markerValue, prop, value);
-      } catch (error) {
-        fail("Live preview failed", error as Error, null);
-        return;
+      const previewError = overrideProps(next.nodes, next.markerValue, previewProps(next));
+      if (previewError) {
+        fail("Live preview failed", previewError, null);
+        return "failed";
       }
     }
-    await send(next);
+    return send(next);
   }, [fail, live, send]);
 
   const choose = useCallback(async (candidateId: string) => {
@@ -123,13 +165,20 @@ export function useVisualEdits({ page, live }: { page: string; live: boolean }) 
   const cancelAmbiguous = useCallback(() => {
     if (!attempt.current || status !== "ambiguous") throw new Error("no ambiguous visual edit is awaiting a choice");
     const revertError = abandon();
-    if (revertError) setFailure({ title: "Revert failed", error: revertError, location: null });
+    if (revertError) setFailure({ title: "Revert failed", error: revertError, location: null, refusal: null });
   }, [abandon, status]);
+
+  /** Previews attribute values (`null` removes one) without writing anything; the caller restores them with `previewAttributes`. */
+  const previewAttributes = useCallback((nodes: Element[], markerValue: string, values: Record<string, string | number | null>): Error | null => {
+    if (!live) return new Error("live preview is not available");
+    return overrideProps(nodes, markerValue, Object.fromEntries(Object.entries(values).map(([name, value]) => [name, value ?? undefined])));
+  }, [live]);
 
   return {
     commit,
     choose,
     cancelAmbiguous,
+    previewAttributes,
     dismissFailure: useCallback(() => setFailure(null), []),
     pending: status !== "idle",
     saving: status === "saving",

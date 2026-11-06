@@ -3,6 +3,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { relative, sep } from "node:path";
 import type { Plugin } from "vite";
 
+import { validateSvgAttributes } from "../src/visual-edit/svg-schemas";
+import { editableOpenings } from "./editable-jsx";
 import { parseEditableSource, type EditableSourceMarker } from "./editable-source-marker";
 import { diskModuleHost, pageModuleGraph } from "./page-module-graph";
 import { PAGE_SLUG_PATTERN, PageStoreError, pagePath, pagesFilePath, writePagesFile } from "./pages-store";
@@ -10,6 +12,7 @@ import { sourceHash } from "./source-hash";
 import {
   assertStyleValue,
   findTextCandidates,
+  setAttributes,
   setStyleProp,
   setText,
   type SetTextOutcome,
@@ -68,8 +71,19 @@ function parseRequest(raw: unknown): VisualEditRequest {
     }
   } else if (fields["kind"] === "text") {
     parsed = { kind: "text", prop: text(fields["prop"], "edit.prop"), from: text(fields["from"], "edit.from"), to: text(fields["to"], "edit.to") };
+  } else if (fields["kind"] === "attributes") {
+    const values = fields["values"];
+    if (values === null || typeof values !== "object" || Array.isArray(values) || Object.keys(values).length === 0) {
+      throw new InvalidRequest('"edit.values" must be a non-empty object of attribute values');
+    }
+    for (const [name, value] of Object.entries(values)) {
+      if (typeof value !== "string" && typeof value !== "number") {
+        throw new InvalidRequest(`"edit.values.${name}" must be a string or a number, got ${JSON.stringify(value)}`);
+      }
+    }
+    parsed = { kind: "attributes", values: values as Record<string, string | number> };
   } else {
-    throw new InvalidRequest('"edit.kind" must be "style" or "text"');
+    throw new InvalidRequest('"edit.kind" must be "style", "text" or "attributes"');
   }
   const choose = body["choose"];
   if (choose !== undefined && (typeof choose !== "string" || choose === "")) throw new InvalidRequest('"choose" must be a non-empty string');
@@ -84,10 +98,18 @@ const REFUSAL_ADVICE: Record<VisualRefused["reason"], (prop: string) => string> 
   entity: () => "the text contains an HTML entity (&...;), which is not rewritten automatically; open the source and edit it by hand",
 };
 
-function refusal(file: string, line: number, column: number, reason: string, advice: string): VisualEditResult {
+function refusal(file: string, line: number, column: number, reason: string, advice: string, attribute?: string): VisualEditResult {
   return {
     statusCode: 422,
-    body: { status: "refused", error: `${file}:${line}:${column}: ${advice}`, reason, file, line, column },
+    body: {
+      status: "refused",
+      error: `${file}:${line}:${column}: ${advice}`,
+      reason,
+      file,
+      line,
+      column,
+      ...(attribute !== undefined ? { attribute } : {}),
+    },
   };
 }
 
@@ -138,10 +160,22 @@ function apply({ pagesDir, workspaceRoot, lineage, request }: ApplyVisualEditOpt
     };
   }
 
+  if (edit.kind === "attributes") {
+    const opening = editableOpenings(callSiteSource, marker.file)[marker.ordinal];
+    if (!opening) throw new InvalidRequest(`${marker.file} has no editable element with ordinal ${marker.ordinal}; reload the page`);
+    try {
+      validateSvgAttributes(opening.tag, edit.values);
+    } catch (error) {
+      throw new InvalidRequest((error as Error).message);
+    }
+  }
+
   const outcome: SetTextOutcome | ((VisualEdited | VisualRefused) & { file: string }) =
     edit.kind === "style"
       ? { ...setStyleProp(callSiteSource, marker.ordinal, edit.prop, edit.value), file: marker.file }
-      : setText({ files: contents, callSiteFile: marker.file, ordinal: marker.ordinal, prop: edit.prop, from: edit.from, to: edit.to, ...(choose !== undefined ? { choose } : {}) });
+      : edit.kind === "attributes"
+        ? { ...setAttributes(callSiteSource, marker.ordinal, edit.values), file: marker.file }
+        : setText({ files: contents, callSiteFile: marker.file, ordinal: marker.ordinal, prop: edit.prop, from: edit.from, to: edit.to, ...(choose !== undefined ? { choose } : {}) });
 
   if (outcome.status === "ambiguous") {
     const where = outcome.candidates.map((c) => `${c.file}:${c.line}`).join(", ");
@@ -188,7 +222,8 @@ function refused(
     const hint = external.length > 0 ? ` (imports outside src/pages: ${external.join(", ")})` : "";
     return refusal(marker.file, marker.line, marker.column, "not-found", `could not find the text "${edit.from}" in the modules of this page${hint}; open the source and edit it by hand`);
   }
-  return refusal(file, line, column, reason, REFUSAL_ADVICE[reason](edit.prop));
+  const subject = outcome.attribute ?? (edit.kind === "attributes" ? Object.keys(edit.values).join(", ") : edit.prop);
+  return refusal(file, line, column, reason, REFUSAL_ADVICE[reason](subject), outcome.attribute);
 }
 
 async function readBody(req: IncomingMessage): Promise<unknown> {

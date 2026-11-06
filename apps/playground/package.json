@@ -4,18 +4,20 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @flanksource/clicky-ui build:icons && vite dev",
+    "prepare:editor": "pnpm --filter @flanksource/clicky-ui build:icons && pnpm --filter @flanksource/react-grab build",
+    "dev": "pnpm run prepare:editor && vite dev",
     "playground:prod": "node scripts/playground-prod.mjs",
-    "build": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && vite build",
+    "build": "pnpm run prepare:editor && tsc -b --noEmit && vite build",
     "preview": "vite preview",
     "lint": "oxlint src plugins vite.config.ts --deny-warnings",
-    "check": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && pnpm run lint",
+    "check": "pnpm run prepare:editor && tsc -b --noEmit && pnpm run lint",
     "test": "vitest run"
   },
   "dependencies": {
     "@flanksource/clicky-ui": "workspace:*",
     "@flanksource/facet": "catalog:",
     "@flanksource/icons": "catalog:",
+    "@flanksource/react-grab": "workspace:*",
     "@iconify/react": "catalog:",
     "@medv/finder": "catalog:",
     "@tanstack/react-query": "catalog:",
@@ -24,8 +26,7 @@
     "modern-screenshot": "catalog:",
     "monaco-editor": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:",
-    "react-grab": "catalog:"
+    "react-dom": "catalog:"
   },
   "devDependencies": {
     "@iconify-icons/ph": "1.2.5",

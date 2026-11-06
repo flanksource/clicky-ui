@@ -84,6 +84,58 @@ const b = <Tile></Tile>;`;
     expect(source.slice(0, second!.insertAt).endsWith("<Tile")).toBe(true);
   });
 
+  it("marks intrinsic SVG shapes and interleaves them with facet tags in one source-ordered sequence", () => {
+    const source = `
+import { Zone } from "@flanksource/facet";
+export default () => (
+  <svg>
+    <g>
+      <rect x={1} />
+      <Zone label="z" />
+      <text>hi</text>
+    </g>
+    <circle r={2} /><ellipse /><line /><polyline /><polygon /><path d="M0 0" />
+    <linearGradient /><defs /><div />
+  </svg>
+);`;
+
+    expect(tags(source)).toEqual([
+      "0:g",
+      "1:rect",
+      "2:Zone",
+      "3:text",
+      "4:circle",
+      "5:ellipse",
+      "6:line",
+      "7:polyline",
+      "8:polygon",
+      "9:path",
+    ]);
+  });
+
+  it("keeps facet ordinals stable when a shape is added after them but shifts later ones", () => {
+    const facet = 'import { BoxNode } from "@flanksource/facet";\n';
+    const before = `${facet}export default () => <><BoxNode /><BoxNode /></>;`;
+    const after = `${facet}export default () => <><BoxNode /><rect /><BoxNode /></>;`;
+
+    expect(tags(before)).toEqual(["0:BoxNode", "1:BoxNode"]);
+    expect(tags(after)).toEqual(["0:BoxNode", "1:rect", "2:BoxNode"]);
+  });
+
+  it("marks SVG shapes in a module with no facet import, inserting after the last attribute", () => {
+    const source = 'export default () => <svg><rect {...p} width="3" /><path /></svg>;';
+    const [rect, path] = editableOpenings(source, FILE);
+
+    expect(source.slice(0, rect!.insertAt).endsWith('width="3"')).toBe(true);
+    expect(source.slice(0, path!.insertAt).endsWith("<path")).toBe(true);
+  });
+
+  it("throws when an SVG shape already authors data-editable-source", () => {
+    expect(() => editableOpenings('export default () => <rect data-editable-source="x" />;', FILE)).toThrow(
+      /page\.tsx:1:22 already authors data-editable-source/,
+    );
+  });
+
   it("throws when an element already authors data-editable-source", () => {
     const source = `import { BoxNode } from "@flanksource/facet";
 const a = <BoxNode data-editable-source="hand" />;`;
@@ -181,5 +233,54 @@ describe("playgroundEditableSource", () => {
     expect(transform(source, join(pagesDir, "x.ts"))).toBeNull();
     expect(transform(source, join(process.cwd(), "src", "x.tsx"))).toBeNull();
     expect(transform('import { BoxNode } from "other";\nexport const a = <BoxNode />;', id)).toBeNull();
+    expect(transform('export const a = <svg><linearGradient /><div /></svg>;', id)).toBeNull();
+  });
+
+  describe("with intrinsic SVG shapes", () => {
+    const svgSource = [
+      'import { BoxNode } from "@flanksource/facet";',
+      "export default () => (",
+      "  <svg>",
+      '    <rect x={1} />',
+      '    <BoxNode title="A" />',
+      '    <g><text>t</text></g>',
+      "  </svg>",
+      ");",
+    ].join("\n");
+
+    it("marks shapes in a file without any facet import", () => {
+      const plain = 'export default () => <svg><rect x={1} /><path d="M0 0"></path></svg>;';
+      const hash = sourceHash(plain);
+
+      expect(transform(plain, id)!.code).toBe(
+        'export default () => <svg><rect x={1} data-editable-source="flanksource/_d/diagram.tsx:1:27#0@' +
+          `${hash}" /><path d="M0 0" data-editable-source="flanksource/_d/diagram.tsx:1:41#1@${hash}"></path></svg>;`,
+      );
+    });
+
+    it("numbers shapes and facet tags in one sequence", () => {
+      const hash = sourceHash(svgSource);
+      const out = transform(svgSource, id)!.code;
+
+      expect(out).toContain(`<rect x={1} data-editable-source="flanksource/_d/diagram.tsx:4:5#0@${hash}" />`);
+      expect(out).toContain(`<BoxNode title="A" data-editable-source="flanksource/_d/diagram.tsx:5:5#1@${hash}" />`);
+      expect(out).toContain(`<g data-editable-source="flanksource/_d/diagram.tsx:6:5#2@${hash}">`);
+      expect(out).toContain(`<text data-editable-source="flanksource/_d/diagram.tsx:6:8#3@${hash}">t</text>`);
+    });
+
+    it("maps code after an injected SVG marker back to its original position", () => {
+      const out = transform(svgSource, id)!;
+      const generated = out.code.split("\n");
+      const decoded = decodeMappings(out.map.mappings);
+      const lineIndex = generated.findIndex((line) => line.includes("<rect"));
+      const generatedColumn = generated[lineIndex]!.indexOf("/>");
+      const original = svgSource.split("\n")[lineIndex]!.indexOf("/>");
+
+      expect(decoded[lineIndex]!.find((s) => s[0] === generatedColumn)?.slice(2)).toEqual([lineIndex, original]);
+    });
+
+    it("still throws on a hand-written marker on an SVG shape", () => {
+      expect(() => transform('export default () => <rect data-editable-source="x" />;', id)).toThrow(/already authors data-editable-source/);
+    });
   });
 });

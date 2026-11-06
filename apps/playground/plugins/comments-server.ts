@@ -8,6 +8,7 @@ import {
 } from "./comments-input";
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import type { Connect, Logger, Plugin } from "vite";
 
 import { COMMENT_TOOLS } from "./comments-schema";
@@ -33,11 +34,13 @@ import {
   assertPage,
   assertRating,
   assertReviewDecision,
+  assertStyleEdit,
   patchComment,
   removeComment,
   type CommentPatch,
   type StoredAuthor,
   type StoredComment,
+  type StoredStyleEdit,
 } from "./comments-store";
 import {
   persistReviewDecision,
@@ -45,7 +48,8 @@ import {
 } from "./reviewable-store";
 import { readExternalPages } from "./external-pages-store";
 import { externalUrl } from "../src/bookmarklet/model";
-import { commentsClient } from "./comments-client";
+import { commentsClient, type CodeRangeSelector } from "./comments-client";
+import { parseEditableSource } from "./editable-source-marker";
 import { LaunchHttpError } from "./launch-client";
 import { PageStoreError } from "./pages-store";
 import { RepositoryDocuments } from "./repository-documents";
@@ -191,13 +195,37 @@ export type RootCommentInput = Pick<
   | "refs"
   | "promptRun"
   | "lint"
+  | "styleEdit"
 > & {
   page: unknown;
   author: StoredAuthor;
   anchor?: string;
   element: unknown;
   source?: Pick<ReviewSourceRequest, "pagesDir" | "expectedSource">;
+  /** The pages root `styleEdit.marker.file` is relative to; required with a `styleEdit`. */
+  pagesDir?: string;
 };
+
+/**
+ * The Gavel `code-range` selector for the line a refused style edit points at,
+ * derived from the validated marker and the server's own roots. Nothing in it
+ * is taken from the client beyond the marker's file, line and source hash.
+ */
+export function styleEditSelector(
+  styleEdit: StoredStyleEdit,
+  { pagesDir, workspace }: { pagesDir: string; workspace: string },
+): CodeRangeSelector {
+  const marker = parseEditableSource(styleEdit.marker);
+  const absolute = resolve(pagesDir, marker.file);
+  if (!absolute.startsWith(resolve(pagesDir) + sep)) {
+    throw new Error(`styleEdit marker file ${marker.file} is outside the pages directory`);
+  }
+  const path = relative(workspace, absolute).split(sep).join("/");
+  if (path === "" || path.startsWith("../") || isAbsolute(path)) {
+    throw new Error(`styleEdit marker file ${marker.file} is outside the workspace ${workspace}`);
+  }
+  return { kind: "code-range", version: 1, path, revision: marker.hash, startLine: marker.line, endLine: marker.line };
+}
 
 /**
  * Stores a new thread root: persists its element capture, checks an external
@@ -214,9 +242,19 @@ export async function createRootComment(
     anchor,
     element: rawElement,
     source,
+    pagesDir,
     ...fields
   } = input;
   const id = randomUUID();
+  let selector: CodeRangeSelector | undefined;
+  if (fields.styleEdit !== undefined) {
+    if (fields.reviewDecision) throw new Error("a style edit cannot carry a review decision");
+    if (!pagesDir) throw new Error("style edit comments require the pages directory");
+    selector = styleEditSelector(assertStyleEdit(fields.styleEdit), {
+      pagesDir,
+      workspace: commentsClient(dir).workspace,
+    });
+  }
   const element = persistElementContext(rawElement);
   const stored: StoredComment = {
     ...fields,
@@ -243,7 +281,7 @@ export async function createRootComment(
     }
   }
   if (!stored.reviewDecision) {
-    return { page, comment: await addComment(dir, page, stored) };
+    return { page, comment: await addComment(dir, page, stored, selector) };
   }
   if (!source)
     throw new Error(
@@ -331,6 +369,7 @@ async function handle(
           "anchor",
           "element",
           "expectedSource",
+          "styleEdit",
         ]);
         const host = req.headers.host;
         if (!host) throw new Error("request has no Host header");
@@ -345,6 +384,12 @@ async function handle(
           author: requireAuthor(body),
           ...(anchor === undefined ? {} : { anchor }),
           element: body["element"],
+          ...(body["styleEdit"] === undefined
+            ? {}
+            : {
+                styleEdit: body["styleEdit"] as StoredStyleEdit,
+                ...(pagesDir === undefined ? {} : { pagesDir }),
+              }),
           ...(rating === undefined ? {} : { rating: assertRating(rating) }),
           ...(reviewDecision === undefined
             ? {}

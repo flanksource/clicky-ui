@@ -148,6 +148,93 @@ describe("applyVisualEdit", () => {
     expect(result).toMatchObject({ statusCode: 422, body: { status: "refused", reason: "external" } });
   });
 
+  describe("attributes edits", () => {
+    const SVG_PAGE = `${FACET}export default () => (
+  <svg>
+    <BoxNode title="A" />
+    <rect x={1} y={zone.y} fill="#fff" />
+    <circle r={3} />
+    <ellipse {...rest} rx={1} />
+  </svg>
+);
+`;
+    const attributes = (source: string, values: unknown) => ({ page: "flanksource/svg", source, edit: { kind: "attributes", values } });
+
+    beforeEach(() => {
+      writeFileSync(file("flanksource/svg.tsx"), SVG_PAGE);
+    });
+
+    it.each([
+      ["replaces a number and a string literal", 1, { x: 40, fill: "#eef" }, '<rect x={1} y={zone.y} fill="#fff" />', '<rect x={40} y={zone.y} fill="#eef" />', 5],
+      ["inserts missing attributes", 2, { stroke: "#123", strokeWidth: 2 }, "<circle r={3} />", '<circle r={3} stroke="#123" strokeWidth={2} />', 6],
+      ["replaces after a spread", 3, { rx: 9 }, "<ellipse {...rest} rx={1} />", "<ellipse {...rest} rx={9} />", 7],
+    ])("%s and answers with the written line", (_name, ordinal, values, before, after, line) => {
+      const result = apply(attributes(marker("flanksource/svg.tsx", ordinal), values));
+
+      expect(result).toMatchObject({
+        statusCode: 200,
+        body: { status: "applied", file: "flanksource/svg.tsx", path: "pages/flanksource/svg.tsx", line },
+        written: file("flanksource/svg.tsx"),
+      });
+      expect(disk("flanksource/svg.tsx")).toBe(SVG_PAGE.replace(before, after));
+    });
+
+    it("refuses a computed attribute naming it, with the location, and writes nothing", () => {
+      const result = apply(attributes(marker("flanksource/svg.tsx", 1), { fill: "#eef", y: 5 }));
+
+      expect(result).toMatchObject({
+        statusCode: 422,
+        body: {
+          status: "refused",
+          reason: "computed",
+          attribute: "y",
+          file: "flanksource/svg.tsx",
+          line: 5,
+          column: 17,
+          error: expect.stringMatching(/^flanksource\/svg\.tsx:5:17: y is computed there/),
+        },
+      });
+      expect(disk("flanksource/svg.tsx")).toBe(SVG_PAGE);
+    });
+
+    it("refuses an attribute shadowed by a later spread, and an unchanged value", () => {
+      expect(apply(attributes(marker("flanksource/svg.tsx", 3), { ry: 2 }))).toMatchObject({
+        statusCode: 422,
+        body: { reason: "spread", attribute: "ry", line: 7 },
+      });
+      expect(apply(attributes(marker("flanksource/svg.tsx", 2), { r: 3 }))).toMatchObject({
+        statusCode: 422,
+        body: { reason: "unchanged", attribute: "r" },
+      });
+      expect(disk("flanksource/svg.tsx")).toBe(SVG_PAGE);
+    });
+
+    it.each([
+      ["an attribute that is not in the schema of the tag at the marker (derived from source, not the client)", 2, { width: 3 }, /"width" is not an editable attribute of <circle>/],
+      ["an event handler attribute", 1, { onClick: "alert(1)" }, /"onClick" is not an editable attribute of <rect>/],
+      ["a number given as a string", 1, { x: "40" }, /"x" of <rect> must be a finite number/],
+      ["a string given as a number", 1, { fill: 4 }, /"fill" of <rect> must be a non-empty string/],
+      ["an infinite number", 1, { x: Number.POSITIVE_INFINITY }, /finite number/],
+      ["an opacity above 1", 1, { opacity: 2 }, /at most 1/],
+      ["a facet component marker", 0, { x: 1 }, /no SVG schema for <BoxNode>/],
+      ["a nested value", 1, { x: { a: 1 } }, /"edit\.values\.x" must be a string or a number/],
+      ["an empty values object", 1, {}, /non-empty object/],
+      ["a non-object values", 1, "x=1", /non-empty object/],
+    ])("answers 400 for %s", (_name, ordinal, values, message) => {
+      const result = apply(attributes(marker("flanksource/svg.tsx", ordinal), values));
+
+      expect(result).toMatchObject({ statusCode: 400, body: { status: "invalid", error: expect.stringMatching(message) } });
+      expect(disk("flanksource/svg.tsx")).toBe(SVG_PAGE);
+    });
+
+    it("answers 409 stale when the file changed after render", () => {
+      const original = marker("flanksource/svg.tsx", 1);
+      writeFileSync(file("flanksource/svg.tsx"), `${SVG_PAGE}// edited elsewhere\n`);
+
+      expect(apply(attributes(original, { x: 2 }))).toMatchObject({ statusCode: 409, body: { status: "stale" } });
+    });
+  });
+
   it.each([
     ["a non-object body", null],
     ["a missing page", { source: "x", edit: {} }],

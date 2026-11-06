@@ -3,6 +3,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { VisualEditResponse } from "../../plugins/visual-edits-contract";
 import { overrideCallSite } from "./react-override";
 import { VisualEditOverlay } from "./VisualEditOverlay";
+import { useCallback } from "react";
+import { useEditableSelection } from "./useEditableSelection";
 
 vi.mock("./react-override", () => ({
   liveOverrideSupport: () => ({ supported: true }),
@@ -40,8 +42,16 @@ function mountDiagram() {
 function mountOverlay(root: HTMLElement) {
   const onOpenSource = vi.fn();
   const onPendingChange = vi.fn();
-  render(<VisualEditOverlay root={root} page={PAGE} onOpenSource={onOpenSource} onPendingChange={onPendingChange} />);
-  return { onOpenSource, onPendingChange };
+  const onSelect = vi.fn();
+  function Surface() {
+    const selection = useEditableSelection({ page: PAGE, enabled: true });
+    const pending = useCallback((value: boolean) => { selection.onFacetPendingChange(value); onPendingChange(value); }, [selection.onFacetPendingChange]);
+    return <VisualEditOverlay root={root} page={PAGE} onOpenSource={onOpenSource} onPendingChange={pending}
+      selected={selection.selected?.node.element ?? null} pending={selection.pending} selectionNotice={selection.notice}
+      onSelect={node => { onSelect(node); selection.select(node); }} />;
+  }
+  render(<Surface />);
+  return { onOpenSource, onPendingChange, onSelect };
 }
 
 async function pickVariant(box: HTMLElement, label: string, option: string) {
@@ -51,9 +61,37 @@ async function pickVariant(box: HTMLElement, label: string, option: string) {
 }
 
 beforeEach(() => {
+  vi.spyOn(Element.prototype, "getClientRects").mockReturnValue([new DOMRect(0, 0, 10, 10)] as unknown as DOMRectList);
   fetchMock.mockReset();
   overrides.mockReset();
   vi.stubGlobal("fetch", fetchMock);
+});
+
+it("counts and selects rendered SVG shapes without showing Facet-only controls", async () => {
+  document.body.innerHTML = `<div id="root"><svg>
+    <defs><marker><path data-editable-source="${ZONE}" /></marker></defs>
+    <g data-editable-source="${ZONE}"><rect id="shape" data-editable-source="${SHARED}" /></g>
+    <text data-editable-source="${SHARED}"><tspan id="label">Cache</tspan></text>
+  </svg></div>`;
+  const { onSelect } = mountOverlay(document.getElementById("root")!);
+  fireEvent.click(await screen.findByRole("button", { name: "Show editable (3)" }));
+  expect(screen.getAllByTestId("visual-edit-editable-outline")).toHaveLength(3);
+  fireEvent.click(document.getElementById("label")!);
+  expect(onSelect.mock.calls.at(-1)?.[0]).toMatchObject({ kind: "svg", tag: "text" });
+  expect(screen.queryByRole("button", { name: /Change variant|Change role/ })).toBeNull();
+  expect(await screen.findByText(/Selected Cache/)).toBeTruthy();
+});
+
+it("updates editable counts when a section's visibility changes", async () => {
+  const { root, api, ui } = mountDiagram();
+  mountOverlay(root);
+  expect(await screen.findByRole("button", { name: "Show editable (3)" })).toBeTruthy();
+  api.style.display = "none";
+  await screen.findByRole("button", { name: "Show editable (2)" });
+  ui.hidden = true;
+  await screen.findByRole("button", { name: "Show editable (1)" });
+  api.style.display = "block";
+  await screen.findByRole("button", { name: "Show editable (2)" });
 });
 
 afterEach(() => {
@@ -75,7 +113,7 @@ it("posts the picked variant for the whole call site and previews it on every in
 
   await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   expect(posted()).toEqual([{ page: PAGE, source: SHARED, edit: { kind: "style", prop: "variant", value: "card" } }]);
-  expect(overrides.mock.calls).toEqual([[[api, ui], SHARED, "variant", "card"]]);
+  expect(overrides.mock.calls).toEqual([[[api, ui], SHARED, { variant: "card" }]]);
   await waitFor(() => expect(onPendingChange).toHaveBeenLastCalledWith(false));
   expect(onPendingChange).toHaveBeenCalledWith(true);
   expect(await screen.findByText("Arrows re-measure on reload")).toBeTruthy();
@@ -100,8 +138,8 @@ it("shows a refused edit with an Open source action and restores the previous pr
   const alert = await screen.findByRole("alert");
   expect(alert.textContent).toMatch(/Edit refused.*variant is computed \(computed-value\)/);
   expect(overrides.mock.calls).toEqual([
-    [[api, ui], SHARED, "variant", "card"],
-    [[api, ui], SHARED, "variant", "outlined"],
+    [[api, ui], SHARED, { variant: "card" }],
+    [[api, ui], SHARED, { variant: "outlined" }],
   ]);
   fireEvent.click(within(alert).getByRole("button", { name: /Open source/ }));
   expect(onOpenSource).toHaveBeenCalledWith({ file: "flanksource/_facet-diagrams/cells.tsx", line: 12 });
@@ -129,7 +167,7 @@ it("lists ambiguous text candidates and re-posts the chosen one", async () => {
     "Choose flanksource/_facet-diagrams/other.tsx:8",
   ]);
   expect(screen.getByText(/title: "Run API"/)).toBeTruthy();
-  expect(overrides.mock.calls).toEqual([[[api], SHARED, "title", "Run Gateway"]]);
+  expect(overrides.mock.calls).toEqual([[[api], SHARED, { title: "Run Gateway" }]]);
 
   fireEvent.click(within(group).getByRole("button", { name: "Choose flanksource/_facet-diagrams/other.tsx:8" }));
 
@@ -154,7 +192,7 @@ it("reverts the preview when the ambiguous edit is cancelled", async () => {
   fireEvent.blur(input);
   fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
 
-  await waitFor(() => expect(overrides.mock.calls.at(-1)).toEqual([[api], SHARED, "title", "Run API"]));
+  await waitFor(() => expect(overrides.mock.calls.at(-1)).toEqual([[api], SHARED, { title: "Run API" }]));
   expect(screen.queryByRole("group", { name: "Ambiguous text" })).toBeNull();
 });
 
