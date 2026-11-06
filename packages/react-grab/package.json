@@ -1,0 +1,71 @@
+{
+  "name": "@flanksource/react-grab",
+  "version": "0.1.50",
+  "description": "Source fork of react-grab (github.com/aidenybai/react-grab), the element picker for React pages, used by the page runtime's page agent",
+  "license": "MIT",
+  "author": {
+    "name": "Aiden Bai",
+    "email": "aiden@million.dev"
+  },
+  "contributors": [
+    "Flanksource (fork maintainer)"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flanksource/clicky-ui.git",
+    "directory": "packages/react-grab"
+  },
+  "type": "module",
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE.md",
+    "FORK.md",
+    "UPSTREAM",
+    "README.md"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./core": { "types": "./dist/core/index.d.ts", "import": "./dist/core/index.js" },
+    "./primitives": { "types": "./dist/primitives.d.ts", "import": "./dist/primitives.js" },
+    "./styles.css": "./dist/styles.css"
+  },
+  "scripts": {
+    "build": "tsx scripts/build.ts",
+    "test": "vitest run tests",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "fork:check": "tsx scripts/fork-check.ts"
+  },
+  "dependencies": {
+    "bippy": "catalog:"
+  },
+  "devDependencies": {
+    "@babel/core": "catalog:",
+    "@babel/preset-typescript": "catalog:",
+    "@tailwindcss/cli": "catalog:",
+    "@types/babel__core": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "babel-preset-solid": "catalog:",
+    "solid-js": "catalog:",
+    "tailwindcss": "catalog:",
+    "tsdown": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react": ">=17.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  }
+}
