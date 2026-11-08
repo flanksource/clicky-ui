@@ -1,5 +1,7 @@
 @config "../tailwind.config.ts";
 @import "tailwindcss";
+/* facet's BoxNode/ContainerNode style themselves with Tailwind classes. */
+@source "../node_modules/@flanksource/facet/dist/components/diagram/**/*.js";
 
 /* The AppShell-based kitchen-sink chrome is full-height; let it fill the viewport. */
 html,

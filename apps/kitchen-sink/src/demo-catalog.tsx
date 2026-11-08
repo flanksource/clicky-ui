@@ -6,6 +6,7 @@ import { IconDemo } from "./demos/IconDemo";
 import { GeneratedIconsDemo } from "./demos/GeneratedIconsDemo";
 import { BadgeDemo } from "./demos/BadgeDemo";
 import { SymbolBadgeDemo } from "./demos/SymbolBadgeDemo";
+import { FacetDiagramStyleDemo } from "./demos/FacetDiagramStyleDemo";
 import { AvatarDemo } from "./demos/AvatarDemo";
 import { FormFieldsDemo } from "./demos/FormFieldsDemo";
 import { GitPickersDemo } from "./demos/GitPickersDemo";
@@ -151,6 +152,7 @@ export const DEMO_GROUPS: DemoGroup[] = [
     items: [
       { id: "badge", label: "Badge", component: BadgeDemo, icon: UiTag },
       { id: "symbol-badge", label: "SymbolBadge", component: SymbolBadgeDemo, icon: UiFileCode },
+      { id: "facet-diagram-style", label: "Facet diagram style", component: FacetDiagramStyleDemo, icon: UiSquare },
       {
         id: "avatar",
         label: "Avatar",

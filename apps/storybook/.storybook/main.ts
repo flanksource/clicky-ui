@@ -1,8 +1,12 @@
 import type { StorybookConfig } from "@storybook/react-vite";
 import tailwindcss from "@tailwindcss/vite";
+import { facetSrc } from "./facet-source.ts";
 
 const config: StorybookConfig = {
-  stories: ["../../../packages/ui/src/**/*.stories.@(ts|tsx|mdx)"],
+  stories: [
+    "../../../packages/ui/src/**/*.stories.@(ts|tsx|mdx)",
+    "../stories/**/*.stories.@(ts|tsx|mdx)",
+  ],
   // Sample assets referenced by stories (e.g. the Markdown image section) live
   // with the kitchen-sink so both apps serve one copy.
   staticDirs: ["../../kitchen-sink/public"],
@@ -44,6 +48,14 @@ const config: StorybookConfig = {
       "react",
       "react-dom",
     ];
+    // WORKAROUND(unreleased-facet): see ./facet-source.ts.
+    if (facetSrc) {
+      const aliases = viteConfig.resolve.alias ?? [];
+      const list = Array.isArray(aliases)
+        ? aliases
+        : Object.entries(aliases).map(([find, replacement]) => ({ find, replacement }));
+      viteConfig.resolve.alias = [{ find: "@flanksource/facet", replacement: facetSrc }, ...list];
+    }
     // Pre-bundle every dependency the stories pull in transitively through
     // packages/ui. On a cold cache (CI) Vite's browser-mode optimizer otherwise
     // discovers them only after the tests start, re-optimizes once and reloads
