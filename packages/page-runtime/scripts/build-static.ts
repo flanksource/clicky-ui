@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { build, type Plugin } from "rolldown";
 import { frameDocument } from "../src/sw/router.ts";
+import { EXPORT_COMPILER_URL } from "../src/sw/runtime-module.ts";
 import { findLocalWorkspaces, localWorkspacesPlugin } from "./local-workspaces.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -39,7 +40,7 @@ export async function buildStatic(options: BuildStaticOptions = {}): Promise<voi
     ...failOnUnresolved,
     input: resolve(root, "src/frame/entry.ts"),
     plugins,
-    external: ["./page-agent.js", "react", "react-dom", "react-dom/client"],
+    external: ["./page-agent.js", EXPORT_COMPILER_URL, "react", "react-dom", "react-dom/client"],
     platform: "browser",
     transform: { define: { "process.env.NODE_ENV": JSON.stringify("development") } },
     output: { file: resolve(outDir, "boot.js"), format: "es", sourcemap: true, codeSplitting: false },
@@ -52,6 +53,15 @@ export async function buildStatic(options: BuildStaticOptions = {}): Promise<voi
     platform: "browser",
     transform: { jsx: { runtime: "automatic", development: true }, define: { "process.env.NODE_ENV": JSON.stringify("development") } },
     output: { file: resolve(outDir, "page-agent.js"), format: "es", sourcemap: true, codeSplitting: false },
+  });
+  await build({
+    ...failOnUnresolved,
+    input: resolve(root, "src/frame/export-compiler.ts"),
+    // The frame's CSP has no 'wasm-unsafe-eval', so the export compiler uses the lexer's asm.js build; the worker keeps WASM.
+    plugins: [...plugins, { name: "es-module-lexer-asm", resolveId(id, importer, extra) { return id === "es-module-lexer" ? this.resolve("es-module-lexer/js", importer, { ...extra, skipSelf: true }) : null; } }],
+    platform: "browser",
+    transform: { define: { "process.env.NODE_ENV": JSON.stringify("development"), "process.env": "{}" } },
+    output: { file: resolve(outDir, "export-compiler.js"), format: "es", sourcemap: true, codeSplitting: false },
   });
   await build({ ...failOnUnresolved, input: resolve(root, "src/frame/devtools-hook.ts"), plugins, platform: "browser", transform: { define: { "process.env.NODE_ENV": JSON.stringify("development") } }, output: { file: resolve(outDir, "devtools-hook.js"), format: "iife" } });
   await writeFile(resolve(outDir, "bootstrap.html"), frameDocument().html);

@@ -7,12 +7,12 @@ import { composeLinkOverrides } from "../link/overrides.ts";
 import { candidatesForPage, openRuntimeDb } from "../storage/db.ts";
 import { createLinkRoutes } from "./link-route.ts";
 import { createRouter } from "./router.ts";
-import { facetPlugins } from "./compiler.ts";
+import { BASE_PLUGINS } from "./compiler.ts";
 import { cleanupLegacyStorage } from "./legacy-storage.ts";
 
 const origin = "https://runtime.example";
 const profile: RuntimeProfile = { runtimeDomain: "runtime.example", embedders: ["https://host.example"], packageOrigin: "https://packages.example", registry: "https://registry.example", managed: {}, policy: { dependencies: "strict" }, minReleaseAgeDays: 0, network: { allow: [] }, csp: { add: {} }, links: "allow", sources: ["host"], readinessTimeoutMs: 1000 };
-const plugins = facetPlugins(() => () => undefined);
+const plugins = BASE_PLUGINS;
 const key = "a".repeat(64);
 
 async function seededRouter(files: Record<string, string>) {

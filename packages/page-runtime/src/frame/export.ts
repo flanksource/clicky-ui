@@ -67,6 +67,9 @@ export async function exportHtml(): Promise<string> {
   const clone = document.documentElement.cloneNode(true) as HTMLElement;
   clone.querySelectorAll("script").forEach((node) => node.remove());
   clone.querySelectorAll("[data-page-agent], [data-react-grab]").forEach((node) => node.remove());
+  // During an export render (export-page.ts) the live root is hidden and the export compile renders after it.
+  const exportRender = clone.querySelector<HTMLElement>("[data-page-runtime-export]");
+  if (exportRender) { clone.querySelector("[data-page-runtime-live]")?.remove(); exportRender.removeAttribute("data-page-runtime-export"); exportRender.id = "root"; }
   for (const link of clone.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')) {
     const response = await fetch(link.href);
     if (!response.ok) throw new Error(`HTML export stylesheet ${link.href}: HTTP ${response.status}`);
@@ -76,7 +79,7 @@ export async function exportHtml(): Promise<string> {
     const style = document.createElement("style"); style.textContent = [...sheet.cssRules].map((rule) => rule.cssText).join("\n"); clone.querySelector("head")!.append(style);
   }
   for (const style of clone.querySelectorAll("style")) style.textContent = await inlineCss({ css: style.textContent, url: location.href, parents: [] });
-  const originals = [...document.images].filter((image) => !image.closest("[data-page-agent], [data-react-grab]"));
+  const originals = [...document.images].filter((image) => !image.closest("[data-page-agent], [data-react-grab]") && !(exportRender && image.closest("[data-page-runtime-live]")));
   for (const [index, image] of [...clone.querySelectorAll<HTMLImageElement>("img")].entries()) {
     const original = originals[index];
     if (!original) throw new Error("HTML export image disappeared from source document");

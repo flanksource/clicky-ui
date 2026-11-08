@@ -28,12 +28,13 @@ export const DEV_SHIM = [
   "",
 ].join("\n");
 
-/** facet's MDX plugins in its build's order, given the plugin functions (the reference and the worker load their own copies). */
-export type MdxPlugins = { remarkFrontmatter: unknown; remarkGfm: unknown; remarkAlert: unknown; facetRedact: unknown; rehypeRaw: unknown };
+/** The MDX plugins every page compiles with, in facet's build order (the reference and the worker load their own copies). */
+export type MdxPlugins = { remarkFrontmatter: unknown; remarkGfm: unknown; remarkAlert: unknown; rehypeRaw: unknown };
 
-export function mdxOptions(plugins: MdxPlugins): { remarkPlugins: unknown[]; rehypePlugins: unknown[] } {
+/** `remark` appends library-declared plugins, as `[plugin, options]` pairs, after the base set; only exports pass them. */
+export function mdxOptions(plugins: MdxPlugins, remark: unknown[] = []): { remarkPlugins: unknown[]; rehypePlugins: unknown[] } {
   return {
-    remarkPlugins: [plugins.remarkFrontmatter, plugins.remarkGfm, [plugins.remarkAlert, { tagName: "blockquote" }], [plugins.facetRedact, { allow: {} }]],
+    remarkPlugins: [plugins.remarkFrontmatter, plugins.remarkGfm, [plugins.remarkAlert, { tagName: "blockquote" }], ...remark],
     rehypePlugins: [[plugins.rehypeRaw, { passThrough: ["mdxFlowExpression", "mdxJsxFlowElement", "mdxJsxTextElement", "mdxTextExpression", "mdxjsEsm"] }]],
   };
 }
@@ -74,9 +75,9 @@ export async function useDevShim(code: string): Promise<string> {
   return rewritten;
 }
 
-/** Compiles an MDX page with facet's plugins and routes jsxDEV calls through the marker shim. */
-export async function compileMdx({ path, code, sourcePath = path }: PageSourceInput, compile: MdxCompile, plugins: MdxPlugins): Promise<string> {
-  const output = await compile({ value: code, path: sourcePath }, { ...mdxOptions(plugins), development: true });
+/** Compiles an MDX page with the base plugins (plus `remark`, for exports) and routes jsxDEV calls through the marker shim. */
+export async function compileMdx({ path, code, sourcePath = path }: PageSourceInput, compile: MdxCompile, plugins: MdxPlugins, remark: unknown[] = []): Promise<string> {
+  const output = await compile({ value: code, path: sourcePath }, { ...mdxOptions(plugins, remark), development: true });
   return useDevShim(defineNodeEnv(String(output)).code);
 }
 

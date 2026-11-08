@@ -37,6 +37,11 @@ describe("worker + frame + boot in real Chromium", () => {
     expect(result.elapsed).toBeGreaterThan(400);
     expect(server.counts().registryRequests).toBe(0);
   });
+  it("exports a Markdown page through its libraries' declared remark plugins", async () => {
+    const result = await run("markdown-export");
+    expect({ failure: result.failure, errors: result.errors, ready: result.states.at(-1) }).toEqual({ failure: undefined, errors: [], ready: "ready" });
+    expect({ kept: result.snapshot?.html.includes("Public summary."), removed: result.snapshot?.html.includes("Internal margin figures."), liveRootHidden: result.snapshot?.html.includes("data-page-runtime-live") }).toEqual({ kept: true, removed: false, liveRootHidden: false });
+  });
   it.each(["resolve", "fetch", "compile", "link", "render", "readiness"])("reports the %s error phase with a source location", async (phase) => {
     const result = await run(phase);
     expect(result.failure).toBeUndefined();

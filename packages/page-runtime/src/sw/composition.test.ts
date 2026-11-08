@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { BarrelIndex } from "../schema.ts";
-import { mergeBarrels } from "./composition.ts";
+import type { BarrelIndex, Fragment } from "../schema.ts";
+import { composeFragments, mergeBarrels } from "./composition.ts";
 
 const SHARED_BARREL = "d3-shape@3.2.0/src/index.js";
 const LINE = "d3-shape@3.2.0/src/line.js";
@@ -9,6 +9,20 @@ const ARC = "d3-shape@3.2.0/src/arc.js";
 function index(own: string, sharedModules: string[], shared: Record<string, number | [number, string]>): BarrelIndex {
   return { modules: [own, ...sharedModules], barrels: { [`${own}-barrel`]: { thing: 0 }, [SHARED_BARREL]: shared } };
 }
+
+describe("composeFragments compiler plugins", () => {
+  const REDACT = "@acme/docs/remark/redact";
+  const fragment = (name: string, extra: Partial<Fragment> = {}): Fragment => ({ fragment: 1, name, imports: {}, scopes: {}, remaps: {}, aliases: {}, inherits: [], integrity: {}, ...extra });
+
+  it("keys each library's plugins by library, in fragment order, and omits libraries that declare none", () => {
+    const docs = fragment("@acme/docs", { imports: { [REDACT]: "@acme/docs@2.0.0/remark/redact.mjs" }, compiler: { remark: [{ module: REDACT, options: { allow: {} } }] } });
+    expect(composeFragments({ fragments: [fragment("@acme/ui"), docs] }).compiler).toEqual({ "@acme/docs": { remark: [{ module: REDACT, options: { allow: {} } }] } });
+  });
+
+  it("rejects a declared plugin the fragment does not map", () => {
+    expect(() => composeFragments({ fragments: [fragment("@acme/docs", { compiler: { remark: [{ module: REDACT }] } })] })).toThrow(`@acme/docs: compiler plugin ${REDACT} is not in its runtime fragment`);
+  });
+});
 
 describe("mergeBarrels", () => {
   it("coalesces a barrel two libraries index identically, keeping every name on the same defining module", () => {

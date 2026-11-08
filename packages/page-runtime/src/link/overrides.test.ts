@@ -15,6 +15,15 @@ describe("library link state and session overrides", () => {
   it.each([["deny", true], ["allow", false]] as const)("rejects links for profile %s with developer overrides %s", (links, developerOverrides) => {
     expect(() => assertLinksAllowed({ profile: { links }, developerOverrides })).toThrow(/developer overrides/);
   });
+  it.each([
+    ["the checkout's declaration replaces the published one", { remark: [{ module: "@flanksource/clicky-ui/remark/local" }] }, { "@flanksource/clicky-ui": { remark: [{ module: "@flanksource/clicky-ui/remark/local" }] }, "@acme/facet": { remark: [{ module: "@acme/facet/remark/redact" }] } }],
+    ["a checkout without a declaration drops the published one", undefined, { "@acme/facet": { remark: [{ module: "@acme/facet/remark/redact" }] } }],
+  ])("compiler plugins: %s", (_case, compiler, expected) => {
+    const lock = { ...exampleLock(), compiler: { "@flanksource/clicky-ui": { remark: [{ module: "@flanksource/clicky-ui/remark/published" }] }, "@acme/facet": { remark: [{ module: "@acme/facet/remark/redact" }] } } };
+    const link = exampleLink();
+    if (compiler) Object.assign(link.build.fragment, { compiler, imports: { ...link.build.fragment.imports, "@flanksource/clicky-ui/remark/local": "@flanksource/clicky-ui@2.0.0/remark/local.mjs" } });
+    expect(composeLinkOverrides({ lock, links: [link], profile: { links: "allow" }, developerOverrides: true }).compiler).toEqual(expected);
+  });
   it("swaps checkout entries and React without mutating the published lock", () => {
     const original = exampleLock();
     const lock = composeLinkOverrides({ lock: original, links: [exampleLink()], profile: { links: "allow" }, developerOverrides: true });

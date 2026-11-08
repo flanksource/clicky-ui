@@ -3,7 +3,7 @@ import { exampleLink, exampleLock } from "../link/testing-fixtures.ts";
 import { composeLinkOverrides } from "../link/overrides.ts";
 import { memoryCaches, memoryLinkStorage } from "../link/testing-cache.ts";
 import { createLinkRoutes } from "./link-route.ts";
-import { facetPlugins } from "./compiler.ts";
+import { BASE_PLUGINS } from "./compiler.ts";
 import type { RuntimeProfile } from "../schema.ts";
 import { parse } from "es-module-lexer";
 import { createRouter } from "./router.ts";
@@ -15,7 +15,7 @@ it("serves host-buffer Markdown through the same compiler as linked Markdown", a
   const caches = memoryCaches();
   const lock = { ...exampleLock(), page: "report.md" };
   await (await caches.open("page-runtime-markdown-pages")).put(`${origin}/__runtime/pages/report.md`, Response.json({ lock, files: { "report.md": "# Revenue" } }));
-  const router = createRouter({ origin, version: "markdown", profile, caches, plugins: facetPlugins(() => () => undefined) });
+  const router = createRouter({ origin, version: "markdown", profile, caches, plugins: BASE_PLUGINS });
   const response = await router.route(new Request(`${origin}/src/report.md?page=report.md`));
   expect(response.headers.get("content-type")).toBe("text/javascript; charset=utf-8");
   expect(response.headers.has("x-page-runtime-error")).toBe(false);
@@ -31,7 +31,7 @@ it("serves linked Markdown as ESM, resolves extensionless imports and serves its
   const source = ['---', 'title: Revenue', '---', '', '# Revenue', '', '```js', 'const total = 3;', '```', '', '![Chart](/src/pages/chart.svg)'].join("\n");
   const image = '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>';
   const store = memoryLinkStorage(); await store.put(link);
-  const routes = createLinkRoutes({ origin, version: "markdown", profile, store, caches: memoryCaches(), plugins: facetPlugins(() => () => undefined), load: async () => ({ lock, files: {} }), fetch: async (input) => {
+  const routes = createLinkRoutes({ origin, version: "markdown", profile, store, caches: memoryCaches(), plugins: BASE_PLUGINS, load: async () => ({ lock, files: {} }), fetch: async (input) => {
     const path = new URL(String(input)).pathname;
     if (path.endsWith("/report.md")) return new Response(source);
     if (path.endsWith("/index.tsx")) return new Response('export { default } from "./report";');

@@ -4,6 +4,7 @@ import { validateAgentFrameMessage, validateAgentHostMessage } from "./agent-val
 import { validateJson } from "./message-values.ts";
 import { validateActivity } from "../activity-schema.ts";
 import { validatePageSources } from "../link/page-sources.ts";
+import { validateCompilerPlugins } from "../sw/compiler-plugins.ts";
 import { validateReviewFrameMessage, validateReviewHostMessage } from "./review/validation.ts";
 
 function text(value: unknown, path: string, empty = false): asserts value is string {
@@ -77,8 +78,9 @@ export function validateSourcePath(path: string): void {
 
 export function validateLock(value: unknown): void {
   const lock = record(value, "lock");
-  keys(lock, ["lock", "packageOrigin", "page", "versions", "map", "integrity", "remaps", "barrels", "listings", "pageSources"], "lock");
+  keys(lock, ["lock", "packageOrigin", "page", "versions", "map", "integrity", "remaps", "barrels", "listings", "pageSources", "compiler"], "lock");
   if (lock.pageSources !== undefined) validatePageSources(lock.pageSources);
+  if (lock.compiler !== undefined) for (const [library, plugins] of Object.entries(record(lock.compiler, "lock.compiler"))) validateCompilerPlugins(plugins, { library, path: `lock.compiler.${library}` });
   if (lock.lock !== 2) throw new Error("invalid lock format");
   text(lock.packageOrigin, "lock.packageOrigin");
   const origin = new URL(lock.packageOrigin);

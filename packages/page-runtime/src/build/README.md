@@ -36,6 +36,23 @@ pnpm run check-fragment /workspace/my-library ../ui/dist/runtime/importmap.json
 
 The checker validates the written fragment against a fresh dist trace and checks converted files' integrity and imports. Without a base argument, declared inherited specifiers count as mapped; with a base it also verifies that the base provides them. Missing mappings, Node built-ins and unconverted CommonJS fail the check. Build failures use NodeBuiltinError, CommonJsConversionError and BaseSetRemapError for those named failure classes.
 
+## Export compiler plugins
+
+A library can contribute remark plugins that run when a Markdown or MDX page is exported to HTML or PDF. Live previews never run them. Declare them in package.json under `pageRuntime.compiler`. Each `module` must be one of the library's own `exports`, and its default export is the plugin. `options` is the JSON value the plugin is applied with:
+
+```json
+{
+  "exports": { "./remark/facet-redact": "./remark/facet-redact.mjs" },
+  "pageRuntime": {
+    "compiler": {
+      "remark": [{ "module": "@flanksource/facet/remark/facet-redact", "options": { "allow": {} } }]
+    }
+  }
+}
+```
+
+The build traces each plugin module, even outside dist, and writes the declaration to the fragment's `compiler` field. A page's lock collects every library's declaration in library order. A local checkout link replaces its library's entry. On export, the frame loads the export compiler and each plugin through the page's import map, with integrity checks. It compiles the page with the base plugins followed by the declared ones, and renders that result in place of the live page for the snapshot or print. Exporting a page that imports other Markdown fails, because the worker compiles imported Markdown without these plugins. An undeclared module, an empty list, or another package's module fails the build.
+
 A library exporting `./page-styles` declares `runtimeDependencies: string[]` on its default or named `pageStyles` recipe. List the package specifiers and recipe-relative files its CSS compiler fetches, including stylesheets, Tailwind plugins and presets. The build imports the recipe from dist and traces these dependencies from that module, including transitive CSS imports and assets, scoped mappings and integrity. The checker reads the same declaration. The recipe's `base` stylesheets are linked on every page and its `entry` holds only compiler inputs; see `src/frame/tailwind/README.md`. Browser field mappings apply before built-in rejection: `false` maps to a generated empty module, while a string resolves to its browser target.
 
 Clicky UI's build appends the runtime step after both Vite passes and stylesheet generation, because the ESM Vite pass empties dist. `pnpm --filter @flanksource/clicky-ui test:runtime-set` runs only its Chromium probe through Gavel. It tests hooks and Clicky UI theme context, counts one React and one renderer in the development build, and checks that a deliberately duplicated React fails.

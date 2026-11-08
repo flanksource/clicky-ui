@@ -34,9 +34,15 @@ export type Fragment = {
   inherits: string[];
   /** Subresource integrity for every traced and converted file, by package-relative URL. */
   integrity: Record<string, string>;
+  /** Compiler plugins the library contributes to HTML and PDF exports, declared in package.json `pageRuntime.compiler`. */
+  compiler?: CompilerPlugins;
 };
 
-export type ImportMap = { imports: Record<string, string>; scopes: Record<string, Record<string, string>> };
+/** A remark plugin: a module the library exports, whose default export is the plugin, with the options it is applied with. */
+export type CompilerPlugin = { module: string; options?: JsonValue };
+export type CompilerPlugins = { remark: CompilerPlugin[] };
+
+export type ImportMap ={ imports: Record<string, string>; scopes: Record<string, Record<string, string>> };
 
 /**
  * A library's barrel export index, published as `runtime/barrels.json`: for each entry barrel, the defining module of
@@ -63,7 +69,8 @@ export type RuntimeProfile = {
   convert?: { origin: string };
   minReleaseAgeDays: number;
   network: { allow: string[] };
-  csp: { add: Record<string, string[]> };
+  /** `wasm` lets frames compile WebAssembly (`'wasm-unsafe-eval'`); off by default, and it never enables JS `eval`. */
+  csp: { add: Record<string, string[]>; wasm?: boolean };
   links: "allow" | "deny";
   sources: Array<"host" | "opfs" | "folder" | "url" | "hash">;
   readinessTimeoutMs: number;
@@ -80,6 +87,8 @@ export type PageLock = {
   barrels: BarrelIndex;
   listings?: Record<string, string>;
   pageSources?: import("./link/page-sources.ts").PageSourceRoot[];
+  /** Each library's export compiler plugins, in library order. */
+  compiler?: Record<string, CompilerPlugins>;
 };
 
 export type FolderManifest = {

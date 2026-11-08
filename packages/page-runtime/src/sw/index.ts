@@ -4,4 +4,4 @@ export { validateVersionRange } from "./versions.ts";
 export { chooseVersion, satisfiesVersion } from "./versions.ts";
 export { composeFragments, resolveSpecifier } from "./composition.ts";
 export { validateProfile, validateDependencies, validatePolicy, permitsNetwork } from "./profile.ts";
-export { compilePage, rewriteImports, facetPlugins, moduleUrl } from "./compiler.ts";
+export { compilePage, rewriteImports, BASE_PLUGINS, moduleUrl } from "./compiler.ts";

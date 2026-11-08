@@ -3,6 +3,7 @@ import type { BridgeEnvelope, FrameConfig, JsonValue, RuntimeError, RuntimePhase
 import { createFrameBridge, workerRequest } from "./bridge.ts";
 import { waitForReadiness } from "./readiness.ts";
 import { exportHtml } from "./export.ts";
+import { withExportRender } from "./export-page.ts";
 import { runtimeError } from "../sw/errors.ts";
 import { validateProfile } from "../sw/profile.ts";
 import { validateFrameMessage } from "../host/validation.ts";
@@ -49,6 +50,8 @@ export async function bootFrame(): Promise<void> {
   let styles: PageStyles | undefined;
   let unmount: (() => void) | undefined;
   let updateData: ((value: JsonValue) => void) | undefined;
+  let latestData: JsonValue = null;
+  let exportMount: ((module: PageModule, root: HTMLElement) => { mounted: Promise<void>; unmount: () => void }) | undefined;
   let receiveData!: (data: JsonValue) => void;
   const data = new Promise<JsonValue>((resolve) => { receiveData = resolve; });
   const bridge = createFrameBridge({ receive: (envelope) => { void receive(envelope).catch((error: unknown) => report(error, envelope.id)); }, error: (error) => report(error) });
@@ -60,7 +63,7 @@ export async function bootFrame(): Promise<void> {
     activitySubscribed = true;
     void workerRequest({ message: "subscribe-activity", load: activity.load, navigationStart: activity.navigationStart }, 15000).catch(report);
   };
-  const dispose = () => { ready = false; unmount?.(); unmount = undefined; agent?.dispose(); agent = undefined; styles?.stop(); styles = undefined; };
+  const dispose = () => { ready = false; unmount?.(); unmount = undefined; exportMount = undefined; agent?.dispose(); agent = undefined; styles?.stop(); styles = undefined; };
   window.addEventListener("pagehide", () => { activity.stop(); dispose(); bridge.dispose(); }, { once: true });
   async function receive(envelope: BridgeEnvelope) {
     const m = envelope.message;
@@ -73,7 +76,7 @@ export async function bootFrame(): Promise<void> {
     else if (m.type === "sources") { performance.mark("page-runtime:sources"); await workerRequest({ page: config?.page, message: m }, 15000); performance.mark("page-runtime:invalidated"); location.reload(); }
     else if (m.type === "reload") location.reload();
     else if (m.type === "theme") { document.documentElement.dataset.theme = m.theme; document.documentElement.dataset.density = m.density; }
-    else if (m.type === "data") { receiveData(m.data); updateData?.(m.data); }
+    else if (m.type === "data") { latestData = m.data; receiveData(m.data); updateData?.(m.data); }
     else if (m.type === "mode" || m.type === "pick" || m.type === "page" || m.type === "pins" || m.type === "highlight" || m.type === "scroll" || m.type === "design-override" || m.type === "design-write" || m.type === "design-write-result" || m.type === "review-list" || m.type === "review-select" || m.type === "review-visibility" || m.type === "review-action") {
       if (!agent) throw new Error("page agent is not ready");
       agent.receive(m);
@@ -87,9 +90,14 @@ export async function bootFrame(): Promise<void> {
       bridge.send(await agent.captureVocabulary({ ready }), reference);
     }
     else if (m.type === "export") {
-      if (!ready) throw new Error("page is not ready for export");
-      if (m.format === "print") { window.print(); bridge.send({ type: "status", state: "ready" }, envelope.id ? { re: envelope.id } : undefined); }
-      else bridge.send({ type: "snapshot", html: await exportHtml() }, envelope.id ? { re: envelope.id } : undefined);
+      if (!ready || !config || !exportMount) throw new Error("page is not ready for export");
+      const reference = envelope.id ? { re: envelope.id } : undefined;
+      const root = document.getElementById("root");
+      if (!(root instanceof HTMLElement)) throw new Error("frame root is missing");
+      await withExportRender({ config, root, mount: exportMount, request: (message) => workerRequest(message, 15000), run: async () => {
+        if (m.format === "print") { window.print(); bridge.send({ type: "status", state: "ready" }, reference); }
+        else bridge.send({ type: "snapshot", html: await exportHtml() }, reference);
+      } });
     }
   }
   try {
@@ -149,8 +157,14 @@ export async function bootFrame(): Promise<void> {
     const { startPageAgent, PageAgentProvider } = agentModule;
     agent = startPageAgent({ root: pageRoot, page: config.page, ...(config.lock.pageSources ? { pageSources: config.lock.pageSources } : {}), send: (message) => bridge.send(message), error: report });
     phase = "render";
-    const mountedPage = mountPage({ module: pageModule, runtime: reactRuntime, agent, provider: PageAgentProvider, data: pageData, file: config.page, subscribe: (update) => { updateData = update; } });
+    const mountedPage = mountPage({ module: pageModule, runtime: reactRuntime, agent, provider: PageAgentProvider, data: pageData, file: config.page, root: pageRoot, subscribe: (update) => { updateData = update; } });
     unmount = mountedPage.unmount;
+    latestData = pageData;
+    const page = config.page; const pageAgent = agent; const runtime = reactRuntime;
+    exportMount = (module, root) => {
+      if (typeof module.default !== "function" && typeof module.default !== "object") throw new Error(`${page}: export compile has no default React component`);
+      return mountPage({ module, runtime, agent: pageAgent, provider: PageAgentProvider, data: latestData, file: page, root, subscribe: () => undefined });
+    };
     performance.mark("page-runtime:render");
     requestAnimationFrame(() => requestAnimationFrame(() => { performance.mark("page-runtime:visible"); subscribeActivity(); activity.schedule(); }));
     phase = "readiness";
@@ -164,7 +178,7 @@ export async function bootFrame(): Promise<void> {
   } catch (error) { if (controlled) subscribeActivity(); dispose(); announceLock(); report(error); }
 }
 
-function mountPage(options: { module: PageModule; runtime: ReactRuntime; agent: PageAgent; provider: typeof import("./page-agent.js")["PageAgentProvider"]; data: JsonValue; file: string; subscribe: (update: (value: JsonValue) => void) => void }): { mounted: Promise<void>; unmount: () => void } {
+function mountPage(options: { module: PageModule; runtime: ReactRuntime; agent: PageAgent; provider: typeof import("./page-agent.js")["PageAgentProvider"]; data: JsonValue; file: string; root: HTMLElement; subscribe: (update: (value: JsonValue) => void) => void }): { mounted: Promise<void>; unmount: () => void } {
   const [React, { createRoot }, { flushSync }] = options.runtime;
   let resolve!: () => void; let reject!: (error: unknown) => void;
   const mounted = new Promise<void>((yes, no) => { resolve = yes; reject = no; });
@@ -179,9 +193,7 @@ function mountPage(options: { module: PageModule; runtime: ReactRuntime; agent: 
     React.useLayoutEffect(() => { options.subscribe(setData); resolve(); }, []);
     return React.createElement(options.module.default, { data });
   }
-  const root = document.getElementById("root");
-  if (!root) throw new Error("frame root is missing");
-  const renderer = createRoot(root);
+  const renderer = createRoot(options.root);
   flushSync(() => renderer.render(React.createElement(Boundary, null, React.createElement(options.provider, { agent: options.agent, children: React.createElement(Mounted) }))));
   return { mounted, unmount: () => renderer.unmount() };
 }

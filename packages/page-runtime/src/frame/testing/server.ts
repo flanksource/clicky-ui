@@ -47,7 +47,7 @@ export default function Page({data}: {data: string}) {
   return <main data-facet-diagram data-facet-ready="false" data-one-react={React === one && one === two} data-hook={Boolean(window.__REACT_DEVTOOLS_GLOBAL_HOOK__)}><h1>{data}</h1><img src="/image.svg" /><svg data-facet-arrow data-facet-arrow-ready="false" /></main>;
 }`;
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" /></svg>';
-type Case = "ready" | "agent" | "review" | "resolve" | "fetch" | "compile" | "link" | "render" | "readiness";
+type Case = "ready" | "agent" | "review" | "resolve" | "fetch" | "compile" | "link" | "render" | "readiness" | "markdown-export";
 async function listen(server: Server): Promise<string> {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address(); if (!address || typeof address === "string") throw new Error("server has no port");
@@ -63,6 +63,8 @@ export async function startRuntimeTestServer(options: { local?: boolean } = {}) 
   const files = await runtimeFiles();
   files.set("@acme/library-one@1.0.0/index.js", 'import React from "react"; export const shared = React; export function StatCard() { return React.createElement("h2", {id:"library-heading",style:{padding:"32px",margin:"32px"}}, "Revenue"); }');
   files.set("@acme/library-two@1.0.0/index.js", 'import React from "react"; export const shared = React;');
+  // A library export plugin: drops paragraphs starting with `options.prefix`, the way facet-redact removes classified regions.
+  files.set("@acme/redact@1.0.0/remark.mjs", "export default function drop(options) { return (tree) => { tree.children = tree.children.filter((node) => !(node.type === \"paragraph\" && node.children?.[0]?.value?.startsWith(options.prefix))); }; }");
   const integrity = Object.fromEntries(await Promise.all([...files].map(async ([path, code]) => [path, await digest(new TextEncoder().encode(code))])));
   const lock: PageLock = { lock: 2, packageOrigin: "http://127.0.0.1", page: "report.tsx", versions: { react: "18.3.1", "@acme/library-one": "1.0.0", "@acme/library-two": "1.0.0" }, map: { imports: { react: `/npm/${runtime}react.js`, "react-dom/client": `/npm/${runtime}react-dom-client.js`, "react/jsx-runtime": `/npm/${runtime}jsx-runtime.js`, "react/jsx-dev-runtime": `/npm/${runtime}jsx-dev-runtime.js`, "@acme/library-one": "/npm/@acme/library-one@1.0.0/index.js", "@acme/library-two": "/npm/@acme/library-two@1.0.0/index.js" }, scopes: {} }, integrity, remaps: {}, barrels: { modules: [], barrels: {} } };
   lock.map.imports["@flanksource/clicky-ui/comments"] = `/npm/${runtime}comments.js`;
@@ -80,7 +82,7 @@ export async function startRuntimeTestServer(options: { local?: boolean } = {}) 
     if (url.pathname.startsWith("/registry")) { registryRequests++; res.statusCode = 500; res.end("registry must not be used"); return; }
     if (url.pathname === "/image.svg" || url.pathname === "/delayed.css") { await new Promise((resolve) => setTimeout(resolve, 180)); res.setHeader("content-type", url.pathname.endsWith("svg") ? "image/svg+xml" : "text/css"); res.end(url.pathname.endsWith("svg") ? SVG : "h1 { color: rgb(1, 2, 3); }"); return; }
     const file = url.pathname.startsWith("/frame/") ? "bootstrap.html" : url.pathname.slice(1);
-    if (!["bootstrap.html", "sw.js", "boot.js", "page-agent.js", "devtools-hook.js"].includes(file)) { res.statusCode = 404; res.end("missing"); return; }
+    if (!["bootstrap.html", "sw.js", "boot.js", "page-agent.js", "export-compiler.js", "devtools-hook.js"].includes(file)) { res.statusCode = 404; res.end("missing"); return; }
     res.setHeader("content-type", file.endsWith("html") ? "text/html" : "text/javascript"); res.end(await readFile(resolve(output, file)));
   })().catch((error: unknown) => { res.statusCode = 500; res.end(String(error)); }); });
   runtimeOrigin = await listen(server);
@@ -101,7 +103,13 @@ export async function startRuntimeTestServer(options: { local?: boolean } = {}) 
       if (name === "link") source = 'import x from "forbidden-package"; export default function Page() { return <main>{x}</main>; }';
       if (name === "render") source = 'export default function Page() { throw new Error("render failure"); }';
       if (name === "readiness") source = 'export const ready = new Promise(() => {}); export default function Page() { return <main>waiting</main>; }';
-      const open: Extract<HostMessage, { type: "open" }> = { type: "open", page: "report.tsx", lock: ownLock, manifest: { dependencies: {} }, files: { "report.tsx": source, "page.css": '@import url("/delayed.css"); main { display: block; }' } };
+      let open: Extract<HostMessage, { type: "open" }> = { type: "open", page: "report.tsx", lock: ownLock, manifest: { dependencies: {} }, files: { "report.tsx": source, "page.css": '@import url("/delayed.css"); main { display: block; }' } };
+      if (name === "markdown-export") {
+        ownLock.page = "report.md";
+        ownLock.map.imports["@acme/redact/remark"] = "/npm/@acme/redact@1.0.0/remark.mjs";
+        ownLock.compiler = { "@acme/redact": { remark: [{ module: "@acme/redact/remark", options: { prefix: "Internal" } }] } };
+        open = { type: "open", page: "report.md", lock: ownLock, manifest: { dependencies: {} }, files: { "report.md": "# Report\n\nPublic summary.\n\nInternal margin figures.\n" } };
+      }
       res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ origin: runtimeOrigin, open, name })); return;
     }
     res.setHeader("content-type", "text/html"); res.end('<!doctype html><html><head><title>RUNNING</title></head><body><script type="module" src="/host.js"></script></body></html>');

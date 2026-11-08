@@ -1,4 +1,5 @@
-import type { Fragment, ImportMap, PageLock, BarrelIndex } from "../schema.ts";
+import type { CompilerPlugins, Fragment, ImportMap, PageLock, BarrelIndex } from "../schema.ts";
+import { validateCompilerPlugins } from "./compiler-plugins.ts";
 
 export const BASE_PACKAGES = ["react", "react-dom", "scheduler", "@tanstack/react-query", "jotai"];
 export const packageName = (specifier: string): string => specifier.startsWith("@") ? specifier.split("/").slice(0, 2).join("/") : specifier.split("/")[0]!;
@@ -23,8 +24,8 @@ function assign(table: Record<string, string>, key: string, value: string, conte
   table[key] = value;
 }
 
-export function composeFragments(options: { fragments: Fragment[] }): Pick<PageLock, "map" | "integrity" | "remaps"> {
-  const map: ImportMap = { imports: {}, scopes: {} }; const integrity: Record<string, string> = {}; const remaps: Record<string, string> = {};
+export function composeFragments(options: { fragments: Fragment[] }): Pick<PageLock, "map" | "integrity" | "remaps" | "compiler"> {
+  const map: ImportMap = { imports: {}, scopes: {} }; const integrity: Record<string, string> = {}; const remaps: Record<string, string> = {}; const compiler: Record<string, CompilerPlugins> = {};
   const url = (s: string) => `/npm/${s}`;
   for (const fragment of options.fragments) {
     const owned = (s: string) => s === fragment.name || s.startsWith(`${fragment.name}/`);
@@ -50,9 +51,11 @@ export function composeFragments(options: { fragments: Fragment[] }): Pick<PageL
       assign(map.imports, url(from), url(to), fragment.name);
     }
     for (const [file, digest] of Object.entries(fragment.integrity)) assign(integrity, file, digest, fragment.name);
+    if (fragment.compiler !== undefined) compiler[fragment.name] = validateCompilerPlugins(fragment.compiler, { library: fragment.name, path: `${fragment.name} fragment compiler` });
   }
   for (const fragment of options.fragments) for (const specifier of fragment.inherits) if (!lookup(map.imports, specifier)) throw new Error(`${fragment.name}: inherited ${specifier} has no base-set mapping`);
-  return { map, integrity, remaps };
+  for (const [library, plugins] of Object.entries(compiler)) for (const plugin of plugins.remark) if (!lookup(map.imports, plugin.module)) throw new Error(`${library}: compiler plugin ${plugin.module} is not in its runtime fragment; rebuild the library runtime`);
+  return { map, integrity, remaps, ...(Object.keys(compiler).length ? { compiler } : {}) };
 }
 
 // Libraries that share a dependency version both index its barrels; identical indices coalesce, divergent ones fail.

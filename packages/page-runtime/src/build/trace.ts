@@ -41,6 +41,8 @@ export type FragmentSpec = {
   topLevel: string[];
   /** Packages left to other fragments' top-level entries. */
   inherits: string[];
+  /** Compiler plugins the library declares; each module is also one of `entries`. */
+  compiler?: import("../schema.ts").CompilerPlugins;
 };
 
 export const IMPORT_CONDITIONS = ["browser", "import", "module", "default"];

@@ -15,6 +15,7 @@ export function fragmentOf(tracer: ClosureTracer, aliases: Record<string, string
     aliases,
     inherits: [...tracer.inherited.keys()].sort(),
     integrity: sorted(Object.fromEntries([...tracer.files.values()].map((file) => [file.url, file.integrity]))),
+    ...(tracer.spec.compiler ? { compiler: tracer.spec.compiler } : {}),
   };
 }
 

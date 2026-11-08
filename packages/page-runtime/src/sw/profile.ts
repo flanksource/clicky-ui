@@ -55,7 +55,8 @@ export function validateProfile(value: unknown): RuntimeProfile {
   strings(network.allow, "network.allow");
   network.allow.forEach((v) => url(v.replaceAll("*", "x"), "network.allow"));
   const csp = record(p.csp, "csp");
-  keys(csp, ["add"], "csp");
+  keys(csp, ["add", "wasm"], "csp");
+  if (csp.wasm !== undefined && typeof csp.wasm !== "boolean") throw new Error("csp.wasm: expected boolean");
   for (const [directive, sources] of Object.entries(record(csp.add, "csp.add"))) {
     if (!/^[a-z]+(?:-[a-z]+)*$/.test(directive)) throw new Error(`csp.add: invalid directive ${directive}`);
     strings(sources, `csp.add.${directive}`);

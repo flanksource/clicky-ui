@@ -28,8 +28,12 @@ async function receive(message: FrameMessage) {
     if (message.state === "connecting" || (message.state === "booting" && !opened)) { opened = true; bridge.send(config.open); return; }
     if (message.state === "booting") { bridge.send({ type: "theme", theme: "dark", density: "compact" }); bridge.send({ type: "data", data: "Report" }); }
     if (message.state === "ready") {
-      const snapshot = await bridge.request({ type: "export", format: "html" });
-      result.textContent = JSON.stringify({ states, errors, elapsed: performance.now() - started, snapshot: snapshot.message }); document.title = "CASE-DONE";
+      // A rejected export is the case result; otherwise the host would wait for CASE-DONE until the test times out.
+      try {
+        const snapshot = await bridge.request({ type: "export", format: "html" });
+        result.textContent = JSON.stringify({ states, errors, elapsed: performance.now() - started, snapshot: snapshot.message });
+      } catch (error) { result.textContent = JSON.stringify({ states, errors, failure: String(error) }); }
+      document.title = "CASE-DONE";
     }
   }
   if (message.type === "error") {
@@ -53,4 +57,4 @@ if (config.name === "review") {
     document.body.append(button);
   }
 }
-frame.src = `${config.origin}/frame/report.tsx?case=${encodeURIComponent(config.name)}#${new URLSearchParams({ host: location.origin, session })}`;
+frame.src = `${config.origin}/frame/${config.open.page}?case=${encodeURIComponent(config.name)}#${new URLSearchParams({ host: location.origin, session })}`;

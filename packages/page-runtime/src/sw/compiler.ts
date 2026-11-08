@@ -13,7 +13,7 @@ import { sourceCandidates } from "./candidates.ts";
 import type { WorkerActivity } from "../activity-schema.ts";
 
 export type CompilerOptions = { path: string; code: string; lock: PageLock; sources: string[]; plugins: MdxPlugins; activity?: WorkerActivity };
-export const facetPlugins = (facetRedact: unknown): MdxPlugins => ({ remarkFrontmatter, remarkGfm, remarkAlert, rehypeRaw, facetRedact });
+export const BASE_PLUGINS: MdxPlugins = { remarkFrontmatter, remarkGfm, remarkAlert, rehypeRaw };
 export const moduleUrl = (url: string): string => {
   const parsed = new URL(url, "https://runtime.invalid");
   return `${parsed.pathname}${parsed.search}`;
