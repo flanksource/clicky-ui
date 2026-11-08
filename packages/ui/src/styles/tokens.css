@@ -40,7 +40,7 @@
  * compile time, finds nothing, and drops the token silently.
  *
  * The shadcn tokens (--background, --primary, …) are full-color aliases of
- * the Flanksource fs-tokens (see fs-tokens.css and the @layer below), so the
+ * the Flanksource clicky-tokens (see clicky-tokens.css and the @layer below), so the
  * utilities reference them directly with `var(--token)` (no `hsl()` wrapper).
  * Tailwind v4 still applies opacity modifiers (`bg-primary/10`) via color-mix.
  */
@@ -73,43 +73,43 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-ring: var(--sidebar-ring);
-  --font-sans: var(--fs-font-sans);
-  --font-mono: var(--fs-font-mono);
+  --font-sans: var(--clicky-font-sans);
+  --font-mono: var(--clicky-font-mono);
 }
 
 @layer clicky-tokens {
-  /* shadcn-style tokens aliased to the Flanksource fs-tokens. These are
-   * theme-independent here — fs-tokens.css redefines the referenced --fs-*
+  /* shadcn-style tokens aliased to the Flanksource clicky-tokens. These are
+   * theme-independent here — clicky-tokens.css redefines the referenced --clicky-*
    * variables under [data-theme="dark"], so light/dark flips automatically.
    * Token *names* are unchanged, so every bg-primary / text-foreground /
    * border-border utility keeps working. */
   :root,
   [data-theme] {
-    --background: var(--fs-bg-canvas);
-    --foreground: var(--fs-fg-1);
-    --card: var(--fs-bg-canvas);
-    --card-foreground: var(--fs-fg-1);
-    --popover: var(--fs-bg-canvas);
-    --popover-foreground: var(--fs-fg-1);
-    --primary: var(--fs-primary-blue);
-    --primary-foreground: var(--fs-fg-on-brand);
-    --secondary: var(--fs-bg-muted);
-    --secondary-foreground: var(--fs-fg-1);
-    --muted: var(--fs-bg-muted);
-    --muted-foreground: var(--fs-fg-muted);
+    --background: var(--clicky-bg-canvas);
+    --foreground: var(--clicky-fg-1);
+    --card: var(--clicky-bg-canvas);
+    --card-foreground: var(--clicky-fg-1);
+    --popover: var(--clicky-bg-canvas);
+    --popover-foreground: var(--clicky-fg-1);
+    --primary: var(--clicky-primary-blue);
+    --primary-foreground: var(--clicky-fg-on-brand);
+    --secondary: var(--clicky-bg-muted);
+    --secondary-foreground: var(--clicky-fg-1);
+    --muted: var(--clicky-bg-muted);
+    --muted-foreground: var(--clicky-fg-muted);
     /* Placeholders mean ABSENCE, so they cannot share --muted-foreground with
        helper text, which means content. At #666666 the two rendered 3.17:1
        apart and operators read placeholder examples as filled values. This is
-       the token fs-tokens.css already earmarks for placeholders. */
-    --placeholder: var(--fs-fg-subtle);
-    --accent: var(--fs-bg-muted);
-    --accent-foreground: var(--fs-fg-1);
-    --destructive: var(--fs-error);
-    --destructive-foreground: var(--fs-fg-on-brand);
-    --border: var(--fs-border-subtle);
-    --input: var(--fs-border-default);
-    --ring: var(--fs-primary-blue);
-    --radius: var(--fs-radius-lg);
+       the token clicky-tokens.css already earmarks for placeholders. */
+    --placeholder: var(--clicky-fg-subtle);
+    --accent: var(--clicky-bg-muted);
+    --accent-foreground: var(--clicky-fg-1);
+    --destructive: var(--clicky-error);
+    --destructive-foreground: var(--clicky-fg-on-brand);
+    --border: var(--clicky-border-subtle);
+    --input: var(--clicky-border-default);
+    --ring: var(--clicky-primary-blue);
+    --radius: var(--clicky-radius-lg);
 
     /* Sidebar: a medium navy surface (same in light & dark), used by the
      * AppShell nav rail. It is lighter than near-black so it reads as navy. */
@@ -120,7 +120,7 @@
     --sidebar-accent-foreground: #ffffff;
     --sidebar-primary: #7cb0ff;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-ring: var(--fs-primary-blue);
+    --sidebar-ring: var(--clicky-primary-blue);
   }
 
   :root,
@@ -177,8 +177,8 @@
     --baseSolidHover: var(--foreground);
     --baseText: var(--muted-foreground);
     --baseTextContrast: var(--foreground);
-    --font-body: var(--fs-font-sans);
-    --font-mono: var(--fs-font-mono);
+    --font-body: var(--clicky-font-sans);
+    --font-mono: var(--clicky-font-mono);
     background-color: var(--background);
     border: 1px solid var(--input);
     border-radius: var(--radius);
@@ -215,7 +215,7 @@
   }
 
   .clicky-mdx-editor-content :where(code, pre) {
-    font-family: var(--fs-font-mono);
+    font-family: var(--clicky-font-mono);
   }
 }
 

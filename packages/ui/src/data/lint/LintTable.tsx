@@ -9,6 +9,7 @@ import { LintSeverityIcon, ToolIcon } from "../test-runner/MarkIcons";
 import { ViolationCard, ViolationDetail, type HostActionProps } from "./LintDetail";
 import { flattenLint, type FlatViolation } from "./grouping";
 import { severityOf } from "./stats";
+import { violationLocationLabel } from "./locations";
 import { diagnosticKeys } from "../diagnostics/diagnostic-identity";
 import { matchesFilterState } from "../test-runner/filterState";
 import type { LintFilters, LintSeverity, LinterResult } from "./types";
@@ -33,7 +34,7 @@ function tableRows(results: readonly LinterResult[], filters: LintFilters): Lint
     severity: severityOf(flat.v),
     linter: flat.linter,
     rule: flat.v.rule?.method ?? "",
-    location: flat.file ? `${flat.file}${flat.v.line ? `:${flat.v.line}` : ""}` : "",
+    location: flat.file ? `${flat.file}${flat.v.line ? `:${flat.v.line}` : ""}` : violationLocationLabel(flat.v, true),
     message: flat.v.message ?? "",
     flat,
   })).filter(({ flat }) => matchesFilterState(flat.linter, filters.linter) && matchesFilterState(severityOf(flat.v), filters.severity));

@@ -49,6 +49,7 @@ export function TagsComboboxControl({
     <Combobox
       multiple
       variant="tags"
+      {...(field.nullable ? { clearable: true, clearLabel: `Clear ${field.label} to null`, onClear: () => field.onChange(null) } : {})}
       id={fieldId}
       // A choice list pins any committed value its options do not carry, so the
       // value stays visible and de-selectable in the menu (a lookup's head set is
@@ -62,6 +63,7 @@ export function TagsComboboxControl({
         field.onChange(next.map((v) => coerceScalarItem(v, itemType)))
       }
       disabled={readOnly}
+      {...(!readOnly ? { inputPlaceholder: defaultPlaceholder(field.schema) || (itemType === "integer" ? "Add integer…" : itemType === "number" ? "Add number…" : itemType === "string" ? "Add tag…" : "Choose values…") } : {})}
       size={size}
       // An enum (or a strict lookup) is a closed set: typed text matching no
       // option is discarded rather than committed. A free scalar list is the

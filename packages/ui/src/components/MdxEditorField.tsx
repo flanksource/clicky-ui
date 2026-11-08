@@ -3,6 +3,7 @@ import { cn } from "../lib/utils";
 import type { FormSize } from "./json-schema-form-size";
 import { inputClass } from "./json-schema-form-utils";
 import { Button } from "./button";
+import { ClearableFieldGroup } from "./clearable-field-group";
 import { createMdxEditorPlugins } from "./mdx-editor-field-plugins";
 import type { MdxEditorFieldProps } from "./mdx-editor-options";
 
@@ -73,6 +74,9 @@ export function MdxEditorField({
   textareaClassName,
   "aria-label": ariaLabel,
   commitInitialMarkdownNormalize = false,
+  clearable,
+  onClear,
+  clearLabel,
   ...pluginOptions
 }: MdxEditorFieldProps) {
   const [mdx, setMdx] = useState<MdxEditorModule | null>(null);
@@ -132,7 +136,7 @@ export function MdxEditorField({
       ariaLabel ??
       (currentError ? "Markdown source" : id ? undefined : "Markdown");
     return (
-      <div className="min-w-0">
+      <ClearableFieldGroup clearable={clearable === true && !readonly && value !== ""} {...(onClear ? { onClear } : {})} {...(clearLabel ? { clearLabel } : {})}>
         {currentError && (
           <div role="alert" className="mb-2 text-sm text-destructive">
             Markdown could not be loaded: {currentError.error}
@@ -161,12 +165,13 @@ export function MdxEditorField({
             Retry rich text
           </Button>
         )}
-      </div>
+      </ClearableFieldGroup>
     );
   }
 
   const { MDXEditor } = mdx;
   return (
+    <ClearableFieldGroup clearable={clearable === true && !readonly && value !== ""} {...(onClear ? { onClear } : {})} {...(clearLabel ? { clearLabel } : {})}>
     <div id={id} data-jsf-input className="min-w-0">
       <MDXEditor
         ref={editorRef}
@@ -180,5 +185,6 @@ export function MdxEditorField({
         onError={reportError}
       />
     </div>
+    </ClearableFieldGroup>
   );
 }

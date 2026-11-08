@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { ELEMENT_PREFIX, resolveElementAnchor } from "../../comments/anchoring/dom-anchor";
 import { measureAnchors, type AnchorMode, type Box } from "./geometry";
 
 const NARROW_WIDTH = 640;
@@ -78,7 +79,7 @@ export function useAnchorBoxes({
       mutations.disconnect();
       resizes.disconnect();
     };
-  }, [origin, markdown, anchors, mode, visible]);
+  }, [origin, markdown, anchors, mode, patchRanges, visible]);
   const currentBoxes = useMemo(() => {
     const current = new Set(anchors);
     return new Map([...boxes].filter(([anchor]) => current.has(anchor)));

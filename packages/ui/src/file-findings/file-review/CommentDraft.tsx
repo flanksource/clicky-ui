@@ -1,7 +1,7 @@
 import { Icon } from "../../data/Icon";
 import { cn } from "../../lib/utils";
 import { CommentDraftCard } from "../../comments/CommentDraftCard";
-import type { CommentCallbacks, CommentConfig } from "../../comments/comment-types";
+import type { CommentCallbacks, CommentConfig, CommentCreateAction } from "../../comments/comment-types";
 import { UiComment } from "../../icons";
 
 const PILL = { width: 104, height: 28 };
@@ -69,7 +69,14 @@ export function CommentDraft({
       style={style}
     >
       {expanded ? (
-        <CommentDraftCard label={label} config={config} anchor={anchor} onCreate={onCreate} onDiscard={onClose} />
+        <CommentDraftCard
+          label={label}
+          config={config}
+          anchor={anchor}
+          onCreate={onCreate}
+          onDiscard={onClose}
+          {...(createActions ? { createActions } : {})}
+        />
       ) : (
         <button
           type="button"

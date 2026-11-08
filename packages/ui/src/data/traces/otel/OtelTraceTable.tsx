@@ -15,6 +15,12 @@ export type OtelTraceTableProps = Pick<
   | "pagination"
   | "infinite"
   | "loading"
+  | "menuActions"
+  | "sort"
+  | "onSortChange"
+  | "manualSort"
+  | "cellFilters"
+  | "onCellFilterChange"
 > & {
   spans: readonly Span[];
   listing?: {
@@ -29,8 +35,6 @@ export type OtelTraceTableProps = Pick<
   traceHref: (id: string) => string;
   /** Places the open trace's title elsewhere (e.g. a breadcrumb in the app shell's top bar), replacing the inline "Back to traces" link. */
   renderTraceTitle?: (title: ReactNode) => ReactNode;
-  /** The listing response's Server-Timing metrics, shown as a badge in the listing's filter bar. */
-  serverTiming?: readonly ServerTimingMetric[];
 };
 
 export function OtelTraceTable({
@@ -41,6 +45,7 @@ export function OtelTraceTable({
   onSelectTrace,
   onSelectSpan,
   traceHref,
+  renderTraceTitle,
   ...tableProps
 }: OtelTraceTableProps) {
   const result = useMemo(() => {
@@ -53,21 +58,26 @@ export function OtelTraceTable({
   const selected = result.traces?.find(
     (trace) => trace.summary.traceId === selectedTraceId,
   );
+  // One row per trace, at its root span's position in the loaded rows: those
+  // arrive in the server's sort, which the listing must keep.
   const listingRows =
     listing &&
-    result.traces?.map((trace) => {
-      const ids = new Set(trace.spans.map((span) => span.spanId));
-      const root = trace.spans.find(
-        (span) => !span.parentId || !ids.has(span.parentId),
-      )!;
-      const source = listing?.rows.find((row) => {
-        const span = row._trace as Span | undefined;
-        return span?.traceId === root.traceId && span.spanId === root.spanId;
-      });
-      if (!source)
-        throw new Error(`Trace ${root.traceId} is missing its mapped root row`);
-      return { ...source, _traceId: trace.summary.traceId };
-    });
+    result.traces
+      ?.map((trace) => {
+        const ids = new Set(trace.spans.map((span) => span.spanId));
+        const root = trace.spans.find(
+          (span) => !span.parentId || !ids.has(span.parentId),
+        )!;
+        const position = listing.rows.findIndex((row) => {
+          const span = row._trace as Span | undefined;
+          return span?.traceId === root.traceId && span.spanId === root.spanId;
+        });
+        if (position < 0)
+          throw new Error(`Trace ${root.traceId} is missing its mapped root row`);
+        return { position, row: { ...listing.rows[position]!, _traceId: trace.summary.traceId } };
+      })
+      .sort((a, b) => a.position - b.position)
+      .map(({ row }) => row);
   return (
     <div className="min-h-0 min-w-0 space-y-3">
       <p className="text-sm text-muted-foreground">
@@ -77,13 +87,16 @@ export function OtelTraceTable({
         <p role="alert">Cannot render traces: {result.error}</p>
       ) : selectedTraceId ? (
         <>
-          <Button variant="link" onClick={() => onSelectTrace()}>
-            Back to traces
-          </Button>
+          {!renderTraceTitle && (
+            <Button variant="link" onClick={() => onSelectTrace()}>
+              Back to traces
+            </Button>
+          )}
           {selected ? (
             <OtelTraceDetail
               trace={selected}
               {...(selectedSpanId ? { selectedSpanId } : {})}
+              {...(renderTraceTitle ? { renderTitle: renderTraceTitle } : {})}
               onSelectSpan={onSelectSpan}
             />
           ) : (

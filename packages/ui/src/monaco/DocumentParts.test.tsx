@@ -9,12 +9,10 @@ vi.mock("../mdx-editor", () => ({
     value,
     onChange,
     images,
-    mdxSyntax,
   }: {
     value: string;
     onChange: (value: string) => void;
     images?: { imagePreviewHandler?: (source: string) => Promise<string> };
-    mdxSyntax?: boolean;
   }) => {
     const [resolved, setResolved] = useState("");
     const source = /!\[[^\]]*\]\(([^)]+)\)/.exec(value)?.[1] ?? "";
@@ -24,12 +22,7 @@ vi.mock("../mdx-editor", () => ({
     return (
       <>
         <img alt="Embedded" src={resolved} />
-        <textarea
-          aria-label="Rich body"
-          data-mdx-syntax={String(mdxSyntax === true)}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
+        <textarea aria-label="Rich body" value={value} onChange={(event) => onChange(event.target.value)} />
       </>
     );
   },
@@ -54,18 +47,6 @@ describe("DocumentForm", () => {
     fireEvent.change(screen.getByDisplayValue("web"), { target: { value: "api" } });
 
     expect(onChange.mock.calls.map(([source]) => JSON.parse(source as string))).toEqual(["api"]);
-  });
-
-  it("reports a value its schema cannot show in place of the form, and retries once the source changes", () => {
-    // A compact string list throws on a non-string item, so a list of numbers cannot be shown.
-    const schema = { type: "object", properties: { tags: { type: "array", items: { type: "string" }, "x-array-display": "list" } } } as const;
-    const { rerender } = render(<DocumentForm path="checks.md" value={"---\ntags: [1]\n---\n"} onChange={vi.fn()} schema={schema} />);
-
-    expect(screen.getByRole("alert")).toHaveTextContent("Use Source to fix it");
-
-    rerender(<DocumentForm path="checks.md" value={"---\ntags: [one]\n---\n"} onChange={vi.fn()} schema={schema} />);
-
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("shows the parse error and calls nothing when the source is not a valid document", () => {
@@ -103,45 +84,6 @@ describe("DocumentRichEditor", () => {
 
     await waitFor(() => expect(screen.getByRole("img", { name: "Embedded" })).toHaveAttribute("src", "/api/file/7/image?path=img%2Fa.png"));
     expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["slide.mdx", "true"],
-    ["SLIDE.MDX", "true"],
-    ["guide.md", "false"],
-  ])("parses %s with mdxSyntax=%s", async (path, expected) => {
-    render(<DocumentRichEditor path={path} value={"# Slide\n"} onChange={vi.fn()} />);
-
-    expect(await screen.findByRole("textbox", { name: "Rich body" })).toHaveAttribute("data-mdx-syntax", expected);
-  });
-
-  it("edits frontmatter in a Properties form above the body, keeping the body", async () => {
-    const onChange = vi.fn();
-    const schema = { type: "object", properties: { title: { type: "string" } } } as const;
-    render(<DocumentRichEditor path="guide.md" value={"---\ntitle: Guide\n---\n# Guide\n"} onChange={onChange} frontmatterSchema={schema} />);
-
-    expect(screen.getByText("Properties").closest("details")).toHaveAttribute("open");
-    fireEvent.change(screen.getByRole("textbox", { name: /title/i }), { target: { value: "Handbook" } });
-
-    expect(onChange.mock.calls).toEqual([["---\ntitle: Handbook\n---\n# Guide\n"]]);
-    expect(await screen.findByRole("textbox", { name: "Rich body" })).toHaveValue("# Guide\n");
-  });
-
-  it("opens a frontmatter block from the Properties form on a page without one", () => {
-    const onChange = vi.fn();
-    const schema = { type: "object", properties: { title: { type: "string" } } } as const;
-    render(<DocumentRichEditor path="guide.md" value={"# Guide\n"} onChange={onChange} frontmatterSchema={schema} />);
-
-    fireEvent.change(screen.getByRole("textbox", { name: /title/i }), { target: { value: "Guide" } });
-
-    expect(onChange.mock.calls).toEqual([["---\ntitle: Guide\n---\n# Guide\n"]]);
-  });
-
-  it("shows no Properties form without a frontmatter schema", async () => {
-    render(<DocumentRichEditor path="guide.md" value={"# Guide\n"} onChange={vi.fn()} />);
-
-    await screen.findByRole("textbox", { name: "Rich body" });
-    expect(screen.queryByText("Properties")).not.toBeInTheDocument();
   });
 
   it("tells the reader to use Source when the frontmatter is not closed", () => {

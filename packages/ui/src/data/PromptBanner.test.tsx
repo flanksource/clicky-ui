@@ -186,6 +186,28 @@ describe("PromptBanner", () => {
     expect(await screen.findByText("schema mismatch")).toBeInTheDocument();
     expect(screen.getAllByText("Approve production deploy").length).toBeGreaterThan(0);
   });
+
+  it("opens the answer dialog for a pending prompt on its own with autoOpen", async () => {
+    stubPromptStream([selectPrompt]);
+    render(<PromptBanner basePath="/api/todos" autoOpen />);
+    expect(await screen.findByRole("dialog")).toHaveTextContent(selectPrompt.title);
+  });
+
+  it("does not reopen a prompt whose auto-opened dialog was closed unanswered", async () => {
+    stubPromptStream([unsupportedPrompt]);
+    render(<PromptBanner basePath="/api/todos" autoOpen />);
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByRole("button", { name: "Answer" })).toBeInTheDocument();
+  });
+
+  it("leaves the dialog closed until asked without autoOpen", async () => {
+    stubPromptStream([unsupportedPrompt]);
+    render(<PromptBanner basePath="/api/todos" />);
+    expect(await screen.findByRole("button", { name: "Answer" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });
 
 function stubPromptStream(prompts: PromptSnapshot[]) {

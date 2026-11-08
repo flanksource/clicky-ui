@@ -39,13 +39,58 @@ export type Violation = {
   locations?: ViolationLocation[];
 };
 
+/**
+ * One place a violation applies (gavel models.ViolationLocation): a file
+ * (optionally at a git ref), an entity, a URL (optionally narrowed by one
+ * selector) or a region of an image. A location may carry several of them.
+ */
 export type ViolationLocation = {
-  file: string;
+  file?: string;
   line?: number;
   column?: number;
+  end_line?: number;
+  /** Git ref (branch, tag or SHA) `file` is read at. */
+  ref?: string;
+  entity?: ViolationEntity;
+  url?: ViolationUrlTarget;
+  image?: ViolationImageRegion;
   /** What is at this place, e.g. the statement a plan finding came from. */
   message?: string;
 };
+
+/** A domain entity, e.g. `{kind: "Policy", id: "<guid>"}`; the host decides where it links. */
+export type ViolationEntity = {
+  kind: string;
+  id: string;
+  name?: string;
+};
+
+/** A page, narrowed by at most one selector strategy (`role` may pair with `name`). */
+export type ViolationUrlTarget = {
+  url: string;
+  css?: string;
+  xpath?: string;
+  testId?: string;
+  role?: string;
+  /** The accessible name a `role` selector matches. */
+  name?: string;
+  text?: string;
+};
+
+/** A rectangle, in the image's own pixels, on a screenshot or artefact at `src`. */
+export type ViolationImageRegion = {
+  src: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/** Where an entity location links in the host, or undefined for a plain chip. */
+export type EntityHref = (entity: ViolationEntity) => string | undefined;
+
+/** What a file-less violation's group is keyed on: its first location's entity kind or URL host, else "Other". */
+export type LintTargetKind = "entity" | "url" | "other";
 
 export type LinterResult = {
   linter: string;
@@ -125,6 +170,8 @@ export type LintNodeKind =
   | "lint-file"
   | "lint-rule"
   | "lint-rule-group"
+  /** File-less violations sharing a target group (entity kind, URL host or "Other"). */
+  | "lint-target"
   /** A linter that failed to run: the leaf carries its error text. */
   | "linter-error";
 
@@ -148,8 +195,8 @@ export type LintNode = {
   ruleName?: string | undefined;
   linter?: LinterResult | undefined;
   violations?: Violation[] | undefined;
-  /** Violations that carry no file, shown on the node itself. */
-  noFileViolations?: Violation[] | undefined;
+  /** For a `lint-target` node: what its name is (an entity kind, a URL host, or "Other"). */
+  targetKind?: LintTargetKind | undefined;
   failed: boolean;
   passed: boolean;
   skipped: boolean;

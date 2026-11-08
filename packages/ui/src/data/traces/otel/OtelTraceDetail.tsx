@@ -5,7 +5,6 @@ import { StatStrip } from "../../StatStrip";
 import { Icon } from "../../Icon";
 import { Callout } from "../../Callout";
 import { Badge } from "../../Badge";
-import { CodeBlock } from "../../CodeBlock";
 import { Properties } from "../../Properties";
 /**
  * OpenTelemetry waterfall with grouped calls and an adjacent span inspector.
@@ -15,7 +14,6 @@ import {
   Button,
   CopyButton,
   SearchInput,
-  Section,
   SplitPane,
   Switch,
 } from "../../../components";
@@ -325,7 +323,7 @@ function WaterfallRow({ index, row, active, pct, onSelect, suspects, onToggleSpa
           {toggleButton(open, () => onToggleGroup(row.id), "database group")}
           <Tinted icon={UiDatabase} color={CATEGORY_COLOR.db} />
           <span className="truncate"><span className="font-medium">{row.spans.length} DB calls</span> <span className="text-muted-foreground">{ops.map(([op, n]) => `${op} ×${n}`).join(", ")}</span></span>
-          {suspectCount > 0 && <><Tinted icon={UiWarningTriangle} color="var(--fs-warning)" label={`${suspectCount} calls run inside a nested agent but are parented elsewhere`} /><span className="text-muted-foreground">{suspectCount}</span></>}
+          {suspectCount > 0 && <><Tinted icon={UiWarningTriangle} color="var(--clicky-warning)" label={`${suspectCount} calls run inside a nested agent but are parented elsewhere`} /><span className="text-muted-foreground">{suspectCount}</span></>}
         </div>
         <div className="relative mr-12 h-full">
           <span className="absolute rounded-sm" style={{ left: pct(first), width: pct(end - first), top: 11, height: 6, background: CATEGORY_COLOR.db, opacity: 0.18 }} />
@@ -353,7 +351,7 @@ function WaterfallRow({ index, row, active, pct, onSelect, suspects, onToggleSpa
         <span className={`truncate ${c === "db" ? "" : "font-medium"}`}>{label}</span>
         {typeof table === "string" && <span className="truncate text-muted-foreground">{table}</span>}
         {row.childCount > 0 && collapsed.has(span.spanId) && <span className="text-muted-foreground">+{row.childCount}</span>}
-        {suspects.has(span.spanId) && <Tinted icon={UiWarningTriangle} color="var(--fs-warning)" label="Runs inside a nested agent but is parented elsewhere" />}
+        {suspects.has(span.spanId) && <Tinted icon={UiWarningTriangle} color="var(--clicky-warning)" label="Runs inside a nested agent but is parented elsewhere" />}
         {error && <Badge size="sm" tone="danger" variant="soft">error</Badge>}
       </div>
       <div className="relative mr-12 h-full">
@@ -375,7 +373,6 @@ function SpanDetail({ index, span, host, onSelect }: { index: TraceIndex; span: 
   const c = category(span);
   const ancestors: Span[] = [];
   for (let p = span.parentId ? index.byId.get(span.parentId) : undefined; p; p = p.parentId ? index.byId.get(p.parentId) : undefined) ancestors.unshift(p);
-  const attributes = Object.entries(span.attributes ?? {});
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
@@ -409,14 +406,45 @@ function SpanDetail({ index, span, host, onSelect }: { index: TraceIndex; span: 
       {c === "agent" && <AgentCard index={index} span={span} />}
       {c === "llm" && <LlmCard span={span} />}
       {c === "db" && <DbCard span={span} />}
-      <Section title={`All attributes (${attributes.length})`} defaultOpen={c === "other"}>
-        <Properties renderLabel={key => <code className="text-xs">{key}</code>} items={attributes.map(([key, value]) => ({ key, value }))} />
-      </Section>
-      {span.otlp && <Section title="OpenTelemetry metadata" defaultOpen={false}><CodeBlock language="json" source={JSON.stringify(span.otlp, null, 2)} jsonDefaultOpenDepth={4} copyable /></Section>}
-      <Section title={`Resource (${Object.keys(span.resource ?? {}).length})`} defaultOpen={false}>
-        <Properties renderLabel={key => <code className="text-xs">{key}</code>} items={Object.entries(span.resource ?? {}).map(([key, value]) => ({ key, value }))} />
-      </Section>
+      <SpanProperties key={span.spanId} span={span} attributesOpen={c === "other"} />
     </div>
+  );
+}
+
+/** One properties table whose section rows (attributes, resource, OTLP metadata) expand in place. */
+function SpanProperties({ span, attributesOpen }: { span: Span; attributesOpen: boolean }) {
+  const [open, setOpen] = useState(() => new Set(attributesOpen ? ["Attributes"] : []));
+  const sections = [
+    { title: "Attributes", values: span.attributes ?? {} },
+    { title: "Resource", values: span.resource ?? {} },
+    ...(span.otlp ? [{ title: "OpenTelemetry metadata", values: span.otlp }] : []),
+  ];
+  const toggle = (title: string) => setOpen(previous => {
+    const next = new Set(previous);
+    if (!next.delete(title)) next.add(title);
+    return next;
+  });
+  return (
+    <Properties
+      keyRef="otel-span"
+      items={sections.map(({ title, values }) => {
+        const entries = Object.entries(values);
+        return {
+          key: title,
+          value: `${entries.length} ${entries.length === 1 ? "key" : "keys"}`,
+          expandable: entries.length > 0,
+          expanded: open.has(title),
+          renderChildren: () => <Properties renderLabel={key => <code className="text-xs">{key}</code>} items={entries.map(([key, value]) => ({ key, value }))} />,
+        };
+      })}
+      renderLabel={(title, _value, item) => (
+        <button type="button" aria-expanded={item.expandable ? open.has(title) : undefined} disabled={!item.expandable} className="flex min-w-0 items-center gap-1 font-medium text-foreground disabled:text-muted-foreground" onClick={() => toggle(title)}>
+          <Icon icon={open.has(title) && item.expandable ? UiChevronDown : UiChevronRight} className="shrink-0 text-muted-foreground" />
+          <span className="truncate">{title}</span>
+        </button>
+      )}
+      renderValue={(_title, value) => <span className="text-xs text-muted-foreground">{value}</span>}
+    />
   );
 }
 

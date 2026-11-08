@@ -70,7 +70,7 @@ describe("nested property maps", () => {
       expect(screen.getByRole("term", { name: "owner" })).not.toContainElement(
         save,
       );
-      expect(save).toHaveClass("text-[var(--fs-success)]");
+      expect(save).toHaveClass("text-[var(--clicky-success)]");
       expect(cancel).toHaveClass("text-destructive");
       fireEvent.click(cancel);
       expect(onChange).not.toHaveBeenCalled();

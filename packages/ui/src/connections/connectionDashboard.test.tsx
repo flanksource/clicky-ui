@@ -29,7 +29,11 @@ function connection(
 }
 
 const renderConnectionLink: ConnectionLinkRenderer = (item, link) => (
-  <a href={`/connection/${item.id}`} className={link.className} title={link.title}>
+  <a
+    href={`/connection/${item.id}`}
+    className={link.className}
+    title={link.title}
+  >
     {link.children}
   </a>
 );
@@ -51,7 +55,9 @@ describe("connection dashboard urls", () => {
   });
 
   it("posts health checks under the api base", () => {
-    expect(connectionHealthUrl("/query/api/v1/")).toBe("/query/api/v1/connections/health");
+    expect(connectionHealthUrl("/query/api/v1/")).toBe(
+      "/query/api/v1/connections/health",
+    );
   });
 });
 
@@ -65,7 +71,10 @@ describe("connection dashboard lanes", () => {
     ]);
 
     expect(lanes.map((lane) => lane.namespace)).toEqual(["alpha", "beta", ""]);
-    expect(lanes[0]?.connections.map((item) => item.name)).toEqual(["alpha", "zeta"]);
+    expect(lanes[0]?.connections.map((item) => item.name)).toEqual([
+      "alpha",
+      "zeta",
+    ]);
   });
 
   it("offers a check control per row and claims no verdict before one is run", () => {
@@ -80,6 +89,16 @@ describe("connection dashboard lanes", () => {
     expect(html).toContain("0/1 checked");
     expect(html).not.toContain("failing");
     expect(html).toContain("not checked");
+  });
+
+  it("shows the storage layer beside a connection", () => {
+    const html = renderToStaticMarkup(
+      <ConnectionDashboardLanes
+        connections={[connection({ layer: "global" })]}
+        renderConnectionLink={renderConnectionLink}
+      />,
+    );
+    expect(html).toContain("Global files");
   });
 
   it("renders lane health, risks, usage, and a detail link once checked", () => {

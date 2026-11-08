@@ -1,8 +1,10 @@
 import { useMemo } from "react";
+import { Button } from "../../components/button";
 import { LogViewer } from "../LogViewer";
 import { parseStackDump } from "../diagnostics/stacktrace";
 import { StackDumpView } from "../diagnostics/StackDumpView";
 import { Expectation } from "./Expectation";
+import { useSelectDetailTab } from "./detailTabContext";
 import type { FailureDetail, Test } from "./types";
 
 /** A failure stack: a Go panic dump as goroutine cards, anything else as a log. */
@@ -46,30 +48,26 @@ export function TestFailureDetail({ failure }: { failure: FailureDetail }) {
   );
 }
 
-// A quarter of the detail pane, which TestDetailPanel makes a size container.
-const OUTPUT_MAX_HEIGHT = "25cqh";
-
-/** stdout / stderr as terminal blocks, each scrolling within a quarter of the detail pane. */
-export function TestOutput({ node }: { node: Test }) {
+/** Combined output, with a ten-line preview linking to the panel's Stdout tab. */
+export function TestOutput({ node, view = "preview" }: { node: Test; view?: "preview" | "full" }) {
+  const selectTab = useSelectDetailTab();
   if (!node.stdout && !node.stderr) return null;
+  const output = [node.stdout, node.stderr].flatMap((stream) => stream ? [stream.replace(/\r?\n$/, "")] : []).join("\n");
+  const lines = output.split(/\r?\n/);
+  const preview = view === "preview";
   return (
-    <div className="space-y-3">
-      {node.stdout && (
-        <div className="space-y-1">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">stdout</div>
-          <LogViewer logs={node.stdout} variant="terminal" maxHeight={OUTPUT_MAX_HEIGHT} />
-        </div>
-      )}
-      {node.stderr && (
-        <div className="space-y-1">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">stderr</div>
-          <LogViewer
-            logs={node.stderr}
-            variant="terminal"
-            maxHeight={OUTPUT_MAX_HEIGHT}
-            borderClass="border-red-500/70"
-          />
-        </div>
+    <div className="space-y-1">
+      {preview && <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Output</div>}
+      <LogViewer
+        logs={preview ? lines.slice(0, 10).join("\n") : output}
+        variant="terminal"
+        maxHeight="none"
+        collapsedLines={lines.length}
+      />
+      {preview && lines.length > 10 && selectTab && (
+        <Button type="button" variant="link" size="sm" className="px-0" onClick={() => selectTab("stdout")}>
+          Show more in Stdout
+        </Button>
       )}
     </div>
   );

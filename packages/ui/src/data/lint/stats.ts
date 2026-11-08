@@ -83,15 +83,12 @@ export function linterToolName(node: Pick<LintNode, "linterName" | "nestedUnder"
   return node.nestedUnder && node.linterName ? node.linterName.slice(node.nestedUnder.length + 1) : node.linterName;
 }
 
-type CountableNode = Pick<LintNode, "violations" | "noFileViolations"> & { children?: CountableNode[] | undefined };
+type CountableNode = Pick<LintNode, "violations"> & { children?: CountableNode[] | undefined };
 
 /** Violations at or beneath a node; error leaves count as zero (they are not findings). */
 export function lintNodeCount(node: CountableNode): number {
   if (node.violations) return node.violations.length;
-  return (
-    (node.noFileViolations?.length ?? 0) +
-    (node.children ?? []).reduce((n, child) => n + lintNodeCount(child), 0)
-  );
+  return (node.children ?? []).reduce((n, child) => n + lintNodeCount(child), 0);
 }
 
 /** The worst severity at or beneath a node. A linter-error leaf is an error. */
@@ -102,7 +99,6 @@ export function lintNodeSeverity(node: LintNode): LintSeverity {
     if (SEVERITY_RANK[sev] > SEVERITY_RANK[worst]) worst = sev;
   };
   if (node.violations) consider(worstSeverity(node.violations));
-  if (node.noFileViolations) consider(worstSeverity(node.noFileViolations));
   for (const child of node.children ?? []) consider(lintNodeSeverity(child));
   return worst;
 }

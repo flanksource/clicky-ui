@@ -71,6 +71,42 @@ export const NoBackendActivity: Story = {
   },
 };
 
+/** A client-side load reported in the same shape: `title` renames the card, and phases are work summed over requests. */
+export const PageLoad: Story = {
+  args: {
+    title: "Page load",
+    metrics: [
+      { name: "total", duration: 963, counters: {} },
+      { name: "fetch", duration: 412.6, counters: { requests: 5 } },
+      { name: "integrity", duration: 3.1, counters: { files: 5 } },
+      { name: "compile", duration: 295.4, counters: { modules: 4 } },
+      { name: "rewrite", duration: 61.8, counters: { modules: 9 } },
+      { name: "tailwind", duration: 48.2, counters: { builds: 1 } },
+    ],
+  },
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole("button", { name: "Show page load" });
+    await userEvent.hover(trigger);
+    await expect(within(document.body).getByText("4 modules")).toBeVisible();
+  },
+};
+
+/** `footer` adds content under the breakdown, such as a link to the full build log. */
+export const WithFooter: Story = {
+  args: {
+    title: "Page load",
+    metrics: [
+      { name: "total", duration: 963, counters: {} },
+      { name: "compile", duration: 295.4, counters: { modules: 4 } },
+    ],
+    footer: <button type="button" className="text-xs text-primary underline">Build log…</button>,
+  },
+  play: async ({ canvasElement }) => {
+    await userEvent.hover(within(canvasElement).getByRole("button", { name: "Show page load" }));
+    await expect(within(document.body).getByRole("button", { name: "Build log…" })).toBeVisible();
+  },
+};
+
 export const MultiSecond: Story = {
   args: {
     metrics: [

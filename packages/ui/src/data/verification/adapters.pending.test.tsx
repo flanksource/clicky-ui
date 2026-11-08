@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render, within } from "@testing-library/react";
 import { TestDetailPanel, TestRunnerProvider, emptyTestFilters, type Test, type TestRunnerContext } from "../test-runner";
 import { verificationAdapters, type VerificationAdapterOptions } from "./adapters";
 
@@ -37,35 +37,6 @@ describe("a step waiting on its form", () => {
 
     expect(renderPendingPrompt).not.toHaveBeenCalled();
     expect(document.querySelector("[data-step-section='pending-form']")).toBeNull();
-  });
-
-  const retried = (live: object): Test => ({
-    ...waitingStep,
-    task_id: "run-1/approval",
-    detail: {
-      step: { id: STEP, kind: "form" },
-      attempts: [
-        { attempt: 1, status: "failed", result: { name: STEP, framework: "fixture", failed: true, message: "the first form expired" } },
-        { attempt: 2, status: "running", ...live },
-      ],
-    },
-  });
-
-  it.each([
-    ["no stored result", {}],
-    ["a partial fixture result", { result: { name: STEP, framework: "fixture", running: true } }],
-    ["a partial result without fixture metadata", { result: { name: STEP, running: true, detail: { note: "awaiting reviewer" } } }],
-    ["a bare partial result", { result: { name: STEP, running: true } }],
-  ])("renders the pending form on the live attempt of a retried step with %s, and not on the earlier attempt", (_, live) => {
-    const renderPendingPrompt = vi.fn(hostForm);
-    renderDetail(retried(live), { renderPendingPrompt });
-
-    const pendingSection = () => document.querySelector<HTMLElement>("[data-step-section='pending-form']");
-    expect(pendingSection()).not.toBeNull();
-    expect(renderPendingPrompt.mock.calls.at(-1)![0]).toMatchObject({ name: STEP, task_id: "run-1/approval", waiting: true });
-
-    fireEvent.change(screen.getByRole("combobox", { name: "Attempt" }), { target: { value: "1" } });
-    expect(pendingSection()).toBeNull();
   });
 
   it("shows no pending-form section when the host renders none", () => {

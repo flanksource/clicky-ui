@@ -16,7 +16,11 @@ const schema: JsonSchemaObject = {
   },
 };
 
-function Harness({ onChange }: { onChange: (value: Record<string, unknown>) => void }) {
+function Harness({
+  onChange,
+}: {
+  onChange: (value: Record<string, unknown>) => void;
+}) {
   const [value, setValue] = useState<Record<string, unknown>>({
     writableRoots: ["/workspace", "/cache"],
   });
@@ -34,15 +38,20 @@ function Harness({ onChange }: { onChange: (value: Record<string, unknown>) => v
 }
 
 describe("JsonSchemaForm compact scalar lists", () => {
-  it("renders each configured value as a compact list item", () => {
+  it("renders list values as numbered array rows with reorder and remove actions", () => {
     render(<Harness onChange={vi.fn()} />);
 
-    const list = screen.getByRole("list", { name: "Writable roots" });
-    expect(within(list).getAllByRole("listitem")).toHaveLength(3);
-    expect(screen.getByRole("textbox", { name: "Writable roots 1" })).toHaveValue(
+    const list = screen.getByRole("group", { name: "Writable roots" });
+    expect(
+      within(list).getByRole("button", { name: "Move item 1 up" }),
+    ).toBeDisabled();
+    expect(
+      within(list).getByRole("button", { name: "Move item 2 down" }),
+    ).toBeDisabled();
+    expect(within(list).getByRole("textbox", { name: "Item 1" })).toHaveValue(
       "/workspace",
     );
-    expect(screen.getByRole("textbox", { name: "Writable roots 2" })).toHaveValue(
+    expect(within(list).getByRole("textbox", { name: "Item 2" })).toHaveValue(
       "/cache",
     );
   });
@@ -51,19 +60,75 @@ describe("JsonSchemaForm compact scalar lists", () => {
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Writable roots 1" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Item 1" }), {
       target: { value: "/repo" },
     });
-    expect(onChange).toHaveBeenLastCalledWith({ writableRoots: ["/repo", "/cache"] });
+    expect(onChange).toHaveBeenLastCalledWith({
+      writableRoots: ["/repo", "/cache"],
+    });
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove /cache" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove item 2" }));
     expect(onChange).toHaveBeenLastCalledWith({ writableRoots: ["/repo"] });
 
-    const add = screen.getByRole("textbox", { name: "Add Writable roots" });
+    fireEvent.click(screen.getByRole("button", { name: "Add item" }));
+    expect(onChange).toHaveBeenLastCalledWith({ writableRoots: ["/repo", ""] });
+    const add = screen.getByRole("textbox", { name: "Item 2" });
     fireEvent.change(add, { target: { value: "/artifacts" } });
-    fireEvent.keyDown(add, { key: "Enter" });
     expect(onChange).toHaveBeenLastCalledWith({
       writableRoots: ["/repo", "/artifacts"],
     });
+  });
+
+  it("reorders list values with the same item actions as boolean arrays", () => {
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "Move item 1 down" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      writableRoots: ["/cache", "/workspace"],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Move item 2 up" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      writableRoots: ["/workspace", "/cache"],
+    });
+  });
+
+  it("hides edit actions for read-only lists", () => {
+    render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{ writableRoots: ["/workspace"] }}
+        readOnly
+        showPreferencesMenu={false}
+      />,
+    );
+    expect(screen.getByRole("textbox", { name: "Item 1" })).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: /Add item|Move item|Remove item/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("honors array item limits in the shared list renderer", () => {
+    render(
+      <JsonSchemaForm
+        schema={{
+          properties: {
+            writableRoots: {
+              ...schema.properties!.writableRoots!,
+              minItems: 2,
+              maxItems: 2,
+            },
+          },
+        }}
+        value={{ writableRoots: ["/workspace", "/cache"] }}
+        onChange={vi.fn()}
+        showPreferencesMenu={false}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: /Add item|Remove item/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Move item 1 down" }),
+    ).toBeEnabled();
   });
 });

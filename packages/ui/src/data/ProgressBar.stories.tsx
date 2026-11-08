@@ -45,12 +45,12 @@ export const JvmHeap: Story = {
     total: 2048 * 1024 ** 2,
     formatValue: formatBytes,
     segments: [
-      { label: "Eden", count: 220 * 1024 ** 2, color: "var(--fs-info-500)" },
-      { label: "Survivor", count: 44 * 1024 ** 2, color: "var(--fs-hint-500)" },
+      { label: "Eden", count: 220 * 1024 ** 2, color: "var(--clicky-info-500)" },
+      { label: "Survivor", count: 44 * 1024 ** 2, color: "var(--clicky-hint-500)" },
       {
         label: "Old Gen",
         count: 576 * 1024 ** 2,
-        color: "var(--fs-prereq-500)",
+        color: "var(--clicky-prereq-500)",
       },
     ],
   },

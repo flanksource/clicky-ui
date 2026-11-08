@@ -107,6 +107,8 @@ export type PreExtension = (
 // optional third arg carries `rootValue` (the form's top-level value) so a
 // replacement widget can read sibling fields without global state.
 export interface PostExtensionContext {
+  /** Input id shared with the field label, for replacement controls. */
+  fieldId?: string;
   rootValue?: Record<string, unknown>;
   onRootChange?: (next: Record<string, unknown>) => void;
   /**
@@ -165,6 +167,8 @@ export interface RenderApi {
 // pre/post extension stacks (so they apply at EVERY depth, not just the top
 // level), and the current depth (for keys/labels).
 export interface RenderContext extends FormErrorContext {
+  showTypeIcons?: boolean;
+  objectDisplay?: "flat" | "accordion";
   readOnly: boolean;
   // This subtree is a view: set by the form-level `readOnly` prop and by any
   // readOnly field (a read-only object, array or map) for its descendants.
@@ -242,6 +246,10 @@ export interface FormLayout {
   help?: HelpDisplay;
 }
 export interface JsonSchemaFormProps extends FormErrorProps {
+  /** Infer label icons from standard schema types and formats. Explicit icons win. */
+  showTypeIcons?: boolean;
+  /** Presentation of nested objects; the document root remains open. */
+  objectDisplay?: "flat" | "accordion";
   schema: JsonSchemaObject;
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;

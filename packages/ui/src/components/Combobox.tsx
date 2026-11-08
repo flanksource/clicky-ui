@@ -42,6 +42,7 @@ export function Combobox(props: ComboboxProps) {
   const {
     options,
     placeholder,
+    inputPlaceholder,
     label,
     ariaLabel: ariaLabelProp,
     disabled,
@@ -99,6 +100,11 @@ export function Combobox(props: ComboboxProps) {
     ...(props.menuWidth !== undefined ? { menuWidth: props.menuWidth } : {}),
   });
   const [query, setQuery] = useState("");
+  const previousValue = useRef(props.value);
+  useEffect(() => {
+    if (props.onInputValueChange && props.multiple !== true && previousValue.current !== props.value && open) setQuery(props.value);
+    previousValue.current = props.value;
+  }, [props.value, props.multiple, props.onInputValueChange, open]);
   const [highlighted, setHighlighted] = useState(-1);
   const labelWidth = useComboboxLabelWidth(label, labelRef);
 
@@ -374,7 +380,8 @@ export function Combobox(props: ComboboxProps) {
 
   function clear() {
     if (selectedValues.length > 0) {
-      if (tristate) emitModes({});
+      if (props.onClear) props.onClear();
+      else if (tristate) emitModes({});
       else emit([]);
     }
     setQuery("");
@@ -469,7 +476,9 @@ export function Combobox(props: ComboboxProps) {
   const ariaLabel =
     ariaLabelProp ?? (typeof label === "string" ? label : undefined);
   const showClear =
-    !required && !loading && !disabled && selectedValues.length > 0;
+    (props.clearable ?? !required) && !loading && !disabled && selectedValues.length > 0;
+  const showToggle = !tags || options.length > 0 || Boolean(onSearch) || Boolean(loading);
+  const menuOpen = open && (showToggle || customEntry !== null);
 
   return (
     <div ref={rootRef} className={cn("relative", className)}>
@@ -489,10 +498,13 @@ export function Combobox(props: ComboboxProps) {
           }
           className={props.triggerClassName}
           disabled={disabled}
-          open={open}
+          open={menuOpen}
           listId={listId}
           ariaLabel={ariaLabel}
           title={props.title}
+          clearable={showClear}
+          onClear={clear}
+          clearLabel={props.clearLabel ?? "Clear"}
           onToggle={() => (open ? commitAndClose() : openMenu())}
         />
       ) : (
@@ -505,7 +517,7 @@ export function Combobox(props: ComboboxProps) {
           disabled={disabled}
           displayValue={displayValue}
           effectivePrefix={effectivePrefix}
-          highlighted={highlighted}
+          highlighted={menuOpen ? highlighted : -1}
           id={id}
           inputRef={inputRef}
           invalid={invalid}
@@ -515,8 +527,10 @@ export function Combobox(props: ComboboxProps) {
           listId={listId}
           loading={loading}
           onClear={clear}
+          {...(props.clearLabel ? { clearLabel: props.clearLabel } : {})}
           onInput={(value) => {
             setQuery(value);
+            props.onInputValueChange?.(value);
             if (!open) setOpen(true);
           }}
           onKeyDown={onKeyDown}
@@ -531,9 +545,11 @@ export function Combobox(props: ComboboxProps) {
               inputRef.current?.focus();
             }
           }}
-          open={open}
+          open={menuOpen}
           options={options}
           placeholder={placeholder}
+          inputPlaceholder={inputPlaceholder}
+          showToggle={showToggle}
           showClear={showClear}
           size={size}
           suffix={suffix}
@@ -543,7 +559,7 @@ export function Combobox(props: ComboboxProps) {
           tags={tags}
         />
       )}
-      {open && menuPos && typeof document !== "undefined" && (
+      {menuOpen && menuPos && typeof document !== "undefined" && (
         <ComboboxMenu
           customEntry={customEntry}
           filtered={filtered}
@@ -561,7 +577,7 @@ export function Combobox(props: ComboboxProps) {
                     ariaLabel={ariaLabel}
                     listId={listId}
                     highlighted={highlighted}
-                    onChange={setQuery}
+                    onChange={value => { setQuery(value); props.onInputValueChange?.(value); }}
                     onKeyDown={onKeyDown}
                   />
                 ) : null}

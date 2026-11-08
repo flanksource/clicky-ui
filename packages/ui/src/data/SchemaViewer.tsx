@@ -1,16 +1,30 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { SegmentedControl } from "../components/SegmentedControl";
+import { UiListTree, UiTable } from "../icons";
 import { rehydrateRefs } from "../components/json-schema-form-refs";
 import type { JsonSchemaObject } from "../components/json-schema-form-types";
 import { cn } from "../lib/utils";
 import { CodeBlock } from "./CodeBlock";
 import { Tree } from "./Tree";
+import { SchemaTypeIcon } from "./SchemaTypeIcon";
+import { SchemaViewerTable } from "./SchemaViewerTable";
+import { groupedSchemaRoots, selectSchemaSections, type SchemaViewerSection } from "./schema-viewer-sections";
 import {
   buildSchemaTree,
   type SchemaViewerFieldMeta,
   type SchemaViewerNode,
 } from "./schema-viewer-model";
 
+export type { SchemaViewerSection } from "./schema-viewer-sections";
+export type SchemaViewerView = "tree" | "table";
+
 export interface SchemaViewerProps {
+  /** Ordered sections selecting root fields. Unselected fields follow as Other fields. */
+  sections?: readonly SchemaViewerSection[];
+  view?: SchemaViewerView;
+  defaultView?: SchemaViewerView;
+  onViewChange?: (view: SchemaViewerView) => void;
+  showViewToggle?: boolean;
   schema: JsonSchemaObject;
   /** Pre-scoped tree roots, for dialogs that want to show a single schema branch. */
   roots?: SchemaViewerNode[];
@@ -41,25 +55,41 @@ export function SchemaViewer({
   toolbarClassName,
   defaultOpenDepth = 1,
   renderDetail,
+  sections,
+  view: controlledView,
+  defaultView = "tree",
+  onViewChange,
+  showViewToggle = true,
 }: SchemaViewerProps) {
+  const [localView, setLocalView] = useState(defaultView);
+  const [query, setQuery] = useState("");
+  const view = controlledView ?? localView;
+  if (controlledView !== undefined && !onViewChange) throw new Error("Controlled SchemaViewer view requires onViewChange");
   const roots = useMemo(
     () => scopedRoots ?? buildTree(rehydrateRefs(schema)),
     [buildTree, scopedRoots, schema],
   );
+  const groups = useMemo(() => selectSchemaSections(roots, sections), [roots, sections]);
+  const groupedRoots = useMemo(() => groupedSchemaRoots(groups), [groups]);
+  const detailPanel = renderDetail ?? ((meta: SchemaViewerFieldMeta) => <SchemaFieldMetaPanel meta={meta} />);
+  const selector = showViewToggle ? <SegmentedControl<SchemaViewerView> aria-label="Schema view" size="sm" value={view} onChange={(next) => {
+        if (controlledView === undefined) setLocalView(next);
+        onViewChange?.(next);
+      }} options={[{ id: "tree", label: "Tree", icon: UiListTree }, { id: "table", label: "Table", icon: UiTable }]} /> : null;
 
-  return (
+  return <div className={cn("min-w-0 text-sm", className)}>
+    {view === "table" ? <SchemaViewerTable groups={groups} renderDetail={detailPanel} showControls={showControls !== false} actions={selector} query={query} onQueryChange={setQuery} /> :
     <Tree<SchemaViewerNode>
-      className={cn("text-sm", className)}
-      roots={roots}
+      roots={groupedRoots}
       getKey={(node) => node.key}
       getChildren={(node) => node.children}
       isSecondary={(node) => Boolean(node.detail)}
       getSearchText={(node) =>
         node.detail ? "" : `${node.label} ${node.badge ?? ""} ${node.platformType ?? ""} ${node.ascode ?? ""}`
       }
-      defaultOpen={(node, depth) => depth < defaultOpenDepth && !isDetailOnly(node)}
+      defaultOpen={(node, depth) => depth < defaultOpenDepth + (sections ? 1 : 0) && !isDetailOnly(node)}
       rowClass={(node, selected) =>
-        node.detail
+        node.detail || !node.children?.length
           ? "cursor-default"
           : selected
             ? "bg-primary/10 border-l-2 border-primary"
@@ -68,50 +98,32 @@ export function SchemaViewer({
       renderRow={({ node }) =>
         node.detail ? (
           <div className="min-w-0 flex-1">
-            {renderDetail ? renderDetail(node.detail) : <SchemaFieldMetaPanel meta={node.detail} />}
+            {detailPanel(node.detail)}
           </div>
         ) : (
           <SchemaViewerRow node={node} />
         )
       }
       empty={empty}
-      {...(showControls !== undefined ? { showControls } : {})}
-      {...(toolbarClassName !== undefined ? { toolbarClassName } : {})}
-    />
-  );
+      showControls={showControls !== false && groupedRoots.some((node) => (node.children?.length ?? 0) > 0)}
+      showSearch={showControls !== false}
+      searchLabel="Filter schema fields"
+      searchQuery={query}
+      onSearchQueryChange={setQuery}
+      actions={selector}
+      toolbarClassName={cn("schema-viewer-toolbar", toolbarClassName)}
+    />}
+  </div>;
 }
 
-const BADGE_TONE: Record<string, string> = {
-  branch: "bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-200",
-  group: "bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-200",
-  activity: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200",
-  clientType: "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-200",
-  clientTypes: "bg-sky-100 text-sky-700 dark:bg-sky-950/50 dark:text-sky-200",
-  fields: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-200",
-  object: "bg-muted text-muted-foreground",
-  array: "bg-muted text-muted-foreground",
-  string: "bg-muted text-muted-foreground",
-  number: "bg-muted text-muted-foreground",
-  integer: "bg-muted text-muted-foreground",
-  boolean: "bg-muted text-muted-foreground",
-  const: "bg-muted text-muted-foreground",
-};
-
 export function SchemaViewerRow({ node }: { node: SchemaViewerNode }) {
-  const tone = node.badge ? BADGE_TONE[node.badge] : undefined;
   return (
     <span className="flex w-full min-w-0 items-center gap-2">
-      <span className="shrink-0 whitespace-nowrap font-mono">{node.label}</span>
-      {node.badge && (
-        <span
-          className={cn(
-            "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium",
-            tone ?? "bg-muted text-muted-foreground",
-          )}
-        >
-          {node.badge}
-        </span>
-      )}
+      <span data-schema-key={node.key} {...(node.section ? { "data-schema-section": node.key } : {})} className={cn("shrink-0 whitespace-nowrap font-mono", node.section && "font-semibold")}>{node.label}</span>
+      {node.badge && <SchemaTypeIcon type={node.badge} />}
+      {(node.meta?.constValue !== undefined || node.meta?.defaultValue !== undefined) && <code className="shrink-0 text-xs text-muted-foreground">
+        {node.meta.constValue ?? `default: ${node.meta.defaultValue}`}
+      </code>}
       {node.count !== undefined && (
         <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
           {node.count}
@@ -128,7 +140,7 @@ export function SchemaViewerRow({ node }: { node: SchemaViewerNode }) {
         </span>
       )}
       {node.description && (
-        <span className="min-w-0 truncate text-xs text-muted-foreground">{node.description}</span>
+        <span title={node.description} className="min-w-0 truncate text-xs text-muted-foreground">{node.description}</span>
       )}
     </span>
   );

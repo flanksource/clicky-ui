@@ -6,7 +6,7 @@ import { emptyLintFilters, type LintAction, type LintFilters, type LintGrouping,
 import { allLintResults, betterleaks, eslint, golangci, pyrightFailed } from "./LintResults.fixtures";
 
 type HarnessProps = Partial<
-  Pick<LintResultsProps, "onIgnore" | "ignoreBusy" | "title" | "headerSlot" | "onOpenFile" | "view" | "onViewChange">
+  Pick<LintResultsProps, "onIgnore" | "ignoreBusy" | "title" | "headerSlot" | "onOpenFile" | "entityHref" | "view" | "onViewChange">
 > & {
   results?: LinterResult[];
   initialGrouping?: LintGrouping;
@@ -126,6 +126,38 @@ describe("LintResults", () => {
     expect(screen.getByText("3 locations")).toBeInTheDocument();
     fireEvent.click(within(places[2]!).getByRole("button"));
     expect(onOpenFile).toHaveBeenLastCalledWith({ file: "rules/br/CopyBook-Fees/XMLData.xml", workDir, line: 9 });
+  });
+
+  it("groups a file-less finding under its entity kind and links the entity through the host", () => {
+    const policyId = "7f3a2c10-5b0a-4c53-9a73-0c9d3f5e8b11";
+    const results: LinterResult[] = [
+      {
+        linter: "data-lint",
+        work_dir: "/repo/oipa",
+        violations: [
+          {
+            severity: "error",
+            rule: { method: "looping-spawn" },
+            message: "P-1001 spawned InvoiceStart 3 times",
+            locations: [
+              { entity: { kind: "Policy", id: policyId, name: "P-1001" } },
+              { url: { url: "https://oipa.example.com/entity/policy/p1", css: ".row[data-activity='a1']" } },
+            ],
+          },
+        ],
+      },
+    ];
+    render(
+      <Harness
+        results={results}
+        entityHref={(entity) => `/entity/${entity.kind.toLowerCase()}/${entity.id}`}
+        initialSelected="data-lint/looping-spawn/policy"
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Policy" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /P-1001 spawned InvoiceStart 3 times/ }));
+    expect(screen.getByRole("link", { name: "Policy · P-1001" })).toHaveAttribute("href", `/entity/policy/${policyId}`);
+    expect(screen.getByText("css: .row[data-activity='a1']")).toBeInTheDocument();
   });
 
   it("shows a placeholder until something is selected", () => {
@@ -392,7 +424,7 @@ describe("LintResults", () => {
     });
 
     it("is absent for a violation that names no file", () => {
-      render(<Harness onOpenFile={vi.fn()} results={[betterleaks]} initialSelected="betterleaks/generic-api-key" />);
+      render(<Harness onOpenFile={vi.fn()} results={[betterleaks]} initialSelected="betterleaks/generic-api-key/other" />);
       expect(screen.getByText("Potential API key found in git history")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Open in Files" })).toBeNull();
     });

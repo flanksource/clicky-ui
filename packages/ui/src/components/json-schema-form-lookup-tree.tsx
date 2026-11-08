@@ -88,6 +88,7 @@ export function LookupTreeControl({
     return (
       <div id={fieldId} data-jsf-input>
         <TreePickerField<OptionNode>
+          {...(field.nullable ? { clearable: true, clearLabel: `Clear ${field.label} to null`, onClear: () => field.onChange(null) } : {})}
           roots={roots}
           getKey={(node) => node.key}
           getChildren={(node) => node.children}

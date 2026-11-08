@@ -36,6 +36,7 @@ export const FORM_KEYWORD_GROUPS: Record<string, Exclude<KeywordGroup, "consumer
   "x-input-suffix-icon": "presentation",
   "x-label-position": "presentation",
   "x-layout": "presentation",
+  "x-object-display": "presentation",
   "x-col-span": "presentation",
   "x-columns": "presentation",
   "x-column-min-width": "presentation",

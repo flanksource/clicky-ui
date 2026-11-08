@@ -30,10 +30,10 @@ export interface MultiGaugeBarProps {
 
 const markerTone: Record<GaugeTone, string> = {
   neutral: "text-muted-foreground",
-  success: "text-[var(--fs-success)]",
-  warning: "text-[var(--fs-warning)]",
-  danger: "text-[var(--fs-error)]",
-  info: "text-[var(--fs-info)]",
+  success: "text-[var(--clicky-success)]",
+  warning: "text-[var(--clicky-warning)]",
+  danger: "text-[var(--clicky-error)]",
+  info: "text-[var(--clicky-info)]",
 };
 
 export function MultiGaugeBar({
@@ -124,7 +124,7 @@ export function MultiGaugeBar({
               data-gauge-fill=""
               {...(size === "sm" && averageId ? { id: averageId } : {})}
               className={cn(
-                "absolute inset-y-0 left-0 overflow-hidden bg-[var(--fs-success-500)]",
+                "absolute inset-y-0 left-0 overflow-hidden bg-[var(--clicky-success-500)]",
                 size === "sm" ? "rounded-sm" : "rounded-md",
               )}
               style={{
@@ -221,7 +221,7 @@ export function MultiGaugeBar({
           ) : (
             <span className="inline-flex items-center gap-1.5">
               <span
-                className="h-3 w-1 rounded-full bg-[var(--fs-success-500)]"
+                className="h-3 w-1 rounded-full bg-[var(--clicky-success-500)]"
                 aria-hidden="true"
               />
               <span>Avg</span>{" "}

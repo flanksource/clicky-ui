@@ -16,6 +16,7 @@ import { LabelIcon } from "../data/Icon";
 import { resolveItemSpec } from "./json-schema-form-item-summary";
 import { isFieldTone } from "./json-schema-form-tone";
 import { unionBranches } from "./json-schema-form-union-model";
+import { nullableSchema } from "./json-schema-form-nullable-model";
 
 // isOpenStringMap reports whether a property is an object whose entries are
 // described by a sub-schema in `additionalProperties` (a typed key/value map) or
@@ -211,6 +212,8 @@ export interface ResolveControlArgs {
 // standard `format: date`/`date-time` keyword, which is a schema-declared signal
 // (not a name guess) and so drives a date control directly. First match wins.
 export function resolveControl(args: ResolveControlArgs): FieldControl {
+  const nonNull = nullableSchema(args.prop);
+  if (nonNull) return { ...resolveControl({ ...args, prop: nonNull }), nullable: true };
   const { key, prop, required, value, onChange } = args;
   const labelIcon = prop["x-icon"];
   const xLayout = prop["x-layout"];

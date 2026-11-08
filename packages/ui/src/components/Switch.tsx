@@ -1,7 +1,7 @@
-import { useId, type ReactNode } from "react";
+import { useId, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 
-export type SwitchProps = {
+export type SwitchProps = Pick<ButtonHTMLAttributes<HTMLButtonElement>, "id" | "aria-labelledby" | "aria-describedby" | "aria-invalid" | "aria-required"> & {
   /** Current on/off state. */
   checked: boolean;
   /** Called with the next state when toggled. */
@@ -29,16 +29,18 @@ export function Switch({
   label,
   className,
   "aria-label": ariaLabel,
+  ...trackProps
 }: SwitchProps) {
   const labelId = useId();
 
   const track = (
     <button
+      {...trackProps}
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={label ? undefined : ariaLabel}
-      aria-labelledby={label ? labelId : undefined}
+      aria-labelledby={label ? labelId : trackProps["aria-labelledby"]}
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(

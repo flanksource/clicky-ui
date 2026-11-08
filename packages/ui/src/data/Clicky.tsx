@@ -58,8 +58,22 @@ import { calloutVariantStyles, type CalloutVariant } from "./callout-tones";
 import { Tree } from "./Tree";
 import { ObjectGraph, type ObjectGraphNode } from "./ObjectGraph";
 import { ExecutionTree, type ExecutionNode } from "./ExecutionTree";
-import { Icon } from "./Icon";
-import { UiCheck, UiCloudDownload, UiEllipsis } from "../icons";
+import { Icon, type StaticIconComponent } from "./Icon";
+import { getFallbackIconProvider } from "./icon-fallback";
+import { CLICKY_ICONIFY_GLYPHS } from "./clicky-icon-glyphs";
+import {
+  UiCheck,
+  UiCloudDownload,
+  UiComment,
+  UiEllipsis,
+  UiEye,
+  UiFileCode,
+  UiFileSpreadsheet,
+  UiFileText,
+  UiJson,
+  UiMarkdown,
+  UiTable,
+} from "../icons";
 import { CodeBlock } from "./CodeBlock";
 import { JsonView } from "./JsonView";
 import { isBlockHtml, sanitizeHtml } from "./html-utils";
@@ -478,6 +492,47 @@ const clickyRuntimeContextDefault: ClickyRuntimeContextValue = {
 const ClickyRuntimeContext = createContext<ClickyRuntimeContextValue>(
   clickyRuntimeContextDefault,
 );
+
+/**
+ * The overflow-menu actions a Clicky result table carries — export (with its
+ * dialog) and debug — for a host that renders a result through its own table.
+ * Render `dialog` once alongside the table.
+ */
+export function useClickyTableMenu({
+  url,
+  download,
+  pagination,
+}: {
+  url?: string | undefined;
+  download?: ClickyDownloadOptions | undefined;
+  pagination?: DataTablePagination | undefined;
+}): { actions: DataTableMenuAction[]; dialog: ReactNode } {
+  // The rows never show the query behind them. "Debug" reveals the console,
+  // which holds the record for the run that produced these rows.
+  const debugAction = useDebugAction();
+  const exporter = useClickyExport({
+    formats: useMemo(() => exportFormatOptions({ url, download }), [download, url]),
+    scopes: useMemo(() => exportScopeOptions(download, pagination), [download, pagination]),
+    onDownload: useCallback(
+      ({ format, scope }: { format: string; scope: string | undefined }) =>
+        runClickyDownload({
+          url: url ?? "",
+          format: format as ClickyRemoteFormat,
+          scope: scope as ClickyDownloadScope | undefined,
+          download,
+        }),
+      [download, url],
+    ),
+  });
+  const actions = useMemo(
+    () =>
+      [exporter.action, debugAction].filter(
+        (action): action is DataTableMenuAction => action !== undefined,
+      ),
+    [exporter.action, debugAction],
+  );
+  return { actions, dialog: exporter.dialog };
+}
 
 export function Clicky(props: ClickyProps) {
   // A host that already runs react-query owns the cache: sharing it is what
@@ -2422,19 +2477,27 @@ function ClickyCommandResponse({
   return <ClickyTextPreview title="Response body" content={rawText} />;
 }
 
+// An icon node draws clicky-ui's own glyph for the Iconify ids it knows, then a
+// host-registered provider's, and otherwise the node's unicode — never the
+// runtime placeholder, which would turn every unknown glyph into a "?".
 function ClickyIconNode({ node }: { node: ClickyNode }) {
   const inlineStyle = toInlineStyle(node.style, node.plain ?? node.unicode);
+  const className = node.style?.className;
+  const glyph = node.iconify ? CLICKY_ICONIFY_GLYPHS[node.iconify] : undefined;
 
   return (
     <span
       style={inlineStyle}
       title={node.tooltip?.plain}
       className="inline-flex items-center"
+      data-clicky-icon={node.iconify ?? ""}
     >
-      {node.iconify ? (
-        <Icon name={node.iconify} />
+      {glyph ? (
+        <Icon icon={glyph} {...(className ? { className } : {})} />
+      ) : node.iconify && getFallbackIconProvider() ? (
+        <Icon name={node.iconify} {...(className ? { className } : {})} />
       ) : (
-        <span>{node.unicode ?? node.plain}</span>
+        <span className={className}>{node.unicode ?? node.plain}</span>
       )}
     </span>
   );

@@ -191,9 +191,7 @@ export function ProfileCanonicalQuery({
       aggregatable: true,
     }),
   );
-  const optionsSchema = structuredClone(
-    providerOptionsSchema(draft.provider?.type ?? ""),
-  );
+  const optionsSchema = providerOptionsSchema(draft.provider?.type ?? "", "query");
   if (optionsSchema.properties) delete optionsSchema.properties.search;
   return (
     <section className="space-y-4 rounded-lg border bg-card p-4">

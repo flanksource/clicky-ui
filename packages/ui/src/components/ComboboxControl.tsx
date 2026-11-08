@@ -35,6 +35,7 @@ export function ComboboxControl({
   listId,
   loading,
   onClear,
+  clearLabel,
   onInput,
   onKeyDown,
   onOpen,
@@ -45,7 +46,9 @@ export function ComboboxControl({
   open,
   options,
   placeholder,
+  inputPlaceholder,
   showClear,
+  showToggle,
   size,
   suffix,
   tagModes,
@@ -70,6 +73,7 @@ export function ComboboxControl({
   listId: string | undefined;
   loading: boolean | undefined;
   onClear: () => void;
+  clearLabel?: string;
   onInput: (value: string) => void;
   onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   onOpen: () => void;
@@ -80,7 +84,9 @@ export function ComboboxControl({
   open: boolean;
   options: ComboboxOption[];
   placeholder: string | undefined;
+  inputPlaceholder: string | undefined;
   showClear: boolean;
+  showToggle: boolean;
   size: FormSize | undefined;
   suffix: ReactNode;
   /** Per-value include/exclude modes; set only in tristate mode. */
@@ -88,23 +94,19 @@ export function ComboboxControl({
   tagValues: string[];
   tags: boolean;
 }) {
+  const actionPadding = ["pr-2", "pr-8", "pr-14", "pr-[5.5rem]"][Number(showToggle) + Number(showClear) + Number(Boolean(suffix))];
+  const suffixPosition = ["right-0", "right-7", "right-[3.75rem]"][Number(showToggle) + Number(showClear)];
   return (
     <div
       ref={anchorRef}
       data-jsf-control
+      data-clearable-field
       className={cn(
         "relative flex items-center",
         tags &&
           "flex-wrap gap-1 rounded-md border border-input bg-background px-2 py-1 text-foreground focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1",
         tags && (size ? controlMinHeightClass[size] : "min-h-control-h"),
-        tags &&
-          (suffix
-            ? showClear
-              ? "pr-[5.5rem]"
-              : "pr-14"
-            : showClear
-              ? "pr-14"
-              : "pr-8"),
+        tags && actionPadding,
         tags && invalid && "border-destructive focus-within:ring-destructive",
         tags && disabled && "cursor-not-allowed opacity-50",
       )}
@@ -153,7 +155,7 @@ export function ComboboxControl({
         aria-describedby={describedBy}
         autoComplete="off"
         disabled={disabled}
-        placeholder={tags && tagValues.length > 0 ? undefined : placeholder}
+        placeholder={inputPlaceholder ?? (tags && tagValues.length > 0 ? undefined : placeholder)}
         value={displayValue}
         {...(!tags && !open && closedLabel ? { title: closedLabel } : {})}
         onChange={(event) => onInput(event.target.value)}
@@ -174,14 +176,7 @@ export function ComboboxControl({
               : "h-control-h px-control-px text-sm",
           "max-sm:text-base",
           !tags && effectivePrefix && "pl-8",
-          !tags &&
-            (suffix
-              ? showClear
-                ? "pr-[5.5rem]"
-                : "pr-14"
-              : showClear
-                ? "pr-14"
-                : "pr-8"),
+          !tags && actionPadding,
           !tags &&
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
           !tags && "disabled:cursor-not-allowed disabled:opacity-50",
@@ -204,7 +199,7 @@ export function ComboboxControl({
         <div
           className={cn(
             "absolute flex h-full items-center",
-            showClear ? "right-[3.75rem]" : "right-7",
+            suffixPosition,
           )}
         >
           {suffix}
@@ -214,8 +209,10 @@ export function ComboboxControl({
         disabled={disabled}
         loading={loading}
         onClear={onClear}
+        {...(clearLabel ? { clearLabel } : {})}
         onToggle={onToggle}
         showClear={showClear}
+        showToggle={showToggle}
       />
     </div>
   );

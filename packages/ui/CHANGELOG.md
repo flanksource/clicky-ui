@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Breaking change: `--fs-*` tokens renamed to `--clicky-*`
+
+Every `--fs-<name>` CSS custom property is now `--clicky-<name>`, and `styles/fs-tokens.css` is now `styles/clicky-tokens.css`. No aliases are provided: update any consumer CSS, inline styles or imports that reference `--fs-*` or `fs-tokens.css`.
+
 ### Breaking change: MatrixEnvHeader plan heatmap
 
 `MatrixEnvHeader` now requires a `plans` prop containing one `{ label, mark }` tick per plan, in matrix row order. Pass the actual plan outcomes; aggregate counts alone cannot describe the heatmap. The number of ticks must equal `counts.total`, including pending plans, or the component throws. Use `mark: "pending"` for queued plans.

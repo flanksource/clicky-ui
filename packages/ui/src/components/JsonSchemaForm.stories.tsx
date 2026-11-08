@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { expect, userEvent, waitFor, within } from "storybook/test";
+import { expect, fireEvent, userEvent, waitFor, within } from "storybook/test";
 import { Button } from "./button";
 import { Modal } from "../overlay/Modal";
 import { JsonSchemaForm } from "./JsonSchemaForm";
@@ -672,6 +672,47 @@ export const PerFieldReadOnly: Story = {
           "Fields whose schema declares `readOnly: true` render as static value displays (no input), while the rest stay editable. Dates are formatted human-readably; an empty read-only value shows an em-dash.",
       },
     },
+  },
+};
+
+const colorSchema: JsonSchemaObject = {
+  type: "object",
+  properties: {
+    fill: { type: "string", title: "Fill", format: "color" },
+    stroke: { type: "string", title: "Stroke", format: "color" },
+    label: { type: "string", title: "Label" },
+  },
+};
+
+const PICKED_COLOR = "#ff8800";
+
+export const ColorFormat: Story = {
+  args: {
+    schema: colorSchema,
+    value: { fill: "#1a2b3c", stroke: "currentColor", label: "Zone" },
+    showPreferencesMenu: false,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "`format: \"color\"` keeps the text input (any CSS color stays typeable) and prefixes it with a native color picker. The picker shows `#rrggbb` text as-is; a value like `currentColor` leaves it neutral and untouched until you pick, which then writes the hex.",
+      },
+    },
+  },
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const stroke = canvas.getByLabelText<HTMLInputElement>("Stroke color picker");
+    await step("A non-hex value leaves the swatch neutral and the text alone", async () => {
+      expect(stroke.value).toBe("#000000");
+      expect(canvasElement.textContent).toContain('"stroke": "currentColor"');
+    });
+    await step("Picking a color writes its hex into the field", async () => {
+      fireEvent.change(stroke, { target: { value: PICKED_COLOR } });
+      await waitFor(() => expect(canvasElement.textContent).toContain(`"stroke": "${PICKED_COLOR}"`));
+      expect(canvas.getByLabelText<HTMLInputElement>("Stroke color picker").value).toBe(PICKED_COLOR);
+      expect(canvas.getByLabelText<HTMLInputElement>("Fill color picker").value).toBe("#1a2b3c");
+    });
   },
 };
 

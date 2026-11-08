@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { JsonSchemaObject } from "../components/json-schema-form-types";
 import { SchemaViewer, SchemaViewerRow } from "./SchemaViewer";
@@ -160,6 +160,75 @@ describe("buildSchemaTree", () => {
 });
 
 describe("SchemaViewer", () => {
+  it("orders selected sections and fields without dropping unselected fields", () => {
+    render(<SchemaViewer schema={PLAIN_SCHEMA} sections={[
+      { id: "specific", title: "Kind fields", select: ["servers", "settings"], order: ["servers", "settings"] },
+      { id: "global", title: "Global fields", select: (node) => node.label === "name" },
+    ]} />);
+
+    expect(screen.getAllByRole("tree")).toHaveLength(1);
+    const groups = [...screen.getByRole("tree").children];
+    expect(groups.map((row) => row.querySelector('[data-schema-section]')?.textContent)).toEqual(["Kind fields", "Global fields"]);
+    expect(within(groups[0] as HTMLElement).getByText("servers").compareDocumentPosition(within(groups[0] as HTMLElement).getByText("settings")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(groups[1] as HTMLElement).getByText("name")).toBeInTheDocument();
+    expect(screen.getAllByRole("searchbox")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("radio", { name: "Table" }));
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+    expect(screen.getAllByRole("searchbox")).toHaveLength(1);
+    expect(screen.getByRole("radio", { name: "Tree" }).closest('.schema-viewer-toolbar')).toContainElement(screen.getByRole("searchbox"));
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "host" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Tree" }));
+    expect(screen.getByRole("searchbox")).toHaveValue("host");
+    expect(screen.getByText("host")).toBeInTheDocument();
+    expect(screen.queryByText("name")).not.toBeInTheDocument();
+  });
+
+  it("switches to a table with nested field paths and type icons", () => {
+    render(<SchemaViewer schema={PLAIN_SCHEMA} />);
+    fireEvent.click(screen.getByRole("radio", { name: "Table" }));
+
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("servers.host")).toBeInTheDocument();
+    expect(within(table).getAllByRole("img", { name: "string type" }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("tree")).not.toBeInTheDocument();
+  });
+
+  it("preserves original field paths when fields are visually grouped under another field", () => {
+    render(<SchemaViewer schema={{}} defaultView="table" roots={[
+      { key: "root/format", label: "format", children: [{ key: "root/json", label: "json", path: "json", badge: "boolean" }] },
+    ]} />);
+    expect(screen.getByText("json")).toBeInTheDocument();
+    expect(screen.queryByText("format.json")).not.toBeInTheDocument();
+  });
+
+  it("offers no expansion for plain leaves or descriptions already shown in the row", () => {
+    render(<SchemaViewer schema={{ type: "object", properties: {
+      name: { type: "string", description: "Display name" },
+      enabled: { type: "boolean" },
+      empty: { type: "object" },
+    } }} />);
+
+    expect(screen.queryByRole("button", { name: "Expand" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Expand all" })).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "boolean type" })).toBeInTheDocument();
+    fireEvent.click(screen.getByText("name"));
+    expect(screen.getAllByText("Display name")).toHaveLength(1);
+  });
+
+  it("expands table rows only when they contain additional metadata", () => {
+    render(<SchemaViewer defaultView="table" schema={{ type: "object", properties: {
+      name: { type: "string", description: "Display name" },
+      timeout: { type: "string", format: "duration" },
+    } }} />);
+
+    fireEvent.click(screen.getByText("name"));
+    expect(screen.getAllByText("Display name")).toHaveLength(1);
+    expect(screen.queryByText("Format")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("timeout"));
+    expect(screen.getByText("Format")).toBeInTheDocument();
+    expect(screen.getByText("duration")).toBeInTheDocument();
+  });
+
   it("rehydrates local refs before rendering", () => {
     render(<SchemaViewer schema={REF_SCHEMA} showControls={false} />);
 

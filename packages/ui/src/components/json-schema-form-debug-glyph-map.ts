@@ -128,6 +128,7 @@ const KEYWORD_GLYPH: Record<string, DebugGlyphPair> = {
   "x-columns": pair(UiColumns),
   "x-col-span": pair(UiColumns),
   "x-layout": pair(UiLayoutDashboard),
+  "x-object-display": pair(UiLayoutDashboard),
   "x-label-position": pair(UiLayoutDashboard),
 };
 

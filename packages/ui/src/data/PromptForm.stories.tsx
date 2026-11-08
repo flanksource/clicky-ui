@@ -1,5 +1,5 @@
 import type { Decorator, Meta, StoryObj } from "@storybook/react-vite";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { fn } from "storybook/test";
 import type { PromptSnapshot } from "../hooks/use-prompts";
 import { PromptForm } from "./PromptForm";
@@ -30,7 +30,7 @@ const PURGE_PROMPT: PromptSnapshot = {
 
 const fakeAnswerFetch: typeof fetch = async (input) => {
   if (String(input).includes("/prompts/") && String(input).endsWith("/answer")) {
-    return new Response(null, { status: 204 });
+    return new Response("", { status: 204 });
   }
   return new Response("not found", { status: 404 });
 };
@@ -39,15 +39,18 @@ const refusingAnswerFetch: typeof fetch = async () =>
   new Response("prompt prompt-purge-staged is already answered", { status: 409 });
 
 function withPromptApi(stub: typeof fetch): Decorator {
-  // PromptForm only fetches on Submit/Cancel, so installing the stub after mount is early enough.
   return function PromptApi(Story) {
-    useEffect(() => {
-      const original = globalThis.fetch;
+    const original = useRef<typeof globalThis.fetch | undefined>(undefined);
+    if (globalThis.fetch !== stub) {
+      original.current = globalThis.fetch;
       globalThis.fetch = stub;
-      return () => {
-        globalThis.fetch = original;
-      };
-    }, []);
+    }
+    useEffect(
+      () => () => {
+        if (original.current) globalThis.fetch = original.current;
+      },
+      [],
+    );
     return <Story />;
   };
 }

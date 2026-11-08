@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
 import { RECEIVER_RUN, sourceChoice } from "./source";
-import { FilterBar, SegmentedControl, type FilterBarFilter, type FilterBarMultiFilter } from "../../../components";
+import { FilterBar, type FilterBarFilter, type FilterBarMultiFilter } from "../../../components";
 import type { ModeFilter, Modes, SearchResult, SearchValues, Source } from "./api";
 import { durationOf, durationRequest, MULTI_SPAN, rangeOf, shortOperation, windowOf } from "./query";
 
@@ -14,8 +15,8 @@ function withSelected(options: { value: string; label: string; description?: str
   return [...options, ...Object.keys(selected ?? {}).filter(value => !listed.has(value)).map(value => ({ value, label: value }))];
 }
 
-/** One line of trace filters: source, services, root operations, attributes, status, duration, span count and the time window. */
-export function QueryBar({ value, onChange, onError, sources, runs, result, allowRecords = true }: {
+/** One line of trace filters: source, services, root operations, attributes, status, duration, span count and the time window. Any filter change returns to the first page. */
+export function QueryBar({ value, onChange: change, onError, sources, runs, result, allowRecords = true, trailing }: {
   value: SearchValues;
   onChange: (next: Partial<SearchValues>) => void;
   onError: (message: string) => void;
@@ -23,13 +24,24 @@ export function QueryBar({ value, onChange, onError, sources, runs, result, allo
   runs: string[];
   result?: SearchResult;
   allowRecords?: boolean;
+  /** Rendered beside the time window, such as the in-flight search's timer. */
+  trailing?: ReactNode;
 }) {
+  const onChange = (next: Partial<SearchValues>) => change({ ...next, offset: undefined });
   const choice = sourceChoice(value);
   const connection = sources.find(source => source.id === value.source && source.id !== "records");
   const multi = (key: ModeFilter, label: string, options: { value: string; label: string; description?: string }[], extra: Partial<FilterBarMultiFilter> = {}): FilterBarMultiFilter => ({
     ...extra, key, kind: "multi", label, value: value[key] ?? {}, onChange: next => onChange({ [key]: next }), options: withSelected(options, value[key]),
   });
   const filters: FilterBarFilter[] = [
+    {
+      key: "source", kind: "enum", label: "Source", required: true, value: choice, onChange: next => onChange(chooseSource(next)),
+      options: [
+        ...(runs.includes(RECEIVER_RUN) ? [{ value: "received", label: "Received" }] : []),
+        ...(allowRecords ? [{ value: "records", label: "Recorded" }] : []),
+        ...sources.filter(source => source.id !== "records").map(source => ({ value: source.id, label: source.name })),
+      ],
+    },
     multi("services", "Service", (result?.services ?? []).map(service => ({ value: service, label: service }))),
     multi("operations", "Root operation", (result?.rootOperations ?? []).map(({ operation }) => ({
       value: operation, label: shortOperation(operation), ...(operation !== shortOperation(operation) ? { description: operation } : {}),
@@ -52,20 +64,8 @@ export function QueryBar({ value, onChange, onError, sources, runs, result, allo
   const range = rangeOf(value);
   return (
     <FilterBar
-      leading={
-        <SegmentedControl
-          aria-label="Source"
-          size="sm"
-          value={choice}
-          onChange={next => onChange(chooseSource(next))}
-          options={[
-            ...(runs.includes(RECEIVER_RUN) ? [{ id: "received", label: "Received" }] : []),
-            ...(allowRecords ? [{ id: "records", label: "Recorded" }] : []),
-            ...sources.filter(source => source.id !== "records").map(source => ({ id: source.id, label: source.name })),
-          ]}
-        />
-      }
       filters={filters}
+      trailing={trailing}
       timeRange={{
         from: range.from, to: range.to, timeEnabled: true, emptyLabel: "Last hour",
         onApply: (from, to) => {

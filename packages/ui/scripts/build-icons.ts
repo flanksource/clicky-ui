@@ -1280,6 +1280,7 @@ ${programmingEntries.join("\n")}
     "",
     "## Upstream licenses",
     "",
+    "- react-grab — MIT — Copyright (c) 2025 Aiden Bai — https://github.com/aidenybai/react-grab — source fork at `react-grab@0.1.50` (`332732ab11f8aed6e588424bac9a0b226aef0ded`), see `@flanksource/react-grab/NOTICE.md` and its verbatim `LICENSE`.",
     "- Phosphor Icons — MIT — https://github.com/phosphor-icons/core",
     "- JetBrains IntelliJ Platform icons with embedded Apache headers — Apache 2.0 — https://github.com/JetBrains/intellij-community",
     "- JetBrains catalog ZIPs marked jb-download-unverified have no embedded license header; their license is not verified by this import.",

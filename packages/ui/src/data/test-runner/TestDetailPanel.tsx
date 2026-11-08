@@ -249,6 +249,13 @@ export function TestDetailPanel() {
   const detailAdapter = runner.adapters.resolveDetail(node, runner);
   const actionAdapter = runner.adapters.resolveActions(selected, runner);
   const tabs = runner.adapters.resolveTabs(node, runner);
+  if ((node.stdout || node.stderr) && !tabs.some((tab) => tab.id === "stdout")) {
+    tabs.unshift({
+      id: "stdout",
+      label: "Stdout",
+      render: () => <div className="p-density-4"><TestOutput node={node} view="full" /></div>,
+    });
+  }
   const ownsScroll = runner.adapters.ownsScroll(node, runner);
 
   const body = (

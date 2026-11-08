@@ -6,11 +6,11 @@
 
 import type { ReactNode } from "react";
 import { ChecklistDetail, FixtureDetail } from "./adapterViews";
-import { StepOutputs } from "./stepKindViews";
+import { StepOutputs, StepRowBadge, StepSourceSection } from "./stepKindViews";
 import { verifyNodeTest } from "./verifyReportTests";
 import { UiTerminal } from "../../icons";
-import { hasStepDetail, readStepDetail, stepKindCopy, type WaitDetail } from "./stepKind";
-import { readStepSource, stepSourceCopy } from "./stepSource";
+import { hasStepDetail, readQuery, readStepDetail, stepFormState, stepKindCopy, stepQueryCopy, type WaitDetail } from "./stepKind";
+import { readStepSource, sourceTabLabel, stepSourceCopy } from "./stepSource";
 import {
   createTestRunnerRegistry,
   outcomeFor,
@@ -156,9 +156,10 @@ function fixtureCopy(node: Test): CopySections {
   const command = context?.command ?? node.command;
   const stepDetail = readStepDetail(node.detail);
   const source = readStepSource(node.detail);
+  const query = readQuery(node.detail);
   return {
     brief: [
-      ...commandSection(node, context),
+      ...(query.kind === "query" ? stepQueryCopy(query.query) : commandSection(node, context)),
       ...assertionSection(node, context),
       ...(source.kind === "source" ? stepSourceCopy(source.source) : []),
       ...(stepDetail.kind === "step" ? stepKindCopy(stepDetail.step) : []),
@@ -199,6 +200,13 @@ const fixtureStepCopyAdapter: TestNodeAdapter = {
   id: "verification-step-copy",
   match: isFixtureStepNode,
   copy: ({ node }) => fixtureCopy(node),
+};
+
+// Claims only the rows it badges, so a host's own row decoration still wins for every other node.
+const stepBadgeAdapter: TestNodeAdapter = {
+  id: "verification-step-badge",
+  match: (node) => node.waiting === true || stepFormState(node) !== undefined,
+  renderRowLeading: ({ node }) => <StepRowBadge node={node} />,
 };
 
 /** Default node adapters for VerificationResults: checklist items and
@@ -250,11 +258,18 @@ export function verificationAdapters(options: VerificationAdapterOptions = {}): 
       });
     },
     detailTabs: ({ node }) => {
+      const tabs = [];
       const detail = readStepDetail(node.detail);
-      if (detail.kind !== "step" || detail.step.outputs === undefined) return [];
-      return [{ id: "outputs", label: "Outputs", render: () => <StepOutputs outputs={detail.step.outputs} /> }];
+      if (detail.kind === "step" && detail.step.outputs !== undefined) {
+        tabs.push({ id: "outputs", label: "Outputs", render: () => <StepOutputs outputs={detail.step.outputs} /> });
+      }
+      const source = readStepSource(node.detail);
+      if (source.kind !== "none") {
+        tabs.push({ id: "source", label: sourceTabLabel(source), render: () => <StepSourceSection result={source} /> });
+      }
+      return tabs;
     },
     copy: ({ node }) => fixtureCopy(node),
   };
-  return createTestRunnerRegistry([checklistAdapter, fixtureAdapter, fixtureStepCopyAdapter]);
+  return createTestRunnerRegistry([checklistAdapter, fixtureAdapter, fixtureStepCopyAdapter, stepBadgeAdapter]);
 }

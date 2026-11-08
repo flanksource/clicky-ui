@@ -32,6 +32,9 @@ export {
 } from "./components/clipboard";
 export { SplitButton, type SplitButtonProps } from "./components/SplitButton";
 export { InputField, type InputFieldProps } from "./components/InputField";
+export { TailwindColorPickerField, type TailwindColorPickerFieldProps } from "./components/TailwindColorPickerField";
+export { TailwindNumberPickerField, type TailwindNumberPickerFieldProps } from "./components/TailwindNumberPickerField";
+export type { TailwindPickerValue } from "./components/tailwind-picker-types";
 export {
   DimensionField,
   type DimensionFieldProps,
@@ -395,6 +398,8 @@ export {
   type WorkspacePaneLocation,
   type WorkspacePaneSlots,
   type WorkspacePaneSpec,
+  type WorkspaceSideArrangement,
+  type WorkspaceSideArrangements,
   type WorkspaceSideLocation,
 } from "./layout/Workspace";
 export {
@@ -404,6 +409,7 @@ export {
   type AppShellNavGroup,
   type AppShellNavSection,
 } from "./layout/AppShell";
+export { NavigationTree, type NavigationTreeProps } from "./layout/NavigationTree";
 export {
   type AppShellNavDrag,
   type AppShellNavDropKind,

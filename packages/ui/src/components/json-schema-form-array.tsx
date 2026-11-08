@@ -17,7 +17,6 @@ import { scalarItemsType } from "./json-schema-form-resolve";
 import { appendInstancePath } from "./json-schema-form-errors";
 import { ObjectArrayView } from "./json-schema-form-object-array-view";
 import { TagsComboboxControl } from "./json-schema-form-tags-combobox";
-import { CompactListArray } from "./json-schema-form-list-array";
 import {
   canAddItem,
   canRemoveItem,
@@ -57,20 +56,20 @@ export function ArrayControl({
   const readOnly = ctx.readOnly || field.readOnly === true;
   const choices = enumItemOptions(field);
   const scalarType = scalarItemsType(field.itemSchema);
+  const perItem =
+    field.arrayDisplay === "stacked" || field.arrayDisplay === "list";
   if (field.arrayDisplay === "list") {
     if (scalarType !== "string") {
       throw new Error(
         `${field.key} uses x-array-display list without string items`,
       );
     }
-    return (
-      <CompactListArray
-        field={field}
-        fieldId={fieldId}
-        readOnly={readOnly}
-        presentation={ctx.presentation === true}
-      />
-    );
+    if (
+      Array.isArray(field.value) &&
+      field.value.some((item) => typeof item !== "string")
+    ) {
+      throw new Error(`${field.key} compact list received a non-string value`);
+    }
   }
   if (field.arrayDisplay === "filter-pills" && choices.length > 0) {
     return (
@@ -86,7 +85,7 @@ export function ArrayControl({
   // makes the whole array a multi-select whose committed values are pills, so
   // the option set is discoverable in one dropdown instead of repeated per item.
   // `x-array-display: "stacked"` opts back into a combobox per item.
-  if (field.arrayDisplay !== "stacked" && choices.length > 0) {
+  if (!perItem && choices.length > 0) {
     return (
       <TagsComboboxControl
         field={field}
@@ -100,7 +99,7 @@ export function ArrayControl({
   // A flat list of scalars is the same gesture as the enum list above — type a
   // value, get a pill — so it takes the same control, with no options to pick
   // from and a comma as a second commit key. Numeric items commit numbers.
-  if (field.arrayDisplay !== "stacked" && scalarType) {
+  if (!perItem && scalarType) {
     return (
       <TagsComboboxControl
         field={field}
@@ -134,6 +133,9 @@ export function ArrayControl({
 
   return (
     <div
+      id={fieldId}
+      role="group"
+      aria-label={field.label}
       className={cn(
         "flex flex-col",
         !ctx.presentation && "rounded-md border border-input p-2",
@@ -143,10 +145,7 @@ export function ArrayControl({
       {items.map((item, i) => (
         <div
           key={i}
-          className={cn(
-            "grid items-start gap-2",
-              readOnly ? "grid-cols-1" : "grid-cols-[1fr_auto]",
-          )}
+          className="flex flex-wrap items-start gap-2"
         >
           {/* The item's row is a FieldWrapper (or a full-width ObjectSection),
               both of which are grid children of a FieldsGrid — inline mode's
@@ -158,7 +157,7 @@ export function ArrayControl({
             layout={ctx.layout}
             size={ctx.size}
             columns={1}
-            className="min-w-0"
+            className="min-w-0 flex-1 basis-64"
           >
             {ctx.render.renderFieldRow(
               {
@@ -192,7 +191,7 @@ export function ArrayControl({
         <Button
           type="button"
           variant="outline"
-          className={cn("gap-1.5", inputSizeClass[ctx.size])}
+          className={cn("self-start gap-1.5", inputSizeClass[ctx.size])}
           onClick={() => field.onChange([...items, seedFromSchema(itemSchema)])}
         >
           <Icon icon={UiAdd} className="text-sm" />

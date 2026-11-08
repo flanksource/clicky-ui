@@ -1,8 +1,12 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { Button } from "../components/button";
+import { Select } from "../components/select";
+import { useRouter } from "../rpc/router";
+import { ConnectionStorageStatus } from "./ConnectionStorageStatus";
 import { cn } from "../lib/utils";
 import {
   groupConnectionDashboardLanes,
+  CONNECTION_LAYER_LABELS,
   type ConnectionDashboardItem,
   type ConnectionLinkRenderer,
   type ConnectionActionsRenderer,
@@ -34,20 +38,82 @@ export type ConnectionDashboardSurfaceProps = {
  * Health checks dial real backends, so they are opt-in: nothing is probed until
  * the operator clicks a row's dot, a lane's Check button, or Check all.
  */
-export function ConnectionDashboardSurface({
+export function ConnectionDashboardSurface(
+  props: ConnectionDashboardSurfaceProps,
+) {
+  const router = useRouter();
+  const dashboard = useConnectionDashboard({
+    apiBase: props.apiBase,
+    ...(props.requestUrl ? { requestUrl: props.requestUrl } : {}),
+  });
+  const location = new URL(
+    typeof window === "undefined" ? "http://localhost/" : window.location.href,
+  );
+  const layer = location.searchParams.get("connection-layer") ?? "";
+  const layers = [
+    ...new Set([
+      ...(dashboard.data?.connections
+        .map((item) => item.layer)
+        .filter((value): value is string => Boolean(value)) ?? []),
+      ...(layer ? [layer] : []),
+    ]),
+  ];
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          Storage layer
+          <Select
+            value={layer}
+            options={[
+              { value: "", label: "All layers" },
+              ...layers.map((value) => ({
+                value,
+                label: CONNECTION_LAYER_LABELS[value] ?? value,
+              })),
+            ]}
+            onChange={(event) => {
+              if (event.target.value)
+                location.searchParams.set(
+                  "connection-layer",
+                  event.target.value,
+                );
+              else location.searchParams.delete("connection-layer");
+              router.navigate(
+                location.pathname + location.search + location.hash,
+                { replace: true },
+              );
+            }}
+          />
+        </label>
+        <ConnectionStorageStatus apiBase={props.apiBase} />
+      </div>
+      <ConnectionDashboardContent {...props} layer={layer} />
+    </div>
+  );
+}
+
+function ConnectionDashboardContent({
   renderConnectionActions,
   apiBase,
   requestUrl,
   renderConnectionLink,
   emptyState,
-}: ConnectionDashboardSurfaceProps) {
+  layer,
+}: ConnectionDashboardSurfaceProps & { layer: string }) {
   const dashboard = useConnectionDashboard({
     apiBase,
     ...(requestUrl ? { requestUrl } : {}),
   });
 
   const { health, pending, error, seed, check } = useConnectionHealth(apiBase);
-  const connections = dashboard.data?.connections;
+  const connections = useMemo(
+    () =>
+      dashboard.data?.connections.filter(
+        (item) => !layer || item.layer === layer,
+      ),
+    [dashboard.data?.connections, layer],
+  );
   useEffect(() => {
     if (connections) seed(connections);
   }, [connections, seed]);
@@ -67,7 +133,12 @@ export function ConnectionDashboardSurface({
             ? dashboard.error.message
             : "Unable to load connections"}
         </span>
-        <Button type="button" variant="outline" size="sm" onClick={() => void dashboard.refetch()}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => void dashboard.refetch()}
+        >
           Retry
         </Button>
       </div>
@@ -90,12 +161,18 @@ export function ConnectionDashboardSurface({
   }
 
   const checked = connections.filter(
-    (connection) => health[connection.id] && health[connection.id]?.state !== "unknown",
+    (connection) =>
+      health[connection.id] && health[connection.id]?.state !== "unknown",
   ).length;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={() => void dashboard.refetch()}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => void dashboard.refetch()}
+        >
           Refresh
         </Button>
         <Button
@@ -196,11 +273,14 @@ export function ConnectionDashboardLanes({
                 {summary.checked}/{lane.connections.length} checked
               </span>
               {summary.unused > 0 ? (
-                <span className="text-[11px] text-muted-foreground">{summary.unused} unused</span>
+                <span className="text-[11px] text-muted-foreground">
+                  {summary.unused} unused
+                </span>
               ) : null}
               {unnamespaced ? (
                 <span className="text-xs text-muted-foreground">
-                  `namespace` is optional on the model, so these are unplaceable rather than global.
+                  `namespace` is optional on the model, so these are unplaceable
+                  rather than global.
                 </span>
               ) : null}
             </header>
@@ -213,7 +293,9 @@ export function ConnectionDashboardLanes({
                   pending={pending.has(connection.id)}
                   onCheck={onCheck}
                   renderConnectionLink={renderConnectionLink}
-                  {...(renderConnectionActions ? { renderConnectionActions } : {})}
+                  {...(renderConnectionActions
+                    ? { renderConnectionActions }
+                    : {})}
                 />
               ))}
             </div>

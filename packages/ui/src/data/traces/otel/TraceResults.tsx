@@ -7,14 +7,11 @@ import { shortOperation } from "./query";
 const startMs = (trace: Summary) => Date.parse(trace.startedAt);
 const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
+/** How many traces match, newest first; the table pages through them. */
 export function ResultSummary({ result }: { result: SearchResult }) {
-  const shown = result.traces.length;
   return (
     <p className="text-sm text-muted-foreground">
-      <span className="font-medium text-foreground">{shown}</span> {shown === 1 ? "trace" : "traces"}
-      {shown < result.total
-        ? <> · the {shown} newest of {result.total.toLocaleString()}. Narrow the window or operation to see older ones</>
-        : <> · all in the window</>}
+      <span className="font-medium text-foreground">{result.total.toLocaleString()}</span> {result.total === 1 ? "trace matches" : "traces match"} · newest first
     </p>
   );
 }

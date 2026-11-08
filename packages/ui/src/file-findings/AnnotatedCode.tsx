@@ -201,9 +201,7 @@ function CodeBody({
   }, [mounted, findings, inlineChips]);
 
   const threads = useRef(sourceComments);
-  useEffect(() => {
-    threads.current = sourceComments;
-  });
+  threads.current = sourceComments;
   const threadsEnabled = sourceComments !== undefined;
   const canStartThreads = sourceComments?.onCreate !== undefined;
   useEffect(() => {

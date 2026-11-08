@@ -29,6 +29,22 @@ export function App() {
 }
 ```
 
+## Tailwind picker fields
+
+`TailwindColorPickerField` and `TailwindNumberPickerField` combine a raw value and a searchable Tailwind lookup in one input. Import them and `TailwindPickerValue` from `@flanksource/clicky-ui/components`. Values explicitly distinguish `{ kind: "literal", value: "#326ce5" }` or `{ kind: "literal", value: 14 }` from `{ kind: "utility", value: "text-sm" }`. `onChange` receives typing immediately, keeping unfinished numeric text such as `"33."` intact; it is the host's responsibility to validate drafts and apply literal values or classes.
+
+```tsx
+import { useState } from "react";
+import { TailwindNumberPickerField, type TailwindPickerValue } from "@flanksource/clicky-ui/components";
+
+export function FontSizeField() {
+  const [value, setValue] = useState<TailwindPickerValue>({ kind: "literal", value: 14 });
+  return <TailwindNumberPickerField ariaLabel="Font size" property="fontSize" value={value} onChange={setValue} />;
+}
+```
+
+Color `utility` selects the class prefix (`bg`, `text`, `fill`, `stroke`, or `border`; defaults to `bg`). Choices include theme tokens and the Tailwind palette, with a native color swatch for literal entry. `resolveColor` can resolve CSS variables in a selected element's theme. Number `property` selects the `fontSize`, `strokeWidth`, or `opacity` scale. Both accept `ariaLabel` for the accessible name, `id` for an external label, `size` for control density, and `disabled` to prevent editing. Optional `onReset` adds an in-field reset button; `resetLabel` overrides its accessible label. Class choices remain separate from presentation attributes so hosts can preserve unrelated classes and responsive variants. Run `pnpm dev:storybook` from the repository root to inspect **Forms / Tailwind pickers**.
+
 ## Runtime settings
 
 Compose `SpecRuntimeBar` with the detailed `SpecRuntimeEditor` from `@flanksource/clicky-ui/ai`. The bar owns mode, model, effort, permission posture, cost, timeout, source/worktree, and commit timing. The detailed editor provides prompt, fallback, tool-policy, environment, checkout, and workflow details. Token and turn limit inputs are omitted; existing values survive edits and serialization.
@@ -411,7 +427,7 @@ import { CommentRail, CommentSidePanel } from "@flanksource/clicky-ui/comments";
 </CommentRail>
 ```
 
-`previewLines` limits rendered body lines and exposes Show more / Show less only on overflow. Maximized bodies are always full. `detailTabs` are host-owned slots mounted only while selected; keep network and application context in those adapters. `onMaximizedChange(open)` lets an embedded host coordinate its available space. The same options pass through CommentThread, CommentThreadList and FileReview's `comments` configuration. Maximized threads retain the existing reply draft in a pinned footer across tabs and failed sends. `threadToMarkdown` adds the canonical Markdown preview tab.
+`previewLines` limits rendered body lines and exposes Show more / Show less only on overflow. Maximized bodies are always full. `detailTabs` are host-owned slots mounted only while selected; keep network and application context in those adapters. `onMaximizedChange(open)` lets an embedded host coordinate its available space. The same options pass through CommentThread, CommentThreadList and FileReview's `comments` configuration. Maximized threads retain the existing reply draft in a pinned footer across tabs and failed sends. `threadToMarkdown` serializes a thread for Copy; to preview it, add a `detailTabs` entry that renders it (for example with `Markdown` from `@flanksource/clicky-ui/data`), so the comments surface never pulls in the Markdown/streamdown pipeline.
 
 `AgentIdentity` from `@flanksource/clicky-ui/chat` accepts `model`, `provider`, `effort` and an optional fallback `label`. It reuses the provider colors, short model formatter and effort glyph catalog. `AgentIdentityProvider` supplies known runtime metadata by `identityId` without changing stored comment authors. Unknown identities/effort remain visible rather than being guessed. The interactive `Comments/Review details` Storybook story demonstrates rails, previews, detail tabs and scrolling drafts.
 
