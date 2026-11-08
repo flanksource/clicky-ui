@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { exampleLock } from "../link/testing-fixtures.ts";
 import { memoryCaches } from "../link/testing-cache.ts";
 import { createRouter, digest } from "./router.ts";
-import { facetPlugins } from "./compiler.ts";
+import { BASE_PLUGINS } from "./compiler.ts";
 import { validateActivity, type WorkerActivity } from "../activity-schema.ts";
 import type { RuntimeProfile } from "../schema.ts";
 
@@ -15,7 +15,7 @@ it("records actual compile, network, transformed-memory and Cache Storage paths 
   lock.integrity[path] = await digest(new TextEncoder().encode(code));
   await (await caches.open("page-runtime-activity-pages")).put(`${origin}/__runtime/pages/page.tsx`, Response.json({ lock, files: { "page.tsx": 'export default "Page";' } }));
   const records: WorkerActivity[] = [];
-  const routerOptions = { origin, version: "activity", profile, caches, plugins: facetPlugins(() => () => undefined), fetch: async () => new Response(code, { headers: { "content-length": String(new TextEncoder().encode(code).byteLength), "cache-control": "immutable" } }), onActivity: ({ record }: { record: WorkerActivity }) => { records.push(record); } };
+  const routerOptions = { origin, version: "activity", profile, caches, plugins: BASE_PLUGINS, fetch: async () => new Response(code, { headers: { "content-length": String(new TextEncoder().encode(code).byteLength), "cache-control": "immutable" } }), onActivity: ({ record }: { record: WorkerActivity }) => { records.push(record); } };
   let router = createRouter(routerOptions);
   const request = async (path: string) => {
     const response = await router.route(new Request(`${origin}${path}`));
@@ -36,7 +36,7 @@ it("records compiler and integrity errors with their phase", async () => {
   const caches = memoryCaches(); const lock = exampleLock(); lock.integrity["acme@1.0.0/index.js"] = "sha384-invalid";
   await (await caches.open("page-runtime-activity-pages")).put(`${origin}/__runtime/pages/page.tsx`, Response.json({ lock, files: { "page.tsx": "export default <div>" } }));
   const records: WorkerActivity[] = [];
-  const router = createRouter({ origin, version: "activity", profile, caches, plugins: facetPlugins(() => () => undefined), fetch: async () => new Response("broken integrity"), onActivity: ({ record }) => { records.push(record); } });
+  const router = createRouter({ origin, version: "activity", profile, caches, plugins: BASE_PLUGINS, fetch: async () => new Response("broken integrity"), onActivity: ({ record }) => { records.push(record); } });
   for (const path of ["/src/page.tsx", "/npm/acme@1.0.0/index.js"]) await router.route(new Request(`${origin}${path}?page=page.tsx`));
   expect(records.map((r) => r.error?.phase)).toEqual(["compile", "fetch"]);
   expect(records[0]!.compileMs).toBeGreaterThan(0);
@@ -47,7 +47,7 @@ it("records compiler and integrity errors with their phase", async () => {
 it("preserves opaque allowed-egress responses and records unavailable sizes without reconstructing them", async () => {
   const opaque = Response.error(); Object.defineProperty(opaque, "type", { value: "opaque" });
   const records: WorkerActivity[] = [];
-  const router = createRouter({ origin, version: "activity", profile: { ...profile, network: { allow: ["https://assets.example/*"] } }, caches: memoryCaches(), plugins: facetPlugins(() => () => undefined), fetch: async () => opaque, onActivity: ({ record }) => { records.push(record); } });
+  const router = createRouter({ origin, version: "activity", profile: { ...profile, network: { allow: ["https://assets.example/*"] } }, caches: memoryCaches(), plugins: BASE_PLUGINS, fetch: async () => opaque, onActivity: ({ record }) => { records.push(record); } });
   expect(await router.route(new Request("https://assets.example/photo.png"))).toBe(opaque);
   expect(records[0]).toMatchObject({ source: "network", status: 0, transferredBytes: null, decodedBytes: null, outputBytes: null });
 });

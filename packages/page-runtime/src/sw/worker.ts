@@ -1,6 +1,5 @@
 import { compile } from "@mdx-js/mdx";
-import facetRedact from "@flanksource/facet/remark/facet-redact";
-import { facetPlugins } from "./compiler.ts";
+import { BASE_PLUGINS } from "./compiler.ts";
 import { createRouter, type RuntimeRouter } from "./router.ts";
 import { validateProfile } from "./profile.ts";
 import { runtimeError } from "./errors.ts";
@@ -37,7 +36,7 @@ function load(): Promise<RuntimeRouter> {
   router ??= (async () => {
     const response = await fetch("/profile.json", { cache: "no-store" });
     if (!response.ok) throw new Error(`profile.json: HTTP ${response.status}`);
-    return createRouter({ origin: scope.location.origin, version: __RUNTIME_VERSION__, profile: validateProfile(await response.json()), plugins: facetPlugins(facetRedact), caches, onActivity: ({ request, record }) => {
+    return createRouter({ origin: scope.location.origin, version: __RUNTIME_VERSION__, profile: validateProfile(await response.json()), plugins: BASE_PLUGINS, caches, onActivity: ({ request, record }) => {
       const event = activityRequests.get(request);
       if (!event) throw new Error("worker activity request context is missing");
       const id = event.resultingClientId || event.clientId;
@@ -68,7 +67,9 @@ scope.addEventListener("message", (event) => {
         port.postMessage({ ok: true }); return;
       }
       const loaded = await load();
-      if (typeof value?.page === "string") await loaded.update(value.page, value.message); else await loaded.message(value?.message);
+      const exportMessage = value?.message as { type?: unknown } | undefined;
+      if (typeof value?.page === "string" && exportMessage?.type === "export-module") await loaded.exportModule(value.page, value.message);
+      else if (typeof value?.page === "string") await loaded.update(value.page, value.message); else await loaded.message(value?.message);
       port.postMessage({ ok: true });
     } catch (error) { port.postMessage({ ok: false, error: runtimeError({ error, phase: "resolve", file: new URL(event.source!.url).pathname }) }); }
   })());

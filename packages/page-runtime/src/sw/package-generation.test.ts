@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { exampleLink, exampleLock } from "../link/testing-fixtures.ts";
 import { memoryCaches, memoryLinkStorage } from "../link/testing-cache.ts";
 import { createRouter, digest } from "./router.ts";
-import { facetPlugins } from "./compiler.ts";
+import { BASE_PLUGINS } from "./compiler.ts";
 import type { RuntimeProfile } from "../schema.ts";
 import { createLinkRoutes } from "./link-route.ts";
 
@@ -19,10 +19,10 @@ describe("pinned package origins", () => {
     if (linked) lock.map.imports["@acme/linked"] = "/link/checkout/src/index.ts";
     const requests: string[] = [];
     const caches = memoryCaches();
-    const router = createRouter({ origin, version: "test", profile, caches, plugins: facetPlugins(() => () => undefined), fetch: async input => { requests.push(String(input)); return new Response(code); } });
+    const router = createRouter({ origin, version: "test", profile, caches, plugins: BASE_PLUGINS, fetch: async input => { requests.push(String(input)); return new Response(code); } });
     await router.message({ type: "open", page: lock.page, lock, manifest: { dependencies: {} }, files: { [lock.page]: 'export default "page";' } });
     const store = memoryLinkStorage(); await store.put(exampleLink());
-    const route = linked ? createLinkRoutes({ origin, version: "test", profile, caches, store, load: async () => ({ lock, files: {} }), plugins: facetPlugins(() => () => undefined), fetch: async input => { requests.push(String(input)); return new Response(code); } }) : router.route;
+    const route = linked ? createLinkRoutes({ origin, version: "test", profile, caches, store, load: async () => ({ lock, files: {} }), plugins: BASE_PLUGINS, fetch: async input => { requests.push(String(input)); return new Response(code); } }) : router.route;
     const response = await route(new Request(`${origin}/npm/${path}?page=${lock.page}`));
     expect(await response?.text()).toContain("first");
     expect(requests).toEqual([`${oldOrigin}/${path}`]);

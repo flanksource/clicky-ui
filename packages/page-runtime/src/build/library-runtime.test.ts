@@ -8,11 +8,11 @@ import type { Fragment } from "../schema.ts";
 import { buildLibraryRuntime, checkFragment } from "./index.ts";
 
 const roots: string[] = [];
-async function fixture(files: Record<string, string>, options: { name?: string; sideEffects?: boolean; exports?: Record<string, string> } = {}) {
+async function fixture(files: Record<string, string>, options: { name?: string; sideEffects?: boolean; exports?: Record<string, string>; pageRuntime?: unknown } = {}) {
   await mkdir(resolve("../../.tmp/A-build"), { recursive: true });
   const root = await mkdtemp(resolve("../../.tmp/A-build/library-"));
   roots.push(root);
-  const manifest = { name: options.name ?? "example-library", version: "1.2.3", type: "module", sideEffects: options.sideEffects ?? false, exports: options.exports ?? { ".": "./dist/index.js" } };
+  const manifest = { name: options.name ?? "example-library", version: "1.2.3", type: "module", sideEffects: options.sideEffects ?? false, exports: options.exports ?? { ".": "./dist/index.js" }, ...(options.pageRuntime === undefined ? {} : { pageRuntime: options.pageRuntime }) };
   const all = { "package.json": JSON.stringify(manifest), ...files };
   for (const [path, contents] of Object.entries(all)) {
     await mkdir(dirname(join(root, path)), { recursive: true });
@@ -39,6 +39,26 @@ describe("buildLibraryRuntime", () => {
     expect(barrels.modules).toContain("example-library@1.2.3/dist/value.js");
     expect(JSON.parse(await readFile(join(options.outDir, "importmap.json"), "utf8"))).toEqual(fragment);
     expect(await checkFragment({ libraryDir: options.libraryDir })).toEqual([]);
+  });
+
+  describe("compiler plugins", () => {
+    const exports = { ".": "./dist/index.js", "./remark/redact": "./remark/redact.mjs" };
+    const files = { "dist/index.js": "export const value = 1;", "remark/redact.mjs": "export default function redact() { return () => undefined; }" };
+    const plugin = { module: "example-library/remark/redact", options: { allow: {} } };
+
+    it("traces a declared plugin outside dist and publishes the declaration in the fragment", async () => {
+      const { fragment } = await buildLibraryRuntime(await fixture(files, { exports, pageRuntime: { compiler: { remark: [plugin] } } }));
+      expect({ compiler: fragment.compiler, target: fragment.imports[plugin.module], integrity: fragment.integrity["example-library@1.2.3/remark/redact.mjs"] }).toEqual({ compiler: { remark: [plugin] }, target: "example-library@1.2.3/remark/redact.mjs", integrity: expect.stringMatching(/^sha384-/) });
+    });
+
+    it.each([
+      ["a module the package does not export", { remark: [{ module: "example-library/remark/missing" }] }, /compiler plugin example-library\/remark\/missing is not in package.json exports/],
+      ["another package's module", { remark: [{ module: "other-library/remark/redact" }] }, /expected a example-library\/… module the library exports/],
+      ["an empty plugin list", { remark: [] }, /expected a non-empty array/],
+      ["an unknown compiler key", { remark: [plugin], rehype: [] }, /pageRuntime\.compiler\.rehype: unknown key/],
+    ])("rejects %s", async (_case, compiler, error) => {
+      await expect(buildLibraryRuntime(await fixture(files, { exports, pageRuntime: { compiler } }))).rejects.toThrow(error);
+    });
   });
 
   it("sweeps chunks beside exported modules but not classic-script bundles outside the exported directories", async () => {

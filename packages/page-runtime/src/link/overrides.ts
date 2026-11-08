@@ -4,6 +4,7 @@ import type { LibraryLink } from "./types.ts";
 import { assertLinksAllowed, linkUrl, validateLink } from "./validation.ts";
 import { mapBarrels } from "./barrels.ts";
 import { validatePageSources, type PageSourceLock } from "./page-sources.ts";
+import { validateCompilerPlugins } from "../sw/compiler-plugins.ts";
 
 export function mountLinkTarget(link: LibraryLink, target: string): string {
   const path = target.replace(/^\/npm\//, "");
@@ -56,6 +57,8 @@ export function composeLinkOverrides(options: { lock: PageSourceLock; links: Lib
     Object.assign(lock.integrity, composed.integrity);
     Object.assign(lock.remaps, composed.remaps);
     lock.versions[link.build.library] = link.build.version;
+    if (link.build.fragment.compiler) lock.compiler = { ...lock.compiler, [link.build.library]: validateCompilerPlugins(link.build.fragment.compiler, { library: link.build.library, path: `${link.build.library} checkout fragment compiler` }) };
+    else if (lock.compiler?.[link.build.library]) lock.compiler = Object.fromEntries(Object.entries(lock.compiler).filter(([library]) => library !== link.build.library));
     lock.barrels = mergeBarrels([lock.barrels, mapBarrels({ index: link.build.barrels, map: (path) => path.startsWith("/npm/") ? mount(path) : linkUrl(link.id, path) })]);
   }
   return lock;

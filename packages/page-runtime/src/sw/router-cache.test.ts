@@ -2,7 +2,7 @@ import { expect, it, vi } from "vitest";
 import { exampleLock } from "../link/testing-fixtures.ts";
 import { memoryCaches } from "../link/testing-cache.ts";
 import { createRouter } from "./router.ts";
-import { facetPlugins } from "./compiler.ts";
+import { BASE_PLUGINS } from "./compiler.ts";
 import { resolvePage } from "./resolver.ts";
 import type { PageLock, RuntimePolicy, RuntimeProfile } from "../schema.ts";
 
@@ -22,7 +22,7 @@ it("loads and validates a persisted page once for concurrent module requests and
   const match = vi.spyOn(store, "match");
   const open = caches.open.bind(caches);
   vi.spyOn(caches, "open").mockImplementation(async (name) => name === "page-runtime-test-pages" ? store : open(name));
-  const router = createRouter({ origin, version: "test", profile, caches, plugins: facetPlugins(() => () => undefined) });
+  const router = createRouter({ origin, version: "test", profile, caches, plugins: BASE_PLUGINS });
   const request = () => router.route(new Request(`${origin}/src/page.tsx?page=page.tsx`));
   await Promise.all([request(), request(), request()]);
   expect(match).toHaveBeenCalledTimes(1);
@@ -38,7 +38,7 @@ const manifest = { dependencies: {} };
 const storedPage = async (record: Record<string, unknown>) => {
   const caches = memoryCaches();
   await (await caches.open("page-runtime-test-pages")).put(`${origin}/__runtime/pages/page.tsx`, Response.json({ files: { "page.tsx": 'export default "page";' }, manifest, ...record }));
-  return { caches, router: createRouter({ origin, version: "test", profile, caches, plugins: facetPlugins(() => () => undefined) }) };
+  return { caches, router: createRouter({ origin, version: "test", profile, caches, plugins: BASE_PLUGINS }) };
 };
 
 it("re-resolves a stored page under exactly the policy its host declared, not the served profile policy", async () => {

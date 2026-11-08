@@ -3,7 +3,7 @@ import type { PageLock, RuntimeProfile } from "../schema.ts";
 import { memoryCaches } from "../link/testing-cache.ts";
 import { conversionFixture, CONVERTER, PROFILE } from "../../spikes/esm-sh/fixtures.ts";
 import { createRouter, contentSecurityPolicy } from "./router.ts";
-import { facetPlugins } from "./compiler.ts";
+import { BASE_PLUGINS } from "./compiler.ts";
 import { resolvePage } from "./resolver.ts";
 import { digest } from "./integrity.ts";
 import { createRequestActivity } from "./activity.ts";
@@ -19,7 +19,7 @@ async function setup(options: { mutate?: (lock: PageLock, modules: Map<string, s
   await options.mutate?.(lock, fixture.modules);
   const caches = memoryCaches();
   const fetcher = vi.fn(fixture.fetcher);
-  const create = () => createRouter({ origin, version: "converted-test", profile: options.profile ?? PROFILE, caches, fetch: fetcher, plugins: facetPlugins(() => () => undefined) });
+  const create = () => createRouter({ origin, version: "converted-test", profile: options.profile ?? PROFILE, caches, fetch: fetcher, plugins: BASE_PLUGINS });
   const router = create();
   await router.message({ type: "open", page: lock.page, manifest: { dependencies: {} }, files: { [lock.page]: 'export { default } from "react-copy-to-clipboard";' }, lock });
   fetcher.mockClear();

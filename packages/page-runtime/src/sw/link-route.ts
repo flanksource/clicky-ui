@@ -15,7 +15,7 @@ import { digest } from "./integrity.ts";
 import { CONTENT_TYPES, extensionOf } from "./content-types.ts";
 import { RuntimeFailure } from "./errors.ts";
 import type { RouterOptions } from "./router.ts";
-import { PAGE_AGENT_URL, pageAgentSource } from "./runtime-module.ts";
+import { RUNTIME_MODULES, runtimeModuleSource } from "./runtime-module.ts";
 import { sourceCandidates } from "./candidates.ts";
 import { isPageModule, pageSourceModule, validatePageSourceLinks, type PageSourceLock } from "../link/page-sources.ts";
 import { byteLength } from "./activity.ts";
@@ -157,7 +157,7 @@ export function createLinkRoutes(options: Options) {
       try { return await control(request); } catch (error) { return new Response(String(error), { status: 403 }); }
     }
     const frame = url.pathname.startsWith("/frame/");
-    if (!/^\/(src|npm|link|frame)\//.test(url.pathname) && url.pathname !== DEV_SHIM_URL && url.pathname !== PAGE_AGENT_URL) return undefined;
+    if (!/^\/(src|npm|link|frame)\//.test(url.pathname) && url.pathname !== DEV_SHIM_URL && !Object.hasOwn(RUNTIME_MODULES, url.pathname)) return undefined;
     const page = url.searchParams.get("page") ?? (frame ? decodeURIComponent(url.pathname.slice(7)) : null);
     if (frame && !(await (await options.caches.open(`page-runtime-${options.version}-pages`)).match(`${options.origin}/__runtime/pages/${encodeURIComponent(page!)}`))) return undefined;
     if (!page) { if (url.pathname.startsWith("/link/")) throw new RuntimeFailure({ phase: "link", file: url.pathname, message: "Linked module requires a page context" }); return undefined; }
@@ -192,13 +192,14 @@ export function createLinkRoutes(options: Options) {
         const document = frameDocument({ config: context.config, preload: moduleGraphs.get(contextId) ?? [] });
         return new Response(document.html, { headers: { "content-type": "text/html; charset=utf-8", "content-length": String(byteLength(document.html)), "content-security-policy": contentSecurityPolicy(context.config.profile, document.nonce), [LINK_CONTEXT_HEADER]: contextId } });
       }
-      if (url.pathname === DEV_SHIM_URL || url.pathname === PAGE_AGENT_URL) {
-        metrics.source = "generated"; metrics.generated = url.pathname === DEV_SHIM_URL ? "JSX development shim" : "page agent module";
+      if (url.pathname === DEV_SHIM_URL || Object.hasOwn(RUNTIME_MODULES, url.pathname)) {
+        const file = RUNTIME_MODULES[url.pathname];
+        metrics.source = "generated"; metrics.generated = file === "page-agent.js" ? "page agent module" : file ? "export compiler module" : "JSX development shim";
         let source = DEV_SHIM;
-        if (url.pathname === PAGE_AGENT_URL) {
-          metrics.source = "network"; metrics.origin = `${options.origin}/page-agent.js`; metrics.transferredBytes = null;
+        if (file) {
+          metrics.source = "network"; metrics.origin = `${options.origin}/${file}`; metrics.transferredBytes = null;
           const start = performance.now();
-          try { source = await pageAgentSource({ origin: options.origin, fetch: async (input, init) => {
+          try { source = await runtimeModuleSource({ origin: options.origin, file, fetch: async (input, init) => {
             const response = await (options.fetch ?? fetch)(input, init);
             metrics.transferredBytes = response.headers.has("content-length") ? Number(response.headers.get("content-length")) : null;
             return response;

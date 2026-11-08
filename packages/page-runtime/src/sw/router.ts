@@ -5,12 +5,12 @@ import type { MdxPlugins } from "./compile.ts";
 import { DEV_SHIM, DEV_SHIM_URL } from "./compile.ts";
 import { CONTENT_TYPES, extensionOf } from "./content-types.ts";
 import { runtimeError, RuntimeFailure } from "./errors.ts";
-import { permitsNetwork, validateProfile } from "./profile.ts";
+import { keys, permitsNetwork, record, validateProfile } from "./profile.ts";
 import { resolvePage } from "./resolver.ts";
 import { stylesheetModule } from "./module-transform.ts";
 import { digest, verifyIntegrity } from "./integrity.ts";
 import { createLinkRoutes } from "./link-route.ts";
-import { PAGE_AGENT_URL, pageAgentSource } from "./runtime-module.ts";
+import { RUNTIME_MODULES, runtimeModuleSource } from "./runtime-module.ts";
 import type { WorkerActivity } from "../activity-schema.ts";
 import { activityResponse, applyLinkActivity, byteLength, createRequestActivity } from "./activity.ts";
 import { convertedFile, converterUrl, rewriteConvertedImports } from "./converted.ts";
@@ -39,6 +39,7 @@ export function frameDocument(options: { config?: FrameConfig; preload?: Iterabl
 export function contentSecurityPolicy(profile: RuntimeProfile, nonce: string): string {
   const directives: Record<string, string[]> = { "script-src": ["'self'", `'nonce-${nonce}'`], "style-src": ["'self'", "'unsafe-inline'"], "img-src": ["'self'", "data:", "blob:"], "connect-src": ["'self'", profile.packageOrigin, profile.registry, ...profile.network.allow.map((v) => new URL(v).origin)], "frame-ancestors": profile.embedders };
   if (profile.convert) directives["connect-src"]!.push(profile.convert.origin);
+  if (profile.csp.wasm) directives["script-src"]!.push("'wasm-unsafe-eval'");
   for (const [name, values] of Object.entries(profile.csp.add)) directives[name] = [...(directives[name] ?? []), ...values];
   return Object.entries(directives).map(([name, values]) => `${name} ${values.join(" ")}`).join("; ");
 }
@@ -52,6 +53,8 @@ export function createRouter(options: RouterOptions) {
   const modules = new WeakMap<PageLock, Map<string, Promise<{ response: Response; activity: WorkerActivity }>>>();
   const moduleGraph = new WeakMap<PageLock, Set<string>>();
   const frameConfigs = new WeakMap<PageLock, FrameConfig>();
+  // Export compiles the frame ran with library compiler plugins, by page and source path; held only for the export.
+  const exportModules = new Map<string, Map<string, string>>();
   const rememberModule = (url: URL, lock: PageLock) => {
     let graph = moduleGraph.get(lock);
     if (!graph) { graph = new Set(); moduleGraph.set(lock, graph); }
@@ -100,6 +103,26 @@ export function createRouter(options: RouterOptions) {
     const saved = await load(page);
     for (const [path, code] of Object.entries(m.files)) if (code === null) delete saved.files[path]; else saved.files[path] = code;
     await (await store).put(key(page), Response.json(saved));
+  }
+  /** Registers the frame's export compile of a Markdown source, served as `/src/<path>?export` until the next one. */
+  async function exportModule(page: string, value: unknown): Promise<void> {
+    const m = record(value, "export-module");
+    keys(m, ["type", "path", "code"], "export-module");
+    if (typeof m.path !== "string" || typeof m.code !== "string") throw new Error("export-module: expected path and code strings");
+    validateSourcePath(m.path);
+    if (!/\.mdx?$/.test(m.path)) throw new Error(`export-module: ${m.path} is not a Markdown source`);
+    const saved = await load(page);
+    if (saved.files[m.path] === undefined) throw new RuntimeFailure({ phase: "fetch", file: m.path, message: `source ${m.path} does not exist` });
+    exportModules.set(page, new Map([[m.path, m.code]]));
+  }
+  async function exported(url: URL, saved: StoredPage, activity: WorkerActivity): Promise<Response> {
+    const path = decodeURIComponent(url.pathname.slice("/src/".length));
+    const code = exportModules.get(saved.lock.page)?.get(path);
+    if (code === undefined) throw new RuntimeFailure({ phase: "fetch", file: path, message: `no export compile is registered for ${path}; export the page again` });
+    activity.source = "compiled"; activity.generated = "export module"; activity.decodedBytes = byteLength(code);
+    const linked = await rewriteImports({ code, path: url.pathname, lock: saved.lock, sources: Object.keys(saved.files), activity });
+    activity.outputBytes = byteLength(linked);
+    return new Response(linked, { headers: JS });
   }
   async function compiled(url: URL, saved: StoredPage, activity: WorkerActivity): Promise<Response> {
     const path = decodeURIComponent(url.pathname.slice("/src/".length)); validateSourcePath(path);
@@ -221,10 +244,11 @@ export function createRouter(options: RouterOptions) {
       }
       if (!page) throw new Error(`${url.pathname}: missing page context`);
       const saved = await load(page);
-      if (url.pathname === PAGE_AGENT_URL || url.pathname === DEV_SHIM_URL) {
+      if (Object.hasOwn(RUNTIME_MODULES, url.pathname) || url.pathname === DEV_SHIM_URL) {
         const started = performance.now();
-        const original = url.pathname === PAGE_AGENT_URL ? await pageAgentSource({ origin: options.origin, fetch: fetcher }) : DEV_SHIM;
-        if (url.pathname === PAGE_AGENT_URL) { activity.fetchMs = performance.now() - started; activity.origin = `${options.origin}/page-agent.js`; activity.source = "network"; activity.transferredBytes = null; }
+        const file = RUNTIME_MODULES[url.pathname];
+        const original = file ? await runtimeModuleSource({ origin: options.origin, fetch: fetcher, file }) : DEV_SHIM;
+        if (file) { activity.fetchMs = performance.now() - started; activity.origin = `${options.origin}/${file}`; activity.source = "network"; activity.transferredBytes = null; }
         else activity.generated = "JSX development shim";
         const code = await rewriteImports({ code: original, path: url.pathname, lock: saved.lock, sources: [], activity });
         activity.decodedBytes = byteLength(original); activity.outputBytes = byteLength(code);
@@ -235,6 +259,7 @@ export function createRouter(options: RouterOptions) {
         const body = JSON.stringify([...new Set(candidates.flatMap((record) => record.candidates))]); activity.outputBytes = byteLength(body); activity.decodedBytes = activity.outputBytes; activity.generated = "source candidates";
         return new Response(body, { headers: { "content-type": "application/json" } });
       }
+      if (url.pathname.startsWith("/src/") && url.searchParams.has("export")) return await exported(url, saved, activity);
       if (url.pathname.startsWith("/src/")) {
         const response = await compiled(url, saved, activity);
         if (response.headers.get("content-type")?.startsWith("text/javascript")) rememberModule(url, saved.lock);
@@ -289,7 +314,7 @@ export function createRouter(options: RouterOptions) {
     options.onActivity?.({ request, record: activity });
     return response;
   }
-  return { route, message, update };
+  return { route, message, update, exportModule };
 }
 export type RuntimeRouter = ReturnType<typeof createRouter>;
 export type OpenPageMessage = Extract<HostMessage, { type: "open" }>;

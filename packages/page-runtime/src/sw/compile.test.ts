@@ -25,7 +25,7 @@ const CARD = [
 ].join("\n");
 
 // The redact plugin is facet's; with no regions in the document it leaves the tree alone.
-const PLUGINS: MdxPlugins = { remarkFrontmatter, remarkGfm, remarkAlert, facetRedact: () => () => undefined, rehypeRaw };
+const PLUGINS: MdxPlugins = { remarkFrontmatter, remarkGfm, remarkAlert, rehypeRaw };
 
 describe("insertSourceMarkers", () => {
   it("marks host tags at their `<` and leaves components, member tags and fragments alone", () => {

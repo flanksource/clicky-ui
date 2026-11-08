@@ -7,6 +7,7 @@ import { convertCommonJs } from "./convert-commonjs.ts";
 import { BaseSetRemapError, CommonJsConversionError, NodeBuiltinError } from "./errors.ts";
 import { composeImportMap, fragmentOf } from "./fragment.ts";
 import { traceRecipeDependencies } from "./recipe-dependencies.ts";
+import { validateCompilerPlugins } from "../sw/compiler-plugins.ts";
 import { ClosureTracer, createResolver, EMPTY_MODULE, exportEntries, IMPORT_CONDITIONS, packageName, resolveEntry, type FragmentSpec } from "./trace.ts";
 
 export const BASE_PACKAGES = ["react", "react-dom", "scheduler", "@tanstack/react-query", "jotai"];
@@ -16,10 +17,17 @@ export type BuiltLibraryRuntime = { fragment: Fragment; barrels: BarrelIndex };
 
 export function librarySpec(options: { libraryDir: string; base?: Fragment }): FragmentSpec {
   const dir = realpathSync(options.libraryDir);
-  const manifest = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { name?: string; version?: string };
+  const manifest = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { name?: string; version?: string; pageRuntime?: { compiler?: unknown } };
   if (!manifest.name || !manifest.version) throw new Error(`${dir}/package.json must declare name and version`);
-  const entries = exportEntries(dir).filter(({ path }) => path.startsWith(`${join(dir, "dist")}${sep}`) && !path.startsWith(`${join(dir, "dist/runtime")}${sep}`));
+  const exported = exportEntries(dir);
+  const compiler = manifest.pageRuntime?.compiler === undefined ? undefined : validateCompilerPlugins(manifest.pageRuntime.compiler, { library: manifest.name, path: `${manifest.name} package.json pageRuntime.compiler` });
+  const entries = exported.filter(({ path }) => path.startsWith(`${join(dir, "dist")}${sep}`) && !path.startsWith(`${join(dir, "dist/runtime")}${sep}`));
   if (!entries.length) throw new Error(`${manifest.name}: no browser exports in dist; build the library first`);
+  for (const plugin of compiler?.remark ?? []) {
+    const entry = exported.find(({ specifier }) => specifier === plugin.module);
+    if (!entry) throw new Error(`${manifest.name}: compiler plugin ${plugin.module} is not in package.json exports`);
+    if (!entries.some(({ specifier }) => specifier === entry.specifier)) entries.push(entry);
+  }
   // Sweep only directories the package exports into: computed dynamic imports load chunks next to exported modules,
   // while other dist artifacts (a CLI's inlined classic-script bundle) are never served as modules.
   const exportedDirs = [...new Set(entries.filter(({ path }) => /\.m?js$/.test(path)).map(({ path }) => dirname(path)))];
@@ -36,7 +44,7 @@ export function librarySpec(options: { libraryDir: string; base?: Fragment }): F
       entries.push(resolveEntry(resolver, from, specifier));
     }
   }
-  return { name: manifest.name, resolveFrom: dir, runtimeBase: `${manifest.name}@${manifest.version}/dist/runtime/`, entries, files, topLevel: providesBase ? BASE_PACKAGES : [], inherits: options.base ? [...new Set(Object.keys(options.base.imports).map(packageName))] : [] };
+  return { name: manifest.name, resolveFrom: dir, runtimeBase: `${manifest.name}@${manifest.version}/dist/runtime/`, entries, files, topLevel: providesBase ? BASE_PACKAGES : [], inherits: options.base ? [...new Set(Object.keys(options.base.imports).map(packageName))] : [], ...(compiler ? { compiler } : {}) };
 }
 
 export function assertTrace(tracer: ClosureTracer): void {

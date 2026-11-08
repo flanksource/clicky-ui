@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { PageLock } from "../schema.ts";
-import { compilePage, facetPlugins, rewriteImports } from "./compiler.ts";
+import { BASE_PLUGINS, compilePage, rewriteImports } from "./compiler.ts";
 import { verifyIntegrity } from "./router.ts";
 
 const LOCK: PageLock = { lock: 2, packageOrigin: "https://packages.example", page: "report.tsx", versions: { "@acme/ui": "1.0.0" }, map: { imports: { "@acme/ui": "/npm/@acme/ui@1.0.0/index.js" }, scopes: {} }, integrity: { "@acme/ui@1.0.0/index.js": "sha384-test", "@acme/ui@1.0.0/util.js": "sha384-test" }, remaps: {}, barrels: { modules: [], barrels: {} } };
-const plugins = facetPlugins(() => () => undefined);
+const plugins = BASE_PLUGINS;
 
 describe("compiled source modules", () => {
   it("compiles Markdown pages and resolves extensionless Markdown source imports", async () => {

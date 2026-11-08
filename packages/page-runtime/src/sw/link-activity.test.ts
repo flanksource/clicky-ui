@@ -5,7 +5,7 @@ import { memoryCaches, memoryLinkStorage } from "../link/testing-cache.ts";
 import { exampleLink, exampleLock } from "../link/testing-fixtures.ts";
 import { createLinkRoutes } from "./link-route.ts";
 import { createRouter, digest } from "./router.ts";
-import { facetPlugins } from "./compiler.ts";
+import { BASE_PLUGINS } from "./compiler.ts";
 import { applyLinkActivity, createRequestActivity } from "./activity.ts";
 import type { LinkActivity } from "./link-activity.ts";
 import { createLinkStore } from "../link/storage.ts";
@@ -24,7 +24,7 @@ async function fixture(options: { fetch?: typeof fetch } = {}) {
   await store.put(link);
   vi.mocked(createLinkStore).mockReturnValue(store);
   await (await caches.open("page-runtime-activity-pages")).put(`${origin}/__runtime/pages/page.tsx`, Response.json(saved));
-  const settings = { origin, version: "activity", profile, caches, store, plugins: facetPlugins(() => () => undefined), load: async () => saved, fetch: options.fetch ?? (async () => new Response(source, { headers: { "content-length": "19" } })) };
+  const settings = { origin, version: "activity", profile, caches, store, plugins: BASE_PLUGINS, load: async () => saved, fetch: options.fetch ?? (async () => new Response(source, { headers: { "content-length": "19" } })) };
   return { settings, handler: createLinkRoutes(settings), saved };
 }
 
