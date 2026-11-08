@@ -27,6 +27,7 @@ export default defineConfig({
         {
           label: "Guides",
           items: [
+            { label: "Making components editable", slug: "guides/editable-components" },
             { label: "JSON Schema form", slug: "guides/json-schema-form" },
             {
               label: "JSON Schema examples",
@@ -42,6 +43,10 @@ export default defineConfig({
             {
               label: "JSON Schema extensions",
               slug: "reference/json-schema-form-extensions",
+            },
+            {
+              label: "FileFindingsView extensions",
+              slug: "reference/file-findings-extensions",
             },
             { label: "Component overview", slug: "reference/components" },
             {
