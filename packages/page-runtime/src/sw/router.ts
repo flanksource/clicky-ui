@@ -69,7 +69,8 @@ export function createRouter(options: RouterOptions) {
         if (!response) throw new RuntimeFailure({ phase: "resolve", file: page, message: `page ${page} has not been opened by its host` });
         const saved = await response.json() as StoredPage;
         if (saved.lock.lock !== 2) {
-          saved.lock = await resolvePage({ page, profile: { ...profile, policy: saved.policy ?? profile.policy }, manifest: saved.manifest, fetch: fetcher });
+          if (!saved.policy) throw new RuntimeFailure({ phase: "resolve", file: page, message: `${page} was stored without its host policy, so it cannot be re-resolved without guessing one (the served profile policy is not the host's); reopen the page from its host, or clear the page runtime cache and try again` });
+          saved.lock = await resolvePage({ page, profile: { ...profile, policy: saved.policy }, manifest: saved.manifest, fetch: fetcher });
           await (await store).put(key(page), Response.json(saved));
         }
         validateLock(saved.lock);
@@ -87,9 +88,9 @@ export function createRouter(options: RouterOptions) {
     const previous = await (await store).match(key(m.page));
     const saved = previous ? await previous.json() as StoredPage : undefined;
     const policy = m.policy ?? profile.policy;
-    const existing = m.lock ?? (saved?.lock.lock === 2 && serial(saved.manifest) === serial(m.manifest) && serial(saved.policy ?? profile.policy) === serial(policy) ? saved.lock : undefined);
+    const existing = m.lock ?? (saved?.lock.lock === 2 && serial(saved.manifest) === serial(m.manifest) && saved.policy && serial(saved.policy) === serial(policy) ? saved.lock : undefined);
     const lock = await resolvePage({ page: m.page, profile: { ...profile, policy }, manifest: m.manifest, ...(existing ? { lock: existing } : {}), fetch: fetcher });
-    const savedPage: StoredPage = { lock, files: m.files, manifest: m.manifest, ...(m.policy ? { policy: m.policy } : {}) };
+    const savedPage: StoredPage = { lock, files: m.files, manifest: m.manifest, policy };
     await (await store).put(key(m.page), Response.json(savedPage));
     pages.set(m.page, Promise.resolve(savedPage));
   }
