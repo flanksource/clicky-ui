@@ -164,7 +164,11 @@ export function connectionSchemaFormExtensions({
       field.schema.properties?.kubeconfig &&
       field.schema.properties?.kubecontext
     ) {
-      const { kubeconfig, kubecontext, ...rest } = field.schema.properties;
+      const { kubeconfig, kubecontext, ...others } = field.schema.properties;
+      // Hoisted fields (host/port/database) already render beside the URL.
+      const rest = Object.fromEntries(
+        Object.entries(others).filter(([, property]) => property["x-clicky-hoist"] !== true),
+      );
       const renderGroup = (title: string, groupSchema: JsonSchemaObject) =>
         createElement(
           "section",

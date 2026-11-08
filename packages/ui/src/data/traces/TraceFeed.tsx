@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Button } from "../../components/button";
+import { FilterBar } from "../../components/FilterBar";
 import { Tabs } from "../../layout/Tabs";
 import { DataTable, type DataTableColumn } from "../DataTable";
 import { TraceView } from "./TraceView";
@@ -80,17 +81,17 @@ export function TraceFeed({ kinds, loadPage, follow, renderCapture, presentation
   }, [rows]);
   const change = (next: Partial<TraceFeedRequest>) => { setHistory([]); setEnded(false); setSelected(undefined); setRequest(previous => ({ ...previous, ...next, cursor: "" })); };
   return <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-    <div className="flex flex-wrap items-center gap-3">
-      <label>Capture <select aria-label="Capture" value={request.kind} onChange={event => change({ kind: event.target.value })}>
-        <option value="">All events</option>{kinds.map(kind => <option key={kind} value={kind}>{kind}</option>)}
-      </select></label>
-      <label>Order <select aria-label="Order" value={request.sort} onChange={event => change({ sort: event.target.value as TraceFeedRequest["sort"] })}>
-        <option value="seq">Sequence</option><option value="timestamp">Timestamp</option>
-      </select></label>
-      {follow && <Button variant="outline" onClick={() => setPaused(value => !value)}>{paused ? "Resume" : "Pause"}</Button>}
-      <Button variant="outline" onClick={() => setRevision(value => value + 1)}>Refresh</Button>
-      <span role="status">{!kinds.length ? "No captures armed" : ended || !follow ? "Capture complete" : paused ? "Paused" : "Following"}</span>
-    </div>
+    <FilterBar className="shrink-0" filters={[
+      { key: "capture", kind: "enum", label: "Capture", required: true, value: request.kind || "*", onChange: kind => change({ kind: kind === "*" ? "" : kind }), options: [{ value: "*", label: "All events" }, ...kinds.map(kind => ({ value: kind, label: kind }))] },
+      { key: "order", kind: "enum", label: "Order", required: true, value: request.sort, onChange: sort => {
+        if (sort !== "seq" && sort !== "timestamp") throw new Error(`Unknown trace order: ${sort}`);
+        change({ sort });
+      }, options: [{ value: "seq", label: "Sequence" }, { value: "timestamp", label: "Timestamp" }] },
+    ]} trailing={<>
+      {follow && <Button size="sm" variant="outline" onClick={() => setPaused(value => !value)}>{paused ? "Resume" : "Pause"}</Button>}
+      <Button size="sm" variant="outline" onClick={() => setRevision(value => value + 1)}>Refresh</Button>
+      <span role="status" className="whitespace-nowrap text-xs text-muted-foreground">{!kinds.length ? "No captures armed" : ended || !follow ? "Capture complete" : paused ? "Paused" : "Following"}</span>
+    </>} />
     {error && <p role="alert">{error.message}</p>}
     <Tabs tabs={[{ id: "stream", label: "Event stream" }, { id: "captures", label: "Captures" }, { id: "raw", label: "Raw stream" }]} value={view} onChange={value => { setView(value); setSelected(undefined); }} />
     <div role="tabpanel" aria-label={view === "raw" ? "Raw stream" : view === "captures" ? "Captures" : "Event stream"} className="flex min-h-0 flex-1 flex-col overflow-auto">

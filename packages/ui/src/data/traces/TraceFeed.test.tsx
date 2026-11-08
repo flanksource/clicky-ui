@@ -6,6 +6,21 @@ import { httpExchangeRows } from "./fixtures";
 beforeEach(() => window.history.replaceState(null, "", "/"));
 
 describe("TraceFeed", () => {
+  it("uses the shared filter bar to select capture and ordering without losing the run URL", async () => {
+    window.history.replaceState(null, "", "/?run=recorded-build#event");
+    const loadPage = vi.fn().mockResolvedValue({ rows: [], nextCursor: "" });
+    render(<TraceFeed kinds={["http", "stacks"]} loadPage={loadPage} />);
+    expect(document.querySelector('[data-filter-bar-item="capture"]')).not.toBeNull();
+    expect(document.querySelector('[data-filter-bar-item="order"]')).not.toBeNull();
+    expect(screen.getByRole("combobox", { name: "Capture" })).toHaveValue("All events");
+    fireEvent.click(screen.getByRole("combobox", { name: "Capture" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "http" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Order" }));
+    fireEvent.mouseDown(await screen.findByRole("option", { name: "Sequence" }));
+    await vi.waitFor(() => expect(loadPage).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "http", sort: "seq", cursor: "" }), expect.any(AbortSignal)));
+    expect(new URLSearchParams(window.location.search).get("run")).toBe("recorded-build");
+    expect(window.location.hash).toBe("#event");
+  });
 	 it("lets a host supply capture presentation while keeping its raw records on demand", async () => {
     window.history.replaceState(null, "", "/?feedView=captures");
     const rows = [{ runId: "example", kind: "process", stream: "capture", seq: 1, timestamp: null, summary: "raw process", record: { pid: 123 } }];

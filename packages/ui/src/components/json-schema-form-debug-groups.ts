@@ -17,6 +17,7 @@ export const FORM_KEYWORD_GROUPS: Record<string, Exclude<KeywordGroup, "consumer
   "x-discriminator": "behaviour",
   "x-order": "presentation",
   "x-clicky-order": "presentation",
+  "x-clicky-hoist": "presentation",
   "x-enum-labels": "presentation",
   "x-enum-icons": "presentation",
   "x-enum-descriptions": "presentation",

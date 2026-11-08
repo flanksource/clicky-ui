@@ -6,6 +6,8 @@ import { ResultTable } from "./TraceResults";
 import type { Span, Summary } from "./api";
 import { spanTraces } from "./span-traces";
 import { DataTable, type DataTableColumn } from "../../DataTable";
+import { ServerTimingBadge } from "../../ServerTimingBadge";
+import type { ServerTimingMetric } from "../../server-timing";
 
 export type OtelTraceTableProps = Pick<
   DataTableProps<Summary>,
@@ -35,6 +37,8 @@ export type OtelTraceTableProps = Pick<
   traceHref: (id: string) => string;
   /** Places the open trace's title elsewhere (e.g. a breadcrumb in the app shell's top bar), replacing the inline "Back to traces" link. */
   renderTraceTitle?: (title: ReactNode) => ReactNode;
+  /** The listing response's Server-Timing metrics, shown as a badge in the listing's filter bar. */
+  serverTiming?: readonly ServerTimingMetric[];
 };
 
 export function OtelTraceTable({
@@ -46,6 +50,7 @@ export function OtelTraceTable({
   onSelectSpan,
   traceHref,
   renderTraceTitle,
+  serverTiming,
   ...tableProps
 }: OtelTraceTableProps) {
   const result = useMemo(() => {
@@ -79,8 +84,10 @@ export function OtelTraceTable({
       .sort((a, b) => a.position - b.position)
       .map(({ row }) => row);
   return (
-    <div className="min-h-0 min-w-0 space-y-3">
-      <p className="text-sm text-muted-foreground">
+    // A flex column so the listing's DataTable fills a bounded parent: its body
+    // scrolls and the pagination footer stays on screen.
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+      <p className="shrink-0 text-sm text-muted-foreground">
         Traces from loaded rows. Filters and paging can leave traces incomplete.
       </p>
       {result.error ? (
@@ -88,7 +95,7 @@ export function OtelTraceTable({
       ) : selectedTraceId ? (
         <>
           {!renderTraceTitle && (
-            <Button variant="link" onClick={() => onSelectTrace()}>
+            <Button variant="link" className="self-start" onClick={() => onSelectTrace()}>
               Back to traces
             </Button>
           )}
@@ -109,6 +116,9 @@ export function OtelTraceTable({
       ) : listing ? (
         <DataTable
           {...tableProps}
+          {...(serverTiming?.length
+            ? { filterBarProps: { trailing: <ServerTimingBadge metrics={serverTiming} /> } }
+            : {})}
           data={listingRows!}
           columns={listing.columns}
           autoFilter={false}

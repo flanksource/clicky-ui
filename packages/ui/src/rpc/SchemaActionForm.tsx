@@ -9,6 +9,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { Button } from "../components/button";
+import { SplitButton } from "../components/SplitButton";
 import { JsonSchemaForm } from "../components/JsonSchemaForm";
 import { Tabs } from "../layout/Tabs";
 import Ajv from "ajv/dist/2020";
@@ -146,7 +147,23 @@ export function SchemaActionForm({
         : undefined,
     [schemaQuery.data],
   );
-  const validForm = validate?.(value) ?? true;
+  // A property marked x-clicky-submit-target (e.g. a connection's storage layer)
+  // says where the entity is saved rather than what it is, so it is chosen from
+  // the save split button instead of being edited as a form field.
+  const target = schemaQuery.data
+    ? submitTarget(schemaQuery.data, value)
+    : undefined;
+  const targetName = target?.name;
+  const formSchema = useMemo(
+    () =>
+      schemaQuery.data && targetName
+        ? withoutProperty(schemaQuery.data, targetName)
+        : schemaQuery.data,
+    [schemaQuery.data, targetName],
+  );
+  const validForm =
+    validate?.(target ? { ...value, [target.name]: target.current } : value) ??
+    true;
   const formErrors = (validate?.errors ?? [])
     .filter((e) => e.keyword !== "if")
     .map((e) => ({
@@ -209,8 +226,13 @@ export function SchemaActionForm({
   const schema = schemaQuery.data;
   if (!schema) return <>{renderSlots({ body: fallback })}</>;
 
-  async function handleSubmit() {
+  async function handleSubmit(overrides: Record<string, unknown> = {}) {
     if (!client.submitForm) return;
+    const submitted = {
+      ...value,
+      ...(target ? { [target.name]: target.current } : {}),
+      ...overrides,
+    };
     if (!canSubmit) {
       setError("Fix the YAML before saving.");
       return;
@@ -219,7 +241,7 @@ export function SchemaActionForm({
     setError("");
     try {
       const path = resolveActionPath(action.path, {
-        ...scalarValues(value),
+        ...scalarValues(submitted),
         ...lockedValues,
       });
       // Entity update operations do not always encode their identifier in the
@@ -238,7 +260,7 @@ export function SchemaActionForm({
       const response = await client.submitForm(
         path,
         method,
-        { ...value, ...lockedBodyValues },
+        { ...submitted, ...lockedBodyValues },
         {
           Accept: "application/json+clicky",
         },
@@ -300,7 +322,7 @@ export function SchemaActionForm({
       {view === "form" ? (
         <div role="tabpanel" aria-label="Form">
           <JsonSchemaForm
-            schema={schema}
+            schema={formSchema ?? schema}
             value={value}
             onChange={setValue}
             errors={formErrors}
@@ -361,16 +383,84 @@ export function SchemaActionForm({
   const footer = (
     <div className="flex items-center justify-end gap-2">
       {footerActions?.({ value, action, canSubmit })}
-      <Button
-        type="button"
-        onClick={handleSubmit}
-        disabled={isSubmitting || !canSubmit}
-      >
-        {isSubmitting ? "Saving…" : submitLabel}
-      </Button>
+      {target ? (
+        <SplitButton
+          label={
+            isSubmitting
+              ? "Saving…"
+              : `${submitLabel} to ${target.label(target.current)}`
+          }
+          onClick={() => void handleSubmit()}
+          disabled={isSubmitting || !canSubmit}
+          title="Choose where to save"
+          items={target.choices
+            .filter((choice) => choice !== target.current)
+            .map((choice) => ({
+              label: `${submitLabel} to ${target.label(choice)}`,
+              onSelect: () => {
+                setValue((draft) => ({ ...draft, [target.name]: choice }));
+                void handleSubmit({ [target.name]: choice });
+              },
+            }))}
+        />
+      ) : (
+        <Button
+          type="button"
+          onClick={() => void handleSubmit()}
+          disabled={isSubmitting || !canSubmit}
+        >
+          {isSubmitting ? "Saving…" : submitLabel}
+        </Button>
+      )}
     </div>
   );
   return <>{renderSlots({ body, footer })}</>;
+}
+
+type SubmitTarget = {
+  name: string;
+  choices: string[];
+  current: string;
+  label: (choice: string) => string;
+};
+
+function submitTarget(
+  schema: JsonSchemaObject,
+  value: Record<string, unknown>,
+): SubmitTarget | undefined {
+  const marked = Object.entries(schema.properties ?? {}).filter(
+    ([, property]) => isRecord(property) && property["x-clicky-submit-target"] === true,
+  );
+  if (marked.length === 0) return undefined;
+  if (marked.length > 1) {
+    throw new Error(
+      `schema marks ${marked.map(([name]) => name).join(", ")} as x-clicky-submit-target; only one property may choose where a form saves`,
+    );
+  }
+  const [name, property] = marked[0] as [string, Record<string, unknown>];
+  const choices = Array.isArray(property.enum) ? property.enum.map(String) : [];
+  if (choices.length === 0) {
+    throw new Error(`x-clicky-submit-target property ${name} must declare an enum of choices`);
+  }
+  const labels = isRecord(property["x-enum-labels"]) ? property["x-enum-labels"] : {};
+  const chosen = value[name] ?? property.default ?? choices[0];
+  return {
+    name,
+    choices,
+    current: String(chosen),
+    label: (choice) => String(labels[choice] ?? choice),
+  };
+}
+
+function withoutProperty(schema: JsonSchemaObject, name: string): JsonSchemaObject {
+  const { [name]: _removed, ...properties } = schema.properties ?? {};
+  return {
+    ...schema,
+    properties,
+    ...(Array.isArray(schema.required)
+      ? { required: schema.required.filter((field) => field !== name) }
+      : {}),
+  };
 }
 
 function isMutation(method: string): boolean {

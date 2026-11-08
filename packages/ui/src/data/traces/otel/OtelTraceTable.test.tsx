@@ -66,6 +66,49 @@ it("sorts the listing through the server's sort keys and keeps the server's row 
   expect(onServerSort).toHaveBeenCalledWith({ key: "op_sort", dir: "desc" });
 });
 
+it("lets the listing fill a bounded parent so the table body scrolls under a pinned footer", () => {
+  // jsdom has no layout; this pins the CSS contract that keeps the footer on screen.
+  const rows = traceExample.spans.map(span => ({ _trace: span, operation: span.operation }));
+  const table: ClickyNode = {
+    kind: "table",
+    columns: [{ name: "operation", label: "Operation" }],
+    rows: rows.map(row => ({ cells: { operation: { kind: "text", text: row.operation, plain: row.operation } } })),
+  };
+  render(
+    <OtelTraceTable
+      {...props}
+      listing={profileTraceListing(rows, table)}
+      pagination={{ page: 0, pageSize: 10, total: rows.length, onPageChange: vi.fn(), onPageSizeChange: vi.fn() }}
+    />,
+  );
+  const themeRoot = screen.getByRole("table").closest("[data-theme]");
+  expect(themeRoot).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
+  expect(themeRoot?.parentElement).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
+});
+
+it("shows how long the server took for the listing beside the filter bar", () => {
+  const rows = traceExample.spans.map(span => ({ _trace: span, operation: span.operation }));
+  const table: ClickyNode = {
+    kind: "table",
+    columns: [{ name: "operation", label: "Operation" }],
+    rows: rows.map(row => ({ cells: { operation: { kind: "text", text: row.operation, plain: row.operation } } })),
+  };
+  render(
+    <OtelTraceTable
+      {...props}
+      listing={profileTraceListing(rows, table)}
+      externalSearch={{ value: "", onChange: vi.fn(), placeholder: "Search spans" }}
+      serverTiming={[
+        { name: "total", duration: 1200, counters: {} },
+        { name: "provider", duration: 1150, counters: { rows: 100 } },
+      ]}
+    />,
+  );
+  const badge = screen.getByRole("button", { name: "Show server timing" });
+  expect(badge).toHaveTextContent("1.2 s");
+  expect(screen.getByPlaceholderText("Search spans").closest("[data-slot='filter-bar']")).toContainElement(badge);
+});
+
 it("reports invalid data instead of rendering a misleading trace", () => {
   render(<OtelTraceTable {...props} spans={[traceExample.spans[0]!, traceExample.spans[0]!]} />);
   expect(screen.getByRole("alert")).toHaveTextContent("duplicate span ids");
