@@ -274,16 +274,18 @@ function CodeBody({
           onMount={(editor, monaco) => onMount({ editor, monaco })}
         />
       </div>
-      <div className="shrink-0 overflow-y-auto border-l border-border px-density-3">
-        <CommentSidePanel
-          focusedAlignment="anchor"
-          formatAnchorLabel={(anchor) => `line ${lineOfAnchor(anchor)}`}
-          renderRootDetails={(comment) => {
-            const finding = findingsById.get(comment.id);
-            return finding && getFindingActions ? <ProblemActions items={getFindingActions(finding)} /> : null;
-          }}
-        />
-      </div>
+      {findings.length > 0 && (
+        <div className="shrink-0 overflow-y-auto border-l border-border px-density-3">
+          <CommentSidePanel
+            focusedAlignment="anchor"
+            formatAnchorLabel={(anchor) => `line ${lineOfAnchor(anchor)}`}
+            renderRootDetails={(comment) => {
+              const finding = findingsById.get(comment.id);
+              return finding && getFindingActions ? <ProblemActions items={getFindingActions(finding)} /> : null;
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

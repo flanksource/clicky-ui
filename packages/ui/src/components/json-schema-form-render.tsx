@@ -31,6 +31,7 @@ import { applyPostExtensions } from "./json-schema-form-extensions";
 import { resolveControl, schemaRendersAsObject } from "./json-schema-form-resolve";
 import { effectiveProperties } from "./json-schema-form-conditionals";
 import { applyChangeEffects, applyListenerState } from "./json-schema-form-listeners";
+import { hoistNestedFields, isHoisted } from "./json-schema-form-hoist";
 import type {
   FieldArgs,
   FieldControl,
@@ -446,9 +447,28 @@ export function renderObjectFields(
   };
   const { properties, required } = applyListenerState(schema, value, listenerOptions);
   const hidden = new Set(opts?.hiddenKeys ?? []);
+  // A nested object's `x-clicky-hoist` fields render in this grid instead of
+  // its section; at depth > 0 this object's own hoisted fields belong to the parent.
+  const hoisted = hoistNestedFields({
+    properties, value, onChange, schema, listenerOptions, instancePath: ctx.instancePath,
+  });
+  const own = Object.entries(properties).filter(
+    ([key, prop]) => !hoisted.emptied.has(key) && !(ctx.depth > 0 && isHoisted(prop)),
+  );
+  const fieldArgs = (key: string, prop: JsonSchemaProperty): FieldArgs =>
+    hoisted.rows.get(key) ?? {
+      key,
+      prop,
+      required: required.includes(key),
+      value: value[key],
+      onChange: (next) => onChange(applyChangeEffects(schema, { ...listenerOptions, value, key, next })),
+      instancePath: appendInstancePath(ctx.instancePath, key),
+    };
   // Per-property `x-clicky-order` wins (composes across merged branches); the
   // object-level `x-order` array is the fallback; document order otherwise.
-  const ordered = orderByClickyOrder(orderByXOrder(Object.entries(properties), schema["x-order"]));
+  const ordered = orderByClickyOrder(
+    orderByXOrder([...own, ...Array.from(hoisted.rows, ([key, args]) => [key, args.prop] as [string, JsonSchemaProperty])], schema["x-order"]),
+  );
   const sorted =
     ctx.sortMode === "required-first"
       ? orderRequiredFirst(ordered, required)
@@ -459,7 +479,7 @@ export function renderObjectFields(
   // object subtrees render in full so a matched parent keeps all its children.
   const entries =
     ctx.depth === 0 && ctx.fieldFilter
-      ? sorted.filter(([key, prop]) => matchesFieldFilter({ key, prop, filter: ctx.fieldFilter!, value: value[key] }))
+      ? sorted.filter(([key, prop]) => matchesFieldFilter({ key, prop, filter: ctx.fieldFilter!, value: fieldArgs(key, prop).value }))
       : sorted;
   // Object-level `x-columns` lays the fields out in a multi-column stacked grid;
   // each field spans `x-col-span` columns (object sections/table arrays span the
@@ -470,17 +490,7 @@ export function renderObjectFields(
   const rows = entries.flatMap(([key, prop]) => {
     if (hidden.has(key)) return [];
     if (compactArrays && prop.type === "array" && prop["x-hidden"] !== false && (!Array.isArray(value[key]) || value[key].length === 0)) return [];
-    const row = renderFieldRow(
-      {
-        key,
-        prop,
-        required: required.includes(key),
-        value: value[key],
-        onChange: (next) => onChange(applyChangeEffects(schema, { ...listenerOptions, value, key, next })),
-        instancePath: appendInstancePath(ctx.instancePath, key),
-      },
-      ctx,
-    );
+    const row = renderFieldRow(fieldArgs(key, prop), ctx);
     if (!row) return [];
     if (columns === "auto" || columns > 1) {
       const span = rendersFullWidth(prop)

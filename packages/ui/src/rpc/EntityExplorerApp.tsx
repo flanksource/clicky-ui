@@ -71,6 +71,13 @@ export type EntityExplorerAppProps = {
   entityDetailHeaderRenderer?: EntityDetailHeaderRenderer;
   /** Compact host controls (e.g. an edit icon) shown right after a surface's title or breadcrumb in the top bar. */
   surfaceTitleActions?: (surfaceKey: string) => ReactNode;
+  /**
+   * Per-surface paging presentation, forwarded to OperationCatalog's
+   * `paginationMode`. Return undefined to keep automatic selection (a cursor
+   * walk whenever the list declares a cursor); return "paged" for a surface
+   * whose readers need prev/next offset controls.
+   */
+  surfacePaginationMode?: (surfaceKey: string) => "paged" | "infinite" | undefined;
 };
 
 // SIDEBAR_COLLAPSED_KEY persists the AppShell rail collapsed flag across reloads.
@@ -88,6 +95,7 @@ export function EntityExplorerApp({
   entityDetailBodyRenderer,
   entityDetailHeaderRenderer,
   surfaceTitleActions,
+  surfacePaginationMode,
 }: EntityExplorerAppProps) {
   const formPre = formExtensions?.pre;
   const formPost = formExtensions?.post;
@@ -159,6 +167,7 @@ export function EntityExplorerApp({
   }, []);
   const surface = resolvedRoute.kind === "surface" ? resolvedRoute.surface : undefined;
   const titleActions = surface ? surfaceTitleActions?.(surface.key) : undefined;
+  const paginationMode = surface ? surfacePaginationMode?.(surface.key) : undefined;
   // The container only exists while a surface is resolved, so a portal
   // mounted before the spec loads renders nothing rather than a bare crumb.
   const navSlot = useMemo<ExplorerNavSlot>(
@@ -248,6 +257,7 @@ export function EntityExplorerApp({
               ? { actionLabels: surfaceActionLabels[resolvedRoute.surface.key] }
               : {})}
             {...(resultRenderer ? { resultRenderer } : {})}
+            {...(paginationMode ? { paginationMode } : {})}
             />
           ) : (
             <UnknownSurface surfaceKey={resolvedRoute.surfaceKey} />

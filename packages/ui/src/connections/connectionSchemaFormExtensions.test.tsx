@@ -177,6 +177,34 @@ describe("connectionSchemaFormExtensions", () => {
     expect(await openSourceOptions("Secret value source")).toEqual(["Secret", "ConfigMap", "Helm"]);
   });
 
+  it("leaves hoisted address fields beside the URL rather than repeating them in the properties group", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        url: { type: "string", title: "Database URL", "x-clicky-order": 2 },
+        properties: {
+          type: "object",
+          title: "Properties",
+          "x-clicky-order": 7,
+          properties: {
+            kubeconfig: { type: "string", title: "Kubeconfig file" },
+            kubecontext: { type: "string", title: "Kubecontext" },
+            host: { type: "string", title: "Host", "x-clicky-order": 2.1, "x-clicky-hoist": true },
+            sslmode: { type: "string", title: "SSL mode" },
+          },
+        },
+      },
+    };
+    const extensions = connectionSchemaFormExtensions({ apiBase: API_BASE, schema, fetcher: neverFetch });
+    render(
+      <JsonSchemaForm schema={schema} value={{}} onChange={() => {}} post={extensions.post} showPreferencesMenu={false} />,
+    );
+
+    expect(screen.getAllByText("Host")).toHaveLength(1);
+    expect(screen.getByRole("region", { name: "Properties" })).toHaveTextContent("SSL mode");
+    expect(screen.getByRole("region", { name: "Properties" })).not.toHaveTextContent("Host");
+  });
+
   it("offers a credential field every source when the schema carries no hints", async () => {
     const schema = credentialSchema();
     const extensions = connectionSchemaFormExtensions({

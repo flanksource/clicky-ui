@@ -121,6 +121,7 @@ const KEYWORD_GLYPH: Record<string, DebugGlyphPair> = {
   "x-discriminator": KIND_GLYPH.enum,
   "x-order": pair(UiSortAlphabetically, UiSortAlphabeticallyDark),
   "x-clicky-order": pair(UiListOrdered),
+  "x-clicky-hoist": pair(UiListOrdered),
   "x-item": pair(UiRows),
   "x-help": pair(UiQuestion),
   "x-help-display": pair(UiQuestion),

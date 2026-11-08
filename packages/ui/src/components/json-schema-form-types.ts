@@ -114,6 +114,9 @@ export interface JsonSchemaProperty {
   // branches (each field carries its own order), unlike the object-level
   // `x-order` array.
   "x-clicky-order"?: number;
+  // Render this field in the parent object's grid, at its own `x-clicky-order`,
+  // instead of in its own object's section. The value stays in the nested object.
+  "x-clicky-hoist"?: boolean;
   // Options passed to the MDXEditor-backed markdown field when `format: "md"`.
   "x-md-editor"?: MdxEditorPluginOptions;
   // Optional inline help metadata emitted by CLI/schema generators. The form

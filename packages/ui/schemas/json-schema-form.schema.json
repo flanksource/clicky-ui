@@ -74,6 +74,11 @@
       "type": "number",
       "examples": [10]
     },
+    "x-clicky-hoist": {
+      "description": "Field-level. Render this field in its parent object's grid, sorted by its own `x-clicky-order` among the parent's fields, instead of in its own object's section. The value stays in the nested object. A section whose every field is hoisted is not rendered.",
+      "type": "boolean",
+      "examples": [true]
+    },
     "x-hidden": {
       "description": "Render nothing for this property — no label, no control, at any depth (a hidden object takes its whole section with it). The value is untouched: hiding is a presentation decision, not a data one. Flippable by an `allOf` branch (a matching branch replaces the property wholesale, so re-declare it with `\"x-hidden\": false` to reveal it) or by an `x-on-change` `show`/`hide` action or `patch`.",
       "type": "boolean",

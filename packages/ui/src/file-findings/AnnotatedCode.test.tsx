@@ -216,6 +216,29 @@ describe("AnnotatedCode", () => {
     expect(screen.queryByRole("textbox")).toBeNull();
   });
 
+  it("only reserves a findings rail while findings exist, including after they arrive or clear", async () => {
+    function ChangingFindings() {
+      const [findings, setFindings] = useState<readonly FileFinding[]>([]);
+      return (
+        <MonacoProvider getWorker={() => ({}) as Worker}>
+          <button type="button" onClick={() => setFindings(FINDINGS)}>Load findings</button>
+          <button type="button" onClick={() => setFindings([])}>Clear findings</button>
+          <AnnotatedCode path="pkg/a.go" source={"package a\n"} findings={findings} />
+        </MonacoProvider>
+      );
+    }
+    const { container } = render(<ChangingFindings />);
+    const paneCount = () => container.querySelector("[data-annotated-code]")!.children.length;
+    expect({ panes: paneCount(), rail: screen.queryByTestId("comment-all-rail") }).toEqual({ panes: 1, rail: null });
+
+    fireEvent.click(screen.getByRole("button", { name: "Load findings" }));
+    const rail = await screen.findByTestId("comment-all-rail");
+    expect({ panes: paneCount(), finding: within(rail).getByText(/Unused parameter/).textContent }).toEqual({ panes: 2, finding: expect.stringContaining(FINDINGS[0]!.message) });
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear findings" }));
+    expect({ panes: paneCount(), rail: screen.queryByTestId("comment-all-rail") }).toEqual({ panes: 1, rail: null });
+  });
+
   it("focuses the thread of a finding when a line inside its range is clicked", async () => {
     const onLineChange = vi.fn();
     mount({ onLineChange });
