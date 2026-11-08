@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["vite/client", "node"],
+    "paths": { "@flanksource/clicky-ui/comments": ["packages/ui/dist/comments.d.ts"] }
+  },
+  "include": ["src", "vite.config.ts", "vitest.config.ts", "dev", "../../packages/page-runtime/src/sw/compiler-internals.d.ts"]
+}
