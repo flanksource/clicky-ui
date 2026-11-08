@@ -98,7 +98,7 @@ export type StoredPromptRun = {
 export type StoredStyleChange = {
   attribute: string;
   from: string | number | null;
-  to: string | number;
+  to: string | number | null;
 };
 
 /**
@@ -449,8 +449,11 @@ export function assertStyleEdit(input: unknown): StoredStyleEdit {
     if (!STYLE_EDIT_NAME.test(attribute)) {
       throw new Error(`styleEdit.changes[${index}].attribute ${JSON.stringify(attribute)} is not an attribute name`);
     }
-    if (change["from"] !== null) assertStyleScalar(change["from"], `styleEdit.changes[${index}].from`);
-    assertStyleScalar(change["to"], `styleEdit.changes[${index}].to`);
+    for (const key of ["from", "to"]) {
+      const value = change[key];
+      if (value === null || (value === "" && (attribute === "children" || attribute === "className"))) continue;
+      assertStyleScalar(value, `styleEdit.changes[${index}].${key}`);
+    }
   });
   const refusal = assertExactKeys(edit["refusal"], ["reason", "file", "line", "column", "message"], "styleEdit.refusal");
   assertStyleText(refusal["reason"], "styleEdit.refusal.reason");

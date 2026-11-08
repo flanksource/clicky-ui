@@ -57,6 +57,15 @@ export function useSource(slug: string | undefined, enabled: boolean): Repositor
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const savedExternally = (event: Event) => {
+      const changed = (event as CustomEvent<{ file: string }>).detail.file;
+      if (draft === saved && (file === changed || (file === undefined && changed.replace(/\.(tsx|mdx?)$/, "") === slug))) setRevision(value => value + 1);
+    };
+    window.addEventListener("playground-source-saved", savedExternally);
+    return () => window.removeEventListener("playground-source-saved", savedExternally);
+  }, [draft, saved, file, slug]);
 
   useEffect(() => {
     if (!slug || !enabled || document) return;
@@ -85,7 +94,7 @@ export function useSource(slug: string | undefined, enabled: boolean): Repositor
     return () => {
       cancelled = true;
     };
-  }, [enabled, slug, document, file]);
+  }, [enabled, slug, document, file, revision]);
 
   const save = useCallback(async () => {
     if (!slug) return false;

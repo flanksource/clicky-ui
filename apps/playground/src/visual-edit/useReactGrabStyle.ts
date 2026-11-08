@@ -28,6 +28,7 @@ function requireEditMode(enterEditMode: (() => void) | undefined): () => void {
  * playground's style panel; on anything else it still opens React Grab's own CSS panel.
  */
 export function useReactGrabStyle(options: {
+  enabled?: boolean;
   contentRef: RefObject<HTMLElement | null>;
   onSelectTarget: (target: EditableRoot) => void;
   onBeforeCssEdit: () => boolean;
@@ -36,6 +37,7 @@ export function useReactGrabStyle(options: {
   current.current = options;
 
   useEffect(() => {
+    if (options.enabled === false) return;
     let registered = false;
     let hadEditPlugin = false;
 
@@ -83,5 +85,5 @@ export function useReactGrabStyle(options: {
       grab.unregisterPlugin("playground-style");
       if (hadEditPlugin) grab.registerPlugin(reactGrabStylePlugin);
     };
-  }, []);
+  }, [options.enabled]);
 }

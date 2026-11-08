@@ -1,10 +1,7 @@
 import { useState } from "react";
-import { Button, ErrorDetails, Modal, SplitButton, type Comment, type DropdownMenuItem } from "@flanksource/clicky-ui";
+import { Button, ErrorDetails, Modal, SplitButton, type Comment } from "@flanksource/clicky-ui";
 import type { AgentTarget, AgentSession } from "./agent-runs-api";
-import { captainAgentTarget } from "./agent-targets";
-import { useCaptainSessions } from "./useCaptainSessions";
-import { AgentIdentity } from "@flanksource/clicky-ui/chat";
-import { RuntimeIdentity } from "./RuntimeIdentity";
+import { useSendTargets } from "./useSendTargets";
 
 export function AgentSendFailure({ comment, error, targetLabel, onRetry, onClose, onOpen, managedSessions = [] }: {
   managedSessions?: AgentSession[];
@@ -17,7 +14,6 @@ export function AgentSendFailure({ comment, error, targetLabel, onRetry, onClose
 }) {
   const [sending, setSending] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
-  const { sessions, error: sessionsError } = useCaptainSessions();
   const [retryTarget, setRetryTarget] = useState<AgentTarget>();
   const run = comment.agentRun;
   const target = retryTarget ? retryTarget.kind !== "playground" ? retryTarget.label : "Playground agent" : targetLabel ?? run?.target?.label ?? "Configured agent session";
@@ -39,11 +35,7 @@ export function AgentSendFailure({ comment, error, targetLabel, onRetry, onClose
       setSending(false);
     }
   };
-  const targets: DropdownMenuItem[] = [
-    { label: "Send to Playground agent", onSelect: () => void retry({ kind: "playground" }) },
-    ...managedSessions.filter(session => session.purpose === "target" && session.state === "running").map(session => ({ label: <span className="flex items-center gap-2">Send to {session.label}<RuntimeIdentity runtime={session.runtime} /></span>, onSelect: () => void retry({ kind: "managed", sessionId: session.sessionId, label: session.label! }) })),
-    ...(sessions ?? []).map(session => ({ label: <span className="flex items-center gap-2">Send to {captainAgentTarget(session).label}<AgentIdentity {...(session.model ? { model: session.model } : { provider: session.source })} /></span>, title: session.cwd ?? session.id, onSelect: () => void retry(captainAgentTarget(session)) })),
-  ];
+  const { items: targets, error: sessionsError, loading: sessionsLoading } = useSendTargets({ managedSessions, onSelect: next => void retry(next) });
 
   return (
     <Modal
@@ -68,7 +60,7 @@ export function AgentSendFailure({ comment, error, targetLabel, onRetry, onClose
         </div>
         {retryError && <p role="alert" className="text-sm text-destructive">Retry failed. See technical details for the latest error.</p>}
         {sessionsError && <p role="alert" className="text-xs text-destructive">{sessionsError}</p>}
-        {sessions === null && !sessionsError && <p role="status" className="text-xs text-muted-foreground">Loading Captain sessions…</p>}
+        {sessionsLoading && <p role="status" className="text-xs text-muted-foreground">Loading Captain sessions…</p>}
         <ErrorDetails
           key={detail}
           title="Technical details"

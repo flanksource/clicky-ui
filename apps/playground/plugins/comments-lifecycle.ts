@@ -24,7 +24,7 @@ async function root(dir: string, id: string) {
     );
   return found.comment;
 }
-function requireHuman(actor: StoredAuthor) {
+export function requireHuman(actor: StoredAuthor) {
   if (actor.kind !== "user")
     throw new CommentHttpError(
       "Only a human can close, reopen or assign comments",

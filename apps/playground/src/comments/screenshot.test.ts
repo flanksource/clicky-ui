@@ -87,6 +87,30 @@ describe("captureScreenshot", () => {
     vi.restoreAllMocks();
   });
 
+  it("crops a live frame selection in host viewport coordinates", async () => {
+    const source = new CaptureTrack(() => Promise.resolve());
+    const { drawImage } = installCaptureBrowser(source);
+    const { captureScreenshot } = await import("./screenshot");
+    const isLive = vi.fn(() => true);
+    expect(await captureScreenshot({
+      rect: { x: 300, y: 150, width: 40, height: 20 },
+      isLive,
+    })).toMatchObject({ status: "captured" });
+    expect(drawImage).toHaveBeenCalledWith(expect.any(HTMLVideoElement), 600, 300, 80, 40, 0, 0, 80, 40);
+    expect(isLive).toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: "stale frame", rect: { x: 10, y: 10, width: 40, height: 20 }, live: false },
+    { name: "invalid geometry", rect: { x: Number.NaN, y: 10, width: 40, height: 20 }, live: true },
+    { name: "empty geometry", rect: { x: 10, y: 10, width: 0, height: 20 }, live: true },
+  ])("rejects $name without encoding a screenshot", async ({ rect, live }) => {
+    const { drawImage } = installCaptureBrowser(new CaptureTrack(() => Promise.resolve()));
+    const { captureScreenshot } = await import("./screenshot");
+    expect(await captureScreenshot({ rect, isLive: () => live })).toEqual({ status: "unavailable", reason: "failed" });
+    expect(drawImage).not.toHaveBeenCalled();
+  });
+
   it("captures two comments from one shared display without recropping the source", async () => {
     let sourceCropCount = 0;
     const source = new CaptureTrack(

@@ -141,6 +141,22 @@ describe("page agent target controls", () => {
     expect(setPageAgentTarget).toHaveBeenCalledWith("other", { kind: "captain", sessionId: SECOND.id, label: "Fix layout · claude" });
     expect(vi.mocked(setPageAgentTarget).mock.invocationCallOrder[0]).toBeLessThan(runAgent.mock.invocationCallOrder[0]!);
   });
+  it("points the comment's page at a chosen session before sending, without asking for a runtime", async () => {
+    const runAgent = vi.fn().mockResolvedValue(undefined);
+    const comment = { id: "page-error", page: "oipa/kit", body: "Page failed", author: null, createdAt: "2026-11-05" } as import("@flanksource/clicky-ui").Comment & { page: string };
+    const target: AgentTarget = { kind: "captain", sessionId: SECOND.id, label: "Fix layout · claude" };
+    function SendChosen() {
+      const { start } = useAgentRuns();
+      return <button onClick={() => void start(comment, target)}>Send chosen</button>;
+    }
+    render(<AgentRunsProvider page="oipa/kit" runAgent={runAgent}><SendChosen /></AgentRunsProvider>);
+    await waitFor(() => expect(fetchAgentSessions).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "Send chosen" }));
+    await waitFor(() => expect(runAgent).toHaveBeenCalledWith("page-error", undefined));
+    expect(setPageAgentTarget).toHaveBeenCalledWith("oipa/kit", target);
+    expect(vi.mocked(setPageAgentTarget).mock.invocationCallOrder[0]).toBeLessThan(runAgent.mock.invocationCallOrder[0]!);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
   it("does not send if saving the new target fails, and retries that choice on the next attempt", async () => {
     vi.mocked(setPageAgentTarget).mockRejectedValueOnce(new Error("Could not save target"));
     const runAgent = vi.fn().mockResolvedValue(undefined);

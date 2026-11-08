@@ -1,41 +1,14 @@
-import { spawnSync } from "node:child_process";
-import { parseArgs } from "node:util";
+import { spawn, spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-process.env.NODE_ENV = "production";
-
-const { values } = parseArgs({
-  options: { port: { type: "string" }, host: { type: "string" } },
-});
-const port = values.port === undefined ? undefined : Number(values.port);
-if (
-  port !== undefined &&
-  (!Number.isInteger(port) || port < 1 || port > 65535)
-) {
-  throw new Error("--port must be an integer between 1 and 65535");
+const root = fileURLToPath(new URL("../", import.meta.url));
+const args = process.argv.slice(2);
+if (!args.includes("--no-build")) {
+  const result = spawnSync("pnpm", ["exec", "tsx", "--tsconfig", "tsconfig.server.json", "plugins/production-build.ts"], { cwd: root, stdio: "inherit", env: { ...process.env, NODE_ENV: "production" } });
+  if (result.error) throw result.error;
+  if (result.status !== 0) process.exit(result.status ?? 1);
 }
-
-const editor = spawnSync(
-  "pnpm",
-  ["run", "prepare:editor"],
-  { stdio: "inherit" },
-);
-if (editor.error) throw editor.error;
-if (editor.status !== 0) process.exit(editor.status ?? 1);
-
-const { createServer } = await import("vite");
-const server = await createServer({
-  mode: "playground-prod",
-  server: {
-    ...(port !== undefined ? { port } : {}),
-    ...(values.host ? { host: values.host } : {}),
-  },
-});
-await server.listen();
-server.printUrls();
-
-for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.once(signal, async () => {
-    await server.close();
-    process.exit(0);
-  });
-}
+const server = spawn("pnpm", ["exec", "tsx", "--tsconfig", "tsconfig.server.json", "plugins/production-cli.ts", ...args.filter(arg => arg !== "--no-build")], { cwd: root, stdio: "inherit", env: { ...process.env, NODE_ENV: "production" } });
+for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, () => server.kill(signal));
+server.once("error", error => { throw error; });
+server.once("exit", code => { process.exitCode = code ?? 1; });

@@ -150,7 +150,7 @@ describe("editable source marker grammar", () => {
 
     expect(formatEditableSource(parts)).toBe("a/_b/c.tsx:12:5#3@0123456789ab");
     expect(parseEditableSource(formatEditableSource(parts))).toEqual(parts);
-    expect(() => parseEditableSource("a.tsx:1:1#0")).toThrow(/malformed data-editable-source/);
+    expect(() => parseEditableSource("a.tsx:1:1#0")).toThrow(/malformed data-source/);
     expect(() => parseEditableSource("a.tsx:1:1#0@xyz")).toThrow(/malformed/);
   });
 });

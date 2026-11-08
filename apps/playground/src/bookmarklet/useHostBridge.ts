@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useCommentRailWidth } from "@flanksource/clicky-ui/comments";
 import { sidebarWidth } from "./host-resize";
+import { matchesBookmarkletParent } from "./origin";
 import {
   bridgeMessage,
   envelope,
@@ -57,6 +58,7 @@ export function useHostBridge() {
   const [anchors, setAnchors] = useState<AnchorState[]>([]);
   const [focus, setFocus] = useState<string>();
   const [error, setError] = useState("");
+  const [floating, setFloating] = useState(false);
   useEffect(() => {
     if (!parentOrigin || !session || window.parent === window) {
       setError("Open the grabber by activating its bookmarklet on a page.");
@@ -71,12 +73,15 @@ export function useHostBridge() {
       return;
     }
     const receive = (event: MessageEvent) => {
-      if (event.origin !== parentOrigin || event.source !== window.parent)
+      if (!matchesBookmarkletParent({ expected: parentOrigin, received: event.origin }) || event.source !== window.parent)
         return;
       const message = bridgeMessage(event.data, session);
       if (!message) return;
       try {
-        if (message["type"] === "sidebar-width") {
+        if (message["type"] === "presentation") {
+          if (typeof message["floating"] !== "boolean") throw new Error("Invalid floating presentation");
+          setFloating(message["floating"]);
+        } else if (message["type"] === "sidebar-width") {
           setWidth(sidebarWidth(message["width"]));
         } else if (message["type"] === "state") {
           const input = message["state"] as Record<string, unknown> | undefined;
@@ -144,5 +149,5 @@ export function useHostBridge() {
     sendToHost({ type: "ready", width });
     return () => window.removeEventListener("message", receive);
   }, []);
-  return { state, anchors, focus, error };
+  return { state, anchors, focus, error, floating };
 }

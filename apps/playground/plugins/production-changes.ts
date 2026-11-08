@@ -1,65 +1,30 @@
+import { watch } from "node:fs";
 import { randomUUID } from "node:crypto";
 import type { ServerResponse } from "node:http";
-import type { ViteDevServer } from "vite";
+import type { Middleware } from "./middleware";
+import type { PackageCatalog } from "@flanksource/page-runtime/publication";
 
-export function productionChanges(server: ViteDevServer, root: string) {
+export function productionChanges(options: { roots: string[]; changed: (file: string) => void; packages: { current(): PackageCatalog; subscribe(listener: (catalog: PackageCatalog) => void): () => void } }) {
   const instance = randomUUID();
   let generation = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const clients = new Set<ServerResponse>();
   const revision = () => `${instance}:${generation}`;
-  const send = (client: ServerResponse) =>
-    client.write(`data: ${JSON.stringify(revision())}\n\n`);
-  let timer: ReturnType<typeof setTimeout>;
+  const send = (client: ServerResponse) => client.write(`data: ${JSON.stringify(revision())}\n\n`);
+  const sendPackages = (client: ServerResponse, catalog: PackageCatalog) => client.write(`event: packages\ndata: ${JSON.stringify(catalog)}\n\n`);
+  const unsubscribe = options.packages.subscribe(catalog => clients.forEach(client => sendPackages(client, catalog)));
   const changed = (file: string) => {
-    if (
-      !file.startsWith(`${root}/src/pages/`) &&
-      file !== `${root}/src/styles.css` &&
-      !server.environments.client?.moduleGraph.getModulesByFile(file)?.size
-    )
-      return;
-    const relative = file.startsWith(root + "/")
-      ? file.slice(root.length)
-      : file;
-    if (
-      relative.includes("/node_modules/") ||
-      relative.includes("/dist/") ||
-      relative.includes("/.tmp/")
-    )
-      return;
+    options.changed(file);
     clearTimeout(timer);
-    timer = setTimeout(() => {
-      generation++;
-      clients.forEach(send);
-    }, 200);
+    timer = setTimeout(() => { generation++; clients.forEach(send); }, 200);
   };
-  server.watcher.on("add", changed).on("change", changed).on("unlink", changed);
-  server.middlewares.use((request, response, next) => {
-    if (request.url !== "/__playground/changes") {
-      next();
-      return;
-    }
-    response.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    });
-    clients.add(response);
-    send(response);
-    response.on("close", () => clients.delete(response));
-  });
-  const heartbeat = setInterval(
-    () => clients.forEach((client) => client.write(": keepalive\n\n")),
-    15000,
-  );
-  const close = () => {
-    clearTimeout(timer);
-    clearInterval(heartbeat);
-    server.watcher
-      .off("add", changed)
-      .off("change", changed)
-      .off("unlink", changed);
-    clients.forEach((client) => client.end());
+  const watchers = options.roots.map(root => watch(root, { recursive: true }, (_event, file) => { if (file) changed(`${root}/${file}`); }));
+  const middleware: Middleware = (request, response, next) => {
+    if (request.url !== "/__playground/changes") { next(); return; }
+    response.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
+    clients.add(response); send(response); sendPackages(response, options.packages.current());
+    response.once("close", () => clients.delete(response));
   };
-  server.httpServer?.once("close", close);
-  return { revision, close };
+  const heartbeat = setInterval(() => clients.forEach(client => client.write(": keepalive\n\n")), 15000);
+  return { revision, changed, middleware, close() { unsubscribe(); clearTimeout(timer); clearInterval(heartbeat); watchers.forEach(watcher => watcher.close()); clients.forEach(client => client.end()); } };
 }

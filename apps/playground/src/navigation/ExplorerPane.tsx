@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import {
   ActionError,
+  CommandPaletteTrigger,
   NavigationTree,
   useMediaQuery,
   type AppShellNavSection,
@@ -37,7 +38,7 @@ export function ExplorerContent({ header, error, section, commentsHref, comments
   const comments: AppShellNavSection = { items: [{ key: "comments", label: "Comments", icon: UiComment, to: commentsHref, active: commentsActive }] };
   return (
     <div data-playground-explorer="" className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
-      <div className="shrink-0 space-y-density-2 px-density-2 pt-density-2">{header}</div>
+      <div className="shrink-0 space-y-density-2 px-density-2 pt-density-2"><CommandPaletteTrigger label="Search artifacts…" onClick={() => window.dispatchEvent(new Event("playground-search"))} />{header}</div>
       {error && (
         <ActionError
           title="Navigation unavailable"

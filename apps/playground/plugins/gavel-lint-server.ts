@@ -1,3 +1,4 @@
+import type { MiddlewareApp, ErrorLogger } from "./middleware";
 import { execFile } from "node:child_process";
 import { relative } from "node:path";
 import { promisify } from "node:util";
@@ -102,51 +103,62 @@ function assertLintMode(mode: unknown): LintMode {
  * file comes from the page slug, never from a client-supplied path, and gavel
  * reads it from disk, so unsaved edits are not linted.
  */
+export function registerGavelLintMiddleware(options: {
+  middlewares: MiddlewareApp;
+  logger: ErrorLogger;
+  pagesDir: string;
+  workspaceRoot: string;
+  promptFile: string;
+  exec?: ExecFile;
+}): void {
+  const exec = options.exec ?? (promisify(execFile) as ExecFile);
+  options.middlewares.use(LINT_ROUTE, (req, res) => {
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: `${req.method} is not allowed; POST {slug, mode} lints a page` });
+      return;
+    }
+    void (async () => {
+      try {
+        const body = await readJsonBody(req);
+        const slug = assertSlug(body["slug"]);
+        const mode = assertLintMode(body["mode"]);
+        if (!sourceExists(options.pagesDir, slug)) {
+          throw new PageStoreError(`page "${slug}" does not exist`, 404);
+        }
+        const absolute = pagePath(options.pagesDir, slug);
+        if (pageExtension(absolute) === ".tsx") {
+          throw new LintRunError(`page "${slug}" is not a markdown page`, 400);
+        }
+        const results = await runGavelLint({
+          exec,
+          cwd: options.workspaceRoot,
+          file: relative(options.workspaceRoot, absolute),
+          mode,
+          promptFile: options.promptFile,
+        });
+        sendJson(res, 200, { results });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        options.logger.error(`[playground-gavel-lint] ${message}`);
+        const status =
+          error instanceof LintRunError || error instanceof PageStoreError ? error.statusCode : 400;
+        sendJson(res, status, { error: message });
+      }
+    })();
+  });
+}
+
 export function playgroundGavelLint(options: {
   pagesDir: string;
   workspaceRoot: string;
   promptFile: string;
   exec?: ExecFile;
 }): Plugin {
-  const exec = options.exec ?? (promisify(execFile) as ExecFile);
   return {
     name: "playground-gavel-lint",
     apply: "serve",
     configureServer(server) {
-      server.middlewares.use(LINT_ROUTE, (req, res) => {
-        if (req.method !== "POST") {
-          sendJson(res, 405, { error: `${req.method} is not allowed; POST {slug, mode} lints a page` });
-          return;
-        }
-        void (async () => {
-          try {
-            const body = await readJsonBody(req);
-            const slug = assertSlug(body["slug"]);
-            const mode = assertLintMode(body["mode"]);
-            if (!sourceExists(options.pagesDir, slug)) {
-              throw new PageStoreError(`page "${slug}" does not exist`, 404);
-            }
-            const absolute = pagePath(options.pagesDir, slug);
-            if (pageExtension(absolute) === ".tsx") {
-              throw new LintRunError(`page "${slug}" is not a markdown page`, 400);
-            }
-            const results = await runGavelLint({
-              exec,
-              cwd: options.workspaceRoot,
-              file: relative(options.workspaceRoot, absolute),
-              mode,
-              promptFile: options.promptFile,
-            });
-            sendJson(res, 200, { results });
-          } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            server.config.logger.error(`[playground-gavel-lint] ${message}`);
-            const status =
-              error instanceof LintRunError || error instanceof PageStoreError ? error.statusCode : 400;
-            sendJson(res, status, { error: message });
-          }
-        })();
-      });
+      registerGavelLintMiddleware({ ...options, middlewares: server.middlewares, logger: server.config.logger });
     },
   };
 }

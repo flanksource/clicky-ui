@@ -1,10 +1,11 @@
 import { svgSchemaFor, validateSvgAttributes, type SvgAttributeValues } from "./svg-schemas";
 
 /** An element's editable attributes by JSX prop name; an attribute the element does not carry is absent. */
-export type SvgFormValues = Record<string, string | number>;
+export type SvgFormValues = Record<string, string | number | null>;
 
 /** `strokeWidth` → `stroke-width`: the DOM attribute a JSX prop of the schema renders as. */
 export function domAttributeName(prop: string): string {
+  if (prop === "className") return "class";
   return prop.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 }
 
@@ -13,6 +14,10 @@ export function readSvgAttributes(element: Element): SvgFormValues {
   const { properties } = svgSchemaFor(element.localName);
   const values: SvgFormValues = {};
   for (const [prop, field] of Object.entries(properties)) {
+    if (prop === "children") {
+      if (element.children.length === 0) values[prop] = element.textContent ?? "";
+      continue;
+    }
     const raw = element.getAttribute(domAttributeName(prop));
     if (raw === null) continue;
     const parsed = Number(raw);
@@ -35,7 +40,8 @@ export function diffSvgAttributes(tag: string, baseline: SvgFormValues, values: 
   for (const prop of Object.keys(svgSchemaFor(tag).properties)) {
     const value = values[prop];
     if (value === undefined || value === baseline[prop]) continue;
-    if (value === "") {
+    if (value === null && baseline[prop] == null) continue;
+    if (value === "" && prop !== "children" && prop !== "className") {
       if (baseline[prop] !== undefined) invalid[prop] = `"${prop}" cannot be removed; restore a value or use Revert`;
       continue;
     }

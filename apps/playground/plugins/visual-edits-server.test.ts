@@ -53,6 +53,26 @@ describe("applyVisualEdit", () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  it("saves a data-backed SVG label and its classes across both modules", () => {
+    writeFileSync(file("flanksource/svg.tsx"), 'import { label } from "./_d/label"; export default () => <svg><text className="fill-primary">{label}</text></svg>');
+    writeFileSync(file("flanksource/_d/label.ts"), 'export const label = "Gateway";');
+    const result = apply({ page: "flanksource/svg", source: marker("flanksource/svg.tsx", 0), edit: { kind: "attributes", values: { children: "API", className: "fill-foreground" }, textFrom: "Gateway" } });
+    expect({ status: result.statusCode, page: disk("flanksource/svg.tsx"), label: disk("flanksource/_d/label.ts") }).toEqual({
+      status: 200,
+      page: 'import { label } from "./_d/label"; export default () => <svg><text className="fill-foreground">{label}</text></svg>',
+      label: 'export const label = "API";',
+    });
+  });
+
+  it("does not write a resolved SVG label when a companion attribute is computed", () => {
+    const source = 'import { label } from "./_d/label"; export default () => <svg><text fill={paint}>{label}</text></svg>';
+    const label = 'export const label = "Gateway";';
+    writeFileSync(file("flanksource/svg.tsx"), source);
+    writeFileSync(file("flanksource/_d/label.ts"), label);
+    const result = apply({ page: "flanksource/svg", source: marker("flanksource/svg.tsx", 0), edit: { kind: "attributes", values: { children: "API", fill: "red" }, textFrom: "Gateway" } });
+    expect({ status: result.statusCode, page: disk("flanksource/svg.tsx"), label: disk("flanksource/_d/label.ts") }).toEqual({ status: 422, page: source, label });
+  });
+
   it("edits a lazily imported _ helper and accepts a second edit made with the original marker", () => {
     const original = marker("flanksource/_d/diagram.tsx", 0);
 

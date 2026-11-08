@@ -1,6 +1,10 @@
-import { readdir, readFile } from "node:fs/promises";
-import { dirname, extname, resolve } from "node:path";
+import { readdir } from "node:fs/promises";
+import { resolve } from "node:path";
 import ts from "typescript";
+import { vocabularyOptions } from "./production-config";
+import { vocabularyPages } from "./vocabulary-directories";
+import { pagePath, assertSlug } from "./pages-store";
+import type { SourceRoot } from "./source-roots";
 
 export async function sourceFiles(root: string): Promise<string[]> {
   return (await readdir(root, { recursive: true, withFileTypes: true }))
@@ -9,15 +13,26 @@ export async function sourceFiles(root: string): Promise<string[]> {
 }
 
 export async function pageFiles(root: string): Promise<string[]> {
-  return (await sourceFiles(resolve(root, "src/pages")))
+  const vocabulary = await vocabularyPages(await vocabularyOptions({ root }));
+  return [...new Set([...(await sourceFiles(resolve(root, "src/pages")))
     .map((file) => file.slice(resolve(root, "src/pages").length + 1))
     .filter(
       (file) =>
         /\.(tsx|md|mdx)$/.test(file) &&
         !file.split("/").some((part) => /^[_.]/.test(part)) &&
         !/\.(test|stories)\./.test(file),
-    )
+    ), ...vocabulary.filter(page => page.slug.startsWith("vocabularies/")).map(page => `${page.slug}.tsx`)])]
     .sort();
+}
+
+export async function resolveBrowserPage(options: { root: string; slug: string; sourceRoots: readonly SourceRoot[] }): Promise<string> {
+  assertSlug(options.slug);
+  if (options.slug.startsWith("vocabularies/")) {
+    const pages = await vocabularyPages(await vocabularyOptions(options));
+    const page = pages.find(page => page.slug === options.slug);
+    if (page) return page.file;
+  }
+  return pagePath(resolve(options.root, "src/pages"), options.slug);
 }
 
 export function liveRegistry(code: string): string {
@@ -58,79 +73,13 @@ export function liveRegistry(code: string): string {
 function __liveModules(kind) {
   const files = globalThis.__PLAYGROUND_FILES__;
   if (!Array.isArray(files)) throw new Error("Missing live playground page manifest");
-  const query = {component: "", meta: "?playground-meta", guidance: "?playground-markdown", markdown: "?raw"}[kind];
   return Object.fromEntries(files.filter(file => kind === "markdown" ? /\\.mdx?$/.test(file) : file.endsWith(".tsx"))
-    .map(file => ["./pages/" + file, () => import(/* @vite-ignore */ "/src/pages/" + file + query)
-      .then(module => kind === "component" ? module : module.default)]));
+    .map(file => ["./pages/" + file, async () => {
+      if (kind === "component") throw new Error("Browser pages must render in PageFrame");
+      const response = await fetch("/__playground/browser-page?" + new URLSearchParams({file, kind}));
+      if (!response.ok) throw new Error(await response.text());
+      return response.json();
+    }]));
 }
 ${code}`;
-}
-
-const sharedPackage =
-  /^(?:react(?:-dom)?(?:\/|$)|@flanksource\/(?:clicky-ui|facet)(?:\/|$)|@tanstack\/react-query(?:\/|$)|jotai(?:\/|$)|@iconify\/react$)/;
-
-export async function sharedImports(root: string): Promise<string[]> {
-  const imports = new Set([
-    "react",
-    "react/jsx-runtime",
-    "react-dom",
-    "react-dom/client",
-    "react-dom/server.browser",
-  ]);
-  const pagesRoot = resolve(root, "src/pages") + "/";
-  const files = await sourceFiles(resolve(root, "src"));
-  const available = new Set(files);
-  for (const file of files) {
-    if (
-      !/\.tsx?$/.test(file) ||
-      /\.(test|stories)\./.test(file) ||
-      file.includes("/test/")
-    )
-      continue;
-    const code = await readFile(file, "utf8");
-    if (!file.startsWith(pagesRoot) && code.includes("createContext"))
-      imports.add(file);
-    const source = ts.createSourceFile(
-      file,
-      code,
-      ts.ScriptTarget.Latest,
-      false,
-    );
-    for (const statement of source.statements) {
-      if (
-        !ts.isImportDeclaration(statement) ||
-        !ts.isStringLiteral(statement.moduleSpecifier)
-      )
-        continue;
-      const clause = statement.importClause;
-      if (clause?.isTypeOnly) continue;
-      if (
-        clause?.namedBindings &&
-        ts.isNamedImports(clause.namedBindings) &&
-        !clause.name &&
-        clause.namedBindings.elements.every((item) => item.isTypeOnly)
-      )
-        continue;
-      const specifier = statement.moduleSpecifier.text;
-      if (extname(specifier) === ".css") continue;
-      if (sharedPackage.test(specifier)) imports.add(specifier);
-      else if (file.startsWith(pagesRoot) && specifier.startsWith(".")) {
-        const target = resolve(dirname(file), specifier);
-        const module = [
-          target,
-          target + ".ts",
-          target + ".tsx",
-          target + "/index.ts",
-          target + "/index.tsx",
-        ].find((path) => available.has(path));
-        if (
-          module &&
-          !target.startsWith(pagesRoot) &&
-          target.startsWith(resolve(root, "src") + "/")
-        )
-          imports.add(module);
-      }
-    }
-  }
-  return [...imports].sort();
 }

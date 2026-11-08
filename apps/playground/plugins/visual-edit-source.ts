@@ -172,13 +172,13 @@ function scalarText(value: string | number): string {
  * or entity-encoded refuses the whole edit and is named in `attribute`. Attributes that already
  * hold the requested value are skipped; when none would change the edit is refused as unchanged.
  */
-export function setAttributes(source: string, ordinal: number, values: Record<string, string | number>): VisualEdited | VisualRefused {
+export function setAttributes(source: string, ordinal: number, values: Record<string, string | number | null>): VisualEdited | VisualRefused {
   const entries = Object.entries(values);
   if (entries.length === 0) throw new Error("setAttributes needs at least one attribute");
   for (const [name, value] of entries) {
     if (!ATTRIBUTE_NAME.test(name)) throw new Error(`invalid attribute name ${JSON.stringify(name)}`);
     if (typeof value === "number" && !Number.isFinite(value)) throw new Error(`invalid value for ${name}: ${value} is not a finite number`);
-    if (typeof value === "string" && value === "") throw new Error(`invalid value for ${name}: expected a non-empty string`);
+    if (typeof value === "string" && value === "" && name !== "children" && name !== "className") throw new Error(`invalid value for ${name}: expected a non-empty string`);
   }
   const sourceFile = parseTsx(source, "page.tsx");
   const opening = openingAt(sourceFile, ordinal);
@@ -187,10 +187,27 @@ export function setAttributes(source: string, ordinal: number, values: Record<st
   let firstUnchanged: VisualRefused | undefined;
 
   for (const [name, to] of entries) {
+    if (name === "children" && !findAttribute(opening, sourceFile, name).attribute) {
+      const parent = opening.node.parent;
+      if (!ts.isJsxElement(parent) || parent.children.some(child => !ts.isJsxText(child) && !(ts.isJsxExpression(child) && isLiteral(child.expression)))) {
+        return { ...refused(sourceFile, "computed", opening.start), attribute: name };
+      }
+      const start = opening.node.end;
+      const end = parent.closingElement.getStart(sourceFile);
+      edits.push({ start, end, text: `{${JSON.stringify(to ?? "")}}` });
+      continue;
+    }
     const { index, attribute, properties } = findAttribute(opening, sourceFile, name);
     const refuse = (reason: VisualRefusalReason, at: number): VisualRefused => ({ ...refused(sourceFile, reason, at), attribute: name });
     const spread = properties.find((p, i) => ts.isJsxSpreadAttribute(p) && i > index);
     if (spread) return refuse("spread", spread.getStart(sourceFile));
+    if (to === null) {
+      if (attribute) {
+        if (!attributeLiteral(attribute)) return refuse("computed", attribute.getStart(sourceFile));
+        edits.push({ start: attribute.pos, end: attribute.end, text: "" });
+      }
+      continue;
+    }
     if (!attribute) {
       inserts.push(` ${name}=${scalarText(to)}`);
       continue;
@@ -212,7 +229,7 @@ export function setAttributes(source: string, ordinal: number, values: Record<st
   }
 
   if (inserts.length > 0) edits.push({ start: opening.insertAt, end: opening.insertAt, text: inserts.join("") });
-  if (edits.length === 0) return firstUnchanged!;
+  if (edits.length === 0) return firstUnchanged ?? refused(sourceFile, "unchanged", opening.start);
   const ordered = edits.sort((a, b) => b.start - a.start);
   const text = ordered.reduce((current, edit) => splice(current, edit), sourceFile.text);
   const at = inserts.length > 0 && ordered.length === 1 ? opening.start : ordered[ordered.length - 1]!.start;

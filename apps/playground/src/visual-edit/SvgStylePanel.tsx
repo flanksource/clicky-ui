@@ -4,12 +4,17 @@ import { ActionError, Button, JsonSchemaForm, useFloatingZIndex, type JsonSchema
 import { UiClose, UiLinkExternal } from "@flanksource/clicky-ui/icons";
 import type { StoredStyleEdit } from "../../plugins/comments-store";
 import { EDITABLE_SOURCE_ATTRIBUTE, parseEditableSource } from "../../plugins/editable-source-marker";
-import { liveOverrideSupport } from "./react-override";
+import { liveOverrideSupport, readCallSiteProps } from "./react-override";
 import { diffSvgAttributes, readSvgAttributes, type SvgFormValues } from "./svg-attributes";
 import { svgSchemaFor } from "./svg-schemas";
 import { useAnchoredPosition } from "./useAnchoredPosition";
 import { useVisualEdits, type AttributeSnapshot } from "./useVisualEdits";
 import type { SourceTarget } from "./VisualEditStatus";
+import { SvgStyleOptions } from "./SvgStyleOptions";
+import { useSvgPreviewCss } from "./useSvgPreviewCss";
+import { svgPropertyClasses } from "./svg-style-values";
+import { SvgTailwindField } from "./SvgTailwindField";
+import { SvgDeleteButton } from "./SvgDeleteButton";
 
 /** What a posted change request leaves behind: who it went to, if anyone, and how to reach its thread. */
 export type StyleChangeRequest = { agent?: string; onFocusThread: () => void };
@@ -60,7 +65,11 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
   const markerValue = element.getAttribute(EDITABLE_SOURCE_ATTRIBUTE);
   if (markerValue === null) throw new Error(`<${tag}> has no ${EDITABLE_SOURCE_ATTRIBUTE}; it was not written in a page module`);
   const marker = useMemo(() => parseEditableSource(markerValue), [markerValue]);
-  const schema = useMemo(() => svgSchemaFor(tag) as unknown as JsonSchemaObject, [tag]);
+  const schema = useMemo(() => {
+    const original = svgSchemaFor(tag);
+    const properties = Object.fromEntries(Object.entries(original.properties).filter(([name]) => name !== "children" || element.children.length === 0));
+    return { ...original, properties: { ...properties, ...(properties.children ? { children: { ...properties.children, title: "Text content", "x-label-position": "top" } } : {}) } } as unknown as JsonSchemaObject;
+  }, [tag, element]);
   const live = useMemo(liveOverrideSupport, []);
   const edits = useVisualEdits({ page, live: live.supported });
   const zIndex = useFloatingZIndex();
@@ -69,18 +78,30 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
   const position = useAnchoredPosition(element, panel);
 
   const [baseline, setBaseline] = useState<SvgFormValues>(() => readSvgAttributes(element));
-  const baselineRef = useRef(baseline);
-  baselineRef.current = baseline;
+  const [originalProps] = useState<Record<string, unknown>>(() => Object.keys(element).some(key => key.startsWith("__reactFiber$")) ? readCallSiteProps(element, markerValue) : { ...baseline });
   const [values, setValues] = useState<Record<string, unknown>>(baseline);
+  const previewCss = useSvgPreviewCss(values.className);
   const [nodes] = useState(() => instancesOf(root, element, markerValue, baseline));
   /** The attributes whose preview is on screen and not yet saved, with the value shown. */
-  const previewed = useRef(new Map<string, string | number>());
+  const previewed = useRef(new Map<string, string | number | null>());
   const [localError, setLocalError] = useState<{ title: string; error: Error } | null>(null);
   const [requesting, setRequesting] = useState(false);
   const [requested, setRequested] = useState<StyleChangeRequest | null>(null);
   const [interactionNotice, setInteractionNotice] = useState<string | null>(null);
 
-  const diff = useMemo(() => diffSvgAttributes(tag, baseline, values), [tag, baseline, values]);
+  const diff = useMemo(() => {
+    const result = diffSvgAttributes(tag, baseline, values);
+    for (const [property, value] of Object.entries(result.changes)) {
+      if (value === null) continue;
+      const classes = svgPropertyClasses({ classes: "className" in values ? values.className : baseline.className, property });
+      const inline = (element as SVGElement).style.getPropertyValue(property.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`));
+      if (classes.length || inline) {
+        result.invalid[property] = `${property} is controlled by ${inline ? "an inline style; open source" : `${classes.join(" ")}; choose a utility or edit className`}`;
+        delete result.changes[property];
+      }
+    }
+    return result;
+  }, [tag, baseline, values, element]);
   const changeNames = Object.keys(diff.changes);
   const invalidMessages = Object.values(diff.invalid);
   const busy = changeNames.length > 0 || invalidMessages.length > 0 || edits.pending || requesting;
@@ -92,11 +113,11 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
   /** Restores the baseline on every previewed attribute; returns the failure, if any. */
   const revertPreview = useCallback((): Error | null => {
     if (previewed.current.size === 0) return null;
-    const target = Object.fromEntries([...previewed.current.keys()].map((name) => [name, baselineRef.current[name] ?? null]));
+    const target = Object.fromEntries([...previewed.current.keys()].map((name) => [name, originalProps[name] ?? null]));
     previewed.current = new Map();
     const present = connected();
     return present.length === 0 ? null : edits.previewAttributes(present, markerValue, target);
-  }, [connected, edits.previewAttributes, markerValue]);
+  }, [connected, edits.previewAttributes, markerValue, originalProps]);
 
   useEffect(() => {
     if (!live.supported) return;
@@ -104,8 +125,8 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
     const settled = (name: string) => !(name in diff.invalid);
     const wanted = [...new Set([...previewed.current.keys(), ...changeNames])]
       .filter(settled)
-      .map((name): [string, string | number | null] => [name, diff.changes[name] ?? baseline[name] ?? null]);
-    const onScreen = (name: string) => previewed.current.get(name) ?? baseline[name] ?? null;
+      .map((name): [string, string | number | null] => [name, name in diff.changes ? diff.changes[name]! : baseline[name] ?? null]);
+    const onScreen = (name: string) => previewed.current.has(name) ? previewed.current.get(name) : baseline[name] ?? null;
     const updates = wanted.filter(([name, value]) => value !== onScreen(name));
     if (updates.length === 0) return;
     for (const [name] of updates) {
@@ -171,19 +192,19 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
   const save = async () => {
     setInteractionNotice(null);
     const saved = diff.changes;
-    const previous: AttributeSnapshot = Object.fromEntries(Object.keys(saved).map((name) => [name, baseline[name] ?? null]));
+    const previous: AttributeSnapshot = Object.fromEntries(Object.keys(saved).map((name) => [name, originalProps[name] ?? null]));
     setLocalError(null);
     setRequested(null);
-    const outcome = await edits.commit({ markerValue, nodes: connected(), edit: { kind: "attributes", values: saved }, previous });
-    previewed.current = new Map();
-    if (outcome === "applied") setBaseline((current) => ({ ...current, ...saved }));
-    if (outcome === "ambiguous") {
-      edits.cancelAmbiguous();
-      setLocalError({ title: "Edit failed", error: new Error("The server asked to choose between several places; an attribute edit names exactly one element") });
+    const outcome = await edits.commit({ markerValue, nodes: connected(), edit: { kind: "attributes", values: saved, ...(typeof baseline.children === "string" && "children" in saved ? { textFrom: baseline.children } : {}) }, previous });
+    if (outcome !== "ambiguous") previewed.current = new Map();
+    if (outcome === "applied") {
+      Object.assign(originalProps, saved);
+      setBaseline((current) => ({ ...current, ...saved }));
     }
   };
 
   const revert = () => {
+    if (edits.candidates.length) edits.cancelAmbiguous();
     setInteractionNotice(null);
     const failure = revertPreview();
     setLocalError(failure ? { title: "Revert failed", error: failure } : null);
@@ -235,7 +256,7 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
       aria-label={`Style ${label}`}
       aria-busy={edits.saving ? true : undefined}
       data-svg-style-panel=""
-      style={{ position: "fixed", left: position.left, top: position.top, zIndex, width: "min(340px, calc(100vw - 16px))", maxHeight: "calc(100vh - 16px)" }}
+      style={{ position: "fixed", left: position.left, top: position.top, zIndex, width: "min(520px, calc(100vw - 16px))", maxHeight: "calc(100vh - 16px)" }}
       className="flex flex-col overflow-hidden rounded-lg border border-border bg-card text-xs text-foreground shadow-lg"
     >
       <div className="flex items-start gap-density-2 border-b border-border p-density-2">
@@ -256,16 +277,26 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
       </div>
       <div className="min-h-0 flex-1 space-y-density-2 overflow-y-auto p-density-2">
         {interactionNotice ? <p role="status">{interactionNotice}</p> : null}
+        <SvgStyleOptions element={element} values={values} onChange={setValues} />
         <JsonSchemaForm
           schema={schema}
           value={values}
           onChange={setValues}
+          readOnly={edits.pending}
+          post={[(field, rendered, context) => {
+            const property = field.key;
+            if (property !== "fill" && property !== "stroke" && property !== "color" && property !== "fontSize" && property !== "strokeWidth" && property !== "opacity") return rendered;
+            return { ...rendered, value: <SvgTailwindField {...(context?.fieldId ? { id: context.fieldId } : {})} element={element} property={property} values={values} baseline={baseline} disabled={edits.pending} onChange={setValues} /> };
+          }]}
           size="xs"
-          layout={{ mode: "inline", labelMaxWidth: "10ch", valueMaxWidth: "100%" }}
+          layout={{ mode: "inline", labelMaxWidth: "14ch", valueMaxWidth: "100%" }}
           applyDefaults={false}
           showPreferencesMenu={false}
           idPrefix={idPrefix}
         />
+        <SvgDeleteButton disabled={busy && !edits.saving} saving={edits.saving} instances={root.querySelectorAll(`[${EDITABLE_SOURCE_ATTRIBUTE}="${markerValue}"]`).length} onDelete={async () => {
+          if (await edits.commit({ markerValue, nodes: connected(), edit: { kind: "delete" } }) === "applied") window.location.reload();
+        }} />
         {!live.supported ? <p className="text-muted-foreground">Live preview off: {live.reason}</p> : null}
         {invalidMessages.length > 0 ? (
           <ul role="status" className="list-disc pl-4 text-muted-foreground">
@@ -273,6 +304,18 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
           </ul>
         ) : null}
         {localError ? <ActionError error={localError.error} title={localError.title} /> : null}
+        {previewCss.error ? <ActionError error={previewCss.error} title="Tailwind preview failed" /> : null}
+        {edits.candidates.length > 0 ? <div className="space-y-density-1">
+          <p>Choose the source text to update:</p>
+          {edits.candidates.map(candidate => <Button key={candidate.id} type="button" size="sm" variant="outline" onClick={() => void (async () => {
+            const result = await edits.choose(candidate.id);
+            if (result === "applied") {
+              Object.assign(originalProps, diff.changes);
+              setBaseline(current => ({ ...current, ...diff.changes }));
+              previewed.current = new Map();
+            }
+          })()}>{candidate.file}:{candidate.line} {candidate.context}</Button>)}
+        </div> : null}
         {failure && !requested ? (
           <ActionError
             error={failure.error}
@@ -319,7 +362,7 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
         <Button
           type="button"
           size="sm"
-          disabled={edits.saving || changeNames.length === 0 || invalidMessages.length > 0}
+          disabled={edits.pending || previewCss.pending || previewCss.error !== null || changeNames.length === 0 || invalidMessages.length > 0}
           onClick={() => void save()}
         >
           {edits.saving ? "Saving…" : "Save"}
