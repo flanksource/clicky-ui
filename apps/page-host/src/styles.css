@@ -1,0 +1,6 @@
+@config "../tailwind.config.ts";
+@import "tailwindcss";
+@source "../../../packages/ui/src/**/*.{ts,tsx}";
+@source "../../../packages/page-runtime/src/host/**/*.{ts,tsx}";
+
+html, body, #app { height: 100%; }
