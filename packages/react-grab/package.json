@@ -37,7 +37,8 @@
     "./styles.css": "./dist/styles.css"
   },
   "scripts": {
-    "build": "tsx scripts/build.ts",
+    "build": "tsx ../page-runtime/scripts/run-package-build.ts",
+    "build:artifacts": "tsx scripts/build.ts",
     "test": "vitest run tests",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "fork:check": "tsx scripts/fork-check.ts"

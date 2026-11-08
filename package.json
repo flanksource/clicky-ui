@@ -17,9 +17,9 @@
     "serve:docs": "pnpm --filter docs preview",
     "test": "pnpm --filter storybook build && pnpm --filter kitchen-sink build && pnpm --filter kitchen-sink test && pnpm --filter playground build && pnpm --filter @flanksource/clicky-ui test && pnpm --filter storybook test && pnpm --filter e2e test",
     "test:e2e": "pnpm --filter e2e test",
-    "format": "prettier --write package.json pnpm-workspace.yaml README.md packages/ui/package.json packages/ui/README.md apps/kitchen-sink/package.json apps/playground/package.json apps/storybook/package.json apps/docs/package.json apps/docs/astro.config.mjs apps/docs/scripts/*.mjs apps/docs/src/content.config.ts apps/docs/src/styles/docs.css \"apps/docs/src/content/docs/**/*.{md,mdx}\" e2e/package.json",
-    "format:check": "prettier --check package.json pnpm-workspace.yaml README.md packages/ui/package.json packages/ui/README.md apps/kitchen-sink/package.json apps/playground/package.json apps/storybook/package.json apps/docs/package.json apps/docs/astro.config.mjs apps/docs/scripts/*.mjs apps/docs/src/content.config.ts apps/docs/src/styles/docs.css \"apps/docs/src/content/docs/**/*.{md,mdx}\" e2e/package.json",
-    "lint": "pnpm --filter @flanksource/clicky-ui lint && pnpm --filter kitchen-sink lint && pnpm --filter playground lint && pnpm --filter storybook lint && pnpm --filter e2e lint",
+    "format": "prettier --write package.json pnpm-workspace.yaml README.md packages/ui/package.json packages/ui/README.md apps/kitchen-sink/package.json apps/playground/package.json apps/storybook/package.json apps/docs/package.json apps/docs/astro.config.mjs apps/docs/scripts/*.mjs apps/docs/src/content.config.ts apps/docs/src/styles/docs.css \"apps/docs/src/content/docs/**/*.{md,mdx}\" e2e/package.json packages/page-runtime/package.json",
+    "format:check": "prettier --check package.json pnpm-workspace.yaml README.md packages/ui/package.json packages/ui/README.md apps/kitchen-sink/package.json apps/playground/package.json apps/storybook/package.json apps/docs/package.json apps/docs/astro.config.mjs apps/docs/scripts/*.mjs apps/docs/src/content.config.ts apps/docs/src/styles/docs.css \"apps/docs/src/content/docs/**/*.{md,mdx}\" e2e/package.json packages/page-runtime/package.json",
+    "lint": "pnpm --filter @flanksource/clicky-ui lint && pnpm --filter kitchen-sink lint && pnpm --filter playground lint && pnpm --filter storybook lint && pnpm --filter e2e lint && pnpm --filter @flanksource/page-runtime lint",
     "typecheck": "tsc -b && pnpm --filter @flanksource/clicky-ui run check:public-exports",
     "check": "pnpm --filter @flanksource/clicky-ui build:icons && pnpm run format:check && pnpm run lint && pnpm run typecheck"
   },
@@ -33,5 +33,10 @@
   "engines": {
     "node": ">=22.12.0"
   },
-  "packageManager": "pnpm@11.22.0+sha512.1ff870c4c6133dfd88fb2afc46dd13d47f09c9794b438c6fdb47ca98caf3bc16381ee0be93a091b8e3824cf01f889f46d7d9e20910fb0be1ab0fb5baa80dd621"
+  "packageManager": "pnpm@11.22.0+sha512.1ff870c4c6133dfd88fb2afc46dd13d47f09c9794b438c6fdb47ca98caf3bc16381ee0be93a091b8e3824cf01f889f46d7d9e20910fb0be1ab0fb5baa80dd621",
+  "pageRuntime": {
+    "policy": {
+      "dependencies": "any"
+    }
+  }
 }

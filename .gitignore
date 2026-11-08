@@ -58,3 +58,7 @@ packages/ui/src/generated/storybook/
 /pico.save
 /.tmp-comments.json
 .facet/
+/apps/playground/docs/plans/
+!/packages/page-runtime/src/build/
+!/packages/page-runtime/src/build/**
+/packages/page-runtime/spikes/

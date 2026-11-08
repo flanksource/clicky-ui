@@ -2,6 +2,7 @@ export { PageFrame, type PageFrameProps } from "./PageFrame.tsx";
 export { createBridge, type BridgeOptions, type PageBridge } from "./bridge.ts";
 export { validateEnvelope, validateFrameMessage, validateHostMessage } from "./validation.ts";
 export { RuntimeActivity } from "./RuntimeActivity.tsx";
+export { clearPageRuntimeCache, PAGE_RUNTIME_CACHE_PREFIX, type ClearedPageRuntimeCache, type ClearPageRuntimeCacheOptions } from "./clear-cache.ts";
 export { BuildLog } from "./BuildLog.tsx";
 export { buildLog, type BuildLogEntry, type BuildStep } from "./build-log.ts";
 export { activityTimings, appendActivity, emptyActivity, summarizeActivity, type RuntimeActivityState } from "./activity-state.ts";
