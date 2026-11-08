@@ -187,13 +187,11 @@ export function CommentThreadList({
       </div>
       {maximizedRoot && (
         <Modal open onClose={closeMaximized} title="Comment thread" size="xl" className="h-[min(800px,90dvh)]"
-          subtitle={<Tabs tabs={[{ id: "thread", label: "Thread" }, ...detailTabs.map(({ id, label }) => ({ id, label })), ...(threadToMarkdown ? [{ id: "markdown", label: "Markdown" }] : [])]} value={maximizedTab} onChange={setMaximizedTab} />}
+          subtitle={<Tabs tabs={[{ id: "thread", label: "Thread" }, ...detailTabs.map(({ id, label }) => ({ id, label }))]} value={maximizedTab} onChange={setMaximizedTab} />}
           footer={onReply && <div ref={replyBar}><CommentReplyInput key={maximizedRoot.id} pinned parentId={maximizedRoot.id} config={config} onCancel={() => {}} onSubmit={body => onReply(maximizedRoot, body)} /></div>}
         >
           <div className="space-y-3" data-testid="comment-thread-modal">
-            {maximizedTab === "markdown" && threadToMarkdown ? (
-              <Markdown text={threadToMarkdown(maximizedThread)} />
-            ) : detailTabs.some(tab => tab.id === maximizedTab) ? (
+            {detailTabs.some(tab => tab.id === maximizedTab) ? (
               detailTabs.find(tab => tab.id === maximizedTab)?.render(maximizedThread)
             ) : (
               <div className="space-y-2">

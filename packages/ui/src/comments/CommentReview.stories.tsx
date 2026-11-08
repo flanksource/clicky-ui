@@ -36,7 +36,7 @@ function ReviewSurface() {
       </section>
       <div className="h-[1000px]" />
     </div>
-    <CommentRail><div className="p-3"><CommentSidePanel className="w-full" compact previewLines={3} focusedAlignment="anchor"
+    <CommentRail open={ctx.railMode !== "closed"} onOpenChange={open => open ? ctx.openCommentList() : ctx.closeRail()}><div className="p-3"><CommentSidePanel className="w-full" compact previewLines={3} focusedAlignment="flow"
       detailTabs={[
         { id: "capture", label: "Capture", render: () => <p>Captured navigation selection and source context.</p> },
         { id: "agents", label: "Agents", render: () => <AgentIdentity model="claude-opus-5-5" effort="high" /> },

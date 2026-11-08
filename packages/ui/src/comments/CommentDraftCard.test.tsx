@@ -14,8 +14,19 @@ import { CommentSidePanel } from "./CommentSidePanel";
 import { useCommentContext } from "./comment-context";
 import { useEffect } from "react";
 import { DEFAULT_COMMENT_STATUSES } from "./comment-types";
+import { Context, createStore } from "./comment-persistence";
 
 const config = { statuses: DEFAULT_COMMENT_STATUSES };
+it("clears the persisted body and facets when the standalone card is discarded", () => {
+  const store = createStore("standalone-discard");
+  store.write("draft:create:target:body", "Discard this draft");
+  store.write("draft:create:target:facets", { priority: "high" });
+  const onDiscard = vi.fn();
+  render(<Context.Provider value={store}><CommentDraftCard config={config} anchor="target" label="Target" onDiscard={onDiscard} /></Context.Provider>);
+  fireEvent.click(screen.getByRole("button", { name: "Discard comment" }));
+  expect([store.read("draft:create:target:body", ""), store.read("draft:create:target:facets", {})]).toEqual(["", {}]);
+  expect(onDiscard).toHaveBeenCalledOnce();
+});
 beforeAll(() =>
   Object.defineProperty(Range.prototype, "getBoundingClientRect", {
     configurable: true,

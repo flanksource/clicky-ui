@@ -8,6 +8,12 @@ export type CommentVocabularyItem = {
   description: string;
   references: readonly string[];
 };
+export type VocabularyDeclarationItem = Omit<CommentVocabularyItem, "catalog"> & { readonly [field: string]: unknown };
+export type VocabularyDeclaration = { alias: string; instructions: string; items: readonly VocabularyDeclarationItem[] };
+export const VOCABULARY_PREVIEW_ATTRIBUTE = "data-vocabulary-preview";
+export function vocabularyAnchor(id: string): string {
+  return `vocabulary:${id}`;
+}
 export type CommentVocabulary = {
   items: readonly CommentVocabularyItem[];
   renderPreview: (item: CommentVocabularyItem) => ReactNode;
