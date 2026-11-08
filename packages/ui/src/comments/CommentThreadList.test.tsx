@@ -100,13 +100,14 @@ describe("CommentThreadList", () => {
     expect(copy).toHaveBeenCalledWith("# Whole thread\n\nroot and reply");
   });
 
-  it("previews the exact copied Markdown in a tab of the maximized thread", async () => {
-    const markdown = "# Whole thread\n\nroot and reply";
+  it("renders a consumer detail tab over the maximized thread and adds no built-in Markdown tab", () => {
+    const threadToMarkdown = (thread: readonly Comment[]) => thread.map((comment) => comment.body).join(" / ");
     render(
       <CommentThreadList
         comments={comments}
         config={config}
-        threadToMarkdown={() => markdown}
+        threadToMarkdown={threadToMarkdown}
+        detailTabs={[{ id: "preview", label: "Preview", render: (thread) => <pre>{threadToMarkdown(thread)}</pre> }]}
       />,
     );
 
@@ -114,10 +115,10 @@ describe("CommentThreadList", () => {
       screen.getAllByRole("button", { name: "Comment actions" })[0]!,
     );
     fireEvent.click(screen.getByText("Maximise"));
-    fireEvent.click(screen.getByRole("tab", { name: "Markdown" }));
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Thread", "Preview"]);
+    fireEvent.click(screen.getByRole("tab", { name: "Preview" }));
 
-    expect(await screen.findByText("Whole thread")).toBeInTheDocument();
-    expect(screen.getByText("root and reply")).toBeInTheDocument();
+    expect(screen.getByText("root comment / a reply")).toBeInTheDocument();
   });
 
   it.each([

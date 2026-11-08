@@ -3,6 +3,7 @@ import { CommentComposer, type CommentComposerProps } from "./CommentComposer";
 import { Icon } from "../data/Icon";
 import { UiClose, UiComment } from "../icons";
 import { useEscapeLayer } from "../overlay/modalStack";
+import { useDiscardCommentDraft } from "./comment-persistence";
 
 export type CommentDraftCardProps = CommentComposerProps & {
   label: string;
@@ -16,8 +17,11 @@ export function CommentDraftCard({
 }: CommentDraftCardProps) {
   const [posting, setPosting] = useState(false);
   const busy = useRef(false);
+  const discardDraft = useDiscardCommentDraft();
   const discard = () => {
-    if (!busy.current) onDiscard();
+    if (busy.current) return;
+    if (props.anchor) discardDraft(props.anchor);
+    onDiscard();
   };
   useEscapeLayer(true, discard);
   return (

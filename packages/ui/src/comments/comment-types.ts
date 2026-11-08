@@ -1,3 +1,4 @@
+import type { CommentScreenshotCapture } from "./annotation-types";
 import type { CommentVocabulary, CommentVocabularyItem } from "./comment-vocabulary";
 import type { ReactNode } from "react";
 import type { StaticIconComponent } from "../data/Icon";
@@ -188,6 +189,10 @@ export type CommentCreateInput = {
   reviewDecision?: CommentReviewDecision;
   facets?: Record<string, string>;
   mentions?: CommentMention[];
+  /** Hand the new root straight to someone, e.g. when a finding is assigned. */
+  assignee?: CommentAuthor;
+  /** A capture of the anchored region, set by the built-in "Post with screenshot" variant. */
+  screenshot?: CommentScreenshotCapture;
 };
 
 export type CommentCreateAction = { id: string; label: string };

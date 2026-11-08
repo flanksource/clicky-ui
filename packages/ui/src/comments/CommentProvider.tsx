@@ -61,7 +61,7 @@ export type CommentProviderProps = CommentCallbacks & {
  * fetching — `comments` and the callbacks are controlled by the consumer.
  */
 export function CommentProvider(props: CommentProviderProps) {
-  return <CommentPersistenceBoundary key={props.persistenceKey ?? "ephemeral"} {...(props.persistenceKey ? { scope: props.persistenceKey } : {})}><CommentProviderInner {...props} /></CommentPersistenceBoundary>;
+  return <CommentPersistenceBoundary {...(props.persistenceKey ? { scope: props.persistenceKey } : {})}><CommentProviderInner {...props} /></CommentPersistenceBoundary>;
 }
 
 function CommentProviderInner({
@@ -83,17 +83,28 @@ function CommentProviderInner({
   onChecklistToggle,
   onMention,
   initialRailMode = "closed",
+  persistenceKey,
 }: CommentProviderProps) {
   const [railMode, setRailMode] = useCommentState<CommentRailMode>("rail", initialRailMode);
   const [focusedAnchor, setFocusedAnchor] = useCommentState<CommentAnchor | null>("focused-anchor", null);
   const [highlightAnchor, setHighlightAnchor] = useState<CommentAnchor | null>(null);
+  // A new persistence scope keeps the subtree mounted: scoped state comes from the new store, the transient highlight resets.
+  const [highlightScope, setHighlightScope] = useState(persistenceKey);
+  if (highlightScope !== persistenceKey) {
+    setHighlightScope(persistenceKey);
+    setHighlightAnchor(null);
+  }
+  // The stable actions below must write to the current scope's store, not the one they were created with.
+  const scopedSetters = useRef({ setRailMode, setFocusedAnchor });
+  scopedSetters.current = { setRailMode, setFocusedAnchor };
   const railModeRef = useRef<CommentRailMode>(railMode);
+  railModeRef.current = railMode;
   const onRailModeChangeRef = useRef(onRailModeChange);
   const onScrollToAnchorRef = useRef(onScrollToAnchor);
   const externalAnchorTopRef = useRef(externalAnchorTop);
   externalAnchorTopRef.current = externalAnchorTop;
   const resolveAnchorRef = useRef(resolveAnchor);
-  const anchorEls = useRef<Record<string, HTMLElement>>({});
+  const anchorEls = useRef<Record<string, Element>>({});
   const contentRef = useRef<HTMLDivElement | null>(null);
 
   const commentCounts = useMemo(() => deriveAnchorCounts(comments), [comments]);
@@ -107,27 +118,27 @@ function CommentProviderInner({
   }, [onRailModeChange, onScrollToAnchor, externalAnchorTop, resolveAnchor]);
 
   const focusAnchor = useCallback((anchor: CommentAnchor) => {
-    setFocusedAnchor(anchor);
+    scopedSetters.current.setFocusedAnchor(anchor);
     railModeRef.current = "focused";
-    setRailMode("focused");
+    scopedSetters.current.setRailMode("focused");
     onRailModeChangeRef.current?.("focused");
   }, []);
 
   const openCommentList = useCallback(() => {
     const next = railModeRef.current === "all" ? "closed" : "all";
     railModeRef.current = next;
-    setRailMode(next);
+    scopedSetters.current.setRailMode(next);
     onRailModeChangeRef.current?.(next);
   }, []);
 
   const closeRail = useCallback(() => {
     railModeRef.current = "closed";
-    setRailMode("closed");
+    scopedSetters.current.setRailMode("closed");
     onRailModeChangeRef.current?.("closed");
   }, []);
 
   const registerAnchor = useCallback(
-    (anchor: CommentAnchor, el: HTMLElement | null) => {
+    (anchor: CommentAnchor, el: Element | null) => {
       if (!el) {
         delete anchorEls.current[anchor];
         return;

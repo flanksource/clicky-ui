@@ -13,10 +13,9 @@ import {
   CommentDraftCard,
   type CommentDraftCardProps,
 } from "./CommentDraftCard";
-import { useDiscardCommentDraft } from "./comment-persistence";
 
 export type CommentDraftPopoverProps = CommentDraftCardProps & {
-  reference: HTMLElement;
+  reference: Element;
 };
 
 export function CommentDraftPopover({
@@ -25,7 +24,6 @@ export function CommentDraftPopover({
   ...props
 }: CommentDraftPopoverProps) {
   const floatingZ = useFloatingZIndex();
-  const discardDraft = useDiscardCommentDraft();
   const lastRect = useRef(reference.getBoundingClientRect());
   const position = useCallback(() => {
     if (reference.isConnected && reference.getClientRects().length)
@@ -66,10 +64,7 @@ export function CommentDraftPopover({
     >
       <CommentDraftCard
         {...props}
-        onDiscard={() => {
-          if (props.anchor) discardDraft(props.anchor);
-          onDiscard();
-        }}
+        onDiscard={onDiscard}
       />
     </div>,
     document.body,
