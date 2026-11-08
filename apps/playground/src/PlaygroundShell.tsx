@@ -19,11 +19,17 @@ import {
   useFloatingZIndex,
   useMediaQuery,
   type WorkspacePaneSpec,
+  type WorkspaceSideArrangements,
 } from "@flanksource/clicky-ui";
 import { CommentDraftPopover } from "@flanksource/clicky-ui/comments";
 import { CommentDashboard } from "./comments/CommentDashboard";
 import { PageErrorBoundary } from "./PageErrorBoundary";
 import { LIVE_SERVER } from "./live-server";
+import { useBrowserSession } from "./browser-mode/session";
+import { BrowserPage } from "./browser-mode/BrowserPage";
+import { VocabularyGenerationHost } from "./vocabularies/config";
+import { VocabularyAnchorTarget } from "./vocabularies/VocabularyAnchorTarget";
+import type { AgentAnchorState } from "@flanksource/page-runtime/schema";
 
 import {
   CommentOverlay,
@@ -104,6 +110,7 @@ import {
   type PageEntry,
 } from "./registry";
 import type { AnnotationVisibility, PlaygroundView } from "./route";
+import { ReloadControl } from "./ReloadControl";
 
 const lazyPageCache = new Map<string, LazyExoticComponent<ComponentType>>();
 
@@ -139,6 +146,10 @@ export type PlaygroundShellProps = {
   onCaptureSelection: PlaygroundComments["captureSelection"];
 };
 
+/** With the editor open the left side is Explorer | Source, next to the page; otherwise the Explorer stands alone. */
+const EDITOR_SIDE_ARRANGEMENT: WorkspaceSideArrangements = { left: "columns" };
+const NO_SIDE_ARRANGEMENT: WorkspaceSideArrangements = {};
+
 /** What the Source pane edits: the page itself, or one of its helper modules (path relative to `src/pages`). */
 type EditTarget = { kind: "page" } | { kind: "file"; file: string; line?: number };
 
@@ -172,8 +183,12 @@ export function PlaygroundShell({
   onCaptureSelection,
 }: PlaygroundShellProps) {
   const ctx = useCommentContext();
+  const browser = useBrowserSession();
+  const [frameAnchors, setFrameAnchors] = useState<AgentAnchorState[]>([]);
+  const [framePending, setFramePending] = useState(false);
+  // The page frame reports its anchors and pending edits; another page's frame starts from neither.
+  useEffect(() => { setFrameAnchors([]); setFramePending(false); }, [active?.slug]);
   const agentRuns = useAgentRuns();
-  const detailTabs = useCommentDetails();
   const phone = useMediaQuery("(max-width: 767px)");
   const { openPrompt } = usePromptRuns();
   const [sidebar, setSidebar] = useSidebarState();
@@ -197,14 +212,14 @@ export function PlaygroundShell({
   // A markdown page is always its own editor, so its source is always loaded.
   const editFile = editTarget?.kind === "file" && active?.kind === "component" ? editTarget : undefined;
   const source = useSource(editFile ? fileSourceTarget(editFile.file) : active?.slug, !folderPage && (editing || markdownPage));
-  const visualEnabled = LIVE_SERVER && view === "preview" && active?.kind === "component" && !editing && !source.dirty;
+  const visualEnabled = !browser && LIVE_SERVER && view === "preview" && active?.kind === "component" && !editing && !source.dirty;
   const visualSelection = useEditableSelection({ page: active?.slug, enabled: visualEnabled });
-  const visualPending = visualSelection.pending;
+  const visualPending = visualSelection.pending || framePending;
   const styleTarget = visualSelection.selected?.node.kind === "svg" ? visualSelection.selected : null;
   const pageFolders = usePageFolders();
   const activityMap = useMemo(() => mergeActivity(activity.feedback, activity.updates), [activity.feedback, activity.updates]);
   const onQueryChange = useCallback((query: string) => setSidebar({ query }, { replace: true }), [setSidebar]);
-  const sourceBusy = source.dirty || visualPending;
+  const sourceBusy = source.dirty || visualPending || framePending;
   const filesystemActionsDisabled = !LIVE_SERVER || sourceBusy || !activity.updatesReady;
   const filesystemActionsDisabledReason = !LIVE_SERVER
     ? "Page filesystem actions require a live playground server"
@@ -225,12 +240,13 @@ export function PlaygroundShell({
         : [],
     [active, allComments, view, markdownPage],
   );
-  const { pins, overlayPins, orphans, labels } = useDomAnchors(
+  const { pins, overlayPins, orphans, labels: domLabels } = useDomAnchors(
     { scrollRef: ctx.contentRef, contentRef },
-    pageComments,
+    browser ? [] : pageComments,
     ctx.registerAnchor,
   );
-  const unresolvedOrphans = orphans.filter((orphan) => orphan.unresolved).length;
+  const labels = browser ? Object.fromEntries(frameAnchors.map(anchor => [anchor.anchor, anchor.state === "moved" ? `${anchor.label} (moved)` : anchor.state === "orphaned" ? "Unavailable" : anchor.label])) : domLabels;
+  const unresolvedOrphans = browser ? frameAnchors.filter(anchor => anchor.state === "orphaned").length : orphans.filter((orphan) => orphan.unresolved).length;
 
   const pageMove = usePageMoveDrag({
     disabled: filesystemActionsDisabled,
@@ -277,7 +293,7 @@ export function PlaygroundShell({
 
   useReactGrabComments({
     contentRef,
-    enabled: view === "preview" && Boolean(active) && !markdownPage && !folderPage,
+    enabled: !browser && view === "preview" && Boolean(active) && !markdownPage && !folderPage,
     onSelect: ({ anchor, element, screenshot }) => {
       onPrepareCommentSelection(anchor, element, screenshot);
       ctx.registerAnchor(anchor, null);
@@ -301,7 +317,7 @@ export function PlaygroundShell({
     visualSelection.select(target);
     if (visualEnabled && !visualPending) setDesigning(true);
   }, [visualSelection.select, visualEnabled, visualPending]);
-  useReactGrabStyle({ contentRef, onSelectTarget: selectVisualTarget, onBeforeCssEdit: visualSelection.beginCssEdit });
+  useReactGrabStyle({ contentRef, enabled: !browser, onSelectTarget: selectVisualTarget, onBeforeCssEdit: visualSelection.beginCssEdit });
   const requestStyleChange = useCallback(async (styleEdit: StoredStyleEdit): Promise<StyleChangeRequest> => {
     const content = contentRef.current;
     const element = styleTarget?.node.element;
@@ -318,13 +334,14 @@ export function PlaygroundShell({
   }, [contentRef, ctx, onPrepareCommentSelection, styleTarget]);
 
   const feedback = useFeedbackCopy({ active, comments: ctx.comments, labels });
+  const detailTabs = useCommentDetails({ threadToMarkdown: feedback.threadToMarkdown });
   const { selectItem: selectReviewItem } =
     useResolvedCommentReview({
       allComments,
       activeSlug: active?.slug,
       selectedId: selectedCommentId,
       active: review === "resolved" && !commentsLoading,
-      pinsVersion: pins.length,
+      pinsVersion: browser ? frameAnchors.length : pins.length,
       context: ctx,
       onNavigate: onReviewNavigate,
     });
@@ -339,7 +356,7 @@ export function PlaygroundShell({
     };
   };
 
-  const PageComponent = active?.kind === "component" ? lazyPage(active) : null;
+  const PageComponent = !browser && active?.kind === "component" ? lazyPage(active) : null;
   // The same element across shell re-renders (polling, pending flags) lets React bail out at the
   // page boundary, so the artifact re-renders only for its own state and contexts — which also
   // keeps Design mode's live prop overrides on screen.
@@ -362,6 +379,7 @@ export function PlaygroundShell({
     (review === "resolved" ||
       ctx.railMode !== "closed" ||
       ctx.comments.length > 0);
+  const openCommentCount = ctx.comments.filter(comment => !comment.parentId && ctx.config.statuses.some(status => status.value === comment.status && status.unresolved)).length;
   // Commenting inside a portaled dialog: lift the rail over the modal backdrop
   // so its composer can be clicked without closing the dialog.
   const floatingZIndex = useFloatingZIndex();
@@ -467,7 +485,7 @@ export function PlaygroundShell({
       {moreActionsRow}
       {!active ? <div className="min-h-0 flex-1 overflow-auto"><CommentDashboard comments={allComments} loading={commentsLoading} error={commentsError} pageHref={pageHref} /></div> : <div className="flex min-h-0 flex-1 flex-col">
         <RunningSessionBars key={active.slug} page={active.slug} />
-        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <div className="flex min-h-0 flex-1">
         <div
           ref={attachScrollRef}
           className="relative min-w-0 flex-1 overflow-auto"
@@ -481,7 +499,7 @@ export function PlaygroundShell({
             contentRef={contentRef}
             scrollRef={ctx.contentRef}
           >
-            <div ref={contentRef} data-review-content data-show-rejected={showRejected} className={cn("min-w-0 p-density-4", (markdownPage || folderPage) && "h-full")}>
+            <div ref={contentRef} data-review-content data-show-rejected={showRejected} className={cn("min-w-0", browser ? "h-full" : "p-density-4", (markdownPage || folderPage) && "h-full")}>
               {pageFolders.error && (
                 <Banner tone="danger">{pageFolders.error}</Banner>
               )}
@@ -512,7 +530,9 @@ export function PlaygroundShell({
                 </Banner>
               )}
               <PageErrorBoundary page={active.slug}>
-              {active.kind === "folder" ? (
+              {browser && active.kind !== "folder" && !repositoryDocument && view === "preview" ? (
+                <BrowserPage key={active.slug} slug={active.slug} sourceDirty={source.dirty} designing={designing} annotations={annotations} showRejected={showRejected} comments={pageComments} onAnchors={setFrameAnchors} onPending={setFramePending} onOpenSource={({ file, line }) => { setDesigning(false); setEditTarget({ kind: "file", file, line }); }} />
+              ) : active.kind === "folder" ? (
                 <Suspense fallback={<p role="status">Loading folder problems…</p>}>
                   <RepositoryFolderPage key={active.slug} id={active.slug} onNavigate={onNavigate} />
                 </Suspense>
@@ -610,7 +630,7 @@ export function PlaygroundShell({
                 />
               </Suspense>
             )}
-            {view === "preview" && annotations === "visible" && (
+            {!browser && view === "preview" && annotations === "visible" && (
               <>
                 <CommentOverlay
                   pins={pins}
@@ -634,13 +654,18 @@ export function PlaygroundShell({
         {railVisible && (
           <CommentRail
             stacked={phone}
-            // Stacked under the artifact on a phone: tall enough for a focused
-            // thread and its composer, with room under it for the fixed
-            // react-grab toolbar so it never covers the rail's controls.
-            className="max-h-[max(15rem,45dvh)] md:max-h-none"
+            open={review === "resolved" || ctx.railMode !== "closed"}
+            onOpenChange={(open) => {
+              if (open) ctx.openCommentList();
+              else {
+                ctx.closeRail();
+                if (review === "resolved") onReviewExit();
+              }
+            }}
+            launcherLabel={`Open comments (${openCommentCount})`}
             {...(railOverDialog ? { style: { zIndex: floatingZIndex } } : {})}
           >
-            <div className="p-density-3 pb-16 md:pb-density-3">
+            <div className="p-density-3">
             {review === "resolved" && (commentsLoading || commentsError) ? <p role="status">{commentsError ?? "Loading resolved feedback…"}</p> : review === "resolved" ? (
               <PlaygroundCommentReview
                 allComments={allComments}
@@ -677,7 +702,7 @@ export function PlaygroundShell({
                 className="w-full"
                 previewLines={3}
                 detailTabs={detailTabs}
-                focusedAlignment="anchor"
+                focusedAlignment={phone ? "flow" : "anchor"}
                 anchorLabels={labels}
                 formatAnchorLabel={shortAnchorLabel}
                 compact
@@ -745,8 +770,7 @@ export function PlaygroundShell({
           {
             id: "editor",
             label: "Source",
-            location: "right" as const,
-            collapsible: false,
+            location: "left" as const,
             width: 560,
             minWidth: 320,
             maxWidth: 1400,
@@ -773,8 +797,16 @@ export function PlaygroundShell({
   ];
 
   return (
-    <>
-      <Workspace className="h-dvh" panes={panes} storageKey={WORKSPACE_STORAGE_KEY} defaultValue={layoutDefaults} />
+    <ReloadControl sourceDirty={sourceBusy}>{() => <>
+      <VocabularyGenerationHost />
+      <VocabularyAnchorTarget page={active?.slug} contentRef={contentRef} />
+      <Workspace
+        className="h-dvh"
+        panes={panes}
+        storageKey={WORKSPACE_STORAGE_KEY}
+        defaultValue={layoutDefaults}
+        sideArrangement={editorOpen ? EDITOR_SIDE_ARRANGEMENT : NO_SIDE_ARRANGEMENT}
+      />
       {repositoryNavigation.dialogs}
       <PageManagementDialogs
         action={pageAction?.action ?? null}
@@ -801,6 +833,6 @@ export function PlaygroundShell({
           return gone ? fallbackPageSlug(pages(), activeSlug) : activeSlug;
         }}
       />
-    </>
+    </>}</ReloadControl>
   );
 }

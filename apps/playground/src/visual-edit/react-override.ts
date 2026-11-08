@@ -100,6 +100,10 @@ function callSiteFiber(node: Element, markerValue: string): Fiber {
  * `undefined` value removes the prop. All props go in one overrideProps call: each call starts from the
  * fiber's committed props, so a second call before the re-render would discard the first.
  */
+export function readCallSiteProps(node: Element, markerValue: string): Record<string, unknown> {
+  return { ...callSiteFiber(node, markerValue).memoizedProps };
+}
+
 export function overrideCallSite(nodes: Element[], markerValue: string, props: Record<string, unknown>): void {
   const found = findRenderer();
   if (!("renderer" in found)) throw new Error(`cannot override ${Object.keys(props).join(", ")} live: ${found.reason}`);

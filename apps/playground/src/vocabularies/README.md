@@ -1,47 +1,66 @@
-# Comment vocabularies
+# Comment vocabularies are pages
 
-Type `@` in a comment or reply to browse vocabulary types, then Enter or Tab to browse their items. Type a path such as `@box/header` to filter directly. Up/Down changes the preview; Enter/Tab inserts the highlighted item. Escape dismisses the picker first. Shift+Enter adds a line; Enter posts when the picker is closed.
+Type `@` in a comment or reply to choose a vocabulary type and item. Enter or Tab inserts an atomic chip; hover or keyboard focus shows a larger image. Stored Markdown remains `[Decision](/?vocabulary=shapes%3Ashape%2Fdecision)`. The reference route shows the image, label, stable id, description, instructions and source references. **Open in vocabulary page** opens the page and scrolls to its preview marker.
 
-Selections are atomic inline chips with a miniature specimen and a larger preview on hover or keyboard focus. The stored body remains Markdown: `[box/header](/?vocabulary=facet%3Abox%2Fheader)`. These links open the tracked vocabulary reference view. API writes resolve selections against the catalog and save server-owned `vocabularyRefs`; clients cannot supply that field. Copy feedback and both agent-delivery paths include saved definitions and source references from roots and replies, deduplicated per thread. Editing a body recomputes its references. Existing plain comments need no migration.
+## Declare a vocabulary
 
-## Add an item
+A normal TSX page exports a default React component, optional `meta`, and a static declaration:
 
-Add an entry to the appropriate `facet/data/*.ts` module and a matching specimen in `facet/specimens/vocabulary/`. An entry has `catalog` (namespace), `type` (picker group), `id` (stable path), `label`, `description` (meaning and usage guidance), `references` (source or documentation pointers), and Facet's renderer-specific `section`. The existing gallery delegates to these tracked specimen modules. Picker types are derived from data rather than an enum.
+```tsx
+import { VocabularyPreview, type VocabularyDeclaration } from "@flanksource/clicky-ui/comments";
 
-## Add another vocabulary
+export const vocabulary = {
+  alias: "shapes",
+  instructions: "Read shapes:shape/key as a shape variant. Open the item's source references. An explicit request selects that variant; a reference identifying an existing element describes its current shape.",
+  items: [{ type: "shape", id: "shape/decision", label: "Decision", description: "A decision with separately labelled outcomes.", references: ["examples/vocabularies/shapes/index.tsx"] }],
+} satisfies VocabularyDeclaration;
 
-Create a directory named after the catalog ID, containing `catalog.ts` and `Preview.tsx`. The metadata module must export exactly one non-empty array of items (default or named export). Provide a default React component in `Preview.tsx` accepting `{item: CommentVocabularyItem}`. Do not import scratch pages or browser components into the metadata module: the server evaluates metadata, while Vite compiles previews in the browser. Only load trusted local code.
+export const meta = { title: "Shapes vocabulary", description: "Decision shapes for diagrams." };
 
-The playground discovers built-in catalogs under `src/vocabularies`. Set `PLAYGROUND_VOCABULARY_DIRS` to a comma-separated list of absolute directories to load additional catalogs. Each directory can contain several catalog folders, or be a single catalog folder itself. The runnable [shapes example](../../examples/vocabularies/shapes/catalog.ts) includes metadata and a preview. From `apps/playground`:
-
-```bash
-PLAYGROUND_VOCABULARY_DIRS="$PWD/examples/vocabularies" pnpm run playground:prod
+export default function Shapes() {
+  return <VocabularyPreview id="shape/decision"><svg width="180" height="90" viewBox="0 0 180 90"><path d="M90 5 170 45 90 85 10 45Z" fill="none" stroke="currentColor" /></svg></VocabularyPreview>;
+}
 ```
 
-The same setting works with `pnpm run dev`. Configure directories before starting the server; adding/removing catalogs or editing their metadata, previews and local helpers needs no restart or shell rebuild. The browser refreshes the catalog every five seconds while visible and on window focus. No additional persistent directory watcher is installed. `GET /__playground/vocabularies` returns the current revision, items and versioned preview URLs. Previews share the playground's React instance and can use its existing dependency aliases. External preview styles should use inline CSS or imported stylesheets; the playground's Tailwind scan does not include arbitrary external directories.
+`alias` is the stable namespace used by saved comments, independent of the directory name. It must match `[a-z][a-z0-9-]*`; duplicates across pages fail with both paths. Items omit `catalog`: the server fills it from the alias. Each item has non-empty `type`, `id`, `label`, `description` and `references`; extra JSON metadata is retained. Every declared id must have exactly one `VocabularyPreview`, and every marker must declare an item. The marker also sets `data-comment-anchor="vocabulary:<id>"`, making it a comment and scroll target. Missing, extra or duplicate markers are visible preview failures.
 
-Every item needs non-empty `catalog`, `type`, `id`, `label`, `description` and `references`. `catalog` must match its folder name, and IDs must be unique within the catalog. Additional JSON metadata is preserved, including renderer-specific fields. Duplicate namespaces, invalid metadata, unreadable directories and symlink traversal fail explicitly. The header's vocabulary status dot opens catalog counts, refresh controls and shared error diagnostics with Copy, More details and Retry. Loading failures turn the dot red and disable new vocabulary selections while keeping navigation, pages and drafts mounted. Preview failures stay inside their specimen, turn the dot amber and expose diagnostics in that dropdown; Reload page recovers cached failed imports. The dropdown stays closed until opened. Server comment validation still rejects invalid catalogs. Saved selections include the resolved definition and references used when the comment was written. If an item is later removed, its saved definition remains readable and the chip explicitly reports that its live preview is unavailable.
+`instructions` is required Markdown for an LLM reading a comment. Explain the vocabulary, its `alias:type/key` references, which sources to open, and how an explicit variant request differs from identifying a current presentation. Copied feedback, dashboard copy and agent delivery include instructions once per alias before the referenced definitions. Unknown aliases fail explicitly. Page Markdown and Copy page include the instructions and full item list.
 
-For example, an item `{catalog:"shapes", type:"shape", id:"shape/decision", label:"Decision", description:"A branching decision", references:["docs/shapes.md#decision"]}` appears under `@shape/`. Its preview component renders that stable ID. New type names automatically appear without changes to the editor. Runtime loading requires the live development or `playground:prod` server; a static `vite preview` deployment cannot compile external TSX modules.
+The declaration is read statically without running the page. Put imported item data in relative local modules. The old `catalog.ts` and `Preview.tsx` discovery and component-preview contract have been removed.
 
-## OIPA kit vocabulary
+## Discovery and navigation
 
-The visual vocabulary of `@flanksource/oipa-kit` is owned by oipa-cli in `packages/oipa-kit/examples/vocabularies/oipa/`, loaded through `PLAYGROUND_VOCABULARY_DIRS=<absolute-oipa-cli-path>/packages/oipa-kit/examples/vocabularies`. It has two kinds of type:
+Vocabulary declarations are discovered in normal `src/pages/**` pages and in configured vocabulary roots. The built-in root is `src/vocabularies`; `PLAYGROUND_VOCABULARY_DIRS` adds comma-separated absolute directories. Root pages are `*.tsx` or `*/index.tsx`; helpers prefixed `_` or `.`, tests, stories, `node_modules` and `dist` are excluded. Root vocabulary pages appear under **Vocabularies** as `vocabularies/<alias>`; declarations in `src/pages` keep their normal slug.
 
-- **Rendering variants:** `@oipa-symbol/badge`, `@oipa-fields/cards`, `@oipa-calculation/equations`, `@oipa-diff/inline` and `@oipa-matrix/verification`, in `oipa/data/styles.ts`.
-- **The kit's glyph tables:** `@oipa-entity`, `@oipa-element`, `@oipa-transport`, `@oipa-field-type`, `@oipa-verification` and `@oipa-state`, in `oipa/data/glyphs.ts`. This file is generated from the kit's `MARKS`, `ELEMENTS`, `TRANSPORTS`, `FIELD_TYPES`, `VERIFICATION` and `STATE_CHANGES`. Regenerate it when the kit changes those tables.
+Facet, Git and the local gitignored Brand page live here. The runnable Shapes example lives in `examples/vocabularies/shapes/index.tsx`. To include it, from `apps/playground`:
 
-The external preview imports the kit's own `examples/vocabulary.tsx` directly and owns its styles (see oipa-cli `packages/oipa-kit/README.md`). No vocabulary-specific alias or OIPA source remains in this playground. Its 103 stable IDs and source references are unchanged, so existing comment selections continue to resolve when the directory is configured. An unknown kit key throws in the preview.
+```bash
+PLAYGROUND_VOCABULARY_DIRS="$PWD/examples/vocabularies" pnpm run dev
+```
 
-## Checks
+The same setting works with `pnpm run playground:prod`. `GET /__playground/vocabularies` returns `revision`, `catalogs` and `items`; each catalog supplies `alias`, `slug`, `file`, a versioned `page` URL, `instructions` and `previewRevision`. Preview revisions hash the page's import graph and managed library versions. The shell refreshes the snapshot every five seconds while visible and on focus. Changes need no shell rebuild.
+
+## Preview generation and cache
+
+Previews are WebP images, generated on demand once per alias with concurrent requests sharing the run. In browser mode, an off-screen 1280×800 `PageFrame` loads the vocabulary using the same project, runtime profile, dependencies, local overrides and lock resolution as the visible page. Once ready, the frame captures its own markers through `capture-vocabulary`. Its styles stay in that frame; it never replaces the active browser session. The frame is unmounted after capture.
+
+In development mode, the shell imports the snapshot's page URL and mounts its default component off-screen within the shell's theme and density providers. It waits for fonts, Facet diagram/arrow readiness and DOM quiescence, then captures the marked blocks. Capture waits for images to decode, caps preview width at 640 pixels and preserves aspect ratio. The temporary page unmounts afterwards. Development generation uses the host document's CSS; browser mode provides page style isolation.
+
+Only `previews.ts` reads or writes `clicky-playground.vocabulary-previews.<alias>`. Its value is `{previewRevision, images: { [id]: {image, width, height} }}`. A revision change replaces the entire alias entry. A storage read, write, removal or quota error appears as **Preview cache unavailable: &lt;reason&gt;** in the status menu; generated images remain available in memory for the session. The cache is an optimization, and storage failures do not hide generation failures.
+
+Open the playground status menu to inspect vocabulary counts and errors. **Regenerate previews** clears an alias's cache and captures it again. Image slots show **Generating preview…** until ready, or the generation failure. Loading errors disable new vocabulary selections while retaining pages and drafts. Saved references whose live item was removed still retain their stored definitions and explicitly report that the live preview is unavailable.
+
+## OIPA vocabulary ownership
+
+The `oipa` page belongs to oipa-cli at `packages/oipa-kit/examples/vocabularies/oipa/index.tsx`. Configure `PLAYGROUND_VOCABULARY_DIRS` to that checkout's `packages/oipa-kit/examples/vocabularies` directory. Rendering variants come from `oipa/data/styles.ts`, and the kit's entity, element, transport, field-type, verification and state glyph tables come from `oipa/data/glyphs.ts`. Its page renders the kit's own specimens and styles. The alias and stable ids keep existing references resolvable. No OIPA-specific renderer lives in this shell.
+
+## Focused verification
 
 From the repository root:
 
 ```bash
-pnpm --filter @flanksource/clicky-ui exec vitest run src/comments/CommentEditor.test.tsx src/comments/comment-vocabulary.test.ts src/comments/CommentComposer.test.tsx src/comments/CommentThreadList.test.tsx
-pnpm --filter playground exec vitest run plugins/vocabularies.test.ts plugins/comment-vocabulary.test.ts plugins/comments-server.test.ts src/comments/markdown.test.ts plugins/agent-runs-server.test.ts
-pnpm --filter @flanksource/clicky-ui check
-pnpm --filter playground build
+gavel test --work-dir ./apps/playground --framework vitest --recursive=false -- src/vocabularies examples/vocabularies/shapes/index.test.tsx src/comments/markdown.test.ts src/markdown/guidance.test.ts
+pnpm --filter playground exec tsc -p tsconfig.json --noEmit
 ```
 
-The extracted Facet specimens currently require exports from the sibling Facet source that are absent from published `@flanksource/facet@0.1.74`, including `ContainerNode`, `BOX_STYLES`, and `DiagramStyleProvider`. The existing local playground alias renders them; a Facet release and catalog-version update are required for a portable package build. No new local package override is introduced by this feature.
+Live checks cover both development and browser mode: open the vocabulary page, reference route, picker and chips; confirm image previews, cache reuse, regeneration and anchor scrolling. Use the local Facet sources required by the current specimens; a portable runtime also needs those exports in its managed Facet build.

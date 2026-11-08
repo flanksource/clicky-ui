@@ -4,10 +4,11 @@ export const VISUAL_EDITS_ROUTE = "/__playground/visual-edits";
 export type VisualEditStyleProp = "variant" | "role";
 
 export type VisualEdit =
+  | { kind: "delete" }
   | { kind: "style"; prop: VisualEditStyleProp; value: string }
   | { kind: "text"; prop: string; from: string; to: string }
   /** Literal SVG attributes keyed by JSX prop name; validated server-side against the schema of the marker's tag. */
-  | { kind: "attributes"; values: Record<string, string | number> };
+  | { kind: "attributes"; values: Record<string, string | number | null>; textFrom?: string };
 
 export type VisualEditRequest = {
   /** Page slug of the page being viewed. */

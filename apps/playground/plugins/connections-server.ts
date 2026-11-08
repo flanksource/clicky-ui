@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
+import type { MiddlewareApp } from "./middleware";
 import { GavelOwnershipError, type GavelEndpoint } from "./gavel-launch-server";
 import { sendJson } from "./comments-server";
 import { checkGavelCompatibility, GavelCompatibilityError } from "./gavel-compatibility";
@@ -51,7 +52,9 @@ async function restart(gavel: GavelEndpoint, captainURL: string, name: string, r
   sendJson(response, 200, { connections: await connections(gavel, captainURL) });
 }
 
-export function playgroundConnections({ gavel, captainURL }: { gavel: GavelEndpoint; captainURL: string }): Plugin {
+type ConnectionsOptions = { gavel: GavelEndpoint; captainURL: string };
+
+export function registerConnectionsMiddleware({ middlewares, gavel, captainURL }: ConnectionsOptions & { middlewares: MiddlewareApp }): void {
   const handle = async (request: IncomingMessage, response: ServerResponse) => {
     const path = new URL(request.url ?? "/", "http://playground.local").pathname;
     const action = /^\/(gavel|captain)\/restart$/.exec(path);
@@ -63,12 +66,13 @@ export function playgroundConnections({ gavel, captainURL }: { gavel: GavelEndpo
     if (request.method !== "GET") return sendJson(response, 405, { error: "Connection status requires GET" });
     sendJson(response, 200, { connections: await connections(gavel, captainURL) });
   };
-  return {
-    name: "playground-connections",
-    configureServer(server) {
-      server.middlewares.use("/__playground/connections", (request, response) => {
-        handle(request, response).catch(cause => sendJson(response, 500, { error: cause instanceof Error ? cause.message : String(cause) }));
-      });
-    },
-  };
+  middlewares.use("/__playground/connections", (request, response) => {
+    handle(request, response).catch(cause => sendJson(response, 500, { error: cause instanceof Error ? cause.message : String(cause) }));
+  });
+}
+
+export function playgroundConnections(options: ConnectionsOptions): Plugin {
+  return { name: "playground-connections", configureServer(server) {
+    registerConnectionsMiddleware({ ...options, middlewares: server.middlewares });
+  } };
 }

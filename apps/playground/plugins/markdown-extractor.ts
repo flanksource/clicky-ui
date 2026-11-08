@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { vocabularyDeclaration } from "./vocabulary-directories";
 
 import type { ExtractedGuidance, GuidanceBlock, GuidanceTone } from "./markdown-model";
 import {
@@ -43,6 +44,13 @@ const GUIDANCE_COMPONENTS = new Set([
 export function extractPageGuidance(entryFile: string, host: GuidanceHost): ExtractionResult {
   const graph = new StaticModuleGraph(host);
   const blocks: GuidanceBlock[] = [];
+  for (const statement of graph.source(entryFile).statements) {
+    if (!ts.isVariableStatement(statement) || !statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || declaration.name.text !== "vocabulary") continue;
+      blocks.push({ kind: "vocabulary", ...vocabularyDeclaration(graph.evaluate(entryFile, declaration.initializer, new Map()), entryFile) });
+    }
+  }
   walkComponent(graph.defaultComponent(entryFile), {}, new Set(), graph, blocks);
   return { guidance: { blocks }, dependencies: [...graph.dependencies] };
 }

@@ -1,8 +1,10 @@
+import type { MiddlewareApp, ErrorLogger } from "./middleware";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 import type {
   ResolvedRuntimeProfile,
   RuntimeProfileResolveRequest,
+  RuntimePresetResolveRequest,
 } from "../../../packages/ui/src/data/ai/runtime-profile";
 import { normalizeToolCatalog } from "../../../packages/ui/src/data/ai/ChatWindow.tool-catalog";
 import {
@@ -12,6 +14,7 @@ import {
 } from "./runtime-profiles-catalog";
 
 export const RUNTIME_PROFILES_ROUTE = "/__playground/runtime-profiles/resolve";
+export const RUNTIME_PRESETS_ROUTE = "/__playground/runtime-profiles/presets/resolve";
 export const RUNTIME_PROFILES_RUNTIMES_ROUTE =
   "/__playground/runtime-profiles/runtimes";
 export const RUNTIME_PROFILES_PERMISSIONS_ROUTE =
@@ -19,9 +22,9 @@ export const RUNTIME_PROFILES_PERMISSIONS_ROUTE =
 export const RUNTIME_PROFILES_MODELS_ROUTE =
   "/__playground/runtime-profiles/models";
 
-export async function resolveRuntimeProfileFromCaptain(
+export async function resolveRuntimeSelectionFromCaptain(
   resolveURL: string,
-  request: RuntimeProfileResolveRequest,
+  request: RuntimeProfileResolveRequest | RuntimePresetResolveRequest,
 ): Promise<ResolvedRuntimeProfile> {
   const response = await fetch(resolveURL, {
     method: "POST",
@@ -67,17 +70,15 @@ function normalizeResolution(value: unknown): ResolvedRuntimeProfile {
   return { ...value, tools } as ResolvedRuntimeProfile;
 }
 
-export function playgroundRuntimeProfiles({
-  modelsURL,
-  permissionsURL,
-  resolveURL,
-  runtimesURL,
-}: {
+export function registerRuntimeProfilesMiddleware({ middlewares, logger, modelsURL, permissionsURL, resolveURL, presetsResolveURL, runtimesURL }: {
+  middlewares: MiddlewareApp;
+  logger: ErrorLogger;
   modelsURL: string;
   permissionsURL: string;
   resolveURL: string;
+  presetsResolveURL: string;
   runtimesURL: string;
-}): Plugin {
+}): void {
   let runtimesPromise:
     | ReturnType<typeof loadRuntimeProfileRuntimeCatalog>
     | undefined;
@@ -90,111 +91,129 @@ export function playgroundRuntimeProfiles({
     );
     return runtimesPromise;
   };
+  middlewares.use(
+    RUNTIME_PROFILES_RUNTIMES_ROUTE,
+    (request, response) => {
+      void (async () => {
+        try {
+          if (request.method !== "GET") {
+            sendJson(response, 405, {
+              error: `GET ${RUNTIME_PROFILES_RUNTIMES_ROUTE} is required`,
+            });
+            return;
+          }
+          sendJson(response, 200, await loadRuntimes());
+        } catch (error) {
+          const detail = errorMessage(error);
+          const message = `Unable to load Captain runtimes from ${runtimesURL}: ${detail}`;
+          logger.error(`[runtime-profiles] ${message}`);
+          sendJson(response, 502, { error: message });
+        }
+      })();
+    },
+  );
+  middlewares.use(RUNTIME_PROFILES_MODELS_ROUTE, (request, response) => {
+    void (async () => {
+      try {
+        if (request.method !== "GET") {
+          sendJson(response, 405, {
+            error: `GET ${RUNTIME_PROFILES_MODELS_ROUTE} is required`,
+          });
+          return;
+        }
+        sendJson(response, 200, await loadRuntimeProfileModelCatalog(modelsURL));
+      } catch (error) {
+        const message = `Unable to load Captain models from ${modelsURL}: ${errorMessage(error)}`;
+        logger.error(`[runtime-profiles] ${message}`);
+        sendJson(response, 502, { error: message });
+      }
+    })();
+  });
+  middlewares.use(
+    RUNTIME_PROFILES_PERMISSIONS_ROUTE,
+    (request, response) => {
+      void (async () => {
+        try {
+          if (request.method !== "GET") {
+            sendJson(response, 405, {
+              error: `GET ${RUNTIME_PROFILES_PERMISSIONS_ROUTE} is required`,
+            });
+            return;
+          }
+          sendJson(
+            response,
+            200,
+            await loadRuntimeProfilePermissionCatalog(
+              permissionsURL,
+              permissionTarget(request),
+            ),
+          );
+        } catch (error) {
+          const message = errorMessage(error);
+          logger.error(`[runtime-profiles] ${message}`);
+          sendJson(
+            response,
+            error instanceof RuntimeProfileRequestError ? 400 : 502,
+            { error: message },
+          );
+        }
+      })();
+    },
+  );
+  for (const [route, upstream] of [[RUNTIME_PROFILES_ROUTE, resolveURL], [RUNTIME_PRESETS_ROUTE, presetsResolveURL]] as const) {
+    middlewares.use(route, (request, response) => {
+      void (async () => {
+        try {
+          if (request.method !== "POST") {
+            sendJson(response, 405, {
+              error: `POST ${route} is required`,
+            });
+            return;
+          }
+          sendJson(
+            response,
+            200,
+            await resolveRuntimeSelectionFromCaptain(
+              upstream,
+              await readJsonBody(request),
+            ),
+          );
+        } catch (error) {
+          const message = errorMessage(error);
+          logger.error(`[runtime-profiles] ${message}`);
+          sendJson(
+            response,
+            error instanceof CaptainResolutionError
+              ? error.status
+              : error instanceof RuntimeProfileRequestError
+                ? 400
+                : 502,
+            { error: message },
+          );
+        }
+      })();
+    });
+  }
+}
+
+export function playgroundRuntimeProfiles({
+  modelsURL,
+  permissionsURL,
+  resolveURL,
+  presetsResolveURL,
+  runtimesURL,
+}: {
+  modelsURL: string;
+  permissionsURL: string;
+  resolveURL: string;
+  presetsResolveURL: string;
+  runtimesURL: string;
+}): Plugin {
   return {
     name: "playground-runtime-profiles",
     apply: "serve",
     configureServer(server) {
-      server.middlewares.use(
-        RUNTIME_PROFILES_RUNTIMES_ROUTE,
-        (request, response) => {
-          void (async () => {
-            try {
-              if (request.method !== "GET") {
-                sendJson(response, 405, {
-                  error: `GET ${RUNTIME_PROFILES_RUNTIMES_ROUTE} is required`,
-                });
-                return;
-              }
-              sendJson(response, 200, await loadRuntimes());
-            } catch (error) {
-              const detail = errorMessage(error);
-              const message = `Unable to load Captain runtimes from ${runtimesURL}: ${detail}`;
-              server.config.logger.error(`[runtime-profiles] ${message}`);
-              sendJson(response, 502, { error: message });
-            }
-          })();
-        },
-      );
-      server.middlewares.use(RUNTIME_PROFILES_MODELS_ROUTE, (request, response) => {
-        void (async () => {
-          try {
-            if (request.method !== "GET") {
-              sendJson(response, 405, {
-                error: `GET ${RUNTIME_PROFILES_MODELS_ROUTE} is required`,
-              });
-              return;
-            }
-            sendJson(response, 200, await loadRuntimeProfileModelCatalog(modelsURL));
-          } catch (error) {
-            const message = `Unable to load Captain models from ${modelsURL}: ${errorMessage(error)}`;
-            server.config.logger.error(`[runtime-profiles] ${message}`);
-            sendJson(response, 502, { error: message });
-          }
-        })();
-      });
-      server.middlewares.use(
-        RUNTIME_PROFILES_PERMISSIONS_ROUTE,
-        (request, response) => {
-          void (async () => {
-            try {
-              if (request.method !== "GET") {
-                sendJson(response, 405, {
-                  error: `GET ${RUNTIME_PROFILES_PERMISSIONS_ROUTE} is required`,
-                });
-                return;
-              }
-              sendJson(
-                response,
-                200,
-                await loadRuntimeProfilePermissionCatalog(
-                  permissionsURL,
-                  permissionTarget(request),
-                ),
-              );
-            } catch (error) {
-              const message = errorMessage(error);
-              server.config.logger.error(`[runtime-profiles] ${message}`);
-              sendJson(
-                response,
-                error instanceof RuntimeProfileRequestError ? 400 : 502,
-                { error: message },
-              );
-            }
-          })();
-        },
-      );
-      server.middlewares.use(RUNTIME_PROFILES_ROUTE, (request, response) => {
-        void (async () => {
-          try {
-            if (request.method !== "POST") {
-              sendJson(response, 405, {
-                error: `POST ${RUNTIME_PROFILES_ROUTE} is required`,
-              });
-              return;
-            }
-            sendJson(
-              response,
-              200,
-              await resolveRuntimeProfileFromCaptain(
-                resolveURL,
-                await readJsonBody(request),
-              ),
-            );
-          } catch (error) {
-            const message = errorMessage(error);
-            server.config.logger.error(`[runtime-profiles] ${message}`);
-            sendJson(
-              response,
-              error instanceof CaptainResolutionError
-                ? error.status
-                : error instanceof RuntimeProfileRequestError
-                  ? 400
-                  : 502,
-              { error: message },
-            );
-          }
-        })();
-      });
+      registerRuntimeProfilesMiddleware({ middlewares: server.middlewares, logger: server.config.logger, modelsURL, permissionsURL, resolveURL, presetsResolveURL, runtimesURL });
     },
   };
 }
@@ -213,7 +232,7 @@ function permissionTarget(request: IncomingMessage) {
 
 async function readJsonBody(
   request: IncomingMessage,
-): Promise<RuntimeProfileResolveRequest> {
+): Promise<RuntimeProfileResolveRequest | RuntimePresetResolveRequest> {
   const chunks: Buffer[] = [];
   for await (const chunk of request) chunks.push(chunk as Buffer);
   const raw = Buffer.concat(chunks).toString("utf8");
@@ -229,7 +248,7 @@ async function readJsonBody(
   if (!isRecord(parsed)) {
     throw new RuntimeProfileRequestError("request body must be a JSON object");
   }
-  return parsed as RuntimeProfileResolveRequest;
+  return parsed as RuntimeProfileResolveRequest | RuntimePresetResolveRequest;
 }
 
 function sendJson(

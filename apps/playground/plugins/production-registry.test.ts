@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { liveRegistry, pageFiles, sharedImports } from "./production-registry";
+import { liveRegistry, pageFiles } from "./production-registry";
 
 describe("production playground registry", () => {
   it("keeps all four loader kinds live without bundling scratch pages", async () => {
@@ -12,7 +12,8 @@ describe("production playground registry", () => {
     for (const kind of ["component", "guidance", "markdown", "meta"]) {
       expect(result).toContain(`__liveModules("${kind}")`);
     }
-    expect(result).toContain("/* @vite-ignore */");
+    expect(result).toContain("/__playground/browser-page?");
+    expect(result).not.toContain("import(/* @vite-ignore */");
   });
 
   it("rejects registry changes that would accidentally bundle pages", () => {
@@ -21,7 +22,7 @@ describe("production playground registry", () => {
     );
   });
 
-  it("discovers public pages and shared providers independently", async () => {
+  it("discovers public pages while excluding helpers and tests", async () => {
     await mkdir(".tmp", { recursive: true });
     const root = await mkdtemp(resolve(".tmp/production-registry-"));
     try {
@@ -43,15 +44,6 @@ describe("production playground registry", () => {
         ),
       ]);
       expect(await pageFiles(root)).toEqual(["guide.md", "welcome.tsx"]);
-      expect(await sharedImports(root)).toEqual([
-        resolve(root, "src/shared.ts"),
-        "@flanksource/clicky-ui",
-        "react",
-        "react-dom",
-        "react-dom/client",
-        "react-dom/server.browser",
-        "react/jsx-runtime",
-      ]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 import { promisify } from "node:util";
 import { gzip } from "node:zlib";
-import type { Connect } from "vite";
+import type { Middleware } from "./middleware";
 import { pageFiles } from "./production-registry";
 
 const compress = promisify(gzip);
@@ -25,11 +25,13 @@ export async function productionAssets({
   root,
   outDir,
   revision,
+  browser = false,
 }: {
   root: string;
   outDir: string;
   revision?: () => string;
-}): Promise<Connect.NextHandleFunction> {
+  browser?: boolean;
+}): Promise<Middleware> {
   const html = await readFile(resolve(outDir, "index.html"), "utf8");
   const files = new Map<
     string,
@@ -76,6 +78,7 @@ export async function productionAssets({
               : "no-cache",
           );
           response.setHeader("Vary", "Accept-Encoding");
+          response.setHeader("Access-Control-Allow-Origin", "*");
           response.setHeader("Content-Length", body.length);
           if (encoded) response.setHeader("Content-Encoding", "gzip");
           response.end(body);
@@ -93,7 +96,7 @@ export async function productionAssets({
     void pageFiles(root)
       .then((pages) => {
         const manifest = JSON.stringify(pages).replaceAll("<", "\\u003c");
-        const live = `<script>globalThis.__PLAYGROUND_FILES__=${manifest};globalThis.__PLAYGROUND_REVISION__=${JSON.stringify(revision?.() ?? null)}</script><script type="module" src="/src/styles.css"></script>`;
+        const live = `<script>globalThis.__PLAYGROUND_FILES__=${manifest};globalThis.__PLAYGROUND_REVISION__=${JSON.stringify(revision?.() ?? null)};globalThis.__PLAYGROUND_BROWSER_MODE__=${browser}</script>${browser ? "" : '<script type="module" src="/src/styles.css"></script>'}`;
         response.setHeader("Content-Type", "text/html");
         response.setHeader("Cache-Control", "no-store");
         response.end(html.replace("<head>", "<head>" + live));

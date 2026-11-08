@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useVocabulary } from "../vocabularies/context";
 import { SplitButton } from "@flanksource/clicky-ui";
 import { writeClipboard } from "./clipboard";
 import { dashboardCopy } from "./dashboard-copy";
@@ -15,6 +16,7 @@ export function CommentDashboardCopy({
   state: DashboardState;
 }) {
   const [copied, setCopied] = useState(false);
+  const { snapshot } = useVocabulary();
   const [error, setError] = useState<string | null>(null);
   async function copy(target: "LLM" | "Claude" | "Codex") {
     try {
@@ -22,6 +24,7 @@ export function CommentDashboardCopy({
         Promise.resolve().then(() =>
           dashboardCopy({
             comments,
+            vocabularyInstructions: Object.fromEntries((snapshot?.catalogs ?? []).map(catalog => [catalog.alias, catalog.instructions])),
             selected,
             state,
             target,

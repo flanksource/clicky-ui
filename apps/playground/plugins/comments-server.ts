@@ -1,3 +1,4 @@
+import type { MiddlewareApp, ErrorLogger } from "./middleware";
 import {
   requireText,
   requireAuthor,
@@ -9,7 +10,7 @@ import {
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import type { Connect, Logger, Plugin } from "vite";
+import type { Plugin } from "vite";
 
 import { COMMENT_TOOLS } from "./comments-schema";
 import {
@@ -18,6 +19,7 @@ import {
   assignComment,
   closeComment,
   reopenComment,
+  requireHuman,
   resolveComment,
 } from "./comments-lifecycle";
 import type { CommentElementContext } from "./comments-model";
@@ -370,7 +372,11 @@ async function handle(
           "element",
           "expectedSource",
           "styleEdit",
+          "assignee",
         ]);
+        const assignee = "assignee" in body ? requireAssignee(body) : null;
+        if ("assignee" in body && !assignee)
+          throw new Error('"assignee" on create must name someone; omit it to leave the thread unassigned');
         const host = req.headers.host;
         if (!host) throw new Error("request has no Host header");
         const rating = optionalText(body, "rating");
@@ -378,10 +384,16 @@ async function handle(
         if (reviewDecision && !pagesDir)
           throw new Error("local source review is not configured");
         const anchor = optionalText(body, "anchor");
-        const { page, comment } = await createRootComment(dir, {
+        const author = requireAuthor(body);
+        if (assignee) {
+          // Checked before storing, so a refused assignment leaves no unassigned thread behind.
+          requireHuman(author);
+          if (optionalText(body, "reviewDecision")) throw new Error("a review decision cannot be assigned");
+        }
+        const { page, comment: stored } = await createRootComment(dir, {
           page: body["page"],
           body: optionalText(body, "body") ?? "",
-          author: requireAuthor(body),
+          author,
           ...(anchor === undefined ? {} : { anchor }),
           element: body["element"],
           ...(body["styleEdit"] === undefined
@@ -401,6 +413,8 @@ async function handle(
                 },
               }),
         });
+        // Assigning goes through the same lifecycle step as the Assign menu, so its rules and history apply.
+        const comment = assignee ? await assignComment(dir, stored.id, author, assignee) : stored;
         sendJson(res, 201, comment);
         if (!comment.reviewDecision) {
           created({ page, comment, origin: `http://${host}` });
@@ -513,26 +527,16 @@ export function playgroundComments(options: PlaygroundCommentsOptions): Plugin {
   return {
     name: "playground-comments",
     configureServer(server) {
-      registerCommentsMiddleware(
-        server.middlewares,
-        server.config.logger,
-        options,
-      );
+      registerCommentsMiddleware({ ...options, middlewares: server.middlewares, logger: server.config.logger });
     },
     configurePreviewServer(server) {
-      registerCommentsMiddleware(
-        server.middlewares,
-        server.config.logger,
-        options,
-      );
+      registerCommentsMiddleware({ ...options, middlewares: server.middlewares, logger: server.config.logger });
     },
   };
 }
 
-function registerCommentsMiddleware(
-  middlewares: Connect.Server,
-  logger: Logger,
-  { dir, pagesDir, onCreated }: PlaygroundCommentsOptions,
+export function registerCommentsMiddleware(
+  { middlewares, logger, dir, pagesDir, onCreated }: PlaygroundCommentsOptions & { middlewares: MiddlewareApp; logger: ErrorLogger },
 ) {
   const created = (event: CommentCreatedEvent) => {
     onCreated?.(event).catch((error: unknown) => {

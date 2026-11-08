@@ -21,6 +21,12 @@ let captureHandle: string | undefined;
 let captureVersion = 0;
 const CAPTURE_TIMEOUT_MS = 10_000;
 
+export type HostViewportRect = { x: number; y: number; width: number; height: number };
+export type ScreenshotTarget = {
+  rect: HostViewportRect;
+  isLive: () => boolean;
+};
+
 function stopStream(stream: MediaStream): void {
   stream.getTracks().forEach((track) => track.stop());
 }
@@ -127,10 +133,11 @@ function nextPaint(): Promise<void> {
 
 function frameRectForElement(
   video: HTMLVideoElement,
-  element: Element,
+  target: Element | ScreenshotTarget,
 ): { x: number; y: number; width: number; height: number } {
-  const bounds = element.getBoundingClientRect();
-  if (!element.isConnected || bounds.width <= 0 || bounds.height <= 0) {
+  const bounds = "rect" in target ? target.rect : target.getBoundingClientRect();
+  const live = "rect" in target ? target.isLive() : target.isConnected;
+  if (!live || !Object.values({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }).every(Number.isFinite) || bounds.width <= 0 || bounds.height <= 0) {
     throw new Error("selected element is no longer visible");
   }
   if (!video.videoWidth || !video.videoHeight) {
@@ -145,10 +152,10 @@ function frameRectForElement(
   ) {
     throw new Error("captured tab has invalid viewport dimensions");
   }
-  const x = Math.max(0, Math.floor(bounds.left * scaleX));
-  const y = Math.max(0, Math.floor(bounds.top * scaleY));
-  const right = Math.min(video.videoWidth, Math.ceil(bounds.right * scaleX));
-  const bottom = Math.min(video.videoHeight, Math.ceil(bounds.bottom * scaleY));
+  const x = Math.max(0, Math.floor(bounds.x * scaleX));
+  const y = Math.max(0, Math.floor(bounds.y * scaleY));
+  const right = Math.min(video.videoWidth, Math.ceil((bounds.x + bounds.width) * scaleX));
+  const bottom = Math.min(video.videoHeight, Math.ceil((bounds.y + bounds.height) * scaleY));
   if (right <= x || bottom <= y) {
     throw new Error("selected element is outside the captured viewport");
   }
@@ -157,7 +164,7 @@ function frameRectForElement(
 
 async function frameToDataUrl(
   stream: MediaStream,
-  element: Element,
+  target: Element | ScreenshotTarget,
 ): Promise<string> {
   const video = document.createElement("video");
   video.muted = true;
@@ -167,7 +174,7 @@ async function frameToDataUrl(
     await video.play();
     await nextPaint();
 
-    const rect = frameRectForElement(video, element);
+    const rect = frameRectForElement(video, target);
     const canvas = document.createElement("canvas");
     canvas.width = rect.width;
     canvas.height = rect.height;
@@ -225,7 +232,7 @@ export function screenshotCaptureSupported(): boolean {
 }
 
 export async function captureScreenshot(
-  element: Element,
+  target: Element | ScreenshotTarget,
 ): Promise<CommentScreenshotCapture> {
   if (!screenshotCaptureSupported()) {
     return { status: "unavailable", reason: "unsupported" };
@@ -247,7 +254,7 @@ export async function captureScreenshot(
     const captureStream = new MediaStream([track]);
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      const frame = frameToDataUrl(captureStream, element);
+      const frame = frameToDataUrl(captureStream, target);
       const stalled = new Promise<never>((_, reject) => {
         timeout = setTimeout(() => {
           if (retainedDisplayStream === stream)

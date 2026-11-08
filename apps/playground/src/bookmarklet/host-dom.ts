@@ -1,8 +1,9 @@
 import { describeElement, resolveAnchor } from "../comments/dom-anchor";
 import type { AnchorState } from "./model";
 import { mountSidebarResize } from "./host-resize";
+import { draftPosition } from "./draft-position";
 
-export function mountHost(frameUrl: string, focus: (anchor: string) => void, onWidth: (width: number) => void) {
+export function mountHost(frameUrl: string, focus: (anchor: string) => void, onWidth: (width: number) => void, onPresentation: (floating: boolean) => void) {
   const root = document.createElement("div");
   root.id = "playground-grabber";
   root.setAttribute("data-react-grab-ignore", "");
@@ -14,6 +15,10 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void, onW
     .resize { position: absolute; top: 0; height: 100%; width: 5px; background: #8886; cursor: col-resize; pointer-events: auto; touch-action: none; }
     .resize:hover, .resize:focus-visible { background: #2563eb; outline: 2px solid white; }
     .resize[hidden], iframe[hidden] ~ .resize { display: none; }
+    .fab { position: absolute; right: 20px; bottom: 20px; width: 48px; height: 48px; border: 2px solid white; border-radius: 50%; background: #2563eb; color: white; font: 600 24px system-ui; cursor: pointer; pointer-events: auto; box-shadow: 0 2px 12px #0004; }
+    .fab[hidden] { display: none; }
+    :host([data-mode=draft]) .resize { display: none; }
+    :host([data-mode=draft]) iframe { inset: auto; border-radius: 10px; }
     .pin { position: absolute; pointer-events: auto; min-width: 22px; height: 22px; padding: 0 4px; border: 1px solid #fff; border-radius: 12px; color: white; background: #2563eb; font: 600 12px system-ui; cursor: pointer; transform: translate(-50%, -50%); }
     .highlight { position: absolute; border: 2px solid #2563eb; background: #2563eb18; box-sizing: border-box; pointer-events: none; }
     .error { position: absolute; top: 12px; left: 12px; max-width: 480px; padding: 12px; background: #fff; color: #991b1b; border: 1px solid currentColor; font: 14px system-ui; pointer-events: auto; }
@@ -26,7 +31,22 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void, onW
   highlight.className = "highlight";
   highlight.hidden = true;
   const sizing = mountSidebarResize(frame, onWidth);
-  shadow.append(style, pins, highlight, frame, sizing.handle);
+  const fab = document.createElement("button");
+  fab.className = "fab";
+  fab.type = "button";
+  fab.textContent = "+";
+  fab.setAttribute("aria-label", "Restore playground comments");
+  fab.title = "Restore playground comments";
+  fab.hidden = true;
+  let mode: "rail" | "draft" = "rail";
+  let minimized = false;
+  let previousMinimized = false;
+  let draftAnchor: string | null = null;
+  let draftHeight = 260;
+  let draftBox = { left: 8, top: 8, bottom: 8 };
+  const restore = () => { minimized = false; frame.hidden = false; fab.hidden = true; frame.focus(); };
+  fab.addEventListener("click", restore);
+  shadow.append(style, pins, highlight, frame, sizing.handle, fab);
   document.documentElement.append(root);
   let anchors: string[] = [];
   let selected: string | null = null;
@@ -36,6 +56,12 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void, onW
 
   function recompute() {
     pending = 0;
+    if (mode === "draft") {
+      const target = draftAnchor ? resolveAnchor(document.body, draftAnchor) : null;
+      if (target) draftBox = target.getBoundingClientRect();
+      const position = draftPosition(draftBox, { width: window.innerWidth, height: window.innerHeight }, draftHeight);
+      for (const [key, value] of Object.entries(position)) frame.style.setProperty(key, `${value}px`);
+    }
     pins.replaceChildren();
     const states = anchors.map((anchor, index): AnchorState => {
       const element = resolveAnchor(document.body, anchor);
@@ -47,7 +73,7 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void, onW
       pin.title = describeElement(element);
       pin.style.left = `${box.right}px`;
       pin.style.top = `${box.top}px`;
-      pin.addEventListener("click", () => focus(anchor));
+      pin.addEventListener("click", () => { showRail(); focus(anchor); });
       pins.append(pin);
       return {
         anchor,
@@ -86,10 +112,47 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void, onW
   resize.observe(document.body);
   window.addEventListener("scroll", schedule, true);
   window.addEventListener("resize", schedule);
+  function showRail() {
+    mode = "rail";
+    root.setAttribute("data-mode", mode);
+    frame.style.removeProperty("left");
+    frame.style.removeProperty("top");
+    frame.style.removeProperty("height");
+    sizing.layout(preferredWidth, maximized);
+    restore();
+    onPresentation(false);
+  }
+  let preferredWidth = 400;
+  let maximized = false;
   return {
     root,
     frame,
-    layout: sizing.layout,
+    restore,
+    showRail,
+    minimize() { minimized = true; frame.hidden = true; fab.hidden = false; fab.focus(); },
+    resume() { frame.hidden = minimized; fab.hidden = !minimized; },
+    draft(active: boolean, anchor?: string, posted = false) {
+      if (active) {
+        if (!anchor) throw new Error("Floating comment requires an anchor");
+        if (mode !== "draft") previousMinimized = minimized;
+        draftAnchor = anchor;
+        mode = "draft";
+        root.setAttribute("data-mode", mode);
+        restore();
+        onPresentation(true);
+        schedule();
+      } else {
+        showRail();
+        if (!posted && previousMinimized) { minimized = true; frame.hidden = true; fab.hidden = false; }
+      }
+    },
+    draftSize(height: number) { draftHeight = height; schedule(); },
+    layout(width: number, detail: boolean) {
+      preferredWidth = width;
+      maximized = detail;
+      if (mode === "rail") sizing.layout(width, detail);
+      else schedule();
+    },
     update(next: string[], callback: typeof onAnchors) {
       anchors = next;
       onAnchors = callback;

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVocabulary } from "../vocabularies/context";
 import { VocabularyStatus } from "../vocabularies/VocabularyStatus";
+import { VocabularyGenerationHost } from "../vocabularies/config";
 import {
   Button,
   CommentProvider,
@@ -19,7 +20,8 @@ import {
   type PageComment,
 } from "../comments/useComments";
 import { commentsToMarkdown } from "../comments/markdown";
-import { tallyAnchors } from "../comments/useDomAnchors";
+import { commentPins } from "../browser-mode/comment-pins";
+import type { AgentPin } from "@flanksource/page-runtime/schema";
 import { PlaygroundCommentReview } from "../comments/PlaygroundCommentReview";
 import { AgentRunsProvider, useAgentRuns } from "../agent-runs/AgentRunsProvider";
 import { AgentTargetPicker } from "../agent-runs/AgentTargetPicker";
@@ -31,6 +33,7 @@ import {
   type AnchorState,
 } from "./model";
 import { sendToHost, useHostBridge } from "./useHostBridge";
+import { FloatingDraft } from "./FloatingDraft";
 
 type PageSession = { page: ExternalPage; state: HostState };
 let detailOpen = false;
@@ -130,8 +133,9 @@ export function BookmarkletPanel() {
   return (
     <ThemeProvider>
       <DensityProvider>
+        <VocabularyGenerationHost />
         <main className="flex h-dvh min-h-0 flex-col bg-background text-foreground">
-          <header className="flex items-center gap-2 border-b border-border p-3">
+          <header className={bridge.floating ? "hidden" : "flex items-center gap-2 border-b border-border p-3"}>
             <h1
               className="min-w-0 flex-1 truncate text-sm font-semibold"
               title={bridge.state?.url}
@@ -139,6 +143,7 @@ export function BookmarkletPanel() {
               Playground comments
             </h1>
             <VocabularyStatus />
+            <Button size="sm" variant="ghost" onClick={() => sendToHost({ type: "minimize" })}>Minimize</Button>
             <Button
               size="sm"
               variant="ghost"
@@ -214,13 +219,14 @@ export function BookmarkletPanel() {
               key={value.page.id}
               className={
                 active === value.page.id
-                  ? "min-h-0 flex-1 overflow-y-auto p-3"
+                  ? bridge.floating ? "min-h-0 flex-1 overflow-y-auto p-2" : "min-h-0 flex-1 overflow-y-auto p-3"
                   : "hidden"
               }
             >
               <SessionRail
                 {...value}
                 visible={active === value.page.id}
+                floating={bridge.floating}
                 anchors={bridge.anchors}
                 {...(bridge.focus ? { focus: bridge.focus } : {})}
               />
@@ -238,7 +244,8 @@ function SessionRail({
   visible,
   anchors,
   focus,
-}: PageSession & { visible: boolean; anchors: AnchorState[]; focus?: string }) {
+  floating,
+}: PageSession & { visible: boolean; floating: boolean; anchors: AnchorState[]; focus?: string }) {
   const { vocabulary } = useVocabulary();
   const commentConfig = useMemo(() => ({ ...PLAYGROUND_COMMENT_CONFIG, ...(vocabulary ? { vocabulary } : {}) }), [vocabulary]);
   const content = useRef<HTMLDivElement>(null);
@@ -296,6 +303,7 @@ function SessionRail({
           page={page}
           state={state}
           visible={visible}
+          floating={floating}
           anchors={anchors}
           comments={comments.allComments.filter(
             (value) => value.page === page.id,
@@ -316,16 +324,18 @@ function RailContents({
   focus,
   comments,
   onReopen,
+  floating,
 }: PageSession & {
   visible: boolean;
+  floating: boolean;
   anchors: AnchorState[];
   focus?: string;
   comments: PageComment[];
   onReopen: (id: string, body: string) => Promise<void>;
 }) {
   const ctx = useCommentContext();
+  const { snapshot } = useVocabulary();
   const agentRuns = useAgentRuns();
-  const detailTabs = useCommentDetails();
   const [review, setReview] = useState(false);
   const [selected, setSelected] = useState<string>();
   const labels = Object.fromEntries(
@@ -333,14 +343,17 @@ function RailContents({
   );
   if (state.selection) labels[state.selection.anchor] = state.selection.label;
   const pins = JSON.stringify(
-    tallyAnchors(ctx.comments).map((value) => value.anchor),
+    commentPins(comments.filter(comment => ctx.comments.some(visible => visible.id === comment.id))),
   );
   useEffect(() => {
     if (visible)
-      sendToHost({ type: "pins", anchors: JSON.parse(pins) as string[] });
+      sendToHost({ type: "pins", anchors: JSON.parse(pins) as AgentPin[] });
   }, [visible, pins, state]);
   useEffect(() => {
-    if (visible && state.selection) ctx.focusAnchor(state.selection.anchor);
+    if (visible && state.selection) {
+      ctx.focusAnchor(state.selection.anchor);
+      if (state.selection.anchor !== "__document__") sendToHost({ type: "draft", active: true, anchor: state.selection.anchor });
+    }
   }, [visible, state.selection, ctx.focusAnchor]);
   useEffect(() => {
     if (visible && focus) ctx.focusAnchor(focus);
@@ -357,6 +370,7 @@ function RailContents({
   ) =>
     commentsToMarkdown([{ page: page.id, comments: [...thread] }], {
       labels,
+      vocabularyInstructions: Object.fromEntries((snapshot?.catalogs ?? []).map(catalog => [catalog.alias, catalog.instructions])),
       pageUrl: () => state.url,
       pagePath: () => state.url,
       screenshotUrl: (url) => new URL(url, location.origin).href,
@@ -366,6 +380,7 @@ function RailContents({
         resolve: `${location.origin}/__playground/comments/${encodeURIComponent(id)}/resolve`,
       }),
     });
+  const detailTabs = useCommentDetails({ threadToMarkdown: markdown });
   const queue = comments.filter(
     (comment) => !comment.parentId && comment.status === "resolved",
   );
@@ -373,6 +388,7 @@ function RailContents({
     if (!queue.some((value) => value.id === selected))
       setSelected(queue[0]?.id);
   }, [comments, selected]);
+  if (visible && floating && state.selection) return <FloatingDraft selection={state.selection} />;
   return (
     <>
       <p className="mb-3 break-all text-xs text-muted-foreground">

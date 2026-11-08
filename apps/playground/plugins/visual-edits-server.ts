@@ -1,18 +1,20 @@
+import type { MiddlewareApp, ErrorLogger } from "./middleware";
 import { readFileSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { relative, sep } from "node:path";
 import type { Plugin } from "vite";
 
-import { validateSvgAttributes } from "../src/visual-edit/svg-schemas";
+import { isSvgEditableTag, validateSvgAttributes } from "../src/visual-edit/svg-schemas";
 import { editableOpenings } from "./editable-jsx";
 import { parseEditableSource, type EditableSourceMarker } from "./editable-source-marker";
 import { diskModuleHost, pageModuleGraph } from "./page-module-graph";
 import { PAGE_SLUG_PATTERN, PageStoreError, pagePath, pagesFilePath, writePagesFile } from "./pages-store";
 import { sourceHash } from "./source-hash";
+import { setSvgAttributes } from "./svg-edit-source";
+import { deleteSvgElement } from "./svg-delete-source";
 import {
   assertStyleValue,
   findTextCandidates,
-  setAttributes,
   setStyleProp,
   setText,
   type SetTextOutcome,
@@ -61,7 +63,9 @@ function parseRequest(raw: unknown): VisualEditRequest {
   if (edit === null || typeof edit !== "object") throw new InvalidRequest('"edit" must be an object');
   const fields = edit as Record<string, unknown>;
   let parsed: VisualEdit;
-  if (fields["kind"] === "style") {
+  if (fields["kind"] === "delete") {
+    parsed = { kind: "delete" };
+  } else if (fields["kind"] === "style") {
     const prop = fields["prop"];
     if (prop !== "variant" && prop !== "role") throw new InvalidRequest('style edits support "variant" and "role"');
     try {
@@ -77,13 +81,14 @@ function parseRequest(raw: unknown): VisualEditRequest {
       throw new InvalidRequest('"edit.values" must be a non-empty object of attribute values');
     }
     for (const [name, value] of Object.entries(values)) {
-      if (typeof value !== "string" && typeof value !== "number") {
+      if (value !== null && typeof value !== "string" && typeof value !== "number") {
         throw new InvalidRequest(`"edit.values.${name}" must be a string or a number, got ${JSON.stringify(value)}`);
       }
     }
-    parsed = { kind: "attributes", values: values as Record<string, string | number> };
+    if (fields["textFrom"] !== undefined && typeof fields["textFrom"] !== "string") throw new InvalidRequest('"edit.textFrom" must be a string');
+    parsed = { kind: "attributes", values: values as Record<string, string | number | null>, ...(typeof fields["textFrom"] === "string" ? { textFrom: fields["textFrom"] } : {}) };
   } else {
-    throw new InvalidRequest('"edit.kind" must be "style", "text" or "attributes"');
+    throw new InvalidRequest('"edit.kind" must be "style", "text", "attributes" or "delete"');
   }
   const choose = body["choose"];
   if (choose !== undefined && (typeof choose !== "string" || choose === "")) throw new InvalidRequest('"choose" must be a non-empty string');
@@ -160,22 +165,26 @@ function apply({ pagesDir, workspaceRoot, lineage, request }: ApplyVisualEditOpt
     };
   }
 
-  if (edit.kind === "attributes") {
+  if (edit.kind === "attributes" || edit.kind === "delete") {
     const opening = editableOpenings(callSiteSource, marker.file)[marker.ordinal];
     if (!opening) throw new InvalidRequest(`${marker.file} has no editable element with ordinal ${marker.ordinal}; reload the page`);
     try {
-      validateSvgAttributes(opening.tag, edit.values);
+      if (edit.kind === "attributes") validateSvgAttributes(opening.tag, edit.values);
+      else if (!isSvgEditableTag(opening.tag)) throw new Error("Deletion requires an editable SVG element");
     } catch (error) {
       throw new InvalidRequest((error as Error).message);
     }
   }
 
+  const svg = edit.kind === "attributes" ? setSvgAttributes({ files: contents, callSiteFile: marker.file, ordinal: marker.ordinal, values: edit.values, ...(edit.textFrom === undefined ? {} : { textFrom: edit.textFrom }), ...(choose === undefined ? {} : { choose }) }) : null;
   const outcome: SetTextOutcome | ((VisualEdited | VisualRefused) & { file: string }) =
     edit.kind === "style"
       ? { ...setStyleProp(callSiteSource, marker.ordinal, edit.prop, edit.value), file: marker.file }
       : edit.kind === "attributes"
-        ? { ...setAttributes(callSiteSource, marker.ordinal, edit.values), file: marker.file }
-        : setText({ files: contents, callSiteFile: marker.file, ordinal: marker.ordinal, prop: edit.prop, from: edit.from, to: edit.to, ...(choose !== undefined ? { choose } : {}) });
+        ? svg!.outcome
+        : edit.kind === "delete"
+          ? { ...deleteSvgElement(callSiteSource, marker.ordinal), file: marker.file }
+          : setText({ files: contents, callSiteFile: marker.file, ordinal: marker.ordinal, prop: edit.prop, from: edit.from, to: edit.to, ...(choose !== undefined ? { choose } : {}) });
 
   if (outcome.status === "ambiguous") {
     const where = outcome.candidates.map((c) => `${c.file}:${c.line}`).join(", ");
@@ -185,19 +194,35 @@ function apply({ pagesDir, workspaceRoot, lineage, request }: ApplyVisualEditOpt
     return refused(outcome, edit, marker, graph.external, host.read);
   }
   const target = pagesFilePath(pagesDir, outcome.file);
-  const before = contents.get(outcome.file)!;
   let hash: string;
+  const patches = svg?.patches ?? new Map([[outcome.file, outcome.source]]);
+  const written: Array<{ file: string; hash: string }> = [];
   try {
-    ({ hash } = writePagesFile(pagesDir, outcome.file, outcome.source, sourceHash(before)));
+    for (const file of patches.keys()) {
+      if (sourceHash(readFileSync(pagesFilePath(pagesDir, file), "utf8")) !== sourceHash(contents.get(file)!)) throw new PageStoreError(`${file} changed while preparing the edit`, 409);
+    }
+    for (const [file, source] of patches) {
+      const result = writePagesFile(pagesDir, file, source, sourceHash(contents.get(file)!));
+      written.push({ file, hash: result.hash });
+    }
+    hash = written.find(item => item.file === outcome.file)!.hash;
   } catch (error) {
+    for (const item of written.reverse()) writePagesFile(pagesDir, item.file, contents.get(item.file)!, item.hash);
     if (error instanceof PageStoreError && error.statusCode === 409) {
       return { statusCode: 409, body: { status: "stale", error: error.message, file: outcome.file } };
     }
     throw error;
   }
-  const steps = lineage.get(target) ?? new Map<string, string>();
-  steps.set(sourceHash(before), hash);
-  lineage.set(target, steps);
+  for (const item of written) {
+    const file = pagesFilePath(pagesDir, item.file);
+    if (edit.kind === "delete") {
+      lineage.delete(file);
+      continue;
+    }
+    const steps = lineage.get(file) ?? new Map<string, string>();
+    steps.set(sourceHash(contents.get(item.file)!), item.hash);
+    lineage.set(file, steps);
+  }
   return {
     statusCode: 200,
     body: { status: "applied", file: outcome.file, path: relative(workspaceRoot, target).split(sep).join("/"), line: outcome.line, hash },
@@ -222,7 +247,7 @@ function refused(
     const hint = external.length > 0 ? ` (imports outside src/pages: ${external.join(", ")})` : "";
     return refusal(marker.file, marker.line, marker.column, "not-found", `could not find the text "${edit.from}" in the modules of this page${hint}; open the source and edit it by hand`);
   }
-  const subject = outcome.attribute ?? (edit.kind === "attributes" ? Object.keys(edit.values).join(", ") : edit.prop);
+  const subject = outcome.attribute ?? (edit.kind === "attributes" ? Object.keys(edit.values).join(", ") : edit.kind === "delete" ? "element" : edit.prop);
   return refusal(file, line, column, reason, REFUSAL_ADVICE[reason](subject), outcome.attribute);
 }
 
@@ -251,26 +276,31 @@ export function playgroundVisualEdits(options: { pagesDir: string; workspaceRoot
     name: "playground-visual-edits",
     apply: "serve",
     configureServer(server) {
-      const lineage = createVisualEditLineage();
-      server.middlewares.use(VISUAL_EDITS_ROUTE, (req, res, next) => {
-        void (async () => {
-          try {
-            if (req.method !== "POST") {
-              res.setHeader("Allow", "POST");
-              return sendJson(res, 405, { status: "invalid", error: `${req.method} is not supported; use POST` });
-            }
-            const result = applyVisualEdit({ ...options, lineage, request: await readBody(req) });
-            if (result.written) server.watcher.emit("change", result.written);
-            sendJson(res, result.statusCode, result.body);
-          } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            if (error instanceof InvalidRequest) return sendJson(res, 400, { status: "invalid", error: message });
-            server.config.logger.error(`[playground-visual-edits] ${req.method} failed: ${message}`);
-            if (res.headersSent) return next(error);
-            sendJson(res, 500, { status: "invalid", error: message });
-          }
-        })();
-      });
+      registerVisualEditsMiddleware({ ...options, middlewares: server.middlewares, logger: server.config.logger, changed: (file) => server.watcher.emit("change", file) });
     },
   };
+}
+
+
+export function registerVisualEditsMiddleware({ middlewares, logger, changed, ...options }: { middlewares: MiddlewareApp; logger: ErrorLogger; pagesDir: string; workspaceRoot: string; changed: (file: string) => void }): void {
+  const lineage = createVisualEditLineage();
+  middlewares.use(VISUAL_EDITS_ROUTE, (req, res, next) => {
+    void (async () => {
+      try {
+        if (req.method !== "POST") {
+          res.setHeader("Allow", "POST");
+          return sendJson(res, 405, { status: "invalid", error: `${req.method} is not supported; use POST` });
+        }
+        const result = applyVisualEdit({ ...options, lineage, request: await readBody(req) });
+        if (result.written) changed(result.written);
+        sendJson(res, result.statusCode, result.body);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (error instanceof InvalidRequest) return sendJson(res, 400, { status: "invalid", error: message });
+        logger.error(`[playground-visual-edits] ${req.method} failed: ${message}`);
+        if (res.headersSent) return next(error);
+        sendJson(res, 500, { status: "invalid", error: message });
+      }
+    })();
+  });
 }

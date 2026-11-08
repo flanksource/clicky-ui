@@ -6,7 +6,7 @@
  * clicky-ui's chart components already reference `--chart-1` … `--chart-4`
  * (`data/TimeseriesPanel.model.ts:61`, `data/ProgressBar.test.tsx`,
  * `lib/color.ts`), and **nothing defines them**. There is no `--chart-*` in
- * `styles/tokens.css`, `styles/fs-tokens.css` or `tailwind-preset.ts`, so every
+ * `styles/tokens.css`, `styles/clicky-tokens.css` or `tailwind-preset.ts`, so every
  * TimeseriesPanel in production silently falls back to the hardcoded hexes in
  * the `var(--chart-N, #......)` defaults. A themed chart palette does not exist
  * to borrow — `_recon/spark.tsx` says so in its own header and works around it
@@ -18,7 +18,7 @@
  * ## Provenance
  *
  * Validated with the data-viz skill's `scripts/validate_palette.js` against
- * both Flanksource surfaces — `--fs-bg-canvas` is `#ffffff` light and `#030712`
+ * both Flanksource surfaces — `--clicky-bg-canvas` is `#ffffff` light and `#030712`
  * dark:
  *
  *   light  ALL PASS — worst adjacent CVD ΔE 9.4 (deutan), normal-vision 16.6,
@@ -133,16 +133,16 @@ export type StatusLevel = "good" | "warning" | "serious" | "critical";
  * "critical" is not confusable with a red that is simply series 3.
  */
 export const STATUS: Record<StatusLevel, { hex: string; token: string; meaning: string }> = {
-  good: { hex: "#059669", token: "--fs-success", meaning: "Observed healthy." },
-  warning: { hex: "#d97706", token: "--fs-warning", meaning: "Attention without failure." },
+  good: { hex: "#059669", token: "--clicky-success", meaning: "Observed healthy." },
+  warning: { hex: "#d97706", token: "--clicky-warning", meaning: "Attention without failure." },
   serious: { hex: "#ea580c", token: "—", meaning: "Degraded. The one level with no fs token yet." },
-  critical: { hex: "#e11d48", token: "--fs-error", meaning: "Failing now." },
+  critical: { hex: "#e11d48", token: "--clicky-error", meaning: "Failing now." },
 };
 
 /** The chart surfaces the palette was validated against. */
 export const SURFACES = {
-  light: { hex: "#ffffff", token: "--fs-bg-canvas" },
-  dark: { hex: "#030712", token: "--fs-bg-canvas" },
+  light: { hex: "#ffffff", token: "--clicky-bg-canvas" },
+  dark: { hex: "#030712", token: "--clicky-bg-canvas" },
 } as const;
 
 /** What ships today, kept so the comparison on the page stays checkable. */

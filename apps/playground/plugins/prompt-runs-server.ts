@@ -1,7 +1,8 @@
+import type { MiddlewareApp, ErrorLogger } from "./middleware";
 import type { IncomingMessage } from "node:http";
 import { isDeepStrictEqual } from "node:util";
 import { join, relative } from "node:path";
-import type { Connect, Logger, Plugin } from "vite";
+import type { Plugin } from "vite";
 
 import type { CaptainPromptSummary } from "./captain-client";
 import { RequestError, describeError, sendError } from "./prompt-runs-errors";
@@ -237,7 +238,7 @@ export function createPromptRuns(options: PromptRunsOptions) {
 
   async function follow(
     entry: PromptAssociation,
-    logger: Logger,
+    logger: ErrorLogger,
   ): Promise<void> {
     if (processing.has(entry.associationId)) return;
     processing.add(entry.associationId);
@@ -263,7 +264,7 @@ export function createPromptRuns(options: PromptRunsOptions) {
   async function start(
     body: Record<string, unknown>,
     origin: string,
-    logger: Logger,
+    logger: ErrorLogger,
   ): Promise<PromptRun> {
     const request = parseRunRequest(body);
     if (!/^[a-f0-9-]{36}$/.test(request.associationId))
@@ -362,7 +363,7 @@ export function createPromptRuns(options: PromptRunsOptions) {
   return {
     /** Stops the launch server the playground started, if any. */
     close: () => endpoint.close(),
-    resume: (logger: Logger) => {
+    resume: (logger: ErrorLogger) => {
       for (const entry of associations.all())
         if (entry.state === "running") void follow(entry, logger);
     },
@@ -415,7 +416,7 @@ export function createPromptRuns(options: PromptRunsOptions) {
       return problems;
     },
     start,
-    runs: async (logger: Logger): Promise<PromptRun[]> => {
+    runs: async (logger: ErrorLogger): Promise<PromptRun[]> => {
       const entries = associations.all();
       for (const entry of entries)
         if (entry.state === "running") void follow(entry, logger);
@@ -431,62 +432,63 @@ export type PromptRuns = ReturnType<typeof createPromptRuns>;
  * result as a captain-authored root comment on it: lint violations become its
  * checklist and file refs, other output its body.
  */
-export function playgroundPromptRuns(runs: PromptRuns): Plugin {
-  const register = (middlewares: Connect.Server, logger: Logger) => {
-    runs.resume(logger);
-    middlewares.use(PROMPT_RUNS_ROUTE, (req, res, next) => {
-      const url = new URL(req.url ?? "/", "http://playground.local");
-      const method = req.method ?? "";
-      const single = PROMPT_ROUTE.exec(url.pathname);
-      const isList = url.pathname === "/prompts";
-      const isRuns = url.pathname === "/prompt-runs";
-      const isProblems = url.pathname === "/document-problems";
-      if (!(single || isList || isRuns || isProblems)) {
-        next();
-        return;
-      }
-      void (async () => {
-        try {
-          if (isRuns && method === "POST") {
-            sendJson(res, 202, {
-              run: await runs.start(
-                await readJsonBody(req),
-                requestOrigin(req),
-                logger,
-              ),
-            });
-          } else if (method !== "GET") {
-            throw new RequestError(
-              `${method} is not allowed; GET reads prompts and runs, POST /prompt-runs starts one`,
-              405,
-            );
-          } else if (isProblems) {
-            sendJson(res, 200, { results: await runs.problems() });
-          } else if (isRuns) {
-            sendJson(res, 200, { runs: await runs.runs(logger) });
-          } else if (isList) {
-            sendJson(res, 200, { prompts: await runs.prompts(url.searchParams.get("page") ?? undefined) });
-          } else if (single) {
-            sendJson(
-              res,
-              200,
-              await runs.prompt(decodeURIComponent(single[1] ?? ""), url.searchParams.get("page") ?? undefined),
-            );
-          }
-        } catch (error) {
-          sendError(logger, res, error);
+export function registerPromptRunsMiddleware({ middlewares, logger, runs }: { middlewares: MiddlewareApp; logger: ErrorLogger; runs: PromptRuns }): void {
+  runs.resume(logger);
+  middlewares.use(PROMPT_RUNS_ROUTE, (req, res, next) => {
+    const url = new URL(req.url ?? "/", "http://playground.local");
+    const method = req.method ?? "";
+    const single = PROMPT_ROUTE.exec(url.pathname);
+    const isList = url.pathname === "/prompts";
+    const isRuns = url.pathname === "/prompt-runs";
+    const isProblems = url.pathname === "/document-problems";
+    if (!(single || isList || isRuns || isProblems)) {
+      next();
+      return;
+    }
+    void (async () => {
+      try {
+        if (isRuns && method === "POST") {
+          sendJson(res, 202, {
+            run: await runs.start(
+              await readJsonBody(req),
+              requestOrigin(req),
+              logger,
+            ),
+          });
+        } else if (method !== "GET") {
+          throw new RequestError(
+            `${method} is not allowed; GET reads prompts and runs, POST /prompt-runs starts one`,
+            405,
+          );
+        } else if (isProblems) {
+          sendJson(res, 200, { results: await runs.problems() });
+        } else if (isRuns) {
+          sendJson(res, 200, { runs: await runs.runs(logger) });
+        } else if (isList) {
+          sendJson(res, 200, { prompts: await runs.prompts(url.searchParams.get("page") ?? undefined) });
+        } else if (single) {
+          sendJson(
+            res,
+            200,
+            await runs.prompt(decodeURIComponent(single[1] ?? ""), url.searchParams.get("page") ?? undefined),
+          );
         }
-      })();
-    });
-  };
+      } catch (error) {
+        sendError(logger, res, error);
+      }
+    })();
+  });
+}
+
+export function playgroundPromptRuns(runs: PromptRuns): Plugin {
   return {
     name: "playground-prompt-runs",
     configureServer(server) {
-      register(server.middlewares, server.config.logger);
+      registerPromptRunsMiddleware({ middlewares: server.middlewares, logger: server.config.logger, runs });
       server.httpServer?.once("close", () => void runs.close());
     },
     configurePreviewServer(server) {
-      register(server.middlewares, server.config.logger);
+      registerPromptRunsMiddleware({ middlewares: server.middlewares, logger: server.config.logger, runs });
       server.httpServer?.once("close", () => void runs.close());
     },
   };

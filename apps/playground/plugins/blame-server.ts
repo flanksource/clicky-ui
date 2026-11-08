@@ -1,7 +1,8 @@
+import type { MiddlewareApp } from "./middleware";
 import { execFile } from "node:child_process";
 import { isAbsolute } from "node:path";
 import { promisify } from "node:util";
-import type { Connect, Plugin } from "vite";
+import type { Plugin } from "vite";
 
 import { sendJson } from "./comments-server";
 
@@ -82,36 +83,37 @@ export async function blameFile(cwd: string, path: string): Promise<FileBlame> {
 }
 
 /** Serves `git blame` of a workspace file, so a review can show who last changed each line. */
+export function registerBlameMiddleware({ middlewares, cwd }: { middlewares: MiddlewareApp; cwd: string }): void {
+  middlewares.use(BLAME_ROUTE, (req, res) => {
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: `${req.method} is not allowed; GET ${BLAME_ROUTE}?path= blames a file` });
+      return;
+    }
+    let path: string;
+    try {
+      path = assertRepoPath(new URL(req.url ?? "/", "http://playground.local").searchParams.get("path"));
+    } catch (error) {
+      sendJson(res, 400, { error: (error as Error).message });
+      return;
+    }
+    blameFile(cwd, path).then(
+      (blame) => sendJson(res, 200, blame),
+      (error: unknown) => {
+        const stderr = (error as { stderr?: string }).stderr?.trim();
+        sendJson(res, 422, { error: `git blame ${path}: ${stderr || (error instanceof Error ? error.message : String(error))}` });
+      },
+    );
+  });
+}
+
 export function playgroundBlame({ cwd }: { cwd: string }): Plugin {
-  const register = (middlewares: Connect.Server) => {
-    middlewares.use(BLAME_ROUTE, (req, res) => {
-      if (req.method !== "GET") {
-        sendJson(res, 405, { error: `${req.method} is not allowed; GET ${BLAME_ROUTE}?path= blames a file` });
-        return;
-      }
-      let path: string;
-      try {
-        path = assertRepoPath(new URL(req.url ?? "/", "http://playground.local").searchParams.get("path"));
-      } catch (error) {
-        sendJson(res, 400, { error: (error as Error).message });
-        return;
-      }
-      blameFile(cwd, path).then(
-        (blame) => sendJson(res, 200, blame),
-        (error: unknown) => {
-          const stderr = (error as { stderr?: string }).stderr?.trim();
-          sendJson(res, 422, { error: `git blame ${path}: ${stderr || (error instanceof Error ? error.message : String(error))}` });
-        },
-      );
-    });
-  };
   return {
     name: "playground-blame",
     configureServer(server) {
-      register(server.middlewares);
+      registerBlameMiddleware({ middlewares: server.middlewares, cwd });
     },
     configurePreviewServer(server) {
-      register(server.middlewares);
+      registerBlameMiddleware({ middlewares: server.middlewares, cwd });
     },
   };
 }

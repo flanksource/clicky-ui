@@ -216,7 +216,7 @@ function writeAtomic(file: string, source: string): void {
 }
 
 /** Module and stylesheet files under `src/pages/` that the editor may open, including `_` helpers. */
-export const PAGES_FILE_EXTENSIONS = [".ts", ".tsx", ".css"] as const;
+export const PAGES_FILE_EXTENSIONS = [".ts", ".tsx", ".css", ".md", ".mdx"] as const;
 
 /**
  * The absolute path of an existing editable file `rel` (forward slashes, relative

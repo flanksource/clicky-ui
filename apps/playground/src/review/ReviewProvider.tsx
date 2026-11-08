@@ -33,6 +33,9 @@ import {
 } from "../comments/dom-anchor";
 import { writeClipboard } from "../comments/clipboard";
 import { LIVE_SERVER } from "../live-server";
+import { usePageReload } from "../page-reload";
+import { useBrowserSession } from "../browser-mode/session";
+import { FrameReviewProvider } from "../browser-mode/FrameReviewProvider";
 import { request } from "../comments/useComments";
 import {
   copyElement,
@@ -90,7 +93,12 @@ async function mutateSource(
   });
 }
 
-export function ReviewProvider({
+export function ReviewProvider(props: Parameters<typeof LocalReviewProvider>[0]) {
+  const browser = useBrowserSession();
+  return browser ? <FrameReviewProvider {...props} session={browser} /> : <LocalReviewProvider {...props} />;
+}
+
+function LocalReviewProvider({
   page,
   active,
   sourceDirty,
@@ -105,6 +113,7 @@ export function ReviewProvider({
   scrollRef: RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
+  const reload = usePageReload();
   const context = useCommentContext();
   const [items, setItems] = useState<Reviewable[]>([]);
   const [error, setError] = useState<unknown>(null);
@@ -230,7 +239,7 @@ export function ReviewProvider({
       ...(source?.lineNumber ? { line: source.lineNumber } : {}),
       ...(source?.columnNumber ? { column: source.columnNumber } : {}),
     });
-    window.location.reload();
+    await reload({ reason: "review", page: options.page });
   };
 
   const submit = async () => {
@@ -267,7 +276,7 @@ export function ReviewProvider({
           associatedCommentIds,
           expectedSource: await sourceRequest(page),
         });
-        window.location.reload();
+        await reload({ reason: "review", page });
       } else {
         await context.callbacks.onCreate?.({
           anchor: anchorFor(id),

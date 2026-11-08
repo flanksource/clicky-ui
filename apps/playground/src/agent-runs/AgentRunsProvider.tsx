@@ -35,7 +35,8 @@ import { RunAgentDialog } from "./RunAgentDialog";
 import { fetchComments, PLAYGROUND_COMMENT_CONFIG } from "../comments/useComments";
 
 type AgentRunsContext = {
-  start: (comment: Comment) => Promise<void>;
+  /** Sends a thread; `target` first points the thread's page at that session. */
+  start: (comment: Comment, target?: AgentTarget) => Promise<void>;
   /** Menu entries for a comment's Assign menu. */
   extraAssignItems: (comment: Comment) => DropdownMenuItem[];
   /** The "sent to agent session" chip for a comment, or nothing. */
@@ -158,15 +159,17 @@ export function AgentRunsProvider({
     [refresh, runAgent],
   );
 
+  const pointAt = useCallback(async (comment: Comment, next: AgentTarget) => {
+    const commentPage = "page" in comment && typeof comment.page === "string" ? comment.page : page ?? (await fetchComments()).find(entry => entry.id === comment.id)?.page;
+    if (!commentPage) throw new Error(`Cannot find the page for comment ${comment.id}`);
+    await setPageAgentTarget(commentPage, next);
+    await refresh();
+  }, [page, refresh]);
+
   const retry = useCallback(async (comment: Comment, next?: AgentTarget) => {
-    if (next) {
-      const commentPage = "page" in comment && typeof comment.page === "string" ? comment.page : page ?? (await fetchComments()).find(entry => entry.id === comment.id)?.page;
-      if (!commentPage) throw new Error(`Cannot find the page for comment ${comment.id}`);
-      await setPageAgentTarget(commentPage, next);
-      await refresh();
-    }
+    if (next) await pointAt(comment, next);
     await send(comment);
-  }, [page, refresh, send]);
+  }, [pointAt, send]);
 
   const openDialog = useCallback((next: DialogTarget) => {
     setDialogError(null);
@@ -174,9 +177,10 @@ export function AgentRunsProvider({
   }, []);
 
   const start = useCallback(
-    async (comment: Comment) => {
-      // A captain target is delivered into as it is, with no runtime to choose.
-      if (!hasRuntime && !pageTarget) {
+    async (comment: Comment, next?: AgentTarget) => {
+      if (next) await pointAt(comment, next);
+      // A session target is delivered into as it is, with no runtime to choose.
+      if (!hasRuntime && !(next ? next.kind !== "playground" : pageTarget)) {
         openDialog({ mode: "run", comment });
         return;
       }
@@ -192,7 +196,7 @@ export function AgentRunsProvider({
         setFailedSend({ comment, error: message });
       }
     },
-    [hasRuntime, openDialog, pageTarget, send],
+    [hasRuntime, openDialog, pageTarget, pointAt, send],
   );
 
   const act = useCallback(

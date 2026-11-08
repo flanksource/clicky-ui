@@ -2,8 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   ResolvedRuntimeProfile,
   RuntimeProfileResolveRequest,
+  RuntimePresetResolveRequest,
 } from "../../../packages/ui/src/data/ai/runtime-profile";
-import { resolveRuntimeProfileFromCaptain } from "./runtime-profiles-server";
+import { registerRuntimeProfilesMiddleware, resolveRuntimeSelectionFromCaptain } from "./runtime-profiles-server";
+import type { Middleware } from "./middleware";
+import { createServer } from "node:http";
 
 const request: RuntimeProfileResolveRequest = {
   profile: {
@@ -54,7 +57,7 @@ const resolution: ResolvedRuntimeProfile = {
   effectivePolicy: [{ destructive: true, policy: "ask" }],
 };
 
-describe("resolveRuntimeProfileFromCaptain", () => {
+describe("resolveRuntimeSelectionFromCaptain", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("forwards the complete request to Captain and returns its authoritative result", async () => {
@@ -67,7 +70,7 @@ describe("resolveRuntimeProfileFromCaptain", () => {
     vi.stubGlobal("fetch", fetch);
 
     await expect(
-      resolveRuntimeProfileFromCaptain(
+      resolveRuntimeSelectionFromCaptain(
         "http://captain/api/chat/runtime-profiles/resolve",
         request,
       ),
@@ -94,10 +97,51 @@ describe("resolveRuntimeProfileFromCaptain", () => {
     );
 
     await expect(
-      resolveRuntimeProfileFromCaptain(
+      resolveRuntimeSelectionFromCaptain(
         "http://captain/api/chat/runtime-profiles/resolve",
         request,
       ),
     ).rejects.toThrow("permission settings require a resolved backend");
   });
+});
+
+it("proxies preset selections to Captain's preset resolver through plain middleware", async () => {
+  const handlers = new Map<string, Middleware>();
+  registerRuntimeProfilesMiddleware({
+    middlewares: { use: (route: string | Middleware, handler?: Middleware) => {
+      if (typeof route !== "string" || !handler) throw new Error("Expected a mounted runtime route");
+      handlers.set(route, handler);
+    } },
+    logger: { error: vi.fn() },
+    modelsURL: "unused",
+    permissionsURL: "unused",
+    runtimesURL: "unused",
+    resolveURL: "http://captain/api/chat/runtime-profiles/resolve",
+    presetsResolveURL: "http://captain/api/chat/runtime-presets/resolve",
+  });
+  const handler = handlers.get("/__playground/runtime-profiles/presets/resolve");
+  expect(handler).toBeDefined();
+  if (!handler) throw new Error("Missing preset resolution middleware");
+  const server = createServer((request, response) => handler(request, response, () => {
+    throw new Error("Preset resolver must handle the request");
+  }));
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Missing preset test server address");
+  const nativeFetch = globalThis.fetch;
+  const captainFetch = vi.fn().mockResolvedValue(Response.json(resolution));
+  vi.stubGlobal("fetch", captainFetch);
+  const selection: RuntimePresetResolveRequest = { selected: ["guardrails"], presets: request.presets };
+  try {
+    const response = await nativeFetch(`http://127.0.0.1:${address.port}`, {
+      method: "POST", body: JSON.stringify(selection),
+    });
+    expect({ status: response.status, body: await response.json() }).toEqual({ status: 200, body: resolution });
+    expect(captainFetch).toHaveBeenCalledWith("http://captain/api/chat/runtime-presets/resolve", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(selection),
+    });
+  } finally {
+    vi.unstubAllGlobals();
+    await new Promise<void>((done, reject) => server.close((error) => error ? reject(error) : done()));
+  }
 });

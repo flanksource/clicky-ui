@@ -1,3 +1,4 @@
+import type { MiddlewareApp, ErrorLogger } from "./middleware";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, isAbsolute, relative, sep } from "node:path";
 import type { Plugin } from "vite";
@@ -167,7 +168,7 @@ function optionalPositiveInteger(
   return value as number;
 }
 
-type SourceEvents = {
+export type SourceEvents = {
   created: (file: string) => void;
   changed: (file: string) => void;
   deleted: (file: string) => void;
@@ -190,7 +191,7 @@ export function announcePageMove(
   events.created(pagePath(pagesDir, nextSlug));
 }
 
-type SourcesOptions = {
+export type SourcesOptions = {
   pagesDir: string;
   commentsDir: string;
   /** Root that a read's `path` is relative to, so it matches the paths linters report. */
@@ -401,30 +402,35 @@ export function playgroundSources(options: SourcesOptions): Plugin {
         folderDeleted: (folder) => server.watcher.emit("unlinkDir", folder),
       };
 
-      server.middlewares.use(SOURCES_ROUTE, (req, res, next) => {
-        void (async () => {
-          try {
-            await handle(options, events, req, res);
-          } catch (error) {
-            const message =
-              error instanceof Error ? error.message : String(error);
-            server.config.logger.error(
-              `[playground-sources] ${req.method} failed: ${message}`,
-            );
-            if (res.headersSent) {
-              next(error);
-              return;
-            }
-            sendJson(
-              res,
-              error instanceof PageStoreError ? error.statusCode : 400,
-              {
-                error: message,
-              },
-            );
-          }
-        })();
-      });
+      registerSourcesMiddleware({ ...options, middlewares: server.middlewares, logger: server.config.logger, events });
     },
   };
+}
+
+
+export function registerSourcesMiddleware({ middlewares, logger, events, ...options }: SourcesOptions & { middlewares: MiddlewareApp; logger: ErrorLogger; events: SourceEvents }): void {
+  middlewares.use(SOURCES_ROUTE, (req, res, next) => {
+    void (async () => {
+      try {
+        await handle(options, events, req, res);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        logger.error(
+          `[playground-sources] ${req.method} failed: ${message}`,
+        );
+        if (res.headersSent) {
+          next(error);
+          return;
+        }
+        sendJson(
+          res,
+          error instanceof PageStoreError ? error.statusCode : 400,
+          {
+            error: message,
+          },
+        );
+      }
+    })();
+  });
 }

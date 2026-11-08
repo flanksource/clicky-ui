@@ -1,5 +1,7 @@
-import { relative, resolve, sep } from "node:path";
-import type { Connect, Plugin } from "vite";
+import { dirname, resolve, sep } from "node:path";
+import type { Plugin } from "vite";
+import type { MiddlewareApp } from "./middleware";
+import { readStaticExports } from "./static-metadata";
 import { NAVIGATION_ROUTE } from "../src/navigation/types";
 import { sendJson } from "./comments-server";
 import type { DocumentProblems } from "./document-problems";
@@ -20,25 +22,19 @@ function failure(cause: unknown): { status: number; error: string } {
  * filter, sort, age and search applied on the server. See
  * `src/navigation/types.ts` for the contract.
  *
- * Page `meta` is evaluated through the dev server's module graph; the preview
- * server has none, so previews label pages from their slug unless `loadMeta`
- * is given.
+ * Page metadata is read statically from the same modules the browser uses.
  */
-export function playgroundNavigation({
-  dir,
-  pagesDir,
-  endpoint,
-  problems,
-  loadMeta,
-}: {
+type NavigationOptions = {
   dir: string;
   pagesDir: string;
   endpoint: GavelEndpoint;
   problems: () => Promise<DocumentProblems>;
   loadMeta?: PageMetaLoader;
-}): Plugin {
-  const register = (middlewares: Connect.Server, pageMeta: PageMetaLoader | undefined) => {
-    const navigation = createNavigation({ dir, pagesDir, endpoint, problems, loadMeta: pageMeta });
+  metadataRoots?: string[];
+};
+
+export function registerNavigationMiddleware({ middlewares, ...options }: NavigationOptions & { middlewares: MiddlewareApp }) {
+    const navigation = createNavigation({ ...options, loadMeta: options.loadMeta ?? (async file => readStaticExports({ file, roots: options.metadataRoots ?? [dirname(options.pagesDir)], names: ["meta"] })["meta"]) });
     middlewares.use(NAVIGATION_ROUTE, (req, res) => {
       if (req.method !== "GET") {
         res.setHeader("Allow", "GET");
@@ -53,14 +49,13 @@ export function playgroundNavigation({
       });
     });
     return navigation;
-  };
+}
+
+export function playgroundNavigation(options: NavigationOptions): Plugin {
   return {
     name: "playground-navigation",
     configureServer(server) {
-      const navigation = register(
-        server.middlewares,
-        loadMeta ?? (async (file) => (await server.ssrLoadModule(`/${relative(server.config.root, file)}?playground-meta`))["default"]),
-      );
+      const navigation = registerNavigationMiddleware({ ...options, middlewares: server.middlewares });
       const source = resolve(server.config.root, "src") + sep;
       const onChange = (_event: string, file: string) => {
         if (resolve(file).startsWith(source)) navigation.clearMeta();
@@ -69,7 +64,7 @@ export function playgroundNavigation({
       server.httpServer?.once("close", () => server.watcher.off("all", onChange));
     },
     configurePreviewServer(server) {
-      register(server.middlewares, loadMeta);
+      registerNavigationMiddleware({ ...options, middlewares: server.middlewares });
     },
   };
 }

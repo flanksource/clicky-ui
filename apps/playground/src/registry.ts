@@ -2,6 +2,7 @@ import type { ComponentType, ReactNode } from "react";
 import type { StaticIconComponent } from "@flanksource/clicky-ui";
 import type { ExtractedGuidance } from "../plugins/markdown-model";
 import { repositoryPage, repositoryFolderPage } from "./documents/catalog";
+import type { VocabularyCatalog, VocabularySnapshot } from "./vocabularies/types";
 
 /** Optional per-page presentation metadata layered over filename-derived defaults. */
 export type PageMeta = {
@@ -220,7 +221,13 @@ export function findPage(
   if (!slug) return undefined;
   if (slug.startsWith("document:")) return repositoryPage(slug);
   if (slug.startsWith("folder:")) return repositoryFolderPage(slug);
-  return pages().find((entry) => entry.slug === slug);
+  const existing = pages().find(entry => entry.slug === slug);
+  if (existing) return existing;
+  if (slug.startsWith("vocabularies/")) {
+    if (!vocabularyPages.has(slug)) vocabularyPages.set(slug, vocabularyPage(slug));
+    return vocabularyPages.get(slug);
+  }
+  return undefined;
 }
 
 /*
@@ -235,6 +242,34 @@ export function findPage(
  * what discards them.
  */
 const removedSlugs = new Set<string>();
+const vocabularyPages = new Map<string, ComponentPageEntry>();
+
+function vocabularyPage(slug: string, catalog?: VocabularyCatalog): ComponentPageEntry {
+  return { kind: "component", slug, title: humanizeSlug(slug), group: "Vocabularies", loadGuidance: async () => {
+    const response = await fetch("/__playground/vocabularies");
+    if (!response.ok) throw new Error(await response.text());
+    const snapshot = await response.json() as VocabularySnapshot;
+    const current = snapshot.catalogs.find(entry => entry.slug === slug);
+    if (!current) throw new Error(`Unknown vocabulary page ${slug}`);
+    return { blocks: [{ kind: "vocabulary", alias: current.alias, instructions: current.instructions, items: snapshot.items.filter(item => item.catalog === current.alias) }] };
+  }, load: async () => {
+    if (catalog) return import(/* @vite-ignore */ catalog.page);
+    const response = await fetch("/__playground/vocabularies");
+    if (!response.ok) throw new Error(await response.text());
+    const snapshot = await response.json() as VocabularySnapshot;
+    const current = snapshot.catalogs.find(entry => entry.slug === slug);
+    if (!current) throw new Error(`Unknown vocabulary page ${slug}`);
+    return import(/* @vite-ignore */ current.page);
+  } };
+}
+
+export function setVocabularyPages(catalogs: VocabularyCatalog[]) {
+  vocabularyPages.clear();
+  for (const catalog of catalogs) {
+    if (!PAGES.some(entry => entry.slug === catalog.slug)) vocabularyPages.set(catalog.slug, vocabularyPage(catalog.slug, catalog));
+  }
+  emit();
+}
 const movedSlugs = new Map<string, string>();
 /**
  * Titles from a rename, which outrank the module's own `meta`: the module at
@@ -251,8 +286,9 @@ function globSlugFor(slug: string): string {
 
 /** Every artifact the app should show right now, newest edits included. */
 export function pages(): PageEntry[] {
-  if (removedSlugs.size === 0 && movedSlugs.size === 0) return PAGES;
-  return PAGES.flatMap((entry) => {
+  const entries = [...PAGES, ...vocabularyPages.values()];
+  if (removedSlugs.size === 0 && movedSlugs.size === 0) return entries;
+  return entries.flatMap((entry) => {
     const slug = movedSlugs.get(entry.slug) ?? entry.slug;
     if (removedSlugs.has(slug)) return [];
     return [
@@ -314,6 +350,7 @@ export async function loadMetadata(entries: readonly PageEntry[]): Promise<void>
     const pending = pendingMeta.get(entry.slug);
     if (pending) return pending;
     const loader = projectedMeta[`./pages/${globSlugFor(entry.slug)}.tsx`];
+    if (!loader && entry.slug.startsWith("vocabularies/")) return;
     if (!loader) throw new Error(`Missing metadata loader for ${entry.slug}`);
     const request = loader().then((meta) => cacheMeta(entry.slug, meta)).finally(() => pendingMeta.delete(entry.slug));
     pendingMeta.set(entry.slug, request);

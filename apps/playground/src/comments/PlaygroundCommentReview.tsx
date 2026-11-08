@@ -73,7 +73,7 @@ export function PlaygroundCommentReview({
   onExit,
   onMaximizedChange,
 }: PlaygroundCommentReviewProps) {
-  const detailTabs = useCommentDetails();
+  const detailTabs = useCommentDetails(threadToMarkdown ? { threadToMarkdown } : {});
   const [pending, setPending] = useState<"close" | "reopen" | null>(null);
   const [error, setError] = useState<unknown>(null);
   useEffect(() => { setError(null); }, [selectedId]);

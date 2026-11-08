@@ -13,11 +13,16 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PageErrorBoundary } from "./PageErrorBoundary";
 
-const { start } = vi.hoisted(() => ({
+const { start, setTarget, session } = vi.hoisted(() => ({
   start: vi.fn().mockResolvedValue(undefined),
+  setTarget: vi.fn().mockResolvedValue(undefined),
+  session: { id: "session-kit", title: "Fix kit", source: "claude", model: "example-model", inCmux: false },
 }));
 vi.mock("./agent-runs/AgentRunsProvider", () => ({
-  useAgentRuns: () => ({ start, data: { settings: { autoRun: false } } }),
+  useAgentRuns: () => ({ start, setTarget, target: undefined, data: { settings: { autoRun: false }, sessions: [] } }),
+}));
+vi.mock("./agent-runs/useCaptainSessions", () => ({
+  useCaptainSessions: () => ({ sessions: [session], error: null }),
 }));
 
 function BrokenPage(): never {
@@ -79,8 +84,28 @@ describe("PageErrorBoundary", () => {
     expect(payload.body).toContain("React component stack:");
     expect(payload.body).toContain("Cannot read properties of undefined");
     fireEvent.click(screen.getByRole("button", { name: "Send to agent" }));
-    await waitFor(() => expect(start).toHaveBeenCalledWith(saved));
+    await waitFor(() => expect(start).toHaveBeenCalledWith(saved, undefined));
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the failure as error details and sends the report to a session picked from the menu", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const saved = { id: "error-comment", body: "report", status: "open", createdAt: "2026-11-05T08:31:35Z" };
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(saved), { status: 201, headers: { "Content-Type": "application/json" } }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    render(host());
+    expect({
+      details: screen.queryByRole("button", { name: "Copy error details" }) !== null,
+      rawReport: screen.queryByText(/User agent:/) !== null,
+    }).toEqual({ details: true, rawReport: false });
+    fireEvent.click(screen.getByRole("button", { name: "Send to another target" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Fix kit/ }));
+    await waitFor(() =>
+      expect(start).toHaveBeenCalledWith(saved, { kind: "captain", sessionId: session.id, label: "Fix kit · claude" }),
+    );
+    expect(JSON.parse(fetch.mock.calls[0]![1].body).body).toContain("React component stack:");
   });
 
   it("shows persistence errors and recovers when navigation selects another page", async () => {

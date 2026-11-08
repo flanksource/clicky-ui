@@ -1,7 +1,9 @@
 import { configureTestComments } from "./testing/comments-store";
 // @vitest-environment node
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { vocabularyPageFile } from "./vocabulary-registry";
+import { sessionScopeDirectory } from "./session-scope";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { createServer, type ViteDevServer } from "vite";
 import { playgroundVocabularies } from "./vocabularies-server";
@@ -23,8 +25,8 @@ const item = {
 
 function catalog(value: unknown = [item]) {
   writeFileSync(
-    resolve(directory, "vocabs/shapes/catalog.ts"),
-    `export default ${JSON.stringify(value)};`,
+    resolve(directory, "vocabs/shapes/index.tsx"),
+    `import { label } from './specimen'; export const vocabulary = {alias:'shapes', instructions:'Read shapes as geometry.', items:${JSON.stringify(value)}}; export default function Shapes() { return <span>{label}</span>; }`,
   );
 }
 beforeEach(async () => {
@@ -36,10 +38,6 @@ beforeEach(async () => {
   writeFileSync(
     resolve(directory, "vocabs/shapes/specimen.ts"),
     "export const label = 'Decision preview';",
-  );
-  writeFileSync(
-    resolve(directory, "vocabs/shapes/Preview.tsx"),
-    "import { label } from './specimen'; export default function Preview() { return <span>{label}</span>; }",
   );
   server = await createServer({
     configFile: false,
@@ -70,9 +68,9 @@ it("loads a directory into the picker API and resolves the same server-owned def
   expect(response.status).toBe(200);
   expect(snapshot.items).toEqual([item]);
   expect(snapshot.catalogs).toEqual([
-    { id: "shapes", preview: expect.stringContaining("vocabVersion=") },
+    { alias: "shapes", slug: "vocabularies/shapes", file: "vocabs/shapes/index.tsx", instructions: "Read shapes as geometry.", page: expect.stringContaining("vocabVersion="), previewRevision: expect.stringMatching(/^[a-f0-9]{20}$/) },
   ]);
-  const preview = await fetch(origin + snapshot.catalogs[0].preview);
+  const preview = await fetch(origin + snapshot.catalogs[0].page);
   expect(preview.status).toBe(200);
   expect(await preview.text()).toMatch(/specimen\.ts\?vocabVersion=/);
   const posted = await fetch(`${origin}/__playground/comments`, {
@@ -103,9 +101,9 @@ it.each([
     error: "references",
   },
   {
-    name: "wrong namespace",
-    entries: [{ ...item, catalog: "other" }],
-    error: "directory name",
+    name: "missing description",
+    entries: [{ ...item, description: "" }],
+    error: "description",
   },
 ])("rejects $name", async ({ entries, error }) => {
   catalog(entries);
@@ -121,12 +119,8 @@ it("discovers new folders and refreshes metadata and preview revisions without r
   catalog([{ ...item, description: "Updated decision guidance" }]);
   mkdirSync(resolve(directory, "vocabs/colors"));
   writeFileSync(
-    resolve(directory, "vocabs/colors/catalog.ts"),
-    `export const colors = ${JSON.stringify([{ ...item, catalog: "colors", type: "color", id: "color/accent" }])};`,
-  );
-  writeFileSync(
-    resolve(directory, "vocabs/colors/Preview.tsx"),
-    "export default function Preview() { return <span>Accent</span>; }",
+    resolve(directory, "vocabs/colors/index.tsx"),
+    `export const vocabulary = {alias:'colors',instructions:'Read colors',items:${JSON.stringify([{ ...item, type: "color", id: "color/accent" }])}}; export default () => null;`,
   );
   const next = await (
     await fetch(`${origin}/__playground/vocabularies`)
@@ -135,14 +129,14 @@ it("discovers new folders and refreshes metadata and preview revisions without r
   expect(next.items.map((entry: typeof item) => entry.description)).toContain(
     "Updated decision guidance",
   );
-  expect(next.catalogs.map((entry: { id: string }) => entry.id)).toEqual([
+  expect(next.catalogs.map((entry: { alias: string }) => entry.alias)).toEqual([
     "colors",
     "shapes",
   ]);
   expect(
-    next.catalogs.find((entry: { id: string }) => entry.id === "shapes")
-      .preview,
-  ).not.toBe(first.catalogs[0].preview);
+    next.catalogs.find((entry: { alias: string }) => entry.alias === "shapes")
+      .page,
+  ).not.toBe(first.catalogs[0].page);
 });
 
 it("refreshes preview helpers and removes deleted catalogs without restarting", async () => {
@@ -157,7 +151,7 @@ it("refreshes preview helpers and removes deleted catalogs without restarting", 
     await fetch(`${origin}/__playground/vocabularies`)
   ).json();
   expect(next.revision).not.toBe(first.revision);
-  const preview = await (await fetch(origin + next.catalogs[0].preview)).text();
+  const preview = await (await fetch(origin + next.catalogs[0].page)).text();
   const helper = preview.match(/"([^"\n]*specimen\.ts\?vocabVersion=[^"\n]*)"/);
   expect(helper).not.toBeNull();
   expect(await (await fetch(origin + helper![1])).text()).toContain(
@@ -165,12 +159,8 @@ it("refreshes preview helpers and removes deleted catalogs without restarting", 
   );
   mkdirSync(resolve(directory, "vocabs/colors"));
   writeFileSync(
-    resolve(directory, "vocabs/colors/catalog.ts"),
-    `export default ${JSON.stringify([{ ...item, catalog: "colors" }])};`,
-  );
-  writeFileSync(
-    resolve(directory, "vocabs/colors/Preview.tsx"),
-    "export default function Preview() { return null; }",
+    resolve(directory, "vocabs/colors/index.tsx"),
+    `export const vocabulary = {alias:'colors', instructions:'Read colors', items:${JSON.stringify([item])}}; export default () => null;`,
   );
   await fetch(`${origin}/__playground/vocabularies`);
   rmSync(resolve(directory, "vocabs/shapes"), { recursive: true });
@@ -186,14 +176,14 @@ it("preserves raw asset imports and refreshes previews when their content change
     "Decision guidance",
   );
   writeFileSync(
-    resolve(directory, "vocabs/shapes/Preview.tsx"),
-    "import label from './label.txt?raw'; export default function Preview() { return <span>{label}</span>; }",
+    resolve(directory, "vocabs/shapes/index.tsx"),
+    `import label from './label.txt?raw'; export const vocabulary = {alias:'shapes',instructions:'Read shapes',items:${JSON.stringify([item])}}; export default () => <span>{label}</span>;`,
   );
   const first = await (
     await fetch(`${origin}/__playground/vocabularies`)
   ).json();
   const preview = await (
-    await fetch(origin + first.catalogs[0].preview)
+    await fetch(origin + first.catalogs[0].page)
   ).text();
   const asset = preview.match(/"([^"\n]*label\.txt\?[^"\n]*)"/);
   expect(asset).not.toBeNull();
@@ -209,6 +199,26 @@ it("preserves raw asset imports and refreshes previews when their content change
     await fetch(`${origin}/__playground/vocabularies`)
   ).json();
   expect(next.revision).not.toBe(first.revision);
+});
+
+it("resolves a vocabulary page slug to its file in the vocabulary root for session scoping", async () => {
+  await fetch(`${origin}/__playground/vocabularies`);
+  const file = realpathSync(resolve(directory, "vocabs/shapes/index.tsx"));
+  expect([vocabularyPageFile("vocabularies/shapes"), sessionScopeDirectory({ page: "vocabularies/shapes", dir: directory, cwd: directory })]).toEqual([file, dirname(file)]);
+  expect(() => vocabularyPageFile("vocabularies/missing")).toThrow("Unknown vocabulary page vocabularies/missing");
+});
+
+it("serves versioned JSON imports as JavaScript modules", async () => {
+  writeFileSync(resolve(directory, "vocabs/shapes/sizes.json"), JSON.stringify({ a4: [210, 297] }));
+  writeFileSync(
+    resolve(directory, "vocabs/shapes/index.tsx"),
+    `import sizes from './sizes.json'; export const vocabulary = {alias:'shapes',instructions:'Read shapes',items:${JSON.stringify([item])}}; export default () => <span>{sizes.a4[0]}</span>;`,
+  );
+  const snapshot = await (await fetch(`${origin}/__playground/vocabularies`)).json();
+  const preview = await (await fetch(origin + snapshot.catalogs[0].page)).text();
+  const json = preview.match(/"([^"\n]*sizes\.json\?[^"\n]*)"/);
+  expect(json?.[1]).toContain("vocabVersion=");
+  expect(await (await fetch(origin + json![1])).text()).toMatch(/export default/);
 });
 
 it("rejects malformed definitions and blocks comment writes instead of using a stale catalog", async () => {

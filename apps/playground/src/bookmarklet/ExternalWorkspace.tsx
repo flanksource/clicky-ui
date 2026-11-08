@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { VocabularyStatus } from "../vocabularies/VocabularyStatus";
+import { VocabularyGenerationHost } from "../vocabularies/config";
 import {
   type AppShellNavDrag,
   Button,
@@ -259,6 +260,7 @@ export function ExternalWorkspace({
   ];
   return (
     <>
+      <VocabularyGenerationHost />
       <Workspace className="h-dvh" panes={panes} storageKey={WORKSPACE_STORAGE_KEY} defaultValue={layoutDefaults} />
       {repositoryNavigation.dialogs}
     </>

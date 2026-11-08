@@ -13,6 +13,7 @@ import { AgentRunsProvider } from "./agent-runs/AgentRunsProvider";
 import { PromptRunsProvider } from "./prompt-runs/PromptRunsProvider";
 import { PLAYGROUND_COMMENT_CONFIG, useComments } from "./comments/useComments";
 import { PlaygroundShell } from "./PlaygroundShell";
+import { ArtifactSearch } from "./navigation/ArtifactSearch";
 import { VocabularyReference } from "./vocabularies/VocabularyReference";
 import { useVocabulary } from "./vocabularies/context";
 import { ExternalWorkspace } from "./bookmarklet/ExternalWorkspace";
@@ -91,6 +92,7 @@ export function App() {
       {new URLSearchParams(window.location.search).has("vocabulary") ? <VocabularyReference id={new URLSearchParams(window.location.search).get("vocabulary")!} /> : <>
       <DensityProvider>
         <RouterProvider adapter={router}>
+          <ArtifactSearch onNavigate={slug => navigateRoute(standardRoute(slug, "preview"))} />
           <CommentProvider
             persistenceKey={route.page || "__dashboard"}
             comments={comments.comments}

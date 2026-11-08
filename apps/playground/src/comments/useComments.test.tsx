@@ -1,11 +1,31 @@
-import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { quoteAnchor } from "@flanksource/clicky-ui/file-findings";
 import { anchorTarget, useComments } from "./useComments";
+import { PageReloadProvider } from "../page-reload";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("feedback loading scope", () => {
+  it.each(["element", "frame"])("posts a %s review decision before reloading through the host callback", async (mode) => {
+    const source = "export default () => <div />;";
+    const fetcher = vi.fn(async (url: string, init?: RequestInit) => Response.json(
+      url.startsWith("/__playground/sources") ? { source } : init?.method === "POST" ? { id: "decision" } : { comments: [] },
+    ));
+    vi.stubGlobal("fetch", fetcher);
+    const reload = vi.fn();
+    const content = document.createElement("div");
+    content.textContent = "Review me";
+    const { result } = renderHook(() => useComments("example", { current: content }, mode === "frame" ? { capture: async () => ({ source: "example.tsx", html: "<div>Review me</div>" }) } : {}), {
+      wrapper: ({ children }) => <PageReloadProvider value={reload}>{children}</PageReloadProvider>,
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => result.current.create({ body: "", reviewDecision: "approved" }));
+    const posted = fetcher.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(JSON.parse(String(posted?.[1]?.body))).toMatchObject({ reviewDecision: "approved", expectedSource: source, page: "example" });
+    expect(reload).toHaveBeenCalledExactlyOnceWith({ reason: "review", page: "example" });
+  });
+
   it("loads only page feedback until global feedback is requested", async () => {
     const fetcher = vi.fn(async (_url: string) => new Response(JSON.stringify({ comments: [] }), { headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", fetcher);

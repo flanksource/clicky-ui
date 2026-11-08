@@ -5,9 +5,10 @@ import { overrideCallSite } from "./react-override";
 import { postVisualEdit } from "./visual-edits-api";
 
 type AttributeEdit = Extract<VisualEdit, { kind: "attributes" }>;
+type DeleteEdit = Extract<VisualEdit, { kind: "delete" }>;
 
 /** The value an attribute had before an edit; `null` when the element did not carry it. */
-export type AttributeSnapshot = Record<string, string | number | null>;
+export type AttributeSnapshot = Record<string, unknown>;
 
 export type VisualEditCommit = {
   markerValue: string;
@@ -15,7 +16,7 @@ export type VisualEditCommit = {
   nodes: Element[];
 } & (
   | {
-      edit: Exclude<VisualEdit, AttributeEdit>;
+      edit: Exclude<VisualEdit, AttributeEdit | DeleteEdit>;
       /** The value the preview shows now, restored when the write fails. */
       previous: string;
     }
@@ -24,6 +25,7 @@ export type VisualEditCommit = {
       /** Every attribute of `edit.values` as it was, restored when the write fails. */
       previous: AttributeSnapshot;
     }
+  | { edit: DeleteEdit; previous?: never }
 );
 
 export type VisualEditRefusal = Extract<VisualEditResponse, { status: "refused" }>;
@@ -52,17 +54,19 @@ function previewProps({ edit }: VisualEditCommit): Record<string, unknown> {
     case "text":
       return { [edit.prop]: edit.to };
     case "attributes":
-      return edit.values;
+      return Object.fromEntries(Object.entries(edit.values).map(([name, value]) => [name, value ?? undefined]));
+    case "delete":
+      throw new Error("Deletion is applied to source before reloading the page");
   }
 }
 
 function revertProps(commit: VisualEditCommit): Record<string, unknown> {
   const { edit, previous } = commit;
+  if (edit.kind === "delete") throw new Error("Deletion has no attribute preview to revert");
   if (typeof previous === "string") {
-    if (edit.kind === "attributes") throw new Error("an attributes edit needs the previous value of every attribute");
     return { [edit.prop]: previous };
   }
-  if (edit.kind !== "attributes") throw new Error(`a ${edit.kind} edit needs its previous value as a string`);
+  if (previous === undefined) throw new Error("An attribute edit requires its previous values");
   return Object.fromEntries(Object.keys(edit.values).map((name) => [name, previous[name] ?? undefined]));
 }
 
@@ -90,7 +94,7 @@ export function useVisualEdits({ page, live }: { page: string; live: boolean }) 
     attempt.current = null;
     setStatus("idle");
     setCandidates([]);
-    if (!live || !current) return null;
+    if (!live || !current || current.edit.kind === "delete") return null;
     return overrideProps(current.nodes, current.markerValue, revertProps(current));
   }, [live]);
 
@@ -147,7 +151,7 @@ export function useVisualEdits({ page, live }: { page: string; live: boolean }) 
   const commit = useCallback(async (next: VisualEditCommit): Promise<VisualEditOutcome> => {
     if (attempt.current) throw new Error("a visual edit is already in flight");
     attempt.current = next;
-    if (live) {
+    if (live && next.edit.kind !== "delete") {
       const previewError = overrideProps(next.nodes, next.markerValue, previewProps(next));
       if (previewError) {
         fail("Live preview failed", previewError, null);
@@ -159,7 +163,7 @@ export function useVisualEdits({ page, live }: { page: string; live: boolean }) 
 
   const choose = useCallback(async (candidateId: string) => {
     if (!attempt.current || status !== "ambiguous") throw new Error("no ambiguous visual edit is awaiting a choice");
-    await send(attempt.current, candidateId);
+    return send(attempt.current, candidateId);
   }, [send, status]);
 
   const cancelAmbiguous = useCallback(() => {
@@ -169,7 +173,7 @@ export function useVisualEdits({ page, live }: { page: string; live: boolean }) 
   }, [abandon, status]);
 
   /** Previews attribute values (`null` removes one) without writing anything; the caller restores them with `previewAttributes`. */
-  const previewAttributes = useCallback((nodes: Element[], markerValue: string, values: Record<string, string | number | null>): Error | null => {
+  const previewAttributes = useCallback((nodes: Element[], markerValue: string, values: Record<string, unknown>): Error | null => {
     if (!live) return new Error("live preview is not available");
     return overrideProps(nodes, markerValue, Object.fromEntries(Object.entries(values).map(([name, value]) => [name, value ?? undefined])));
   }, [live]);

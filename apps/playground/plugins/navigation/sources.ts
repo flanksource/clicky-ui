@@ -1,5 +1,9 @@
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { realpath, stat } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { vocabularyOptions } from "../production-config";
+import { vocabularyPages } from "../vocabulary-directories";
+import { readStaticExports } from "../static-metadata";
 import { readExternalPages } from "../external-pages-store";
 import { PAGE_EXTENSIONS, listFolders } from "../pages-store";
 import type { ActivityIndex } from "./activity";
@@ -103,4 +107,14 @@ export function pagesSource({ pagesDir, loadMeta }: { pagesDir: string; loadMeta
 
 export function externalRecords(dir: string, activity: ActivityIndex): ExternalRecord[] {
   return readExternalPages(dir).map((page) => ({ id: page.id, title: page.title, urls: page.urls, activity: activity.get(page.id) ?? emptyActivity() }));
+}
+
+export async function vocabularyRecords(options: { pagesDir: string; activity: ActivityIndex }): Promise<PageRecord[]> {
+  const pagesDir = await realpath(options.pagesDir);
+  const vocabulary = await vocabularyOptions({ root: dirname(dirname(pagesDir)), pagesDir });
+  const pages = (await vocabularyPages(vocabulary)).filter(page => !page.file.startsWith(pagesDir + "/"));
+  return Promise.all(pages.map(async page => {
+    const meta = pageMetaData(page.file, readStaticExports({ file: page.file, roots: vocabulary.sourceRoots.map(root => root.directory), names: ["meta"] })["meta"]);
+    return { ...meta, slug: page.slug, title: meta.title ?? page.alias, activity: { ...(options.activity.get(page.slug) ?? emptyActivity()), updated: (await stat(page.file)).mtimeMs } };
+  }));
 }

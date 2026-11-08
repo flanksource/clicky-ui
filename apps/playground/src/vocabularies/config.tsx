@@ -1,24 +1,38 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
-import { ErrorWrapper } from "@flanksource/clicky-ui";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { CommentVocabularyItem } from "../../../../packages/ui/src/comments/comment-vocabulary";
 import { request } from "../comments/useComments";
-import { VocabularyContext, type PreviewFailure } from "./context";
+import { VocabularyContext } from "./context";
+import { createVocabularyPreviews, useVocabularyPreview, type PreviewJob } from "./previews";
+import { VocabularyPreviewGenerator } from "./VocabularyPreviewGenerator";
+import { setVocabularyPages } from "../registry";
 import type { VocabularySnapshot } from "./types";
+
+const JobsContext = createContext<PreviewJob[]>([]);
+
+export function VocabularyGenerationHost() {
+  return <>{useContext(JobsContext).map(job => <VocabularyPreviewGenerator key={job.id} job={job} />)}</>;
+}
+
+function PreviewImage({ item }: { item: CommentVocabularyItem }) {
+  const preview = useVocabularyPreview(item);
+  if (preview.status === "generating") return <span role="status">Generating preview…</span>;
+  if (preview.status === "failed") return <span className="text-xs text-muted-foreground">{preview.error}</span>;
+  return <img alt={item.label} src={preview.image.image} width={preview.image.width} height={preview.image.height} className="max-h-full max-w-full object-contain" />;
+}
 
 export function VocabularyProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<VocabularySnapshot | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [failures, setFailures] = useState<Record<string, PreviewFailure>>({});
+  const [jobs, setJobs] = useState<PreviewJob[]>([]);
+  const previews = useMemo(() => createVocabularyPreviews({ storage: () => localStorage, generate: (catalog, count) => new Promise((resolve, reject) => {
+    const finish = () => setJobs(current => current.filter(job => job !== pending));
+    const pending: PreviewJob = { id: crypto.randomUUID(), catalog, count, resolve: images => { finish(); resolve(images); }, reject: error => { finish(); reject(error); } };
+    setJobs(current => [...current, pending]);
+  }) }), []);
+  useSyncExternalStore(previews.subscribe, previews.getVersion, previews.getVersion);
   const refreshRef = useRef<() => void>(() => {});
   const retry = useCallback(() => refreshRef.current(), []);
-  const report = useCallback((failure: PreviewFailure) => {
-    const key = `${failure.revision}:${failure.catalog}:${failure.item}`;
-    setFailures(current => current[key] ? current : { ...current, [key]: failure });
-  }, []);
-  useEffect(() => {
-    setFailures(current => Object.fromEntries(Object.entries(current).filter(([, failure]) => failure.revision === snapshot?.revision)));
-  }, [snapshot]);
   useEffect(() => {
     const controller = new AbortController();
     let pending = false;
@@ -29,6 +43,7 @@ export function VocabularyProvider({ children }: { children: ReactNode }) {
       try {
         const data = await request<VocabularySnapshot>("/__playground/vocabularies", { signal: controller.signal });
         if (typeof data.revision !== "string" || !Array.isArray(data.items) || !Array.isArray(data.catalogs)) throw new Error("Invalid vocabulary catalog response");
+        for (const catalog of data.catalogs) if (![catalog.alias, catalog.slug, catalog.file, catalog.page, catalog.instructions, catalog.previewRevision].every(value => typeof value === "string" && value.trim())) throw new Error("Invalid vocabulary page catalog response");
         if (!controller.signal.aborted) {
           setSnapshot(current => current?.revision === data.revision ? current : data);
           setError(null);
@@ -48,21 +63,7 @@ export function VocabularyProvider({ children }: { children: ReactNode }) {
     document.addEventListener("visibilitychange", visibleRefresh);
     return () => { controller.abort(); window.clearInterval(timer); window.removeEventListener("focus", visibleRefresh); document.removeEventListener("visibilitychange", visibleRefresh); };
   }, []);
-  const vocabulary = useMemo(() => {
-    if (!snapshot) return undefined;
-    const previews = new Map(snapshot.catalogs.map(catalog => [catalog.id, lazy(async () => {
-      const module = await import(/* @vite-ignore */ catalog.preview) as { default: ComponentType<{ item: CommentVocabularyItem }> };
-      if (!module.default) throw new Error(`Vocabulary ${catalog.id} preview requires a default component`);
-      return module;
-    })]));
-    const available = new Set(snapshot.items.map(item => `${item.catalog}:${item.id}`));
-    return { items: snapshot.items, renderPreview: (item: CommentVocabularyItem) => {
-      const Preview = previews.get(item.catalog);
-      if (!Preview || !available.has(`${item.catalog}:${item.id}`)) return <span className="text-xs text-muted-foreground">Preview unavailable: {item.catalog}:{item.id} is no longer loaded</span>;
-      return <ErrorWrapper key={`${snapshot.revision}:${item.catalog}:${item.id}`} onError={(error, info) => report({ error, componentStack: info.componentStack ?? null, catalog: item.catalog, item: item.id, module: snapshot.catalogs.find(catalog => catalog.id === item.catalog)!.preview, revision: snapshot.revision })} renderFallback={() => <span className="text-xs text-muted-foreground">Preview unavailable</span>}>
-        <Suspense fallback={<span role="status">Loading preview…</span>}><Preview item={item} /></Suspense>
-      </ErrorWrapper>;
-    } };
-  }, [snapshot, report]);
-  return <VocabularyContext.Provider value={{ vocabulary: error === null ? vocabulary : undefined, snapshot, error, refreshing, retry, failures: Object.values(failures).filter(failure => failure.revision === snapshot?.revision) }}>{children}</VocabularyContext.Provider>;
+  useEffect(() => { if (snapshot) { previews.configure(snapshot); setVocabularyPages(snapshot.catalogs); } }, [snapshot, previews]);
+  const vocabulary = useMemo(() => snapshot ? { items: snapshot.items, renderPreview: (item: CommentVocabularyItem) => <PreviewImage item={item} /> } : undefined, [snapshot]);
+  return <VocabularyContext.Provider value={{ vocabulary: error === null ? vocabulary : undefined, snapshot, error, refreshing, retry, previews, failures: previews.failures() }}><JobsContext.Provider value={jobs}>{children}</JobsContext.Provider></VocabularyContext.Provider>;
 }

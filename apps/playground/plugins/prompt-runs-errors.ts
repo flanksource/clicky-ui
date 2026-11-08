@@ -1,5 +1,5 @@
 import type { ServerResponse } from "node:http";
-import type { Logger } from "vite";
+import type { ErrorLogger } from "./middleware";
 import { CaptainHttpError, CaptainUnreachableError } from "./captain-client";
 import { LaunchHttpError } from "./launch-client";
 import { sendJson } from "./comments-server";
@@ -86,7 +86,7 @@ export function errorEnvelope(error: unknown): {
 }
 
 export function sendError(
-  logger: Logger,
+  logger: ErrorLogger,
   res: ServerResponse,
   error: unknown,
 ): void {

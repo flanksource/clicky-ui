@@ -39,7 +39,7 @@ function mountPanel() {
   return { rect, ...props };
 }
 
-const field = (name: string) => screen.getByLabelText(name) as HTMLInputElement;
+const field = (name: string) => screen.getByLabelText(name, { selector: "input" }) as HTMLInputElement;
 
 beforeEach(() => {
   fetchMock.mockReset();
@@ -52,6 +52,22 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   document.body.innerHTML = "";
+});
+
+it("renders geometry as number inputs and previews a stepper change", () => {
+  const { rect } = mountPanel();
+  expect(["x", "y", "width", "height"].map(name => {
+    const input = screen.getByRole<HTMLInputElement>("spinbutton", { name });
+    return { name, type: input.type, step: input.step };
+  })).toEqual(["x", "y", "width", "height"].map(name => ({ name, type: "number", step: "any" })));
+  const width = field("width");
+  fireEvent.change(width, { target: { value: "80.125" } });
+  expect(width.validity.stepMismatch).toBe(false);
+  expect(overrides.mock.calls.at(-1)).toEqual([[rect], MARKER, { width: 80.125 }]);
+  fireEvent.click(screen.getByRole("button", { name: "Increase width" }));
+  expect(overrides.mock.calls.at(-1)).toEqual([[rect], MARKER, { width: 81.125 }]);
+  fireEvent.keyDown(width, { key: "ArrowDown" });
+  expect(overrides.mock.calls.at(-1)).toEqual([[rect], MARKER, { width: 80.125 }]);
 });
 
 it("shows the tag, the source location and one field per schema attribute, filled from the element", () => {
@@ -213,4 +229,54 @@ it("keeps a saving panel mounted when Escape or Open source is requested", async
   expect([onClose.mock.calls, onOpenSource.mock.calls]).toEqual([[], []]);
   finish(jsonResponse(200, { status: "applied", file: "x.tsx", path: "src/pages/x.tsx", line: 42, hash: "bbbbbbbbbbbb" }));
   await screen.findByText(/Saved x.tsx/);
+});
+
+it("saves a chosen Tailwind color as className after compiling its preview", async () => {
+  const { rect } = mountPanel();
+  fetchMock.mockImplementation(async url => url.startsWith("/__playground/svg-preview")
+    ? { ok: true, text: async () => ".fill-primary { fill: var(--primary) }" } as Response
+    : jsonResponse(200, { status: "applied", file: "diagram.tsx", path: "src/pages/diagram.tsx", line: 42, hash: "bbbbbbbbbbbb" }));
+  fireEvent.change(field("fill"), { target: { value: "#ff0000" } });
+  fireEvent.focus(screen.getByRole("combobox", { name: "fill" }));
+  fireEvent.change(field("fill"), { target: { value: "fill-primary" } });
+  fireEvent.mouseDown(screen.getByRole("option", { name: /fill-primary$/ }));
+  await waitFor(() => expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false));
+  expect(field("fill").value).toBe("fill-primary");
+  expect(overrides.mock.calls.at(-1)).toEqual([[rect], MARKER, { fill: "#eeeeee", className: "fill-primary" }]);
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await screen.findByText(/Saved diagram.tsx/);
+  expect(fetchMock.mock.calls.filter(([url]) => url === "/__playground/visual-edits").map(([, init]) => JSON.parse(init.body as string))).toEqual([
+    { page: PAGE, source: MARKER, edit: { kind: "attributes", values: { className: "fill-primary" } } },
+  ]);
+});
+
+it("uses one labelled input for each merged color and numeric field", () => {
+  mountPanel();
+  for (const name of ["fill", "stroke", "color", "strokeWidth", "opacity"]) {
+    const input = field(name);
+    expect(input.getAttribute("role")).toBe("combobox");
+    expect(document.querySelector(`label[for="${input.id}"]`)?.textContent).toBe(name);
+    expect(screen.getAllByRole("combobox", { name })).toHaveLength(1);
+  }
+});
+
+it("previews a raw number after replacing its Tailwind class", async () => {
+  const { rect } = mountPanel();
+  fetchMock.mockResolvedValue({ ok: true, text: async () => ".stroke-4 { stroke-width: 4px }" } as Response);
+  fireEvent.change(field("strokeWidth"), { target: { value: "stroke-4" } });
+  await waitFor(() => expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.change(field("strokeWidth"), { target: { value: "3" } });
+  expect(overrides.mock.calls.at(-1)).toEqual([[rect], MARKER, { strokeWidth: 3, className: "" }]);
+  await waitFor(() => expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false));
+});
+
+it("posts a confirmed deletion without modifying React props and surfaces stale source", async () => {
+  mountPanel();
+  fetchMock.mockResolvedValue(jsonResponse(409, { status: "stale", error: "Reload before deleting", file: "diagram.tsx" }));
+  fireEvent.click(screen.getByRole("button", { name: "Delete SVG element" }));
+  expect(fetchMock).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
+  await screen.findByText("Reload before deleting");
+  expect(posted()).toEqual([{ page: PAGE, source: MARKER, edit: { kind: "delete" } }]);
+  expect(overrides).not.toHaveBeenCalled();
 });

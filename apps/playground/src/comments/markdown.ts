@@ -26,6 +26,7 @@ export type CommentPageSection = {
 
 export type CommentMarkdownOptions = {
   labels: Record<string, string>;
+  vocabularyInstructions: Record<string, string>;
   pageUrl: (page: string) => string;
   pagePath: (page: string) => string;
   screenshotUrl?: (url: string) => string;
@@ -88,7 +89,9 @@ function renderSection(
     pagePath,
     screenshotUrl = (url) => url,
     commentActionUrls,
-  }: CommentMarkdownOptions,
+    vocabularyInstructions,
+    printedInstructions,
+  }: CommentMarkdownOptions & { printedInstructions: Set<string> },
 ): string[] {
   const capturedUrl = page.startsWith("external:")
     ? comments.find((comment) => comment.element?.pageUrl)?.element?.pageUrl
@@ -193,9 +196,18 @@ function renderSection(
       (comment.vocabularyRefs ?? []).map(item => [`${item.catalog}:${item.id}`, item] as const)));
     if (vocabularyRefs.size) {
       out.push("", "**Vocabulary references:**");
-      for (const item of vocabularyRefs.values()) {
-        out.push(`- ${item.catalog}:${item.id}: ${item.description}`, `  - Preview: ${new URL(vocabularyHref(item), pageUrl(page)).href}`);
-        for (const reference of item.references) out.push(`  - ${reference}`);
+      const aliases = [...new Set([...vocabularyRefs.values()].map(item => item.catalog))];
+      for (const alias of aliases) {
+        if (!Object.hasOwn(vocabularyInstructions, alias) || !vocabularyInstructions[alias]?.trim()) throw new Error(`Unknown vocabulary alias ${alias}: instructions are required`);
+        if (!printedInstructions.has(alias)) {
+          out.push("", `**${alias} vocabulary:**`, "", vocabularyInstructions[alias]!, "");
+          printedInstructions.add(alias);
+        }
+        for (const item of vocabularyRefs.values()) {
+          if (item.catalog !== alias) continue;
+          out.push(`- ${item.catalog}:${item.id}: ${item.description}`, `  - Preview: ${new URL(vocabularyHref(item), pageUrl(page)).href}`);
+          for (const reference of item.references) out.push(`  - ${reference}`);
+        }
       }
     }
     for (const reply of sortReplies(replies.get(root.id) ?? [])) {
@@ -255,7 +267,8 @@ export function commentsToMarkdown(
   options: CommentMarkdownOptions,
 ): string {
   if (sections.length === 0) return "_No comments._\n";
+  const printedInstructions = new Set<string>();
   return sections
-    .flatMap((section) => renderSection(section, options))
+    .flatMap((section) => renderSection(section, { ...options, printedInstructions }))
     .join("\n");
 }

@@ -28,6 +28,7 @@ import { playgroundPageMeta } from "./plugins/page-meta-vite-plugin";
 import { playgroundSources } from "./plugins/sources-server";
 import { playgroundEditableSource } from "./plugins/editable-source-plugin";
 import { playgroundVisualEdits } from "./plugins/visual-edits-server";
+import { svgPreview } from "./plugins/svg-preview";
 import { playgroundPageActivity } from "./plugins/page-activity";
 import { playgroundRuntimeProfiles } from "./plugins/runtime-profiles-server";
 import { playgroundWorkspaceFiles } from "./plugins/workspace-files-server";
@@ -123,6 +124,7 @@ export default defineConfig(({ mode }) => ({
     mode === "playground-prod" && playgroundProduction({ root }),
     react(),
     tailwindcss(),
+    svgPreview({ root, workspaceRoot }),
     // Design mode's live preview needs react-dom registered with a DevTools hook.
     playgroundReactDevtoolsHook({ root }),
     // Pre-transform: stamps facet node call sites with data-editable-source for Design mode.
@@ -130,7 +132,7 @@ export default defineConfig(({ mode }) => ({
     playgroundMarkdown({ sourceRoot: resolve(root, "src") }),
     playgroundPageMeta({ sourceRoot: resolve(root, "src") }),
     playgroundPageActivity(resolve(root, "src/pages")),
-    playgroundVocabularies({ dir: playgroundDataDir, roots: vocabularyRoots }),
+    playgroundVocabularies({ dir: playgroundDataDir, roots: vocabularyRoots, pagesDir: resolve(root, "src/pages") }),
     playgroundConnections({ gavel: gavelEndpoint, captainURL }),
     // Before playgroundComments: that middleware answers every other
     // /__playground/comments/* path (including /:id/agent-run) with a 405.
@@ -160,6 +162,7 @@ export default defineConfig(({ mode }) => ({
         `${captainURL}/api/captain/ai/permissions/catalog`,
       runtimesURL: `${captainURL}/api/chat/runtimes`,
       resolveURL: `${captainURL}/api/chat/runtime-profiles/resolve`,
+      presetsResolveURL: `${captainURL}/api/chat/runtime-presets/resolve`,
     }),
     playgroundWorkspaceFiles({ cwd: workspaceRoot }),
     playgroundBlame({ cwd: workspaceRoot }),
@@ -188,6 +191,10 @@ export default defineConfig(({ mode }) => ({
       {
         find: /^@flanksource\/clicky-ui\/icons$/,
         replacement: resolve(uiSrc, "icons.ts"),
+      },
+      {
+        find: /^@flanksource\/clicky-ui\/comments\/anchoring$/,
+        replacement: resolve(uiSrc, "comment-anchoring.ts"),
       },
       {
         find: /^@flanksource\/clicky-ui\/comments$/,

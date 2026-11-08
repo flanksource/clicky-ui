@@ -6,7 +6,7 @@ import type { NavigationFilter, NavigationQuery, NavigationResponse, NavigationS
 import { loadActivity, problemCounts, repositoryActivity } from "./activity";
 import { NavigationRequestError, pageFolderKey, parseNodeKey } from "./keys";
 import { directoryLister, repositoryChildren, repositoryRoots, searchRepositories, type RepositoryContext } from "./repository";
-import { externalRecords, pagesSource, type PageMetaLoader } from "./sources";
+import { externalRecords, pagesSource, vocabularyRecords, type PageMetaLoader } from "./sources";
 import {
   countOlder,
   externalFolder,
@@ -121,8 +121,12 @@ export function createNavigation(deps: NavigationDeps) {
       return { children: shapeOpen(folder.children ?? []) };
     }
 
-    const records = await pages.records({ updates, activity: index });
-    const pageRanked = pageEntries(selectPages(records, pages.folders(), options), options);
+    const vocabularies = await vocabularyRecords({ pagesDir: deps.pagesDir, activity: index });
+    const records = [...await pages.records({ updates, activity: index }), ...vocabularies];
+    const folders = [...pages.folders(), ...(vocabularies.length ? ["vocabularies"] : [])];
+    const pageRanked = pageEntries(selectPages(records, folders, options), options);
+    const vocabularyFolder = pageRanked.find(({ entry }) => entry.key === "page:vocabularies");
+    if (vocabularies.length && vocabularyFolder) vocabularyFolder.entry.icon = "UiLedger";
     if (key.kind === "page-folder") {
       const folder = findEntry(sortRanked(pageRanked, options.sort), pageFolderKey(key.folder));
       if (!folder) throw new NavigationRequestError(`Unknown navigation node: ${query.node}`);

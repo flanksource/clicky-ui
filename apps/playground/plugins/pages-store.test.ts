@@ -124,12 +124,23 @@ describe("pages store", () => {
       expect(readFileSync(join(pagesDir, helper), "utf8")).toBe("export const a = 3;\n");
     });
 
+    it.each([".md", ".mdx"])("writes frontmatter through the hashed file API for %s pages", extension => {
+      const file = `docs/guide${extension}`;
+      const source = "# Guide\n";
+      const updated = '---\ndependencies:\n  entities: "^7"\n---\n# Guide\n';
+      write(file, source);
+      const opened = readPagesFile(pagesDir, file);
+      expect(writePagesFile(pagesDir, file, updated, opened.hash)).toEqual({ file, hash: sourceHash(updated) });
+      expect(readPagesFile(pagesDir, file).source).toBe(updated);
+      expect(() => writePagesFile(pagesDir, file, source, opened.hash)).toThrow(expect.objectContaining({ statusCode: 409 }));
+    });
+
     it.each([
       ["a parent segment", "docs/../docs/_helper/diagram.tsx", 400],
       ["an absolute path", "/etc/hosts.ts", 400],
       ["a backslash", "docs\\_helper\\diagram.tsx", 400],
       ["an empty segment", "docs//_helper/diagram.tsx", 400],
-      ["another extension", "docs/guide.md", 400],
+      ["another extension", "docs/guide.txt", 400],
       ["a missing file", "docs/_helper/missing.tsx", 404],
     ])("refuses %s", (_name, rel, statusCode) => {
       write("docs/guide.md", "# guide");

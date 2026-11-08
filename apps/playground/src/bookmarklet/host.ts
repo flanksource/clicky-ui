@@ -1,306 +1,105 @@
-import { init } from "@flanksource/react-grab/core";
-import type { ReactGrabAPI } from "@flanksource/react-grab";
-import {
-  captureElementContext,
-  captureElementHtml,
-} from "../comments/element-context";
-import {
-  commentAnchor,
-  describeElement,
-  resolveAnchor,
-} from "../comments/dom-anchor";
-import {
-  captureScreenshot,
-  releaseScreenshotCapture,
-} from "../comments/screenshot";
-import {
-  bridgeMessage,
-  envelope,
-  type HostMessage,
-  type HostState,
-} from "./model";
+import { startPageAgent, validateHostMessage } from "@flanksource/page-runtime/frame";
+import type { AgentFrameMessage, AgentSelection } from "@flanksource/page-runtime/schema";
+import { captureScreenshot, releaseScreenshotCapture } from "../comments/screenshot";
+import { bridgeMessage, envelope, externalTitle, type HostMessage, type HostState } from "./model";
 import { mountHost } from "./host-dom";
 import { sidebarWidth } from "./host-resize";
+import { bookmarkletParentOrigin } from "./origin";
 
 declare global {
-  interface Window {
-    __PLAYGROUND_GRABBER__?: { focus: () => void; close: () => void };
-  }
+  interface Window { __PLAYGROUND_GRABBER__?: { focus: () => void; close: () => void } }
 }
 
-function install() {
-  if (window.__PLAYGROUND_GRABBER__) {
-    window.__PLAYGROUND_GRABBER__.focus();
-    return;
-  }
-  if (!["http:", "https:", "file:"].includes(location.protocol))
-    throw new Error(
-      "Playground grabber supports HTTP(S) and file documents only",
-    );
-  const script = document.currentScript as HTMLScriptElement | null;
-  if (!script?.src)
-    throw new Error("Bookmarklet must be loaded through its script URL");
-  const origin = new URL(script.src).origin;
-  const session = Array.from(
-    crypto.getRandomValues(new Uint32Array(4)),
-    (value) => value.toString(16),
-  ).join("");
+export function installBookmarklet(scriptUrl: string) {
+  if (window.__PLAYGROUND_GRABBER__) { window.__PLAYGROUND_GRABBER__.focus(); return; }
+  if (!["http:", "https:", "file:"].includes(location.protocol)) throw new Error("The shared page agent requires an HTTP(S) or file document");
+  const origin = new URL(scriptUrl).origin;
+  const session = crypto.randomUUID();
   const frameUrl = new URL("/", origin);
-  frameUrl.search = new URLSearchParams({
-    bookmarklet: "1",
-    parentOrigin: location.protocol === "file:" ? "null" : location.origin,
-    session,
-  }).toString();
+  frameUrl.search = new URLSearchParams({ bookmarklet: "1", parentOrigin: bookmarkletParentOrigin(location.href), session }).toString();
   let ready = false;
   let closed = false;
-  let capturing = false;
   let screenshotRequested = false;
-  let picking = false;
-  let selectionVersion = 0;
-  let state: HostState = {
-    url: location.href,
-    title: document.title || location.hostname,
-  };
-  const send = (message: HostMessage) =>
-    ui.frame.contentWindow?.postMessage(envelope(session, message), origin);
-  const ui = mountHost(frameUrl.href, (anchor) =>
-    send({ type: "focus", anchor }), width => send({ type: "sidebar-width", width }),
-  );
-  const existing = window.__REACT_GRAB__;
-  const api: ReactGrabAPI =
-    existing ??
-    init({ enabled: true, telemetry: false, freezeReactUpdates: false });
-  if (!api || typeof api.registerPlugin !== "function") {
-    ui.close();
-    throw new Error("Incompatible React Grab API on this page");
-  }
-  if (!existing) window.__REACT_GRAB__ = api;
-  const previousAction = api.getToolbarState()?.defaultAction;
-  const previousEnabled = api.isEnabled();
-  api.setEnabled(true);
-  const plugin = `playground-bookmarklet-${session}`;
+  let version = 0;
+  let state: HostState = { url: location.href, title: externalTitle({ url: location.href, title: document.title }) };
+  const send = (message: HostMessage) => ui.frame.contentWindow?.postMessage(envelope(session, message), origin);
+  const error = (cause: unknown) => { ui.resume(); send({ type: "error", error: cause instanceof Error ? cause.message : String(cause) }); };
+  const ui = mountHost(frameUrl.href, anchor => send({ type: "focus", anchor }), width => send({ type: "sidebar-width", width }), floating => send({ type: "presentation", floating }));
 
-  async function select(element: Element, screenshot = false) {
-    picking = false;
-    if (
-      ui.root.contains(element) ||
-      element.closest("[data-react-grab-ignore]")
-    )
-      return;
-    const anchor = commentAnchor(element, document.body);
-    if (!anchor) {
-      send({
-        type: "error",
-        error: "Selected element is outside this document",
-      });
-      return;
-    }
-    const version = ++selectionVersion;
+  async function select(selection: AgentSelection) {
+    const revision = ++version;
     const url = location.href;
-    capturing = true;
-    ui.frame.hidden = true;
-    const image = screenshot ? captureScreenshot(element) : undefined;
-    api.deactivate();
+    const screenshot = screenshotRequested;
+    screenshotRequested = false;
     try {
-      const context = await captureElementContext(element, {
-        fallbackSource: url,
-        root: document.body,
-      });
-      const capture = await image;
-      if (closed || version !== selectionVersion || location.href !== url)
-        return;
-      state = {
-        url,
-        title: document.title || location.hostname,
-        selection: {
-          anchor,
-          label: describeElement(element),
-          element: {
-            ...context,
-            pageUrl: url,
-            ...(capture ? { screenshot: capture } : {}),
-          },
-        },
-      };
-      ui.highlight(anchor);
+      const image = screenshot ? await captureScreenshot({ rect: { x: selection.rect.left, y: selection.rect.top, width: selection.rect.width, height: selection.rect.height }, isLive: () => !closed && version === revision && location.href === url }) : undefined;
+      if (closed || version !== revision || location.href !== url) return;
+      state = { url, title: externalTitle({ url, title: document.title }), selection: { anchor: selection.anchor, label: selection.label, element: { source: selection.element.source, componentName: selection.element.componentName, html: selection.element.html, locators: selection.element.locators, pageUrl: url, ...(image ? { screenshot: image } : {}) } } };
       send({ type: "state", state });
-    } catch (error) {
-      send({
-        type: "error",
-        error: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      if (version === selectionVersion && !closed) {
-        capturing = false;
-        ui.frame.hidden = false;
-      }
-    }
+    } catch (cause) { error(cause); }
+    finally { if (!closed && version === revision) ui.resume(); }
   }
 
-  api.registerPlugin({
-    name: plugin,
-    hooks: {
-      transformActionContext(context) {
-        return { ...context, enterPromptMode: () => { void select(context.element); } };
-      },
-      onDeactivate() {
-        picking = false;
-        if (!capturing) ui.frame.hidden = false;
-      },
-      onElementSelect(element) {
-        if (!picking) return;
-        const screenshot = screenshotRequested;
-        screenshotRequested = false;
-        void select(element, screenshot);
-        return true;
-      },
-    },
-    actions: [
-      {
-        id: "playground-external-screenshot",
-        label: "Comment with screenshot",
-        onAction: (context) => {
-          context.hideContextMenu();
-          context.cleanup();
-          return select(context.element, true);
-        },
-      },
-    ],
-  });
-  api.setToolbarState({ defaultAction: "comment" });
+  function receive(message: AgentFrameMessage) {
+    if (message.type === "selection") void select(message.selection);
+    else if (message.type === "focus") { ui.showRail(); send(message); }
+    else if (message.type === "anchors") send({ type: "anchors", anchors: message.anchors.map(anchor => ({ anchor: anchor.anchor, available: anchor.state !== "orphaned", label: anchor.state === "moved" ? `${anchor.label} (moved)` : anchor.label, ...(anchor.rect ? { top: anchor.rect.top } : {}) })) });
+    else if (message.type === "keys" && message.key === "c") { ui.frame.hidden = true; agent.receive({ type: "pick" }); }
+    else if (message.type === "keys" && message.key === "Escape") ui.resume();
+  }
+  const start = () => startPageAgent({ root: document.body, page: location.href, sourceContext: { mode: "external-document", url: location.href }, send: receive, error, ...(window.__REACT_GRAB__ ? { picker: window.__REACT_GRAB__ } : {}) });
+  let agent: ReturnType<typeof startPageAgent>;
+  try { agent = start(); } catch (cause) { ui.close(); throw cause; }
 
   function onMessage(event: MessageEvent) {
-    if (event.origin !== origin || event.source !== ui.frame.contentWindow)
-      return;
+    if (event.origin !== origin || event.source !== ui.frame.contentWindow) return;
     const message = bridgeMessage(event.data, session);
     if (!message) return;
-    switch (message["type"]) {
-      case "ready":
-        try { ui.layout(sidebarWidth(message["width"]), false); }
-        catch (cause) { send({ type: "error", error: String(cause) }); return; }
-        ready = true;
-        ui.root.shadowRoot?.querySelector(".error")?.remove();
-        send({ type: "state", state });
-        break;
-      case "sidebar-layout":
-        try {
+    try {
+      switch (message["type"]) {
+        case "ready": ui.layout(sidebarWidth(message["width"]), false); ready = true; ui.root.shadowRoot?.querySelector(".error")?.remove(); send({ type: "state", state }); break;
+        case "sidebar-layout":
           if (typeof message["maximized"] !== "boolean") throw new Error("Invalid detail mode");
-          ui.layout(sidebarWidth(message["width"]), message["maximized"]);
-        } catch (cause) { send({ type: "error", error: String(cause) }); }
-        break;
-      case "close":
-        close();
-        break;
-      case "pick":
-        picking = true;
-        screenshotRequested = message["screenshot"] === true;
-        ui.frame.hidden = true;
-        api.setToolbarState({ defaultAction: "comment" });
-        api.activate();
-        break;
-      case "page":
-        selectionVersion++;
-        state = {
-          url: location.href,
-          title: document.title || location.hostname,
-          selection: {
-            anchor: "__document__",
-            label: "Whole page",
-            element: {
-              source: location.href,
-              pageUrl: location.href,
-              html: captureElementHtml(document.body),
-            },
-          },
-        };
-        send({ type: "state", state });
-        break;
-      case "pins":
-        if (
-          Array.isArray(message["anchors"]) &&
-          message["anchors"].every((anchor) => typeof anchor === "string")
-        ) {
-          ui.update(message["anchors"], (anchors) =>
-            send({ type: "anchors", anchors }),
-          );
+          ui.layout(sidebarWidth(message["width"]), message["maximized"]); break;
+        case "minimize": agent.receive({ type: "mode", mode: "off" }); ui.minimize(); break;
+        case "draft":
+          if (typeof message["active"] !== "boolean" || (message["active"] && typeof message["anchor"] !== "string")) throw new Error("Invalid floating comment presentation");
+          ui.draft(message["active"], typeof message["anchor"] === "string" ? message["anchor"] : undefined, message["posted"] === true); break;
+        case "draft-size":
+          if (typeof message["height"] !== "number" || !Number.isFinite(message["height"]) || message["height"] <= 0) throw new Error("Invalid floating comment height");
+          ui.draftSize(message["height"]); break;
+        case "pick": screenshotRequested = message["screenshot"] === true; ui.frame.hidden = true; agent.receive({ type: "mode", mode: "comment" }); break;
+        case "page": ui.showRail(); agent.receive({ type: "page" }); break;
+        case "pins": {
+          const command = validateHostMessage(message);
+          if (command.type !== "pins") throw new Error("Unexpected bookmarklet pins command");
+          agent.receive(command); break;
         }
-        break;
-      case "highlight":
-        if (message["anchor"] === null || typeof message["anchor"] === "string")
-          ui.highlight(message["anchor"]);
-        break;
-      case "scroll": {
-        if (typeof message["anchor"] !== "string") return;
-        const element =
-          message["anchor"] === "__document__"
-            ? document.body
-            : resolveAnchor(document.body, message["anchor"]);
-        if (!element) return;
-        element.scrollIntoView({
-          behavior: message["behavior"] === "auto" ? "auto" : "smooth",
-          block: message["block"] === "start" ? "start" : "center",
-        });
-        if (
-          typeof message["offset"] === "number" &&
-          Number.isFinite(message["offset"])
-        ) {
-          window.scrollBy({ top: -message["offset"], behavior: "instant" });
+        case "highlight": case "scroll": {
+          const command = validateHostMessage(message);
+          if (command.type !== "highlight" && command.type !== "scroll") throw new Error("Unexpected bookmarklet command");
+          agent.receive(command); break;
         }
-        ui.highlight(message["anchor"]);
-        break;
+        case "close": close(); break;
+        default: throw new Error(`Unknown bookmarklet command ${String(message["type"])}`);
       }
-    }
+    } catch (cause) { error(cause); }
   }
   window.addEventListener("message", onMessage);
-  const startup = window.setTimeout(() => {
-    if (!ready)
-      ui.error(
-        "Playground comments could not load. Check that the playground is running and this page permits its scripts and frames, then reload this page and activate the bookmarklet again.",
-      );
-  }, 15000);
-  const navigation = window.setInterval(() => {
+  const startup = setTimeout(() => { if (!ready) ui.error("Playground comments could not load. Check that the playground is running and this page permits its scripts and frames."); }, 15000);
+  const navigation = setInterval(() => {
     if (state.url === location.href) return;
-    selectionVersion++;
-    capturing = false;
-    ui.frame.hidden = false;
-    state = { url: location.href, title: document.title || location.hostname };
-    ui.update([], () => {});
-    ui.highlight(null);
-    send({ type: "state", state });
+    version++; agent.dispose();
+    try { agent = start(); } catch (cause) { error(cause); return; }
+    state = { url: location.href, title: externalTitle({ url: location.href, title: document.title }) }; ui.showRail(); send({ type: "state", state });
   }, 250);
   function close() {
-    closed = true;
-    selectionVersion++;
-    window.clearTimeout(startup);
-    window.clearInterval(navigation);
-    window.removeEventListener("message", onMessage);
-    releaseScreenshotCapture();
-    api.unregisterPlugin(plugin);
-    if (existing) {
-      api.setToolbarState({ defaultAction: previousAction ?? "copy" });
-      api.setEnabled(previousEnabled);
-    } else {
-      api.dispose();
-      delete window.__REACT_GRAB__;
-    }
-    ui.close();
-    delete window.__PLAYGROUND_GRABBER__;
+    closed = true; version++; clearTimeout(startup); clearInterval(navigation); window.removeEventListener("message", onMessage); releaseScreenshotCapture(); agent.dispose(); ui.close(); delete window.__PLAYGROUND_GRABBER__;
   }
-  window.__PLAYGROUND_GRABBER__ = {
-    focus() {
-      api.deactivate();
-      ui.frame.hidden = false;
-      ui.frame.focus();
-      if (ready) send({ type: "state", state });
-    },
-    close,
-  };
+  window.__PLAYGROUND_GRABBER__ = { focus() { agent.receive({ type: "mode", mode: "off" }); ui.restore(); ui.frame.focus(); }, close };
 }
 
-try {
-  install();
-} catch (error) {
-  window.alert(
-    `Playground grabber: ${error instanceof Error ? error.message : String(error)}`,
-  );
+const currentScript = document.currentScript as HTMLScriptElement | null;
+if (currentScript?.src) {
+  try { installBookmarklet(currentScript.src); } catch (error) { window.alert(`Playground grabber: ${error instanceof Error ? error.message : String(error)}`); }
 }

@@ -35,6 +35,7 @@ import { captureElementContext, captureElementHtml } from "./element-context";
 import { captureScreenshot } from "./screenshot";
 
 import { pageSourcePath } from "../documents/review-target";
+import { usePageReload } from "../page-reload";
 
 export const COMMENTS_ROUTE = "/__playground/comments";
 
@@ -196,6 +197,7 @@ export function useComments(
     ) => Promise<CommentElementCaptureContext>;
   } = {},
 ): PlaygroundComments {
+  const reload = usePageReload();
   const captureRef = useRef(options.capture);
   captureRef.current = options.capture;
   const enabled = options.enabled !== false;
@@ -316,6 +318,12 @@ export function useComments(
               `Unknown comment create action ${JSON.stringify(actionId)}`,
             );
           }
+          let expectedSource: string | undefined;
+          if (input.reviewDecision) {
+            const payload = await request<{ source: string }>(`/__playground/sources?slug=${encodeURIComponent(page)}`);
+            if (typeof payload.source !== "string") throw new Error("Could not read review source");
+            expectedSource = payload.source;
+          }
           if (captureRef.current) {
             const element = await captureRef.current(input, actionId);
             await post(COMMENTS_ROUTE, {
@@ -325,8 +333,11 @@ export function useComments(
               anchor: input.anchor ?? null,
               ...(input.rating ? { rating: input.rating } : {}),
               ...(input.styleEdit ? { styleEdit: input.styleEdit } : {}),
+              ...(input.reviewDecision ? { reviewDecision: input.reviewDecision, expectedSource } : {}),
+              ...(input.assignee ? { assignee: input.assignee } : {}),
               element,
             });
+            if (input.reviewDecision) await reload({ reason: "review", page });
             return;
           }
           const anchor = input.anchor ?? null;
@@ -378,12 +389,6 @@ export function useComments(
             ...(capturedScreenshot ? { screenshot: capturedScreenshot } : {}),
           };
 
-          let expectedSource: string | undefined;
-          if (input.reviewDecision) {
-            const payload = await request<{ source: string }>(`/__playground/sources?slug=${encodeURIComponent(page)}`);
-            if (typeof payload.source !== "string") throw new Error("Could not read review source");
-            expectedSource = payload.source;
-          }
           await post(COMMENTS_ROUTE, {
             page,
             body: input.body,
@@ -394,16 +399,17 @@ export function useComments(
             ...(input.reviewDecision
               ? { reviewDecision: input.reviewDecision }
               : {}),
+            ...(input.assignee ? { assignee: input.assignee } : {}),
             element,
             ...(expectedSource === undefined ? {} : { expectedSource }),
           });
-          if (input.reviewDecision) window.location.reload();
+          if (input.reviewDecision) await reload({ reason: "review", page });
           if (preparedSelection.current === prepared) {
             preparedSelection.current = null;
           }
         },
       ),
-    [contentRef, mutate, page, post],
+    [contentRef, mutate, page, post, reload],
   );
 
   const reply = useCallback(

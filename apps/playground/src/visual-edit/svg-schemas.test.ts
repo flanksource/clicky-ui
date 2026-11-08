@@ -11,10 +11,11 @@ const GEOMETRY = {
   polyline: ["points"],
   polygon: ["points"],
   path: ["d"],
-  text: ["x", "y", "fontSize", "fontWeight", "textAnchor"],
+  text: ["children", "x", "y", "fontSize", "fontFamily", "fontWeight", "textAnchor"],
+  tspan: ["children", "x", "y", "dx", "dy", "fontSize", "fontFamily", "fontWeight"],
   g: [],
 } as const;
-const PAINT = ["fill", "stroke", "strokeWidth", "opacity", "strokeDasharray"];
+const PAINT = ["fill", "stroke", "strokeWidth", "opacity", "strokeDasharray", "color", "className"];
 
 describe("svgSchemaFor", () => {
   it.each(SVG_EDITABLE_TAGS)("<%s> lists its geometry then the shared paint attributes, ordered by x-order", (tag) => {

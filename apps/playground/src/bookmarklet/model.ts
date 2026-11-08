@@ -1,4 +1,5 @@
 import type { CommentElementCaptureContext } from "../../plugins/comments-model";
+import type { AgentPin } from "@flanksource/page-runtime/schema";
 
 export const EXTERNAL_PAGES_ROUTE = "/__playground/external-pages";
 export const BOOKMARKLET_ROUTE = "/__playground/bookmarklet.js";
@@ -10,6 +11,12 @@ export type ExternalPage = {
   base: string;
   urls: string[];
 };
+
+export function externalTitle(options: { url: string; title: string }): string {
+  if (options.title.trim()) return options.title;
+  const url = new URL(options.url);
+  return url.protocol === "file:" ? decodeURIComponent(url.pathname).split("/").filter(Boolean).at(-1) ?? url.href : url.hostname;
+}
 
 export function externalUrl(input: string): { url: string; base: string } {
   const url = new URL(input);
@@ -41,12 +48,16 @@ export type AnchorState = {
   top?: number;
 };
 export type HostMessage =
+  | { type: "presentation"; floating: boolean }
   | { type: "sidebar-width"; width: number }
   | { type: "state"; state: HostState }
   | { type: "anchors"; anchors: AnchorState[] }
   | { type: "focus"; anchor: string }
   | { type: "error"; error: string };
 export type PanelMessage =
+  | { type: "minimize" }
+  | { type: "draft"; active: boolean; posted?: boolean; anchor?: string }
+  | { type: "draft-size"; height: number }
   | { type: "ready"; width: number }
   | { type: "sidebar-layout"; width: number; maximized: boolean }
   | { type: "close" }
@@ -60,7 +71,7 @@ export type PanelMessage =
       offset?: number;
     }
   | { type: "highlight"; anchor: string | null }
-  | { type: "pins"; anchors: string[] };
+  | { type: "pins"; anchors: AgentPin[] };
 
 export function envelope(session: string, message: HostMessage | PanelMessage) {
   return { bridge: BRIDGE, session, message };

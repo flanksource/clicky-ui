@@ -5,7 +5,7 @@
  * free of React and DOM imports. The objects are shaped for clicky-ui's
  * `JsonSchemaForm` (keys are JSX prop names, ordered with `x-order`).
  */
-export const SVG_EDITABLE_TAGS = ["rect", "circle", "ellipse", "line", "polyline", "polygon", "path", "text", "g"] as const;
+export const SVG_EDITABLE_TAGS = ["rect", "circle", "ellipse", "line", "polyline", "polygon", "path", "text", "tspan", "g"] as const;
 export type SvgEditableTag = (typeof SVG_EDITABLE_TAGS)[number];
 
 export type SvgFieldSchema = {
@@ -15,7 +15,7 @@ export type SvgFieldSchema = {
   maximum?: number;
   multipleOf?: number;
   enum?: readonly string[];
-  "x-number-display"?: "slider";
+  "x-number-display"?: "slider" | "stepper";
 };
 
 export type SvgTagSchema = {
@@ -48,17 +48,23 @@ const GEOMETRY: Record<SvgEditableTag, Record<string, SvgFieldSchema>> = {
   polygon: { points: text },
   path: { d: text },
   text: {
+    children: text,
     x: length,
     y: length,
     fontSize: length,
+    fontFamily: text,
     fontWeight: { type: "string", enum: FONT_WEIGHTS },
     textAnchor: { type: "string", enum: ["start", "middle", "end"] },
   },
+  tspan: { children: text, x: length, y: length, dx: length, dy: length, fontSize: length, fontFamily: text, fontWeight: { type: "string", enum: FONT_WEIGHTS } },
   g: {},
 };
 
 function buildSchema(tag: SvgEditableTag): SvgTagSchema {
-  const properties = { ...GEOMETRY[tag], ...PAINT };
+  const properties: Record<string, SvgFieldSchema> = { ...GEOMETRY[tag], ...PAINT, color, className: text };
+  for (const name of ["x", "y", "width", "height"]) {
+    if (properties[name]) properties[name] = { ...properties[name], "x-number-display": "stepper" };
+  }
   return { type: "object", properties, "x-order": Object.keys(properties), additionalProperties: false };
 }
 
@@ -73,7 +79,7 @@ export function svgSchemaFor(tag: string): SvgTagSchema {
   return SCHEMAS[tag];
 }
 
-export type SvgAttributeValues = Record<string, string | number>;
+export type SvgAttributeValues = Record<string, string | number | null>;
 
 /**
  * Checks `values` against the schema of `<tag>`: only its attributes, with the
@@ -90,6 +96,8 @@ export function validateSvgAttributes(tag: string, values: unknown): SvgAttribut
   for (const [name, value] of entries) {
     const field = properties[name];
     if (!field) throw new Error(`"${name}" is not an editable attribute of <${tag}>; allowed: ${Object.keys(properties).join(", ")}`);
+    if (value === null) continue;
+    if ((name === "children" || name === "className") && typeof value === "string") continue;
     if (field.type === "number") {
       if (typeof value !== "number" || !Number.isFinite(value)) {
         throw new Error(`"${name}" of <${tag}> must be a finite number, got ${JSON.stringify(value)}`);

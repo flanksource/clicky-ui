@@ -1,10 +1,12 @@
+import type { MiddlewareApp, ErrorLogger } from "./middleware";
 import { readFileSync, statSync } from "node:fs";
 import { RepositoryDocuments } from "./repository-documents";
+import { instructions, vocabularyPageFile } from "./vocabulary-registry";
 import { cwdInSessionScope, sessionScopeDirectory } from "./session-scope";
 import { pageInSessionScope } from "../src/agent-runs/session-scope";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Readable } from "node:stream";
-import type { Connect, Logger, Plugin } from "vite";
+import type { Plugin } from "vite";
 
 import { buildPlaygroundInstructions } from "../src/agent-instructions-text";
 import {
@@ -334,9 +336,10 @@ function agentAuthor(options: {
   };
 }
 
-function markdownOptions(origin: string, dir: string): CommentMarkdownOptions {
+function markdownOptions({ origin, dir, vocabularyInstructions }: { origin: string; dir: string; vocabularyInstructions: Record<string, string> }): CommentMarkdownOptions {
   return {
     labels: {},
+    vocabularyInstructions,
     pageUrl: (page) => `${origin}/?page=${encodeURIComponent(page)}`,
     pagePath: (page) => {
       if (page.startsWith("document:")) return new RepositoryDocuments(dir).document(page).absolutePath;
@@ -345,6 +348,7 @@ function markdownOptions(origin: string, dir: string): CommentMarkdownOptions {
           `External page ${page} has no captured URL to hand to an agent`,
         );
       }
+      if (page.startsWith("vocabularies/")) return vocabularyPageFile(page);
       return `apps/playground/src/pages/${page}.tsx`;
     },
     screenshotUrl: (url) => new URL(url, origin).href,
@@ -373,7 +377,7 @@ async function threadMarkdown(options: ThreadMessageOptions): Promise<string> {
   ) as PlaygroundComment[];
   return commentsToMarkdown(
     [{ page: options.page, comments: thread }],
-    markdownOptions(options.origin, options.dir),
+    markdownOptions({ origin: options.origin, dir: options.dir, vocabularyInstructions: Object.fromEntries([...new Set(thread.flatMap(comment => (comment.vocabularyRefs ?? []).map(item => item.catalog)))].map(alias => [alias, instructions(alias)])) }),
   );
 }
 
@@ -1085,7 +1089,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
 
 export type AgentRuns = ReturnType<typeof createAgentRuns>;
 
-function sendError(logger: Logger, res: ServerResponse, error: unknown): void {
+function sendError(logger: ErrorLogger, res: ServerResponse, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
   const status =
     error instanceof CommentHttpError
@@ -1113,115 +1117,116 @@ function sendError(logger: Logger, res: ServerResponse, error: unknown): void {
  * Register this plugin before `playgroundComments`: that middleware answers
  * every other `/__playground/comments/*` path with a 405.
  */
-export function playgroundAgentRuns(runs: AgentRuns): Plugin {
-  const register = (middlewares: Connect.Server, logger: Logger) => {
-    middlewares.use(AGENT_RUNS_ROUTE, (req, res, next) => {
-      const url = new URL(req.url ?? "/", "http://playground.local");
-      const method = req.method ?? "";
-      const comment = AGENT_COMMENT_ROUTE.exec(url.pathname);
-      const proxied = PROXY_ROUTE.exec(url.pathname);
-      const entry = SESSION_ENTRY_ROUTE.exec(url.pathname);
-      const isSessions = url.pathname === "/agent-sessions";
-      const isSettings = url.pathname === "/agent-sessions/settings";
-      const isTargets = url.pathname === "/agent-sessions/targets";
-      const isCaptain = url.pathname === "/agent-sessions/captain";
-      const isProjects = url.pathname === "/agent-sessions/projects";
-      const isCreate = url.pathname === "/agent-sessions/sessions";
-      if (
-        !(
-          comment ||
-          proxied ||
-          entry ||
-          isSessions ||
-          isSettings ||
-          isTargets ||
-          isCaptain ||
-          isProjects ||
-          isCreate
-        )
-      ) {
-        next();
-        return;
-      }
-      void (async () => {
-        try {
-          if (isProjects) {
-            if (method !== "GET")
-              throw new RequestError("GET lists projects", 405);
-            sendJson(res, 200, await runs.projects());
-          } else if (isCreate) {
-            if (method !== "POST")
-              throw new RequestError("POST creates a managed session", 405);
-            sendJson(
-              res,
-              201,
-              await runs.createSession(
-                await readJsonBody(req),
-                requestOrigin(req),
-              ),
-            );
-          } else if (comment) {
-            if (method !== "POST") {
-              throw new RequestError("POST is required to run an agent", 405);
-            }
-            const id = decodeURIComponent(comment[1] ?? "");
-            sendJson(
-              res,
-              202,
-              await runs.runOnComment(id, await readJsonBody(req), requestOrigin(req)),
-            );
-          } else if (isSessions) {
-            if (method !== "GET") {
-              throw new RequestError("GET reads the agent sessions and settings", 405);
-            }
-            sendJson(res, 200, await runs.sessions());
-          } else if (isSettings) {
-            if (method !== "PUT") {
-              throw new RequestError("PUT updates the agent session settings", 405);
-            }
-            sendJson(res, 200, {
-              settings: await runs.updateSettings(await readJsonBody(req)),
-            });
-          } else if (isTargets) {
-            if (method !== "PUT") {
-              throw new RequestError("PUT sets a page's agent target", 405);
-            }
-            sendJson(res, 200, {
-              settings: await runs.setTarget(await readJsonBody(req)),
-            });
-          } else if (isCaptain) {
-            if (method !== "GET") {
-              throw new RequestError("GET lists the live captain sessions", 405);
-            }
-            sendJson(res, 200, { sessions: await runs.captainSessions(url.searchParams.get("page") ?? undefined) });
-          } else if (entry) {
-            if (method !== "DELETE") {
-              throw new RequestError("DELETE ends and forgets an agent session", 405);
-            }
-            await runs.forgetSession(decodeURIComponent(entry[1] ?? ""));
-            sendJson(res, 200, { removed: true });
-          } else if (proxied) {
-            await runs.proxy(
-              req,
-              res,
-              proxied[1] as "runs" | "sessions",
-              proxied[2] ?? "",
-              url.search,
-            );
+export function registerAgentRunsMiddleware({ middlewares, logger, runs }: { middlewares: MiddlewareApp; logger: ErrorLogger; runs: AgentRuns }): void {
+  middlewares.use(AGENT_RUNS_ROUTE, (req, res, next) => {
+    const url = new URL(req.url ?? "/", "http://playground.local");
+    const method = req.method ?? "";
+    const comment = AGENT_COMMENT_ROUTE.exec(url.pathname);
+    const proxied = PROXY_ROUTE.exec(url.pathname);
+    const entry = SESSION_ENTRY_ROUTE.exec(url.pathname);
+    const isSessions = url.pathname === "/agent-sessions";
+    const isSettings = url.pathname === "/agent-sessions/settings";
+    const isTargets = url.pathname === "/agent-sessions/targets";
+    const isCaptain = url.pathname === "/agent-sessions/captain";
+    const isProjects = url.pathname === "/agent-sessions/projects";
+    const isCreate = url.pathname === "/agent-sessions/sessions";
+    if (
+      !(
+        comment ||
+        proxied ||
+        entry ||
+        isSessions ||
+        isSettings ||
+        isTargets ||
+        isCaptain ||
+        isProjects ||
+        isCreate
+      )
+    ) {
+      next();
+      return;
+    }
+    void (async () => {
+      try {
+        if (isProjects) {
+          if (method !== "GET")
+            throw new RequestError("GET lists projects", 405);
+          sendJson(res, 200, await runs.projects());
+        } else if (isCreate) {
+          if (method !== "POST")
+            throw new RequestError("POST creates a managed session", 405);
+          sendJson(
+            res,
+            201,
+            await runs.createSession(
+              await readJsonBody(req),
+              requestOrigin(req),
+            ),
+          );
+        } else if (comment) {
+          if (method !== "POST") {
+            throw new RequestError("POST is required to run an agent", 405);
           }
-        } catch (error) {
-          sendError(logger, res, error);
+          const id = decodeURIComponent(comment[1] ?? "");
+          sendJson(
+            res,
+            202,
+            await runs.runOnComment(id, await readJsonBody(req), requestOrigin(req)),
+          );
+        } else if (isSessions) {
+          if (method !== "GET") {
+            throw new RequestError("GET reads the agent sessions and settings", 405);
+          }
+          sendJson(res, 200, await runs.sessions());
+        } else if (isSettings) {
+          if (method !== "PUT") {
+            throw new RequestError("PUT updates the agent session settings", 405);
+          }
+          sendJson(res, 200, {
+            settings: await runs.updateSettings(await readJsonBody(req)),
+          });
+        } else if (isTargets) {
+          if (method !== "PUT") {
+            throw new RequestError("PUT sets a page's agent target", 405);
+          }
+          sendJson(res, 200, {
+            settings: await runs.setTarget(await readJsonBody(req)),
+          });
+        } else if (isCaptain) {
+          if (method !== "GET") {
+            throw new RequestError("GET lists the live captain sessions", 405);
+          }
+          sendJson(res, 200, { sessions: await runs.captainSessions(url.searchParams.get("page") ?? undefined) });
+        } else if (entry) {
+          if (method !== "DELETE") {
+            throw new RequestError("DELETE ends and forgets an agent session", 405);
+          }
+          await runs.forgetSession(decodeURIComponent(entry[1] ?? ""));
+          sendJson(res, 200, { removed: true });
+        } else if (proxied) {
+          await runs.proxy(
+            req,
+            res,
+            proxied[1] as "runs" | "sessions",
+            proxied[2] ?? "",
+            url.search,
+          );
         }
-      })();
-    });
-  };
+      } catch (error) {
+        sendError(logger, res, error);
+      }
+    })();
+  });
+}
+
+export function playgroundAgentRuns(runs: AgentRuns): Plugin {
   return {
     name: "playground-agent-runs",
     configureServer(server) {
-      register(server.middlewares, server.config.logger);
+      registerAgentRunsMiddleware({ middlewares: server.middlewares, logger: server.config.logger, runs });
     },
     configurePreviewServer(server) {
-      register(server.middlewares, server.config.logger);
+      registerAgentRunsMiddleware({ middlewares: server.middlewares, logger: server.config.logger, runs });
     },
   };
 }

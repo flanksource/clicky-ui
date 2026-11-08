@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, waitFor, cleanup } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { VocabularyProvider } from "./config";
+import { VocabularyGenerationHost, VocabularyProvider } from "./config";
 import { useVocabulary } from "./context";
 import { VocabularyStatus } from "./VocabularyStatus";
+import { DensityProvider, ThemeProvider } from "@flanksource/clicky-ui";
 
 const snapshot = { revision: "one", catalogs: [], items: [] };
 const connections = [
@@ -17,7 +18,7 @@ function Consumer() {
   const state = useVocabulary();
   return <><input aria-label="Draft" defaultValue="Keep my draft" /><button onClick={state.retry}>Retry test</button><span>{state.error ? "Unavailable" : state.vocabulary ? "Ready" : "Loading"}</span><VocabularyStatus /></>;
 }
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 it("preserves the editor and its draft through initial failure and successful retry", async () => {
   const fetch = vi.fn().mockRejectedValueOnce(new TypeError("Failed to fetch")).mockResolvedValue(new Response(JSON.stringify(snapshot), { headers: { "Content-Type": "application/json" } }));
@@ -62,14 +63,14 @@ it("does not overlap manual retries and ignores cancellation after unmount", asy
   complete(new Response(JSON.stringify(snapshot), { headers: { "Content-Type": "application/json" } }));
 });
 
-it.each(["./missing-preview.tsx", "./_test/ThrowingPreview.tsx"])("contains preview failure %s and recovers on a new revision", async preview => {
+it.each(["./missing-preview.tsx", "./_test/ThrowingPreview.tsx"])("contains preview failure %s and recovers on a new revision", async page => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   const item = { catalog: "broken", type: "box", id: "box/header", label: "Header", description: "Example", references: ["docs/example"] };
-  const data = { revision: "broken", catalogs: [{ id: "broken", preview }], items: [item] };
+  const data = { revision: "broken", catalogs: [{ alias: "broken", page, slug: "vocabularies/broken", file: "broken/index.tsx", instructions: "Read broken as specimens.", previewRevision: "broken" }], items: [item] };
   mockVocabularyFetch(vi.fn(async () => new Response(JSON.stringify(data), { headers: { "Content-Type": "application/json" } })));
-  function PreviewConsumer() { const state = useVocabulary(); return <><p>Page stays mounted</p><VocabularyStatus />{state.vocabulary?.renderPreview(item)}</>; }
-  render(<VocabularyProvider><PreviewConsumer /></VocabularyProvider>);
-  await screen.findByText("Preview unavailable");
+  function PreviewConsumer() { const state = useVocabulary(); return <><VocabularyGenerationHost /><p>Page stays mounted</p><VocabularyStatus />{state.vocabulary?.renderPreview(item)}</>; }
+  render(<ThemeProvider><DensityProvider><VocabularyProvider><PreviewConsumer /></VocabularyProvider></DensityProvider></ThemeProvider>);
+  await screen.findByText(page.includes("Throwing") ? "Specimen render failed" : /Unknown variable dynamic import|Failed to resolve|Cannot find|Unknown variable|Failed to fetch|Cannot import/);
   expect(screen.getByText("Page stays mounted")).toBeTruthy();
   await waitFor(() => expect(screen.getByRole("button", { name: "Playground status: preview issues" })).toBeTruthy());
   data.revision = "recovered";
@@ -77,7 +78,19 @@ it.each(["./missing-preview.tsx", "./_test/ThrowingPreview.tsx"])("contains prev
   data.catalogs = [];
   fireEvent.focus(window);
   await screen.findByRole("button", { name: "Playground status: ready" });
-  expect(screen.queryByText("Preview unavailable")).toBeNull();
+  expect(screen.queryByText("Specimen render failed")).toBeNull();
+});
+
+it("renders cached preview images with dimensions and accessible labels", async () => {
+  const item = { catalog: "shapes", type: "shape", id: "shape/decision", label: "Decision", description: "A branching decision", references: ["shapes/index.tsx"] };
+  const catalog = { alias: "shapes", page: "./missing-page.tsx", slug: "vocabularies/shapes", file: "shapes/index.tsx", instructions: "Read shapes as geometry.", previewRevision: "cached" };
+  localStorage.setItem("clicky-playground.vocabulary-previews.shapes", JSON.stringify({ previewRevision: "cached", images: { [item.id]: { image: "data:image/webp;base64,YQ==", width: 180, height: 90 } } }));
+  mockVocabularyFetch(vi.fn(async () => Response.json({ revision: "cached", catalogs: [catalog], items: [item] })));
+  function ImageConsumer() { const { vocabulary } = useVocabulary(); return <>{vocabulary?.renderPreview(item)}</>; }
+  render(<VocabularyProvider><ImageConsumer /></VocabularyProvider>);
+  const image = await screen.findByRole("img", { name: "Decision" });
+  expect({ src: image.getAttribute("src"), width: image.getAttribute("width"), height: image.getAttribute("height") }).toEqual({ src: "data:image/webp;base64,YQ==", width: "180", height: "90" });
+  expect(screen.queryByRole("status")).toBeNull();
 });
 
 it("preserves a loaded editor on background failure and keeps recovery inside the dropdown", async () => {
@@ -125,11 +138,11 @@ it("keeps the lint-count failure behind a warning status dot", async () => {
   expect({ title: screen.getByText("Lint counts unavailable").textContent, message: screen.getByText(problemsError).textContent }).toEqual({ title: "Lint counts unavailable", message: problemsError });
 });
 
-function mockBackends(gavel: Record<string, unknown>, restart: (init?: RequestInit) => Response) {
+function mockBackends(gavel: Record<string, unknown>, restart: () => Response | Promise<Response>) {
   const calls: string[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     calls.push(`${init?.method ?? "GET"} ${url}`);
-    if (url === RESTART_ENDPOINT) return restart(init);
+    if (url === RESTART_ENDPOINT) return restart();
     return Response.json(url === "/__playground/connections" ? { connections: [{ ...connections[0], ...gavel }, connections[1]] } : snapshot);
   }));
   return calls;
@@ -137,9 +150,10 @@ function mockBackends(gavel: Record<string, unknown>, restart: (init?: RequestIn
 
 it("restarts the Gavel server the playground started once confirmed, and shows the new process", async () => {
   const [OLD_PID, NEW_PID] = [4101, 4202];
+  let respond!: () => void;
   const calls = mockBackends(
     { status: "incompatible", error: "Gavel at http://gavel.local is incompatible. Rebuild and restart Gavel.", management: "playground", pid: OLD_PID },
-    () => Response.json({ connections: [{ ...connections[0], management: "playground", pid: NEW_PID }, connections[1]] }),
+    () => new Promise(resolve => { respond = () => resolve(Response.json({ connections: [{ ...connections[0], management: "playground", pid: NEW_PID }, connections[1]] })); }),
   );
   render(<VocabularyProvider><Consumer /></VocabularyProvider>);
   fireEvent.click(await screen.findByRole("button", { name: "Playground status: incompatible" }));
@@ -149,16 +163,18 @@ it("restarts the Gavel server the playground started once confirmed, and shows t
 
   fireEvent.click(screen.getByRole("button", { name: "Restart Gavel" }));
   const dialog = await screen.findByRole("dialog", { name: "Restart Gavel?" });
-  expect(dialog.textContent).toContain(`pid ${OLD_PID}`);
-  expect(calls).not.toContain(`POST ${RESTART_ENDPOINT}`);
+  expect({ menuOpen: screen.queryByRole("heading", { name: "Connections" }) !== null, mentionsPid: dialog.textContent?.includes(`pid ${OLD_PID}`), posted: calls.includes(`POST ${RESTART_ENDPOINT}`) }).toEqual({ menuOpen: false, mentionsPid: true, posted: false });
   fireEvent.click(screen.getByRole("button", { name: "Restart" }));
 
-  await screen.findByText(`Started by the playground · pid ${NEW_PID}`);
+  await screen.findByRole("button", { name: "Playground status: restarting Gavel" });
+  respond();
+  fireEvent.click(await screen.findByRole("button", { name: "Playground status: ready" }));
+  expect(screen.getByText(`Started by the playground · pid ${NEW_PID}`)).toBeTruthy();
   expect(calls.filter(call => call === `POST ${RESTART_ENDPOINT}`)).toHaveLength(1);
   expect(screen.getAllByText("Connected")).toHaveLength(2);
 });
 
-it("starts an on-demand Gavel without asking, and keeps a failed start inside the status menu", async () => {
+it("starts an on-demand Gavel without asking, and reports a failed start until connections are refreshed", async () => {
   const failure = "gavel launch serve exited (1) before http://gavel.local answered: listen tcp: bind: address already in use";
   const calls = mockBackends({ status: "disconnected", error: "Connection refused", management: "on-demand" }, () => Response.json({ error: failure }, { status: 502 }));
   render(<VocabularyProvider><Consumer /></VocabularyProvider>);
@@ -167,8 +183,13 @@ it("starts an on-demand Gavel without asking, and keeps a failed start inside th
 
   fireEvent.click(screen.getByRole("button", { name: "Start Gavel" }));
   await screen.findByText("Could not start Gavel");
-  expect({ dialog: screen.queryByRole("dialog"), posts: calls.filter(call => call === `POST ${RESTART_ENDPOINT}`).length, message: screen.getByText(failure).textContent }).toEqual({ dialog: null, posts: 1, message: failure });
+  expect({ dialog: screen.queryByRole("dialog", { name: /Gavel/ }), posts: calls.filter(call => call === `POST ${RESTART_ENDPOINT}`).length, message: screen.getByText(failure).textContent }).toEqual({ dialog: null, posts: 1, message: failure });
   expect((screen.getByRole("button", { name: "Start Gavel" }) as HTMLButtonElement).disabled).toBe(false);
+  expect(screen.getByRole("button", { name: "Playground status: could not start Gavel" })).toBeTruthy();
+
+  fireEvent.click(screen.getByRole("button", { name: "Refresh connections" }));
+  await screen.findByRole("button", { name: "Playground status: disconnected" });
+  expect(screen.queryByText("Could not start Gavel")).toBeNull();
 });
 
 it.each(["disconnected", "incompatible"])("shows independent backend %s state and clears the status dot after retry", async status => {

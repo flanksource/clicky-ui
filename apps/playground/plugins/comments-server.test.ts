@@ -349,6 +349,34 @@ describe("playground comment lifecycle API", () => {
       });
     }
     const stored = async () => (await readAll(dir)).sample?.[0];
+    const create = (body: Record<string, unknown>) =>
+      fetch(`${baseUrl}/__playground/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ page: "sample", body: "Wrap the error", element: { source: "sample.tsx", html: "<main>Sample</main>" }, ...body }),
+      });
+
+    it("creates a root already handed to the assignee named on create", async () => {
+      const response = await create({ author: human, assignee: agent });
+
+      expect(response.status).toBe(201);
+      const created = (await response.json()) as StoredComment;
+      expect({ status: created.status, assignee: created.assignee, acknowledgedAt: created.acknowledgedAt }).toEqual({
+        status: "in_progress",
+        assignee: agent,
+        acknowledgedAt: undefined,
+      });
+      expect(await stored()).toEqual(created);
+    });
+
+    it.each([
+      ["an agent assigning on create", { author: agent, assignee: otherAgent }, 403],
+      ["a null assignee on create", { author: human, assignee: null }, 400],
+    ])("refuses %s and stores nothing", async (_label, body, status) => {
+      const response = await create(body);
+
+      expect({ status: response.status, stored: await readAll(dir) }).toEqual({ status, stored: {} });
+    });
 
     it.each([
       ["an agent", agent],
