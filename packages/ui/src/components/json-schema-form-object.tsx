@@ -118,6 +118,25 @@ export function StringMapControl({
   field: FieldControl;
   ctx: RenderContext;
 }) {
+  const properties = ctx.layout.mode === "properties";
+  if (!properties && field.valueSchema?.type === "string" && !field.valuePatternSchemas?.length) {
+    const layout = { ...ctx.layout, mode: "properties" as const };
+    return (
+      <FieldsGrid layout={layout} size={ctx.size}>
+        <StringMapEntries field={field} ctx={{ ...ctx, layout }} />
+      </FieldsGrid>
+    );
+  }
+  return <StringMapEntries field={field} ctx={ctx} />;
+}
+
+function StringMapEntries({
+  field,
+  ctx,
+}: {
+  field: FieldControl;
+  ctx: RenderContext;
+}) {
   // A read-only map marks its whole subtree non-editable: no rename/remove/add
   // and value inputs disabled.
   const readOnly = ctx.readOnly || field.readOnly === true;
@@ -342,7 +361,7 @@ export function StringMapControl({
                                     size: propertyControlSize[ctx.size],
                                   }}
                                   renderPreview={(previewField) => (
-                                    <span>{String(previewField.value)}</span>
+                                    <span>{previewField.value === "" ? "New field" : String(previewField.value)}</span>
                                   )}
                                   renderEditor={(draft) => (
                                     <div className="flex min-w-0 items-center gap-1">
@@ -413,7 +432,7 @@ export function StringMapControl({
           variant={properties ? "ghost" : "outline"}
           onClick={addEntry}
           className={cn(
-            "gap-1.5",
+            "self-start gap-1.5",
             properties && "col-span-full justify-self-start m-1",
             inputSizeClass[
               properties ? propertyControlSize[ctx.size] : childCtx.size

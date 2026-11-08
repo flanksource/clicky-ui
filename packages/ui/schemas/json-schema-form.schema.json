@@ -6,6 +6,10 @@
   "description": "A JSON Schema 2020-12 document annotated for @flanksource/clicky-ui's JsonSchemaForm. It is the standard 2020-12 meta-schema plus the `x-*` presentation keywords the form reads, applied at every depth (nested `properties`, `items`, `allOf` branches, map value schemas). Set `$schema` to this document's `$id` to validate a form schema and get hover documentation in editors.\n\nControl resolution is first-match-wins on schema keywords, never on field names: `x-clicky-lookup` → `enum` (or an `anyOf`/`oneOf` branch carrying an `enum`) → `format: date|date-time` → `format: textarea` → `format: md` → `boolean` → `integer`/`number` → `array` → open string map (`additionalProperties`/`patternProperties`/`propertyNames`) → nested object (`properties`) → string.\n\nUnknown `x-*` keys are allowed: consumers read their own extension keys from `PreExtension`/`PostExtension` functions and the form passes them through untouched.",
   "allOf": [{ "$ref": "https://json-schema.org/draft/2020-12/schema" }],
   "properties": {
+    "x-object-display": {
+      "description": "Presentation of this nested object: flat headed fields or a collapsible accordion section. Overrides the form-level objectDisplay option.",
+      "enum": ["flat", "accordion"]
+    },
     "title": {
       "description": "The field label. A missing title falls back to the property key; an explicit empty string renders no label at all (for a field whose host already names it)."
     },
@@ -19,9 +23,9 @@
       "description": "Renders the field as a picker over these values. Label, icon, description and tone per value come from `x-enum-labels`, `x-enum-icons`, `x-enum-descriptions` and `x-enum-tones`; the presentation from `x-enum-display`. On `propertyNames`, restricts a map's keys to a picker. On an array's `items`, renders a tag list (or `x-array-display: filter-pills`)."
     },
     "format": {
-      "description": "Standard string format. Formats with form-specific meaning: `date` and `date-time` render a date picker; `textarea` a multi-line text box; `md` the MDXEditor-backed markdown editor (options in `x-md-editor`); `percent` (on a number) shows a static `%` unit inside the input; `password` masks the input and excludes the field from text filtering. Any other format renders a plain string input.",
+      "description": "Standard string format. Formats with form-specific meaning: `date` and `date-time` render a date picker; `textarea` a multi-line text box; `md` the MDXEditor-backed markdown editor (options in `x-md-editor`); `percent` (on a number) shows a static `%` unit inside the input; `password` masks the input and excludes the field from text filtering; `color` keeps the text input (any CSS color stays typeable) and prefixes it with a color picker that writes a `#rrggbb` value, left neutral while the text is not a `#rrggbb` hex. Any other format renders a plain string input.",
       "anyOf": [
-        { "enum": ["date", "date-time", "textarea", "md", "percent", "password"] },
+        { "enum": ["date", "date-time", "textarea", "md", "percent", "password", "color"] },
         { "type": "string" }
       ]
     },
@@ -237,8 +241,8 @@
       "$ref": "#/$defs/ArrayItemSpec"
     },
     "x-number-display": {
-      "description": "Render a bounded number (requires `maximum`) as a single-thumb slider with a progress-filled track instead of a numeric input.",
-      "const": "slider"
+      "description": "Use slider for a bounded number (requires maximum). Use stepper for manual decimal entry with buttons and arrow-key stepping by multipleOf, or 1 when unconstrained.",
+      "enum": ["slider", "stepper"]
     },
     "x-discriminator": {
       "description": "Object-level. Names the property whose value selects a \"kind\" (e.g. a connection `type`). The form renders that property first as a picker; once chosen, it shows the matched `allOf` branch's fields and collapses the picker to a compact header with a \"change\" affordance.",

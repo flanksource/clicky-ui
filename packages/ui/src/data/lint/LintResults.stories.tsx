@@ -8,6 +8,7 @@ import { emptyLintFilters, type LintAction, type LintFilters, type LintGrouping,
 import {
   allLintResults,
   betterleaks,
+  dataLint,
   eslint,
   golangci,
   markdownlintClean,
@@ -43,6 +44,7 @@ function Harness({
   selected: initialSelected = null,
   withIgnore = false,
   renderRun,
+  entityHref,
 }: {
   results?: LinterResult[];
   grouping?: LintGrouping;
@@ -50,6 +52,7 @@ function Harness({
   selected?: string | null;
   withIgnore?: boolean;
   renderRun?: LintResultsProps["renderRun"];
+  entityHref?: LintResultsProps["entityHref"];
 }) {
   const [grouping, setGrouping] = useState<LintGrouping>(initialGrouping);
   const [filters, setFilters] = useState<LintFilters>(initialFilters);
@@ -84,6 +87,7 @@ function Harness({
         }
         {...(withIgnore ? { onIgnore, ignoreBusy: busy } : {})}
         {...(renderRun ? { renderRun } : {})}
+        {...(entityHref ? { entityHref } : {})}
       />
       {applied && (
         <pre data-testid="applied-ignore" className="border-t border-border bg-muted p-2 font-mono text-xs">
@@ -131,6 +135,29 @@ export const FileLinterRule: Story = {
       ]}
     />
   ),
+};
+
+/**
+ * Findings that point at entities, pages and screenshots rather than files are
+ * grouped beside the files by entity kind, URL host, or "Other". The host links
+ * Policy entities through `entityHref`.
+ */
+export const FindingsWithoutFiles: Story = {
+  name: "Findings at entities, pages and images",
+  render: () => (
+    <Harness
+      results={[dataLint]}
+      grouping="linter-file"
+      selected="data-lint/policy"
+      entityHref={(entity) => (entity.kind === "Policy" ? `#/entity/policy/${entity.id}` : undefined)}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const tree = within(within(canvasElement).getByRole("tree"));
+    await expect(tree.getByText("Policy")).toBeInTheDocument();
+    await expect(tree.getByText("oipa.example.com")).toBeInTheDocument();
+    await expect(tree.getByText("Other")).toBeInTheDocument();
+  },
 };
 
 export const Summary: Story = {

@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import type { ClearableFieldProps } from "./field-clear-button";
 import type { FormSize } from "./json-schema-form-size";
 
 export type MdxEditorHeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
@@ -179,7 +180,7 @@ export interface MdxEditorPluginOptions {
   plugins?: MdxEditorPlugin[];
 }
 
-export interface MdxEditorFieldProps extends MdxEditorPluginOptions {
+export interface MdxEditorFieldProps extends MdxEditorPluginOptions, ClearableFieldProps {
   id?: string;
   value?: string;
   onChange?: (markdown: string) => void;

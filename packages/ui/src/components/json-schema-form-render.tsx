@@ -63,6 +63,9 @@ import { matchesFieldFilter } from "./json-schema-form-filter";
 import { Combobox } from "./Combobox";
 import { UnionControl } from "./json-schema-form-union";
 import { JsonControl } from "./json-schema-form-json";
+import { NullableControl } from "./json-schema-form-nullable";
+import { FormObjectSection } from "./json-schema-form-section";
+import { UiText, UiCalendar, UiToggleOff, UiListNumbers, UiArray, UiCode2, UiListDashes } from "../icons";
 import { FormHelp } from "./json-schema-form-help-links";
 import { hasFormHelp } from "./json-schema-form-help-model";
 
@@ -77,6 +80,15 @@ import { hasFormHelp } from "./json-schema-form-help-model";
 export function renderValueControl(field: FieldControl, ctx: RenderContext): ReactNode {
   // ctx.instancePath is the field's own path here: buildField descends into the
   // child context before rendering the value.
+  const fieldId = fieldInputId(ctx.instancePath, ctx.idPrefix);
+  if (field.nullable && !ctx.presentation) {
+    const nonNull = { ...field, onChange: (next: unknown) => field.onChange(field.kind === "date" && next === "" ? null : next) };
+    return <NullableControl field={field} fieldId={fieldId} ctx={ctx}>{renderNonNullableControl(nonNull, ctx)}</NullableControl>;
+  }
+  return renderNonNullableControl(field, ctx);
+}
+
+function renderNonNullableControl(field: FieldControl, ctx: RenderContext): ReactNode {
   const fieldId = fieldInputId(ctx.instancePath, ctx.idPrefix);
   if (ctx.presentation && field.kind !== "display" && field.kind !== "link") {
     return <PropertyValuePreview field={field} fieldId={fieldId} ctx={ctx} />;
@@ -180,7 +192,17 @@ function buildField(
   };
   const hiddenBy = args.prop["x-hidden-by"];
   if (args.prop["x-hidden"] && hide(hiddenBy ? `hidden by ${hiddenBy}` : "hidden by the schema (x-hidden)")) return null;
+  // A const already holding its value is a fixed discriminator (the union
+  // selector chose it); there is nothing to edit, so it is not shown.
+  if (args.prop.const !== undefined && args.prop["x-hidden"] !== false && args.value === args.prop.const && hide("hidden: const discriminator")) return null;
   const base = resolveControl(args);
+  if (ctx.showTypeIcons && base.labelIcon == null) {
+    const icons = { string: UiText, textarea: UiText, markdown: UiText, date: UiCalendar, boolean: UiToggleOff, number: UiListNumbers, array: UiArray, object: UiCode2, "string-map": UiCode2, enum: UiListDashes };
+    if (base.kind in icons) {
+      const Glyph = icons[base.kind as keyof typeof icons];
+      base.labelIcon = <Glyph />;
+    }
+  }
   let field: FieldControl | null = base;
   let beforeDrop: FieldControl = base;
   for (const ext of ctx.pre) {
@@ -256,6 +278,7 @@ function buildField(
   };
   let value: ReactNode = renderValueControl(field, valueCtx);
   const postCtx = {
+    fieldId,
     ...(ctx.rootValue ? { rootValue: ctx.rootValue } : {}),
     ...(ctx.onRootChange ? { onRootChange: ctx.onRootChange } : {}),
     instancePath,
@@ -324,6 +347,13 @@ export function renderFieldRow(
   if (ctx.layout.mode === "properties" && field.kind !== "display") {
     return <PropertiesFieldRow {...built} label={opts?.labelOverride ?? built.label} ctx={ctx} />;
   }
+  if (field.kind === "object" && field.label !== "" && (field.schema["x-object-display"] ?? ctx.objectDisplay) === "accordion") {
+    const path = args.instancePath ?? appendInstancePath(ctx.instancePath, field.key);
+    const hasErrors = built.messages.length > 0 || ctx.errors.some(error => error.instancePath.startsWith(`${path}/`));
+    return <FormObjectSection title={built.label} hasErrors={hasErrors}>
+      <FieldErrorText id={fieldErrorId(built.fieldId)} errors={built.messages} />{built.value}
+    </FormObjectSection>;
+  }
   // Object fields — and table-laid-out arrays/string-maps — render as a flat
   // section: a header followed by their body at full width, rather than an
   // inline label + narrow value column. This keeps deep schemas (e.g. policy →
@@ -361,7 +391,7 @@ export function renderFieldRow(
     return <div className="col-span-full">{built.value}</div>;
   }
   const label = opts?.labelOverride ? (
-    <span className={cn("flex items-center gap-2 font-medium", labelSizeClass[ctx.size])}>
+    <label htmlFor={built.fieldId} className={cn("flex items-center gap-2 whitespace-nowrap font-medium", labelSizeClass[ctx.size])}>
       <LabelIcon icon={field.labelIcon} className="text-[15px] text-muted-foreground" />
       <span>{opts.labelOverride}</span>
       {field.required && <span className="text-destructive">*</span>}
@@ -376,7 +406,7 @@ export function renderFieldRow(
       {built.help === "hover" && hasFormHelp(field) && (
         <HelpHint label={opts.labelOverride} helper={<FormHelp field={field} />} />
       )}
-    </span>
+    </label>
   ) : (
     built.label
   );

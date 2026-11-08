@@ -12,8 +12,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 /* Placeholders mean ABSENCE; helper text means content. They shared
  * --muted-foreground until #666666 placeholders started reading as filled
  * values in forms. These are the two brand values that must stay apart. */
-const PLACEHOLDER = "#9ca3af"; /* --fs-fg-subtle, light */
-const MUTED = "#666666"; /* --fs-fg-muted, light */
+const PLACEHOLDER = "#9ca3af"; /* --clicky-fg-subtle, light */
+const MUTED = "#666666"; /* --clicky-fg-muted, light */
 
 async function loadStylesheet(id: string, base: string) {
   const path = id.startsWith(".")
@@ -22,11 +22,11 @@ async function loadStylesheet(id: string, base: string) {
   return { path, base: dirname(path), content: readFileSync(path, "utf8") };
 }
 
-/* fs-tokens.css is imported too, unlike the content-width harness: the brand
+/* clicky-tokens.css is imported too, unlike the content-width harness: the brand
  * values these assertions pin live there, and tokens.css only aliases them. */
 async function buildUtilities(candidates: string[]) {
   const compiler = await compile(
-    '@import "tailwindcss";\n@import "./fs-tokens.css";\n@import "./tokens.css";',
+    '@import "tailwindcss";\n@import "./clicky-tokens.css";\n@import "./tokens.css";',
     { base: here, loadStylesheet },
   );
   return compiler.build(candidates);
@@ -44,8 +44,8 @@ describe("placeholder token", () => {
 
   it("resolves the placeholder chain to the brand's subtle colour", async () => {
     const css = await buildUtilities(["text-placeholder"]);
-    expect(css).toMatch(/--placeholder:\s*var\(--fs-fg-subtle\)/);
-    expect(css).toMatch(new RegExp(`--fs-fg-subtle:\\s*${PLACEHOLDER}`));
+    expect(css).toMatch(/--placeholder:\s*var\(--clicky-fg-subtle\)/);
+    expect(css).toMatch(new RegExp(`--clicky-fg-subtle:\\s*${PLACEHOLDER}`));
   });
 
   /* The regression guard for the other half of the change: helper text, captions
@@ -53,8 +53,8 @@ describe("placeholder token", () => {
    * secondary string in every app rather than just the placeholders. */
   it("leaves muted-foreground on its own darker value", async () => {
     const css = await buildUtilities(["text-muted-foreground"]);
-    expect(css).toMatch(/--muted-foreground:\s*var\(--fs-fg-muted\)/);
-    expect(css).toMatch(new RegExp(`--fs-fg-muted:\\s*${MUTED}`));
+    expect(css).toMatch(/--muted-foreground:\s*var\(--clicky-fg-muted\)/);
+    expect(css).toMatch(new RegExp(`--clicky-fg-muted:\\s*${MUTED}`));
     expect(PLACEHOLDER).not.toBe(MUTED);
   });
 

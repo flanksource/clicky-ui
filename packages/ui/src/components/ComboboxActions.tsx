@@ -1,28 +1,33 @@
 import { Icon } from "../data/Icon";
 import { UiChevronDown, UiClose } from "../icons";
+import { cn } from "../lib/utils";
 
 export function ComboboxActions({
   disabled,
   loading,
   onClear,
+  clearLabel = "Clear",
   onToggle,
   showClear,
+  showToggle,
 }: {
   disabled: boolean | undefined;
   loading: boolean | undefined;
   onClear: () => void;
+  clearLabel?: string;
   onToggle: () => void;
   showClear: boolean;
+  showToggle: boolean;
 }) {
   return (
     <>
       {showClear && (
         <button
           type="button"
-          tabIndex={-1}
-          aria-label="Clear"
+          aria-label={clearLabel}
+          title={clearLabel}
           onClick={onClear}
-          className="absolute right-7 flex h-full items-center px-1 text-muted-foreground hover:text-foreground"
+          className={cn("absolute flex h-full items-center px-1 text-muted-foreground hover:text-foreground", showToggle ? "right-7" : "right-1")}
         >
           <Icon icon={UiClose} className="text-xs" />
         </button>
@@ -50,7 +55,7 @@ export function ComboboxActions({
             />
           </svg>
         </span>
-      ) : (
+      ) : showToggle && (
         <button
           type="button"
           tabIndex={-1}

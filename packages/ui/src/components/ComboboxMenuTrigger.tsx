@@ -7,6 +7,7 @@ import {
 import { UiChevronDown } from "../icons";
 import { Icon } from "../data/Icon";
 import { cn } from "../lib/utils";
+import { FieldClearButton, type ClearableFieldProps } from "./field-clear-button";
 
 export function ComboboxMenuTrigger({
   anchorRef,
@@ -19,6 +20,9 @@ export function ComboboxMenuTrigger({
   ariaLabel,
   title,
   onToggle,
+  clearable,
+  onClear,
+  clearLabel,
 }: {
   anchorRef: RefObject<HTMLDivElement | null>;
   triggerRef: RefObject<HTMLButtonElement | null>;
@@ -30,9 +34,9 @@ export function ComboboxMenuTrigger({
   ariaLabel: string | undefined;
   title: string | undefined;
   onToggle: () => void;
-}) {
+} & ClearableFieldProps) {
   return (
-    <div ref={anchorRef} className="h-full min-w-0">
+    <div ref={anchorRef} data-clearable-field className="relative h-full min-w-0">
       <button
         ref={triggerRef}
         type="button"
@@ -53,14 +57,16 @@ export function ComboboxMenuTrigger({
         className={cn(
           "inline-flex h-control-h w-full min-w-0 items-center gap-1.5 rounded-md border border-input bg-background px-control-px text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
           className,
+          clearable && "pr-14",
         )}
       >
         {content}
         <Icon
           icon={UiChevronDown}
-          className="ml-auto size-3 shrink-0 text-muted-foreground"
+          className="pointer-events-none absolute right-2 top-1/2 size-3 shrink-0 -translate-y-1/2 text-muted-foreground"
         />
       </button>
+      {clearable && !disabled && <span className="absolute inset-y-0 right-7 flex items-center"><FieldClearButton {...(onClear ? { onClear } : {})} {...(clearLabel ? { clearLabel } : {})} /></span>}
     </div>
   );
 }

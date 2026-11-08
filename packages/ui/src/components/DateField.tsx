@@ -1,6 +1,7 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
 import { DatePicker } from "./DatePicker";
 import { DateTimePicker } from "./DateTimePicker";
+import type { ClearableFieldProps } from "./field-clear-button";
 
 export type DateFieldMode = "date" | "datetime";
 
@@ -9,7 +10,7 @@ export type DateFieldProps = Omit<
   // `prefix` is a global HTML attribute typed as string; omit it so our
   // ReactNode adornment prop below is not intersected down to `string & ReactNode`.
   "type" | "value" | "onChange" | "prefix"
-> & {
+> & ClearableFieldProps & {
   /** Selects native date input or date-time input behavior. */
   mode?: DateFieldMode;
   /** ISO date or datetime-local string shown in the input. */

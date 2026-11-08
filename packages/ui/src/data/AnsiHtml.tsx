@@ -23,32 +23,95 @@ const ANSI_COLORS: Record<string, string> = {
 
 type Span = { text: string; style: string };
 
+function indexedColor(index: number): string | undefined {
+  if (!Number.isInteger(index) || index < 0 || index > 255) return undefined;
+  if (index < 16)
+    return ANSI_COLORS[String(index < 8 ? 30 + index : 90 + index - 8)]?.slice(
+      6,
+    );
+  if (index >= 232) {
+    const value = 8 + (index - 232) * 10;
+    return `rgb(${value},${value},${value})`;
+  }
+  const offset = index - 16;
+  const level = (value: number) => (value === 0 ? 0 : 55 + value * 40);
+  return `rgb(${level(Math.floor(offset / 36))},${level(Math.floor(offset / 6) % 6)},${level(offset % 6)})`;
+}
+
+function applySgr(
+  styles: Record<string, string>,
+  codes: number[],
+): Record<string, string> {
+  for (let i = 0; i < codes.length; i++) {
+    const code = codes[i];
+    if (code === 0) {
+      styles = {};
+    } else if (code === 38 || code === 48) {
+      const property = code === 38 ? "color" : "background-color";
+      const mode = codes[++i];
+      let color: string | undefined;
+      if (mode === 2) {
+        const rgb = codes.slice(i + 1, i + 4);
+        i += 3;
+        if (
+          rgb.length === 3 &&
+          rgb.every(
+            (value) => Number.isInteger(value) && value >= 0 && value <= 255,
+          )
+        )
+          color = `rgb(${rgb.join(",")})`;
+      } else if (mode === 5) {
+        const index = codes[++i];
+        if (index !== undefined) color = indexedColor(index);
+      }
+      if (color !== undefined) styles[property] = color;
+    } else if (code === 22) {
+      delete styles["font-weight"];
+      delete styles.opacity;
+    } else if (code === 23) {
+      delete styles["font-style"];
+    } else if (code === 24) {
+      delete styles["text-decoration"];
+    } else if (code === 39) {
+      delete styles.color;
+    } else if (code === 49) {
+      delete styles["background-color"];
+    } else if (code !== undefined) {
+      const background =
+        (code >= 40 && code <= 47) || (code >= 100 && code <= 107);
+      const rule = ANSI_COLORS[String(background ? code - 10 : code)];
+      if (rule) {
+        const [property, value] = rule.split(":");
+        if (property && value)
+          styles[background ? "background-color" : property] = value;
+      }
+    }
+  }
+  return styles;
+}
+
 function parseAnsi(raw: string): Span[] {
   const spans: Span[] = [];
   // eslint-disable-next-line no-control-regex
   const re = /\x1b\[([0-9;]*)m/g;
   let last = 0;
-  let styles: string[] = [];
+  let styles: Record<string, string> = {};
+  const style = () =>
+    Object.entries(styles)
+      .map(([property, value]) => `${property}:${value}`)
+      .join(";");
   let match: RegExpExecArray | null;
 
   while ((match = re.exec(raw)) !== null) {
     if (match.index > last) {
-      spans.push({ text: raw.slice(last, match.index), style: styles.join(";") });
+      spans.push({ text: raw.slice(last, match.index), style: style() });
     }
-    const codes = (match[1] ?? "").split(";").filter(Boolean);
-    for (const code of codes) {
-      if (code === "0" || code === "") {
-        styles = [];
-      } else {
-        const rule = ANSI_COLORS[code];
-        if (rule) styles.push(rule);
-      }
-    }
+    styles = applySgr(styles, (match[1] ?? "").split(";").map(Number));
     last = match.index + match[0].length;
   }
 
   if (last < raw.length) {
-    spans.push({ text: raw.slice(last), style: styles.join(";") });
+    spans.push({ text: raw.slice(last), style: style() });
   }
 
   return spans;

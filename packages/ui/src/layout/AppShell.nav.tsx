@@ -18,9 +18,9 @@ import {
   type NavDragState,
 } from "./AppShell.nav.drag";
 
-// Per-group collapsed state. Owned by AppShell (see `useGroupCollapsed` there)
-// and passed down, because AppShell renders NavSections twice — the desktop
-// rail and the mobile drawer — and per-render state behind one storage key
+// Per-group collapsed state. Owned by the host (AppShell, or NavigationTree
+// outside it) via `useGroupCollapsed` and passed down, because AppShell renders
+// NavSections twice — the desktop rail and the mobile drawer — and per-render state behind one storage key
 // would desync: the rail stays mounted while the drawer is open, so a drawer
 // toggle would write localStorage the rail never reads back.
 export interface GroupState {
@@ -33,17 +33,20 @@ export function NavSections({
   collapsed,
   groupState,
   onNavigate,
+  className,
 }: {
   sections: AppShellNavSection[];
   collapsed: boolean;
   groupState: GroupState;
   onNavigate?: () => void;
+  className?: string;
 }) {
   return (
     <nav
       className={cn(
         "flex flex-col gap-0.5",
         collapsed ? "px-2" : "px-density-2",
+        className,
       )}
     >
       {sections.map((section, index) => (

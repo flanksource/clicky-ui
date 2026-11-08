@@ -43,7 +43,7 @@ export function TreeDataTable<T extends Record<string, unknown>>({
   });
   const byNode = new Map<T, TreeRow<T>>(rows.map((row) => [row.node, row]));
   const treeColumns = columns.map((column): DataTableColumn<T> => {
-    const { sortable: _sortable, ...rest } = column;
+    const rest = { ...column, sortable: false };
     if (column.key !== treeColumn) return rest;
     return {
       ...rest,

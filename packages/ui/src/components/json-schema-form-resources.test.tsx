@@ -56,7 +56,7 @@ describe("resource schema editing", () => {
     render(<Form schema={{ properties: { sandbox: { title: "Sandbox", anyOf: [
       { type: "boolean", title: "Toggle" }, { type: "string", title: "Command" }, { type: "null", title: "Unset" },
     ] } } }} initial={{ sandbox: false }} />);
-    fireEvent.change(screen.getByRole("combobox", { name: "Sandbox format" }), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Clear Sandbox to null" }));
     expect(screen.getByRole("status")).toHaveTextContent('{"sandbox":null}');
     fireEvent.change(screen.getByRole("combobox", { name: "Sandbox format" }), { target: { value: "0" } });
     expect(screen.getByRole("status")).toHaveTextContent('{"sandbox":false}');
@@ -75,7 +75,7 @@ describe("resource schema editing", () => {
       type: "object", additionalProperties: { format: "json" },
       properties: { enabled: { type: "boolean", title: "Enable sandbox", description: "Confine the child process." } },
     } } }} initial={{ sandbox: {} }} />);
-    fireEvent.click(screen.getByRole("checkbox", { name: "Enable sandbox" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Enable sandbox" }));
     expect(screen.getByRole("status")).toHaveTextContent('{"sandbox":{"enabled":true}}');
     expect(screen.getByText("Confine the child process.")).toBeInTheDocument();
   });

@@ -6,6 +6,7 @@ import { UiChevronDown } from "../icons";
 import { Tree, type TreeProps } from "../data/Tree";
 import { useEscapeLayer, useFloatingZIndex } from "../overlay/modalStack";
 import { inputSizeClass, type FormSize } from "./json-schema-form-size";
+import { FieldClearButton, type ClearableFieldProps } from "./field-clear-button";
 
 // Upper bound the open panel grows to so wide trees show full labels before
 // truncating; the panel is never narrower than the trigger.
@@ -18,7 +19,7 @@ const PANEL_MIN_HEIGHT_PX = 200;
 // Breathing room kept between the panel and the viewport edge.
 const VIEWPORT_MARGIN_PX = 8;
 
-export interface TreePickerFieldProps<T> {
+export interface TreePickerFieldProps<T> extends ClearableFieldProps {
   /** Root nodes of the tree to browse. */
   roots: T[];
   getKey: (node: T) => string | number;
@@ -114,8 +115,12 @@ export function TreePickerField<T>({
   renderTrigger,
   renderFooter,
   triggerAriaLabel,
+  clearable,
+  onClear,
+  clearLabel,
 }: TreePickerFieldProps<T>) {
   const [open, setOpen] = useState(false);
+  const showClear = clearable && !disabled && (selected != null || label != null);
   const floatingZ = useFloatingZIndex();
   const [pos, setPos] = useState<
     { top: number; left: number; width: number; maxWidth: number; maxHeight: number } | null
@@ -182,7 +187,7 @@ export function TreePickerField<T>({
   }, [open]);
 
   return (
-    <div ref={rootRef} className={cn("relative", className)}>
+    <div ref={rootRef} data-clearable-field className={cn("relative", className)}>
       {renderTrigger ? (
         renderTrigger({
           open,
@@ -208,6 +213,7 @@ export function TreePickerField<T>({
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
             "disabled:cursor-not-allowed disabled:opacity-50",
             triggerClassName,
+            showClear && "pr-14",
           )}
         >
           <span className={cn("min-w-0 flex-1 truncate", label == null && "text-muted-foreground")}>
@@ -218,6 +224,7 @@ export function TreePickerField<T>({
           </span>
         </button>
       )}
+      {showClear && !renderTrigger && <span className="absolute inset-y-0 right-7 flex items-center"><FieldClearButton {...(clearLabel ? { clearLabel } : {})} onClear={() => { if (!onClear) throw new Error("A clearable tree picker requires onClear"); onClear(); setOpen(false); anchorRef.current?.focus(); }} /></span>}
 
       {open &&
         pos &&

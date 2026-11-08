@@ -24,6 +24,8 @@ export type ErrorWrapperProps = {
   renderFallback?: (failure: {
     error: Error;
     componentStack: string | null;
+    /** The same diagnostics the default fallback renders, ready for {@link ErrorDetails}. */
+    diagnostics: ErrorDiagnostics;
     report: string;
     reset: () => void;
   }) => ReactNode;
@@ -60,6 +62,7 @@ export class ErrorWrapper extends Component<
             {this.props.renderFallback({
               error: this.state.error,
               componentStack: this.state.componentStack,
+              diagnostics: errorDiagnostics(this.state.error, this.state.componentStack),
               report: errorReport(this.state.error, this.state.componentStack),
               reset: () => this.setState({ error: null, componentStack: null }),
             })}

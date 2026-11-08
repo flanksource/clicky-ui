@@ -1,6 +1,8 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
+import type { ClickyNode } from "../../Clicky";
 import { OtelTraceTable } from "./OtelTraceTable";
+import { profileListingSort, profileTraceListing } from "./profile-listing";
 import { traceExample } from "./fixtures";
 
 afterEach(cleanup);
@@ -23,6 +25,45 @@ it("shows the selected span and allows returning to the trace list", () => {
 it("retains server search controls with no rows", () => {
   render(<OtelTraceTable {...props} spans={[]} externalSearch={{ value: "missing", onChange: vi.fn(), placeholder: "Search spans" }} />);
   expect(screen.getByPlaceholderText("Search spans")).toHaveValue("missing");
+});
+
+it("gives server-filterable listing cells include/exclude actions keyed on the server value", () => {
+  vi.useFakeTimers();
+  const service = traceExample.summary.service;
+  const rows = traceExample.spans.map(span => ({ _trace: span, service: span.service }));
+  const table: ClickyNode = {
+    kind: "table",
+    columns: [{ name: "service", label: "Service", filterKey: "filter.service" }],
+    rows: rows.map(row => ({ cells: { service: { kind: "text", text: row.service.toUpperCase(), plain: row.service.toUpperCase(), filterValue: row.service } } })),
+  };
+  const onCellFilterChange = vi.fn();
+  render(<OtelTraceTable {...props} listing={profileTraceListing(rows, table)} onCellFilterChange={onCellFilterChange} />);
+  fireEvent.mouseEnter(screen.getByText(service.toUpperCase()).closest("span.relative")!);
+  act(() => vi.advanceTimersByTime(150));
+  fireEvent.click(screen.getByRole("button", { name: `Exclude ${service}` }));
+  expect(onCellFilterChange).toHaveBeenCalledWith({ key: "filter.service", value: service, mode: "exclude" });
+  vi.useRealTimers();
+});
+
+it("sorts the listing through the server's sort keys and keeps the server's row order", () => {
+  const [first, second] = [
+    { ...traceExample.spans[0]!, traceId: "a".repeat(32), spanId: "a-root", operation: "older first" },
+    { ...traceExample.spans[0]!, traceId: "b".repeat(32), spanId: "b-root", operation: "newer second", startedAt: "2026-11-02T11:00:00Z" },
+  ];
+  const rows = [first, second].map(span => ({ _trace: span, operation: span.operation }));
+  const table: ClickyNode = {
+    kind: "table",
+    columns: [{ name: "operation", label: "Operation", sortKey: "op_sort" }],
+    rows: rows.map(row => ({ cells: { operation: { kind: "text", text: row.operation, plain: row.operation } } })),
+  };
+  const onServerSort = vi.fn();
+  const sorting = profileListingSort(table, { value: { key: "op_sort", dir: "asc" }, onChange: onServerSort });
+  render(<OtelTraceTable {...props} spans={[first, second]} listing={profileTraceListing(rows, table)} {...sorting} />);
+  // spanTraces orders newest first; the listing keeps the rows as the server sent them.
+  expect(screen.getAllByRole("row").slice(1).map(row => row.textContent)).toEqual([first.operation, second.operation]);
+  // The server's ascending sort marks this column, so a click asks for descending.
+  fireEvent.click(screen.getByRole("button", { name: /Operation/ }));
+  expect(onServerSort).toHaveBeenCalledWith({ key: "op_sort", dir: "desc" });
 });
 
 it("reports invalid data instead of rendering a misleading trace", () => {

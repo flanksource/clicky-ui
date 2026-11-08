@@ -98,7 +98,7 @@ export function SplitButton({
             aria-label={title ?? "Open menu"}
             className={cn(
               "h-auto self-stretch rounded-l-none border-l border-l-current/25 px-2",
-              size !== "icon" && "w-8",
+              size === "xs" ? "w-6 px-0" : size !== "icon" && "w-8",
             )}
           >
             <Icon icon={open ? UiChevronUp : UiChevronDown} />

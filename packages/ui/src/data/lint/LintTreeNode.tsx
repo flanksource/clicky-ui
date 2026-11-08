@@ -1,6 +1,6 @@
 import { Icon } from "../Icon";
 import { cn } from "../../lib/utils";
-import { UiClock, UiFileCode, UiFolder, UiTag, UiWrench } from "../../icons";
+import { UiBox, UiClock, UiFileCode, UiFolder, UiGlobe, UiQuestion, UiTag, UiWrench } from "../../icons";
 import { LintSeverityIcon, OutcomeIcon, ToolIcon } from "../test-runner/MarkIcons";
 import { toolMark } from "../test-runner/marks";
 import { formatTestDuration } from "../test-runner/status";
@@ -35,6 +35,13 @@ function NodeIcon({ node }: { node: LintNode }) {
     case "lint-rule":
     case "lint-rule-group":
       return <Icon icon={UiTag} className="shrink-0 text-muted-foreground" />;
+    case "lint-target":
+      return (
+        <Icon
+          icon={node.targetKind === "entity" ? UiBox : node.targetKind === "url" ? UiGlobe : UiQuestion}
+          className="shrink-0 text-muted-foreground"
+        />
+      );
     case "linter-error":
       return <LintSeverityIcon severity="error" />;
   }

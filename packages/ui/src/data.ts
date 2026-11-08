@@ -178,6 +178,8 @@ export {
   SchemaViewerRow,
   SchemaFieldMetaPanel,
   type SchemaViewerProps,
+  type SchemaViewerSection,
+  type SchemaViewerView,
   type SchemaViewerProps as SchemaBrowserProps,
   type SchemaFieldMetaPanelProps,
 } from "./data/SchemaViewer";
@@ -267,6 +269,7 @@ export {
   type MarkdownDocumentStats,
 } from "./data/examples/markdown-preview-mock";
 export { MethodBadge, type MethodBadgeProps } from "./data/MethodBadge";
+export { ImagePreview, type ImagePreviewProps } from "./data/ImagePreview";
 export { ProgressBar, type ProgressBarProps, type ProgressSegment } from "./data/ProgressBar";
 export { SignedDeltaBar, type SignedDeltaBarProps } from "./data/SignedDeltaBar";
 export { MultiGaugeBar, type MultiGaugeBarProps, type GaugeMarker } from './data/MultiGaugeBar';
@@ -526,7 +529,10 @@ export {
 } from "./data/task-query-keys";
 export { TaskManagerButton, type TaskManagerButtonProps } from "./data/TaskManagerButton";
 export { PromptDialog, type PromptDialogProps } from "./data/PromptDialog";
+export { PromptForm, type PromptFormProps } from "./data/PromptForm";
 export { PromptBanner, type PromptBannerProps } from "./data/PromptBanner";
+export { PromptIndicator, type PromptIndicatorProps } from "./data/PromptIndicator";
+export { PromptList, type PromptListProps } from "./data/PromptList";
 export {
   usePrompts,
   answerPrompt,
@@ -613,6 +619,7 @@ export {
   type ErrorDetailsProps,
 } from "./data/diagnostics/ErrorDetails";
 export { ActionError } from "./data/diagnostics/ActionError";
+export { ProblemRow, type ProblemRowProps } from "./data/diagnostics/ProblemRow";
 export {
   normalizeErrorDiagnostics,
   parseDiagnosticsStackTrace,

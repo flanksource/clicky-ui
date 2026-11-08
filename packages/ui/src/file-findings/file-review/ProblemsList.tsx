@@ -4,8 +4,7 @@ import type { HighlightedLine } from "../../data/code-highlight";
 import { HighlightedTokens } from "../../data/HighlightedTokens";
 import { matchesFilterState } from "../../data/test-runner/filterState";
 import { ProblemRow } from "../../data/diagnostics/ProblemRow";
-import { ProblemViewOptions } from "../../data/diagnostics/ProblemViewOptions";
-import { ProblemFacet } from "../../data/diagnostics/ProblemFacet";
+import { FilterBar } from "../../components/FilterBar";
 import { diagnosticKeys } from "../../data/diagnostics/diagnostic-identity";
 import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
 import { FINDING_SEVERITIES } from "../severity-counts";
@@ -14,6 +13,7 @@ import { SEVERITY_MARK, bySeverityThenLine, squiggleUnder } from "./marks";
 
 import {
   emptyProblemFilters,
+  matchesProblemFilters,
   problemType,
   type ProblemFilters,
 } from "./problem-filters";
@@ -27,6 +27,87 @@ function count(
   for (const finding of findings)
     counts.set(value(finding), (counts.get(value(finding)) ?? 0) + 1);
   return counts;
+}
+
+/** The "N of M problems" count and the severity / issue-type filter menu over a problem list. */
+export function ProblemFilterBar({
+  findings,
+  shown,
+  filters,
+  onFiltersChange,
+}: {
+  findings: readonly FileFinding[];
+  shown: number;
+  filters: ProblemFilters;
+  onFiltersChange: (next: ProblemFilters) => void;
+}) {
+  const severityCounts = count(
+    findings.filter((f) => matchesFilterState(problemType(f), filters.type)),
+    (f) => f.severity,
+  );
+  const typeCounts = count(
+    findings.filter((f) => matchesFilterState(f.severity, filters.severity)),
+    problemType,
+  );
+  const types = [
+    ...new Set([...findings.map(problemType), ...filters.type.keys()]),
+  ].sort();
+  const active = filters.severity.size + filters.type.size;
+  return (
+    <div className="border-b border-border p-1 text-xs" data-problem-filters="">
+      {/* Picks commit immediately (no Apply): the host owns the filter state. */}
+      <FilterBar
+        autoSubmit={false}
+        overflowMode="wrap"
+        leading={
+          <span className="px-1 text-muted-foreground">
+            {shown} of {findings.length} problems
+          </span>
+        }
+        filters={[
+          {
+            key: "severity",
+            kind: "multi",
+            label: "Severity",
+            options: FINDING_SEVERITIES.map((s) => ({
+              value: s,
+              label: LABELS[s],
+              count: severityCounts.get(s) ?? 0,
+            })),
+            value: Object.fromEntries(filters.severity),
+            onChange: (value) =>
+              onFiltersChange({
+                ...filters,
+                severity: new Map(Object.entries(value)) as ProblemFilters["severity"],
+              }),
+          },
+          {
+            key: "type",
+            kind: "multi",
+            label: "Issue Type",
+            options: types.map((type) => ({
+              value: type,
+              label: type,
+              count: typeCounts.get(type) ?? 0,
+            })),
+            value: Object.fromEntries(filters.type),
+            onChange: (value) => onFiltersChange({ ...filters, type: new Map(Object.entries(value)) }),
+          },
+        ]}
+        trailing={
+          active > 0 && (
+            <button
+              type="button"
+              className="text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => onFiltersChange(emptyProblemFilters())}
+            >
+              Clear filters
+            </button>
+          )
+        }
+      />
+    </div>
+  );
 }
 
 export function ProblemsList({
@@ -72,69 +153,16 @@ export function ProblemsList({
   const keys = useMemo(() => entries.map((entry) => entry.key), [entries]);
   const [expanded, setExpanded] = useProblemExpansion(keys);
   const shown = entries
-    .filter(
-      ({ finding: f }) =>
-        matchesFilterState(f.severity, filters.severity) &&
-        matchesFilterState(problemType(f), filters.type),
-    )
+    .filter(({ finding }) => matchesProblemFilters(finding, filters))
     .sort((a, b) => bySeverityThenLine(a.finding, b.finding));
-  const severityCounts = count(
-    findings.filter((f) => matchesFilterState(problemType(f), filters.type)),
-    (f) => f.severity,
-  );
-  const typeCounts = count(
-    findings.filter((f) => matchesFilterState(f.severity, filters.severity)),
-    problemType,
-  );
-  const types = [
-    ...new Set([...findings.map(problemType), ...filters.type.keys()]),
-  ].sort();
-  const active = filters.severity.size + filters.type.size;
   return (
     <>
-      <div
-        className="flex items-center justify-between border-b border-border p-1 text-xs"
-        data-problem-filters=""
-      >
-        <span className="px-2 text-muted-foreground">
-          {shown.length} of {findings.length} problems
-        </span>
-        <ProblemViewOptions active={active}>
-          <ProblemFacet
-            label="Severity"
-            options={FINDING_SEVERITIES.map((s) => ({
-              value: s,
-              label: LABELS[s],
-              count: severityCounts.get(s) ?? 0,
-            }))}
-            state={filters.severity}
-            onChange={(severity) =>
-              onFiltersChange({
-                ...filters,
-                severity: severity as ProblemFilters["severity"],
-              })
-            }
-          />
-          <ProblemFacet
-            label="Issue Type"
-            options={types.map((type) => ({
-              value: type,
-              label: type,
-              count: typeCounts.get(type) ?? 0,
-            }))}
-            state={filters.type}
-            onChange={(type) => onFiltersChange({ ...filters, type })}
-          />
-          <button
-            type="button"
-            className="text-xs text-muted-foreground"
-            disabled={!active}
-            onClick={() => onFiltersChange(emptyProblemFilters())}
-          >
-            Clear filters
-          </button>
-        </ProblemViewOptions>
-      </div>
+      <ProblemFilterBar
+        findings={findings}
+        shown={shown.length}
+        filters={filters}
+        onFiltersChange={onFiltersChange}
+      />
       {shown.length === 0 ? (
         <p className="p-6 text-center text-xs text-muted-foreground">
           {findings.length

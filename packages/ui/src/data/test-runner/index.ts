@@ -106,6 +106,7 @@ export {
   MatrixUnavailableEnvHeader,
   type MatrixMarkProps,
   type MatrixMixProps,
+  type MatrixUnit,
   type MatrixElapsedProps,
   type MatrixHeatmapProps,
   type MatrixTick,

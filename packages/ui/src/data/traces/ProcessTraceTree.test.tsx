@@ -12,6 +12,20 @@ const processRow = (key: string) => {
 const itemOf = (key: string) => processRow(key).closest<HTMLElement>('[role="treeitem"]')!;
 
 describe("ProcessTraceTree", () => {
+  it("updates inline usage bars in place, preserving measured CPU above one core and unknown RAM", () => {
+    const node = { ...processNodeRows[1]!, cpuPercent: 125 };
+    const sample = { ...processSampleRows[0]!, key: node.key, pid: node.pid, memoryPercent: 8 };
+    const { rerender } = render(<ProcessTraceTree nodes={[node]} samples={[sample]} showUsageBars onSelect={() => {}} />);
+    const row = processRow(node.key);
+    expect(screen.getByRole("progressbar", { name: `CPU for pid ${node.pid}` })).toHaveAttribute("aria-valuenow", "100");
+    expect(screen.getByText("125.0%")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: `RAM for pid ${node.pid}` })).toHaveAttribute("aria-valuenow", "8");
+    rerender(<ProcessTraceTree nodes={[{ ...node, cpuPercent: null }]} samples={[]} showUsageBars onSelect={() => {}} />);
+    expect(processRow(node.key)).toBe(row);
+    expect(screen.getByRole("progressbar", { name: `CPU for pid ${node.pid}` })).not.toHaveAttribute("aria-valuenow");
+    expect(screen.getByRole("progressbar", { name: `RAM for pid ${node.pid}` })).not.toHaveAttribute("aria-valuenow");
+  });
+
   it("renders the forest, with orphans as roots and children under their parent", () => {
     render(<ProcessTraceTree nodes={processNodeRows} onSelect={() => {}} />);
     expect(screen.getAllByRole("treeitem")).toHaveLength(4);

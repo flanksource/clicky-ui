@@ -1,4 +1,8 @@
 export { TraceView, type TraceViewProps } from "./TraceView";
+export { TraceFeed, type TraceFeedProps } from "./TraceFeed";
+export { ProcessTraceHeader, type ProcessTraceHeaderProps } from "./ProcessTraceHeader";
+export type { ProcessHeaderRow, ProcessHeaderSnapshot } from "./process-header";
+export type { TraceFeedPage, TraceFeedRecord, TraceFeedRequest } from "./trace-feed";
 export { TraceHarView, type TraceHarViewProps } from "./TraceHarView";
 export { exchangeToHarEntry, type ExchangeToHarEntryOptions } from "./har-adapter";
 export { SqlTraceTable, type SqlTraceTableProps } from "./SqlTraceTable";
@@ -73,7 +77,7 @@ export { OtelTraceDetail } from "./otel/OtelTraceDetail";
 export { OtelTraceSearch } from "./otel/OtelTraceSearch";
 export { OtelTraceTable, type OtelTraceTableProps } from "./otel/OtelTraceTable";
 export { profileSpans } from "./otel/profile-spans";
-export { profileTraceListing } from "./otel/profile-listing";
+export { profileListingSort, profileTraceListing } from "./otel/profile-listing";
 export { searchParams as otelSearchParams, readSearchValues as readOtelSearchValues } from "./otel/api";
 export { durationOf as otelDurationOf } from "./otel/query";
 export type { Span as OtelSpan, Summary as OtelSummary, SearchForm as OtelSearchForm } from "./otel/api";

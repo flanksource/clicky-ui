@@ -20,6 +20,25 @@ it("opens a grouped call's inspector and steps to the next visible span", () => 
   expect(screen.getByText("SELECT * FROM customers", { selector: "pre" })).toBeTruthy();
 });
 
+it("renders the trace title through renderTitle instead of inline", () => {
+  render(<OtelTraceDetail trace={traceExample} selectedSpanId="root" onSelectSpan={() => undefined} renderTitle={title => <header data-testid="slot">{title}</header>} />);
+  expect(screen.getByTestId("slot")).toContainElement(screen.getByRole("heading", { level: 1 }));
+  expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
+});
+
+it("lists span attributes and resource as expandable sections of one properties table", () => {
+  const span = traceExample.spans.find(candidate => candidate.spanId === "orders")!;
+  const trace = { ...traceExample, spans: traceExample.spans.map(candidate => candidate === span ? { ...span, resource: { "service.name": "orders-api" } } : candidate) };
+  render(<OtelTraceDetail trace={trace} selectedSpanId="orders" onSelectSpan={() => undefined} />);
+  const resource = screen.getByRole("button", { name: "Resource" });
+  expect(resource.getAttribute("aria-expanded")).toBe("false");
+  expect(screen.queryByText("orders-api")).toBeNull();
+  fireEvent.click(resource);
+  expect(resource.getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByText("orders-api")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Attributes" }).closest("dl")).toBe(resource.closest("dl"));
+});
+
 it("clips long SQL statements until explicitly expanded", () => {
   const statement = "SELECT * FROM orders; ".repeat(100);
   const trace = { ...traceExample, spans: traceExample.spans.map(span => span.spanId === "orders" ? { ...span, attributes: { ...span.attributes, "db.statement": statement } } : span) };

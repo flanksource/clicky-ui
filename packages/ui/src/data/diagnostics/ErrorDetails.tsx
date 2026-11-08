@@ -66,7 +66,7 @@ export function ErrorDetails({
     }
   };
   return (
-    <details className={cn("group min-w-0 rounded-md border border-destructive/30 bg-destructive/5", className)}>
+    <details className={cn("@container/error-details group min-w-0 rounded-md border border-destructive/30 bg-destructive/5", className)}>
       <summary className="flex cursor-pointer list-none flex-wrap items-start gap-2 p-3">
         <Icon icon={UiWarningTriangle} className="mt-0.5 shrink-0 text-destructive" />
         <div className="min-w-0 flex-1">
@@ -75,7 +75,7 @@ export function ErrorDetails({
             {diagnostics.message}
           </div>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-2 text-xs font-medium text-muted-foreground sm:flex-row sm:items-center sm:gap-3">
+        <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-3 text-xs font-medium text-muted-foreground @sm/error-details:w-auto">
           {actions && (
             // Swallow the click so a summary-row action does not open or close the details.
             <span className="inline-flex" onClick={(event) => event.preventDefault()}>

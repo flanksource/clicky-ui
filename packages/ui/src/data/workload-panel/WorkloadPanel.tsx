@@ -44,9 +44,9 @@ export function WorkloadPanel(props: WorkloadPanelProps) {
           <ResourceMetrics cpu={cpu} memory={memory} />
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
             <span>Avg inside bar</span>
-            <span className="text-[var(--fs-info)]">Request</span>
-            <span className="text-[var(--fs-warning)]">P90</span>
-            <span className="text-[var(--fs-error)]">P95</span>
+            <span className="text-[var(--clicky-info)]">Request</span>
+            <span className="text-[var(--clicky-warning)]">P90</span>
+            <span className="text-[var(--clicky-error)]">P95</span>
             <span>Limit</span>
           </div>
           {jvm && (

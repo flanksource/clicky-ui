@@ -6,7 +6,8 @@ import { useEscapeLayer } from "../overlay/modalStack";
 import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { SplitPane } from "./SplitPane";
 import { AppShellSlotOutlines } from "./AppShell.debug";
-import { NavSections, type GroupState } from "./AppShell.nav";
+import { NavSections } from "./AppShell.nav";
+import { useGroupCollapsed } from "./useGroupCollapsed";
 import type { AppShellNavDrag } from "./AppShell.nav.drag";
 import { contentWidthClassName, type ContentWidth } from "./content-width";
 
@@ -79,6 +80,12 @@ export type AppShellNavGroup = {
   /** Fetch immediate children when expanded; errors remain visible and can be retried by reopening. */
   loadChildren?: () => Promise<{ groups?: AppShellNavGroup[]; items: AppShellNavItem[]; order?: string[] }>;
   /**
+   * Invalidates this group's loaded children: when it changes while the group
+   * is open, only this group re-fetches. Falls back to the section's
+   * `childrenVersion` when unset.
+   */
+  version?: string | number;
+  /**
    * Makes the group's own heading row a destination as well as a disclosure:
    * the label becomes a nav link and the chevron sits beside it as a separate
    * control. Needed wherever a node is both a folder and a leaf — e.g. a
@@ -90,6 +97,11 @@ export type AppShellNavGroup = {
 export type AppShellNavSection = {
   /** Invalidate open lazy groups without resetting expansion or focus. */
   childrenVersion?: string | number;
+  /**
+   * Re-fetch a lazy group's children every time it is reopened. Defaults to
+   * true; set false to keep loaded children until a version change.
+   */
+  reloadOnOpen?: boolean;
   /** Show a loading message instead of an empty tree while data is being fetched. */
   loading?: boolean;
   /** Optional controlled search for tree navigation. */
@@ -216,41 +228,6 @@ function readStored(key: string | undefined): string | null {
 }
 
 const DEFAULT_GROUP_COLLAPSE_KEY = "clicky-ui:app-shell:groups";
-
-function readGroupState(storageKey: string): Record<string, boolean> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object"
-      ? (parsed as Record<string, boolean>)
-      : {};
-  } catch {
-    return {};
-  }
-}
-
-// Lives here rather than in AppShell.nav so a single instance can be shared by
-// both NavSections renders (rail + mobile drawer).
-function useGroupCollapsed(storageKey: string): GroupState {
-  const [state, setState] = useState<Record<string, boolean>>(() =>
-    readGroupState(storageKey),
-  );
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify(state));
-    } catch {
-      // Rail state is a UX nicety; private-mode storage failures are safe to swallow.
-    }
-  }, [state, storageKey]);
-  return {
-    isCollapsed: (key, fallback) => state[key] ?? fallback,
-    toggle: (key, fallback) =>
-      setState((prev) => ({ ...prev, [key]: !(prev[key] ?? fallback) })),
-  };
-}
 
 export function AppShell(props: AppShellProps) {
   const {

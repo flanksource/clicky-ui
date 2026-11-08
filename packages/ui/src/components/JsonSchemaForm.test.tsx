@@ -342,7 +342,7 @@ describe("JsonSchemaForm defaults", () => {
         AutoRenew: true,
       });
       expect(screen.getByDisplayValue("00")).toBeInTheDocument();
-      expect(screen.getByRole("checkbox")).toBeChecked();
+      expect(screen.getByRole("switch")).toBeChecked();
     });
 
     it("commits no default and renders none", () => {
@@ -354,7 +354,7 @@ describe("JsonSchemaForm defaults", () => {
       expect(onChange).not.toHaveBeenCalled();
       expect(screen.getByDisplayValue("G0000011")).toBeInTheDocument();
       expect(screen.queryByDisplayValue("00")).toBeNull();
-      expect(screen.getByRole("checkbox")).not.toBeChecked();
+      expect(screen.getByRole("switch")).not.toBeChecked();
     });
 
     // Editing one field spreads the form's effective value, so suppressing only
@@ -447,7 +447,7 @@ describe("JsonSchemaForm number coercion", () => {
 });
 
 describe("JsonSchemaForm boolean fallback", () => {
-  it("renders a checkbox for a boolean value", () => {
+  it("renders a switch for a boolean value", () => {
     render(
       <JsonSchemaForm
         schema={{ type: "object", properties: { spawned: { type: "boolean" } } }}
@@ -455,7 +455,7 @@ describe("JsonSchemaForm boolean fallback", () => {
         onChange={vi.fn()}
       />,
     );
-    expect(screen.getByRole("checkbox")).toBeChecked();
+    expect(screen.getByRole("switch")).toBeChecked();
   });
 
   it("falls back to a text input when the value is a non-boolean (token)", () => {
@@ -466,7 +466,7 @@ describe("JsonSchemaForm boolean fallback", () => {
         onChange={vi.fn()}
       />,
     );
-    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
     expect(screen.getByRole("textbox")).toHaveValue("{{flag}}");
   });
 });
@@ -543,9 +543,10 @@ describe("JsonSchemaForm string-map", () => {
     render(
       <JsonSchemaForm schema={schema} value={{ members: { "Approved/Rejected": "Approved" } }} onChange={onChange} />,
     );
-    const input = screen.getAllByRole("textbox").find((el) => (el as HTMLInputElement).value === "Approved");
-    expect(input).toBeTruthy();
-    fireEvent.change(input as HTMLElement, { target: { value: "Rejected" } });
+    fireEvent.click(screen.getByRole("button", { name: "Edit Approved/Rejected" }));
+    const input = screen.getByRole("textbox", { name: "Approved/Rejected" });
+    fireEvent.change(input, { target: { value: "Rejected" } });
+    fireEvent.keyDown(input, { key: "Enter" });
     expect(onChange).toHaveBeenCalledWith({ members: { "Approved/Rejected": "Rejected" } });
   });
 });

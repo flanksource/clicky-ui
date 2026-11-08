@@ -93,7 +93,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "Read-only JSON Schema tree viewer copied from the platform TestRunner schema inspector and adapted for shared clicky-ui use.",
+          "Read-only JSON Schema viewer with ordered field sections, tree and table views, type icons, and expandable metadata.",
       },
     },
   },
@@ -124,4 +124,27 @@ export const PlainSchema: Story = {
       },
     },
   },
+};
+
+export const SectionedReference: Story = {
+  args: {
+    schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Unique step identifier." },
+        timeout: { type: "string", format: "duration", default: "30s" },
+        exec: { type: "string", description: "Executable to run." },
+        args: { type: "array", items: { type: "string" } },
+        env: { type: "object", additionalProperties: { type: "string" } },
+      },
+    },
+    sections: [
+      { id: "global", title: "Global fields", select: ["timeout", "id"], order: ["id", "timeout"] },
+      { id: "kind", title: "Command fields", select: "*", order: ["exec", "args", "env"] },
+    ],
+  },
+};
+
+export const TableReference: Story = {
+  args: { ...SectionedReference.args, defaultView: "table" },
 };

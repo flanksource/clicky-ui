@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { ELEMENT_PREFIX, resolveElementAnchor } from "../../comments/anchoring/dom-anchor";
 import { measureAnchors, type AnchorMode, type Box } from "./geometry";
 
 const NARROW_WIDTH = 640;
@@ -45,12 +46,15 @@ export function useAnchorBoxes({
   markdown,
   anchors,
   mode,
+  patchRanges,
   visible,
 }: {
   origin: RefObject<HTMLDivElement | null>;
   markdown: RefObject<HTMLDivElement | null>;
   anchors: readonly string[];
   mode: AnchorMode;
+  /** Current source lines of the `r:` anchors that are placed, so they are boxed on the blocks covering them. */
+  patchRanges?: ReadonlyMap<string, { start: number; end: number }>;
   /** A hidden document measures as zero, so the last boxes are kept until it shows again. */
   visible: boolean;
 }) {
@@ -62,7 +66,7 @@ export function useAnchorBoxes({
     const markdownEl = markdown.current;
     if (!originEl || !markdownEl || !visible) return;
     const sync = () => {
-      setBoxes(measureAnchors({ origin: originEl, markdown: markdownEl, anchors, mode }));
+      setBoxes(measureAnchors({ origin: originEl, markdown: markdownEl, anchors, mode, ...(patchRanges ? { patchRanges } : {}) }));
       setHeight(originEl.offsetHeight);
       setWidth(originEl.offsetWidth);
     };
@@ -75,7 +79,7 @@ export function useAnchorBoxes({
       mutations.disconnect();
       resizes.disconnect();
     };
-  }, [origin, markdown, anchors, mode, visible]);
+  }, [origin, markdown, anchors, mode, patchRanges, visible]);
   const currentBoxes = useMemo(() => {
     const current = new Set(anchors);
     return new Map([...boxes].filter(([anchor]) => current.has(anchor)));
@@ -93,4 +97,34 @@ export function useNarrow(ref: RefObject<HTMLDivElement | null>) {
     return () => observer.disconnect();
   }, [ref]);
   return narrow;
+}
+
+/**
+ * The `e:` anchors whose element the rendered markdown still contains. Resolved
+ * against the DOM whether or not it is visible, so a thread on an element that is
+ * gone can be listed as orphaned from any tab.
+ */
+export function useFoundElements({
+  markdown,
+  anchors,
+}: {
+  markdown: RefObject<HTMLDivElement | null>;
+  anchors: readonly string[];
+}): ReadonlySet<string> {
+  const [found, setFound] = useState<ReadonlySet<string>>(new Set());
+  useLayoutEffect(() => {
+    const root = markdown.current;
+    const elements = anchors.filter((anchor) => anchor.startsWith(ELEMENT_PREFIX));
+    if (!root || elements.length === 0) return setFound((current) => (current.size === 0 ? current : new Set()));
+    const sync = () =>
+      setFound((current) => {
+        const next = new Set(elements.filter((anchor) => resolveElementAnchor(root, anchor)));
+        return next.size === current.size && [...next].every((anchor) => current.has(anchor)) ? current : next;
+      });
+    sync();
+    const mutations = new MutationObserver(sync);
+    mutations.observe(root, { childList: true, subtree: true, characterData: true });
+    return () => mutations.disconnect();
+  }, [markdown, anchors]);
+  return found;
 }

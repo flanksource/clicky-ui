@@ -23,7 +23,7 @@ const meta = {
     size: {
       description: "Size preset forwarded to both halves.",
       control: "select",
-      options: ["default", "sm", "lg"],
+      options: ["default", "xs", "sm", "lg"],
     },
     loading: { description: "Spinner on the primary half.", control: "boolean" },
     disabled: { description: "Disable both halves.", control: "boolean" },
@@ -47,6 +47,18 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const Compact: Story = {
+  args: { size: "xs" },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The 24px compact preset keeps the primary action and chevron aligned in dense toolbars. Use size="xs" rather than applying height or padding to the wrapper.',
+      },
+    },
+  },
+};
 
 export const Outline: Story = { args: { variant: "outline" } };
 

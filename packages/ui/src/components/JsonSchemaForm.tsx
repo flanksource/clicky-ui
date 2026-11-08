@@ -63,6 +63,8 @@ function resolveFormLayout(
 // by the pre/post extension functions the consumer supplies. The component holds
 // no domain knowledge.
 export function JsonSchemaForm({
+  showTypeIcons = false,
+  objectDisplay = "flat",
   schema,
   value,
   onChange,
@@ -149,6 +151,8 @@ export function JsonSchemaForm({
   }, [effectiveValue, onChange, readOnly, value]);
 
   const ctx: RenderContext = {
+    showTypeIcons,
+    objectDisplay,
     readOnly,
     viewOnly: readOnly,
     hideReadOnlyFields,

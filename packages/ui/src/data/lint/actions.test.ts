@@ -194,6 +194,20 @@ describe("lintNodeActions", () => {
     ]);
   });
 
+  it.each<[string, Partial<LintNode>, string[]]>([
+    ["under a rule offers the rule everywhere", { linterName: "data-lint", ruleName: "looping-spawn" }, ["Ignore rule looping-spawn everywhere", "Disable data-lint entirely"]],
+    ["under a linter offers only disabling it", { linterName: "data-lint" }, ["Disable data-lint entirely"]],
+    [
+      "at the root offers disabling each linter beneath it",
+      { children: [node({ kind: "linter", linterName: "betterleaks" }), node({ kind: "linter", linterName: "data-lint" })] },
+      ["Disable betterleaks entirely", "Disable data-lint entirely"],
+    ],
+  ])("a target group %s (no file scope exists)", (_, partial, labels) => {
+    const actions = lintNodeActions(node({ kind: "lint-target", name: "Policy", work_dir: "/repo", ...partial }), []);
+    expect(actions.map((a) => a.label)).toEqual(labels);
+    expect(actions.every((a) => a.req.file === undefined)).toBe(true);
+  });
+
   it("linter-error nodes have nothing to ignore", () => {
     expect(lintNodeActions(node({ kind: "linter-error", linterName: "pyright" }), [])).toEqual([]);
   });

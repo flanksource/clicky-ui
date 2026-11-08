@@ -21,6 +21,10 @@ const COUNTER_LABELS: Record<string, readonly [singular: string, plural: string]
   hits: ["hit", "hits"],
   misses: ["miss", "misses"],
   errors: ["error", "errors"],
+  requests: ["request", "requests"],
+  modules: ["module", "modules"],
+  files: ["file", "files"],
+  builds: ["build", "builds"],
 };
 
 function splitOutsideQuotes(value: string, delimiter: "," | ";"): string[] {

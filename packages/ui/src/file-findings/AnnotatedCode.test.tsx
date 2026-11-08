@@ -10,7 +10,10 @@ const fake = vi.hoisted(() => {
     readOnly: undefined as boolean | undefined,
     onChange: undefined as ((value: string) => void) | undefined,
     decorations: [] as Array<{ range: unknown; options: Record<string, unknown> }>,
-    onMouseDown: undefined as ((event: { target: { position?: { lineNumber: number } } }) => void) | undefined,
+    onMouseDown: undefined as ((event: { target: { type?: number; position?: { lineNumber: number } } }) => void) | undefined,
+    mouseHandlers: [] as Array<NonNullable<typeof state.onMouseDown>>,
+    actions: [] as Array<{ id: string; run: () => void }>,
+    selection: { startLineNumber: 3, endLineNumber: 5, endColumn: 4 },
   };
   const editor = {
     getValue: () => state.value,
@@ -24,8 +27,14 @@ const fake = vi.hoisted(() => {
     }),
     onMouseDown: vi.fn((callback: NonNullable<typeof state.onMouseDown>) => {
       state.onMouseDown = callback;
+      state.mouseHandlers.push(callback);
       return { dispose: vi.fn() };
     }),
+    addAction: vi.fn((action: { id: string; run: () => void }) => {
+      state.actions.push(action);
+      return { dispose: vi.fn() };
+    }),
+    getSelection: () => state.selection,
     onDidScrollChange: vi.fn(() => ({ dispose: vi.fn() })),
     revealLineInCenter: vi.fn(),
     getTopForLineNumber: (line: number) => line * 20,
@@ -124,6 +133,9 @@ function mount(props: Partial<React.ComponentProps<typeof AnnotatedCode>> = {}) 
 beforeEach(() => {
   vi.clearAllMocks();
   fake.state.onMouseDown = undefined;
+  fake.state.mouseHandlers.length = 0;
+  fake.state.actions.length = 0;
+  fake.state.selection = { startLineNumber: 3, endLineNumber: 5, endColumn: 4 };
   fake.languages.length = 0;
   fake.registered.length = 0;
 });
@@ -312,5 +324,45 @@ describe("AnnotatedCode", () => {
     const focused = await screen.findByTestId("comment-focused-rail");
     // getTopForLineNumber(12) = 240 and jsdom reports every rect at 0.
     await waitFor(() => expect(focused).toHaveStyle({ top: "240px" }));
+  });
+
+  describe("with sourceComments", () => {
+    const GUTTER = 2;
+    const ranges = [{ id: "r:thread", startLine: 3, endLine: 4 }];
+    async function setup() {
+      const onSelect = vi.fn();
+      const onCreate = vi.fn();
+      mount({ findings: FINDINGS, sourceComments: { ranges, onSelect, onCreate } });
+      await waitFor(() => expect(fake.state.actions).toHaveLength(1));
+      const click = (lineNumber: number) => fake.state.mouseHandlers.forEach((handler) => handler({ target: { type: GUTTER, position: { lineNumber } } }));
+      return { onSelect, onCreate, click };
+    }
+
+    it("marks each thread range in the gutter", async () => {
+      await setup();
+      expect(fake.state.decorations.at(-1)).toEqual({
+        range: { startLineNumber: 3, startColumn: 1, endLineNumber: 4, endColumn: 1 },
+        options: { isWholeLine: true, glyphMarginClassName: expect.stringContaining("bg-primary"), glyphMarginHoverMessage: { value: "Open comment" } },
+      });
+    });
+
+    it("offers Comment on the selected lines, leaving out a last line the selection only reaches the start of", async () => {
+      const { onCreate } = await setup();
+      fake.state.actions[0]!.run();
+      fake.state.selection = { startLineNumber: 3, endLineNumber: 5, endColumn: 1 };
+      fake.state.actions[0]!.run();
+      expect(onCreate.mock.calls).toEqual([[{ startLine: 3, endLine: 5 }], [{ startLine: 3, endLine: 4 }]]);
+    });
+
+    it("opens a thread from its gutter marker, starts one from an empty line, and leaves a finding's line alone", async () => {
+      const { onSelect, onCreate, click } = await setup();
+      click(4);
+      click(8);
+      click(12);
+      expect({ selected: onSelect.mock.calls, created: onCreate.mock.calls }).toEqual({
+        selected: [["r:thread"]],
+        created: [[{ startLine: 8, endLine: 8 }]],
+      });
+    });
   });
 });

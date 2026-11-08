@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { formatShort } from "../lib/format";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "./Icon";
 import { UiAdd, UiCheck, UiClose, UiRemove } from "../icons";
@@ -204,10 +205,11 @@ export function FilterPill({
         <span className="truncate">{label}</span>
         {count !== undefined && (
           <span
-            className="shrink-0 text-[10px] tabular-nums text-muted-foreground"
+            className="shrink-0 rounded-full border border-border px-1.5 text-[10px] leading-4 tabular-nums text-muted-foreground"
+            title={count.toLocaleString()}
             data-pill-count=""
           >
-            {count}
+            {formatShort(count)}
           </span>
         )}
       </>

@@ -17,6 +17,23 @@ function renderSplitButton(overrides: Partial<Parameters<typeof SplitButton>[0]>
 }
 
 describe("SplitButton", () => {
+  it.each([true, false])(
+    "sizes the compact primary action with menu=%s",
+    (withMenu) => {
+      renderSplitButton({ size: "xs", ...(withMenu ? {} : { items: [] }) });
+      const primary = screen.getByRole("button", { name: "Save" });
+      expect(primary).toHaveClass("h-6", "px-2", "text-[11px]");
+      if (withMenu) {
+        expect(screen.getByRole("button", { name: "Open menu" })).toHaveClass(
+          "w-6",
+          "h-auto",
+          "self-stretch",
+        );
+        expect(primary.parentElement).not.toHaveClass("px-2");
+      }
+    },
+  );
+
   it("fires the primary handler when the primary half is clicked", () => {
     const { onClick, onCopy } = renderSplitButton();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));

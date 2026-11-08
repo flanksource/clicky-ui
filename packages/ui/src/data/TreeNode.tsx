@@ -186,8 +186,10 @@ export function TreeNode<T>({
   const revealNextKey = revealPath?.get(key) ?? null;
   const isOnRevealPath = revealNextKey !== null;
   const revealOverride = revealOverrides?.get(key);
-  const pathOnly = isOnRevealPath && revealOverride === undefined;
   const ownOpen = getExpanded ? getExpanded(node) : open;
+  // An ancestor that is already open keeps all its children; only a closed one
+  // opens to just the next path node.
+  const pathOnly = isOnRevealPath && revealOverride === undefined && !ownOpen;
   const isOpen = isForcedOpen || pathOnly || (revealOverride ?? ownOpen);
 
   useEffect(() => {
@@ -257,7 +259,7 @@ export function TreeNode<T>({
     if (!expandable) return;
     if (isOnRevealPath) {
       if (!onRevealToggle) throw new Error("A revealed tree path requires onRevealToggle");
-      const next = pathOnly || !revealOverride;
+      const next = pathOnly || !(revealOverride ?? ownOpen);
       if (next && lazyUnloaded) loadLazyChildren();
       onRevealToggle(key, next);
       return;

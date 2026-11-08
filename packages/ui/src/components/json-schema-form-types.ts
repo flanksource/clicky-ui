@@ -15,6 +15,7 @@ export type * from "./json-schema-form-listener-types";
 // Every `x-*` key declared here must also be documented in the published
 // meta-schema, schemas/json-schema-form.schema.json (enforced by its test).
 export interface JsonSchemaProperty {
+  "x-object-display"?: "flat" | "accordion";
   type?: JsonSchemaType | JsonSchemaType[];
   description?: string;
   title?: string;
@@ -105,9 +106,9 @@ export interface JsonSchemaProperty {
   // Array-level: how to summarize one item in a collapsed accordion row. Every
   // value names a property of the item. See ArrayItemSpec.
   "x-item"?: ArrayItemSpec;
-  // Render a bounded number (needs `maximum`) as a single-thumb slider with a
-  // progress-filled track instead of a numeric input.
-  "x-number-display"?: "slider";
+  // "slider" needs a maximum; "stepper" accepts arbitrary decimals while its
+  // buttons and arrow keys increment by multipleOf, or 1 when unconstrained.
+  "x-number-display"?: "slider" | "stepper";
   // Per-property render order: lower values sort first, properties without it
   // keep document order after the ordered ones. Composes across merged if/then
   // branches (each field carries its own order), unlike the object-level
@@ -214,6 +215,9 @@ export interface JsonSchemaConditional {
   properties?: Record<string, JsonSchemaProperty>;
   required?: string[];
   additionalProperties?: boolean | JsonSchemaProperty;
+  // An inlined `$ref` member keeps its referenced schema's title and closure.
+  unevaluatedProperties?: boolean;
+  title?: string;
   description?: string;
   // An unconditional member's load listeners, applied after the object's own.
   "x-on-load"?: ChangeListener[];
@@ -363,6 +367,7 @@ export interface JsonSchemaHelpBlock {
 // transform it. `value`/`onChange` are carried here so post-extension adornments
 // (e.g. an insert-snippet button) can read and mutate the field.
 export interface FieldControl {
+  nullable?: boolean;
   key: string;
   kind: FieldControlKind;
   label: string;

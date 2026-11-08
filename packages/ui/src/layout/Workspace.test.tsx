@@ -441,6 +441,7 @@ describe("Workspace", () => {
               rightWidth: 340,
               bottomHeight: 220,
               stackHeights: {},
+              paneWidths: {},
               collapsed: {},
               sideCollapsed: { left: false, right: false },
             }}
@@ -451,5 +452,304 @@ describe("Workspace", () => {
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  describe("side columns", () => {
+    const EXPLORER_WIDTH = 240;
+    const SOURCE_WIDTH = 400;
+    const KEY_STEP = 16;
+    const columnPanes: WorkspacePaneSpec[] = [
+      {
+        id: "explorer",
+        label: "Explorer",
+        location: "left",
+        content: <div>Files</div>,
+        width: EXPLORER_WIDTH,
+      },
+      {
+        id: "source",
+        label: "Source",
+        location: "left",
+        content: <div>Code</div>,
+        width: SOURCE_WIDTH,
+        minWidth: 200,
+        maxWidth: 600,
+      },
+      { id: "page", label: "Page", location: "center", content: <div>Page</div> },
+      {
+        id: "variables",
+        label: "Variables",
+        location: "right",
+        content: <div>Values</div>,
+        width: 340,
+      },
+    ];
+    const withoutSource = columnPanes.filter((pane) => pane.id !== "source");
+    const columns = { left: "columns" } as const;
+    const regionWidth = (side: string) =>
+      screen
+        .getByTestId(`workspace-region-${side}`)
+        .style.getPropertyValue("--workspace-region-width");
+    const paneWidth = (id: string) =>
+      screen
+        .getByTestId(`workspace-stack-${id}`)
+        .style.getPropertyValue("--workspace-pane-width");
+    const stackOrder = (side: string) =>
+      Array.from(
+        screen
+          .getByTestId(`workspace-region-${side}`)
+          .querySelectorAll("[data-testid^=workspace-stack-]"),
+      ).map((node) => node.getAttribute("data-testid"));
+
+    it("lays the panes of a columns side next to each other in pane order, each at its own width, and leaves other sides stacked", () => {
+      render(<Workspace panes={columnPanes} sideArrangement={columns} />);
+
+      expect({
+        order: stackOrder("left"),
+        widths: [paneWidth("explorer"), paneWidth("source")],
+        left: [
+          regionWidth("left"),
+          screen.getByTestId("workspace-region-left").classList.contains("@3xl/workspace:flex-row"),
+        ],
+        right: [
+          regionWidth("right"),
+          screen.getByTestId("workspace-region-right").classList.contains("@3xl/workspace:flex-row"),
+        ],
+      }).toEqual({
+        order: ["workspace-stack-explorer", "workspace-stack-source"],
+        widths: [`${EXPLORER_WIDTH}px`, `${SOURCE_WIDTH}px`],
+        left: [`${EXPLORER_WIDTH + SOURCE_WIDTH}px`, true],
+        right: ["340px", false],
+      });
+    });
+
+    it("keeps stacking with one shared width when no arrangement is given", () => {
+      render(
+        <Workspace
+          panes={columnPanes.map((pane) =>
+            pane.id === "source" ? { ...pane, width: EXPLORER_WIDTH } : pane,
+          )}
+        />,
+      );
+
+      expect({
+        region: regionWidth("left"),
+        flexRow: screen.getByTestId("workspace-region-left").classList.contains("@3xl/workspace:flex-row"),
+        paneHandles: screen.queryAllByTestId(/^workspace-resize-pane-/),
+        sideHandle: screen.queryByTestId("workspace-resize-left") !== null,
+      }).toEqual({
+        region: `${EXPLORER_WIDTH}px`,
+        flexRow: false,
+        paneHandles: [],
+        sideHandle: true,
+      });
+    });
+
+    it("allows panes of a columns side to differ in width, which a stacked side forbids", () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        expect(() => render(<Workspace panes={columnPanes} />)).toThrow("share one width");
+        expect(() =>
+          render(<Workspace panes={columnPanes} sideArrangement={columns} />),
+        ).not.toThrow();
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("resizes one column by keyboard without moving the others, and remembers it by pane id", () => {
+      const first = render(
+        <Workspace panes={columnPanes} sideArrangement={columns} storageKey="columns" />,
+      );
+      const handle = screen.getByTestId("workspace-resize-pane-source");
+      expect(handle).toHaveAttribute("aria-valuenow", `${SOURCE_WIDTH}`);
+      fireEvent.keyDown(handle, { key: "ArrowRight" });
+      expect({
+        explorer: paneWidth("explorer"),
+        source: paneWidth("source"),
+        region: regionWidth("left"),
+      }).toEqual({
+        explorer: `${EXPLORER_WIDTH}px`,
+        source: `${SOURCE_WIDTH + KEY_STEP}px`,
+        region: `${EXPLORER_WIDTH + SOURCE_WIDTH + KEY_STEP}px`,
+      });
+      first.unmount();
+
+      render(<Workspace panes={columnPanes} sideArrangement={columns} storageKey="columns" />);
+      expect([paneWidth("explorer"), paneWidth("source")]).toEqual([
+        `${EXPLORER_WIDTH}px`,
+        `${SOURCE_WIDTH + KEY_STEP}px`,
+      ]);
+    });
+
+    it("clamps a column to its own min and max width", () => {
+      render(<Workspace panes={columnPanes} sideArrangement={columns} />);
+      const handle = screen.getByTestId("workspace-resize-pane-source");
+
+      fireEvent.keyDown(handle, { key: "End" });
+      const widest = paneWidth("source");
+      fireEvent.keyDown(handle, { key: "Home" });
+
+      expect([widest, paneWidth("source")]).toEqual(["600px", "200px"]);
+    });
+
+    it("hands a pane that appears later its own default width and leaves resized siblings alone", () => {
+      const { rerender } = render(<Workspace panes={withoutSource} sideArrangement={columns} />);
+      fireEvent.keyDown(screen.getByTestId("workspace-resize-pane-explorer"), {
+        key: "ArrowRight",
+      });
+
+      rerender(<Workspace panes={columnPanes} sideArrangement={columns} />);
+
+      expect({
+        explorer: paneWidth("explorer"),
+        source: paneWidth("source"),
+        region: regionWidth("left"),
+      }).toEqual({
+        explorer: `${EXPLORER_WIDTH + KEY_STEP}px`,
+        source: `${SOURCE_WIDTH}px`,
+        region: `${EXPLORER_WIDTH + KEY_STEP + SOURCE_WIDTH}px`,
+      });
+    });
+
+    it("shrinks a collapsed column to a rail while the side toggle still collapses the whole side", () => {
+      render(<Workspace panes={columnPanes} sideArrangement={columns} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Collapse Explorer" }));
+      const afterPane = [paneWidth("explorer"), regionWidth("left")];
+      fireEvent.click(screen.getByRole("button", { name: "Collapse left side" }));
+
+      expect({ afterPane, afterSide: regionWidth("left") }).toEqual({
+        afterPane: ["40px", `${40 + SOURCE_WIDTH}px`],
+        afterSide: "0px",
+      });
+    });
+
+    it("offers no column handle for a non-resizable pane or a collapsed one", () => {
+      render(
+        <Workspace
+          panes={columnPanes.map((pane) =>
+            pane.id === "explorer" ? { ...pane, resizable: false } : pane,
+          )}
+          sideArrangement={columns}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Collapse Source" }));
+
+      expect(screen.queryAllByTestId(/^workspace-resize-pane-/)).toEqual([]);
+    });
+  });
+
+  describe("stored layout versions", () => {
+    const stored = (version: number, state: Record<string, unknown>) =>
+      window.localStorage.setItem("versioned", JSON.stringify({ version, state }));
+    const base = {
+      leftWidth: 300,
+      rightWidth: 350,
+      bottomHeight: 200,
+      stackHeights: {},
+      collapsed: {},
+      sideCollapsed: { left: false, right: false },
+    };
+
+    it("reads a version 2 layout, which predates column widths, keeping its sizes", () => {
+      stored(2, base);
+
+      render(<Workspace panes={panes} storageKey="versioned" />);
+
+      expect(
+        screen
+          .getByTestId("workspace-region-left")
+          .style.getPropertyValue("--workspace-region-width"),
+      ).toBe("300px");
+    });
+
+    it("warns and resets a layout whose column widths are not numbers", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        stored(3, { ...base, paneWidths: { explorer: "wide" } });
+
+        render(<Workspace panes={panes} storageKey="versioned" />);
+
+        expect({
+          warned: warn.mock.calls.length,
+          left: screen
+            .getByTestId("workspace-region-left")
+            .style.getPropertyValue("--workspace-region-width"),
+          cleared: window.localStorage.getItem("versioned")?.includes("wide"),
+        }).toEqual({ warned: 1, left: "280px", cleared: false });
+      } finally {
+        warn.mockRestore();
+      }
+    });
+  });
+
+  describe("top-right controls", () => {
+    const withoutRight = panes.filter((pane) => pane.location !== "right");
+    const header = (id: string) =>
+      screen.getByTestId(`workspace-pane-${id}`).querySelector("header");
+    const reserve = (container: HTMLElement) =>
+      (
+        container.querySelector("[data-slot=workspace]") as HTMLElement
+      ).style.getPropertyValue("--workspace-top-right-reserve");
+
+    it("keeps the center header clear of the controls at every width when no right pane is shown", () => {
+      render(<Workspace panes={withoutRight} />);
+
+      expect(header("editor")).toHaveClass(
+        "pr-[var(--workspace-top-right-reserve,0px)]",
+      );
+    });
+
+    it("hands the corner to the first right pane once the sides sit by side, and keeps the stacked center clear", () => {
+      render(<Workspace panes={panes} />);
+
+      expect({
+        center: header("editor")?.className.match(
+          /\S*top-right-reserve\S*|@3xl\/workspace:pr-2/g,
+        ),
+        right: header("variables")?.className.match(/\S*top-right-reserve\S*/g),
+      }).toEqual({
+        center: [
+          "pr-[var(--workspace-top-right-reserve,0px)]",
+          "@3xl/workspace:pr-2",
+        ],
+        right: ["@3xl/workspace:pr-[var(--workspace-top-right-reserve,0px)]"],
+      });
+    });
+
+    it("publishes the measured width of the controls, with their inset, for the headers under them", () => {
+      const measured = 64;
+      const rect = vi
+        .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+        .mockImplementation(function (this: HTMLElement) {
+          return {
+            width: this.dataset["testid"] === "workspace-top-right" ? measured : 0,
+          } as DOMRect;
+        });
+      try {
+        const { container } = render(<Workspace panes={withoutRight} />);
+
+        expect(reserve(container)).toBe(`${measured + 8}px`);
+      } finally {
+        rect.mockRestore();
+      }
+    });
+
+    it("reserves nothing when there are no controls", () => {
+      const { container } = render(
+        <Workspace
+          panes={withoutRight.filter((pane) => pane.location !== "left")}
+        />,
+      );
+
+      expect(reserve(container)).toBe("0px");
+    });
+
+    it("lets a crowded header wrap its trailing actions onto another row", () => {
+      render(<Workspace panes={panes} />);
+
+      expect(header("explorer")).toHaveClass("flex-wrap", "min-h-9");
+    });
   });
 });

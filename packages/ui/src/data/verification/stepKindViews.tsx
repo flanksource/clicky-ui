@@ -3,23 +3,30 @@
 // watcher's events. Rendered inside FixtureDetail; split out so adapterViews.tsx
 // stays focused on the command/CEL body.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/button";
-import { Badge, type BadgeTone } from "../Badge";
+import { SegmentedControl, type SegmentedOption } from "../../components/SegmentedControl";
+import { Badge, type BadgeSize, type BadgeTone } from "../Badge";
+import { UiHourglass } from "../../icons";
 import { CodeBlock } from "../CodeBlock";
 import { JsonView } from "../JsonView";
+import { JsonSchemaForm } from "../../components/JsonSchemaForm";
 import type { StepSourceResult } from "./stepSource";
-import { formatTestDuration, useSelectDetailTab } from "../test-runner";
+import { formatTestDuration, useSelectDetailTab, type Test } from "../test-runner";
 import {
   clockTime,
+  stepFormState,
   formatDelay,
   formatExportValue,
   policySummary,
   waitDecidedBy,
   type ExecutionHeader,
   type StepDetail,
+  type StepForm,
+  type StepFormState,
   type StepExport,
+  type StepQuery,
   type WaitCondition,
   type WaitDetail,
   type WaitOutcome,
@@ -37,6 +44,125 @@ function Section({ name, title, aside, children }: { name: string; title: string
       </div>
       {children}
     </section>
+  );
+}
+
+// ── Form ────────────────────────────────────────────────────────────────────
+
+const FORM_BADGE: Record<StepFormState, { label: string; tone: BadgeTone }> = {
+  answered: { label: "Answered", tone: "success" },
+  rejected: { label: "Rejected", tone: "warning" },
+  supplied: { label: "Supplied", tone: "info" },
+  unanswered: { label: "Not answered", tone: "danger" },
+};
+
+const ignoreChange = () => {};
+
+function StepFormBadge({ state, size }: { state: StepFormState; size?: BadgeSize }) {
+  const { label, tone } = FORM_BADGE[state];
+  return <Badge tone={tone} clickToCopy={false} {...(size ? { size } : {})}>{label}</Badge>;
+}
+
+/**
+ * The tree row's step badge: "Awaiting answer" while the step waits on its
+ * form, then how the form was answered. Null for any other node.
+ */
+export function StepRowBadge({ node }: { node: Test }) {
+  if (node.waiting) {
+    return (
+      <span className="flex shrink-0 items-center" data-step-badge="">
+        <Badge tone="warning" size="xs" icon={UiHourglass} clickToCopy={false}>Awaiting answer</Badge>
+      </span>
+    );
+  }
+  const state = stepFormState(node);
+  if (!state) return null;
+  return (
+    <span className="flex shrink-0 items-center" data-step-badge="">
+      <StepFormBadge state={state} size="xs" />
+    </span>
+  );
+}
+
+/** The form a `form` step (or `params:`) showed, read-only through the same JsonSchemaForm the prompt dialog used. */
+export function StepFormSection({ form }: { form: StepForm }) {
+  const by = [form.answeredBy && `by ${form.answeredBy}`, form.answeredAt && `at ${clockTime(form.answeredAt)}`].filter(Boolean).join(" ");
+  return (
+    <Section name="form" title="Form" aside={<StepFormBadge state={form.state} />}>
+      <div className="text-sm font-medium">{form.title}</div>
+      {form.description ? <div className="text-xs text-muted-foreground">{form.description}</div> : null}
+      {by ? <div className="text-[11px] text-muted-foreground">{by}</div> : null}
+      <JsonSchemaForm schema={form.schema} value={form.values} onChange={ignoreChange} readOnly />
+    </Section>
+  );
+}
+
+/** The host's answerable form for a step waiting on a person, headed like the answered form it becomes. */
+export function StepPendingFormSection({ children }: { children: ReactNode }) {
+  return (
+    <Section
+      name="pending-form"
+      title="Form"
+      aside={<Badge tone="warning" size="xs" icon={UiHourglass} clickToCopy={false}>Awaiting answer</Badge>}
+    >
+      {children}
+    </Section>
+  );
+}
+
+// ── Query ───────────────────────────────────────────────────────────────────
+
+type QueryView = "template" | "sql";
+
+function ValueTable({ name, keyLabel, rows }: { name: string; keyLabel: string; rows: [string, unknown][] }) {
+  return (
+    <table className="w-full table-fixed border-collapse text-left text-[11px]" {...{ [`data-query-${name}`]: "" }}>
+      <thead className="text-muted-foreground">
+        <tr className="border-b border-border">
+          <th className="w-[28%] py-1 pr-2 font-medium">{keyLabel}</th>
+          <th className="py-1 font-medium">Value</th>
+        </tr>
+      </thead>
+      <tbody className="font-mono">
+        {rows.map(([key, value]) => (
+          <tr key={key} className="border-b border-border/60 align-top last:border-0">
+            <td className="break-words py-1 pr-2">{key}</td>
+            <td className="break-all py-1">{formatExportValue(value)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/**
+ * A query step's query: the template as authored and the statement commons-db
+ * issued, behind a compact Template / SQL switch, then the params by name and
+ * the values bound to the statement's placeholders.
+ */
+export function StepQuerySection({ query }: { query: StepQuery }) {
+  const [view, setView] = useState<QueryView>("template");
+  const params = Object.entries(query.params ?? {});
+  const args = query.arguments ?? [];
+  const options: SegmentedOption<QueryView>[] = [
+    { id: "template", label: "Template", title: "The query as authored, with its params references" },
+    query.sql
+      ? { id: "sql", label: "SQL", title: "The statement issued, params bound to driver placeholders" }
+      : { id: "sql", label: "SQL", title: "No issued statement was recorded", disabled: true },
+  ];
+  return (
+    <Section
+      name="query"
+      title="Query"
+      aside={<SegmentedControl size="sm" value={view} options={options} onChange={setView} aria-label="Query view" />}
+    >
+      {query.queryFile ? <div className="break-all font-mono text-[11px] text-muted-foreground" title={query.queryFile}>{query.queryFile}</div> : null}
+      <div className="min-w-0" data-query-code={view}>
+        <CodeBlock language="sql" source={view === "sql" && query.sql ? query.sql : query.template} copyable />
+      </div>
+      {params.length > 0 && <ValueTable name="params" keyLabel="Param" rows={params} />}
+      {args.length > 0 && <ValueTable name="arguments" keyLabel="Argument" rows={args.map((value, i) => [String(i + 1), value])} />}
+    </Section>
   );
 }
 

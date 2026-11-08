@@ -1,7 +1,7 @@
 import { Icon } from "../../data/Icon";
 import { cn } from "../../lib/utils";
 import { CommentDraftCard } from "../../comments/CommentDraftCard";
-import type { CommentCallbacks, CommentConfig } from "../../comments/comment-types";
+import type { CommentCallbacks, CommentConfig, CommentCreateAction } from "../../comments/comment-types";
 import { UiComment } from "../../icons";
 
 const PILL = { width: 104, height: 28 };
@@ -33,6 +33,7 @@ export function CommentDraft({
   onCreate,
   onExpand,
   onClose,
+  createActions,
 }: {
   anchor: string;
   label: string;
@@ -43,6 +44,8 @@ export function CommentDraft({
   onCreate: NonNullable<CommentCallbacks["onCreate"]>;
   onExpand: () => void;
   onClose: () => void;
+  /** Post variants beside the default Post; the picked id reaches `onCreate`. */
+  createActions?: readonly CommentCreateAction[] | undefined;
 }) {
 
   const pillTop = position.top - PILL.height - 8;
@@ -66,7 +69,14 @@ export function CommentDraft({
       style={style}
     >
       {expanded ? (
-        <CommentDraftCard label={label} config={config} anchor={anchor} onCreate={onCreate} onDiscard={onClose} />
+        <CommentDraftCard
+          label={label}
+          config={config}
+          anchor={anchor}
+          onCreate={onCreate}
+          onDiscard={onClose}
+          {...(createActions ? { createActions } : {})}
+        />
       ) : (
         <button
           type="button"

@@ -158,6 +158,34 @@ export const RunningWithProgress: Story = {
   ),
 };
 
+export const QueuedStepWithSource: Story = {
+  render: () => {
+    const queued = {
+      name: "inspect",
+      framework: "fixture",
+      pending: true,
+      detail: {
+        name: "inspect",
+        kind: "command",
+        state: "queued",
+        origin: { file: "activities.fixture.yaml", kind: "step", row_index: 2 },
+        source: {
+          file: "activities.fixture.yaml",
+          line: 6,
+          end_line: 9,
+          language: "yaml",
+          text: "  - id: inspect\n    kind: query\n    connection: lab\n    query: SELECT COUNT(*) FROM activities",
+        },
+      },
+    };
+    return (
+      <div className="h-screen">
+        <VerificationResults report={report({ state: "running", tests: [queued] })} selected={queued} onSelect={() => {}} />
+      </div>
+    );
+  },
+};
+
 export const ChecklistOnly: Story = {
   render: () => (
     <div className="h-screen">

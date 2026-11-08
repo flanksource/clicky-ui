@@ -49,6 +49,8 @@ const entry = {
   chat: resolve(__dirname, "src/chat.ts"),
   ai: resolve(__dirname, "src/ai.ts"),
   "runtime-profile": resolve(__dirname, "src/runtime-profile.ts"),
+  "comment-anchoring": resolve(__dirname, "src/comment-anchoring.ts"),
+  "page-styles": resolve(__dirname, "src/page-styles.ts"),
   "tailwind-preset": resolve(__dirname, "src/tailwind-preset.ts"),
   styles: resolve(__dirname, "src/styles.ts"),
 };

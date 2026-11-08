@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../components/button";
 import { Icon } from "./Icon";
-import { UiCheck, UiClose, UiComment, UiHourglass, UiQuestion, UiRobotAi } from "../icons";
+import { UiCheck, UiClose, UiHourglass, UiQuestion, UiRobotAi } from "../icons";
 import { cn } from "../lib/utils";
 import { answerPrompt, usePrompts, type PromptFilter, type PromptSnapshot } from "../hooks/use-prompts";
 import { PromptDialog } from "./PromptDialog";
+import { PromptList } from "./PromptList";
+import type { LookupFetcher } from "../components/json-schema-form-runtime-types";
 import {
   analyzePromptInlineActions,
   buildPromptInlineValues,
   initialPromptComment,
-  summarizePromptAnswer,
+  orderPrompts,
   summarizePrompts,
   type PromptInlineDecision,
 } from "./PromptBanner.model";
@@ -27,6 +29,14 @@ export interface PromptBannerProps extends PromptFilter {
   showSummary?: boolean | undefined;
   /** Maximum recent prompts shown in the summary list. */
   historyLimit?: number | undefined;
+  /** Passed to the answer dialog to resolve the schema's `x-clicky-lookup` fields. */
+  lookupFetcher?: LookupFetcher | undefined;
+  /**
+   * Open the answer dialog as soon as a prompt becomes pending, once per prompt:
+   * closing it without answering leaves it pending in the banner rather than
+   * reopening it.
+   */
+  autoOpen?: boolean | undefined;
 }
 
 // PromptBanner subscribes to pending prompts for a scope (owner / session label)
@@ -41,6 +51,8 @@ export function PromptBanner({
   inlineActions = "auto",
   showSummary = true,
   historyLimit = 5,
+  lookupFetcher,
+  autoOpen = false,
   state: _ignoredState,
   ...filter
 }: PromptBannerProps) {
@@ -62,7 +74,14 @@ export function PromptBanner({
     [activePrompt, inlineActions],
   );
   const summary = useMemo(() => summarizePrompts(prompts), [prompts]);
-  const recent = prompts.slice(0, Math.max(0, historyLimit));
+  const recent = useMemo(() => orderPrompts(prompts).slice(0, Math.max(0, historyLimit)), [prompts, historyLimit]);
+
+  const autoOpened = useRef(new Set<string>());
+  useEffect(() => {
+    if (!autoOpen || !next || active || autoOpened.current.has(next.id)) return;
+    autoOpened.current.add(next.id);
+    setActive(next);
+  }, [autoOpen, next?.id, active]);
 
   useEffect(() => {
     setComment(activePrompt ? initialPromptComment(activePrompt, inlineSpec) : "");
@@ -172,7 +191,7 @@ export function PromptBanner({
           </div>
         ) : null}
 
-        {showSummary && recent.length > 0 ? <PromptHistory prompts={recent} activeId={next?.id} /> : null}
+        {showSummary && recent.length > 0 ? <PromptList prompts={recent} activeId={next?.id} /> : null}
       </div>
       {active ? (
         <PromptDialog
@@ -181,6 +200,7 @@ export function PromptBanner({
           open={true}
           onClose={() => setActive(null)}
           onResolved={() => setActive(null)}
+          lookupFetcher={lookupFetcher}
         />
       ) : null}
     </section>
@@ -200,35 +220,4 @@ function PromptSummaryCounts({ summary }: { summary: ReturnType<typeof summarize
       )}
     </div>
   );
-}
-
-function PromptHistory({ prompts, activeId }: { prompts: PromptSnapshot[]; activeId?: string | undefined }) {
-  return (
-    <ol className="divide-y divide-border overflow-hidden rounded-md border border-border bg-background text-xs">
-      {prompts.map((prompt) => (
-        <li
-          key={prompt.id}
-          className={cn("flex min-w-0 items-start gap-2 px-2 py-1.5", prompt.id === activeId && "bg-muted/60")}
-        >
-          <PromptStateIcon prompt={prompt} />
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate font-medium text-foreground">{prompt.title}</span>
-              {prompt.kind ? <span className="shrink-0 text-muted-foreground">{prompt.kind}</span> : null}
-            </div>
-            <div className="mt-0.5 truncate text-muted-foreground">{summarizePromptAnswer(prompt)}</div>
-          </div>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-function PromptStateIcon({ prompt }: { prompt: PromptSnapshot }) {
-  if (prompt.state === "answered") return <Icon icon={UiCheck} className="mt-0.5 size-3.5 shrink-0 text-emerald-600" />;
-  if (prompt.state === "cancelled" || prompt.state === "expired") {
-    return <Icon icon={UiClose} className="mt-0.5 size-3.5 shrink-0 text-rose-600" />;
-  }
-  if (prompt.kind === "comment") return <Icon icon={UiComment} className="mt-0.5 size-3.5 shrink-0" />;
-  return <Icon icon={UiHourglass} className="mt-0.5 size-3.5 shrink-0" />;
 }

@@ -41,7 +41,7 @@ export interface SearchResult {
   traces: Summary[];
   total: number;
   services: string[];
-  /** Every filter but the operation and span-count ones applied, by root operation. */
+  /** Every filter but the operation and span-count ones applied, by root operation: the root-operation filter's options. */
   rootOperations: OperationStats[];
   /** key=value suggestions from those traces' root spans, most frequent first. */
   attributes: { value: string; count: number }[];
@@ -74,6 +74,8 @@ export type SearchValues = Record<string, unknown> & {
   minDuration?: string | undefined;
   maxDuration?: string | undefined;
   limit?: number | undefined;
+  /** Matching traces to skip, newest first: the page's start. */
+  offset?: number | undefined;
 };
 export interface SearchForm {
   schema: JsonSchemaObject;
@@ -105,7 +107,7 @@ export function readSearchValues(params: URLSearchParams = new URLSearchParams(w
   for (const [key, value] of params) {
     if (key === "span") continue;
     if ((MODE_FILTERS as readonly string[]).includes(key)) result[key] = parseModes(key, value);
-    else if (key === "limit" || key === "minSpans") {
+    else if (key === "limit" || key === "offset" || key === "minSpans") {
       if (!/^\d+$/.test(value)) throw new Error(`${key} must be a whole number, not ${JSON.stringify(value)}`);
       result[key] = Number(value);
     } else result[key] = value;

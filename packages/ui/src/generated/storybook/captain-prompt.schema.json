@@ -157,53 +157,6 @@
       }
     },
     {
-      "id": "claude-fable-5-1",
-      "provider": "anthropic",
-      "label": "Claude Fable 5.1",
-      "capabilitiesKnown": true,
-      "reasoning": true,
-      "temperature": false,
-      "supportedEfforts": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-      ],
-      "defaultEffort": "high",
-      "configured": true,
-      "modes": [
-        "api",
-        "agent",
-        "cli"
-      ],
-      "runtime": {
-        "model": "claude-fable-5-1"
-      }
-    },
-    {
-      "id": "claude-opus-5",
-      "provider": "anthropic",
-      "label": "Claude Opus 5",
-      "capabilitiesKnown": true,
-      "reasoning": true,
-      "temperature": false,
-      "supportedEfforts": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-      ],
-      "configured": true,
-      "modes": [
-        "api"
-      ],
-      "runtime": {
-        "model": "claude-opus-5"
-      }
-    },
-    {
       "id": "gpt-6.1-sol",
       "provider": "openai",
       "label": "GPT-6.1-Sol",
@@ -251,6 +204,30 @@
       }
     },
     {
+      "id": "gpt-6.1-terra",
+      "provider": "openai",
+      "label": "GPT-6.1 Terra",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": false,
+      "supportedEfforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ],
+      "defaultEffort": "medium",
+      "configured": true,
+      "modes": [
+        "agent",
+        "cli"
+      ],
+      "runtime": {
+        "model": "gpt-6.1-terra"
+      }
+    },
+    {
       "id": "gpt-6-sol",
       "provider": "openai",
       "label": "GPT-6-Sol",
@@ -294,77 +271,6 @@
       ],
       "runtime": {
         "model": "gpt-6-luna"
-      }
-    },
-    {
-      "id": "gpt-5.6-sol",
-      "provider": "openai",
-      "label": "GPT-5.6-Sol",
-      "capabilitiesKnown": true,
-      "reasoning": true,
-      "temperature": false,
-      "supportedEfforts": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max",
-        "ultra"
-      ],
-      "configured": true,
-      "modes": [
-        "agent",
-        "cli"
-      ],
-      "runtime": {
-        "model": "gpt-5.6-sol"
-      }
-    },
-    {
-      "id": "gpt-5.6-terra",
-      "provider": "openai",
-      "label": "GPT-5.6-Terra",
-      "capabilitiesKnown": true,
-      "reasoning": true,
-      "temperature": false,
-      "supportedEfforts": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max",
-        "ultra"
-      ],
-      "configured": true,
-      "modes": [
-        "agent",
-        "cli"
-      ],
-      "runtime": {
-        "model": "gpt-5.6-terra"
-      }
-    },
-    {
-      "id": "gpt-5.6-luna",
-      "provider": "openai",
-      "label": "GPT-5.6-Luna",
-      "capabilitiesKnown": true,
-      "reasoning": true,
-      "temperature": false,
-      "supportedEfforts": [
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-      ],
-      "configured": true,
-      "modes": [
-        "agent",
-        "cli"
-      ],
-      "runtime": {
-        "model": "gpt-5.6-luna"
       }
     },
     {
@@ -437,6 +343,21 @@
       ],
       "runtime": {
         "model": "lyria-3.5"
+      }
+    },
+    {
+      "id": "gemini-omni-1.2-flash",
+      "provider": "google",
+      "label": "gemini-omni-1.2-flash",
+      "capabilitiesKnown": true,
+      "reasoning": true,
+      "temperature": false,
+      "configured": true,
+      "modes": [
+        "api"
+      ],
+      "runtime": {
+        "model": "gemini-omni-1.2-flash"
       }
     },
     {
@@ -568,6 +489,36 @@
       "runtime": {
         "model": "deepseek-v4-pro"
       }
+    },
+    {
+      "id": "jev-latest",
+      "provider": "jev",
+      "label": "Jev Latest",
+      "capabilitiesKnown": true,
+      "reasoning": false,
+      "temperature": false,
+      "configured": true,
+      "modes": [
+        "api"
+      ],
+      "runtime": {
+        "model": "jev-latest"
+      }
+    },
+    {
+      "id": "jev-preview",
+      "provider": "jev",
+      "label": "jev-preview",
+      "capabilitiesKnown": true,
+      "reasoning": false,
+      "temperature": false,
+      "configured": true,
+      "modes": [
+        "api"
+      ],
+      "runtime": {
+        "model": "jev-preview"
+      }
     }
   ],
   "prompt": {
@@ -599,6 +550,30 @@
         },
         "type": "object"
       },
+      "HookAction": {
+        "additionalProperties": false,
+        "properties": {
+          "commands": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "if": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "with": {
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
       "Prompt": {
         "additionalProperties": false,
         "properties": {
@@ -608,6 +583,12 @@
           "attachments": {
             "items": {
               "$ref": "#/$defs/AttachmentRef"
+            },
+            "type": "array"
+          },
+          "inputHooks": {
+            "items": {
+              "$ref": "#/$defs/HookAction"
             },
             "type": "array"
           },
@@ -624,6 +605,12 @@
           "outputSchemaType": {
             "type": "string"
           },
+          "schemaHooks": {
+            "items": {
+              "$ref": "#/$defs/HookAction"
+            },
+            "type": "array"
+          },
           "schemaJSON": true,
           "schemaStrictness": {
             "type": "string"
@@ -637,6 +624,9 @@
           "typeSafeQuestions": true,
           "user": {
             "type": "string"
+          },
+          "variables": {
+            "type": "object"
           }
         },
         "required": [
@@ -677,6 +667,14 @@
       },
       "Bare": {
         "type": "boolean"
+      },
+      "Batch": {
+        "format": "int32",
+        "type": "integer"
+      },
+      "BatchConc": {
+        "format": "int32",
+        "type": "integer"
       },
       "Budget": {
         "type": "string"
@@ -824,7 +822,9 @@
       "NoPresets",
       "RuntimeProfile",
       "Timeout",
-      "NoStream"
+      "NoStream",
+      "Batch",
+      "BatchConc"
     ],
     "type": "object"
   },
@@ -891,49 +891,12 @@
             "max"
           ],
           "defaultEffort": "high"
-        },
-        {
-          "id": "claude-fable-5-1",
-          "label": "Claude Fable 5.1",
-          "provider": "anthropic",
-          "mode": "api",
-          "releaseDate": "2026-09-01",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ],
-          "defaultEffort": "high"
-        },
-        {
-          "id": "claude-opus-5",
-          "label": "Claude Opus 5",
-          "provider": "anthropic",
-          "mode": "api",
-          "releaseDate": "2026-07-24",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ]
         }
       ],
       "models": [
         "claude-opus-5-5",
         "claude-haiku-5-5",
-        "claude-sonnet-5-5",
-        "claude-fable-5-1",
-        "claude-opus-5"
+        "claude-sonnet-5-5"
       ],
       "permissions": {
         "modes": {
@@ -1188,38 +1151,12 @@
             "max"
           ],
           "defaultEffort": "high"
-        },
-        {
-          "id": "claude-fable-5-1",
-          "label": "Claude Fable 5.1",
-          "provider": "anthropic",
-          "mode": "agent",
-          "releaseDate": "2026-09-01",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "inputMediaTypes": [
-            "image/png",
-            "image/jpeg",
-            "image/gif",
-            "image/webp",
-            "application/pdf"
-          ],
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ],
-          "defaultEffort": "high"
         }
       ],
       "models": [
         "claude-opus-5-5",
         "claude-haiku-5-5",
-        "claude-sonnet-5-5",
-        "claude-fable-5-1"
+        "claude-sonnet-5-5"
       ],
       "permissions": {
         "modes": {
@@ -1441,7 +1378,7 @@
         "ANTHROPIC_API_KEY"
       ],
       "authenticated": true,
-      "binary": "/Users/moshe/.cmuxterm/cmux-cli-shims/24589DC2-E866-410B-ABED-C61117D59BD2/claude",
+      "binary": "/Users/moshe/.local/bin/claude",
       "kind": "cli",
       "mode": "cli",
       "modelDetails": [
@@ -1499,31 +1436,12 @@
             "max"
           ],
           "defaultEffort": "high"
-        },
-        {
-          "id": "claude-fable-5-1",
-          "label": "Claude Fable 5.1",
-          "provider": "anthropic",
-          "mode": "cli",
-          "releaseDate": "2026-09-01",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ],
-          "defaultEffort": "high"
         }
       ],
       "models": [
         "claude-opus-5-5",
         "claude-haiku-5-5",
-        "claude-sonnet-5-5",
-        "claude-fable-5-1"
+        "claude-sonnet-5-5"
       ],
       "permissions": {
         "modes": {
@@ -1917,7 +1835,7 @@
         "OPENAI_API_KEY"
       ],
       "authenticated": true,
-      "binary": "/Users/moshe/.cmuxterm/cmux-cli-shims/24589DC2-E866-410B-ABED-C61117D59BD2/codex",
+      "binary": "/Users/moshe/Library/pnpm/bin/codex",
       "kind": "cli",
       "mode": "agent",
       "modelDetails": [
@@ -1959,6 +1877,25 @@
           "priority": 2
         },
         {
+          "id": "gpt-6.1-terra",
+          "label": "GPT-6.1 Terra",
+          "provider": "openai",
+          "mode": "agent",
+          "releaseDate": "2026-10-26",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultEffort": "medium",
+          "priority": 3
+        },
+        {
           "id": "gpt-6-sol",
           "label": "GPT-6-Sol",
           "provider": "openai",
@@ -1992,73 +1929,15 @@
             "xhigh",
             "max"
           ],
-          "priority": 5
-        },
-        {
-          "id": "gpt-5.6-sol",
-          "label": "GPT-5.6-Sol",
-          "provider": "openai",
-          "mode": "agent",
-          "releaseDate": "2026-07-09",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max",
-            "ultra"
-          ],
           "priority": 6
-        },
-        {
-          "id": "gpt-5.6-terra",
-          "label": "GPT-5.6-Terra",
-          "provider": "openai",
-          "mode": "agent",
-          "releaseDate": "2026-07-09",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max",
-            "ultra"
-          ],
-          "priority": 8
-        },
-        {
-          "id": "gpt-5.6-luna",
-          "label": "GPT-5.6-Luna",
-          "provider": "openai",
-          "mode": "agent",
-          "releaseDate": "2026-07-09",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ],
-          "priority": 9
         }
       ],
       "models": [
         "gpt-6.1-sol",
         "gpt-6-astra",
+        "gpt-6.1-terra",
         "gpt-6-sol",
-        "gpt-6-luna",
-        "gpt-5.6-sol",
-        "gpt-5.6-terra",
-        "gpt-5.6-luna"
+        "gpt-6-luna"
       ],
       "permissions": {
         "modes": {
@@ -2261,7 +2140,7 @@
         "OPENAI_API_KEY"
       ],
       "authenticated": true,
-      "binary": "/Users/moshe/.cmuxterm/cmux-cli-shims/24589DC2-E866-410B-ABED-C61117D59BD2/codex",
+      "binary": "/Users/moshe/Library/pnpm/bin/codex",
       "kind": "cli",
       "mode": "cli",
       "modelDetails": [
@@ -2303,6 +2182,25 @@
           "priority": 2
         },
         {
+          "id": "gpt-6.1-terra",
+          "label": "GPT-6.1 Terra",
+          "provider": "openai",
+          "mode": "cli",
+          "releaseDate": "2026-10-26",
+          "capabilitiesKnown": true,
+          "reasoning": true,
+          "temperature": false,
+          "supportedEfforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultEffort": "medium",
+          "priority": 3
+        },
+        {
           "id": "gpt-6-sol",
           "label": "GPT-6-Sol",
           "provider": "openai",
@@ -2336,73 +2234,15 @@
             "xhigh",
             "max"
           ],
-          "priority": 5
-        },
-        {
-          "id": "gpt-5.6-sol",
-          "label": "GPT-5.6-Sol",
-          "provider": "openai",
-          "mode": "cli",
-          "releaseDate": "2026-07-09",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max",
-            "ultra"
-          ],
           "priority": 6
-        },
-        {
-          "id": "gpt-5.6-terra",
-          "label": "GPT-5.6-Terra",
-          "provider": "openai",
-          "mode": "cli",
-          "releaseDate": "2026-07-09",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max",
-            "ultra"
-          ],
-          "priority": 8
-        },
-        {
-          "id": "gpt-5.6-luna",
-          "label": "GPT-5.6-Luna",
-          "provider": "openai",
-          "mode": "cli",
-          "releaseDate": "2026-07-09",
-          "capabilitiesKnown": true,
-          "reasoning": true,
-          "temperature": false,
-          "supportedEfforts": [
-            "low",
-            "medium",
-            "high",
-            "xhigh",
-            "max"
-          ],
-          "priority": 9
         }
       ],
       "models": [
         "gpt-6.1-sol",
         "gpt-6-astra",
+        "gpt-6.1-terra",
         "gpt-6-sol",
-        "gpt-6-luna",
-        "gpt-5.6-sol",
-        "gpt-5.6-terra",
-        "gpt-5.6-luna"
+        "gpt-6-luna"
       ],
       "permissions": {
         "modes": {
@@ -2658,6 +2498,14 @@
           "temperature": false
         },
         {
+          "id": "gemini-omni-1.2-flash",
+          "label": "gemini-omni-1.2-flash",
+          "provider": "google",
+          "mode": "api",
+          "capabilitiesKnown": true,
+          "temperature": false
+        },
+        {
           "id": "gemini-nano-banana-2.1",
           "label": "gemini-nano-banana-2.1",
           "provider": "google",
@@ -2723,6 +2571,7 @@
         "gemini-4-argon",
         "nano-banana-pro-preview",
         "lyria-3.5",
+        "gemini-omni-1.2-flash",
         "gemini-nano-banana-2.1",
         "gemini-flash-latest",
         "gemini-3.5-flash-lite",
@@ -3335,10 +3184,34 @@
       "authEnvVars": [
         "TYPESAFE_API_KEY"
       ],
-      "authenticated": false,
+      "authenticated": true,
       "kind": "api",
       "mode": "api",
-      "modelError": "configure a Captain vault token or set TYPESAFE_API_KEY to list models",
+      "modelDetails": [
+        {
+          "id": "jev-latest",
+          "label": "Jev Latest",
+          "provider": "jev",
+          "mode": "api",
+          "releaseDate": "2026-09-15",
+          "capabilitiesKnown": true,
+          "temperature": false,
+          "priority": 1
+        },
+        {
+          "id": "jev-preview",
+          "label": "jev-preview",
+          "provider": "jev",
+          "mode": "api",
+          "releaseDate": "2026-10-14",
+          "capabilitiesKnown": true,
+          "temperature": false
+        }
+      ],
+      "models": [
+        "jev-latest",
+        "jev-preview"
+      ],
       "permissions": {
         "modes": {
           "acceptEdits": {
@@ -3506,7 +3379,7 @@
         }
       },
       "provider": "jev",
-      "ready": false
+      "ready": true
     }
   ],
   "runtimeSources": [
@@ -9225,12 +9098,6 @@
       "writable": false
     },
     {
-      "id": "builtin",
-      "kind": "embedded",
-      "label": "Built-in prompts",
-      "writable": false
-    },
-    {
       "id": "883fbbc4b6ff",
       "kind": "local",
       "label": "/Users/moshe/go/src/github.com/flanksource/captain/.captain/prompts",
@@ -9299,6 +9166,15 @@
           "cwd": {
             "type": "string"
           },
+          "if": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
           "when": {
             "enum": [
               "onVerify",
@@ -9306,6 +9182,9 @@
               "always"
             ],
             "type": "string"
+          },
+          "with": {
+            "type": "object"
           }
         },
         "type": "object"
@@ -9351,6 +9230,18 @@
           },
           "tenantID": {
             "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Batch": {
+        "additionalProperties": false,
+        "properties": {
+          "concurrency": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "integer"
           }
         },
         "type": "object"
@@ -9438,12 +9329,7 @@
             "type": "boolean"
           },
           "gates": {
-            "enum": [
-              "none",
-              "cheap",
-              "full"
-            ],
-            "type": "string"
+            "$ref": "#/$defs/CommitGateSpecs"
           },
           "message": {
             "type": "string"
@@ -9484,6 +9370,38 @@
           }
         },
         "type": "object"
+      },
+      "CommitGateSpecs": {
+        "description": "Gates each commit must pass. The excludes gate always runs. Retired level strings none, cheap and full are still accepted.",
+        "oneOf": [
+          {
+            "items": {
+              "properties": {
+                "config": {
+                  "description": "Gate configuration, e.g. max-size's bytes.",
+                  "type": "object"
+                },
+                "name": {
+                  "description": "Registered gate name: secret-names, max-size, or a host's own.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          {
+            "enum": [
+              "none",
+              "cheap",
+              "full"
+            ],
+            "type": "string"
+          }
+        ]
       },
       "ConfigMapKeySelector": {
         "additionalProperties": false,
@@ -9599,6 +9517,9 @@
           "kubernetes": {
             "$ref": "#/$defs/KubernetesConnection"
           },
+          "opensearch": {
+            "$ref": "#/$defs/OpenSearchConnection"
+          },
           "serviceAccount": {
             "type": "boolean"
           }
@@ -9656,6 +9577,48 @@
         },
         "type": "object"
       },
+      "Grant": {
+        "additionalProperties": false,
+        "properties": {
+          "headers": {
+            "items": {
+              "$ref": "#/$defs/HeaderGrant"
+            },
+            "type": "array"
+          },
+          "methods": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "HeaderGrant": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "valueFrom": {
+            "$ref": "#/$defs/EnvVar"
+          }
+        },
+        "type": "object"
+      },
       "HelmRefKeySelector": {
         "additionalProperties": false,
         "properties": {
@@ -9665,6 +9628,117 @@
           "name": {
             "type": "string"
           }
+        },
+        "type": "object"
+      },
+      "HookAction": {
+        "additionalProperties": false,
+        "properties": {
+          "commands": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "if": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "with": {
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "InlineTool": {
+        "additionalProperties": false,
+        "properties": {
+          "baseDir": {
+            "type": "string"
+          },
+          "checkout": {
+            "$ref": "#/$defs/Checkout"
+          },
+          "connections": {
+            "$ref": "#/$defs/ExecConnections"
+          },
+          "credentials": {
+            "enum": [
+              "none",
+              "direct",
+              "proxied",
+              "sidecar",
+              "sidecar-proxied"
+            ],
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "destructive": {
+            "type": "boolean"
+          },
+          "dotenv": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "envVars": {
+            "items": {
+              "$ref": "#/$defs/EnvVar"
+            },
+            "type": "array"
+          },
+          "exec": {
+            "type": "string"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/$defs/Grant"
+            },
+            "type": "array"
+          },
+          "input": true,
+          "output": true,
+          "patch": {
+            "type": "string"
+          },
+          "permission": {
+            "$ref": "#/$defs/ToolPolicy"
+          },
+          "placement": {
+            "enum": [
+              "host",
+              "sandbox",
+              "supervisor",
+              "sidecar"
+            ],
+            "type": "string"
+          },
+          "readonly": {
+            "type": "boolean"
+          },
+          "retry": {
+            "$ref": "#/$defs/ToolRetry"
+          },
+          "timeout": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "InlineTools": {
+        "additionalProperties": {
+          "$ref": "#/$defs/InlineTool"
         },
         "type": "object"
       },
@@ -9685,6 +9759,12 @@
           },
           "kubeconfig": {
             "$ref": "#/$defs/EnvVar"
+          },
+          "kubeconfigPath": {
+            "type": "string"
+          },
+          "kubecontext": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -9842,6 +9922,36 @@
         },
         "type": "array"
       },
+      "OpenSearchConnection": {
+        "additionalProperties": false,
+        "properties": {
+          "connection": {
+            "type": "string"
+          },
+          "digest": {
+            "type": "boolean"
+          },
+          "index": {
+            "type": "string"
+          },
+          "insecureSkipVerify": {
+            "type": "boolean"
+          },
+          "password": {
+            "$ref": "#/$defs/EnvVar"
+          },
+          "urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "username": {
+            "$ref": "#/$defs/EnvVar"
+          }
+        },
+        "type": "object"
+      },
       "Part": {
         "additionalProperties": false,
         "properties": {
@@ -9982,6 +10092,12 @@
             },
             "type": "array"
           },
+          "inputHooks": {
+            "items": {
+              "$ref": "#/$defs/HookAction"
+            },
+            "type": "array"
+          },
           "inputSchemaJSON": true,
           "inputSchemaType": {
             "type": "string"
@@ -9994,6 +10110,12 @@
           },
           "outputSchemaType": {
             "type": "string"
+          },
+          "schemaHooks": {
+            "items": {
+              "$ref": "#/$defs/HookAction"
+            },
+            "type": "array"
           },
           "schemaJSON": true,
           "schemaStrictness": {
@@ -10008,6 +10130,9 @@
           "typeSafeQuestions": true,
           "user": {
             "type": "string"
+          },
+          "variables": {
+            "type": "object"
           }
         },
         "required": [
@@ -10338,6 +10463,9 @@
               "$ref": "#/$defs/EnvVar"
             },
             "type": "array"
+          },
+          "patch": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -10345,6 +10473,9 @@
       "Spec": {
         "additionalProperties": false,
         "properties": {
+          "batch": {
+            "$ref": "#/$defs/Batch"
+          },
           "budget": {
             "$ref": "#/$defs/Budget"
           },
@@ -10446,6 +10577,9 @@
           },
           "toolPreferences": {
             "$ref": "#/$defs/ToolPreferences"
+          },
+          "tools": {
+            "$ref": "#/$defs/InlineTools"
           },
           "workflow": {
             "$ref": "#/$defs/Workflow"
@@ -10584,6 +10718,30 @@
           },
           "output": true,
           "toolCallId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ToolRetry": {
+        "additionalProperties": false,
+        "properties": {
+          "attempts": {
+            "type": "integer"
+          },
+          "backoff": {
+            "type": "number"
+          },
+          "delay": {
+            "type": "string"
+          },
+          "exitCodes": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "maxDelay": {
             "type": "string"
           }
         },

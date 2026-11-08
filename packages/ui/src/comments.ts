@@ -13,8 +13,8 @@ export {
   type HostViewportRect,
   type ScreenshotTarget,
 } from "./comments/annotation-screenshot";
+export { ElementOutline } from "./comments/ElementOutline";
 export {
-  ElementOutline,
   elementLabel,
   useElementPicker,
   type ElementPicker,

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ExplorerNavContext, type ExplorerNavSlot } from "./ExplorerNav";
 import { ThemeSwitcher } from "../components/theme-switcher";
 import type { PreExtension, PostExtension } from "../components/json-schema-form-types";
 import type { ClickyCommandRuntime } from "../data/Clicky";
@@ -68,6 +69,8 @@ export type EntityExplorerAppProps = {
   entityDetailBodyRenderer?: EntityDetailBodyRenderer;
   /** Host override for a loaded entity's "{title}: {id}" heading. */
   entityDetailHeaderRenderer?: EntityDetailHeaderRenderer;
+  /** Compact host controls (e.g. an edit icon) shown right after a surface's title or breadcrumb in the top bar. */
+  surfaceTitleActions?: (surfaceKey: string) => ReactNode;
 };
 
 // SIDEBAR_COLLAPSED_KEY persists the AppShell rail collapsed flag across reloads.
@@ -84,6 +87,7 @@ export function EntityExplorerApp({
   resultRenderer,
   entityDetailBodyRenderer,
   entityDetailHeaderRenderer,
+  surfaceTitleActions,
 }: EntityExplorerAppProps) {
   const formPre = formExtensions?.pre;
   const formPost = formExtensions?.post;
@@ -147,6 +151,26 @@ export function EntityExplorerApp({
     return sections;
   }, [surfaceGroups, basePath, resolvedRoute, showApiExplorer, explorerDefinition]);
 
+  const [navContainer, setNavContainer] = useState<HTMLElement | null>(null);
+  const [navClaims, setNavClaims] = useState(0);
+  const claimNav = useCallback(() => {
+    setNavClaims((count) => count + 1);
+    return () => setNavClaims((count) => count - 1);
+  }, []);
+  const surface = resolvedRoute.kind === "surface" ? resolvedRoute.surface : undefined;
+  const titleActions = surface ? surfaceTitleActions?.(surface.key) : undefined;
+  // The container only exists while a surface is resolved, so a portal
+  // mounted before the spec loads renders nothing rather than a bare crumb.
+  const navSlot = useMemo<ExplorerNavSlot>(
+    () => ({
+      container: surface ? navContainer : null,
+      title: surface?.title ?? "",
+      titleActions,
+      claim: claimNav,
+    }),
+    [claimNav, navContainer, surface, titleActions],
+  );
+
   useEffect(() => {
     if (defaultSurface == null || relativePath !== "/") return;
     navigate(withBasePath(basePath, `/${defaultSurface.key}`), { replace: true });
@@ -178,14 +202,22 @@ export function EntityExplorerApp({
       {...(resolvedRoute.kind === "surface" && resolvedRoute.surface
         ? {
             nav: (
-              <div className="flex min-w-0 flex-1 items-baseline gap-density-2">
-                <h1 className="min-w-0 truncate text-base font-semibold tracking-tight">
-                  {resolvedRoute.surface.title}
-                </h1>
-                <p className="hidden min-w-0 truncate text-sm text-muted-foreground lg:block">
-                  {makeSurfaceDefinition(resolvedRoute.surface).description}
-                </p>
-              </div>
+              <>
+                {navClaims === 0 && (
+                  <div className="flex min-w-0 flex-1 items-baseline gap-density-2">
+                    <h1 className="min-w-0 truncate text-base font-semibold tracking-tight">
+                      {resolvedRoute.surface.title}
+                    </h1>
+                    {titleActions ? (
+                      <div className="flex shrink-0 items-center self-center">{titleActions}</div>
+                    ) : null}
+                    <p className="hidden min-w-0 truncate text-sm text-muted-foreground lg:block">
+                      {makeSurfaceDefinition(resolvedRoute.surface).description}
+                    </p>
+                  </div>
+                )}
+                <div ref={setNavContainer} data-slot="explorer-nav" className="contents" />
+              </>
             ),
           }
         : {})}
@@ -272,7 +304,7 @@ export function EntityExplorerApp({
     </AppShell>
   );
 
-  return content;
+  return <ExplorerNavContext.Provider value={navSlot}>{content}</ExplorerNavContext.Provider>;
 }
 
 type ExplorerRoute =

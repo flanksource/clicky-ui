@@ -5,9 +5,20 @@
 // and the CelDetails block).
 
 import type { ReactNode } from "react";
+import { Clicky } from "../Clicky";
 import { JsonView } from "../JsonView";
-import { readStepDetail, splitExecutionDetail, waitDecidedBy, type WaitDetail } from "./stepKind";
-import { ExecutionHeaderView, FailureCallout, MalformedStepDetail, StepKindSections, StepSourceSection } from "./stepKindViews";
+import { ViolationLocations } from "../lint/ViolationLocations";
+import { readQuery, readStepDetail, readViolation, splitExecutionDetail, waitDecidedBy, withoutQuery, withoutViolation, type WaitDetail } from "./stepKind";
+import {
+  ExecutionHeaderView,
+  FailureCallout,
+  MalformedStepDetail,
+  StepFormSection,
+  StepKindSections,
+  StepPendingFormSection,
+  StepQuerySection,
+  StepSourceSection,
+} from "./stepKindViews";
 import { readStepSource, withoutSource } from "./stepSource";
 import {
   Expectation,
@@ -122,20 +133,33 @@ function FailureMessage({ node, cause, error }: { node: Test; cause: string | un
   );
 }
 
-export function FixtureDetail({ node, renderWait }: { node: Test; renderWait?: (wait: WaitDetail) => ReactNode }) {
+export type FixtureDetailProps = {
+  node: Test;
+  renderWait?: (wait: WaitDetail) => ReactNode;
+  /** The answerable form of a step waiting on a person (`node.waiting`); the host owns the prompt it answers. */
+  renderPendingPrompt?: (node: Test) => ReactNode;
+};
+
+export function FixtureDetail({ node, renderWait, renderPendingPrompt }: FixtureDetailProps) {
   const context = node.context as FixtureContext | undefined;
   const command = context?.command ?? node.command;
   const cwd = context?.cwd ?? node.work_dir;
   const stepDetail = readStepDetail(node.detail);
+  const violation = readViolation(node.detail);
+  const query = readQuery(node.detail);
   const { header, rest } = splitExecutionDetail(node.detail);
   // A typed step shows its own sections, so the raw block keeps only what they don't cover.
-  const rawDetail = withoutSource(stepDetail.kind === "step" ? splitExecutionDetail(stepDetail.step.rest).rest : rest);
+  const rawDetail = withoutQuery(withoutViolation(withoutSource(stepDetail.kind === "step" ? splitExecutionDetail(stepDetail.step.rest).rest : rest)));
+  const pendingForm = node.waiting === true && renderPendingPrompt ? renderPendingPrompt(node) : null;
   return (
     <div className="space-y-4 p-density-4">
       <ExecutionHeaderView header={header} {...(stepDetail.kind === "step" ? { stepKind: stepDetail.step.step.kind } : {})} />
+      {pendingForm != null && <StepPendingFormSection>{pendingForm}</StepPendingFormSection>}
       <FailureMessage node={node} cause={stepDetail.kind === "step" ? stepDetail.step.wait?.cause : undefined} error={header.error} />
-      {command && (
-        <div className="min-w-0 space-y-1">
+      {query.kind === "query" && <StepQuerySection query={query.query} />}
+      {query.kind === "invalid" && <MalformedStepDetail error={query.error} />}
+      {command && query.kind !== "query" && (
+        <div className="min-w-0 space-y-1" data-step-section="command">
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Command</div>
           <code className="block overflow-x-auto whitespace-pre rounded bg-muted px-2 py-1.5 text-xs">
             {command}
@@ -150,9 +174,22 @@ export function FixtureDetail({ node, renderWait }: { node: Test; renderWait?: (
           </div>
         </div>
       )}
+      {stepDetail.kind === "step" && stepDetail.step.view && (
+        <div className="min-w-0 space-y-1" data-step-section="view">
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Response</div>
+          <Clicky data={stepDetail.step.view} />
+        </div>
+      )}
+      {stepDetail.kind === "step" && stepDetail.step.form && <StepFormSection form={stepDetail.step.form} />}
+      {violation.kind === "violation" && violation.violation.locations.length > 0 && (
+        <div className="min-w-0" data-step-section="locations">
+          <ViolationLocations locations={violation.violation.locations} workDir={node.work_dir} />
+        </div>
+      )}
+      {violation.kind === "invalid" && <MalformedStepDetail error={violation.error} />}
       <TestOutput node={node} />
       <CelDetails node={node} />
-      <StepSourceSection result={readStepSource(node.detail)} />
+      {(node.failed || node.pending) && <StepSourceSection result={readStepSource(node.detail)} />}
       {stepDetail.kind === "step" && <StepKindSections step={stepDetail.step} {...(renderWait ? { renderWait } : {})} />}
       {stepDetail.kind === "invalid" && <MalformedStepDetail error={stepDetail.error} />}
       {rawDetail != null && (

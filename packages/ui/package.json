@@ -29,6 +29,7 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./runtime/*": "./dist/runtime/*",
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
@@ -144,9 +145,19 @@
       "import": "./dist/runtime-profile.js",
       "require": "./dist/runtime-profile.cjs"
     },
+    "./comments/anchoring": {
+      "types": "./dist/comment-anchoring.d.ts",
+      "import": "./dist/comment-anchoring.js",
+      "require": "./dist/comment-anchoring.cjs"
+    },
     "./oxlint-plugins": "./oxlint-plugins/clicky-ui.js",
     "./json-schema-form.schema.json": "./schemas/json-schema-form.schema.json",
     "./styles.css": "./dist/styles.css",
+    "./page-styles": {
+      "types": "./dist/page-styles.d.ts",
+      "import": "./dist/page-styles.js",
+      "require": "./dist/page-styles.cjs"
+    },
     "./mdx-editor.css": "./dist/mdx-editor.css",
     "./tailwind-preset": {
       "types": "./dist/tailwind-preset.d.ts",
@@ -160,7 +171,9 @@
   },
   "scripts": {
     "dev": "vite dev",
-    "build": "pnpm run build:icons && pnpm run check:public-exports && vite build && node scripts/rewrite-declaration-imports.mjs && pnpm run check:declarations && vite build --mode cjs && node scripts/build-styles.mjs",
+    "build": "tsx ../page-runtime/scripts/run-package-build.ts",
+    "build:artifacts": "pnpm run build:icons && pnpm run check:public-exports && vite build && node scripts/rewrite-declaration-imports.mjs && pnpm run check:declarations && vite build --mode cjs && node scripts/build-styles.mjs && tsx scripts/build-runtime.ts",
+    "test:runtime-set": "gavel test --work-dir ../page-runtime --framework vitest --recursive=false -- --config ../../packages/ui/scripts/test-runtime-set.config.ts",
     "build:icons": "tsx scripts/build-icons.ts",
     "build:icons:force": "tsx scripts/build-icons.ts --force",
     "download:icons": "tsx scripts/download-icons.ts",
@@ -183,6 +196,8 @@
     "@codemirror/language": "catalog:",
     "@codemirror/state": "catalog:",
     "@codemirror/view": "catalog:",
+    "@medv/finder": "catalog:",
+    "dom-accessibility-api": "catalog:",
     "@flanksource/icons": "catalog:",
     "@floating-ui/react": "catalog:",
     "@lexical/react": "catalog:",
@@ -198,6 +213,7 @@
     "jotai": "catalog:",
     "jsonc-parser": "catalog:",
     "lexical": "catalog:",
+    "modern-screenshot": "catalog:",
     "monaco-yaml": "catalog:",
     "tailwind-merge": "catalog:",
     "yaml": "catalog:"

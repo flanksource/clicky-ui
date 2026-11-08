@@ -6,14 +6,14 @@ import { collapsedPathSegments, normalizeLintPath, relPath, workDirLabel } from 
 import { severityOf } from "../data/lint/stats";
 import type { LinterResult } from "../data/lint/types";
 import type { Test } from "../data/test-runner/types";
-import { fileRefKey, type FileFinding, type FileTreeNode } from "./types";
+import { fileRefKey, type FileFinding, type FileRef, type FileTreeNode } from "./types";
 
 /**
  * One finding per violation that names a file. A violation without a file
  * cannot be placed in a source view and is left out; one without a line is
  * anchored to the first line of its file (a file-level finding). A violation
- * found at several places (`locations`) is a finding at each of them, its
- * message naming what is there.
+ * found at several file locations is a finding at each of them, its message
+ * naming what is there; entity, URL and image locations have no place here.
  */
 export function lintFindings(results: readonly LinterResult[]): FileFinding[] {
   return results.flatMap((result) =>
@@ -26,8 +26,9 @@ export function lintFindings(results: readonly LinterResult[]): FileFinding[] {
         kind: "lint" as const,
       };
       const message = violation.message ?? "";
-      if ((violation.locations?.length ?? 0) > 1) {
-        return violation.locations!.map((location) => ({
+      const fileLocations = (violation.locations ?? []).filter((location) => location.file);
+      if (fileLocations.length > 1) {
+        return fileLocations.map((location) => ({
           ...finding,
           file: relPath(location.file, result.work_dir)!,
           line: Math.max(location.line ?? 1, 1),
@@ -88,16 +89,16 @@ type PathTrie = {
   name: string;
   path: string;
   folders: Map<string, PathTrie>;
-  files: Map<string, FileFinding[]>;
+  files: Map<string, { file: string; findings: FileFinding[] }>;
 };
 
 function newTrie(name: string, path: string): PathTrie {
   return { name, path, folders: new Map(), files: new Map() };
 }
 
-function addToTrie(root: PathTrie, finding: FileFinding): void {
-  const segments = collapsedPathSegments(finding.file);
-  if (segments.length === 0) throw new Error(`findings: empty file path (${JSON.stringify(finding.file)})`);
+function addToTrie(root: PathTrie, file: string, finding?: FileFinding): void {
+  const segments = collapsedPathSegments(file);
+  if (segments.length === 0) throw new Error(`findings: empty file path (${JSON.stringify(file)})`);
   let current = root;
   for (const segment of segments.slice(0, -1)) {
     let child = current.folders.get(segment);
@@ -108,7 +109,9 @@ function addToTrie(root: PathTrie, finding: FileFinding): void {
     current = child;
   }
   const basename = segments[segments.length - 1]!;
-  current.files.set(basename, [...(current.files.get(basename) ?? []), finding]);
+  const entry = current.files.get(basename) ?? { file, findings: [] };
+  if (finding) entry.findings.push(finding);
+  current.files.set(basename, entry);
 }
 
 const byName = ([a]: [string, unknown], [b]: [string, unknown]) => a.localeCompare(b);
@@ -122,14 +125,15 @@ function trieNodes(trie: PathTrie, workDir: string | undefined): FileTreeNode[] 
         key: `folder\u0000${workDir ?? ""}\u0000${folder.path}`,
         name,
         kind: "folder",
+        ref: { workDir, file: folder.path },
         children,
         findings: children.flatMap((c) => c.findings),
       };
     });
   const files = Array.from(trie.files.entries())
     .sort(byName)
-    .map(([name, findings]): FileTreeNode => {
-      const ref = { workDir, file: findings[0]!.file };
+    .map(([name, { file, findings }]): FileTreeNode => {
+      const ref = { workDir, file };
       return {
         key: fileRefKey(ref),
         name,
@@ -152,22 +156,30 @@ function workDirRootNames(workDirs: readonly (string | undefined)[]): Map<string
 }
 
 /**
- * The files that have findings as a path tree: folders before files, each level
- * sorted by name, single-child folders folded into one row (`pkg/sub/a.go`).
- * When the findings span several work dirs, each gets its own root folder.
+ * The files that have findings, plus any listed in `files`, as a path tree:
+ * folders before files, each level sorted by name, single-child folders folded
+ * into one row (`pkg/sub/a.go`). A listed file with no findings is a node with
+ * none. When the files span several work dirs, each gets its own root folder.
  */
-export function groupFindingsByFile(findings: readonly FileFinding[]): FileTreeNode[] {
-  const byWorkDir = new Map<string | undefined, FileFinding[]>();
-  for (const finding of findings) {
-    byWorkDir.set(finding.workDir, [...(byWorkDir.get(finding.workDir) ?? []), finding]);
-  }
+export function groupFindingsByFile(findings: readonly FileFinding[], files: readonly FileRef[] = []): FileTreeNode[] {
+  const byWorkDir = new Map<string | undefined, { findings: FileFinding[]; files: string[] }>();
+  const groupOf = (workDir: string | undefined) => {
+    const existing = byWorkDir.get(workDir);
+    if (existing) return existing;
+    const created = { findings: [], files: [] };
+    byWorkDir.set(workDir, created);
+    return created;
+  };
+  for (const finding of findings) groupOf(finding.workDir).findings.push(finding);
+  for (const ref of files) groupOf(ref.workDir).files.push(ref.file);
   const multiRoot = byWorkDir.size > 1;
   const rootNames = workDirRootNames(Array.from(byWorkDir.keys()));
 
   const roots = Array.from(byWorkDir.entries())
-    .map(([workDir, group]): FileTreeNode[] => {
+    .map(([workDir, { findings: group, files: groupFiles }]): FileTreeNode[] => {
       const trie = newTrie("", "");
-      for (const finding of group) addToTrie(trie, finding);
+      for (const file of groupFiles) addToTrie(trie, file);
+      for (const finding of group) addToTrie(trie, finding.file, finding);
       const nodes = trieNodes(trie, workDir);
       if (!multiRoot) return nodes;
       return [
@@ -175,6 +187,7 @@ export function groupFindingsByFile(findings: readonly FileFinding[]): FileTreeN
           key: `root\u0000${workDir ?? ""}`,
           name: rootNames.get(workDir)!,
           kind: "folder",
+          ref: { workDir, file: "" },
           children: nodes,
           findings: group,
         },

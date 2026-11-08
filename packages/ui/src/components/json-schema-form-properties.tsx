@@ -182,7 +182,7 @@ export function PropertyValueEditor({
           icon={UiCheck}
           label={`Save ${field.label}`}
           className={cn(
-            "w-6 text-[var(--fs-success)] hover:text-[var(--fs-success-700)]",
+            "w-6 text-[var(--clicky-success)] hover:text-[var(--clicky-success-700)]",
             controlHeightClass[ctx.size],
           )}
           onClick={() => accept({ restoreFocus: true })}

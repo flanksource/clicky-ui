@@ -75,3 +75,13 @@ describe("FilterPill tri-state switch", () => {
     expect(onModeChange).toHaveBeenCalledWith("include");
   });
 });
+
+describe("FilterPill facet count", () => {
+  it("shows a large facet count in short SI form with the exact count as its title", () => {
+    const exact = 698_988;
+    render(<FilterPill label="oipa-oipa" count={exact} onModeChange={() => undefined} />);
+    const count = document.querySelector("[data-pill-count]");
+    expect(count?.textContent).toBe("699K");
+    expect(count?.getAttribute("title")).toBe(exact.toLocaleString());
+  });
+});
