@@ -158,6 +158,37 @@ export const RunningWithProgress: Story = {
   ),
 };
 
+// A running query step: gavel's live `detail.query` record — the connection
+// target as badges, the template and issued SQL — which the next snapshot
+// extends in place, and the PRINT / RAISERROR messages so far as its stdout.
+export const RunningQueryWithMessages: Story = {
+  render: () => {
+    const running = {
+      name: "inspectspawn",
+      framework: "fixture",
+      running: true,
+      stdout: "DetectLoopingSpawn: listing the looping groups (a full pass over the loop links)\n+121s: 39,692,332 candidate links\n",
+      detail: {
+        name: "inspectspawn",
+        kind: "command",
+        state: "running",
+        query: {
+          template: "EXEC dbo.DetectLoopingSpawn @MinGenerations=$(.params.minGenerations), @Stage=0",
+          sql: "EXEC dbo.DetectLoopingSpawn @MinGenerations=@p1, @Stage=0",
+          arguments: [100],
+          params: { minGenerations: 100 },
+          connection: { name: "lab", type: "sql_server", host: "db.example.com", port: "1433", user: "reporter", database: "app" },
+        },
+      },
+    };
+    return (
+      <div className="h-screen">
+        <VerificationResults report={report({ state: "running", tests: [running] })} selected={running} onSelect={() => {}} />
+      </div>
+    );
+  },
+};
+
 export const QueuedStepWithSource: Story = {
   render: () => {
     const queued = {

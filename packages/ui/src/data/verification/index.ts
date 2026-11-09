@@ -20,6 +20,8 @@ export {
   readStepDetail,
   readViolation,
   type StepQuery,
+  type StepQueryBatch,
+  type StepQueryConnection,
   type StepQueryResult,
   type ViolationDetail,
   type ViolationDetailResult,

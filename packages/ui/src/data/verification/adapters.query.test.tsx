@@ -90,8 +90,73 @@ describe("a query step's query", () => {
   });
 });
 
+const HOST = "db.example.com";
+const PORT = "1433";
+const USER = "reporter";
+const DATABASE = "app";
+const connection = { name: "lab", type: "sql_server", host: HOST, port: PORT, user: USER, database: DATABASE };
+const PRINTED = "purge: listing the looping groups";
+const ANSI_WARNING = "Warning: Null value is eliminated by an aggregate";
+
+// A running step: no `passed`, the live record in `detail.query` as gavel's
+// testrunner projects ExecutionNode.Metadata.
+const runningQueryStep = (record: unknown): Test => ({ name: "purge", framework: "fixture", running: true, detail: { name: "purge", kind: "command", state: "running", query: record } });
+
+describe("a query step's connection and batches", () => {
+  it("badges the connection's host:port, user and database beside its name and type", () => {
+    renderDetail(queryStep({ ...query, connection }));
+    const row = querySection()!.querySelector<HTMLElement>("[data-query-connection]")!;
+    expect(row).toHaveTextContent("lab");
+    expect(row).toHaveTextContent("sql_server");
+    const target = (label: string) => row.querySelector<HTMLElement>(`[data-query-target='${label}']`);
+    expect(target("host")).toHaveTextContent(`${HOST}:${PORT}`);
+    expect(target("user")).toHaveTextContent(USER);
+    expect(target("db")).toHaveTextContent(DATABASE);
+  });
+
+  it("omits the badges a connection has no value for (a sqlite file has only its database)", () => {
+    renderDetail(queryStep({ ...query, connection: { name: "lab", type: "sqlite", database: "/data/lab.db" } }));
+    const row = querySection()!.querySelector<HTMLElement>("[data-query-connection]")!;
+    expect([...row.querySelectorAll("[data-query-target]")].map((badge) => badge.getAttribute("data-query-target"))).toEqual(["db"]);
+  });
+
+  it("badges the batches that ended, and leaves the server's messages to the step's stdout and stderr", () => {
+    renderDetail({
+      ...queryStep({ ...query, connection, batches: [{ batch: 1, run: 1, rowsAffected: 4 }, { batch: 2, run: 3 }] }),
+      stdout: `${PRINTED}\n`,
+      stderr: `${ANSI_WARNING}\n`,
+    });
+    const section = querySection()!;
+    expect(section.querySelector("[data-query-batches]")).toHaveTextContent("batch 1 done · 4 row(s)batch 2 run 3 done");
+    expect(section).not.toHaveTextContent(PRINTED);
+    expect(section).not.toHaveTextContent(ANSI_WARNING);
+    expect(document.body).toHaveTextContent(PRINTED);
+    expect(document.body).toHaveTextContent(ANSI_WARNING);
+  });
+
+  it("updates a running step's query in place as its record grows, keeping the chosen SQL tab", () => {
+    const live = { ...query, connection, batches: [{ batch: 1, run: 1, rowsAffected: 4 }] };
+    const view = renderDetail(runningQueryStep(live));
+    fireEvent.click(within(querySection()!).getByRole("radio", { name: "SQL" }));
+    const grown = runningQueryStep({ ...live, batches: [...live.batches, { batch: 2, run: 1 }] });
+    view.rerender(
+      <TestRunnerProvider value={{ tests: [grown], selected: grown, done: false, filters: emptyTestFilters(), expandAll: null, busy: {},
+        adapters: verificationAdapters(), onSelect: () => {}, onFiltersChange: () => {}, onExpandAllChange: () => {} }}>
+        <TestDetailPanel />
+      </TestRunnerProvider>,
+    );
+    const section = querySection()!;
+    expect(section.querySelector("[data-query-batches]")).toHaveTextContent("batch 1 done · 4 row(s)batch 2 done");
+    expect(within(section).getByRole("radio", { name: "SQL" })).toHaveAttribute("aria-checked", "true");
+    expect(section.querySelector("[data-query-code]")).toHaveTextContent(SQL);
+  });
+});
+
 describe("readQuery", () => {
   it.each([
+    [{ template: TEMPLATE, connection: { name: "lab" } }, "detail.query.connection.type must be a string"],
+    [{ template: TEMPLATE, connection: { name: "lab", type: "postgres", port: 5432 } }, "detail.query.connection.port must be a string"],
+    [{ template: TEMPLATE, batches: [{ batch: 1, run: 1, rowsAffected: "4" }] }, "detail.query.batches[0].rowsAffected must be a number"],
     [{ sql: SQL }, "detail.query.template must be a string"],
     [{ template: TEMPLATE, sql: 3 }, "detail.query.sql must be a string"],
     [{ template: TEMPLATE, params: [STATUS] }, "detail.query.params must be an object"],

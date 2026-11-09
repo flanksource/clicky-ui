@@ -13,6 +13,7 @@ import {
   ExecutionHeaderView,
   FailureCallout,
   MalformedStepDetail,
+  StepFailedTestsSection,
   StepFormSection,
   StepKindSections,
   StepPendingFormSection,
@@ -39,15 +40,15 @@ function checklistItemOutcome(item: Test): TestOutcome {
 
 function ChecklistItemRow({ item }: { item: Test }) {
   return (
-    <li className="flex items-start gap-1.5 text-xs">
-      <OutcomeIcon outcome={checklistItemOutcome(item)} className="mt-0.5 text-sm" />
-      <span className="min-w-0">
-        {item.name}
-        {item.message ? (
-          <span className="block text-[11px] text-muted-foreground">{item.message}</span>
-        ) : null}
-      </span>
-    </li>
+    <tr className="align-top" data-checklist-item="">
+      <td className="px-2 py-1.5">
+        <span className="flex items-start gap-1.5">
+          <OutcomeIcon outcome={checklistItemOutcome(item)} className="mt-0.5 text-sm" />
+          <span className="min-w-0">{item.name}</span>
+        </span>
+      </td>
+      <td className="px-2 py-1.5 text-muted-foreground">{item.message}</td>
+    </tr>
   );
 }
 
@@ -56,12 +57,16 @@ function ChecklistItemRow({ item }: { item: Test }) {
 export function ChecklistDetail({ node }: { node: Test }) {
   const items = node.children && node.children.length > 0 ? node.children : [node];
   return (
-    <div className="space-y-2 p-density-4">
-      <ul className="space-y-1">
-        {items.map((item, index) => (
-          <ChecklistItemRow key={item.task_id ?? index} item={item} />
-        ))}
-      </ul>
+    <div className="p-density-4">
+      <div className="overflow-hidden rounded-md border border-border/60">
+        <table className="w-full border-collapse text-xs">
+          <tbody className="divide-y divide-border/60">
+            {items.map((item, index) => (
+              <ChecklistItemRow key={item.task_id ?? index} item={item} />
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -152,10 +157,11 @@ export function FixtureDetail({ node, renderWait, renderPendingPrompt }: Fixture
   const rawDetail = withoutQuery(withoutViolation(withoutSource(stepDetail.kind === "step" ? splitExecutionDetail(stepDetail.step.rest).rest : rest)));
   const pendingForm = node.waiting === true && renderPendingPrompt ? renderPendingPrompt(node) : null;
   return (
-    <div className="space-y-4 p-density-4">
+    <div className="space-y-4 p-density-4" data-fixture-detail="">
       <ExecutionHeaderView header={header} {...(stepDetail.kind === "step" ? { stepKind: stepDetail.step.step.kind } : {})} />
       {pendingForm != null && <StepPendingFormSection>{pendingForm}</StepPendingFormSection>}
       <FailureMessage node={node} cause={stepDetail.kind === "step" ? stepDetail.step.wait?.cause : undefined} error={header.error} />
+      {stepDetail.kind === "step" && stepDetail.step.step.kind === "test" && <StepFailedTestsSection node={node} />}
       {query.kind === "query" && <StepQuerySection query={query.query} />}
       {query.kind === "invalid" && <MalformedStepDetail error={query.error} />}
       {command && query.kind !== "query" && (

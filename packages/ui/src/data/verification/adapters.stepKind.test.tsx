@@ -229,23 +229,23 @@ describe("verificationAdapters: watcher events", () => {
 });
 
 describe("verificationAdapters: step identity", () => {
-  it("names the step kind and id for a node with no fixture context", () => {
+  it("names the step kind once, in the detail header, not again in the body", () => {
     renderDetail({
       name: "stack",
       framework: "services",
       passed: true,
-      detail: { step: { id: "stack", kind: "services" } },
+      detail: { kind: "services", step: { id: "stack", kind: "services" } },
     });
-    const ref = document.querySelector("[data-step-ref]")!;
-    expect(ref.textContent).toBe("services · stack");
+    expect(screen.getAllByText("services")).toHaveLength(1);
+    expect(screen.getByText("services").closest("[data-detail-header]")).not.toBeNull();
   });
 
   it("claims a playwright node carrying detail.step but not a playwright test", () => {
     renderDetail({ name: "watch", framework: "playwright", passed: true, detail: { step: { id: "watch", kind: "playwright" } } });
-    expect(document.querySelector("[data-step-ref]")).not.toBeNull();
+    expect(document.querySelector("[data-fixture-detail]")).not.toBeNull();
     document.body.innerHTML = "";
     renderDetail({ name: "checkout › pays", framework: "playwright", passed: true, detail: { trace: "t.zip" } });
-    expect(document.querySelector("[data-step-ref]")).toBeNull();
+    expect(document.querySelector("[data-fixture-detail]")).toBeNull();
   });
 
   it("says so, with the offending field, when the step detail breaks the contract", () => {
