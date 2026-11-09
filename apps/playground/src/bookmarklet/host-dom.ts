@@ -112,15 +112,24 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void, onW
   resize.observe(document.body);
   window.addEventListener("scroll", schedule, true);
   window.addEventListener("resize", schedule);
-  function showRail() {
+  function railLayout() {
     mode = "rail";
     root.setAttribute("data-mode", mode);
     frame.style.removeProperty("left");
     frame.style.removeProperty("top");
     frame.style.removeProperty("height");
     sizing.layout(preferredWidth, maximized);
-    restore();
     onPresentation(false);
+  }
+  function showRail() {
+    railLayout();
+    restore();
+  }
+  const resume = () => { frame.hidden = minimized; fab.hidden = !minimized; };
+  function closeDraft(posted: boolean) {
+    railLayout();
+    if (posted || !previousMinimized) restore();
+    else { minimized = true; resume(); }
   }
   let preferredWidth = 400;
   let maximized = false;
@@ -130,7 +139,12 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void, onW
     restore,
     showRail,
     minimize() { minimized = true; frame.hidden = true; fab.hidden = false; fab.focus(); },
-    resume() { frame.hidden = minimized; fab.hidden = !minimized; },
+    resume,
+    /** A new URL drops any floating draft but never reopens a minimized sidebar. */
+    pageChanged() {
+      if (mode === "draft") closeDraft(false);
+      else resume();
+    },
     draft(active: boolean, anchor?: string, posted = false) {
       if (active) {
         if (!anchor) throw new Error("Floating comment requires an anchor");
@@ -141,10 +155,7 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void, onW
         restore();
         onPresentation(true);
         schedule();
-      } else {
-        showRail();
-        if (!posted && previousMinimized) { minimized = true; frame.hidden = true; fab.hidden = false; }
-      }
+      } else closeDraft(posted);
     },
     draftSize(height: number) { draftHeight = height; schedule(); },
     layout(width: number, detail: boolean) {

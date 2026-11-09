@@ -29,6 +29,7 @@ import {
   createAgentSession,
 } from "./agent-runs-api";
 import { AgentRunChip } from "./AgentRunChip";
+import { rememberAgentTarget } from "./agent-targets";
 import { AgentSendFailure } from "./AgentSendFailure";
 import { AgentSessionPanel } from "./AgentSessionPanel";
 import { RunAgentDialog } from "./RunAgentDialog";
@@ -146,6 +147,7 @@ export function AgentRunsProvider({
     async (next: AgentTarget) => {
       if (!page) throw new Error("AgentRunsProvider has no page to set a target for");
       await setPageAgentTarget(page, next);
+      rememberAgentTarget(next);
       await refresh();
     },
     [page, refresh],
@@ -163,6 +165,7 @@ export function AgentRunsProvider({
     const commentPage = "page" in comment && typeof comment.page === "string" ? comment.page : page ?? (await fetchComments()).find(entry => entry.id === comment.id)?.page;
     if (!commentPage) throw new Error(`Cannot find the page for comment ${comment.id}`);
     await setPageAgentTarget(commentPage, next);
+    rememberAgentTarget(next);
     await refresh();
   }, [page, refresh]);
 

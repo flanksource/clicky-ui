@@ -91,7 +91,7 @@ export function installBookmarklet(scriptUrl: string) {
     if (state.url === location.href) return;
     version++; agent.dispose();
     try { agent = start(); } catch (cause) { error(cause); return; }
-    state = { url: location.href, title: externalTitle({ url: location.href, title: document.title }) }; ui.showRail(); send({ type: "state", state });
+    state = { url: location.href, title: externalTitle({ url: location.href, title: document.title }) }; ui.pageChanged(); send({ type: "state", state });
   }, 250);
   function close() {
     closed = true; version++; clearTimeout(startup); clearInterval(navigation); window.removeEventListener("message", onMessage); releaseScreenshotCapture(); agent.dispose(); ui.close(); delete window.__PLAYGROUND_GRABBER__;
