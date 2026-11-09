@@ -86,6 +86,8 @@ export function comboboxAriaProps(
 
 export function defaultPlaceholder(schema: JsonSchemaProperty): string {
   if (schema.default != null && typeof schema.default !== "object") return String(schema.default);
+  const example = schema.examples?.[0];
+  if (example != null && typeof example !== "object") return String(example);
   return "";
 }
 
