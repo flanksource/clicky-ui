@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clockTime, policySummary, readStepDetail, splitExecutionDetail, stepKindCopy, waitDecidedBy, type StepDetail } from "./stepKind";
+import { clockTime, policySummary, readQuery, readStepDetail, splitExecutionDetail, stepKindCopy, waitDecidedBy, type StepDetail } from "./stepKind";
 
 const STEP = { id: "plan", kind: "todo_prompt" };
 
@@ -198,5 +198,43 @@ describe("splitExecutionDetail", () => {
 
   it("leaves a field of the wrong type in the raw rest instead of hiding it", () => {
     expect(splitExecutionDetail({ state: 3 })).toEqual({ header: {}, rest: { state: 3 } });
+  });
+});
+
+const TEMPLATE = "SELECT 1";
+const SESSION = { engine: "sqlserver", sessionId: 57, server: "db01", database: "app", user: "reporter", page: 2 };
+const SAMPLE = { sampledAt: "2026-11-09T10:00:10Z", engine: "sqlserver", sessionId: 57, cpuMs: 9000, logicalReads: 120000, waitType: "LCK_M_S", blockedBy: 61, blocked: true, sql: "SELECT 1" };
+
+function queryOf(record: Record<string, unknown>) {
+  const result = readQuery({ query: { template: TEMPLATE, ...record } });
+  return result.kind === "query" ? result.query : result;
+}
+
+describe("readQuery session and diagnose", () => {
+  it("reads the session, the samples, the dropped count and the diagnose error", () => {
+    expect(queryOf({ session: SESSION, diagnose: [SAMPLE], diagnoseDropped: 3, diagnoseError: "no VIEW SERVER STATE" })).toEqual({
+      template: TEMPLATE, session: SESSION, diagnose: [SAMPLE], diagnoseDropped: 3, diagnoseError: "no VIEW SERVER STATE",
+    });
+  });
+
+  it("reads a sample that omits every key but sampledAt, engine and sessionId", () => {
+    const minimal = { sampledAt: SAMPLE.sampledAt, engine: "postgres", sessionId: 4121 };
+    expect(queryOf({ diagnose: [minimal] })).toEqual({ template: TEMPLATE, diagnose: [minimal] });
+  });
+
+  it("leaves session and diagnose absent when the record has none (or a null diagnose)", () => {
+    expect(queryOf({ diagnose: null })).toEqual({ template: TEMPLATE });
+  });
+
+  it.each([
+    ["session.sessionId", { session: { ...SESSION, sessionId: "57" } }, "detail.query.session.sessionId must be a number"],
+    ["session.engine", { session: { sessionId: 1 } }, "detail.query.session.engine must be a string"],
+    ["sample.cpuMs", { diagnose: [{ ...SAMPLE, cpuMs: "9000" }] }, "detail.query.diagnose[0].cpuMs must be a number"],
+    ["sample.blocked", { diagnose: [SAMPLE, { ...SAMPLE, blocked: 1 }] }, "detail.query.diagnose[1].blocked must be a boolean"],
+    ["sample.sampledAt", { diagnose: [{ ...SAMPLE, sampledAt: undefined }] }, "detail.query.diagnose[0].sampledAt must be a string"],
+    ["diagnose", { diagnose: {} }, "detail.query.diagnose must be an array"],
+    ["diagnoseDropped", { diagnoseDropped: "3" }, "detail.query.diagnoseDropped must be a number"],
+  ])("reports a wrong-typed %s by path", (_name, record, error) => {
+    expect(queryOf(record)).toEqual({ kind: "invalid", error });
   });
 });

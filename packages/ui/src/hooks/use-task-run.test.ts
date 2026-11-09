@@ -24,7 +24,7 @@ class MockEventSource {
   }
   emit(type: string, data: unknown) {
     for (const fn of this.listeners[type] ?? []) {
-      fn({ data: JSON.stringify(data) } as MessageEvent);
+      fn({ data: typeof data === "string" ? data : JSON.stringify(data) } as MessageEvent);
     }
   }
   close() {
@@ -237,6 +237,127 @@ describe("useTaskRun (SSE)", () => {
       isComplete: false,
     }));
     expect(es.closed).toBe(true);
+  });
+});
+
+describe("useTaskRun session feed", () => {
+  const CAPTAIN = { type: "captain", id: "abc" };
+  const OTHER = { type: "captain", id: "other" };
+  const entry = { id: "m1", role: "assistant", parts: [{ type: "text", text: "hello" }] };
+  const state = { revision: 2, lifecycleStatus: "running", activityState: "active", facets: "f1" };
+
+  const handlers = () => ({ onEntry: vi.fn(), onState: vi.fn(), onError: vi.fn() });
+
+  beforeEach(() => {
+    vi.stubGlobal("EventSource", MockEventSource as unknown as typeof EventSource);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    MockEventSource.last = null;
+  });
+
+  it("dispatches session, session-state and session-error frames to the subscriber of that ref only", () => {
+    const { result } = renderHook(() => useTaskRun({ id: "g1" }));
+    const es = MockEventSource.last!;
+    const mine = handlers();
+    const theirs = handlers();
+    result.current.sessionFeed!.subscribe(CAPTAIN, mine);
+    result.current.sessionFeed!.subscribe(OTHER, theirs);
+
+    act(() => es.emit("session", { session: CAPTAIN, entry }));
+    act(() => es.emit("session-state", { session: CAPTAIN, state }));
+    act(() => es.emit("session-error", { session: CAPTAIN, error: "LISTEN failed" }));
+
+    expect(mine.onEntry).toHaveBeenCalledExactlyOnceWith(entry);
+    expect(mine.onState).toHaveBeenCalledExactlyOnceWith(state);
+    expect(mine.onError).toHaveBeenCalledExactlyOnceWith("LISTEN failed");
+    expect(theirs.onEntry).not.toHaveBeenCalled();
+    expect(theirs.onState).not.toHaveBeenCalled();
+    expect(theirs.onError).not.toHaveBeenCalled();
+  });
+
+  it("delivers to every subscriber of a ref and keeps the feed identity stable across renders", () => {
+    const { result, rerender } = renderHook(() => useTaskRun({ id: "g1" }));
+    const first = result.current.sessionFeed;
+    const a = handlers();
+    const b = handlers();
+    first!.subscribe(CAPTAIN, a);
+    first!.subscribe(CAPTAIN, b);
+
+    rerender();
+    act(() => MockEventSource.last!.emit("session", { session: CAPTAIN, entry }));
+
+    expect(result.current.sessionFeed).toBe(first);
+    expect(a.onEntry).toHaveBeenCalledTimes(1);
+    expect(b.onEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops delivering to a subscriber once it unsubscribes", () => {
+    const { result } = renderHook(() => useTaskRun({ id: "g1" }));
+    const es = MockEventSource.last!;
+    const gone = handlers();
+    const kept = handlers();
+    const unsubscribe = result.current.sessionFeed!.subscribe(CAPTAIN, gone);
+    result.current.sessionFeed!.subscribe(CAPTAIN, kept);
+
+    unsubscribe();
+    act(() => es.emit("session", { session: CAPTAIN, entry }));
+
+    expect(gone.onEntry).not.toHaveBeenCalled();
+    expect(kept.onEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not buffer: a frame sent before anyone subscribed is never replayed", () => {
+    const { result } = renderHook(() => useTaskRun({ id: "g1" }));
+    act(() => MockEventSource.last!.emit("session", { session: CAPTAIN, entry }));
+
+    const late = handlers();
+    result.current.sessionFeed!.subscribe(CAPTAIN, late);
+
+    expect(late.onEntry).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: "a session frame without a session ref", event: "session", data: { entry } },
+    { name: "a session frame whose ref has no id", event: "session", data: { session: { type: "captain" }, entry } },
+    { name: "a session frame without an entry", event: "session", data: { session: CAPTAIN } },
+    { name: "a session frame whose entry has no message id", event: "session", data: { session: CAPTAIN, entry: { role: "assistant" } } },
+    { name: "a session-state frame without a revision", event: "session-state", data: { session: CAPTAIN, state: { lifecycleStatus: "running", facets: "f1" } } },
+    { name: "a session-state frame without facets", event: "session-state", data: { session: CAPTAIN, state: { revision: 1, lifecycleStatus: "running" } } },
+    { name: "a session-error frame without an error string", event: "session-error", data: { session: CAPTAIN, error: 7 } },
+  ])("rejects $name loudly and delivers nothing", async ({ event, data }) => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { result } = renderHook(() => useTaskRun({ id: "g1" }));
+    const subscriber = handlers();
+    result.current.sessionFeed!.subscribe(CAPTAIN, subscriber);
+
+    act(() => MockEventSource.last!.emit(event, data));
+
+    await waitFor(() => expect(result.current.status).toBe("invalid task session data"));
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(String(consoleError.mock.calls[0]?.[0])).toContain(event);
+    for (const fn of Object.values(subscriber)) expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("rejects a session frame that is not JSON", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { result } = renderHook(() => useTaskRun({ id: "g1" }));
+    const subscriber = handlers();
+    result.current.sessionFeed!.subscribe(CAPTAIN, subscriber);
+
+    act(() => MockEventSource.last!.emit("session", "{not json"));
+
+    await waitFor(() => expect(result.current.status).toBe("invalid task session data"));
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    expect(subscriber.onEntry).not.toHaveBeenCalled();
+  });
+
+  it("has no session feed on the polling transport, which carries no session frames", () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => [groupSnap("running")] }));
+    const { result } = renderHook(() => useTaskRun({ id: "g1", forcePoll: true }));
+
+    expect(result.current.sessionFeed).toBeUndefined();
   });
 });
 

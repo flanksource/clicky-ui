@@ -433,6 +433,60 @@ export type StepQuery = {
   connection?: StepQueryConnection;
   /** The batches of a SQL program that have ended, with the rows each changed where the driver reports it. */
   batches?: StepQueryBatch[];
+  /** The server session the query ran on (SPID, backend PID, connection id or ClickHouse query id). */
+  session?: StepQuerySession;
+  /** AutoDiagnose samples of that session while the statement ran, oldest first (gavel keeps the last 100). */
+  diagnose?: StepQuerySample[];
+  /** How many older samples gavel dropped beyond the ones in `diagnose`. */
+  diagnoseDropped?: number;
+  /** Why sampling stopped (a missing grant, a read error); the query itself is unaffected. */
+  diagnoseError?: string;
+};
+
+/** commons-db query.ServerSession. `engine` is postgres, sqlserver, mysql or clickhouse; `sessionId` is 0 for clickhouse, which uses `queryId`. */
+export type StepQuerySession = {
+  engine: string;
+  sessionId: number;
+  queryId?: string;
+  server?: string;
+  database?: string;
+  user?: string;
+  page?: number;
+};
+
+/**
+ * commons-db sqlactivity.Sample as JSON. A zero metric means the engine does not
+ * report it; `blockedBy` 0 means not blocked; `transactionStartedAt` may be the
+ * zero time ("0001-01-01T00:00:00Z").
+ */
+export type StepQuerySample = {
+  sampledAt: string;
+  engine: string;
+  sessionId: number;
+  database?: string;
+  requestId?: number;
+  blockedBy?: number;
+  blocked?: boolean;
+  user?: string;
+  application?: string;
+  clientHost?: string;
+  state?: string;
+  command?: string;
+  waitType?: string;
+  waitResource?: string;
+  waitMs?: number;
+  startedAt?: string;
+  transactionStartedAt?: string;
+  elapsedMs?: number;
+  transactionMs?: number;
+  cpuMs?: number;
+  logicalReads?: number;
+  reads?: number;
+  writes?: number;
+  memoryBytes?: number;
+  openTransactions?: number;
+  queryId?: string;
+  sql?: string;
 };
 
 export type StepQueryConnection = {
@@ -470,6 +524,43 @@ function readQueryBatch(value: unknown, index: number): StepQueryBatch {
   };
 }
 
+function readQuerySession(value: unknown): StepQuerySession {
+  const path = "detail.query.session";
+  const s = record(value, path);
+  return {
+    engine: str(s.engine, `${path}.engine`),
+    sessionId: num(s.sessionId, `${path}.sessionId`),
+    ...optional(s, "queryId", (v) => str(v, `${path}.queryId`)),
+    ...optional(s, "server", (v) => str(v, `${path}.server`)),
+    ...optional(s, "database", (v) => str(v, `${path}.database`)),
+    ...optional(s, "user", (v) => str(v, `${path}.user`)),
+    ...optional(s, "page", (v) => num(v, `${path}.page`)),
+  };
+}
+
+const SAMPLE_STRINGS = [
+  "database", "user", "application", "clientHost", "state", "command", "waitType", "waitResource",
+  "startedAt", "transactionStartedAt", "queryId", "sql",
+] as const;
+const SAMPLE_NUMBERS = [
+  "requestId", "blockedBy", "waitMs", "elapsedMs", "transactionMs", "cpuMs", "logicalReads", "reads", "writes",
+  "memoryBytes", "openTransactions",
+] as const;
+
+function readQuerySample(value: unknown, index: number): StepQuerySample {
+  const path = `detail.query.diagnose[${index}]`;
+  const s = record(value, path);
+  const sample: StepQuerySample = {
+    sampledAt: str(s.sampledAt, `${path}.sampledAt`),
+    engine: str(s.engine, `${path}.engine`),
+    sessionId: num(s.sessionId, `${path}.sessionId`),
+    ...optional(s, "blocked", (v) => bool(v, `${path}.blocked`)),
+  };
+  for (const key of SAMPLE_STRINGS) Object.assign(sample, optional(s, key, (v) => str(v, `${path}.${key}`)));
+  for (const key of SAMPLE_NUMBERS) Object.assign(sample, optional(s, key, (v) => num(v, `${path}.${key}`)));
+  return sample;
+}
+
 export type StepQueryResult =
   | { kind: "none" }
   | { kind: "query"; query: StepQuery }
@@ -486,6 +577,10 @@ function readQueryRecord(value: unknown): StepQuery {
     ...optional(q, "queryFile", (v) => str(v, `${path}.queryFile`)),
     ...optional(q, "connection", readQueryConnection),
     ...optional(q, "batches", (v) => list(v, `${path}.batches`).map(readQueryBatch)),
+    ...optional(q, "session", readQuerySession),
+    ...optional(q, "diagnose", (v) => list(v, `${path}.diagnose`).map(readQuerySample)),
+    ...optional(q, "diagnoseDropped", (v) => num(v, `${path}.diagnoseDropped`)),
+    ...optional(q, "diagnoseError", (v) => str(v, `${path}.diagnoseError`)),
   };
 }
 

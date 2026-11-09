@@ -4041,10 +4041,12 @@ function ClickyStackTraceNode({ node }: { node: ClickyNode }) {
 }
 
 function ClickyCollapsed({ node }: { node: ClickyNode }) {
+  const [expanded, setExpanded] = useState(false);
   return (
-    <details className="rounded-md border border-border bg-background">
-      <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-foreground">
+    <details className="rounded-md border border-border bg-background" onToggle={(event) => setExpanded(event.currentTarget.open)}>
+      <summary className="cursor-pointer break-words px-3 py-2 text-sm font-medium text-foreground">
         <ClickyNodeRenderer node={node.label} />
+        <span className="ml-2 inline-block text-xs font-normal text-muted-foreground">{expanded ? "Show less" : "Show more"}</span>
       </summary>
       {node.content && (
         <div className="border-t border-border px-3 py-3">

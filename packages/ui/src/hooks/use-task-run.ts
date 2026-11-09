@@ -14,6 +14,11 @@ import {
   withTaskStreams,
 } from "../data/task-streams";
 import { taskQueryKeys } from "../data/task-query-keys";
+import {
+  createTaskSessionFeed,
+  TASK_SESSION_FRAME_EVENTS,
+  type TaskSessionFeed,
+} from "../data/task-session-feed";
 import { useEventSourceFactory } from "./event-source";
 
 // use-task-run / use-task-runs are the generic clicky-ui task clients. They are
@@ -49,6 +54,15 @@ export interface UseTaskRunResult {
   snapshots: TaskSnapshot[];
   status: string;
   isComplete: boolean;
+  /**
+   * The live changes of the sessions the run's tasks drive (`session`,
+   * `session-state` and `session-error` frames), multiplexed on the same
+   * stream. Stable across renders; live-only, so a subscriber reads the
+   * transcript itself and uses the feed for what follows. Undefined on the
+   * polling transport, which carries no session frames — a session shown
+   * there can only be read, not followed.
+   */
+  sessionFeed?: TaskSessionFeed | undefined;
 }
 
 export interface UseTaskRunOptions extends TaskTransportOptions {
@@ -89,6 +103,10 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
   const [streamsById, setStreamsById] = useState<Record<string, TaskStreams>>({});
   const [status, setStatus] = useState("idle");
   const [isComplete, setIsComplete] = useState(false);
+  // One fan-out for the hook's lifetime: subscribers outlive a reconnect and a
+  // change of run, and see only frames sent while they are subscribed.
+  const [sessionSource] = useState(createTaskSessionFeed);
+  const polling = forcePoll || headersKey !== "{}" || !hasEventSource();
 
   // Read through a ref so a host's inline `value={(url) => ...}` factory prop
   // does not restart the subscription every render — only the effect's own
@@ -145,7 +163,7 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     };
 
     // Polling fallback transport.
-    if (forcePoll || headersKey !== "{}" || !hasEventSource()) {
+    if (polling) {
       let stopped = false;
       let timer: ReturnType<typeof setTimeout> | undefined;
       const tick = async () => {
@@ -207,6 +225,18 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
         setStatus("invalid task logs data");
       }
     });
+    // Session frames are not part of any task's state: they go straight to the
+    // feed. A malformed one is reported and dropped, never half-applied.
+    for (const event of TASK_SESSION_FRAME_EVENTS) {
+      es.addEventListener(event, (e) => {
+        try {
+          sessionSource.dispatch(event, JSON.parse((e as MessageEvent).data as string));
+        } catch (cause) {
+          console.error(`Dropped a "${event}" frame from ${streamUrl(basePath, query)}: ${String(cause)}`);
+          setStatus("invalid task session data");
+        }
+      });
+    }
     es.addEventListener("done", () => {
       setStatus("complete");
       setIsComplete(true);
@@ -214,7 +244,7 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     });
     es.onerror = () => setStatus("connection lost — retrying");
     return () => es.close();
-  }, [subscriptionKey, runIdsKey, kind, basePath, enabled, pollMs, forcePoll, headersKey]);
+  }, [subscriptionKey, runIdsKey, kind, basePath, enabled, pollMs, polling, headersKey, sessionSource]);
 
   const current = stateKey === subscriptionKey;
   // The streams are merged back in only here, at the boundary. The polling
@@ -227,7 +257,12 @@ export function useTaskRun(options: UseTaskRunOptions = {}): UseTaskRunResult {
     [current, byId, streamsById],
   );
 
-  return { snapshots, status: current ? status : "idle", isComplete: current && isComplete };
+  return {
+    snapshots,
+    status: current ? status : "idle",
+    isComplete: current && isComplete,
+    sessionFeed: polling ? undefined : sessionSource.feed,
+  };
 }
 
 export interface UseTaskRunsOptions extends TaskTransportOptions {

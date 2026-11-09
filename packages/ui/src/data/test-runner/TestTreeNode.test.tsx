@@ -31,9 +31,15 @@ function renderRow(node: Test) {
 }
 
 describe("TestTreeNode count badges", () => {
-  it("uses a neutral badge for aborted children", () => {
+  it("uses a neutral outline badge for aborted children", () => {
     renderRow({ name: "plan", children: [{ name: "not run", aborted: true, skipped: true }] });
-    expect(screen.getByText("1").parentElement).toHaveClass("bg-muted", "text-foreground");
+    expect(screen.getByText("1").parentElement).toHaveClass("bg-transparent", "border-border", "text-foreground", "rounded-sm");
+  });
+  it("renders a failed count as a danger outline badge, not a filled pill", () => {
+    renderRow({ name: "plan", children: [{ name: "broken", failed: true }] });
+    const badge = screen.getByText("1").parentElement;
+    expect(badge).toHaveClass("bg-transparent", "border-red-500", "rounded-sm");
+    expect(badge).not.toHaveClass("bg-red-500", "rounded-full");
   });
   // A subtree of warnings only (a lint rule, a soft-failing suite) still has a
   // size worth showing; without a warned badge its row carried no count at all.

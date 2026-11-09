@@ -27,6 +27,8 @@ import { TaskPrompts } from "./TaskPrompts";
 import type { LogEntry, TaskControlAction, TaskSnapshot } from "./TaskSnapshot";
 import { type TaskHeaderExtra, TaskMetadataChips } from "./TaskHeaderExtras";
 import { type TaskExtraTabs, TaskStreamTabs } from "./TaskStreamTabs";
+import { resolveTaskSession, type TaskSessionRenderers } from "./TaskSession";
+import type { TaskSessionFeed } from "./task-session-feed";
 import {
   isFailedOrWarn,
   taskGroupErrorCount,
@@ -87,6 +89,18 @@ export interface TaskProgressProps {
   headerExtra?: TaskHeaderExtra;
   /** Base path the prompt API is mounted under; a task's pending prompts are answered there. */
   promptBasePath?: string;
+  /**
+   * Renderers for the session a task drives (`TaskSnapshot.session`), keyed by
+   * session type and layered over the built-in captain renderer. A type with no
+   * renderer shows as a `type · id` chip.
+   */
+  sessionRenderers?: TaskSessionRenderers;
+  /**
+   * The live changes of the sessions the tasks drive, from the task stream
+   * they came from (`useTaskRun(...).sessionFeed`). Without it an expanded
+   * session is read once and not followed.
+   */
+  sessionFeed?: TaskSessionFeed;
 }
 
 export function TaskProgress({
@@ -102,6 +116,8 @@ export function TaskProgress({
   extraTabs,
   headerExtra,
   promptBasePath = DEFAULT_PROMPT_BASE,
+  sessionRenderers,
+  sessionFeed,
 }: TaskProgressProps) {
   const groups = taskGroupTree(snapshots);
 
@@ -129,6 +145,8 @@ export function TaskProgress({
         {...(connectionStatus ? { connectionStatus } : {})}
         {...(extraTabs ? { extraTabs } : {})}
         {...(headerExtra ? { headerExtra } : {})}
+        {...(sessionRenderers ? { sessionRenderers } : {})}
+        {...(sessionFeed ? { sessionFeed } : {})}
         promptBasePath={promptBasePath}
       >
         {node.children.length > 0 && (
@@ -161,6 +179,8 @@ function TaskGroupCard({
   extraTabs,
   headerExtra,
   promptBasePath,
+  sessionRenderers,
+  sessionFeed,
 }: {
   group: TaskSnapshot;
   tasks: TaskSnapshot[];
@@ -170,6 +190,8 @@ function TaskGroupCard({
   initialShowAllTasks: boolean | undefined;
   extraTabs?: TaskExtraTabs;
   headerExtra?: TaskHeaderExtra;
+  sessionRenderers?: TaskSessionRenderers;
+  sessionFeed?: TaskSessionFeed;
   promptBasePath: string;
   onControl?: (
     action: TaskControlAction,
@@ -340,6 +362,8 @@ function TaskGroupCard({
             {...(connectionStatus ? { connectionStatus } : {})}
             {...(extraTabs ? { extraTabs } : {})}
             {...(headerExtra ? { headerExtra } : {})}
+            {...(sessionRenderers ? { sessionRenderers } : {})}
+            {...(sessionFeed ? { sessionFeed } : {})}
             promptBasePath={promptBasePath}
           />
         ),
@@ -359,6 +383,8 @@ function TaskRow({
   extraTabs: contributeTabs,
   headerExtra,
   promptBasePath,
+  sessionRenderers,
+  sessionFeed,
 }: {
   task: TaskSnapshot;
   group: TaskSnapshot;
@@ -367,6 +393,8 @@ function TaskRow({
   connectionStatus?: string;
   extraTabs?: TaskExtraTabs;
   headerExtra?: TaskHeaderExtra;
+  sessionRenderers?: TaskSessionRenderers;
+  sessionFeed?: TaskSessionFeed;
   promptBasePath: string;
   onTaskControl?: (
     action: TaskControlAction,
@@ -377,7 +405,14 @@ function TaskRow({
   const [expanded, setExpanded] = useState(false);
   const logs: LogEntry[] = t.logs ?? [];
   const hasLogs = logs.length > 0;
-  const extraTabs = contributeTabs?.(t, group) ?? [];
+  const session = t.session ?? group.session;
+  const sessionView = session
+    ? resolveTaskSession({ session, task: t, renderers: sessionRenderers, feed: sessionFeed })
+    : undefined;
+  const extraTabs = [
+    ...(sessionView?.tab ? [sessionView.tab] : []),
+    ...(contributeTabs?.(t, group) ?? []),
+  ];
   // A host that has nothing to add for this task returns null, and the default
   // metadata chips take over — so enriching one kind of task never costs the
   // rest their header.
@@ -448,6 +483,7 @@ function TaskRow({
                 {logs.length +
                   (t.stdout ? 1 : 0) +
                   (t.stderr ? 1 : 0) +
+                  (sessionView?.tab ? 1 : 0) +
                   (execDetails || processDetails ? 1 : 0)}
               </span>
             )}
@@ -489,6 +525,7 @@ function TaskRow({
             )}
           </div>
         )}
+        {sessionView && <div className="mt-0.5 min-w-0">{sessionView.summary}</div>}
         {t.progressMetrics && (
           <div className="text-xs tabular-nums text-muted-foreground">
             {!hasProgress && t.progressMetrics.unit && `${done} ${t.progressMetrics.unit} · `}

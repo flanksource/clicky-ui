@@ -13,6 +13,7 @@ import { ProgressBar } from "./ProgressBar";
 import { TaskProgress } from "./TaskProgress";
 import { taskWorkProgress } from "./task-work-progress";
 import type { TaskControlAction, TaskRunMeta, TaskSnapshot } from "./TaskSnapshot";
+import { resolveTaskSession, type TaskSessionRenderers } from "./TaskSession";
 import type { TaskHeaderExtra } from "./TaskHeaderExtras";
 import type { TaskExtraTabs } from "./TaskStreamTabs";
 import { taskQueryKeys } from "./task-query-keys";
@@ -58,6 +59,11 @@ export interface TaskManagerProps {
    * for a task falls back to the default metadata chips.
    */
   headerExtra?: TaskHeaderExtra;
+  /**
+   * Renderers for the session a run or task drives, keyed by session type and
+   * layered over the built-in captain renderer.
+   */
+  sessionRenderers?: TaskSessionRenderers;
   renderRunDetails?: (run: TaskRunMeta, snapshots: TaskSnapshot[]) => ReactNode;
   controlUrl?: (run: TaskRunMeta, action: TaskControlAction) => string | undefined;
   showTaskControls?: (run: TaskRunMeta) => boolean;
@@ -99,8 +105,39 @@ const durationColumn: DataTableColumn<RunTableRow> = {
     />
   ),
 };
-const runColumns: DataTableColumn<RunTableRow>[] = [
-  { key: "name", label: "Run", sortable: true, grow: true, minWidth: 220 },
+// A run that drives a session shows its summary line under the run name.
+function runNameCell(row: RunTableRow, sessionRenderers: TaskSessionRenderers | undefined, detail?: ReactNode): ReactNode {
+  const session = row.run.session;
+  return (
+    <div className="min-w-0 space-y-0.5">
+      <div className="font-medium">{row.name}</div>
+      {detail}
+      {session && (
+        <div className="min-w-0 text-xs">{resolveTaskSession({ session, task: runGroupSnapshot(row.run), renderers: sessionRenderers }).summary}</div>
+      )}
+    </div>
+  );
+}
+
+function runGroupSnapshot(run: TaskRunMeta): TaskSnapshot {
+  return {
+    id: run.id,
+    name: run.name,
+    type: "group",
+    status: run.status,
+    groupId: run.id,
+    ...(run.kind ? { kind: run.kind } : {}),
+    ...(run.startedAt ? { startedAt: run.startedAt } : {}),
+    ...(run.finishedAt ? { finishedAt: run.finishedAt } : {}),
+    ...(run.session ? { session: run.session } : {}),
+  };
+}
+
+const runColumns = (sessionRenderers: TaskSessionRenderers | undefined): DataTableColumn<RunTableRow>[] => [
+  {
+    key: "name", label: "Run", sortable: true, grow: true, minWidth: 220,
+    render: (_, row) => runNameCell(row, sessionRenderers),
+  },
   {
     key: "status", label: "Status", sortable: true,
     render: (_, row) => (
@@ -116,20 +153,17 @@ const runColumns: DataTableColumn<RunTableRow>[] = [
   startedColumn,
   { key: "finishedAt", label: "Finished", kind: "timestamp", sortable: true },
 ];
-const compactRunColumns: DataTableColumn<RunTableRow>[] = [
+const compactRunColumns = (sessionRenderers: TaskSessionRenderers | undefined): DataTableColumn<RunTableRow>[] => [
   {
     key: "name", label: "Run", sortable: true, grow: true, minWidth: 220,
-    render: (_, row) => (
-      <div className="space-y-0.5">
-        <div className="font-medium">{row.name}</div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{applicationLabel(row.kind)}</span>
-          <span className={cn("inline-flex items-center gap-1 capitalize", taskStatusColor(row.status))}>
-            <Icon icon={taskStatusIcon(row.status)} />{row.status}
-          </span>
-        </div>
+    render: (_, row) => runNameCell(row, sessionRenderers, (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span>{applicationLabel(row.kind)}</span>
+        <span className={cn("inline-flex items-center gap-1 capitalize", taskStatusColor(row.status))}>
+          <Icon icon={taskStatusIcon(row.status)} />{row.status}
+        </span>
       </div>
-    ),
+    )),
   },
   progressColumn,
   startedColumn,
@@ -146,6 +180,7 @@ export function TaskManager({
   onSelectRun,
   extraTabs,
   headerExtra,
+  sessionRenderers,
   renderRunDetails,
   controlUrl,
   showTaskControls,
@@ -222,12 +257,16 @@ export function TaskManager({
     run,
   })), [runs]);
   const openId = onSelectRun ? selectedId : localSelectedId;
+  const columns = useMemo(
+    () => (compact ? compactRunColumns(sessionRenderers) : runColumns(sessionRenderers)),
+    [compact, sessionRenderers],
+  );
 
   return (
     <DataTable
       {...(className ? { className } : {})}
       data={rows}
-      columns={compact ? compactRunColumns : runColumns}
+      columns={columns}
       emptyMessage="No background tasks."
       externalFilters={filters}
       filterBarProps={{ trailing: <span className="text-xs text-muted-foreground">{status}</span> }}
@@ -247,6 +286,7 @@ export function TaskManager({
           runsQueryKey={runsQueryKey}
           extraTabs={extraTabs}
           headerExtra={headerExtra}
+          sessionRenderers={sessionRenderers}
           renderRunDetails={renderRunDetails}
           controlUrl={controlUrl}
           showTaskControls={showTaskControls}
@@ -274,6 +314,7 @@ function ExpandedRun({
   runsQueryKey,
   extraTabs,
   headerExtra,
+  sessionRenderers,
   renderRunDetails,
   controlUrl,
   showTaskControls,
@@ -284,12 +325,13 @@ function ExpandedRun({
   runsQueryKey: QueryKey;
   extraTabs: TaskExtraTabs | undefined;
   headerExtra: TaskHeaderExtra | undefined;
+  sessionRenderers: TaskSessionRenderers | undefined;
   renderRunDetails: TaskManagerProps["renderRunDetails"];
   controlUrl: TaskManagerProps["controlUrl"];
   showTaskControls: TaskManagerProps["showTaskControls"];
 }) {
   const runId = run.id;
-  const { snapshots, status } = useTaskRun({ id: runId, basePath, pollMs });
+  const { snapshots, status, sessionFeed } = useTaskRun({ id: runId, basePath, pollMs });
   const apiBase = basePath ?? "/api/v1";
   const queryClient = useQueryClient();
   const pendingControls = useRef(new Map<string, Promise<void>>());
@@ -364,6 +406,8 @@ function ExpandedRun({
         metricsBaseUrl={`${apiBase}/tasks/metrics/`}
         {...(extraTabs ? { extraTabs } : {})}
         {...(headerExtra ? { headerExtra } : {})}
+        {...(sessionRenderers ? { sessionRenderers } : {})}
+        {...(sessionFeed ? { sessionFeed } : {})}
       />
     </div>
   );

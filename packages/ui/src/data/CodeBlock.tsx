@@ -43,6 +43,8 @@ export type CodeBlockProps = {
    * should show instead.
    */
   inline?: boolean | undefined;
+  /** Host controls rendered in the header beside the language label, e.g. a view switch (ignored when `bare` or `inline`). */
+  toolbar?: ReactNode;
 };
 
 // A captured SQL statement can run to tens of thousands of characters on one
@@ -65,6 +67,7 @@ export function CodeBlock({
   diff,
   diffView,
   inline = false,
+  toolbar,
 }: CodeBlockProps) {
   const language = (languageProp ?? "").toLowerCase().replace(/^\.+/, "");
   const chromaHtml = highlightedHtml ? sanitizeHtml(highlightedHtml) : "";
@@ -160,7 +163,7 @@ export function CodeBlock({
         className={cn("overflow-hidden rounded-md border border-border bg-muted/40", className)}
         {...overrideAttrs}
       >
-        <CodeBlockHeader label={jsonFormat} actions={headerActions} />
+        <CodeBlockHeader label={jsonFormat} toolbar={toolbar} actions={headerActions} />
         <div className="overflow-auto p-3 text-xs">{tree}</div>
       </div>
     );
@@ -214,16 +217,19 @@ export function CodeBlock({
       className={cn("overflow-hidden rounded-md border border-border bg-muted/40", className)}
       {...overrideAttrs}
     >
-      <CodeBlockHeader label={languageProp || "text"} actions={headerActions} />
+      <CodeBlockHeader label={languageProp || "text"} toolbar={toolbar} actions={headerActions} />
       {body}
     </div>
   );
 }
 
-function CodeBlockHeader({ label, actions }: { label: string; actions: ReactNode }) {
+function CodeBlockHeader({ label, toolbar, actions }: { label: string; toolbar?: ReactNode; actions: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5">
-      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
+        {toolbar}
+      </span>
       {actions}
     </div>
   );

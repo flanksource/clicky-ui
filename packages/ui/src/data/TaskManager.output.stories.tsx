@@ -5,6 +5,14 @@ import { expect, userEvent, waitFor, within } from "storybook/test";
 
 import { TaskManager } from "./TaskManager";
 import type { TaskRunMeta, TaskSnapshot } from "./TaskSnapshot";
+import {
+  CAPTAIN_SESSION_LIVE_ENTRY,
+  CAPTAIN_SESSION_LIVE_TEXT,
+  CAPTAIN_SESSION_REF,
+  CAPTAIN_SESSION_SUMMARY,
+  captainSessionFrame,
+  withCaptainSessionFetch,
+} from "./TaskSession.story-support";
 
 // A supervised process, streamed the way clicky actually streams one: the output
 // travels as `event: output` deltas and is stripped from every `event: task`
@@ -24,6 +32,7 @@ const RUNS: TaskRunMeta[] = [
     completed: 0,
     failed: 0,
     running: 1,
+    session: CAPTAIN_SESSION_REF,
   },
 ];
 
@@ -36,7 +45,7 @@ const processDetails = (sampledAt: string) => ({
   latest: { cpuPercent: 3.1, rssBytes: 1024, vmsBytes: 2048, openFiles: 8, sampledAt },
   peak: { cpuPercent: 9.4, rssBytes: 4096, vmsBytes: 8192, openFiles: 12, sampledAt },
   metrics: {},
-  metadata: { state: "running", session: "df7aa36e", turn: { planMode: false, pending: 1 } },
+  metadata: { state: "running", turn: { planMode: false, pending: 1 } },
 });
 
 const groupFrame: TaskSnapshot = {
@@ -47,6 +56,7 @@ const groupFrame: TaskSnapshot = {
   groupId: "run-agent",
   total: 1,
   running: 1,
+  session: CAPTAIN_SESSION_REF,
 };
 
 const taskFrame = (sampledAt: string): TaskSnapshot => ({
@@ -58,6 +68,17 @@ const taskFrame = (sampledAt: string): TaskSnapshot => ({
   startedAt: "2026-06-02T12:00:00Z",
   details: processDetails(sampledAt),
 });
+
+// The server refreshes the summary on the group frame as the agent works; the
+// task row falls back to its group's session.
+const SUMMARY_ACTIONS_LATER = CAPTAIN_SESSION_SUMMARY.actions + 1;
+const groupFrameLater: TaskSnapshot = {
+  ...groupFrame,
+  session: {
+    ...CAPTAIN_SESSION_REF,
+    summary: { ...CAPTAIN_SESSION_SUMMARY, actions: SUMMARY_ACTIONS_LATER },
+  },
+};
 
 const FIRST_CHUNK = "starting agent\nconnected\n";
 const SECOND_CHUNK = "turn 1 complete\n";
@@ -99,6 +120,17 @@ class ScriptedEventSource {
             offset: FIRST_CHUNK.length,
           }],
           [420, "task", taskFrame("2026-06-02T12:00:04Z")],
+          [420, "task", groupFrameLater],
+          // The session's live entries ride this same stream. The feed is
+          // live-only, so the entry is sent again (an upsert by message id)
+          // for as long as the story might take to expand the task.
+          ...[600, 1200, 1800, 2400].map(
+            (delay): [number, string, unknown] => [
+              delay,
+              "session",
+              captainSessionFrame(CAPTAIN_SESSION_LIVE_ENTRY),
+            ],
+          ),
         ];
     for (const [delay, type, data] of script) {
       this.timers.push(
@@ -152,7 +184,7 @@ const withScriptedStream: Decorator = (Story) => {
 const meta = {
   title: "Data/TaskManager Output",
   component: TaskManager,
-  decorators: [withScriptedStream, withQueryClient],
+  decorators: [withScriptedStream, withCaptainSessionFetch, withQueryClient],
   parameters: {
     docs: {
       description: {
@@ -178,8 +210,14 @@ export const OutputSurvivesLaterTaskFrames: Story = {
     await userEvent.click(await canvas.findByText("claude-agent"));
     await userEvent.click(await canvas.findByText("run agent"));
 
-    // The tab exists once output has arrived...
-    await expect(await canvas.findByRole("button", { name: "stdout" })).toBeInTheDocument();
+    // The task drives a session, so the Session tab is first and selected; the
+    // stdout tab exists once output has arrived...
+    await expect(await canvas.findByRole("button", { name: "Session" })).toHaveAttribute("aria-current", "true");
+
+    // Its live entries arrive as `session` frames on this same task stream and
+    // land in the open inspector, which opens no EventSource of its own.
+    await waitFor(() => expect(canvas.getByText(CAPTAIN_SESSION_LIVE_TEXT)).toBeInTheDocument(), { timeout: 4000 });
+    await userEvent.click(await canvas.findByRole("button", { name: "stdout" }));
     await expect(await canvas.findByText(/starting agent/)).toBeInTheDocument();
 
     // ...and is still there after the task frames that carry none, with the
@@ -197,7 +235,13 @@ export const OutputSurvivesLaterTaskFrames: Story = {
     // The structured metadata reaches the header as chips, and keeps its
     // structure out of them.
     await expect(canvas.getByTitle("state: running")).toBeInTheDocument();
-    await expect(canvas.getByTitle("session: df7aa36e")).toBeInTheDocument();
     await expect(canvas.queryByTitle(/^turn:/)).toBeNull();
+
+    // The session the run drives is a typed reference rather than a metadata
+    // chip: the run row and the task row each carry its summary line, drawn
+    // from the listing and the task stream with no session request. The task
+    // row follows the group frame that refreshed the summary.
+    await expect((await canvas.findAllByTestId("session-task-summary")).length).toBeGreaterThan(1);
+    await waitFor(() => expect(canvas.getByText(`${SUMMARY_ACTIONS_LATER} actions`)).toBeInTheDocument());
   },
 };

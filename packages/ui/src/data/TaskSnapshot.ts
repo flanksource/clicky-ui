@@ -98,6 +98,35 @@ export interface TaskExecDetails {
   [key: string]: unknown;
 }
 
+/**
+ * A typed pointer from a task to the session it drives (Go `task.SessionRef`).
+ * `type` names the kind of session so a renderer can be chosen for it — this
+ * module gives it no meaning of its own; `href` is where the session is served.
+ */
+export interface TaskSessionRef {
+  type: string;
+  id: string;
+  href?: string;
+  /**
+   * What a collapsed row shows of the session, computed by the server and
+   * refreshed on the task and run frames — a row needs no session request.
+   */
+  summary?: TaskSessionSummary;
+}
+
+/** Go `task.SessionSummary`. */
+export interface TaskSessionSummary {
+  model?: string;
+  context?: { usedTokens: number; windowTokens: number };
+  /** Tool calls made so far. */
+  actions: number;
+  /** The newest tool call or assistant text. For a tool, `text` is a short
+   *  summary of the call's input (a command, a path). */
+  latest?: { kind: "tool" | "text"; tool?: string; text: string };
+  /** What the agent is doing right now, in the producer's words. */
+  activity?: string;
+}
+
 export interface TaskSnapshot {
   /** Stable identities of tasks that must finish before this task starts. */
   dependencyIds?: string[];
@@ -158,6 +187,8 @@ export interface TaskSnapshot {
   details?: TaskProcessDetails | TaskExecDetails | Record<string, unknown>;
   /** Pending prompts a running task is blocked on (Go `prompt.TaskLabel`). */
   prompts?: PromptSnapshot[];
+  /** The session this task drives; a task row falls back to its group's. */
+  session?: TaskSessionRef;
 }
 
 // TaskRunMeta mirrors the Go `task.RunMeta` listing summary returned by
@@ -180,6 +211,7 @@ export interface TaskRunMeta {
   work?: TaskWorkProgress;
   href?: string;
   controls?: TaskControlAction[];
+  session?: TaskSessionRef;
 }
 
 // Terminal run/group statuses (not running/pending). Used to decide when an SSE

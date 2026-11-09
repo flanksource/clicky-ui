@@ -479,6 +479,8 @@ export {
   type TaskProcessDetails,
   type TaskResourceLimits,
   type TaskSnapshot,
+  type TaskSessionRef,
+  type TaskSessionSummary,
   type TaskRunMeta,
   isTerminalStatus,
   allGroupsTerminal,
@@ -488,6 +490,20 @@ export {
   type TaskExtraTabs,
   type TaskStreamTab,
 } from "./data/TaskStreamTabs";
+export {
+  defaultTaskSessionRenderers,
+  type TaskSessionContext,
+  type TaskSessionRenderer,
+  type TaskSessionRenderers,
+} from "./data/TaskSession";
+export { TaskSessionChip } from "./data/TaskSession.chip";
+export { SessionSummaryLine } from "./data/TaskSession.summary";
+export {
+  createTaskSessionFeed,
+  type TaskSessionFeed,
+  type TaskSessionFeedRef,
+  type TaskSessionFeedSource,
+} from "./data/task-session-feed";
 export { TaskMetadataChips, type TaskHeaderExtra } from "./data/TaskHeaderExtras";
 export { TaskMetadata } from "./data/TaskProcessMetadata";
 export {

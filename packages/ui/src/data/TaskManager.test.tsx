@@ -100,6 +100,28 @@ describe("TaskManager selection", () => {
     expect(await screen.findByText("Fifth")).toBeInTheDocument();
   });
 
+  it("renders a collapsed run's session summary from the listing with no session request", async () => {
+    const withSession: TaskRunMeta = {
+      ...RUN,
+      session: {
+        type: "captain",
+        id: "abc",
+        href: "/api/captain/sessions/abc",
+        summary: { model: "claude-sonnet-5", actions: 4, latest: { kind: "tool", tool: "Read", text: "src/router.ts" } },
+      },
+    };
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => [withSession] }) as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    renderManager(createClient(), <TaskManager basePath="/api/v1" />);
+
+    const summary = await screen.findByTestId("session-task-summary");
+
+    expect(within(summary).getByText("4 actions")).toBeInTheDocument();
+    expect(within(summary).getByTestId("session-tail-tool")).toHaveTextContent("src/router.ts");
+    const urls = fetchMock.mock.calls.map(([input]) => String(input));
+    expect(urls.filter((url) => url.includes("/sessions/"))).toEqual([]);
+  });
+
   it("calls onSelectRun with the run id when a collapsed row is clicked", async () => {
     vi.stubGlobal("fetch", mockFetch());
     const onSelectRun = vi.fn();
