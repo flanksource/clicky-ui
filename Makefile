@@ -1,4 +1,4 @@
-.PHONY: build lint icons test clean handoff
+.PHONY: build lint icons test clean handoff e2e-preview
 
 export PATH := /opt/homebrew/opt/node@24/bin:/usr/local/opt/node/bin:$(PATH)
 
@@ -19,6 +19,10 @@ icons:
 
 test:
 	pnpm run test
+
+e2e-preview:
+	pnpm --filter kitchen-sink exec vite build
+	pnpm --filter kitchen-sink exec vite preview --port 5801 --strictPort
 
 clean:
 	rm -rf packages/ui/dist apps/kitchen-sink/dist apps/playground/dist apps/storybook/storybook-static

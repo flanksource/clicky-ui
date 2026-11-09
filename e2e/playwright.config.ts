@@ -39,7 +39,7 @@ export default defineConfig({
     { command: "pnpm --filter page-host dev:runtime", url: "http://localhost:5811/profile.json", reuseExistingServer: !process.env.CI, timeout: 30_000 },
   ] : {
     command: process.env.CI
-      ? "pnpm --filter kitchen-sink exec vite preview --port 5801 --strictPort"
+      ? "make -C .. e2e-preview"
       : "pnpm --filter kitchen-sink dev",
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,

@@ -161,3 +161,6 @@ packageExtensions:
 
 minimumReleaseAgeExclude:
   - "@flanksource/facet@0.1.74"
+
+patchedDependencies:
+  astro@7.4.4: patches/astro@7.4.4.patch

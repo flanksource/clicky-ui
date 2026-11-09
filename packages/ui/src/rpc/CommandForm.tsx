@@ -83,7 +83,7 @@ export function CommandForm({
       <div
         className={
           inlineLayout
-            ? "sticky bottom-0 z-10 -mx-2 flex justify-end border-t border-border bg-background/95 px-2 py-3 backdrop-blur-sm"
+            ? "sticky bottom-0 z-10 flex justify-end border-t border-border bg-background/95 py-3 backdrop-blur-sm"
             : "flex justify-end"
         }
       >
