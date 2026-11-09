@@ -16,6 +16,34 @@ The `?page=flanksource/brands/flanksource` route is the canonical Flanksource de
 pnpm run dev:playground     # http://localhost:5274
 ```
 
+For a compiled, optimized playground shell with live page editing, run this from the repository root or `apps/playground`:
+
+```bash
+pnpm run playground:prod
+```
+
+This builds the shell, shared UI, React, and bookmarklet into `apps/playground/dist`, then serves them on port **5275**. React itself is compiled from its development build so Design mode's live preview keeps `overrideProps`; everything else is a production build. Page components, Markdown, metadata, guidance, and Tailwind styles remain live through Vite. Saving a page or its helper publishes a change notice; the **Page reloads** setting controls when updates are applied. Adding, moving, or deleting a page updates the catalog on the next reload without rebuilding the shell. Comments, source editing, and agent-session APIs remain available. Pages compile when opened, so an unrelated broken scratch page does not prevent the shell from building.
+
+Restart the command after changing the shell, shared providers, library code, or dependency configuration. This is a local editing server with a production build of its base UI; dev-server-only actions documented below also work in this mode. Hashed assets are minified, cached, and served with gzip compression. The regular playground uses port **5274**, so both commands can run together. Override the production port with `pnpm run playground:prod --port 5276`; `--host 127.0.0.1` restricts it to loopback.
+
+Load additional comment vocabularies with `PLAYGROUND_VOCABULARY_DIRS=/absolute/path/to/vocabs pnpm run playground:prod` (comma-separated directories). Catalog folders contain `catalog.ts` metadata and `Preview.tsx`; new catalogs and edits refresh at runtime without rebuilding the shell. See [the vocabulary format and runnable example](src/vocabularies/README.md).
+
+**Page reloads** defaults to **Manual**: source changes show **Updates available · Reload**. **Automatic when idle** waits while comment drafts, submissions, or unsaved source edits exist. This preference is saved in localStorage for all pages on the same origin; different ports have separate preferences. Comment drafts and open-thread state use sessionStorage, surviving reloads independently in each tab until it closes. **Saved drafts** provides Copy and Discard actions even when an edited artifact no longer contains the original target. Other apps can opt in by giving `CommentProvider` a document-specific `persistenceKey`; without it, comment UI state stays in memory.
+
+Browser-mode pages expose lint-style runtime problems, previewed dependency fixes saved to YAML page headers, and browser-local filesystem package overrides. See [Runtime problems and page dependencies](docs/runtime-dependencies.md) for the header format, folder preparation, permission recovery, and reload behavior.
+
+Artifact comments open in a resizable right sidebar on desktop. **Close** or **Hide** minimizes the entire sidebar into the bottom-right **Open comments** floating button, which shows the number of open threads. On phones, that button opens a comments dialog; closing it or pressing Escape returns to the floating button. Comments never take a row below the artifact. Shared consumers can opt in with `<CommentRail open={open} onOpenChange={setOpen} launcherLabel="Open comments">`; the controlled rail uses the shared `Modal` when its host is narrow.
+
+The toolbar's **Playground status** dot includes Gavel and Captain connections alongside comment vocabularies. Open it for each server's address, connection state, error, and **Refresh connections**. Checks refresh every ten seconds while visible and on window focus. Gavel uses `PLAYGROUND_GAVEL_URL` or its on-demand launch address; Captain uses the agent runtime's server. Status checks do not start Gavel: it may show **Disconnected** until a feature starts the launch server. `GET /__playground/connections` returns both checks independently, each with its `management`: `playground` (the playground started the running server, with its `pid`), `on-demand` (not running; the playground starts it when needed), or `external` (another process runs it).
+
+Each server the playground manages has a lifecycle action beside it. **Restart** on a Gavel the playground started asks for confirmation (requests in progress on it fail), stops that process, and starts `gavel launch serve` again from `PLAYGROUND_GAVEL_BINARY`, so a rebuilt binary takes effect without restarting the playground. **Start** launches an on-demand Gavel that is not running yet. While the menu is closed, the status dot reports a restart in progress or a failed one until **Refresh connections**. Captain, a `PLAYGROUND_GAVEL_URL` server, and any other process already listening on the on-demand address are shown as run outside the playground and are never stopped. `POST /__playground/connections/gavel/restart` performs the same action and returns the refreshed connections; it answers 409 for a server the playground does not own and 502 when the new server fails to start.
+
+Gavel shows **Incompatible** when its OpenAPI document lacks the linter catalog, filtering, or ignore APIs required by repository review. Rebuild it and choose **Restart** (or restart the server where it runs when it is external); the launch-schema endpoint alone does not prove compatibility. Set `PLAYGROUND_GAVEL_BINARY=/absolute/path/to/gavel/.bin/gavel` in the gitignored local environment to use a sibling build for on-demand launches. It defaults to `gavel` on PATH; `PLAYGROUND_GAVEL_URL` takes precedence and selects an externally managed server. Neither compatibility checks nor connection polling stop an incompatible server.
+
+The toolbar's **Agent** menu holds playground session grouping, the default model, and **Auto-run new comments**, followed by active Captain and playground sessions. Select a session to inspect it; **All sessions…** opens history and page-target controls. The top-right **Preferences** avatar groups theme, density, and page reloads. Reload monitoring stays active while the menu is closed. On phones, **Copy feedback** lives in **More actions** so Agent and Preferences remain visible.
+
+Repository failures use the shared error wrapper. **Copy** includes the operation, method, endpoint, HTTP status, response content type, complete response body, and available stack details while **More details** remains collapsed. Non-JSON and malformed JSON responses retain their original body for diagnosis; network failures retain their endpoint and cause.
+
 ## Adding an artifact
 
 For coding agents, open **Agent instructions** in the toolbar. **Copy playground instructions** copies the current page URL, feedback API schema address, and the playground workflow. **Copy skill installation instructions** copies a prompt that asks your agent to save the reusable `clicky-ui-playground` skill in your workspace. Both use the canonical [playground skill](../../.agents/skills/clicky-ui-playground/SKILL.md), including page creation, shared component usage, browser verification, and feedback handling.
@@ -57,7 +85,38 @@ The original file remains the single source of metadata. Vite watches the projec
 
 ## Editing in the browser
 
-**Edit** opens the artifact's source in Monaco beside the live preview. `⌘S` (or the Save button) writes the file to disk; Vite's HMR then refreshes the preview — there is no separate "apply" step, and your own editor sees the same file.
+**Edit** opens the artifact's source in Monaco beside the preview. `⌘S` (or the Save button) writes the file to disk, and your own editor sees the same file. HMR is off, so the preview shows the save after a reload: `playground:prod` offers **Updates available · Reload** (see **Page reloads**), and the dev server needs a manual reload.
+
+Helper modules open in the same editor. **Open source** in Design mode (below) opens the module that renders a diagram node, such as `src/pages/flanksource/_facet-diagrams/layouts/capability-map.tsx`, at the node's line. `GET`/`PUT /__playground/sources/files?file=<path under src/pages>` reads and writes `.ts`, `.tsx` and `.css` files there, including `_` helpers. Each read returns a content hash, and a write with a stale `expectedHash` is refused with `409`, so a save never overwrites a change made since the file was opened.
+
+### Design mode: visual editing of facet diagrams
+
+Component authors: see [Making components editable](../docs/src/content/docs/guides/editable-components.md) for the current marker/source contract, authoring examples, verification steps, and the proposed generic component integration.
+
+**Design** (beside **Edit**) edits facet diagrams in place. Hover a box or container to show its style chip; pick a value to change its `variant` (`BOX_STYLES`, `CONTAINER_STYLES`) or, for `Tile`/`Zone`, its `role`. Click a title, description, footer, tag or label to edit the text inline; Enter or blur saves, Escape cancels. Each change is written to the TSX that renders the node. **Applies to N nodes** means several rendered nodes share that call site, so the change applies to all of them. Design and Edit are mutually exclusive, and Design cannot start while the editor has unsaved changes.
+
+Design also discovers source-marked SVG shapes and groups. Click a shape to open its attribute form, preview a change, then **Save** or **Revert**. SVG text and individual `tspan` elements expose **Text content** without flattening nested spans. **Tailwind & theme** offers semantic color and typography utilities alongside the element’s computed values; `className` preserves custom classes and variants. New utilities compile before saving, and theme colors continue to follow light/dark changes. **Reset** removes a presentation attribute, allowing classes or inheritance to control it. Text, attributes and classes save as one draft; computed labels use the existing literal resolver and unsafe edits offer **Request change**. **Show editable** counts visible Facet nodes and SVG targets together, excluding SVG definitions and resources. A marked child shape takes priority over its group. Switching targets with an unsaved or invalid draft keeps the current panel open and asks you to save or revert first. Escape or Close explicitly discards the preview; a save in progress must finish before closing.
+
+Color, font-size, stroke-width and opacity properties use the shared `TailwindColorPickerField` and `TailwindNumberPickerField` controls. Type a literal value or search Tailwind classes in the same input; reset is built into the field. Colors offer theme tokens and the standard palette with swatches; font sizes offer `text-xs` through `text-9xl` with their dimensions. Switching between classes and literals preserves unrelated utilities and responsive variants. **Delete SVG element** asks for confirmation, then removes the selected element and its children from source and reloads the page. Shared call sites disclose how many rendered instances will be removed. Save or revert a draft before deleting; stale source is refused.
+
+React Grab's **Style element** toolbar and context-menu action use the same selection and editor as Design. Other DOM elements retain React Grab's CSS editor. The playground consumes `@flanksource/react-grab` from this workspace; its startup, build, and check commands build that package through `prepare:editor` so the toolbar dispatch fix is available without a separate manual build.
+
+How a change reaches the source:
+
+- Facet nodes carry stable markers: `data-editable-box` / `data-editable-container` (naming the style prop) and `data-editable-text` (naming the text prop), documented in facet's README under "Editable markers". Any component can emit them.
+- `plugins/editable-source-plugin.ts` stamps each facet node call site in `src/pages/**/*.tsx` with `data-editable-source="<file>:<line>:<col>#<ordinal>@<hash>"` at compile time, in dev and `playground:prod`.
+- `POST /__playground/visual-edits` with `{page, source, edit: {kind:"style", prop, value} | {kind:"text", prop, from, to}, choose?}` rewrites the source:
+  - **Style edits** set a literal attribute at the call site.
+  - **Text edits** change the literal attribute on the call site, or else the unique matching string literal or JSX text in the page's module graph. This covers text mapped from arrays and text passed as children of a wrapper.
+- Responses:
+  - `200` applied.
+  - `409` stale: the file changed outside Design mode since the page rendered, so reload.
+  - `422` refused: for a computed `variant={…}`, a later spread, an entity in JSX text, or text outside `src/pages`. It names `file:line`, and **Open source** goes there.
+  - `422` ambiguous: lists candidates to choose from.
+
+The change is previewed immediately by re-rendering the node through the React DevTools renderer's `overrideProps`. The hook is installed by a classic `<head>` script (`plugins/react-devtools-hook.ts`, bippy's `install-hook-only.iife.js`), which runs before any module, however the shell is bundled. `overrideProps` exists only in React's development build, so `playground:prod` compiles `react` and `react-dom` from their development builds while the shell, every other dependency and the pages stay production builds. Live preview works on both :5274 and :5275. A preview lasts until the page re-renders from source; arrows re-measure on reload.
+
+Design mode needs the local facet checkout (`PLAYGROUND_EXTERNAL_ALIASES`) until a facet release with the editable markers, `Tile`/`Zone` and the style API replaces the pinned `@flanksource/facet@0.1.74`.
 
 Choose **New → New folder** to create a visible folder. The active page header also exposes **Rename**, **Move**, and **Delete**. Right-click a page for those same page actions, or right-click a folder to create a page or nested folder there; the Context Menu key and Shift+F10 provide the same keyboard access. Rename updates the filename and a simple string-literal `export const meta = { title: "…" }`; derived metadata fails loudly instead of being rewritten. Move and rename rebase the page's relative module and `import.meta.url` references, update incoming TypeScript imports and static `?page=` links under `src/`, and carry feedback to the new slug as one rollback-protected operation. They do not create an alias for the old URL or rewrite prose and comments. Delete confirms the exact `.tsx` path and removes its feedback. These filesystem actions are disabled while the Monaco buffer has unsaved changes and are available only under `vite dev`.
 
@@ -65,7 +124,7 @@ A `.md` page renders through the library's `FileReview` (`@flanksource/clicky-ui
 
 Monaco is configured for TSX but **not** wired to the real type graph: pulling `@flanksource/clicky-ui` types into the browser would cost megabytes, so "cannot find module" diagnostics are suppressed. Syntax, JSX and local type errors still surface; authoritative type checking stays with `pnpm run typecheck` and the dev-server overlay.
 
-Filesystem operations go through `plugins/sources-server.ts` and are confined to `src/pages/**`: slugs must match `^[a-z0-9][a-z0-9-]*(/[a-z0-9][a-z0-9-]*)*$`, parents may not be symbolic links, and every resolved path is re-checked for containment before anything is changed. Filesystem actions are dev-server only.
+Filesystem operations go through `plugins/sources-server.ts` and are confined to `src/pages/**`: slugs must match `^[a-z0-9][a-z0-9-]*(/[a-z0-9][a-z0-9-]*)*$`, helper paths may not be absolute or contain `..`, no path segment may be a symbolic link, and every resolved path is re-checked for containment before anything is changed. Filesystem actions are dev-server only.
 
 ## Verification cookbook
 
@@ -79,6 +138,10 @@ The Captain verifier envelope remains under **Captain verifier envelope** for co
 
 ### Bookmarklet for external pages and local files
 
+The playground's **Search artifacts** button and **Command+K** (**Ctrl+K** on Windows/Linux) search pages, repository documents, and external captures across the full catalog. Select a result with the arrow keys and Enter. This search is available only in the playground app; the bookmarklet does not bind these shortcuts.
+
+The bookmarklet starts with its comment rail visible. **Minimize** folds it into a bottom-right floating button; restoring it retains the current draft and thread. Element comments open a floating input beside the selected element, following scrolling and fitting within the viewport. Posting opens the saved thread in the rail; discard or Escape clears the draft, while posting failures preserve it. **Comment on page** continues using the rail.
+
 Local `file://` HTML documents are supported alongside HTTP(S) pages. Open the file in your browser and activate the same bookmarklet. Comments are associated with the full file host/path and URL fragment; moving or renaming a file creates a different identity. The playground must be running to load the script and comment rail. The bridge uses the file document's opaque message origin with parent-window and session checks.
 
 Start the playground with `pnpm run dev:playground`, open **Bookmarklet** in the toolbar, and drag **Playground grabber** to your bookmarks bar. **Copy bookmarklet** provides the same `javascript:` URL for manual bookmark installation. Activate the bookmark on an HTTP(S) page, then choose **Select element** or **Comment on page** in its injected rail. Comments, replies, resolution, human closing and reopening use the same persisted store and API as artifact feedback. React source context is included when available; plain HTML captures retain the actual document URL, selector and HTML. Screenshot comments use the selected page's existing optional capture flow.
@@ -87,15 +150,21 @@ External pages are grouped by origin, path and URL fragment. The first URL creat
 
 The playground sidebar lists **External pages** with the original HTML in a sandboxed preview beside captured feedback and resolved threads. HTTP(S) pages load directly and remain subject to their site's framing policy. Registered local `.html`/`.htm` documents load through `GET /__playground/external-pages/html?page=<external-id>&url=<encoded-file-url>`; this serves only the exact file associated with that set, with no arbitrary-path access or sibling asset serving. Local previews support self-contained HTML with inline styles, scripts and embedded assets. Open the original-page link and reactivate the bookmarklet to inspect live anchors or create new captures. Full navigation requires reactivation; repeated activation focuses the existing grabber, and **Close** removes the injected UI and restores existing React Grab settings. The playground must stay reachable. Development and `pnpm --filter playground preview` both serve the loader and storage APIs; build assets with `pnpm --filter playground build` before preview.
 
-This is a bookmarklet, so page CSP can block its script or iframe, and browsers may require local-network permission when reaching a local playground from an HTTPS site. Browser internal pages, cross-origin iframe contents and closed shadow roots are outside v1 support. No browser policy is bypassed. The injected host exchanges validated, session-bound messages with a playground-origin iframe; that frame makes same-origin storage requests. Catalog metadata lives in `.playground/external-pages.json`, alongside `comments.json` and screenshots. The loader is `GET /__playground/bookmarklet.js`; `GET /__playground/external-pages` lists sets, `GET /__playground/external-pages?url=<encoded-url>` resolves an association and returns compatible candidates, and `POST /__playground/external-pages` accepts `{url,title,mergeInto?}` to create or associate a set. Comment requests use the returned `external:<uuid>` page key and include the captured `element.pageUrl`.
+This is a bookmarklet, so page CSP can block its script or iframe, and browsers may require local-network permission when reaching a local playground from an HTTPS site. Browser internal pages, cross-origin iframe contents and closed shadow roots are outside v1 support. No browser policy is bypassed. The injected host exchanges validated, session-bound messages with a playground-origin iframe; that frame makes same-origin storage requests. Catalog metadata lives in `.playground/external-pages.json`; comments and screenshots use Gavel. The loader is `GET /__playground/bookmarklet.js`; `GET /__playground/external-pages` lists sets, `GET /__playground/external-pages?url=<encoded-url>` resolves an association and returns compatible candidates, and `POST /__playground/external-pages` accepts `{url,title,mergeInto?}` to create or associate a set. Comment requests use the returned `external:<uuid>` page key and include the captured `element.pageUrl`.
 
 Two complementary tools:
 
 **react-grab** — hover any element, press `⌘C` to copy it as Markdown for a coding agent: the component, the page URL, a selector for that instance, its React component stack and up to 4 KB of raw HTML (the same body gavel's react-grab plugin writes). **Copy screenshot** puts the element's PNG and that same Markdown on the clipboard as one item. It loads in development and built preview.
 
-**Comment pins** — select an element through react-grab and choose **Comment** or **Comment with screenshot**. Write one draft in the focused rail, then choose **Post comment** or **Post with screenshot**. Plain comments never request screen capture. Successful PNGs live under `.playground/screenshots/` (gitignored); cancellation or browser limitations are recorded when capture was requested. Use **Comment on page** for a whole-page note. Every new root persists source context and up to 4 KB of raw HTML.
+**Comment pins** — activate react-grab's **Comment on element** button and left-click an element to open and focus its floating comment input. Right-click opens the action menu, including **Comment with screenshot**. Write beside the selected element, then choose **Post comment** or **Post with screenshot**. The box follows scrolling and stays open when the pointer leaves. Discard or Escape clears the draft; vocabulary menus consume Escape first. Switching targets preserves drafts for recovery. A failed post keeps the draft and shows an error; a successful post opens the thread in the rail. Plain comments never request screen capture. Successful PNGs are stored as Gavel attachments; cancellation or browser limitations are recorded when capture was requested. Use **Comment on page** for a whole-page note in the rail. Every new root persists source context and up to 4 KB of raw HTML. Bookmarklet comments retain their panel.
 
-**Reviewable elements** — add a stable `data-review-id` to an element, or select it in react-grab and choose **Make reviewable**. The playground adds inline controls for **Approve**, **Reject with comment**, **Request revision**, and **Delete source and feedback**. Rejection and revision require a comment; a newer decision closes the older decision but preserves its rationale. Delete removes the selected JSX element or literal array row from its page source, along with feedback anchored inside it. The source editor must be saved first. Source edits are available only under `vite dev` and fail when the selected source is ambiguous or has changed since selection.
+Drag the comment rail's left edge to resize it, or focus the divider and use arrow keys (Shift for larger steps, Home/End for the limits). The preferred width survives navigation and reloads. Local rails default to 320px and bookmarklets to 400px, bounded to 280–640px while retaining document space; compact layouts use the full available width. Sidebar comments and replies show three lines, with **Show more / Show less** when needed.
+
+Choose **Maximise** from a comment's actions to open **Thread**, **Capture**, **Agents**, and **Markdown**. Capture holds the screenshot, source and HTML. Agents lists thread-linked and page sessions, retains historical IDs, and loads Captain's existing session inspector on selection. Provider marks use their colors; model labels are compact (for example **Opus 5.5**), with an effort glyph when reported. Full identities remain in tooltips and details. A reply editor stays below every tab, targets the root thread, and retains drafts on failure or closing. Maximizing from a bookmarklet temporarily expands its iframe to the viewport and restores the preferred sidebar width when closed.
+
+**Reviewable elements** — add a stable `data-review-id` to an element, or select it in react-grab and choose **Make reviewable**. The playground adds inline controls for **Approve**, **Reject with comment**, **Request revision**, and **Delete source and feedback**. Rejection and revision require a comment; a newer decision closes the older decision but preserves its rationale. Delete removes the selected JSX element or literal array row from its page source, along with feedback anchored inside it. The source editor must be saved first. Source edits fail when the selected source is ambiguous or has changed since selection.
+
+Source-editable mapped entries must declare a literal `reviewId` in the page's local array; factory-generated IDs cannot identify an editable row. Failed review submissions stay inside the dialog with the draft intact. Review, chat, and comment action errors use `ErrorDetails`: Copy includes the operation identity and available server diagnostics while details remain collapsed. The shared `ActionError` renderer accepts an original error plus labelled context, for example `<ActionError error={error} context={[["Comment", comment.id]]} />`.
 
 ```tsx
 <section data-review-id="review-summary-row">Summary row</section>
@@ -121,7 +190,7 @@ Each root comment menu offers **Close** alongside **Resolve** for active comment
 
 Sidebar pages with feedback show their open root-comment count in a badge. Replies and resolved or closed comments do not increase the badge.
 
-The AppShell sidebar renders its folders and pages through Clicky Tree, including search, expand/collapse controls, page/folder context menus and page drag-and-drop. **Sort by** offers **Recent activity** (latest source edit or feedback), **Updated** (page source-file modification time), **Commented** (latest feedback activity), and **Resolved** (latest currently resolved thread). Date sorts put the newest activity first and retain the folder hierarchy. Folder order follows the newest matching descendant.
+The Workspace Explorer pane renders one unified tree (page folders, repository folders and External pages, served by `GET /__playground/navigation`) through Clicky Tree, including search, expand/collapse controls, page/folder context menus and page drag-and-drop. **Sort by** offers **Recent activity** (latest source edit or feedback), **Updated** (page source-file modification time), **Commented** (latest feedback activity), and **Resolved** (latest currently resolved thread). Date sorts put the newest activity first and retain the folder hierarchy. Folder order follows the newest matching descendant.
 
 **Open** includes pages with open or in-progress threads; **Resolved** includes pages with threads waiting for human review. Selecting both matches either status. The default age view includes source edits or feedback within seven days; **Show older** widens it. External captures use feedback timestamps. Closed threads are separate from resolved threads. Filters remain available when no pages match, and **Reset view** restores the recent view and clears search, sorting and filters.
 
@@ -153,7 +222,7 @@ curl -s localhost:5274/__playground/comments/schema | jq '.tools[] | {name, desc
 | `PATCH`  | `/__playground/comments/{id}`         | `{body?, rating?}`                                                  | Edit text or rating; a `status` field is rejected with `400`                      |
 | `DELETE` | `/__playground/comments/{id}`         | —                                                                   | Remove, cascading to replies                                                      |
 
-Statuses are `open`, `in_progress`, `resolved`, `closed`; the first two are active work. `in_progress` is reached only through acknowledge or assign, never by editing `status`. A root being worked on carries `assignee`, `acknowledgedBy` and `acknowledgedAt` (an assigned thread has no acknowledgement until its assignee acknowledges); older `comments.json` files without these fields still load. Repeating acknowledge as the holder changes nothing. Close, reopen and assign reject non-user actors and invalid stage transitions. The machine-readable tool schema lists `acknowledge_comment` but intentionally omits the human-only close, reopen and assign operations. Ratings are `positive` or `negative`. Every new root's `element` is `{componentName?, source, html, screenshot?}`; `html` is capped at 4 KB and optional `screenshot` is either `{status:"captured", dataUrl:"data:image/png;base64,…"}` or `{status:"unavailable", reason:"unsupported"|"cancelled"|"failed"}`. Invalid or missing context is a 400. A missing `author` also fails because identity is never inferred, so an agent's reply cannot show up as "You". Every comment is addressed by id alone; only `POST /__playground/comments` needs a page.
+Statuses are `open`, `in_progress`, `resolved`, `closed`; the first two are active work. `in_progress` is reached only through acknowledge or assign, never by editing `status`. A root being worked on carries `assignee`, `acknowledgedBy` and `acknowledgedAt` (an assigned thread has no acknowledgement until its assignee acknowledges); these fields are projected from Gavel's comment and structured content. Repeating acknowledge as the holder changes nothing. Close, reopen and assign reject non-user actors and invalid stage transitions. The machine-readable tool schema lists `acknowledge_comment` but intentionally omits the human-only close, reopen and assign operations. Ratings are `positive` or `negative`. Every new root's `element` is `{componentName?, source, html, screenshot?}`; `html` is capped at 4 KB and optional `screenshot` is either `{status:"captured", dataUrl:"data:image/png;base64,…"}` or `{status:"unavailable", reason:"unsupported"|"cancelled"|"failed"}`. Invalid or missing context is a 400. A missing `author` also fails because identity is never inferred, so an agent's reply cannot show up as "You". Every comment is addressed by id alone; only `POST /__playground/comments` needs a page.
 
 ```bash
 # What still needs doing, and where
@@ -187,11 +256,11 @@ Replies land one level deep: replying to a reply attaches to the thread root, ma
 
 A session is a captain chat whose prompt declares three inline tools (`SESSION_TOOLS`): `list_feedback` reads unresolved threads, and `reply_to_thread` and `resolve_thread` post as the session's agent author. They call this playground's comments API at the origin the session was started from, so the agent never builds those HTTP calls itself. The tools need `curl` and `jq` on the host running captain, and a captain release whose chats bind inline tools.
 
-The **Agent sessions** panel (toolbar) edits the settings:
+The toolbar's **Agent** menu edits the settings:
 
 - **Sessions: Shared | Per page** (`grouping`). `shared` keeps one session for every page (`page: null`); `page` gives each page its own session (`page: "<page id>"`), primed to handle only that page's threads. Switching leaves existing sessions alone; they stay listed until stopped or forgotten.
 - **Auto-run new comments** (`autoRun`). Every new top-level comment by a human (not review decisions) is sent to its session right after it is stored, exactly as if **Run agent** had been chosen, starting the session if none is live. A failed hand-off shows on the thread as `agentRun.state: "error"` and is logged. Turning it on requires a runtime.
-- **Runtime** (`runtime`). Every new or replacement session starts with it; running sessions keep theirs. The first **Run agent** without one asks for it, and **Change…** edits it, through clicky-ui's `SpecRuntimeBar` limited to captain's available agent-mode runtimes (`/__playground/runtime-profiles/runtimes`) and their models (`/__playground/runtime-profiles/models`, proxying captain's `/api/chat/models`).
+- **Model** (`runtime`). Every new or replacement session starts with it; running sessions keep theirs. The first **Run agent** without one asks for it. Select the model in **Agent → Playground agent** to edit it through clicky-ui's `SpecRuntimeBar`, limited to captain's available agent-mode runtimes (`/__playground/runtime-profiles/runtimes`) and their models (`/__playground/runtime-profiles/models`, proxying captain's `/api/chat/models`).
 
 How a thread reaches its session:
 
@@ -201,12 +270,14 @@ How a thread reaches its session:
 - Before sending, the server hands the thread to the agent: it assigns the thread to the session's agent author `{name: <model>, kind:"agent", via:"playground", sessionId}` (a human action, so it can take a thread over) and acknowledges as that author. The message tells the agent its author name, so it must not acknowledge again and must reply and resolve as that author. Completion comes from the agent's own reply and resolve; the server posts no summary.
 - A handed-off root stores `agentRun: {sessionId?, requestedAt, state, error?, target?}`, where `state` is `queued` (the agent was busy), `sent`, `done` (the thread was resolved) or `error` (the hand-off failed; `error` says why, and `sessionId` is absent when no session was started). Several roots can share one `sessionId`. Reopening a thread clears it. The thread shows a "Sent to agent session · state" chip that opens the **Agent sessions** panel on that session: a list of every session (page, state, model, **Stop**, **Forget**) and, for the selected one, a live `SessionTail` with an **Inspect** toggle for the full `SessionInspector`.
 
+Failed sends show **Send failed**. Opening the chip shows the target and a short explanation, with the complete error and command in collapsed, scrollable **Technical details**. **Retry send** sends the same thread through the existing agent-run endpoint using the page's current target and runtime settings. It is disabled while sending, closes the dialog on success, and keeps the latest error available after a failed retry. Initial send failures open the same dialog. **Copy** includes the complete diagnostics even while details are collapsed.
+
 | Method | Path | Purpose |
 | ------ | ---- | ------- |
 | `GET`  | `/__playground/agent-sessions` | `{settings, sessions}` — running sessions verified against captain first |
 | `PUT`  | `/__playground/agent-sessions/settings` | Patch `{autoRun?, grouping?, runtime?}`; `400` on unknown fields or bad values, `409` for `autoRun: true` without a runtime |
 | `PUT`  | `/__playground/agent-sessions/targets` | `{page, target}` with `target` `{kind:"playground"}` or `{kind:"captain", sessionId, label}`; answers `{settings}` |
-| `GET`  | `/__playground/agent-sessions/captain` | `{sessions:[{id, source, title, cwd?, model?, inCmux}]}` — captain's live sessions without their process environment |
+| `GET`  | `/__playground/agent-sessions/captain` | `{sessions:[{id, captainId?, source, title, cwd?, model?, status?, detailAvailable?, inCmux}]}` — Captain's live sessions without their process environment; optional `?page=<page id>` scopes the list to that page/folder |
 | `DELETE` | `/__playground/agent-sessions/sessions/{runId}` | Stop the session if it is running and forget it (the panel's **Forget**); the next thread for it starts a new one |
 | `GET`  | `/__playground/agent-runs/runs/{runId}` and `.../stream` | Proxy to captain's run snapshot and SSE stream |
 | `POST` | `/__playground/agent-runs/runs/{runId}/stop` | Proxy to captain's stop; the stored session becomes `stopped` |
@@ -214,7 +285,17 @@ How a thread reaches its session:
 
 #### Per-page target: the playground agent or a live captain session
 
-Each page chooses where its threads go: the **Playground agent** (the sessions above), or a **live captain session** — a Claude Code or Codex agent you already run, which captain lists under `GET <captain>/api/captain/sessions/live`. The bookmarklet rail shows a **Send comments to** picker for its page; the choice is stored per page as `settings.targets["<page id>"] = {kind:"captain", sessionId, label}` and applies to **Run agent** (shown as **Send to <label>**) and auto-run alike. Choosing **Playground agent** removes the page's entry.
+Pages and repository folders show compact running-session bars beneath their header. Pages include sessions working in their containing directory and descendants; folders include their directory and descendants, with complete directory boundaries (`arb` excludes `arb-other`). Explicit page targets and running page/shared playground sessions also appear, deduplicated against live Captain sessions. Each bar shows the agent/model, process status, session ID and latest activity. Select its identity to inspect the session without changing the comment target. Entries awaiting a transcript remain inspectable and say **Transcript unavailable**. Finished sessions disappear on the next refresh; historical sessions remain available through **Agent → All sessions…**. Discovery refreshes every ten seconds while visible and on window focus; failures appear above the bars.
+
+The **Send comments to** popup includes **Project** and **Agent** filters, combined with text search. Projects use full directory paths so equally named directories remain distinct. The selected target and Playground agent remain available while filtering.
+
+Choose **New session…** to select a project from Captain's catalog and an agent/model, then create a managed chat session as the page's target. Creation primes the agent to wait; existing comments are not sent. Explicit sessions are separate from automatic shared/per-page sessions, receive later comments through their managed run, and support Inspect, Stop, and Forget. An ended or forgotten target requires choosing another target.
+
+`GET /__playground/agent-sessions/projects` returns `{projects, defaultProject}`. `POST /__playground/agent-sessions/sessions` accepts `{page, project, runtime}` and returns `{session, settings}` after startup succeeds. Managed targets persist as `{kind:"managed", sessionId, label}`; startup failures preserve the previous selection.
+
+Each page chooses where its threads go: the **Playground agent** (the sessions above), or a **live captain session** — a Claude Code or Codex agent you already run, which captain lists under `GET <captain>/api/captain/sessions/live`. Open **Agent → All sessions…** on an artifact page to change its **Send comments to** target; the bookmarklet rail exposes the same picker for external pages. The choice is stored per page as `settings.targets["<page id>"] = {kind:"captain", sessionId, label}` and applies to **Run agent** (shown as **Send to <label>**) and auto-run alike. Choosing **Playground agent** removes the page's entry. Changing the picker does not resend existing comments or stop existing sessions.
+
+In a failed-send dialog, **Retry send** is a split button. Its primary action retries the configured target; **Send to another target** lists the playground agent and live Captain sessions. Choosing an entry saves it as the thread's page target, then resends that thread. If saving fails, nothing is sent; the dialog retains the chosen target for another retry. This also works for failed threads opened from the global Comments dashboard.
 
 Sending a thread to a captain target:
 
@@ -244,6 +325,31 @@ Each result also records `promptRun: {promptId, promptName, runId, sessionId?, v
 | `POST` | `/__playground/prompt-runs` | Start a run: `{promptId, variables, presets, page, anchor, element, author}` (human author; element without screenshot) → `202 {run}` |
 | `GET`  | `/__playground/prompt-runs` | `{runs}` — recent runs, `state` `running`, `done` (with `commentId`), `empty` or `failed` (with `error`); kept in memory, so a playground restart forgets them |
 
+Prompts are discovered and run through Gavel's launch API (`gavel launch serve`). The playground starts it on demand: the first prompt request starts `gavel launch serve --root <repo> --local-root <repo> --addr 127.0.0.1:9330` (needs `gavel` on `PATH`), unless a launch server already answers there, as one another playground started does. The playground stops only the server it started, when it shuts down, and starts a new one if that one exits. Set `PLAYGROUND_GAVEL_URL` in `.env.local` to use a launch server you run yourself; the playground then never starts one, and an unreachable URL is a `502` naming it.
+
+## Comments storage
+
+Comments use Gavel's PostgreSQL comments service. Run a recent Gavel binary with a configured local PostgreSQL database, explicitly provision its new comments tables, then start the playground:
+
+```bash
+gavel comments provision
+pnpm run dev:playground
+```
+
+The playground and its launch server use one workspace namespace, `gavel://workspace/<sha256-of-workspace-path>`. Roots map page identity to a target URI; anchors, captured HTML, locator alternatives, ratings, vocabulary definitions, review decisions and prompt provenance are structured comment content. Replies use Gavel messages. Screenshots use Gavel attachments and its blob store. Lifecycle transitions, final human outcomes, versions and audit events belong to Gavel.
+
+The Vite `/__playground/comments` API projects this model for the existing UI and agent tools. Its adapter forwards local actor attribution to Gavel over loopback; remote clients cannot assert actors against this local host. A failed backend operation returns an error and leaves the draft mounted. Page moves and review updates use an atomic batch of versioned comment actions. Deleting a thread hides it and its attachments from normal reads while retaining its audit history.
+
+Existing `.playground/comments.json` files and screenshot directories are left untouched. No old comments are imported or read as a fallback. External-page catalogs, agent-session preferences and prompt associations remain host metadata.
+
+Set `PLAYGROUND_GAVEL_BINARY` in `apps/playground/.env.local` to a rebuilt sibling binary, or `PLAYGROUND_GAVEL_URL` to a separately managed launch server. The server must expose `/api/v1/comments`, its batch/actions/attachments routes, and `/api/v1/comments/openapi.json`. Restart the playground after changing its backend configuration.
+
+Backend integration tests use Gavel's `comments/testhost` and isolated commons-db test databases. A sibling Gavel checkout is required. Run one test worker at a time:
+
+```bash
+gavel test --work-dir apps/playground --framework vitest --recursive=false --concurrency 1 -- plugins/comments-server.test.ts plugins/comments-store.test.ts --maxWorkers=1 --no-file-parallelism
+```
+
 ## How it fits together
 
 | Concern                          | Where                                                                |
@@ -253,13 +359,14 @@ Each result also records `promptRun: {promptId, promptName, runId, sessionId?, v
 | Grab → anchor string             | `src/comments/dom-anchor.ts`, `src/comments/useReactGrabComments.ts` |
 | Anchor ↔ library registry        | `src/comments/useDomAnchors.ts`                                      |
 | Comment pins                     | `src/comments/CommentOverlay.tsx`                                    |
-| Comment persistence              | `plugins/comments-store.ts`, `plugins/comments-server.ts`            |
+| Comment persistence              | `plugins/comments-client.ts`, `plugins/comments-projection.ts`            |
 | Persisted element context        | `plugins/comments-model.ts`, `src/comments/element-context.ts`       |
 | Comment API tool schema          | `plugins/comments-schema.ts`                                         |
 | Shared agent session (captain)   | `plugins/agent-runs-server.ts`, `plugins/captain-client.ts`, `src/agent-runs/` |
 | Feedback → markdown for an agent | `src/comments/markdown.ts`                                           |
 | Routable review components       | `src/review/ReviewComponents.tsx`                                    |
 | Source editing                   | `src/editor/`, `plugins/pages-store.ts`, `plugins/sources-server.ts` |
+| Design mode (visual edits)       | `src/visual-edit/`, `plugins/editable-source-plugin.ts`, `plugins/editable-jsx.ts`, `plugins/visual-edit-source.ts`, `plugins/visual-edits-server.ts`, `plugins/page-module-graph.ts` |
 
 The comment _UI_ — threads, composer, statuses, the rail — is the library's own `CommentProvider` / `CommentSidePanel`. The playground supplies the React Grab anchor adapter and storage middleware for Vite dev and preview.
 

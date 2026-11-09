@@ -1,0 +1,25 @@
+// Derived from react-grab (MIT, Copyright (c) 2025 Aiden Bai): packages/react-grab/tsconfig.json
+{
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "module": "NodeNext",
+    "esModuleInterop": true,
+    "strictNullChecks": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "skipLibCheck": true
+  },
+  "include": [
+    "src",
+    "tests",
+    "tsdown.config.ts",
+    "vitest.config.ts",
+    "solid-babel-plugin.ts",
+    "solid-source-location-babel-plugin.ts",
+    "scripts",
+    "hack"
+  ],
+  "exclude": ["**/node_modules/**", "dist"]
+}

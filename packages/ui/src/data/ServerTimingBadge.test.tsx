@@ -36,6 +36,34 @@ describe("ServerTimingBadge", () => {
     expect(screen.getByText("0.0 ms")).toBeInTheDocument();
   });
 
+  it("names the card and trigger after a custom title and labels request, module, file and build counters", () => {
+    render(
+      <ServerTimingBadge
+        title="Page load"
+        metrics={[
+          { name: "total", duration: 30, counters: {} },
+          { name: "fetch", duration: 12, counters: { requests: 1, files: 2 } },
+          { name: "compile", duration: 8, counters: { modules: 2, builds: 1 } },
+        ]}
+      />,
+    );
+
+    fireEvent.focus(screen.getByRole("button", { name: "Show page load" }));
+
+    expect(screen.getByText("Page load")).toBeInTheDocument();
+    expect(screen.getByText("1 request · 2 files")).toBeInTheDocument();
+    expect(screen.getByText("2 modules · 1 build")).toBeInTheDocument();
+  });
+
+  it("renders the footer inside the card under the phases", () => {
+    render(<ServerTimingBadge metrics={metrics} footer={<button type="button">Build log…</button>} />);
+
+    expect(screen.queryByRole("button", { name: "Build log…" })).not.toBeInTheDocument();
+    fireEvent.focus(screen.getByRole("button", { name: "Show server timing" }));
+
+    expect(screen.getByRole("button", { name: "Build log…" })).toBeInTheDocument();
+  });
+
   it("renders nothing without a total metric", () => {
     const { container, rerender } = render(<ServerTimingBadge metrics={undefined} />);
     expect(container).toBeEmptyDOMElement();

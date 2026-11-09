@@ -21,3 +21,21 @@ describe("tri-state filters", () => {
     expect(onChange).toHaveBeenCalledWith(undefined);
   });
 });
+
+describe("required enum filters", () => {
+  const source = (required: boolean, onChange = vi.fn()): FilterBarFilter => ({
+    key: "source", kind: "enum", label: "Source", value: "records", options: [{ value: "records" }, { value: "receiver" }], onChange, required,
+  });
+
+  it("keeps a required choice through Clear all, and clears an optional one", () => {
+    const kept = vi.fn();
+    const cleared = vi.fn();
+    clearFilterBarFilter(source(true, kept));
+    clearFilterBarFilter(source(false, cleared));
+    expect({ kept: kept.mock.calls, cleared: cleared.mock.calls }).toEqual({ kept: [], cleared: [[""]] });
+  });
+
+  it("does not count a required choice as an active filter", () => {
+    expect([isFilterBarFilterActive(source(true)), isFilterBarFilterActive(source(false))]).toEqual([false, true]);
+  });
+});

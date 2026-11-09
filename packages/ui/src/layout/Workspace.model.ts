@@ -30,11 +30,23 @@ export type WorkspacePaneSpec = {
   contentClassName?: string;
 };
 
+/**
+ * How the panes on one side sit: "stack" shares a single region width and divides its height, "columns"
+ * puts them next to each other, each with its own width.
+ */
+export type WorkspaceSideArrangement = "stack" | "columns";
+
+export type WorkspaceSideArrangements = Partial<
+  Record<WorkspaceSideLocation, WorkspaceSideArrangement>
+>;
+
 export type WorkspaceLayoutState = {
   leftWidth: number;
   rightWidth: number;
   bottomHeight: number;
   stackHeights: Record<string, number>;
+  /** Width of each side pane on a side arranged as "columns", by pane id; panes without an entry use their spec width. */
+  paneWidths: Record<string, number>;
   collapsed: Record<string, boolean>;
   sideCollapsed: Record<WorkspaceSideLocation, boolean>;
 };
@@ -45,9 +57,14 @@ export const WORKSPACE_DEFAULT_SIDE_WIDTH = 320;
 export const WORKSPACE_DEFAULT_BOTTOM_HEIGHT = 240;
 export const WORKSPACE_COLLAPSED_RAIL_WIDTH = 40;
 
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 3;
+/** Layouts written before per-pane column widths existed; they load with no column widths. */
+const MIGRATED_STORAGE_VERSION = 2;
 
-export function validateWorkspacePanes(panes: WorkspacePaneSpec[]) {
+export function validateWorkspacePanes(
+  panes: WorkspacePaneSpec[],
+  sideArrangement: WorkspaceSideArrangements = {},
+) {
   const ids = new Set<string>();
   for (const pane of panes) {
     if (!pane.id.trim())
@@ -69,8 +86,10 @@ export function validateWorkspacePanes(panes: WorkspacePaneSpec[]) {
   if (panes.filter((pane) => pane.location === "bottom").length > 1) {
     throw new Error("Workspace allows at most one bottom pane");
   }
-  validateSharedSideWidth(panes, "left");
-  validateSharedSideWidth(panes, "right");
+  for (const location of ["left", "right"] as const) {
+    if (sideArrangement[location] !== "columns")
+      validateSharedSideWidth(panes, location);
+  }
 }
 
 function validatePaneDimensions(pane: WorkspacePaneSpec) {
@@ -139,6 +158,15 @@ export function createWorkspaceLayoutState(
       )
       .map((pane) => [pane.id, pane.height as number]),
   );
+  const paneWidths = Object.fromEntries(
+    panes
+      .filter(
+        (pane) =>
+          (pane.location === "left" || pane.location === "right") &&
+          pane.width !== undefined,
+      )
+      .map((pane) => [pane.id, pane.width as number]),
+  );
   const collapsed = Object.fromEntries(
     panes.map((pane) => [pane.id, pane.defaultCollapsed ?? false]),
   );
@@ -153,6 +181,7 @@ export function createWorkspaceLayoutState(
       bottom?.height ??
       WORKSPACE_DEFAULT_BOTTOM_HEIGHT,
     stackHeights: { ...stackHeights, ...defaults.stackHeights },
+    paneWidths: { ...paneWidths, ...defaults.paneWidths },
     collapsed: { ...collapsed, ...defaults.collapsed },
     sideCollapsed: { left: false, right: false, ...defaults.sideCollapsed },
   };
@@ -178,6 +207,7 @@ export function readWorkspaceLayoutState(
       rightWidth: parsed.state.rightWidth,
       bottomHeight: parsed.state.bottomHeight,
       stackHeights: filterPaneRecord(parsed.state.stackHeights, paneIds),
+      paneWidths: filterPaneRecord(parsed.state.paneWidths ?? {}, paneIds),
       collapsed: filterPaneRecord(parsed.state.collapsed, paneIds),
       sideCollapsed: parsed.state.sideCollapsed,
     });
@@ -208,9 +238,13 @@ function filterPaneRecord<T>(
   );
 }
 
-function isStoredWorkspaceState(
-  value: unknown,
-): value is { version: 2; state: WorkspaceLayoutState } {
+type StoredWorkspaceState = {
+  version: number;
+  state: Omit<WorkspaceLayoutState, "paneWidths"> &
+    Partial<Pick<WorkspaceLayoutState, "paneWidths">>;
+};
+
+function isStoredWorkspaceState(value: unknown): value is StoredWorkspaceState {
   if (!value || typeof value !== "object") return false;
   const stored = value as {
     version?: unknown;
@@ -218,8 +252,11 @@ function isStoredWorkspaceState(
   };
   const state = stored.state;
   return (
-    stored.version === STORAGE_VERSION &&
+    (stored.version === STORAGE_VERSION ||
+      stored.version === MIGRATED_STORAGE_VERSION) &&
     Boolean(state) &&
+    (stored.version === MIGRATED_STORAGE_VERSION ||
+      isRecord(state?.paneWidths, "number")) &&
     isPositiveNumber(state?.leftWidth) &&
     isPositiveNumber(state?.rightWidth) &&
     isPositiveNumber(state?.bottomHeight) &&

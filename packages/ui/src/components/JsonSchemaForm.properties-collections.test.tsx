@@ -44,11 +44,12 @@ describe("collection property presentation", () => {
       expect(accordion).toHaveTextContent("1 service");
       expect(within(accordion).getByText("API")).toBeInTheDocument();
       expect(accordion).not.toHaveTextContent("Enabled");
-      expect(
-        within(
-          screen.getByRole("button", { name: "Edit Compact list" }),
-        ).getByText("Check configuration"),
-      ).toHaveClass("font-mono");
+      const list = within(
+        screen.getByRole("button", { name: "Edit Compact list" }),
+      ).getByRole("group", { name: "Compact list" });
+      expect(list).toHaveTextContent(
+        "Item 1Check configurationItem 2Verify output",
+      );
       expect(
         container.querySelectorAll(
           "input, textarea, select, [role=combobox], [aria-expanded], .border-input",

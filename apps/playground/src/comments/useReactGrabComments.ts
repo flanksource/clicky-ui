@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
-import { commentPlugin, type ContextMenuActionContext } from "react-grab";
+import { commentPlugin, type ContextMenuActionContext } from "@flanksource/react-grab";
 
 import type { CommentScreenshotCapture } from "../../plugins/comments-model";
 import { writeClipboard } from "./clipboard";
@@ -98,7 +98,7 @@ export function useReactGrabComments(options: {
             onAction: copyScreenshot,
           },
           {
-            id: "playground-comment",
+            id: "comment",
             label: "Comment",
             enabled,
             onAction: (context) => select(context, false),
@@ -119,7 +119,7 @@ export function useReactGrabComments(options: {
           },
         ],
       });
-      grab.setToolbarState({ defaultAction: "playground-comment" });
+      grab.setToolbarState({ defaultAction: "comment" });
       registered = true;
     };
 

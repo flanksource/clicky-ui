@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   DEFAULT_PAGE_SLUG,
@@ -19,9 +19,34 @@ import {
   pageTitle,
   pages,
   slugFromGlobKey,
+  setVocabularyPages,
 } from "./registry";
 
+describe("vocabulary page loading", () => {
+  const catalog = { alias: "shapes", slug: "vocabularies/shapes", file: "shapes/index.tsx", page: "./vocabularies/_test/ThrowingPreview.tsx", instructions: "Read shapes as geometry.", previewRevision: "one" };
+  afterEach(() => { setVocabularyPages([]); vi.unstubAllGlobals(); });
+  it("opens a vocabulary slug directly before the snapshot has loaded", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ catalogs: [catalog], items: [], revision: "one" })));
+    const entry = findPage(catalog.slug);
+    if (entry?.kind !== "component") throw new Error("Expected vocabulary page");
+    expect(findPage(catalog.slug)).toBe(entry);
+    await expect(loadPage(entry)).resolves.toMatchObject({ default: expect.any(Function) });
+    await expect(entry.loadGuidance()).resolves.toEqual({ blocks: [{ kind: "vocabulary", alias: catalog.alias, instructions: catalog.instructions, items: [] }] });
+  });
+  it("imports the snapshot's page URL and includes the page in the registry", async () => {
+    setVocabularyPages([catalog]);
+    const entry = findPage(catalog.slug);
+    if (entry?.kind !== "component") throw new Error("Expected vocabulary page");
+    await expect(loadPage(entry)).resolves.toMatchObject({ default: expect.any(Function) });
+    expect(pages().filter(page => page.slug === catalog.slug)).toEqual([entry]);
+  });
+});
+
 describe("default page", () => {
+  it("resolves repository folder deep links without falling back to a component page", () => {
+    const slug = "folder:00000000-0000-0000-0000-000000000001/docs/nested";
+    expect(findPage(slug)).toMatchObject({ kind: "folder", slug, title: "nested", group: "Repositories" });
+  });
   it("opens the tracked Welcome page independently of glob order", () => {
     expect(DEFAULT_PAGE_SLUG).toBe("welcome");
     expect(PAGES.some((entry) => entry.slug === DEFAULT_PAGE_SLUG)).toBe(true);

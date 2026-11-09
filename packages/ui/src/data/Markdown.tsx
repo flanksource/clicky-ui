@@ -16,8 +16,11 @@ import { useRouter } from "../rpc/router";
 import { Callout, type CalloutProps } from "./Callout";
 import { CodeBlock } from "./CodeBlock";
 import { rehypeSourceBlocks, sourceAttributes, type SourceAttributes } from "./markdown-source-blocks";
+import { rehypeDocumentUrls } from "./markdown-urls";
 
 export type MarkdownProps = {
+  /** Resolve sanitized document links and images relative to a host-owned source location. */
+  resolveUrl?: ((url: string, kind: "link" | "image") => string) | undefined;
   /** Markdown source text. */
   text: string;
   /** Classes applied to the rendered markdown wrapper. */
@@ -113,6 +116,7 @@ type StreamdownComponent = ComponentType<{
     h5?: ComponentType<MarkdownHeadingProps>;
     h6?: ComponentType<MarkdownHeadingProps>;
     a?: ComponentType<MarkdownLinkProps>;
+    img?: ComponentType<MarkdownImageProps>;
     code?: ComponentType<MarkdownCodeProps>;
     ul?: ComponentType<MarkdownElementProps>;
     ol?: ComponentType<MarkdownElementProps>;
@@ -274,6 +278,10 @@ function MarkdownTableCell({ className, style, children }: MarkdownElementProps)
 }
 
 type MarkdownLinkProps = MarkdownElementProps & { href?: string; title?: string };
+type MarkdownImageProps = MarkdownElementProps & { src?: string; alt?: string; title?: string };
+function MarkdownImage({ src, alt, title, className, ...props }: MarkdownImageProps) {
+  return <img src={src} alt={alt ?? ""} title={title} className={className} loading="lazy" {...sourceAttributes(props)} />;
+}
 
 // Streamdown renders every link as a button behind an "Open external link?"
 // prompt that always opens a new tab, so an in-app link such as `/connections`
@@ -333,6 +341,7 @@ const markdownComponents = {
   h5: (props: MarkdownHeadingProps) => <MarkdownHeading as="h5" {...props} />,
   h6: (props: MarkdownHeadingProps) => <MarkdownHeading as="h6" {...props} />,
   a: MarkdownLink,
+  img: MarkdownImage,
   pre: MarkdownPre,
   code: MarkdownCode,
   ul: MarkdownList,
@@ -375,12 +384,13 @@ const CALLOUT_ALLOWED_TAGS = {
  *  blocks render via the library CodeBlock, and lists and tables are styled
  *  here rather than by Streamdown. Falls back to preformatted text until
  *  Streamdown loads or when it is not installed. */
-export function Markdown({ text, className, callouts = false, sourceBlocks = false }: MarkdownProps) {
+export function Markdown({ text, className, callouts = false, sourceBlocks = false, resolveUrl }: MarkdownProps) {
   if (sourceBlocks && callouts) {
     throw new Error(
       "Markdown: sourceBlocks and callouts cannot be combined; callouts replaces the sanitiser schema that sourceBlocks keeps",
     );
   }
+  if (resolveUrl && callouts) throw new Error("Markdown: resolveUrl and callouts cannot be combined because callouts owns the sanitizer chain");
   const [streamdown, setStreamdown] = useState<StreamdownModule | null>(null);
 
   useEffect(() => {
@@ -396,10 +406,12 @@ export function Markdown({ text, className, callouts = false, sourceBlocks = fal
   // Streamdown's own chain (raw, sanitize, harden) followed by the stamping
   // plugin. Appending, rather than replacing, keeps the document sanitised, and
   // running last lets the attributes survive the sanitiser.
-  const sourceRehypePlugins = useMemo(
-    () => (streamdown ? [...Object.values(streamdown.defaultRehypePlugins), rehypeSourceBlocks] : undefined),
-    [streamdown],
-  );
+  const sourceRehypePlugins = useMemo(() => {
+    if (!streamdown) return undefined;
+    const { raw, sanitize, harden } = streamdown.defaultRehypePlugins;
+    if (!raw || !sanitize || !harden) throw new Error("Streamdown must provide its raw, sanitize and harden plugins");
+    return [raw, sanitize, ...(resolveUrl ? [rehypeDocumentUrls(resolveUrl)] : []), harden, ...(sourceBlocks ? [rehypeSourceBlocks] : [])];
+  }, [streamdown, sourceBlocks, resolveUrl]);
 
   if (!streamdown) {
     return <pre className={cn("whitespace-pre-wrap text-sm", className)}>{text}</pre>;
@@ -416,6 +428,7 @@ export function Markdown({ text, className, callouts = false, sourceBlocks = fal
         <Streamdown
           parseIncompleteMarkdown
           components={callouts ? calloutComponents : markdownComponents}
+          {...(resolveUrl ? { rehypePlugins: sourceRehypePlugins } : {})}
           allowedTags={callouts ? CALLOUT_ALLOWED_TAGS : undefined}
         >
           {text}

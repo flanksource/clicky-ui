@@ -139,6 +139,10 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Build e2e application
+        run: |
+          pnpm --filter @flanksource/clicky-ui run build
+          pnpm --filter kitchen-sink exec vite build
       - name: Gavel e2e tests
         uses: flanksource/gavel@fb4916508ea984a8d1cdcc52190765a0ed6ec57a # v0.0.61
         with:

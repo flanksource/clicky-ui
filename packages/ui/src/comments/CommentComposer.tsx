@@ -1,10 +1,12 @@
+import { ActionError } from "../data/diagnostics/ActionError";
 import { useRef, useState } from "react";
+import { useCommentState } from "./comment-persistence";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { DropdownMenu } from "../overlay/DropdownMenu";
 import { UiArrowUp, UiClose, UiThumbsDown, UiThumbsUp } from "../icons";
 import type { BadgeTone } from "../data/Badge";
-import { MentionTextarea } from "./MentionTextarea";
+import { CommentEditor } from "./CommentEditor";
 import { toneToBadgeTone } from "./comment-utils";
 import type {
   CommentAnchor,
@@ -39,6 +41,7 @@ export type CommentComposerProps = {
   createActions?: readonly CommentCreateAction[];
   /** Fired once per mention referenced by a posted comment. */
   onMention?: (mention: CommentMention, context: { body: string }) => void;
+  onCancel?: () => void;
 };
 
 function FacetPicker({
@@ -126,21 +129,25 @@ export function CommentComposer({
   onCreate,
   createActions,
   onMention,
+  onCancel,
 }: CommentComposerProps) {
-  const [open, setOpen] = useState(!collapsible || autoFocus);
-  const [body, setBody] = useState("");
-  const [facets, setFacets] = useState<Record<string, string>>({});
-  const [rating, setRating] = useState<CommentRating | undefined>();
+  const draftKey = `draft:create:${anchor ?? "general"}`;
+  const [open, setOpen] = useCommentState(`${draftKey}:open`, !collapsible || autoFocus);
+  const [body, setBody] = useCommentState(`${draftKey}:body`, "");
+  const [facets, setFacets] = useCommentState<Record<string, string>>(`${draftKey}:facets`, {});
+  const [rating, setRating] = useCommentState<CommentRating | undefined>(`${draftKey}:rating`, undefined);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<unknown>(null);
   const submittingRef = useRef(false);
-  const mentionsRef = useRef<Map<string, CommentMention>>(new Map());
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [savedMentions, setSavedMentions] = useCommentState<CommentMention[]>(`${draftKey}:mentions`, []);
+  const mentionsRef = useRef<Map<string, CommentMention>>(new Map(savedMentions.map((mention) => [mention.id, mention])));
 
   function reset() {
     setBody("");
     setFacets({});
     setRating(undefined);
     mentionsRef.current.clear();
+    setSavedMentions([]);
   }
 
   function setFacet(key: string, value: string | undefined) {
@@ -158,6 +165,7 @@ export function CommentComposer({
     if ((!text && !rating) || submittingRef.current) return;
     submittingRef.current = true;
     setSubmitting(true);
+    setError(null);
     const mentions = [...mentionsRef.current.values()].filter((m) =>
       body.toLowerCase().includes(`@${m.name.toLowerCase()}`),
     );
@@ -174,13 +182,15 @@ export function CommentComposer({
       for (const mention of mentions) onMention?.(mention, { body: text });
       reset();
       if (collapsible) setOpen(false);
+    } catch (cause) {
+      setError(cause);
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
     }
   }
 
-  if (!open && body.trim().length === 0) {
+  if (collapsible && !open && body.trim().length === 0) {
     return (
       <button
         type="button"
@@ -198,16 +208,18 @@ export function CommentComposer({
       aria-busy={submitting}
       className="relative rounded-2xl border border-border bg-muted/25 px-3 pt-3 pb-10 shadow-sm transition-[border-color,box-shadow] focus-within:border-primary/40 focus-within:shadow-md [@media(pointer:coarse)]:pb-2"
     >
-      <MentionTextarea
-        ref={inputRef}
+      <CommentEditor
+        {...(config.vocabulary ? { vocabulary: config.vocabulary } : {})}
         value={body}
         onChange={setBody}
         mentionables={config.mentionables ?? []}
-        onMentionSelect={(m) => mentionsRef.current.set(m.id, m)}
+        onMentionSelect={(m) => { mentionsRef.current.set(m.id, m); setSavedMentions([...mentionsRef.current.values()]); }}
         onSubmit={() => void submit()}
         onCancel={() => {
+          if (submittingRef.current) return;
           reset();
           if (collapsible) setOpen(false);
+          onCancel?.();
         }}
         placeholder={placeholder}
         // An always-open composer is page chrome: focusing it on mount would
@@ -216,6 +228,7 @@ export function CommentComposer({
         data-testid="comment-compose-input"
         className="min-h-[48px] pr-10 [@media(pointer:coarse)]:pr-12"
       />
+      {error !== null && <ActionError error={error} context={[["Operation", "Post comment"], ["Anchor", anchor ?? "Whole page"]]} />}
       {collapsible && (
         <button
           type="button"

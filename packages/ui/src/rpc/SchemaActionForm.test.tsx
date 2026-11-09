@@ -71,6 +71,62 @@ describe("collectionPath", () => {
 });
 
 describe("SchemaActionForm", () => {
+  it("blocks mutually exclusive configuration and explains the conflict", async () => {
+    renderForm(
+      <SchemaActionForm
+        client={baseClient({
+          getSchema: vi.fn(async () => ({
+            type: "object",
+            properties: {},
+            not: {
+              description: "Choose one kubeconfig source.",
+              required: ["certificate", "properties"],
+            },
+          })),
+          submitForm: vi.fn(),
+        })}
+        action={createAction}
+        initialValue={{
+          certificate: "example",
+          properties: { kubeconfig: "/example.yaml" },
+        }}
+        fallback={null}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: "Save" })).toBeDisabled();
+    expect(
+      screen.getByText("Choose one kubeconfig source."),
+    ).toBeInTheDocument();
+  });
+  it("blocks an empty required name and exposes dirty state after editing", async () => {
+    const layout = vi.fn(({ body, footer }) => (
+      <>
+        {body}
+        {footer}
+      </>
+    ));
+    renderForm(
+      <SchemaActionForm
+        client={baseClient({
+          getSchema: vi.fn(async () => ({
+            type: "object",
+            required: ["name"],
+            properties: { name: { type: "string", title: "Name" } },
+          })),
+          submitForm: vi.fn(),
+        })}
+        action={createAction}
+        fallback={null}
+        renderLayout={layout}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: "Save" })).toBeDisabled();
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "example" },
+    });
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(layout.mock.lastCall?.[0]).toMatchObject({ dirty: true });
+  });
   it("renders the fallback when the resource exposes no schema", async () => {
     const client = baseClient({
       getSchema: vi.fn(async () => undefined),
@@ -134,6 +190,75 @@ describe("SchemaActionForm", () => {
       expect.objectContaining({ Accept: "application/json+clicky" }),
     );
     expect(onSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  describe("a submit-target property", () => {
+    const layers = {
+      type: "string",
+      title: "Save to",
+      enum: ["db", "global"],
+      default: "db",
+      "x-enum-labels": { db: "Database", global: "Global files" },
+      "x-clicky-submit-target": true,
+    };
+    const schema = {
+      type: "object",
+      required: ["layer"],
+      properties: { name: { type: "string", title: "Name" }, layer: layers },
+    };
+
+    function renderTargetForm(initialValue: Record<string, unknown>) {
+      const submitForm = vi.fn(async () => ({ success: true }) as never);
+      renderForm(
+        <SchemaActionForm
+          client={baseClient({ getSchema: vi.fn(async () => schema), submitForm })}
+          action={createAction}
+          initialValue={initialValue}
+          submitLabel="Add Connection"
+          fallback={<div>param form</div>}
+        />,
+      );
+      return submitForm;
+    }
+
+    it("is chosen from the save split button instead of a form field", async () => {
+      const submitForm = renderTargetForm({ name: "pg" });
+
+      const save = await screen.findByRole("button", { name: "Add Connection to Database" });
+      expect(screen.queryByText("Save to")).toBeNull();
+      fireEvent.click(save);
+
+      await waitFor(() => expect(submitForm).toHaveBeenCalledTimes(1));
+      expect(submitForm).toHaveBeenCalledWith(
+        "/api/v1/connection",
+        "POST",
+        { name: "pg", layer: "db" },
+        expect.anything(),
+      );
+    });
+
+    it("submits to another target picked from the split button menu", async () => {
+      const submitForm = renderTargetForm({ name: "pg" });
+
+      fireEvent.click(await screen.findByRole("button", { name: "Choose where to save" }));
+      fireEvent.click(await screen.findByText("Add Connection to Global files"));
+
+      await waitFor(() => expect(submitForm).toHaveBeenCalledTimes(1));
+      expect(submitForm).toHaveBeenCalledWith(
+        "/api/v1/connection",
+        "POST",
+        { name: "pg", layer: "global" },
+        expect.anything(),
+      );
+    });
+
+    it("keeps an edited entity's current target as the primary action", async () => {
+      renderTargetForm({ name: "pg", layer: "global" });
+
+      expect(
+        await screen.findByRole("button", { name: "Add Connection to Global files" }),
+      ).toBeTruthy();
+    });
   });
 
   it("edits and submits the same draft through the YAML tab", async () => {

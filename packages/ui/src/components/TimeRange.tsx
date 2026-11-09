@@ -784,7 +784,9 @@ function formatRangeLabel(kind: TimeRangeKind, from: string, to: string, emptyLa
   const trimmedTo = to.trim();
 
   if (!trimmedFrom && !trimmedTo) {
-    return emptyLabel ?? (kind === "date" ? "Any date" : "now-24h");
+    // An unset range filters nothing, so naming a window here would claim one
+    // the query does not apply.
+    return emptyLabel ?? (kind === "date" ? "Any date" : "Any time");
   }
 
   if (kind === "time") {

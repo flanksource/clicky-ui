@@ -6,11 +6,11 @@
 
 import type { ReactNode } from "react";
 import { ChecklistDetail, FixtureDetail } from "./adapterViews";
-import { StepOutputs } from "./stepKindViews";
+import { StepOutputs, StepRowBadge, StepSourceSection } from "./stepKindViews";
 import { verifyNodeTest } from "./verifyReportTests";
 import { UiTerminal } from "../../icons";
-import { hasStepDetail, readStepDetail, stepKindCopy, type WaitDetail } from "./stepKind";
-import { readStepSource, stepSourceCopy } from "./stepSource";
+import { hasStepDetail, readQuery, readStepDetail, stepFormState, stepKindCopy, stepQueryCopy, type WaitDetail } from "./stepKind";
+import { readStepSource, sourceTabLabel, stepSourceCopy } from "./stepSource";
 import {
   createTestRunnerRegistry,
   outcomeFor,
@@ -156,9 +156,10 @@ function fixtureCopy(node: Test): CopySections {
   const command = context?.command ?? node.command;
   const stepDetail = readStepDetail(node.detail);
   const source = readStepSource(node.detail);
+  const query = readQuery(node.detail);
   return {
     brief: [
-      ...commandSection(node, context),
+      ...(query.kind === "query" ? stepQueryCopy(query.query) : commandSection(node, context)),
       ...assertionSection(node, context),
       ...(source.kind === "source" ? stepSourceCopy(source.source) : []),
       ...(stepDetail.kind === "step" ? stepKindCopy(stepDetail.step) : []),
@@ -201,12 +202,25 @@ const fixtureStepCopyAdapter: TestNodeAdapter = {
   copy: ({ node }) => fixtureCopy(node),
 };
 
+// Claims only the rows it badges, so a host's own row decoration still wins for every other node.
+const stepBadgeAdapter: TestNodeAdapter = {
+  id: "verification-step-badge",
+  match: (node) => node.waiting === true || stepFormState(node) !== undefined,
+  renderRowLeading: ({ node }) => <StepRowBadge node={node} />,
+};
+
 /** Default node adapters for VerificationResults: checklist items and
  *  fixture/CEL steps. Registration order matters only when a node could match
  *  both — a checklist node never carries a `context`, so the two never race. */
 export type VerificationAdapterOptions = {
   /** Override the wait section while retaining the fixture's other detail sections. */
   renderWait?: (wait: WaitDetail) => ReactNode;
+  /**
+   * The answerable form of a step waiting on a person (`node.waiting`), shown in
+   * its own section at the top of the step's detail. The host resolves which
+   * pending prompt belongs to the node and answers it (e.g. with PromptForm).
+   */
+  renderPendingPrompt?: (node: Test) => ReactNode;
 };
 
 export function verificationAdapters(options: VerificationAdapterOptions = {}): TestNodeAdapterRegistry {
@@ -227,11 +241,18 @@ export function verificationAdapters(options: VerificationAdapterOptions = {}): 
       }));
     },
     detailTabs: ({ node }) => {
+      const tabs = [];
       const detail = readStepDetail(node.detail);
-      if (detail.kind !== "step" || detail.step.outputs === undefined) return [];
-      return [{ id: "outputs", label: "Outputs", render: () => <StepOutputs outputs={detail.step.outputs} /> }];
+      if (detail.kind === "step" && detail.step.outputs !== undefined) {
+        tabs.push({ id: "outputs", label: "Outputs", render: () => <StepOutputs outputs={detail.step.outputs} /> });
+      }
+      const source = readStepSource(node.detail);
+      if (source.kind !== "none") {
+        tabs.push({ id: "source", label: sourceTabLabel(source), render: () => <StepSourceSection result={source} /> });
+      }
+      return tabs;
     },
     copy: ({ node }) => fixtureCopy(node),
   };
-  return createTestRunnerRegistry([checklistAdapter, fixtureAdapter, fixtureStepCopyAdapter]);
+  return createTestRunnerRegistry([checklistAdapter, fixtureAdapter, fixtureStepCopyAdapter, stepBadgeAdapter]);
 }

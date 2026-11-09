@@ -1,4 +1,5 @@
 import { Icon } from "../Icon";
+import { ElapsedDuration } from "../ElapsedDuration";
 import { Badge } from "../Badge";
 import { IconButton } from "../../components/IconButton";
 import { UiClass, UiRefresh, UiStop } from "../../icons";
@@ -20,7 +21,7 @@ const NAME_TONE: Record<string, string> = {
   failed: "text-red-600 dark:text-red-400",
   timedout: "text-amber-600 dark:text-amber-400",
   warned: "text-amber-600 dark:text-amber-400",
-  aborted: "text-red-500 dark:text-red-300",
+  aborted: "text-muted-foreground",
   running: "text-blue-600 dark:text-blue-400",
   skipped: "text-muted-foreground",
   pending: "text-muted-foreground",
@@ -39,7 +40,7 @@ function CountBadges({ node }: { node: Test }) {
       {s.failed > 0 && <Badge tone="danger" variant="solid" size="xxs" count={s.failed} />}
       {s.warned > 0 && <Badge tone="warning" variant="outline" size="xxs" count={s.warned} />}
       {s.timedout > 0 && <Badge tone="warning" variant="solid" size="xxs" count={s.timedout} />}
-      {s.aborted > 0 && <Badge tone="danger" variant="soft" size="xxs" count={s.aborted} />}
+      {s.aborted > 0 && <Badge tone="neutral" variant="soft" size="xxs" count={s.aborted} />}
       {s.skipped > 0 && <Badge tone="neutral" variant="soft" size="xxs" count={s.skipped} />}
       {s.running > 0 && <Badge tone="info" variant="solid" size="xxs" count={s.running} />}
       {s.pending > 0 && <Badge tone="neutral" variant="soft" size="xxs" count={s.pending} />}
@@ -62,6 +63,7 @@ export function TestTreeNode({ node, selected }: { node: Test; selected: boolean
   const fwNode = fwAdapter?.renderFrameworkIcon?.({ node, runner });
   const leadingAdapter = runner.adapters.resolveRowLeading(node, runner);
   const dur = node.duration || (hasChildren ? totalDuration(node) : 0);
+  const live = !!node.running && !!node.started && !node.duration;
   const canRerun = !!runner.onRerun && node.framework !== "task";
   const canStop = !!runner.onStop && !!node.can_stop && !!node.task_id;
   const showMessage = status && (MESSAGE_STATUSES.has(status) || (node.framework === "task" && (status === "running" || status === "pending")));
@@ -115,8 +117,15 @@ export function TestTreeNode({ node, selected }: { node: Test; selected: boolean
         </span>
       )}
 
-      {dur > 0 && (
-        <span className="shrink-0 text-xs text-muted-foreground">{formatTestDuration(dur)}</span>
+      {live ? (
+        <ElapsedDuration
+          startedAt={node.started}
+          finishedAt={undefined}
+          format={(ms) => formatTestDuration(ms * 1e6)}
+          className="shrink-0 text-xs text-muted-foreground"
+        />
+      ) : (
+        dur > 0 && <span className="shrink-0 text-xs text-muted-foreground">{formatTestDuration(dur)}</span>
       )}
 
       {hasChildren && <CountBadges node={node} />}

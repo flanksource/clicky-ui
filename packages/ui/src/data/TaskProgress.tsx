@@ -1,13 +1,25 @@
 import { taskWorkProgress } from "./task-work-progress";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { taskGroupTree, type TaskGroupNode } from "./task-group-tree";
 import { Button } from "../components/button";
 import { CopyButton } from "../components/CopyButton";
 import { SplitButton } from "../components/SplitButton";
 import { useCopyFlash } from "../components/clipboard";
-import { UiCheck, UiCopy, UiJson, UiPlay, UiRefresh, UiRestart, UiStop, UiWarningTriangle } from "../icons";
+import {
+  UiCheck,
+  UiCopy,
+  UiJson,
+  UiPlay,
+  UiRefresh,
+  UiRestart,
+  UiStop,
+  UiWarningTriangle,
+} from "../icons";
 import { cn } from "../lib/utils";
+import { formatBytes, formatBytesPerSecond } from "../lib/format";
 import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { Icon } from "./Icon";
+import { ElapsedDuration } from "./ElapsedDuration";
 import { ProgressBar } from "./ProgressBar";
 import { TaskProcessDetailsView } from "./TaskProcessDetails";
 import { TaskExecDetailsView } from "./TaskExecDetails";
@@ -51,7 +63,10 @@ export interface TaskProgressProps {
   /** Show every child task when the group first opens. */
   initialShowAllTasks?: boolean;
   className?: string;
-  onControl?: (action: TaskControlAction, group: TaskSnapshot) => void | Promise<void>;
+  onControl?: (
+    action: TaskControlAction,
+    group: TaskSnapshot,
+  ) => void | Promise<void>;
   onTaskControl?: (
     action: TaskControlAction,
     task: TaskSnapshot,
@@ -88,8 +103,7 @@ export function TaskProgress({
   headerExtra,
   promptBasePath = DEFAULT_PROMPT_BASE,
 }: TaskProgressProps) {
-  const groups = snapshots.filter((s) => s.type === "group");
-  const tasks = snapshots.filter((s) => s.type === "task");
+  const groups = taskGroupTree(snapshots);
 
   if (groups.length === 0) {
     return (
@@ -99,25 +113,36 @@ export function TaskProgress({
     );
   }
 
+  const renderGroup = (node: TaskGroupNode): ReactNode => {
+    const g = node.group;
+    return (
+      <TaskGroupCard
+        key={g.groupId || g.id}
+        group={g}
+        tasks={node.tasks}
+        allTasks={node.allTasks}
+        compact={compact}
+        initialShowAllTasks={initialShowAllTasks}
+        {...(onControl ? { onControl } : {})}
+        {...(onTaskControl ? { onTaskControl } : {})}
+        {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
+        {...(connectionStatus ? { connectionStatus } : {})}
+        {...(extraTabs ? { extraTabs } : {})}
+        {...(headerExtra ? { headerExtra } : {})}
+        promptBasePath={promptBasePath}
+      >
+        {node.children.length > 0 && (
+          <div className="mt-2 space-y-2 border-l pl-3">
+            {node.children.map(renderGroup)}
+          </div>
+        )}
+      </TaskGroupCard>
+    );
+  };
   return (
     <div className={cn(compact ? "space-y-2" : "space-y-3", className)}>
       {title && <h2 className="text-sm font-semibold">{title}</h2>}
-      {groups.map((g) => (
-        <TaskGroupCard
-          key={g.groupId || g.id}
-          group={g}
-          tasks={tasks.filter((t) => g.groupId ? t.groupId === g.groupId : t.group === g.id)}
-          compact={compact}
-          initialShowAllTasks={initialShowAllTasks}
-          {...(onControl ? { onControl } : {})}
-          {...(onTaskControl ? { onTaskControl } : {})}
-          {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
-          {...(connectionStatus ? { connectionStatus } : {})}
-          {...(extraTabs ? { extraTabs } : {})}
-          {...(headerExtra ? { headerExtra } : {})}
-          promptBasePath={promptBasePath}
-        />
-      ))}
+      {groups.map(renderGroup)}
     </div>
   );
 }
@@ -125,6 +150,8 @@ export function TaskProgress({
 function TaskGroupCard({
   group: g,
   tasks,
+  allTasks,
+  children,
   compact,
   initialShowAllTasks,
   onControl,
@@ -137,12 +164,17 @@ function TaskGroupCard({
 }: {
   group: TaskSnapshot;
   tasks: TaskSnapshot[];
+  allTasks: TaskSnapshot[];
+  children: ReactNode;
   compact: boolean | undefined;
   initialShowAllTasks: boolean | undefined;
   extraTabs?: TaskExtraTabs;
   headerExtra?: TaskHeaderExtra;
   promptBasePath: string;
-  onControl?: (action: TaskControlAction, group: TaskSnapshot) => void | Promise<void>;
+  onControl?: (
+    action: TaskControlAction,
+    group: TaskSnapshot,
+  ) => void | Promise<void>;
   onTaskControl?: (
     action: TaskControlAction,
     task: TaskSnapshot,
@@ -154,24 +186,30 @@ function TaskGroupCard({
   const [showAll, setShowAll] = useState(initialShowAllTasks ?? false);
   const { state: copyState, copy } = useCopyFlash();
   const work = taskWorkProgress(g);
-  const total = g.work ? work.total : g.total ?? tasks.length;
-  const counts = g.work ? work.counts : bucketTasks(tasks);
+  const total = g.work ? work.total : (g.total ?? allTasks.length);
+  const counts = g.work ? work.counts : bucketTasks(allTasks);
   const done = counts.ok + counts.warn + counts.fail + counts.canceled;
   const progress = g.work ? work.label : total > 0 ? `${done}/${total}` : "";
 
   const running = tasks.filter((t) => t.status === "running");
   const pending = tasks.filter((t) => t.status === "pending");
-  const completed = tasks.filter((t) => t.status !== "running" && t.status !== "pending");
+  const completed = tasks.filter(
+    (t) => t.status !== "running" && t.status !== "pending",
+  );
   const alwaysShow = completed.filter(isFailedOrWarn);
   const collapsible = completed.filter((t) => !isFailedOrWarn(t));
 
   const hiddenCompleted = collapsible.length - MAX_COMPLETED;
   const collapseCompleted = !showAll && hiddenCompleted > 0;
-  const visibleSuccess = collapseCompleted ? collapsible.slice(-MAX_COMPLETED) : collapsible;
+  const visibleSuccess = collapseCompleted
+    ? collapsible.slice(-MAX_COMPLETED)
+    : collapsible;
 
   const hiddenPending = pending.length - MAX_PENDING;
   const collapsePending = !showAll && hiddenPending > 0;
-  const visiblePending = collapsePending ? pending.slice(0, MAX_PENDING) : pending;
+  const visiblePending = collapsePending
+    ? pending.slice(0, MAX_PENDING)
+    : pending;
 
   const isTerminal = g.status !== "running" && g.status !== "pending";
 
@@ -179,19 +217,28 @@ function TaskGroupCard({
     {
       label: "Copy as JSON",
       icon: UiJson,
-      onSelect: () => copy(taskGroupJson(g, tasks)),
+      onSelect: () => copy(taskGroupJson(g, allTasks)),
     },
     {
       label: "Copy errors only",
       icon: UiWarningTriangle,
-      disabled: taskGroupErrorCount(tasks) === 0,
-      onSelect: () => copy(taskGroupErrors(g, tasks)),
+      disabled: taskGroupErrorCount(allTasks) === 0,
+      onSelect: () => copy(taskGroupErrors(g, allTasks)),
     },
   ];
 
   return (
-    <div className={cn("rounded-lg border bg-card", compact ? "p-2" : "p-4")}>
-      <div className={cn("flex items-center justify-between gap-3", compact ? "mb-2" : "mb-3")}>
+    <div
+      role="group"
+      aria-label={g.name}
+      className={cn("rounded-lg border bg-card", compact ? "p-2" : "p-4")}
+    >
+      <div
+        className={cn(
+          "flex items-center justify-between gap-3",
+          compact ? "mb-2" : "mb-3",
+        )}
+      >
         <h3 className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
           <Icon
             icon={taskStatusIcon(g.status)}
@@ -201,9 +248,11 @@ function TaskGroupCard({
               g.status === "running" && "animate-spin",
             )}
           />
-          <span className="truncate">{g.name}</span>
+          <span className="break-words">{g.name}</span>
           {progress && (
-            <span className="shrink-0 text-xs text-muted-foreground">{progress}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {progress}
+            </span>
           )}
           {g.kind && (
             <span className="shrink-0 rounded-full bg-muted px-1.5 py-0 text-[10px] text-muted-foreground">
@@ -224,12 +273,18 @@ function TaskGroupCard({
             </span>
           )}
           <SplitButton
-            label={copyState === "copied" ? "Copied" : copyState === "error" ? "Copy failed" : "Copy"}
+            label={
+              copyState === "copied"
+                ? "Copied"
+                : copyState === "error"
+                  ? "Copy failed"
+                  : "Copy"
+            }
             icon={copyState === "copied" ? UiCheck : UiCopy}
             variant="ghost"
             size="sm"
             title="More copy options"
-            onClick={() => copy(taskGroupMarkdown(g, tasks))}
+            onClick={() => copy(taskGroupMarkdown(g, allTasks))}
             items={copyItems}
           />
           {onControl && <TaskControls target={g} onControl={onControl} />}
@@ -238,7 +293,11 @@ function TaskGroupCard({
 
       {total > 0 && (
         <div className={compact ? "mb-2" : "mb-3"}>
-          <ProgressBar segments={taskSegments(counts)} total={total} height="h-1.5" />
+          <ProgressBar
+            segments={taskSegments(counts)}
+            total={total}
+            height="h-1.5"
+          />
         </div>
       )}
 
@@ -257,7 +316,10 @@ function TaskGroupCard({
       {hiddenCompleted > 0 || hiddenPending > 0 ? (
         <button
           type="button"
-          className={cn("border-b text-xs text-muted-foreground hover:text-foreground", compact ? "py-1" : "py-1.5")}
+          className={cn(
+            "border-b text-xs text-muted-foreground hover:text-foreground",
+            compact ? "py-1" : "py-1.5",
+          )}
           onClick={() => setShowAll((v) => !v)}
         >
           {showAll
@@ -266,20 +328,23 @@ function TaskGroupCard({
         </button>
       ) : null}
 
-      {[...visibleSuccess, ...alwaysShow, ...running, ...visiblePending].map((t) => (
-        <TaskRow
-          key={t.id}
-          task={t}
-          group={g}
-          compact={compact}
-          {...(onTaskControl ? { onTaskControl } : {})}
-          {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
-          {...(connectionStatus ? { connectionStatus } : {})}
-          {...(extraTabs ? { extraTabs } : {})}
-          {...(headerExtra ? { headerExtra } : {})}
-          promptBasePath={promptBasePath}
-        />
-      ))}
+      {[...visibleSuccess, ...alwaysShow, ...running, ...visiblePending].map(
+        (t) => (
+          <TaskRow
+            key={t.id}
+            task={t}
+            group={g}
+            compact={compact}
+            {...(onTaskControl ? { onTaskControl } : {})}
+            {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
+            {...(connectionStatus ? { connectionStatus } : {})}
+            {...(extraTabs ? { extraTabs } : {})}
+            {...(headerExtra ? { headerExtra } : {})}
+            promptBasePath={promptBasePath}
+          />
+        ),
+      )}
+      {children}
     </div>
   );
 }
@@ -319,18 +384,27 @@ function TaskRow({
   const header = headerExtra?.(t, group) ?? <TaskMetadataChips task={t} />;
   const hasOutput = !!t.stdout || !!t.stderr || extraTabs.length > 0;
   const execDetails = isTaskExecDetails(t.details) ? t.details : undefined;
-  const processDetails = isTaskProcessDetails(t.details) ? t.details : undefined;
-  const expandable = hasLogs || hasOutput || execDetails !== undefined || processDetails !== undefined;
+  const processDetails = isTaskProcessDetails(t.details)
+    ? t.details
+    : undefined;
+  const expandable =
+    hasLogs ||
+    hasOutput ||
+    execDetails !== undefined ||
+    processDetails !== undefined;
   // Promote the latest warning message inline so a `warning` row shows its
   // reason without expanding. Suppressed when an error is already shown.
-  const latestWarn = t.error ? undefined : logs.filter((l) => l.level === "warn").at(-1);
+  const latestWarn = t.error
+    ? undefined
+    : logs.filter((l) => l.level === "warn").at(-1);
   // Bounded per-task progress (e.g. records emitted in a phase): render an x/y
   // count, a percentage, and a thin bar while the task runs.
   const done = t.progress ?? 0;
-  // Only surface bounded progress once work has actually started — an untouched
-  // task should not render a "0/100 · 0%" placeholder.
-  const hasProgress = typeof t.maxValue === "number" && t.maxValue > 0 && done > 0;
-  const pct = hasProgress ? Math.round((done / (t.maxValue as number)) * 100) : 0;
+  const hasProgress =
+    typeof t.maxValue === "number" && t.maxValue > 0;
+  const pct = hasProgress
+    ? Math.round((done / (t.maxValue as number)) * 100)
+    : 0;
 
   return (
     <div
@@ -343,27 +417,48 @@ function TaskRow({
     >
       <Icon
         icon={taskStatusIcon(t.status)}
-        className={cn(taskStatusColor(t.status), "mt-0.5", compact ? "text-base" : "text-lg", t.status === "running" && "animate-spin")}
+        className={cn(
+          taskStatusColor(t.status),
+          "mt-0.5",
+          compact ? "text-base" : "text-lg",
+          t.status === "running" && "animate-spin",
+        )}
       />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
-            <span className="truncate">{t.name}</span>
-            {t.error && <span className="truncate text-xs font-normal text-red-500">{t.error}</span>}
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <span className="flex min-w-0 flex-1 basis-full items-center gap-1.5 text-sm font-medium sm:basis-auto">
+            <span className="break-words">{t.name}</span>
+            {t.error && (
+              <span className="truncate text-xs font-normal text-red-500">
+                {t.error}
+              </span>
+            )}
             {latestWarn && (
-              <span className={cn("truncate text-xs font-normal", logLevelColor("warn"))}>
+              <span
+                className={cn(
+                  "truncate text-xs font-normal",
+                  logLevelColor("warn"),
+                )}
+              >
                 {latestWarn.message}
               </span>
             )}
             {expandable && (
               <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
-                {logs.length + (t.stdout ? 1 : 0) + (t.stderr ? 1 : 0) + (execDetails || processDetails ? 1 : 0)}
+                {logs.length +
+                  (t.stdout ? 1 : 0) +
+                  (t.stderr ? 1 : 0) +
+                  (execDetails || processDetails ? 1 : 0)}
               </span>
             )}
           </span>
           {header}
           <div className="flex shrink-0 items-center gap-1">
-            {t.duration && <span className="text-xs text-muted-foreground">{t.duration}</span>}
+            <ElapsedDuration
+              startedAt={t.startedAt}
+              finishedAt={t.finishedAt}
+              className="text-xs text-muted-foreground"
+            />
             <CopyButton
               value={() => taskMarkdown(t)}
               label={`Copy ${t.name}`}
@@ -381,15 +476,24 @@ function TaskRow({
           </div>
         </div>
         {(t.description || hasProgress) && (
-          <div className="mt-0.5 flex items-center gap-2">
+          <div className="mt-0.5 flex flex-wrap items-center gap-2">
             {t.description && (
-              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{t.description}</span>
+              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                {t.description}
+              </span>
             )}
             {hasProgress && (
               <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                {done}/{t.maxValue} · {pct}%
+                {done}/{t.maxValue}{t.progressMetrics?.unit ? ` ${t.progressMetrics.unit}` : ""} · {pct}%
               </span>
             )}
+          </div>
+        )}
+        {t.progressMetrics && (
+          <div className="text-xs tabular-nums text-muted-foreground">
+            {!hasProgress && t.progressMetrics.unit && `${done} ${t.progressMetrics.unit} · `}
+            {(t.progressMetrics.bytes ?? 0) > 0 && formatBytes(t.progressMetrics.bytes)}
+            {(t.progressMetrics.bytesPerSecond ?? 0) > 0 && ` · ${formatBytesPerSecond(t.progressMetrics.bytesPerSecond)}`}
           </div>
         )}
         {hasProgress && t.status === "running" && (
@@ -401,26 +505,37 @@ function TaskRow({
             />
           </div>
         )}
-        {t.prompts && t.prompts.length > 0 && <TaskPrompts prompts={t.prompts} basePath={promptBasePath} />}
-        {expanded && execDetails && <TaskExecDetailsView details={execDetails} />}
+        {t.prompts && t.prompts.length > 0 && (
+          <TaskPrompts prompts={t.prompts} basePath={promptBasePath} />
+        )}
+        {expanded && execDetails && (
+          <TaskExecDetailsView details={execDetails} />
+        )}
         {expanded && processDetails && (
           <TaskProcessDetailsView
             details={processDetails}
             {...(metricsBaseUrl ? { metricsBaseUrl } : {})}
-          {...(connectionStatus ? { connectionStatus } : {})}
+            {...(connectionStatus ? { connectionStatus } : {})}
           />
         )}
         {expanded && hasLogs && (
           <div className="mt-1 ml-1 max-h-48 space-y-0.5 overflow-y-auto border-l-2 pl-2">
-            {logs.map((l, i) => (
-              <div key={i} className={cn("text-xs", logLevelColor(l.level))}>
-                <span className="mr-1 font-mono text-muted-foreground">{l.level.substring(0, 3)}</span>
+            {logs.map((l) => (
+              <div key={l.seq} className={cn("text-xs", logLevelColor(l.level))}>
+                <span className="mr-1 font-mono text-muted-foreground">
+                  {l.level.substring(0, 3)}
+                </span>
                 {l.message}
               </div>
             ))}
           </div>
         )}
-        {expanded && <TaskStreamTabs task={t} {...(extraTabs.length > 0 ? { extraTabs } : {})} />}
+        {expanded && (
+          <TaskStreamTabs
+            task={t}
+            {...(extraTabs.length > 0 ? { extraTabs } : {})}
+          />
+        )}
       </div>
     </div>
   );
@@ -433,7 +548,10 @@ function TaskControls({
   stopPropagation,
 }: {
   target: TaskSnapshot;
-  onControl: (action: TaskControlAction, target: TaskSnapshot) => void | Promise<void>;
+  onControl: (
+    action: TaskControlAction,
+    target: TaskSnapshot,
+  ) => void | Promise<void>;
   labelSuffix?: string;
   stopPropagation?: boolean;
 }) {
@@ -452,7 +570,9 @@ function TaskControls({
     try {
       await onControl(action, target);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : `Failed to ${action} task`);
+      setError(
+        cause instanceof Error ? cause.message : `Failed to ${action} task`,
+      );
     } finally {
       setBusy(null);
     }
@@ -461,8 +581,13 @@ function TaskControls({
     <>
       {(target.controls ?? []).map((action) => {
         const ControlIcon = icons[action];
-        const actionLabel = action === "drain" ? "Stop after current" : action[0]?.toUpperCase() + action.slice(1);
-        const label = labelSuffix ? `${actionLabel} ${labelSuffix}` : actionLabel;
+        const actionLabel =
+          action === "drain"
+            ? "Stop after current"
+            : action[0]?.toUpperCase() + action.slice(1);
+        const label = labelSuffix
+          ? `${actionLabel} ${labelSuffix}`
+          : actionLabel;
         return (
           <Button
             key={action}
@@ -481,7 +606,11 @@ function TaskControls({
           </Button>
         );
       })}
-      {error && <span role="alert" className="text-xs text-red-600">{error}</span>}
+      {error && (
+        <span role="alert" className="text-xs text-red-600">
+          {error}
+        </span>
+      )}
     </>
   );
 }

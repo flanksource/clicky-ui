@@ -42,4 +42,13 @@ describe("Switch", () => {
     render(<Switch checked={false} onChange={() => {}} label="Dark mode" />);
     expect(screen.getByRole("switch", { name: "Dark mode" })).toBeInTheDocument();
   });
+
+  it("forwards a form label and validation attributes to the interactive track", () => {
+    render(<><label htmlFor="enabled-switch">Enabled</label><Switch id="enabled-switch" checked={false} onChange={() => {}} aria-invalid aria-required aria-describedby="enabled-error" /><p id="enabled-error">Enable this option</p></>);
+    const toggle = screen.getByLabelText("Enabled");
+    expect(toggle).toHaveAttribute("role", "switch");
+    expect(toggle).toHaveAttribute("aria-invalid", "true");
+    expect(toggle).toHaveAttribute("aria-required", "true");
+    expect(toggle).toHaveAccessibleDescription("Enable this option");
+  });
 });

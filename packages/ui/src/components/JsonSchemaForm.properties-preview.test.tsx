@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { JsonSchemaForm } from "./JsonSchemaForm";
 
 describe("properties presentation", () => {
-  it.each([true, false])("presents %s as a checkbox until editing", (value) => {
+  it.each([true, false])("presents %s as a disabled switch until editing", (value) => {
     const onChange = vi.fn();
     render(
       <JsonSchemaForm
@@ -16,12 +16,12 @@ describe("properties presentation", () => {
         showPreferencesMenu={false}
       />,
     );
-    const preview = screen.getByRole("checkbox", { name: "Enabled" });
-    expect(preview).toHaveProperty("checked", value);
+    const preview = screen.getByRole("switch", { name: "Enabled" });
+    expect(preview).toHaveAttribute("aria-checked", String(value));
     expect(preview).toBeDisabled();
     expect(screen.queryByText(String(value))).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Edit Enabled" }));
-    const editor = screen.getByRole("checkbox", { name: "Enabled" });
+    const editor = screen.getByRole("switch", { name: "Enabled" });
     expect(editor).toBeEnabled();
     fireEvent.click(editor);
     expect(onChange).not.toHaveBeenCalled();

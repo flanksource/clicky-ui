@@ -1,4 +1,4 @@
-import { useRef, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useRef, useSyncExternalStore } from "react";
 import {
   CommentProvider,
   DensityProvider,
@@ -13,7 +13,11 @@ import { AgentRunsProvider } from "./agent-runs/AgentRunsProvider";
 import { PromptRunsProvider } from "./prompt-runs/PromptRunsProvider";
 import { PLAYGROUND_COMMENT_CONFIG, useComments } from "./comments/useComments";
 import { PlaygroundShell } from "./PlaygroundShell";
+import { ArtifactSearch } from "./navigation/ArtifactSearch";
+import { VocabularyReference } from "./vocabularies/VocabularyReference";
+import { useVocabulary } from "./vocabularies/context";
 import { ExternalWorkspace } from "./bookmarklet/ExternalWorkspace";
+import { allowDocumentNavigation } from "./documents/navigation-guard";
 import {
   fallbackPageSlug,
   findPage,
@@ -28,7 +32,10 @@ import {
 } from "./route";
 
 export function App() {
+  const { vocabulary } = useVocabulary();
+  const commentConfig = useMemo(() => ({ ...PLAYGROUND_COMMENT_CONFIG, ...(vocabulary ? { vocabulary } : {}) }), [vocabulary]);
   const [route, navigateRoute] = useHistoryRoute<PlaygroundRoute>({
+    beforeNavigate: (next) => allowDocumentNavigation(next.page),
     parse: (_pathname, search) => {
       const parsed = parsePlaygroundRoute(
         search,
@@ -55,18 +62,41 @@ export function App() {
   const active = findPage(route.page);
   const isExternal = route.page.startsWith("external:");
   const comments = useComments(route.page, contentRef, { poll: true, all: route.page === "" || route.review === "resolved" });
-  const standardRoute = (
-    page: string,
-    view: PlaygroundRoute["view"] = route.view,
-  ): PlaygroundRoute => ({ page, view, annotations: route.annotations, ...(route.showRejected ? { showRejected:true } : {}) });
+  const standardRoute = useCallback(
+    (page: string, view: PlaygroundRoute["view"] = route.view): PlaygroundRoute => ({ page, view, annotations: route.annotations, ...(route.showRejected ? { showRejected: true } : {}) }),
+    [route.view, route.annotations, route.showRejected],
+  );
+  const pageHref = useCallback((slug: string) => buildPlaygroundRoute(standardRoute(slug)), [standardRoute]);
+  const onShowRejectedChange = useCallback((showRejected: boolean) => navigateRoute({ ...route, showRejected }), [navigateRoute, route]);
+  const onViewChange = useCallback((view: PlaygroundRoute["view"]) => navigateRoute(standardRoute(route.page, view)), [navigateRoute, standardRoute, route.page]);
+  const onAnnotationsChange = useCallback((annotations: PlaygroundRoute["annotations"]) => navigateRoute({ ...route, annotations }), [navigateRoute, route]);
+  const onNavigate = useCallback((slug?: string) => navigateRoute(standardRoute(slug ?? "")), [navigateRoute, standardRoute]);
+  const onReviewNavigate = useCallback(
+    (page: string, comment?: string) => navigateRoute({ page, annotations: route.annotations, view: "preview", review: "resolved", ...(comment ? { comment } : {}) }),
+    [navigateRoute, route.annotations],
+  );
+  const onReviewExit = useCallback(() => navigateRoute(standardRoute(route.page)), [navigateRoute, standardRoute, route.page]);
+  const navigateExternal = useCallback(
+    (page: string, comment?: string, review?: boolean) =>
+      navigateRoute({
+        page,
+        view: "preview",
+        annotations: route.annotations,
+        ...(review || comment ? { review: "resolved" as const, ...(comment ? { comment } : {}) } : {}),
+      }),
+    [navigateRoute, route.annotations],
+  );
 
   return (
     <ThemeProvider>
+      {new URLSearchParams(window.location.search).has("vocabulary") ? <VocabularyReference id={new URLSearchParams(window.location.search).get("vocabulary")!} /> : <>
       <DensityProvider>
         <RouterProvider adapter={router}>
+          <ArtifactSearch onNavigate={slug => navigateRoute(standardRoute(slug, "preview"))} />
           <CommentProvider
+            persistenceKey={route.page || "__dashboard"}
             comments={comments.comments}
-            config={PLAYGROUND_COMMENT_CONFIG}
+            config={commentConfig}
             resolveAnchor={strictAnchorResolver}
             {...(!isExternal ? { onCreate: comments.create } : {})}
             onReply={comments.reply}
@@ -82,23 +112,14 @@ export function App() {
             {isExternal ? (
               <ExternalWorkspace
                 id={route.page}
-                pageHref={(slug) => buildPlaygroundRoute(standardRoute(slug))}
+                pageHref={pageHref}
                 comments={comments.allComments}
                 commentsLoading={comments.loading}
                 error={comments.error}
                 review={route.review === "resolved"}
                 {...(route.comment ? { selectedId: route.comment } : {})}
                 onReopen={comments.commentAndReopen}
-                navigate={(page, comment, review) =>
-                  navigateRoute({
-                    page,
-                    view: "preview",
-                    annotations: route.annotations,
-                    ...(review || comment
-                      ? { review: "resolved" as const, ...(comment ? { comment } : {}) }
-                      : {}),
-                  })
-                }
+                navigate={navigateExternal}
               />
             ) : (
               <PlaygroundShell
@@ -110,27 +131,15 @@ export function App() {
                 view={route.view}
                 annotations={route.annotations}
                 showRejected={route.showRejected ?? false}
-                onShowRejectedChange={(showRejected) => navigateRoute({ ...route, showRejected })}
+                onShowRejectedChange={onShowRejectedChange}
                 {...(route.review ? { review: route.review } : {})}
                 {...(route.comment ? { selectedCommentId: route.comment } : {})}
-                pageHref={(slug) => buildPlaygroundRoute(standardRoute(slug))}
-                onViewChange={(view) =>
-                  navigateRoute(standardRoute(route.page, view))
-                }
-                onAnnotationsChange={(annotations) =>
-                  navigateRoute({ ...route, annotations })
-                }
-                onNavigate={(slug) => navigateRoute(standardRoute(slug ?? ""))}
-                onReviewNavigate={(page, comment) =>
-                  navigateRoute({
-                    page,
-                    annotations: route.annotations,
-                    view: "preview",
-                    review: "resolved",
-                    ...(comment ? { comment } : {}),
-                  })
-                }
-                onReviewExit={() => navigateRoute(standardRoute(route.page))}
+                pageHref={pageHref}
+                onViewChange={onViewChange}
+                onAnnotationsChange={onAnnotationsChange}
+                onNavigate={onNavigate}
+                onReviewNavigate={onReviewNavigate}
+                onReviewExit={onReviewExit}
                 onCommentAndReopen={comments.commentAndReopen}
                 onPrepareCommentSelection={comments.prepareSelection}
                 onCaptureSelection={comments.captureSelection}
@@ -141,6 +150,7 @@ export function App() {
           </CommentProvider>
         </RouterProvider>
       </DensityProvider>
+      </>}
     </ThemeProvider>
   );
 }

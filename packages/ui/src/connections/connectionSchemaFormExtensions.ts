@@ -1,14 +1,19 @@
 import { createElement } from "react";
+import { JsonSchemaForm } from "../components/JsonSchemaForm";
 import type { PostExtension } from "../components/json-schema-form-runtime-types";
 import type { JsonSchemaObject } from "../components/json-schema-form-types";
 import type { SecretValueSource } from "../components/SecretKeySelector";
-import {
-  createSecretFormExtensions,
-  type SecretFormLoaders,
-} from "../components/secret-form-extension";
+import { type SecretFormLoaders } from "../components/secret-form-extension";
 import { stripTrailingSlashes } from "../lib/string";
 import { ConnectionNamespaceField } from "./connectionNamespaceField";
 import type { ConnectionFormExtensions } from "./connectionsPageModel";
+import { ConnectionKubernetesField } from "./ConnectionKubernetesField";
+import {
+  connectionKubernetesSelection,
+  kubernetesURL,
+  type KubernetesSelection,
+} from "./connectionKubernetesSelection";
+import { ConnectionSecretField } from "./ConnectionSecretField";
 
 const NAMESPACE_COMPONENT = "k8s-namespace-selector";
 const SECRET_SOURCES_HINT = "x-clicky-secret-sources";
@@ -22,7 +27,9 @@ const ALL_SECRET_SOURCES: readonly SecretValueSource[] = [
   "onepassword",
   "value",
 ];
-const DEFAULT_URL_SOURCES = ALL_SECRET_SOURCES.filter((source) => source !== "serviceaccount");
+const DEFAULT_URL_SOURCES = ALL_SECRET_SOURCES.filter(
+  (source) => source !== "serviceaccount",
+);
 
 /** Fetches `url` and returns its JSON body, rejecting on a non-2xx answer. */
 export type ConnectionJsonFetcher = <T>(url: string) => Promise<T>;
@@ -42,9 +49,13 @@ export type ConnectionSecretSources = {
 };
 
 const fetchJson: ConnectionJsonFetcher = async <T>(url: string) => {
-  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  const response = await fetch(url, {
+    headers: { Accept: "application/json" },
+  });
   if (!response.ok) {
-    throw new Error(`GET ${url} failed with ${response.status}: ${(await response.text()).trim()}`);
+    throw new Error(
+      `GET ${url} failed with ${response.status}: ${(await response.text()).trim()}`,
+    );
   }
   return (await response.json()) as T;
 };
@@ -57,7 +68,9 @@ function sourcesHint(
   const declared = schema[hint];
   if (declared === undefined) return [...fallback];
   if (!Array.isArray(declared) || declared.length === 0) {
-    throw new Error(`connection schema ${hint} must be a non-empty array of secret sources`);
+    throw new Error(
+      `connection schema ${hint} must be a non-empty array of secret sources`,
+    );
   }
   return declared.map((source) => {
     if (!ALL_SECRET_SOURCES.includes(source as SecretValueSource)) {
@@ -75,7 +88,9 @@ function sourcesHint(
  * commons-db serves). A hint the schema omits falls back to every source, and
  * for URLs to every source but `serviceaccount`.
  */
-export function connectionSecretSources(schema: JsonSchemaObject): ConnectionSecretSources {
+export function connectionSecretSources(
+  schema: JsonSchemaObject,
+): ConnectionSecretSources {
   return {
     secretSources: sourcesHint(schema, SECRET_SOURCES_HINT, ALL_SECRET_SOURCES),
     urlSources: sourcesHint(schema, URL_SOURCES_HINT, DEFAULT_URL_SOURCES),
@@ -103,16 +118,22 @@ export function connectionSecretLoaders({
         `${base}/secrets/preview?kind=${kind}&name=${encodeURIComponent(name)}${namespaceQuery(namespace)}`,
       ),
     loadServiceAccounts: (namespace) =>
-      fetcher(`${base}/secrets?kind=serviceaccount${namespaceQuery(namespace)}`),
+      fetcher(
+        `${base}/secrets?kind=serviceaccount${namespaceQuery(namespace)}`,
+      ),
     loadOnePasswordVaults: () => fetcher(`${base}/secrets/onepassword/vaults`),
     loadOnePasswordItems: (vaultID) =>
-      fetcher(`${base}/secrets/onepassword/items?vault=${encodeURIComponent(vaultID)}`),
+      fetcher(
+        `${base}/secrets/onepassword/items?vault=${encodeURIComponent(vaultID)}`,
+      ),
     loadOnePasswordFields: (vaultID, itemID) =>
       fetcher(
         `${base}/secrets/onepassword/fields?vault=${encodeURIComponent(vaultID)}&item=${encodeURIComponent(itemID)}`,
       ),
     loadWorkloads: (namespace, kinds) =>
-      fetcher(`${base}/workloads?namespace=${encodeURIComponent(namespace)}&kinds=${kinds.join(",")}`),
+      fetcher(
+        `${base}/workloads?namespace=${encodeURIComponent(namespace)}&kinds=${kinds.join(",")}`,
+      ),
   };
 }
 
@@ -130,17 +151,110 @@ export function connectionSchemaFormExtensions({
   schema,
   fetcher = fetchJson,
 }: ConnectionSchemaFormExtensionsOptions): Required<ConnectionFormExtensions> {
-  const loaders = connectionSecretLoaders({ apiBase, fetcher });
+  const sources = connectionSecretSources(schema);
   const namespacesUrl = `${stripTrailingSlashes(apiBase)}/connections/namespaces`;
-  // One stable function: NamespacePicker reloads whenever its loader changes.
-  const loadNamespaces = () => fetcher<string[]>(namespacesUrl);
-  const namespacePost: PostExtension = (field, nodes) => {
-    if (field.readOnly || field.schema["x-clicky-component"] !== NAMESPACE_COMPONENT) return nodes;
+  const createLoaders = (selection: KubernetesSelection) =>
+    connectionSecretLoaders({
+      apiBase,
+      fetcher: (url) => fetcher(kubernetesURL(url, selection)),
+    });
+  const namespacePost: PostExtension = (field, nodes, context) => {
+    if (
+      field.key === "properties" &&
+      field.schema.properties?.kubeconfig &&
+      field.schema.properties?.kubecontext
+    ) {
+      const { kubeconfig, kubecontext, ...others } = field.schema.properties;
+      // Hoisted fields (host/port/database) already render beside the URL.
+      const rest = Object.fromEntries(
+        Object.entries(others).filter(([, property]) => property["x-clicky-hoist"] !== true),
+      );
+      const renderGroup = (title: string, groupSchema: JsonSchemaObject) =>
+        createElement(
+          "section",
+          { className: "space-y-2", "aria-label": title },
+          createElement(
+            "h3",
+            { className: "text-sm font-medium border-b pb-2" },
+            title,
+          ),
+          createElement(JsonSchemaForm, {
+            schema: groupSchema,
+            value: (field.value ?? {}) as Record<string, unknown>,
+            onChange: field.onChange,
+            ...(context?.rootValue ? {rootValue: context.rootValue} : {}),
+            ...(context?.onRootChange ? {onRootChange: context.onRootChange} : {}),
+            ...(context?.instancePath ? {instancePath: context.instancePath} : {}),
+            readOnly: field.readOnly === true,
+            post: [namespacePost],
+            showPreferencesMenu: false,
+          }),
+        );
+      return {
+        label: null,
+        value: createElement(
+          "div",
+          { className: "space-y-4" },
+          renderGroup("Kubernetes resolution", {
+            type: "object",
+            "x-columns": 2,
+            properties: { kubeconfig, kubecontext },
+          }),
+          Object.keys(rest).length
+            ? renderGroup(field.label, { ...field.schema, type: "object", properties: rest })
+            : null,
+        ),
+      };
+    }
+    const selection = connectionKubernetesSelection(context?.rootValue);
+    const component = field.schema["x-clicky-component"];
+    if (
+      !field.readOnly &&
+      (component === "k8s-context-selector" ||
+        component === "k8s-kubeconfig-selector")
+    ) {
+      return {
+        ...nodes,
+        value: createElement(ConnectionKubernetesField, {
+          field,
+          context,
+          base: `${stripTrailingSlashes(apiBase)}/connections`,
+          fetcher,
+        }),
+      };
+    }
+    if (
+      !field.readOnly &&
+      (component === "k8s-secret-selector" || component === "k8s-url-selector")
+    ) {
+      return {
+        ...nodes,
+        value: createElement(ConnectionSecretField, {
+          field,
+          createLoaders,
+          selection,
+          namespace:
+            typeof context?.rootValue?.namespace === "string"
+              ? context.rootValue.namespace
+              : "",
+          ...sources,
+        }),
+      };
+    }
+    if (
+      field.readOnly ||
+      field.schema["x-clicky-component"] !== NAMESPACE_COMPONENT
+    )
+      return nodes;
     return {
       label: nodes.label,
-      value: createElement(ConnectionNamespaceField, { field, loadNamespaces }),
+      value: createElement(ConnectionNamespaceField, {
+        field,
+        selection,
+        fetcher,
+        namespacesUrl,
+      }),
     };
   };
-  const secrets = createSecretFormExtensions({ loaders, ...connectionSecretSources(schema) });
-  return { pre: [], post: [namespacePost, ...secrets.post] };
+  return { pre: [], post: [namespacePost] };
 }

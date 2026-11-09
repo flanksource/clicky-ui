@@ -14,6 +14,13 @@ import { RouterProvider } from "../rpc/RouterProvider";
 import type { RouterAdapter } from "../rpc/router";
 
 describe("Markdown links", () => {
+  it("resolves relative document links and images before URL hardening while keeping scripts blocked", async () => {
+    const { container } = render(<Markdown sourceBlocks text={'[Details](docs/details.md)\n\n![Diagram](diagram.svg)\n\n<script>bad()</script>\n\n[Unsafe](javascript:bad())'} resolveUrl={(url, kind) => kind === "image" ? "/assets/diagram.svg" : url === "docs/details.md" ? "/?page=details" : url} />);
+    expect(await screen.findByRole("link", { name: "Details" })).toHaveAttribute("href", "/?page=details");
+    expect(screen.getByRole("img", { name: "Diagram" })).toHaveAttribute("src", "/assets/diagram.svg");
+    expect(container.querySelector("script")).toBeNull();
+    expect(container.querySelector('a[href^="javascript:"]')).toBeNull();
+  });
   const routedAdapter = (navigate: (to: string) => void): RouterAdapter => ({
     pathname: "/",
     navigate,

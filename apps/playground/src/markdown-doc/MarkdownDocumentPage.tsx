@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@flanksource/clicky-ui";
+import { ActionError, Button } from "@flanksource/clicky-ui";
 import { useCommentContext } from "@flanksource/clicky-ui/comments";
 import { FileReview, lintFindings, type FileReviewLayout } from "@flanksource/clicky-ui/file-findings";
 import { MonacoProvider } from "@flanksource/clicky-ui/monaco";
@@ -7,10 +7,11 @@ import { UiSparkles } from "@flanksource/clicky-ui/icons";
 
 import { getMonacoWorker } from "../editor/monaco-setup";
 import type { PageSource } from "../editor/useSource";
-import { PlaygroundBanner as Banner } from "../PlaygroundShellParts";
 import type { AnnotationVisibility, PlaygroundView } from "../route";
 import { useBlame } from "./blame-api";
 import { usePageLint, type LintRun } from "./lint-api";
+import { useProblemFilters } from "./useProblemFilters";
+import { useCommentDetails } from "../comments/useCommentDetails";
 
 export type MarkdownDocumentView = Extract<PlaygroundView, "preview" | "source" | "problems">;
 
@@ -23,7 +24,7 @@ export type MarkdownDocumentPageProps = {
   /** Hidden annotations leave the document without comment highlights or threads. */
   annotations: AnnotationVisibility;
   /** Opens the Captain prompt dialog against this page's saved file. */
-  onLint: (file: string) => void;
+  onLint: (file: string, promptId?: string) => void;
 };
 
 function runError(run: LintRun): string | null {
@@ -39,8 +40,10 @@ function runError(run: LintRun): string | null {
  */
 export function MarkdownDocumentPage({ slug, view, onViewChange, source, annotations, onLint }: MarkdownDocumentPageProps) {
   const ctx = useCommentContext();
+  const detailTabs = useCommentDetails();
   const { runs, results, run } = usePageLint(slug);
   const [layout, setLayout] = useState<FileReviewLayout>("margin");
+  const [problemFilters, setProblemFilters] = useProblemFilters();
   const { path, ready, draft, dirty, saving } = source;
   const blameState = useBlame(ready ? path : null, ready && !dirty ? draft : null);
   // git reads the file on disk; only blame that describes the text on screen is shown.
@@ -58,8 +61,8 @@ export function MarkdownDocumentPage({ slug, view, onViewChange, source, annotat
     [path, results],
   );
   const comments = useMemo(
-    () => ({ items: ctx.comments, callbacks: ctx.callbacks, config: ctx.config }),
-    [ctx.comments, ctx.callbacks, ctx.config],
+    () => ({ items: ctx.comments, callbacks: ctx.callbacks, config: ctx.config, previewLines: 3, detailTabs }),
+    [ctx.comments, ctx.callbacks, ctx.config, detailTabs],
   );
   const runId = (runs.prompt.status === "done" ? runs.prompt.results : []).find((result) => result.run_id)?.run_id;
 
@@ -83,9 +86,7 @@ export function MarkdownDocumentPage({ slug, view, onViewChange, source, annotat
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const errors = [source.error, runError(runs.lint), runError(runs.prompt)].filter(
-    (error): error is string => error !== null,
-  );
+  const errors = [["Load source", source.error], ["Lint", runError(runs.lint)], ["Prompt", runError(runs.prompt)]] as const;
 
   if (!ready || !path) return <p className="p-density-3 text-xs text-muted-foreground">Loading source…</p>;
 
@@ -137,11 +138,7 @@ export function MarkdownDocumentPage({ slug, view, onViewChange, source, annotat
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-density-2" data-markdown-document={slug}>
-      {errors.map((error) => (
-        <Banner key={error} tone="danger">
-          {error}
-        </Banner>
-      ))}
+      {errors.map(([operation, error]) => error && <ActionError key={operation} error={error} context={[["Operation", operation], ["Page", slug]]} />)}
       <MonacoProvider getWorker={getMonacoWorker}>
         <FileReview
           path={path}
@@ -149,6 +146,8 @@ export function MarkdownDocumentPage({ slug, view, onViewChange, source, annotat
           view={view}
           onViewChange={onViewChange}
           findings={findings}
+          problemFilters={problemFilters}
+          onProblemFiltersChange={setProblemFilters}
           {...(annotations === "visible" ? { comments } : {})}
           selectToComment
           authorFilter

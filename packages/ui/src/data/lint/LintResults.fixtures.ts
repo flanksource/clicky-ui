@@ -91,6 +91,55 @@ export const betterleaks: LinterResult = {
   ],
 };
 
+/**
+ * A data check: one finding read from a rules file at a git ref, the rest
+ * pointing at entities, a page and a screenshot rather than at a file.
+ */
+export const dataLint: LinterResult = {
+  linter: "data-lint",
+  work_dir: "/repo/rules",
+  success: false,
+  duration: 1_400_000_000,
+  violations: [
+    {
+      file: "/repo/rules/checks/looping-spawn.sql",
+      line: 120,
+      severity: "warning",
+      rule: { method: "looping-spawn" },
+      message: "Query scans every pending activity",
+      locations: [{ ref: "main", file: "/repo/rules/checks/looping-spawn.sql", line: 120, column: 5 }],
+    },
+    {
+      severity: "error",
+      rule: { method: "looping-spawn" },
+      message: "P-1001 spawned InvoiceStart 3 times",
+      locations: [
+        { entity: { kind: "Policy", id: "7f3a2c10-5b0a-4c53-9a73-0c9d3f5e8b11", name: "P-1001" } },
+        { entity: { kind: "AsTransaction", id: "c8d73550-1111-4c53-9a73-0c9d3f5e8b11", name: "InvoiceStart" } },
+        {
+          url: { url: "https://oipa.example.com/entity/policy/7f3a2c10", css: "[data-activity='a1']" },
+          message: "the pending activity row",
+        },
+      ],
+    },
+    {
+      severity: "warning",
+      rule: { method: "pending-row" },
+      message: "Activity row still shows 02 Pending",
+      locations: [
+        { url: { url: "https://oipa.example.com/activity/a1", testId: "activity-status" } },
+        { image: { src: "/samples/markdown/swatch.svg", x: 0, y: 0, width: 64, height: 32 }, message: "as captured" },
+      ],
+    },
+    {
+      severity: "info",
+      rule: { method: "pending-row" },
+      message: "Screenshot only, no page recorded",
+      locations: [{ image: { src: "/samples/markdown/swatch.svg", x: 8, y: 8, width: 32, height: 16 } }],
+    },
+  ],
+};
+
 /** The linter binary exited with a config error: no violations, only an error. */
 export const pyrightFailed: LinterResult = {
   linter: "pyright",

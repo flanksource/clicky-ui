@@ -15,6 +15,14 @@ describe("TimeRange", () => {
     expect(screen.getByRole("dialog", { name: "Time range" })).toBeInTheDocument();
   });
 
+  it("labels an unset time range as unbounded rather than as a window it does not apply", () => {
+    render(<TimeRange from="" to="" onApply={vi.fn()} />);
+
+    const trigger = screen.getByRole("button", { name: /time range filter/i });
+    expect(trigger).toHaveTextContent("Any time");
+    expect(trigger).not.toHaveTextContent("now-24h");
+  });
+
   it("applies typed time range values from the custom inputs", () => {
     const onApply = vi.fn();
 

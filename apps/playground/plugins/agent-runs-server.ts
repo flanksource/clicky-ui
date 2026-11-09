@@ -1,7 +1,12 @@
-import { readFileSync } from "node:fs";
+import type { MiddlewareApp, ErrorLogger } from "./middleware";
+import { readFileSync, statSync } from "node:fs";
+import { RepositoryDocuments } from "./repository-documents";
+import { instructions, vocabularyPageFile } from "./vocabulary-registry";
+import { cwdInSessionScope, sessionScopeDirectory } from "./session-scope";
+import { pageInSessionScope } from "../src/agent-runs/session-scope";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Readable } from "node:stream";
-import type { Connect, Logger, Plugin } from "vite";
+import type { Plugin } from "vite";
 
 import { buildPlaygroundInstructions } from "../src/agent-instructions-text";
 import {
@@ -11,7 +16,7 @@ import {
 import type { PlaygroundComment } from "../src/comments/useComments";
 import {
   AGENT_SESSION_GROUPINGS,
-  isCaptainTarget,
+  isSessionTarget,
   readAgentSessions,
   writeAgentSessions,
   type AgentSession,
@@ -54,7 +59,7 @@ export const AGENT_SESSIONS_ROUTE = "/__playground/agent-sessions";
 export const AGENT_PROXY_ROUTE = "/__playground/agent-runs";
 
 export type AgentRunsOptions = {
-  /** The `.playground` data directory holding comments.json and agent-sessions.json. */
+  /** The `.playground` directory for agent-session settings and host metadata. */
   dir: string;
   /** Captain's base URL, e.g. `http://localhost:9020`. */
   captainURL: string;
@@ -64,6 +69,8 @@ export type AgentRunsOptions = {
   skillPath: string;
   /** How long to wait for captain to report the new run's session id. */
   sessionTimeoutMs?: number;
+  /** Re-check automatic document sessions against the filesystem server's current roots. */
+  resolveDocumentDirectory?: (page: string) => Promise<string>;
 };
 
 const AGENT_COMMENT_ROUTE = /^\/comments\/([^/]+)\/agent-run$/;
@@ -108,13 +115,16 @@ export const SESSION_TOOLS = {
   reply_to_thread: {
     description:
       "Reply to a feedback thread as this session's agent. Say what you changed and how you verified it.",
-    input: { id: "string, the thread root's comment id", body: "string, the reply in Markdown" },
+    input: {
+      id: "string, the thread root's comment id",
+      body: "string, the reply in Markdown",
+    },
     permission: "allow",
     exec: [
       ...CALL_API,
       "input=$(cat)",
       "id=$(jq -r '.id | @uri' <<<\"$input\")",
-      "body=$(jq -c --arg name {{shq author}} '{body: .body, author: {name: $name, kind: \"agent\"} }' <<<\"$input\")",
+      'body=$(jq -c --arg name {{shq author}} \'{body: .body, author: {name: $name, kind: "agent"} }\' <<<"$input")',
       'call -X POST -H "Content-Type: application/json" --data "$body" {{shq origin}}"/__playground/comments/$id/replies"',
     ].join("\n"),
   },
@@ -235,6 +245,9 @@ function parseSettingsPatch(body: Record<string, unknown>): SettingsPatch {
  */
 export type CaptainSessionOption = {
   id: string;
+  captainId?: string;
+  status?: string;
+  detailAvailable?: boolean;
   source: string;
   title: string;
   cwd?: string;
@@ -247,6 +260,9 @@ export function captainSessionOption(record: CaptainLiveSession): CaptainSession
   const prompt = record.initialPrompt?.trim().split("\n")[0];
   return {
     id: record.id,
+    ...(record.key ? { captainId: record.key } : {}),
+    ...(record.live?.status ? { status: record.live.status } : {}),
+    ...(record.detailAvailable !== undefined ? { detailAvailable: record.detailAvailable } : {}),
     source: record.source,
     title: record.title || record.slug || prompt || record.id,
     ...(record.cwd ? { cwd: record.cwd } : {}),
@@ -255,8 +271,13 @@ export function captainSessionOption(record: CaptainLiveSession): CaptainSession
   };
 }
 
-function parseTargetRequest(body: Record<string, unknown>): { page: string; target: AgentTarget } {
-  const unexpected = Object.keys(body).find((key) => key !== "page" && key !== "target");
+function parseTargetRequest(body: Record<string, unknown>): {
+  page: string;
+  target: AgentTarget;
+} {
+  const unexpected = Object.keys(body).find(
+    (key) => key !== "page" && key !== "target",
+  );
   if (unexpected) {
     throw new RequestError(
       `target request has no field ${JSON.stringify(unexpected)}; use page and target`,
@@ -265,12 +286,19 @@ function parseTargetRequest(body: Record<string, unknown>): { page: string; targ
   }
   const { page, target } = body;
   if (typeof page !== "string" || page === "") {
-    throw new RequestError('"page" is required: a page slug or external:<uuid> key', 400);
+    throw new RequestError(
+      '"page" is required: a page slug or external:<uuid> key',
+      400,
+    );
   }
-  if (isRecord(target) && target["kind"] === "playground" && Object.keys(target).length === 1) {
+  if (
+    isRecord(target) &&
+    target["kind"] === "playground" &&
+    Object.keys(target).length === 1
+  ) {
     return { page, target: { kind: "playground" } };
   }
-  if (!isCaptainTarget(target) || Object.keys(target).length !== 3) {
+  if (!isSessionTarget(target) || Object.keys(target).length !== 3) {
     throw new RequestError(
       '"target" must be {kind:"playground"} or {kind:"captain", sessionId, label}',
       400,
@@ -281,6 +309,7 @@ function parseTargetRequest(body: Record<string, unknown>): { page: string; targ
 
 /** The session a page's threads go to: its own in `page` grouping, else the shared one. */
 function sessionPage(settings: AgentSessionSettings, page: string): string | null {
+  if (page.startsWith("document:")) return page.split("/")[0]!;
   return settings.grouping === "page" ? page : null;
 }
 
@@ -307,16 +336,19 @@ function agentAuthor(options: {
   };
 }
 
-function markdownOptions(origin: string): CommentMarkdownOptions {
+function markdownOptions({ origin, dir, vocabularyInstructions }: { origin: string; dir: string; vocabularyInstructions: Record<string, string> }): CommentMarkdownOptions {
   return {
     labels: {},
+    vocabularyInstructions,
     pageUrl: (page) => `${origin}/?page=${encodeURIComponent(page)}`,
     pagePath: (page) => {
+      if (page.startsWith("document:")) return new RepositoryDocuments(dir).document(page).absolutePath;
       if (page.startsWith("external:")) {
         throw new Error(
           `External page ${page} has no captured URL to hand to an agent`,
         );
       }
+      if (page.startsWith("vocabularies/")) return vocabularyPageFile(page);
       return `apps/playground/src/pages/${page}.tsx`;
     },
     screenshotUrl: (url) => new URL(url, origin).href,
@@ -339,21 +371,21 @@ type ThreadMessageOptions = {
   author: StoredAuthor;
 };
 
-function threadMarkdown(options: ThreadMessageOptions): string {
-  const thread = readPage(options.dir, options.page).filter(
+async function threadMarkdown(options: ThreadMessageOptions): Promise<string> {
+  const thread = (await readPage(options.dir, options.page)).filter(
     (entry) => entry.id === options.rootId || entry.parentId === options.rootId,
   ) as PlaygroundComment[];
   return commentsToMarkdown(
     [{ page: options.page, comments: thread }],
-    markdownOptions(options.origin),
+    markdownOptions({ origin: options.origin, dir: options.dir, vocabularyInstructions: Object.fromEntries([...new Set(thread.flatMap(comment => (comment.vocabularyRefs ?? []).map(item => item.catalog)))].map(alias => [alias, instructions(alias)])) }),
   );
 }
 
-function threadMessage(options: ThreadMessageOptions): string {
+async function threadMessage(options: ThreadMessageOptions): Promise<string> {
   const identity = JSON.stringify({ name: options.author.name, kind: "agent" });
   return [
     `Handle this playground feedback thread. It is already acknowledged for you as ${identity}: do not acknowledge it again. Reply with what you changed and how you verified it using reply_to_thread, then resolve the thread with resolve_thread.`,
-    threadMarkdown(options),
+    await threadMarkdown(options),
   ].join("\n\n");
 }
 
@@ -362,7 +394,7 @@ function threadMessage(options: ThreadMessageOptions): string {
  * session tools, so it calls the thread's reply and resolve URLs itself, as
  * the author it was acknowledged as.
  */
-function captainThreadMessage(options: ThreadMessageOptions): string {
+async function captainThreadMessage(options: ThreadMessageOptions): Promise<string> {
   const author = JSON.stringify({ name: options.author.name, kind: "agent" });
   const base = `${options.origin}/__playground/comments/${encodeURIComponent(options.rootId)}`;
   return [
@@ -373,7 +405,7 @@ function captainThreadMessage(options: ThreadMessageOptions): string {
       `curl -sS --fail-with-body -X POST -H 'Content-Type: application/json' --data '{}' '${base}/resolve'`,
       "```",
     ].join("\n"),
-    threadMarkdown(options),
+    await threadMarkdown(options),
   ].join("\n\n");
 }
 
@@ -387,7 +419,9 @@ function sessionInstructions(options: {
   const scope =
     options.page === null
       ? "You are the playground's one shared agent session. Feedback threads from every page arrive"
-      : `You are the agent session for playground page ${JSON.stringify(options.page)}. Feedback threads on that page arrive`;
+      : options.page.startsWith("document:") && !options.page.includes("/")
+        ? `You are the agent session for repository ${JSON.stringify(options.page)}. Feedback threads for Markdown paths in this repository arrive`
+        : `You are the agent session for playground page ${JSON.stringify(options.page)}. Feedback threads on that page arrive`;
   return [
     buildPlaygroundInstructions({
       url: `${options.origin}/`,
@@ -422,20 +456,20 @@ function sameAgent(left: StoredAuthor | undefined, right: StoredAuthor): boolean
 }
 
 /** Hands a root to the agent: human assignment if needed, then the agent's acknowledgement. */
-function claimForAgent(options: {
+async function claimForAgent(options: {
   dir: string;
   comment: StoredComment;
   human: StoredAuthor;
   agent: StoredAuthor;
-}): void {
+}): Promise<void> {
   const { dir, comment, human, agent } = options;
   if (!sameAgent(comment.assignee, agent)) {
-    assignComment(dir, comment.id, human, agent);
+    await assignComment(dir, comment.id, human, agent);
   }
-  acknowledgeComment(dir, comment.id, agent);
+  await acknowledgeComment(dir, comment.id, agent);
   // Acknowledgement is idempotent for the holder, so a repeat run (or an agent
   // that acknowledged first) leaves the previous session id on record.
-  patchComment(dir, comment.id, { assignee: agent, acknowledgedBy: agent });
+  await patchComment(dir, comment.id, { assignee: agent, acknowledgedBy: agent });
 }
 
 /** A root handed to the playground's own session, or delivered into a live captain one. */
@@ -443,8 +477,8 @@ type ThreadHandoff =
   | { comment: StoredComment; session: AgentSession }
   | { comment: StoredComment; delivery: CaptainDeliverResult };
 
-function setAgentRun(dir: string, id: string, run: StoredAgentRun): void {
-  patchComment(dir, id, { agentRun: run });
+async function setAgentRun(dir: string, id: string, run: StoredAgentRun): Promise<void> {
+  await patchComment(dir, id, { agentRun: run });
 }
 
 export function createAgentRuns(options: AgentRunsOptions) {
@@ -498,6 +532,8 @@ export function createAgentRuns(options: AgentRunsOptions) {
 
   /** Starts the session for `page` (null: shared), replacing that page's previous one. */
   async function startSession(startOptions: {
+    project?: string;
+    directory?: string;
     page: string | null;
     runtime: AgentSessionRuntime;
     instructions: string;
@@ -506,7 +542,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
     author: StoredAuthor;
   }): Promise<AgentSession> {
     const runId = await captain.startChatRun({
-      content: draftPrompt(cwd),
+      content: draftPrompt(startOptions.project ?? startOptions.directory ?? cwd),
       variables: {
         instructions: startOptions.instructions,
         message: startOptions.message,
@@ -517,18 +553,41 @@ export function createAgentRuns(options: AgentRunsOptions) {
       spec: startOptions.runtime.spec,
       presets: startOptions.runtime.presets,
     });
+    let sessionId: string;
+    try {
+      sessionId = await captain.awaitSessionId(runId, sessionTimeoutMs);
+    } catch (error) {
+      const stopped = await captain.fetch(
+        `${UPSTREAM_PREFIX.runs}${encodeURIComponent(runId)}/stop`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        },
+      );
+      if (!stopped.ok && stopped.status !== 404 && stopped.status !== 409)
+        throw new Error(
+          `${describeError(error)}; cleanup of run ${runId} failed: ${stopped.status}`,
+        );
+      throw error;
+    }
     const session: AgentSession = {
       runId,
-      sessionId: await captain.awaitSessionId(runId, sessionTimeoutMs),
+      sessionId,
       page: startOptions.page,
       runtime: startOptions.runtime,
       startedAt: new Date().toISOString(),
       state: "running",
     };
+    if (startOptions.project) return session;
     update((data) => ({
       ...data,
       sessions: [
-        ...data.sessions.filter((entry) => entry.page !== startOptions.page),
+        ...data.sessions.filter(
+          (entry) =>
+            entry.purpose === "target" ||
+            entry.page !== startOptions.page,
+        ),
         session,
       ],
     }));
@@ -536,8 +595,94 @@ export function createAgentRuns(options: AgentRunsOptions) {
   }
 
   /** Every live captain session, projected for the target picker. */
-  async function captainSessions(): Promise<CaptainSessionOption[]> {
-    return (await captain.listLiveSessions()).map(captainSessionOption);
+  async function captainSessions(page?: string): Promise<CaptainSessionOption[]> {
+    const directory = page ? sessionScopeDirectory({ page, dir, cwd }) : undefined;
+    const stored = readAgentSessions(dir);
+    const linked = new Set(page ? [
+      ...Object.entries(stored.settings.targets ?? {}).filter(([key]) => pageInSessionScope(key, page)).map(([, target]) => target.sessionId),
+      ...stored.sessions.filter(session => session.page && pageInSessionScope(session.page, page)).map(session => session.sessionId),
+    ] : []);
+    return (await captain.listLiveSessions())
+      .filter(session => !directory || linked.has(session.id) || (session.key && linked.has(session.key)) || (session.cwd && cwdInSessionScope(session.cwd, directory)))
+      .map(captainSessionOption);
+  }
+
+  async function projects() {
+    const result = await captain.listProjects();
+    if (!result.projects.some((project) => project.path === cwd))
+      result.projects.unshift({
+        value: cwd,
+        label: cwd.split("/").at(-1)!,
+        path: cwd,
+      });
+    return { projects: result.projects, defaultProject: cwd };
+  }
+
+  function createSession(body: Record<string, unknown>, origin: string) {
+    return serialized(async () => {
+      if (
+        Object.keys(body).some(
+          (key) => !["page", "project", "runtime"].includes(key),
+        )
+      )
+        throw new RequestError(
+          "Use page, project and runtime to create a session",
+          400,
+        );
+      const { page, project } = body;
+      if (typeof page !== "string" || !page || typeof project !== "string")
+        throw new RequestError("page and project are required", 400);
+      if (!(await projects()).projects.some((entry) => entry.path === project))
+        throw new RequestError("Choose a project from Captain's catalog", 400);
+      if (!statSync(project).isDirectory())
+        throw new RequestError("Project must be a directory", 400);
+      const runtime = parseRuntime(body["runtime"]);
+      const author = agentAuthor({
+        model: runtime.spec.model,
+        via: "playground",
+      });
+      const session = await startSession({
+        page,
+        project,
+        runtime,
+        origin,
+        author,
+        instructions: sessionInstructions({
+          skill: readFileSync(skillPath, "utf8"),
+          origin,
+          author,
+          page,
+        }),
+        message:
+          "Wait for explicitly delivered feedback. Do not list, claim, or work on existing comments. Reply briefly that you are ready.",
+      });
+      const managed: AgentSession = {
+        ...session,
+        purpose: "target",
+        cwd: project,
+        label: `${page} · ${runtime.spec.model}`,
+      };
+      const target = {
+        kind: "managed" as const,
+        sessionId: session.sessionId,
+        label: managed.label!,
+      };
+      try {
+        update((data) => ({
+          ...data,
+          sessions: [...data.sessions, managed],
+          settings: {
+            ...data.settings,
+            targets: { ...data.settings.targets, [page]: target },
+          },
+        }));
+      } catch (error) {
+        const stopped = await captain.fetch(`${UPSTREAM_PREFIX.runs}${encodeURIComponent(session.runId)}/stop`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        if (!stopped.ok && stopped.status !== 404 && stopped.status !== 409) throw new Error(`${describeError(error)}; cleanup of run ${session.runId} failed: ${stopped.status}`);
+        throw error;
+      }
+      return { session: managed, settings: readAgentSessions(dir).settings };
+    });
   }
 
   /**
@@ -567,8 +712,8 @@ export function createAgentRuns(options: AgentRunsOptions) {
       via: "captain",
     });
     const requestedAt = new Date().toISOString();
-    claimForAgent({ dir, comment, human: request.human, agent: author });
-    setAgentRun(dir, comment.id, {
+    await claimForAgent({ dir, comment, human: request.human, agent: author });
+    await setAgentRun(dir, comment.id, {
       sessionId: target.sessionId,
       requestedAt,
       state: "queued",
@@ -578,10 +723,10 @@ export function createAgentRuns(options: AgentRunsOptions) {
     try {
       delivery = await captain.deliver(
         target.sessionId,
-        captainThreadMessage({ dir, page, rootId: comment.id, origin, author }),
+        await captainThreadMessage({ dir, page, rootId: comment.id, origin, author }),
       );
     } catch (error) {
-      setAgentRun(dir, comment.id, {
+      await setAgentRun(dir, comment.id, {
         sessionId: target.sessionId,
         requestedAt,
         state: "error",
@@ -590,22 +735,32 @@ export function createAgentRuns(options: AgentRunsOptions) {
       });
       throw error;
     }
-    setAgentRun(dir, comment.id, {
+    await setAgentRun(dir, comment.id, {
       sessionId: target.sessionId,
       requestedAt,
       state: delivery.status === "queued" ? "queued" : "sent",
       target: { label: target.label, channel: delivery.channel },
     });
-    return { comment: findComment(dir, comment.id)!.comment, delivery };
+    return { comment: (await findComment(dir, comment.id))!.comment, delivery };
   }
 
   /** Points a page's threads at a live captain session, or back at the playground's. */
-  function setTarget(body: Record<string, unknown>): Promise<AgentSessionSettings> {
+  function setTarget(
+    body: Record<string, unknown>,
+  ): Promise<AgentSessionSettings> {
     const { page, target } = parseTargetRequest(body);
     return serialized(async () => {
       const data = readAgentSessions(dir);
       const targets = { ...data.settings.targets };
-      if (target.kind === "captain") targets[page] = target;
+      if (target.kind === "managed") {
+        const session = data.sessions.find(
+          (entry) =>
+            entry.sessionId === target.sessionId && entry.purpose === "target",
+        );
+        if (!session || (await verify(session)).state !== "running")
+          throw new RequestError("Managed session is no longer available", 409);
+      }
+      if (target.kind !== "playground") targets[page] = target;
       else delete targets[page];
       const settings = { ...data.settings, targets };
       writeAgentSessions(dir, { ...data, settings });
@@ -619,7 +774,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
     request: RunRequest,
     origin: string,
   ): Promise<ThreadHandoff> {
-    const found = findComment(dir, id);
+    const found = await findComment(dir, id);
     if (!found) throw new CommentHttpError(`comment "${id}" not found`, 404);
     if (found.comment.parentId) {
       throw new CommentHttpError("only a thread root can be sent to an agent", 409);
@@ -632,14 +787,21 @@ export function createAgentRuns(options: AgentRunsOptions) {
     }
 
     const target = readAgentSessions(dir).settings.targets?.[found.page];
-    if (target) {
+    if (target?.kind === "managed" && request.runtime) throw new RequestError("Managed targets do not accept runtime overrides", 409);
+    if (target?.kind === "captain") {
       if (request.runtime) {
         throw new RequestError(
           `page ${found.page} sends its threads to captain session ${JSON.stringify(target.label)}, which needs no runtime`,
           409,
         );
       }
-      return deliverToCaptain({ comment: found.comment, page: found.page, request, origin, target });
+      return deliverToCaptain({
+        comment: found.comment,
+        page: found.page,
+        request,
+        origin,
+        target,
+      });
     }
 
     // A named runtime becomes the one every new or replacement session starts with.
@@ -649,9 +811,26 @@ export function createAgentRuns(options: AgentRunsOptions) {
     }
     const { settings, sessions } = readAgentSessions(dir);
     const page = sessionPage(settings, found.page);
-    const stored = sessions.find((entry) => entry.page === page);
+    let documentDirectory: string | undefined;
+    if (found.page.startsWith("document:") && target?.kind !== "managed") {
+      if (!options.resolveDocumentDirectory) throw new Error("Repository document authorization is not configured");
+      documentDirectory = await options.resolveDocumentDirectory(found.page);
+    }
+    const stored =
+      target?.kind === "managed"
+        ? sessions.find(
+            (entry) =>
+              entry.sessionId === target.sessionId &&
+              entry.purpose === "target",
+          )
+        : sessions.find((entry) => !entry.purpose && entry.page === page);
     const known = stored ? await verify(stored) : null;
     const session = known?.state === "running" ? known : null;
+    if (target?.kind === "managed" && (!session || request.runtime))
+      throw new RequestError(
+        "Managed target is unavailable or a runtime override was supplied; choose another target",
+        409,
+      );
     const runtime = session?.runtime ?? settings.runtime;
     if (!runtime) {
       throw new RequestError(
@@ -671,6 +850,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
     if (!session) {
       const started = await startSession({
         page,
+        ...(documentDirectory ? { directory: documentDirectory } : {}),
         runtime,
         instructions: sessionInstructions({
           skill: readFileSync(skillPath, "utf8"),
@@ -678,11 +858,11 @@ export function createAgentRuns(options: AgentRunsOptions) {
           author,
           page,
         }),
-        message: message(author),
+        message: await message(author),
         origin,
         author,
       });
-      claimForAgent({
+      await claimForAgent({
         dir,
         comment: found.comment,
         human: request.human,
@@ -692,29 +872,29 @@ export function createAgentRuns(options: AgentRunsOptions) {
           via: "playground",
         }),
       });
-      setAgentRun(dir, id, {
+      await setAgentRun(dir, id, {
         sessionId: started.sessionId,
         requestedAt,
         state: "sent",
       });
-      return { comment: findComment(dir, id)!.comment, session: started };
+      return { comment: (await findComment(dir, id))!.comment, session: started };
     }
 
-    claimForAgent({ dir, comment: found.comment, human: request.human, agent: author });
-    setAgentRun(dir, id, {
+    await claimForAgent({ dir, comment: found.comment, human: request.human, agent: author });
+    await setAgentRun(dir, id, {
       sessionId: session.sessionId,
       requestedAt,
       state: "queued",
     });
     try {
-      const sent = await captain.sendMessage(session.runId, message(author));
-      setAgentRun(dir, id, {
+      const sent = await captain.sendMessage(session.runId, await message(author));
+      await setAgentRun(dir, id, {
         sessionId: session.sessionId,
         requestedAt,
         state: sent.status === "queued" ? "queued" : "sent",
       });
     } catch (error) {
-      setAgentRun(dir, id, {
+      await setAgentRun(dir, id, {
         sessionId: session.sessionId,
         requestedAt,
         state: "error",
@@ -722,7 +902,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
       });
       throw error;
     }
-    return { comment: findComment(dir, id)!.comment, session };
+    return { comment: (await findComment(dir, id))!.comment, session };
   }
 
   function runOnComment(
@@ -759,9 +939,9 @@ export function createAgentRuns(options: AgentRunsOptions) {
     try {
       await serialized(() => sendThread(comment.id, { human }, origin));
     } catch (error) {
-      const run = findComment(dir, comment.id)?.comment.agentRun;
+      const run = (await findComment(dir, comment.id))?.comment.agentRun;
       if (run?.state !== "error") {
-        setAgentRun(dir, comment.id, {
+        await setAgentRun(dir, comment.id, {
           ...(run?.sessionId ? { sessionId: run.sessionId } : {}),
           requestedAt: new Date().toISOString(),
           state: "error",
@@ -894,6 +1074,8 @@ export function createAgentRuns(options: AgentRunsOptions) {
   }
 
   return {
+    projects,
+    createSession,
     runOnComment,
     autoRunComment,
     updateSettings,
@@ -907,7 +1089,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
 
 export type AgentRuns = ReturnType<typeof createAgentRuns>;
 
-function sendError(logger: Logger, res: ServerResponse, error: unknown): void {
+function sendError(logger: ErrorLogger, res: ServerResponse, error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
   const status =
     error instanceof CommentHttpError
@@ -935,86 +1117,116 @@ function sendError(logger: Logger, res: ServerResponse, error: unknown): void {
  * Register this plugin before `playgroundComments`: that middleware answers
  * every other `/__playground/comments/*` path with a 405.
  */
-export function playgroundAgentRuns(runs: AgentRuns): Plugin {
-  const register = (middlewares: Connect.Server, logger: Logger) => {
-    middlewares.use(AGENT_RUNS_ROUTE, (req, res, next) => {
-      const url = new URL(req.url ?? "/", "http://playground.local");
-      const method = req.method ?? "";
-      const comment = AGENT_COMMENT_ROUTE.exec(url.pathname);
-      const proxied = PROXY_ROUTE.exec(url.pathname);
-      const entry = SESSION_ENTRY_ROUTE.exec(url.pathname);
-      const isSessions = url.pathname === "/agent-sessions";
-      const isSettings = url.pathname === "/agent-sessions/settings";
-      const isTargets = url.pathname === "/agent-sessions/targets";
-      const isCaptain = url.pathname === "/agent-sessions/captain";
-      if (!(comment || proxied || entry || isSessions || isSettings || isTargets || isCaptain)) {
-        next();
-        return;
-      }
-      void (async () => {
-        try {
-          if (comment) {
-            if (method !== "POST") {
-              throw new RequestError("POST is required to run an agent", 405);
-            }
-            const id = decodeURIComponent(comment[1] ?? "");
-            sendJson(
-              res,
-              202,
-              await runs.runOnComment(id, await readJsonBody(req), requestOrigin(req)),
-            );
-          } else if (isSessions) {
-            if (method !== "GET") {
-              throw new RequestError("GET reads the agent sessions and settings", 405);
-            }
-            sendJson(res, 200, await runs.sessions());
-          } else if (isSettings) {
-            if (method !== "PUT") {
-              throw new RequestError("PUT updates the agent session settings", 405);
-            }
-            sendJson(res, 200, {
-              settings: await runs.updateSettings(await readJsonBody(req)),
-            });
-          } else if (isTargets) {
-            if (method !== "PUT") {
-              throw new RequestError("PUT sets a page's agent target", 405);
-            }
-            sendJson(res, 200, {
-              settings: await runs.setTarget(await readJsonBody(req)),
-            });
-          } else if (isCaptain) {
-            if (method !== "GET") {
-              throw new RequestError("GET lists the live captain sessions", 405);
-            }
-            sendJson(res, 200, { sessions: await runs.captainSessions() });
-          } else if (entry) {
-            if (method !== "DELETE") {
-              throw new RequestError("DELETE ends and forgets an agent session", 405);
-            }
-            await runs.forgetSession(decodeURIComponent(entry[1] ?? ""));
-            sendJson(res, 200, { removed: true });
-          } else if (proxied) {
-            await runs.proxy(
-              req,
-              res,
-              proxied[1] as "runs" | "sessions",
-              proxied[2] ?? "",
-              url.search,
-            );
+export function registerAgentRunsMiddleware({ middlewares, logger, runs }: { middlewares: MiddlewareApp; logger: ErrorLogger; runs: AgentRuns }): void {
+  middlewares.use(AGENT_RUNS_ROUTE, (req, res, next) => {
+    const url = new URL(req.url ?? "/", "http://playground.local");
+    const method = req.method ?? "";
+    const comment = AGENT_COMMENT_ROUTE.exec(url.pathname);
+    const proxied = PROXY_ROUTE.exec(url.pathname);
+    const entry = SESSION_ENTRY_ROUTE.exec(url.pathname);
+    const isSessions = url.pathname === "/agent-sessions";
+    const isSettings = url.pathname === "/agent-sessions/settings";
+    const isTargets = url.pathname === "/agent-sessions/targets";
+    const isCaptain = url.pathname === "/agent-sessions/captain";
+    const isProjects = url.pathname === "/agent-sessions/projects";
+    const isCreate = url.pathname === "/agent-sessions/sessions";
+    if (
+      !(
+        comment ||
+        proxied ||
+        entry ||
+        isSessions ||
+        isSettings ||
+        isTargets ||
+        isCaptain ||
+        isProjects ||
+        isCreate
+      )
+    ) {
+      next();
+      return;
+    }
+    void (async () => {
+      try {
+        if (isProjects) {
+          if (method !== "GET")
+            throw new RequestError("GET lists projects", 405);
+          sendJson(res, 200, await runs.projects());
+        } else if (isCreate) {
+          if (method !== "POST")
+            throw new RequestError("POST creates a managed session", 405);
+          sendJson(
+            res,
+            201,
+            await runs.createSession(
+              await readJsonBody(req),
+              requestOrigin(req),
+            ),
+          );
+        } else if (comment) {
+          if (method !== "POST") {
+            throw new RequestError("POST is required to run an agent", 405);
           }
-        } catch (error) {
-          sendError(logger, res, error);
+          const id = decodeURIComponent(comment[1] ?? "");
+          sendJson(
+            res,
+            202,
+            await runs.runOnComment(id, await readJsonBody(req), requestOrigin(req)),
+          );
+        } else if (isSessions) {
+          if (method !== "GET") {
+            throw new RequestError("GET reads the agent sessions and settings", 405);
+          }
+          sendJson(res, 200, await runs.sessions());
+        } else if (isSettings) {
+          if (method !== "PUT") {
+            throw new RequestError("PUT updates the agent session settings", 405);
+          }
+          sendJson(res, 200, {
+            settings: await runs.updateSettings(await readJsonBody(req)),
+          });
+        } else if (isTargets) {
+          if (method !== "PUT") {
+            throw new RequestError("PUT sets a page's agent target", 405);
+          }
+          sendJson(res, 200, {
+            settings: await runs.setTarget(await readJsonBody(req)),
+          });
+        } else if (isCaptain) {
+          if (method !== "GET") {
+            throw new RequestError("GET lists the live captain sessions", 405);
+          }
+          sendJson(res, 200, { sessions: await runs.captainSessions(url.searchParams.get("page") ?? undefined) });
+        } else if (entry) {
+          if (method !== "DELETE") {
+            throw new RequestError("DELETE ends and forgets an agent session", 405);
+          }
+          await runs.forgetSession(decodeURIComponent(entry[1] ?? ""));
+          sendJson(res, 200, { removed: true });
+        } else if (proxied) {
+          await runs.proxy(
+            req,
+            res,
+            proxied[1] as "runs" | "sessions",
+            proxied[2] ?? "",
+            url.search,
+          );
         }
-      })();
-    });
-  };
+      } catch (error) {
+        sendError(logger, res, error);
+      }
+    })();
+  });
+}
+
+export function playgroundAgentRuns(runs: AgentRuns): Plugin {
   return {
     name: "playground-agent-runs",
     configureServer(server) {
-      register(server.middlewares, server.config.logger);
+      registerAgentRunsMiddleware({ middlewares: server.middlewares, logger: server.config.logger, runs });
     },
     configurePreviewServer(server) {
-      register(server.middlewares, server.config.logger);
+      registerAgentRunsMiddleware({ middlewares: server.middlewares, logger: server.config.logger, runs });
     },
   };
 }

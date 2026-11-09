@@ -119,6 +119,23 @@ describe("enum array as a tags combobox", () => {
 // A list of scalars has no options at all: typing IS how a value is added. The
 // numeric case has to survive the round trip through the pill's text.
 describe("scalar array as a tags combobox", () => {
+  it.each([
+    ["string", ["api"], "Add tag…", "worker", ["api", "worker"]],
+    ["integer", [2], "Add integer…", "4", [2, 4]],
+    ["number", [1.25], "Add number…", "2.5", [1.25, 2.5]],
+  ] as const)("keeps the %s entry prompt visible after selecting values without an empty options toggle", (type, initial, placeholder, entry, expected) => {
+    const onChange = vi.fn();
+    render(<JsonSchemaForm schema={{ properties: { values: { type: "array", title: "Values", items: { type } } } }} value={{ values: [...initial] }} onChange={onChange} applyDefaults={false} />);
+    const input = screen.getByRole("combobox", { name: "Values" });
+    expect(input).toHaveAttribute("placeholder", placeholder);
+    expect(screen.queryByRole("button", { name: "Toggle options" })).not.toBeInTheDocument();
+    fireEvent.focus(input);
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(input).toHaveAttribute("aria-expanded", "false");
+    fireEvent.change(input, { target: { value: entry } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledWith({ values: [...expected] });
+  });
   const portsSchema: JsonSchemaObject = {
     type: "object",
     properties: {

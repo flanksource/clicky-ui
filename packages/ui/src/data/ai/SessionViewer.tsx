@@ -361,7 +361,7 @@ export function SessionViewer({
   return (
     <div
       className={cn(
-        "@container/session-viewer min-w-0 bg-background text-sm text-foreground data-[theme=dark]:bg-[var(--fs-bg-subtle)] [[data-theme=dark]_&]:bg-[var(--fs-bg-subtle)]",
+        "@container/session-viewer min-w-0 bg-background text-sm text-foreground data-[theme=dark]:bg-[var(--clicky-bg-subtle)] [[data-theme=dark]_&]:bg-[var(--clicky-bg-subtle)]",
         scrollable && "flex h-full min-h-0 flex-col",
         className,
       )}

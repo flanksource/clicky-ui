@@ -58,7 +58,7 @@ function chipTone(key: string, value: string): "active" | undefined {
  */
 export function TaskMetadataChips({ task }: { task: TaskSnapshot }) {
   const details = isTaskProcessDetails(task.details) ? task.details : undefined;
-  const entries = metadataEntries(details?.metadata);
+  const entries = [...metadataEntries(task.labels), ...metadataEntries(details?.metadata)].filter((entry, index, entries) => entries.findIndex(other => other.key === entry.key) === index);
   if (entries.length === 0) return null;
   return (
     <div className="flex min-w-0 shrink items-center gap-1 overflow-hidden">

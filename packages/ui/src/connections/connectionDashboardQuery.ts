@@ -22,15 +22,19 @@ export function useConnectionDashboard({
   });
   return useQuery({
     queryKey: [CONNECTION_DASHBOARD_QUERY_KEY, dashboardUrl],
+    meta: { surface: "connection" },
     queryFn: async (): Promise<ConnectionDashboardResponse> => {
       const response = await fetch(dashboardUrl, {
         headers: { Accept: "application/json" },
       });
       if (!response.ok) {
         const message = (await response.text()).trim();
-        throw new Error(message || `Connection dashboard failed: ${response.status}`);
+        throw new Error(
+          message || `Connection dashboard failed: ${response.status}`,
+        );
       }
-      const payload = (await response.json()) as Partial<ConnectionDashboardResponse>;
+      const payload =
+        (await response.json()) as Partial<ConnectionDashboardResponse>;
       if (!Array.isArray(payload.connections)) {
         throw new Error("Connection dashboard response is missing connections");
       }

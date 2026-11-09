@@ -11,6 +11,7 @@ import {
 import { OutcomeIcon, ToolIcon } from "./MarkIcons";
 import { STATUS_LABELS, outcomeFor } from "./status";
 import type { Test } from "./types";
+import { UiSkipCircle } from "../../icons";
 
 // Identifiers gavel puts on the wire: testrunner/parsers/types.go Framework
 // values, the "task" pseudo-framework, and each linters/*/ Name().
@@ -37,6 +38,9 @@ const FIXTURE_STEPS = ["exec", "test", "lint", "verify", "query", "criterion", "
 const FIXTURE_STEP_KINDS = ["services", "todo", "todo_prompt", "ai", "browser", "agent-browser"];
 
 describe("test outcome marks", () => {
+  it("uses the GitHub skip-circle icon and neutral colour for aborted execution", () => {
+    expect(TEST_OUTCOMES.aborted).toMatchObject({ icon: UiSkipCircle, className: "text-muted-foreground" });
+  });
   it("cover every status the filter bar counts, plus errored", () => {
     const counted = STATUS_LABELS.map((s) => s.key).filter((k) => k !== "total");
     expect(Object.keys(TEST_OUTCOMES).sort()).toEqual([...counted, "errored"].sort());

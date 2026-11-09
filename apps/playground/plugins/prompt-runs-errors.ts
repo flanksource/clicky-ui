@@ -1,5 +1,5 @@
 import type { ServerResponse } from "node:http";
-import type { Logger } from "vite";
+import type { ErrorLogger } from "./middleware";
 import { CaptainHttpError, CaptainUnreachableError } from "./captain-client";
 import { LaunchHttpError } from "./launch-client";
 import { sendJson } from "./comments-server";
@@ -22,6 +22,7 @@ type ErrorEnvelope = {
   hint?: string;
   context?: Record<string, string | number>;
   details?: { label: string; value: string }[];
+  stacktrace?: string;
 };
 
 export function errorEnvelope(error: unknown): {
@@ -42,7 +43,7 @@ export function errorEnvelope(error: unknown): {
       },
     };
   if (error instanceof LaunchHttpError)
-    return { status: error.status, body: { error: message } };
+    return { status: error.status, body: { error: message, ...(error.diagnostics ? { context: Object.fromEntries(error.diagnostics.context), details: error.diagnostics.details, stacktrace: error.diagnostics.stacktrace } : {}) } };
   if (error instanceof CaptainUnreachableError)
     return {
       status: 502,
@@ -85,7 +86,7 @@ export function errorEnvelope(error: unknown): {
 }
 
 export function sendError(
-  logger: Logger,
+  logger: ErrorLogger,
   res: ServerResponse,
   error: unknown,
 ): void {

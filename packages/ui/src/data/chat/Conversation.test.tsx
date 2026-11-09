@@ -10,6 +10,11 @@ const USER_MESSAGE: UIMessage = {
 };
 
 describe("Conversation", () => {
+  it("shows copyable failures alongside an empty state", () => {
+    render(<Conversation messages={[]} emptyState={<p>Start a conversation</p>} error={new Error("request failed")} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("request failed");
+    expect(screen.getByRole("button", { name: "Copy error details" })).toBeInTheDocument();
+  });
   it("shows a waiting indicator while awaiting the response stream", () => {
     render(<Conversation messages={[USER_MESSAGE]} status="submitted" />);
 

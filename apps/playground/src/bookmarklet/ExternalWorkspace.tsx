@@ -1,16 +1,19 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
+import { VocabularyStatus } from "../vocabularies/VocabularyStatus";
+import { VocabularyGenerationHost } from "../vocabularies/config";
 import {
-  AppShell,
+  type AppShellNavDrag,
   Button,
   CommentSidePanel,
+  Workspace,
   useCommentContext,
+  type WorkspacePaneSpec,
 } from "@flanksource/clicky-ui";
 import { BookmarkletInstall } from "./BookmarkletInstall";
 import { PlaygroundAgentInstructions } from "../PlaygroundAgentInstructions";
-import {
-  AgentSessionButton,
-  useAgentRuns,
-} from "../agent-runs/AgentRunsProvider";
+import { useAgentRuns } from "../agent-runs/AgentRunsProvider";
+import { AgentSessionButton } from "../agent-runs/AgentSessionButton";
+import { PlaygroundPreferences } from "../PlaygroundPreferences";
 import { useExternalCatalog } from "./external-catalog";
 import { ExternalPreview } from "./ExternalPreview";
 import { CommentCapture } from "../comments/CommentCapture";
@@ -18,11 +21,25 @@ import { PlaygroundCommentReview } from "../comments/PlaygroundCommentReview";
 import { useFeedbackCopy } from "../comments/useFeedbackCopy";
 import { resolvedReviewQueue } from "../comments/PlaygroundCommentReview";
 import type { PageComment } from "../comments/useComments";
-import { usePlaygroundNavigation } from "../usePlaygroundNavigation";
-import { usePageFolders } from "../editor/usePageFolders";
+import { findPage } from "../registry";
 import { useSidebarState } from "../sidebar-state";
-import { usePageActivity } from "../sidebar-activity";
+import { mergeActivity, usePageActivity } from "../sidebar-activity";
 import { PlaygroundSidebarControls } from "../PlaygroundSidebarControls";
+import { PlaygroundNotifications } from "../PlaygroundNotifications";
+import { useRepositoryNavigation } from "../documents/useRepositoryNavigation";
+import { WORKSPACE_STORAGE_KEY, explorerPane, useExplorerLayoutDefaults } from "../navigation/ExplorerPane";
+import { useNavigationTree } from "../navigation/useNavigationTree";
+import type { NavigationMenuDeps } from "../navigation/menus";
+import { useRecentSection } from "../recent-navigation";
+
+// Module-level so the identities stay stable across renders and don't rebuild the nav sections.
+const EXTERNAL_PAGE_DRAG: AppShellNavDrag = {
+  canDrag: () => false,
+  onDrop: () => { throw new Error("Page dragging is unavailable from an external page"); },
+};
+const rejectExternalPageAction: NavigationMenuDeps["setPageAction"] = () => {
+  throw new Error("Source actions are unavailable from an external page");
+};
 
 export function ExternalWorkspace({
   id,
@@ -48,13 +65,22 @@ export function ExternalWorkspace({
   const catalog = useExternalCatalog();
   const [sidebar, setSidebar] = useSidebarState();
   const activity = usePageActivity();
-  const folders = usePageFolders();
-  const sections = usePlaygroundNavigation({ activeSlug: id, feedback: activity.feedback, age: sidebar.age,
-    query: sidebar.query, onQueryChange: (query) => setSidebar({ query }), sort: sidebar.sort, filters: sidebar.filters, updates: activity.updates, loading: commentsLoading,
-    folders: folders.folders, pageHref, actionsDisabled: true, disabledReason: "Open an artifact page to manage its source",
-    drag: { canDrag: () => false, onDrop: () => { throw new Error("Page dragging is unavailable from an external page"); } },
-    setPageAction: () => { throw new Error("Source actions are unavailable from an external page"); },
-  });
+  const activityMap = useMemo(() => mergeActivity(activity.feedback, activity.updates), [activity.feedback, activity.updates]);
+  const onQueryChange = useCallback((query: string) => setSidebar({ query }, { replace: true }), [setSidebar]);
+  const layoutDefaults = useExplorerLayoutDefaults();
+  const repositoryNavigation = useRepositoryNavigation({ activeSlug: id, pageHref });
+  const navigationMenu = useMemo<NavigationMenuDeps>(
+    () => ({
+      actionsDisabled: true,
+      disabledReason: "Open an artifact page to manage its source",
+      setPageAction: rejectExternalPageAction,
+      pageFor: findPage,
+      repository: repositoryNavigation.actions,
+    }),
+    [repositoryNavigation.actions],
+  );
+  const tree = useNavigationTree({ activeSlug: id, sidebar, onQueryChange, pageHref, drag: EXTERNAL_PAGE_DRAG, menu: navigationMenu });
+  const { recent, metadataError } = useRecentSection({ activeSlug: id, activity: activityMap, query: sidebar.query, filters: sidebar.filters, pageHref, loading: activity.loading });
   const page = catalog.pages.find((entry) => entry.id === id);
   const ctx = useCommentContext();
   const agentRuns = useAgentRuns();
@@ -71,41 +97,57 @@ export function ExternalWorkspace({
       navigate(selected.page, selected.id);
     }
   }, [review, commentsLoading, error, selected, id, selectedId, navigate]);
-  return (
-    <AppShell
-      brand="Playground · External pages"
-      contentClassName="overflow-hidden"
-      contentWidth="full"
-      sidebarWidth={300}
-      collapsedStorageKey="playground:sidebar:collapsed"
-      sidebarHeader={<PlaygroundSidebarControls activeSlug={id} activity={activity} state={sidebar} onChange={setSidebar} error={activity.error ?? folders.error} />}
-      actions={
+  const headerActions = (
+    <>
+      <VocabularyStatus problemsError={tree.problemsError} />
+      <PlaygroundAgentInstructions />
+      <AgentSessionButton />
+      <BookmarkletInstall />
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={!page || !ctx.comments.length}
+        onClick={feedback.copyFeedback}
+      >
+        {feedback.copied ? "Copied" : "Copy feedback"}
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={!Object.values(activity.feedback).some((page) => page.resolvedCount > 0)}
+        onClick={() =>
+          navigate(id, undefined, !review)
+        }
+      >
+        Review resolved ({Object.values(activity.feedback).reduce((count, page) => count + page.resolvedCount, 0)})
+      </Button>
+      <PlaygroundNotifications recent={recent} />
+      <PlaygroundPreferences sourceDirty={false} />
+    </>
+  );
+  const panes: WorkspacePaneSpec[] = [
+    explorerPane({
+      title: "Playground · External pages",
+      header: (
         <>
-          <PlaygroundAgentInstructions />
-          <AgentSessionButton />
-          <BookmarkletInstall />
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!page || !ctx.comments.length}
-            onClick={feedback.copyFeedback}
-          >
-            {feedback.copied ? "Copied" : "Copy feedback"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!Object.values(activity.feedback).some((page) => page.resolvedCount > 0)}
-            onClick={() =>
-              navigate(id, undefined, !review)
-            }
-          >
-            Review resolved ({Object.values(activity.feedback).reduce((count, page) => count + page.resolvedCount, 0)})
-          </Button>
+          {repositoryNavigation.controls}
+          <PlaygroundSidebarControls state={sidebar} onChange={setSidebar} olderCount={tree.olderCount} commentsError={activity.commentsError} updatesError={activity.updatesError} />
+          {metadataError !== null && <p role="alert" className="py-density-1 text-xs text-destructive">{metadataError}</p>}
         </>
-      }
-      navSections={sections}
-    >
+      ),
+      error: tree.error,
+      section: tree.section,
+      commentsHref: pageHref(""),
+      commentsActive: false,
+    }),
+    {
+      id: "page",
+      label: "External page",
+      location: "center",
+      collapsible: false,
+      slots: { headerTrailing: headerActions },
+      contentClassName: "overflow-hidden",
+      content: (
       <div className="flex h-full min-h-0 flex-col overflow-auto lg:flex-row lg:overflow-hidden">
         <section className="flex min-h-[60dvh] min-w-0 flex-1 shrink-0 flex-col gap-4 overflow-auto p-4 lg:min-h-0">
           <h1 className="text-lg font-semibold">
@@ -213,6 +255,14 @@ export function ExternalWorkspace({
           )}
         </aside>
       </div>
-    </AppShell>
+      ),
+    },
+  ];
+  return (
+    <>
+      <VocabularyGenerationHost />
+      <Workspace className="h-dvh" panes={panes} storageKey={WORKSPACE_STORAGE_KEY} defaultValue={layoutDefaults} />
+      {repositoryNavigation.dialogs}
+    </>
   );
 }

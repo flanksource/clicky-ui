@@ -1,3 +1,5 @@
+import { ELEMENT_PREFIX, resolveElementAnchor } from "../../comments/anchoring/dom-anchor";
+import { isPatchAnchor } from "../../comments/anchoring/patch-anchor";
 import { blockAnchor, lineRangeAnchorResolver } from "../findings-comments";
 
 import { QUOTE_PREFIX, parseQuoteAnchor, resolveQuote } from "./quote-anchor";
@@ -19,19 +21,23 @@ export function sourceBlockOf(node: Node | null): Element | null {
 /**
  * Boxes for each anchor, relative to `origin`. A `q:` anchor finds its quote in
  * `markdown` through its section and context words; a `line:N` anchor resolves to its block like a line finding's
- * does. An anchor that no longer finds its target is left out. Entries come
- * in document order.
+ * does. An anchor in `patchRanges` (an `r:` thread already placed in the
+ * source) covers every block that overlaps its lines; an `e:` anchor finds its
+ * element by its locators and takes that element's box. An anchor that no
+ * longer finds its target is left out. Entries come in document order.
  */
 export function measureAnchors({
   origin,
   markdown,
   anchors,
   mode,
+  patchRanges,
 }: {
   origin: Element;
   markdown: Element;
   anchors: readonly string[];
   mode: AnchorMode;
+  patchRanges?: ReadonlyMap<string, { start: number; end: number }>;
 }): Map<string, Box[]> {
   const base = origin.getBoundingClientRect();
   const rel = (rect: DOMRect): Box => ({
@@ -46,6 +52,14 @@ export function measureAnchors({
     if (!blocks.has(key)) blocks.set(key, el);
   }
 
+  /** One box per rendered line of `block`'s text, or the block itself when it has none. */
+  const blockBoxes = (block: Element): Box[] => {
+    const range = document.createRange();
+    range.selectNodeContents(block);
+    const lines = textLines([...range.getClientRects()].filter((rect) => rect.width > 0).map(rel));
+    return lines.length > 0 ? lines : [rel(block.getBoundingClientRect())];
+  };
+
   // `at` is where the anchored text itself starts, so anchors sharing a block keep document order.
   const found: { anchor: string; boxes: Box[]; at: number }[] = [];
   for (const anchor of anchors) {
@@ -58,13 +72,25 @@ export function measureAnchors({
       if (boxes.length > 0) found.push({ anchor, boxes, at: text[0]?.top ?? boxes[0]!.top });
       continue;
     }
+    if (anchor.startsWith(ELEMENT_PREFIX)) {
+      const element = resolveElementAnchor(markdown, anchor)?.element;
+      const box = element && rel(element.getBoundingClientRect());
+      if (box) found.push({ anchor, boxes: [box], at: box.top });
+      continue;
+    }
+    if (isPatchAnchor(anchor)) {
+      const lines = patchRanges?.get(anchor);
+      if (!lines) continue;
+      const covered = [...markdown.querySelectorAll<HTMLElement>(SOURCE_BLOCK)]
+        .filter((el) => Number(el.dataset.sourceStart) <= lines.end && Number(el.dataset.sourceEnd) >= lines.start)
+        .flatMap(blockBoxes);
+      if (covered.length > 0) found.push({ anchor, boxes: covered, at: covered[0]!.top });
+      continue;
+    }
     const key = lineRangeAnchorResolver(anchor, [...blocks.keys()]);
     const block = key ? blocks.get(key) : undefined;
     if (block) {
-      const range = document.createRange();
-      range.selectNodeContents(block);
-      const lines = textLines([...range.getClientRects()].filter((rect) => rect.width > 0).map(rel));
-      const boxes = lines.length > 0 ? lines : [rel(block.getBoundingClientRect())];
+      const boxes = blockBoxes(block);
       found.push({ anchor, boxes, at: boxes[0]!.top });
     }
   }

@@ -59,7 +59,7 @@ function literalRowId(row: ObjectLiteralExpression): string | undefined {
     : undefined;
 }
 
-function validSource(source: string): string {
+export function validSource(source: string): string {
   const result = ts.transpileModule(source, {
     fileName: "page.tsx",
     reportDiagnostics: true,

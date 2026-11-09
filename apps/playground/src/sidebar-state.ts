@@ -3,18 +3,19 @@ import type { SidebarFilter, SidebarSort } from "./sidebar-activity";
 
 export type SidebarState = { sort: SidebarSort; filters: SidebarFilter[]; query: string; age: "recent" | "all" };
 
-function parse(_path: string, search: string): SidebarState {
+export function parseSidebarState(_path: string, search: string): SidebarState {
   const params = new URLSearchParams(search);
   const age = params.get("sidebar.age") ?? "recent";
-  if (age !== "recent" && age !== "all") throw new Error("Invalid sidebar age");
+  if (age !== "recent" && age !== "all") throw new Error(`Invalid sidebar age: ${age}`);
   const sort = params.get("sidebar.sort") ?? "none";
   const filters = (params.get("sidebar.filters") ?? "").split(",").filter(Boolean);
   if (!["none", "updated", "commented", "resolved"].includes(sort)) throw new Error(`Invalid sidebar sort: ${sort}`);
-  if (filters.some((filter) => !["open", "resolved", "recent"].includes(filter))) throw new Error("Invalid sidebar filters");
+  const invalidFilter = filters.find((filter) => !["open", "resolved"].includes(filter));
+  if (invalidFilter !== undefined) throw new Error(`Invalid sidebar filter: ${invalidFilter}`);
   return { age, sort: sort as SidebarSort, filters: filters as SidebarFilter[], query: params.get("sidebar.q") ?? "" };
 }
 
-function build(state: SidebarState): string {
+export function buildSidebarState(state: SidebarState): string {
   const url = new URL(window.location.href);
   for (const key of ["sidebar.sort", "sidebar.filters", "sidebar.q", "sidebar.age"]) url.searchParams.delete(key);
   if (state.sort !== "none") url.searchParams.set("sidebar.sort", state.sort);
@@ -24,4 +25,4 @@ function build(state: SidebarState): string {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-export function useSidebarState() { return useHistoryRoute({ parse, build }); }
+export function useSidebarState() { return useHistoryRoute({ parse: parseSidebarState, build: buildSidebarState }); }

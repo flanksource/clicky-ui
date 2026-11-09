@@ -33,6 +33,7 @@ const entry = {
   "mdx-editor": resolve(__dirname, "src/mdx-editor.ts"),
   components: resolve(__dirname, "src/components.ts"),
   data: resolve(__dirname, "src/data.ts"),
+  git: resolve(__dirname, "src/git.ts"),
   devtools: resolve(__dirname, "src/devtools.ts"),
   comments: resolve(__dirname, "src/comments.ts"),
   icons: resolve(__dirname, "src/icons.ts"),
@@ -48,6 +49,8 @@ const entry = {
   chat: resolve(__dirname, "src/chat.ts"),
   ai: resolve(__dirname, "src/ai.ts"),
   "runtime-profile": resolve(__dirname, "src/runtime-profile.ts"),
+  "comment-anchoring": resolve(__dirname, "src/comment-anchoring.ts"),
+  "page-styles": resolve(__dirname, "src/page-styles.ts"),
   "tailwind-preset": resolve(__dirname, "src/tailwind-preset.ts"),
   styles: resolve(__dirname, "src/styles.ts"),
 };

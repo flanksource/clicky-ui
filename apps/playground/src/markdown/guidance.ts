@@ -14,6 +14,8 @@ export function guidanceToMarkdown(title: string, guidance: ExtractedGuidance): 
 
 function blockToMarkdown(block: GuidanceBlock): string {
   switch (block.kind) {
+    case "vocabulary":
+      return [`## ${block.alias} vocabulary`, block.instructions, ...block.items.map(item => `- ${block.alias}:${item.id}: ${item.description}\n${item.references.map(reference => `  - ${reference}`).join("\n")}`)].join("\n\n");
     case "section":
       return [`## ${block.title}`, block.description].filter(Boolean).join("\n\n");
     case "practice":

@@ -79,7 +79,10 @@ export const testProfileSchema: ProfileSchema = {
       properties: {
         options: {
           type: "object",
-          properties: { index: { type: "string" } },
+          properties: {
+            address: { type: "string", title: "Address", "x-clicky-component": "k8s-url-selector" },
+            index: { type: "string", title: "Index" },
+          },
         },
       },
     },

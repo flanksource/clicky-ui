@@ -4,6 +4,9 @@ import { HoverCard } from "../overlay/HoverCard";
 import { resolveSize, type SizeToken } from "../lib/size";
 import { useDensityValue } from "../hooks/use-density";
 import { UiRobotAi } from "../icons";
+import { modelProvider } from "../data/chat/ContextMeter.model";
+import { providerIcon, providerIconColor } from "../data/chat/provider-icons";
+import { AgentIdentity } from "../data/chat/AgentIdentity";
 import { authorDisplayName } from "./comment-utils";
 import type { CommentAuthor as CommentAuthorModel } from "./comment-types";
 
@@ -16,6 +19,19 @@ export type CommentAuthorAvatarProps = {
   bare?: boolean;
 };
 
+export function CommentAuthorName({ author }: { author: CommentAuthorModel | null }) {
+  if (author?.kind !== "agent") return <>{authorDisplayName(author)}</>;
+  return (
+    <AgentIdentity
+      hideIcon
+      model={author.model ?? author.name}
+      {...(author.model ? { label: author.name } : {})}
+      {...(author.effort ? { effort: author.effort } : {})}
+      {...(author.sessionId ? { identityId: author.sessionId } : {})}
+    />
+  );
+}
+
 /**
  * Renders a comment author's identity glyph: a person avatar for `user`
  * authors, an icon chip for `agent` authors. Wrapped in a hover card naming the
@@ -27,7 +43,7 @@ export function CommentAuthorAvatar({
   bare = false,
 }: CommentAuthorAvatarProps) {
   const density = useDensityValue();
-  const name = authorDisplayName(author);
+  const name = author?.name ?? authorDisplayName(author);
   const isAgent = author?.kind === "agent";
 
   const glyph = isAgent ? (
@@ -59,6 +75,7 @@ function AgentChip({
   size: number;
 }) {
   const icon = author.icon;
+  const provider = modelProvider(author.model ?? author.name);
   return (
     <span
       role="img"
@@ -69,7 +86,8 @@ function AgentChip({
       <Icon
         {...(typeof icon === "string"
           ? { name: icon }
-          : { icon: icon ?? UiRobotAi })}
+          : { icon: icon ?? providerIcon(provider) ?? UiRobotAi })}
+        {...(providerIconColor(provider) ? { className: providerIconColor(provider)! } : {})}
         width={Math.max(10, Math.round(size * 0.6))}
         height={Math.max(10, Math.round(size * 0.6))}
       />

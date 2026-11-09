@@ -13,11 +13,12 @@ import {
   lintNodeActions,
 } from "./actions";
 import { isLinterErrored, linterToolName, lintNodeCount, severityOf } from "./stats";
-import { OpenInFilesLink, type OpenFileTarget } from "../OpenInFilesLink";
-import { relPath } from "./paths";
+import type { OpenFileTarget } from "../OpenInFilesLink";
+import { showsLocationList, violationLocationLabel } from "./locations";
+import { ViolationLocations } from "./ViolationLocations";
 import { ViolationSnippet, type LintSourceLoader } from "./ViolationSnippet";
 import { IgnoreActionsMenu } from "./LintIgnoreMenu";
-import { cachedAge, type LintAction, type LintNode, type LinterResult, type Violation } from "./types";
+import { cachedAge, type EntityHref, type LintAction, type LintNode, type LinterResult, type LintTargetKind } from "./types";
 
 export type HostActionProps = {
   onIgnore?: ((action: LintAction) => void | Promise<void>) | undefined;
@@ -26,6 +27,8 @@ export type HostActionProps = {
   onOpenFile?: ((target: OpenFileTarget) => void) | undefined;
   /** Loads a violation's file so its card shows the flagged lines with context. */
   loadSource?: LintSourceLoader | undefined;
+  /** Where an entity location links in the host; without it entities are plain chips. */
+  entityHref?: EntityHref | undefined;
 };
 
 type RenderRun = (result: LinterResult) => ReactNode;
@@ -56,67 +59,16 @@ function Pre({ children, tone }: { children: ReactNode; tone?: "error" }) {
   );
 }
 
-function violationLocation(v: Violation, withFile: boolean): string {
-  const position = `:${v.line ?? 0}${v.column ? `:${v.column}` : ""}`;
-  return withFile && v.file ? `${v.file}${position}` : position;
-}
-
-// ViolationLocations lists each place a violation one fix resolves applies,
-// relative to the linter's work dir, each opening its own line.
-function ViolationLocations({
-  violation,
-  workDir,
-  onOpenFile,
-}: Pick<HostActionProps, "onOpenFile"> & { violation: Violation; workDir: string }) {
-  const locations = violation.locations ?? [];
-  return (
-    <div className="mt-1 space-y-0.5">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{`${locations.length} locations`}</div>
-      <ul className="space-y-0.5">
-        {locations.map((location, i) => {
-          const file = relPath(location.file, workDir) ?? location.file;
-          return (
-            <li key={i} className="flex flex-wrap items-baseline gap-2 text-xs" data-testid="lint-violation-location">
-              <span className="font-mono text-muted-foreground">{`${file}${location.line ? `:${location.line}` : ""}`}</span>
-              {location.message && <span>{location.message}</span>}
-              {onOpenFile && (
-                <OpenInFilesLink
-                  target={{ file, ...(workDir ? { workDir } : {}), ...(location.line ? { line: location.line } : {}) }}
-                  onOpenFile={onOpenFile}
-                />
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-export function ViolationDetail({ violation, file, workDir, loadSource, onOpenFile, showFile, showMessage = true }: ViolationProps & { showMessage?: boolean }) {
+export function ViolationDetail({ violation, file, workDir, loadSource, onOpenFile, entityHref, showFile, showMessage = true }: ViolationProps & { showMessage?: boolean }) {
   return <div className="space-y-2" data-lint-violation-detail="">
-    {showFile && <p className="break-all font-mono text-xs text-muted-foreground">{violationLocation(violation, true)}</p>}
+    {showFile && <p className="break-all font-mono text-xs text-muted-foreground">{violationLocationLabel(violation, true)}</p>}
     <ViolationSnippet violation={violation} file={file} workDir={workDir} loadSource={loadSource} showMessage={showMessage} />
-    {(violation.locations?.length ?? 0) > 1 && <ViolationLocations violation={violation} workDir={workDir} onOpenFile={onOpenFile} />}
+    {showsLocationList(violation) && <ViolationLocations className="mt-1" locations={violation.locations!} workDir={workDir} onOpenFile={onOpenFile} entityHref={entityHref} />}
   </div>;
 }
 
 export function ViolationCard(props: ViolationProps & { expanded?: boolean; onExpandedChange?: (expanded: boolean) => void }) {
-  return <div data-lint-violation=""><ProblemRow {...(props.expanded !== undefined ? { expanded: props.expanded } : {})} {...(props.onExpandedChange ? { onExpandedChange: props.onExpandedChange } : {})} message={props.violation.message ?? ""} severity={severityOf(props.violation)} metadata={`${props.linter} ${props.violation.rule?.method ?? ""}`} location={violationLocation(props.violation, Boolean(props.showFile))} actions={violationMenuItems(props)}><ViolationDetail {...props} showMessage={false} /></ProblemRow></div>;
-}
-
-function groupViolationsByRule(violations: readonly Violation[]): Array<{ rule: string; violations: Violation[] }> {
-  const grouped = new Map<string, Violation[]>();
-  for (const v of violations) {
-    const key = v.rule?.method || "(no rule)";
-    grouped.set(key, [...(grouped.get(key) ?? []), v]);
-  }
-  return Array.from(grouped.keys())
-    .sort()
-    .map((rule) => ({
-      rule,
-      violations: grouped.get(rule)!.slice().sort((a, b) => (a.line ?? 0) - (b.line ?? 0)),
-    }));
+  return <div data-lint-violation=""><ProblemRow {...(props.expanded !== undefined ? { expanded: props.expanded } : {})} {...(props.onExpandedChange ? { onExpandedChange: props.onExpandedChange } : {})} message={props.violation.message ?? ""} severity={severityOf(props.violation)} metadata={`${props.linter} ${props.violation.rule?.method ?? ""}`} location={violationLocationLabel(props.violation, Boolean(props.showFile))} actions={violationMenuItems(props)}><ViolationDetail {...props} showMessage={false} /></ProblemRow></div>;
 }
 
 function shellQuote(s: string): string {
@@ -203,37 +155,8 @@ function ResultDetails({ result, workDir }: { result: LinterResult; workDir: str
   );
 }
 
-function NoFileViolations({
-  violations,
-  linter,
-  workDir,
-}: {
-  violations: readonly Violation[];
-  linter: string;
-  workDir: string;
-}) {
-  if (violations.length === 0) return null;
-  return (
-    <Section title="Violations Without File">
-      <div className="space-y-3">
-        {groupViolationsByRule(violations).map(({ rule, violations: group }) => (
-          <div key={rule} className="space-y-2 rounded border border-border bg-muted/40 p-3">
-            <div className="font-mono text-sm">
-              {rule} <span className="text-xs text-muted-foreground">({group.length})</span>
-            </div>
-            {group.map((v, i) => (
-              <ViolationCard key={i} violation={v} linter={linter} file="" workDir={workDir} />
-            ))}
-          </div>
-        ))}
-      </div>
-    </Section>
-  );
-}
-
 function LinterDetail({ node, renderRun }: { node: LintNode; renderRun?: RenderRun | undefined }) {
   const result = node.linter;
-  const linter = node.linterName ?? result?.linter ?? "";
   const workDir = node.work_dir ?? result?.work_dir ?? "";
   const run = result && renderRun?.(result);
   return (
@@ -250,7 +173,6 @@ function LinterDetail({ node, renderRun }: { node: LintNode; renderRun?: RenderR
           <Pre>{result.raw_output}</Pre>
         </Section>
       )}
-      <NoFileViolations violations={node.noFileViolations ?? []} linter={linter} workDir={workDir} />
     </>
   );
 }
@@ -380,7 +302,38 @@ function RuleDetail({ node, ...ignore }: HostActionProps & { node: LintNode }) {
           </div>
         </Section>
       )}
-      <NoFileViolations violations={node.noFileViolations ?? []} linter={linter} workDir={workDir} />
+    </>
+  );
+}
+
+const TARGET_TITLE: Record<LintTargetKind, string> = { entity: "Entity kind", url: "Host", other: "Target" };
+
+/** File-less violations that share a target group: an entity kind, a URL host, or "Other". */
+function TargetDetail({ node, ...host }: HostActionProps & { node: LintNode }) {
+  const violations = node.violations ?? [];
+  return (
+    <>
+      <Section title={TARGET_TITLE[node.targetKind ?? "other"]}>
+        <Mono>{node.name}</Mono>
+        <span className="ml-2 text-xs text-muted-foreground">({lintNodeCount(node)} violations)</span>
+      </Section>
+      {violations.length > 0 && (
+        <Section title="Violations">
+          <div className="space-y-2">
+            {violations.map((v, i) => (
+              <ViolationCard
+                key={i}
+                violation={v}
+                linter={node.linterName ?? ""}
+                file=""
+                workDir={node.work_dir ?? ""}
+                showFile
+                {...host}
+              />
+            ))}
+          </div>
+        </Section>
+      )}
     </>
   );
 }
@@ -391,6 +344,7 @@ const KIND_LABEL: Record<LintNode["kind"], string> = {
   "lint-file": "File",
   "lint-rule": "Rule",
   "lint-rule-group": "Rule",
+  "lint-target": "Target",
   "linter-error": "Linter error",
 };
 
@@ -454,6 +408,7 @@ export function LintDetailPanel({
   ignoreBusy,
   onOpenFile,
   loadSource,
+  entityHref,
   renderRun,
 }: LintDetailPanelProps) {
   if (!node) {
@@ -466,7 +421,7 @@ export function LintDetailPanel({
       </div>
     );
   }
-  const ignore = { onIgnore, ignoreBusy, onOpenFile, loadSource };
+  const ignore = { onIgnore, ignoreBusy, onOpenFile, loadSource, entityHref };
   return (
     <div className="flex h-full min-h-0 flex-col">
       <DetailHeader node={node} actions={lintNodeActions(node, results)} onIgnore={onIgnore} ignoreBusy={ignoreBusy} />
@@ -476,6 +431,7 @@ export function LintDetailPanel({
         {node.kind === "lint-folder" && <FolderDetail node={node} results={results} />}
         {node.kind === "lint-file" && <FileDetail node={node} {...ignore} />}
         {(node.kind === "lint-rule" || node.kind === "lint-rule-group") && <RuleDetail node={node} {...ignore} />}
+        {node.kind === "lint-target" && <TargetDetail node={node} {...ignore} />}
       </div>
     </div>
   );

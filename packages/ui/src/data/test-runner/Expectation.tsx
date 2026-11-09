@@ -78,7 +78,7 @@ export function Expectation({
     >
       {check && (
         <Row label={checkLabel}>
-          <Value value={check} />
+          <Value value={check} className={check.includes("\n") ? "block overflow-x-auto whitespace-pre break-normal" : ""} />
         </Row>
       )}
       {varEntries.map(([name, value]) => (

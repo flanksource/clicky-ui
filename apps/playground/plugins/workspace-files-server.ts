@@ -1,6 +1,7 @@
+import type { MiddlewareApp } from "./middleware";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { Connect, Plugin } from "vite";
+import type { Plugin } from "vite";
 
 import { sendJson } from "./comments-server";
 
@@ -52,27 +53,28 @@ export async function listWorkspaceFiles(cwd: string): Promise<WorkspaceFile[]> 
 }
 
 /** Serves the workspace's file list to the prompt dialog's file / git picker. */
+export function registerWorkspaceFilesMiddleware({ middlewares, cwd }: { middlewares: MiddlewareApp; cwd: string }): void {
+  middlewares.use(WORKSPACE_FILES_ROUTE, (req, res) => {
+    if (req.method !== "GET") {
+      sendJson(res, 405, { error: `${req.method} is not allowed; GET lists the workspace files` });
+      return;
+    }
+    listWorkspaceFiles(cwd).then(
+      (files) => sendJson(res, 200, { files }),
+      (error: unknown) =>
+        sendJson(res, 500, { error: `git could not list ${cwd}: ${error instanceof Error ? error.message : String(error)}` }),
+    );
+  });
+}
+
 export function playgroundWorkspaceFiles({ cwd }: { cwd: string }): Plugin {
-  const register = (middlewares: Connect.Server) => {
-    middlewares.use(WORKSPACE_FILES_ROUTE, (req, res) => {
-      if (req.method !== "GET") {
-        sendJson(res, 405, { error: `${req.method} is not allowed; GET lists the workspace files` });
-        return;
-      }
-      listWorkspaceFiles(cwd).then(
-        (files) => sendJson(res, 200, { files }),
-        (error: unknown) =>
-          sendJson(res, 500, { error: `git could not list ${cwd}: ${error instanceof Error ? error.message : String(error)}` }),
-      );
-    });
-  };
   return {
     name: "playground-workspace-files",
     configureServer(server) {
-      register(server.middlewares);
+      registerWorkspaceFilesMiddleware({ middlewares: server.middlewares, cwd });
     },
     configurePreviewServer(server) {
-      register(server.middlewares);
+      registerWorkspaceFilesMiddleware({ middlewares: server.middlewares, cwd });
     },
   };
 }

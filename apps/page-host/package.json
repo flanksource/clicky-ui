@@ -1,0 +1,37 @@
+{
+  "name": "page-host",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @flanksource/clicky-ui build:icons && vite dev --port 5810",
+    "dev:runtime": "node dev/runtime-server.mjs",
+    "build": "pnpm --filter @flanksource/clicky-ui build:icons && tsc -b --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "oxlint src vite.config.ts --deny-warnings",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@flanksource/clicky-ui": "workspace:*",
+    "@flanksource/page-runtime": "workspace:*",
+    "@shikijs/langs": "catalog:",
+    "@shikijs/themes": "catalog:",
+    "@shikijs/transformers": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "monaco-editor": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "shiki": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "jsdom": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,4 +1,6 @@
 import { JsonSchemaForm } from "../../components/JsonSchemaForm";
+import { ProfileCanonicalQuery } from "./profileCanonicalQuery";
+import type { JsonSchemaObject } from "../../components/json-schema-form-types";
 import type {
   FormLayout,
   LookupFetcher,
@@ -107,13 +109,14 @@ export function ProfileSourceSection({
 }) {
   const connectionID = profileConnectionID(draft.provider?.connection ?? "");
   const providerType = draft.provider?.type ?? "";
+  const inlineConnectionSchema = providerOptionsSchema(providerType, "connection");
   return (
-    <div className="grid h-full min-h-0 gap-4">
+    <div className="grid h-full min-h-0 min-w-0 grid-cols-1 gap-4">
       <SectionCard
         title="Source"
         description="Select the provider and saved connection. Connection credentials remain server-side."
       >
-        <div className="grid gap-4 @xl:grid-cols-2">
+        <div className="grid items-start gap-4 @xl:grid-cols-2">
           <EditorField label="Provider type" required>
             <select
               value={providerType}
@@ -133,25 +136,48 @@ export function ProfileSourceSection({
               ))}
             </select>
           </EditorField>
-          <JsonSchemaForm
-            idPrefix="profile-source-connection"
-            schema={providerConnectionSchema()}
-            value={{
-              connection: draft.provider?.connection ?? "",
-              provider: draft.provider ?? {},
-            }}
-            onChange={(next) => {
-              if (typeof next.connection !== "string") {
-                throw new Error("provider.connection must be a string");
-              }
-              onChange({
-                ...draft,
-                provider: { ...draft.provider, connection: next.connection },
-              });
-            }}
-            showPreferencesMenu={false}
-            {...(lookupFetcher ? { lookupFetcher } : {})}
-          />
+          <div className="min-w-0 space-y-3">
+            <JsonSchemaForm
+              idPrefix="profile-source-connection"
+              schema={providerConnectionSchema()}
+              value={{
+                connection: draft.provider?.connection ?? "",
+                provider: draft.provider ?? {},
+              }}
+              onChange={(next) => {
+                if (typeof next.connection !== "string") {
+                  throw new Error("provider.connection must be a string");
+                }
+                onChange({
+                  ...draft,
+                  provider: { ...draft.provider, connection: next.connection },
+                });
+              }}
+              showPreferencesMenu={false}
+              {...(lookupFetcher ? { lookupFetcher } : {})}
+            />
+            {Object.keys(inlineConnectionSchema.properties ?? {}).length > 0 ? (
+              <JsonSchemaForm
+                idPrefix="profile-source-inline-connection"
+                schema={inlineConnectionSchema}
+                value={draft.provider?.options ?? {}}
+                // The form only knows its own keys; the query options it does
+                // not render must survive its edits.
+                onChange={(inline) =>
+                  onChange({
+                    ...draft,
+                    provider: {
+                      ...draft.provider,
+                      options: { ...draft.provider?.options, ...inline },
+                    },
+                  })
+                }
+                showPreferencesMenu={false}
+                pre={profileFormExtensions().pre}
+                post={profileFormExtensions().post}
+              />
+            ) : null}
+          </div>
         </div>
         {sampleStale ? (
           <p className="mt-4 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
@@ -160,7 +186,8 @@ export function ProfileSourceSection({
           </p>
         ) : null}
       </SectionCard>
-      {connectionID ? (
+      {(providerType==="opensearch" || providerType==="opentelemetry") ? <ProfileCanonicalQuery draft={draft} onChange={onChange} onSample={onSample}/> : null}
+      {draft.search ? null : connectionID ? (
         <ProfileWizardQueryStep
           key={connectionID}
           connectionID={connectionID}
@@ -191,7 +218,7 @@ export function ProfileSourceSection({
                 built from the profile schema do. */}
             <JsonSchemaForm
               idPrefix="profile-provider-options"
-              schema={providerOptionsSchema(providerType)}
+              schema={providerOptionsSchema(providerType, "query")}
               value={draft.provider?.options ?? {}}
               onChange={(options) =>
                 onChange({
@@ -211,6 +238,7 @@ export function ProfileSourceSection({
 }
 
 export function ProfileSchemaSection({
+  schema,
   draft,
   keys,
   title,
@@ -223,6 +251,7 @@ export function ProfileSchemaSection({
   onChange,
 }: EditorSectionProps & {
   keys: string[];
+  schema?: JsonSchemaObject;
   title: string;
   description: string;
   idPrefix: string;
@@ -260,7 +289,7 @@ export function ProfileSchemaSection({
     <SectionCard title={title} description={description}>
       <JsonSchemaForm
         idPrefix={idPrefix}
-        schema={profileSchemaProjection(keys)}
+        schema={schema ?? profileSchemaProjection(keys)}
         value={Object.fromEntries(
           keys.flatMap((key) =>
             Object.prototype.hasOwnProperty.call(draft, key)

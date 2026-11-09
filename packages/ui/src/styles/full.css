@@ -4,7 +4,7 @@
  * the resolved utility-class rules alongside the tokens, so consumers don't
  * need to add their own `@source` directive pointing at our node_modules. */
 @import "tailwindcss";
-@import "./fs-tokens.css";
+@import "./clicky-tokens.css";
 @source "../**/*.{ts,tsx}";
 
 /* Colour utilities that only ever appear at runtime, in markup no build-time

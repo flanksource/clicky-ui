@@ -6,12 +6,14 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import { useCommentState } from "./comment-persistence";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { UiComment } from "../icons";
 import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { CommentThread } from "./CommentThread";
 import { CommentThreadList } from "./CommentThreadList";
+import type { CommentDetailOptions } from "./comment-detail";
 import {
   useCommentContextOptional,
   type CommentContextValue,
@@ -35,7 +37,9 @@ import {
   type CommentStatusStage,
 } from "./comment-types";
 
-export type CommentSidePanelProps = {
+export type CommentSidePanelProps = CommentDetailOptions & {
+  /** Hide root creation while another composer owns the draft; replies remain available. */
+  hideComposer?: boolean;
   /** Explicit label per anchor key. */
   anchorLabels?: Record<CommentAnchor, string>;
   /** Fallback label formatter for anchors without an explicit label. */
@@ -154,6 +158,7 @@ function AllComments({
   threadToMarkdown,
   renderRootDetails,
   extraAssignItems,
+  detailOptions,
 }: {
   ctx: CommentContextValue;
   comments: Comment[];
@@ -162,6 +167,7 @@ function AllComments({
   threadToMarkdown?: (thread: readonly Comment[]) => string;
   renderRootDetails?: (comment: Comment) => ReactNode;
   extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
+  detailOptions: CommentDetailOptions;
 }) {
   const ordered = useMemo(() => {
     const anchorOrder = new Map(orderedAnchors(ctx).map((a, i) => [a, i]));
@@ -208,6 +214,7 @@ function AllComments({
       className="space-y-3 overflow-y-auto pr-1"
     >
       <CommentThreadList
+        {...detailOptions}
         comments={ordered}
         config={ctx.config}
         compact
@@ -248,6 +255,8 @@ function FocusedComments({
   renderRootDetails,
   createActions,
   extraAssignItems,
+  hideComposer,
+  detailOptions,
 }: {
   ctx: CommentContextValue;
   comments: Comment[];
@@ -258,6 +267,8 @@ function FocusedComments({
   renderRootDetails?: (comment: Comment) => ReactNode;
   createActions?: readonly CommentCreateAction[];
   extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
+  hideComposer?: boolean;
+  detailOptions: CommentDetailOptions;
 }) {
   const comments = selectAnchorThreads(visible, anchor);
   const hasComments = comments.length > 0;
@@ -271,11 +282,13 @@ function FocusedComments({
         }
       />
       <CommentThread
+        {...detailOptions}
         comments={comments}
         config={ctx.config}
         anchor={anchor}
         compact={compact ?? false}
         autoFocusComposer={!hasComments}
+        hideComposer={hideComposer ?? false}
         defaultExpanded={hasComments}
         composerPlaceholder={
           hasComments ? "Add another top-level comment…" : "Add a comment…"
@@ -296,12 +309,17 @@ function FocusedComments({
  * toggle when collapsed. Renders nothing outside a provider or when empty.
  */
 export function CommentSidePanel(props: CommentSidePanelProps) {
+  const detailOptions: CommentDetailOptions = {
+    ...(props.previewLines !== undefined ? { previewLines: props.previewLines } : {}),
+    ...(props.detailTabs ? { detailTabs: props.detailTabs } : {}),
+    ...(props.onMaximizedChange ? { onMaximizedChange: props.onMaximizedChange } : {}),
+  };
   const ctx = useCommentContextOptional();
   const label = useAnchorLabel(props);
   const railRef = useRef<HTMLElement>(null);
   const focusedRef = useRef<HTMLDivElement>(null);
   const [focusedOffset, setFocusedOffset] = useState<number | null>(null);
-  const [stage, setStage] = useState<CommentStatusStage>("active");
+  const [stage, setStage] = useCommentState<CommentStatusStage>("stage", "active");
   const focusedAnchor = ctx?.railMode === "focused" ? ctx.focusedAnchor : null;
 
   useEffect(() => {
@@ -333,14 +351,15 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
       setFocusedOffset(Math.max(0, nextOffset));
     };
     update();
-    content.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("scroll", update, { capture: true, passive: true });
     window.addEventListener("resize", update);
     const observer =
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
     observer?.observe(content);
     observer?.observe(rail);
+    observer?.observe(focused);
     return () => {
-      content.removeEventListener("scroll", update);
+      window.removeEventListener("scroll", update, true);
       window.removeEventListener("resize", update);
       observer?.disconnect();
     };
@@ -434,6 +453,7 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
       </div>
       {ctx.railMode === "all" ? (
         <AllComments
+          detailOptions={detailOptions}
           ctx={ctx}
           comments={visible}
           label={label}
@@ -462,6 +482,8 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
           style={focusedOffset == null ? undefined : { top: focusedOffset }}
         >
           <FocusedComments
+            detailOptions={detailOptions}
+            hideComposer={props.hideComposer ?? false}
             ctx={ctx}
             comments={ctx.comments}
             anchor={ctx.focusedAnchor}

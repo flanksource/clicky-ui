@@ -86,6 +86,8 @@ export function comboboxAriaProps(
 
 export function defaultPlaceholder(schema: JsonSchemaProperty): string {
   if (schema.default != null && typeof schema.default !== "object") return String(schema.default);
+  const example = schema.examples?.[0];
+  if (example != null && typeof example !== "object") return String(example);
   return "";
 }
 
@@ -274,7 +276,7 @@ export function orderByPriority<T>(
 export function softError(field: FieldControl): string | undefined {
   const v = field.value;
   const isEmpty = v === undefined || v === null || v === "";
-  if (field.required && isEmpty) return "Required";
+  if (field.required && isEmpty && !(v === null && field.nullable)) return "Required";
 
   if (field.kind === "number" && typeof field.minimum === "number" && typeof v === "number") {
     if (v < field.minimum) return `Must be ≥ ${field.minimum}`;

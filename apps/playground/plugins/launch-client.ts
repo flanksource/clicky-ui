@@ -2,7 +2,12 @@ import type {
   CaptainPromptDetail,
   CaptainPromptSummary,
 } from "./captain-client";
-import type { Violation } from "../../../packages/ui/src/data/lint/types";
+import type { LinterResult } from "../../../packages/ui/src/data/lint/types";
+import type { GavelEndpoint } from "./gavel-launch-server";
+import { normalizeErrorDiagnostics, type ErrorDiagnostics } from "../../../packages/ui/src/data/diagnostics/error-diagnostics";
+
+const describe = (cause: unknown) =>
+  cause instanceof Error ? cause.message : String(cause);
 
 export type LaunchSnapshot = {
   metadata: {
@@ -12,16 +17,12 @@ export type LaunchSnapshot = {
     labels?: Record<string, string>;
   };
   status: { state: string; running: boolean };
-  lint?: Array<{
-    success: boolean;
-    error?: string;
-    session_id?: string;
-    violations: Violation[];
-  }>;
+  lint?: LinterResult[];
   error?: string;
 };
 
 export class LaunchHttpError extends Error {
+  diagnostics?: ErrorDiagnostics;
   constructor(
     readonly status: number,
     message: string,
@@ -32,32 +33,61 @@ export class LaunchHttpError extends Error {
 
 export class LaunchClient {
   constructor(
-    readonly baseURL: string,
+    readonly endpoint: GavelEndpoint,
     readonly workspace: string,
   ) {}
-  private async json<T>(path: string, init?: RequestInit): Promise<T> {
+  /** Bumped each time the endpoint starts a new server; its preparations are gone with the old one. */
+  get generation() {
+    return this.endpoint.generation;
+  }
+  private async json<T>(
+    path: string,
+    init?: RequestInit,
+    retried = false,
+  ): Promise<T> {
+    let baseURL: string;
+    try {
+      baseURL = await this.endpoint.url();
+    } catch (cause) {
+      throw new LaunchHttpError(502, describe(cause));
+    }
     let response: Response;
     try {
-      response = await fetch(new URL(path, this.baseURL), init);
+      response = await fetch(new URL(path, baseURL), init);
     } catch (cause) {
+      // An on-demand server that has gone away is started again; every
+      // request is a read, a prepare or an idempotency-keyed start, so one
+      // retry is safe.
+      if (!retried && this.endpoint.unreachable())
+        return this.json(path, init, true);
       throw new LaunchHttpError(
         502,
-        `Cannot reach Gavel at ${this.baseURL}: ${cause instanceof Error ? cause.message : String(cause)}`,
+        `Cannot reach Gavel at ${baseURL}: ${describe(cause)}`,
       );
     }
-    const value = (await response.json()) as { error?: string };
-    if (!response.ok)
-      throw new LaunchHttpError(
-        response.status,
-        value.error ?? `Gavel returned ${response.status}`,
-      );
+    const body = await response.text();
+    const context: Array<[string, string]> = [["Endpoint", new URL(path, baseURL).href], ["Method", init?.method ?? "GET"], ["Status", String(response.status)], ["Content type", response.headers.get("content-type") ?? "Missing"]];
+    const fail = (message: string, status: number, diagnostics?: ErrorDiagnostics): never => {
+      const error = new LaunchHttpError(status, message);
+      error.diagnostics = { ...diagnostics, message, context: [...(diagnostics?.context ?? []), ...context], details: [...(diagnostics?.details ?? []), { label: "Response", value: body }], stacktrace: diagnostics?.stacktrace ?? error.stack ?? message };
+      throw error;
+    };
+    if (!response.headers.get("content-type")?.includes("application/json"))
+      fail(`Gavel returned a non-JSON response (HTTP ${response.status}) from ${path}`, 502);
+    let value: unknown;
+    try { value = JSON.parse(body); }
+    catch { fail(`Gavel returned invalid JSON (HTTP ${response.status}) from ${path}`, 502); }
+    if (!response.ok) {
+      const diagnostics = normalizeErrorDiagnostics(value, `Gavel returned ${response.status}`);
+      fail(diagnostics?.message ?? `Gavel returned ${response.status}`, response.status, diagnostics ?? undefined);
+    }
     return value as T;
   }
-  prepare(): Promise<{ preparationId: string; directory: string }> {
+  prepare(workspace = this.workspace): Promise<{ preparationId: string; directory: string }> {
     return this.json("/api/launch/prepare", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspace: { cwd: this.workspace } }),
+      body: JSON.stringify({ workspace: { cwd: workspace } }),
     });
   }
   prompts(preparationId: string): Promise<{ prompts: CaptainPromptSummary[] }> {
@@ -83,8 +113,21 @@ export class LaunchClient {
       body: JSON.stringify(body),
     });
   }
+  filterLint(preparationId: string, results: LinterResult[]): Promise<LinterResult[]> {
+    return this.json("/api/launch/lint/filter", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ preparationId, results }),
+    });
+  }
   run(id: string): Promise<LaunchSnapshot> {
     return this.json(`/api/runs/${encodeURIComponent(id)}`);
+  }
+  async listRuns({ labels, limit, before }: { labels: Record<string, string>; limit: number; before: string }): Promise<{ runs: LaunchSnapshot[] }> {
+    const query = new URLSearchParams({ ...Object.fromEntries(Object.entries(labels).map(([key, value]) => [`label.${key}`, value])), limit: String(limit), ...(before ? { before } : {}) });
+    const result = await this.json<{ runs: LaunchSnapshot[] }>(`/api/runs?${query}`);
+    if (!Array.isArray(result.runs)) throw new LaunchHttpError(502, "Gavel run list is missing its runs array");
+    return result;
   }
   async find(association: string): Promise<LaunchSnapshot | undefined> {
     const result = await this.json<{ runs: LaunchSnapshot[] }>(

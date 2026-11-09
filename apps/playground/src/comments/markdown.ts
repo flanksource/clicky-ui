@@ -1,3 +1,4 @@
+import { vocabularyHref } from "../../../../packages/ui/src/comments/comment-vocabulary";
 // Relative imports, not the `@flanksource/clicky-ui/comments` alias: the
 // playground's Vite plugins build the same thread markdown for agent runs, and
 // the plugin bundle cannot resolve that alias.
@@ -8,6 +9,7 @@ import {
   sortReplies,
 } from "../../../../packages/ui/src/comments/comment-utils";
 
+import { parseEditableSource } from "../../plugins/editable-source-marker";
 import { tallyAnchors } from "./anchor-tally";
 import {
   describeMarkdown,
@@ -24,6 +26,7 @@ export type CommentPageSection = {
 
 export type CommentMarkdownOptions = {
   labels: Record<string, string>;
+  vocabularyInstructions: Record<string, string>;
   pageUrl: (page: string) => string;
   pagePath: (page: string) => string;
   screenshotUrl?: (url: string) => string;
@@ -54,6 +57,30 @@ export function commentsForFolder(
   );
 }
 
+/** Where page modules live in the repository, as `pageSourcePath` has it (a marker file is relative to it). */
+const PAGES_SOURCE_ROOT = "apps/playground/src/pages";
+
+const scalar = (value: string | number | null) =>
+  value === null ? "(not set)" : `\`${value}\``;
+
+/** The visual edit Design mode could not write back, for the agent that must make it by hand. */
+function styleEditLines({
+  marker,
+  tag,
+  changes,
+  refusal,
+}: NonNullable<PlaygroundComment["styleEdit"]>): string[] {
+  const { file, line } = parseEditableSource(marker);
+  return [
+    `- style edit: \`<${tag}>\` at \`${PAGES_SOURCE_ROOT}/${file}:${line}\``,
+    ...changes.map(
+      ({ attribute, from, to }) =>
+        `  - ${attribute}: ${scalar(from)} → ${scalar(to)}`,
+    ),
+    `  - not applied automatically (${refusal.reason}) at \`${PAGES_SOURCE_ROOT}/${refusal.file}:${refusal.line}:${refusal.column}\`: ${refusal.message}`,
+  ];
+}
+
 function renderSection(
   { page, comments }: CommentPageSection,
   {
@@ -62,15 +89,18 @@ function renderSection(
     pagePath,
     screenshotUrl = (url) => url,
     commentActionUrls,
-  }: CommentMarkdownOptions,
+    vocabularyInstructions,
+    printedInstructions,
+  }: CommentMarkdownOptions & { printedInstructions: Set<string> },
 ): string[] {
   const capturedUrl = page.startsWith("external:")
     ? comments.find((comment) => comment.element?.pageUrl)?.element?.pageUrl
     : undefined;
+  const capturedSource = page.startsWith("document:") ? comments.find((comment) => comment.element?.source)?.element?.source : undefined;
   const out = [
     `## Playground feedback — ${page.split("/").at(-1) ?? page}`,
     `- URL: ${capturedUrl ?? pageUrl(page)}`,
-    `- source: \`${capturedUrl ?? pagePath(page)}\``,
+    `- source: \`${capturedUrl ?? capturedSource ?? pagePath(page)}\``,
     "",
   ];
 
@@ -86,6 +116,9 @@ function renderSection(
   );
   const promptRunByComment = new Map(
     comments.map((comment) => [comment.id, comment.promptRun]),
+  );
+  const styleEditByComment = new Map(
+    comments.map((comment) => [comment.id, comment.styleEdit]),
   );
   const rank = new Map(
     tallyAnchors(comments).map((tally, index) => [tally.anchor, index]),
@@ -154,8 +187,28 @@ function renderSection(
         out.push(`  - [${item.status}] ${item.label}`);
       }
     }
+    const styleEdit = styleEditByComment.get(root.id);
+    if (styleEdit) out.push(...styleEditLines(styleEdit));
     for (const group of root.refs ?? []) {
       out.push(`- ${group.label}: ${group.items.map((item) => `\`${item}\``).join(", ")}`);
+    }
+    const vocabularyRefs = new Map([root, ...(replies.get(root.id) ?? [])].flatMap(comment =>
+      (comment.vocabularyRefs ?? []).map(item => [`${item.catalog}:${item.id}`, item] as const)));
+    if (vocabularyRefs.size) {
+      out.push("", "**Vocabulary references:**");
+      const aliases = [...new Set([...vocabularyRefs.values()].map(item => item.catalog))];
+      for (const alias of aliases) {
+        if (!Object.hasOwn(vocabularyInstructions, alias) || !vocabularyInstructions[alias]?.trim()) throw new Error(`Unknown vocabulary alias ${alias}: instructions are required`);
+        if (!printedInstructions.has(alias)) {
+          out.push("", `**${alias} vocabulary:**`, "", vocabularyInstructions[alias]!, "");
+          printedInstructions.add(alias);
+        }
+        for (const item of vocabularyRefs.values()) {
+          if (item.catalog !== alias) continue;
+          out.push(`- ${item.catalog}:${item.id}: ${item.description}`, `  - Preview: ${new URL(vocabularyHref(item), pageUrl(page)).href}`);
+          for (const reference of item.references) out.push(`  - ${reference}`);
+        }
+      }
     }
     for (const reply of sortReplies(replies.get(root.id) ?? [])) {
       out.push(
@@ -214,7 +267,8 @@ export function commentsToMarkdown(
   options: CommentMarkdownOptions,
 ): string {
   if (sections.length === 0) return "_No comments._\n";
+  const printedInstructions = new Set<string>();
   return sections
-    .flatMap((section) => renderSection(section, options))
+    .flatMap((section) => renderSection(section, { ...options, printedInstructions }))
     .join("\n");
 }

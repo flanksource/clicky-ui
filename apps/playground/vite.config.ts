@@ -15,6 +15,7 @@ import {
   createAgentRuns,
   playgroundAgentRuns,
 } from "./plugins/agent-runs-server";
+import { configureComments } from "./plugins/comments-client";
 import { playgroundComments } from "./plugins/comments-server";
 import {
   createPromptRuns,
@@ -25,11 +26,21 @@ import { playgroundExports } from "./plugins/exports-server";
 import { playgroundMarkdown } from "./plugins/markdown-vite-plugin";
 import { playgroundPageMeta } from "./plugins/page-meta-vite-plugin";
 import { playgroundSources } from "./plugins/sources-server";
+import { playgroundEditableSource } from "./plugins/editable-source-plugin";
+import { playgroundVisualEdits } from "./plugins/visual-edits-server";
+import { svgPreview } from "./plugins/svg-preview";
 import { playgroundPageActivity } from "./plugins/page-activity";
 import { playgroundRuntimeProfiles } from "./plugins/runtime-profiles-server";
 import { playgroundWorkspaceFiles } from "./plugins/workspace-files-server";
 import { playgroundGavelLint } from "./plugins/gavel-lint-server";
 import { playgroundBlame } from "./plugins/blame-server";
+import { playgroundProduction } from "./plugins/production-server";
+import { playgroundReactDevtoolsHook } from "./plugins/react-devtools-hook";
+import { fixedGavel, onDemandGavel } from "./plugins/gavel-launch-server";
+import { authorizeDocumentDirectory, playgroundRepositoryDocuments } from "./plugins/repository-documents-server";
+import { playgroundNavigation } from "./plugins/navigation-server";
+import { playgroundVocabularies } from "./plugins/vocabularies-server";
+import { playgroundConnections } from "./plugins/connections-server";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(root, "../..");
@@ -69,6 +80,7 @@ function existingPath(name: string, path: string): string {
 const externalRoots = envList("PLAYGROUND_EXTERNAL_ROOTS").map((path) =>
   existingPath("PLAYGROUND_EXTERNAL_ROOTS", path),
 );
+const vocabularyRoots = [resolve(root, "src/vocabularies"), ...envList("PLAYGROUND_VOCABULARY_DIRS").map(path => existingPath("PLAYGROUND_VOCABULARY_DIRS", path))];
 
 const externalAliases: Alias[] = envList("PLAYGROUND_EXTERNAL_ALIASES").map(
   (entry) => {
@@ -89,44 +101,68 @@ const externalAliases: Alias[] = envList("PLAYGROUND_EXTERNAL_ALIASES").map(
   },
 );
 
+const gavelEndpoint = localEnv.PLAYGROUND_GAVEL_URL ? fixedGavel(localEnv.PLAYGROUND_GAVEL_URL) : onDemandGavel({ workspace: workspaceRoot, command: [localEnv.PLAYGROUND_GAVEL_BINARY ?? "gavel"], localRoots: [workspaceRoot, ...envList("PLAYGROUND_LOCAL_ROOTS").map((path) => existingPath("PLAYGROUND_LOCAL_ROOTS", path))] });
+configureComments({ dir: playgroundDataDir, endpoint: gavelEndpoint, workspace: workspaceRoot });
+const captainURL = "http://localhost:9020";
 const agentRuns = createAgentRuns({
   dir: playgroundDataDir,
-  captainURL: "http://localhost:9020",
+  captainURL,
   cwd: workspaceRoot,
   skillPath: resolve(workspaceRoot, ".agents/skills/clicky-ui-playground/SKILL.md"),
+  resolveDocumentDirectory: (page) => authorizeDocumentDirectory({ dir: playgroundDataDir, endpoint: gavelEndpoint, page }),
+});
+const promptRuns = createPromptRuns({
+  dir: playgroundDataDir,
+  gavelURL: localEnv.PLAYGROUND_GAVEL_URL,
+  endpoint: gavelEndpoint,
+  workspace: workspaceRoot,
+  onCreated: agentRuns.autoRunComment,
 });
 
 export default defineConfig(({ mode }) => ({
   plugins: [
+    mode === "playground-prod" && playgroundProduction({ root }),
     react(),
     tailwindcss(),
+    svgPreview({ root, workspaceRoot }),
+    // Design mode's live preview needs react-dom registered with a DevTools hook.
+    playgroundReactDevtoolsHook({ root }),
+    // Pre-transform: stamps facet node call sites with data-editable-source for Design mode.
+    playgroundEditableSource({ pagesDir: resolve(root, "src/pages") }),
     playgroundMarkdown({ sourceRoot: resolve(root, "src") }),
     playgroundPageMeta({ sourceRoot: resolve(root, "src") }),
     playgroundPageActivity(resolve(root, "src/pages")),
+    playgroundVocabularies({ dir: playgroundDataDir, roots: vocabularyRoots, pagesDir: resolve(root, "src/pages") }),
+    playgroundConnections({ gavel: gavelEndpoint, captainURL }),
     // Before playgroundComments: that middleware answers every other
     // /__playground/comments/* path (including /:id/agent-run) with a 405.
     playgroundAgentRuns(agentRuns),
-    playgroundPromptRuns(
-      createPromptRuns({
-        dir: playgroundDataDir,
-        gavelURL: localEnv.PLAYGROUND_GAVEL_URL ?? "http://localhost:9330",
-        workspace: workspaceRoot,
-        onCreated: agentRuns.autoRunComment,
-      }),
-    ),
+    playgroundRepositoryDocuments({ dir: playgroundDataDir, endpoint: gavelEndpoint }),
+    playgroundPromptRuns(promptRuns),
+    playgroundNavigation({
+      dir: playgroundDataDir,
+      pagesDir: resolve(root, "src/pages"),
+      endpoint: gavelEndpoint,
+      problems: promptRuns.problems,
+    }),
     playgroundComments({
       dir: playgroundDataDir,
       pagesDir: resolve(root, "src/pages"),
       onCreated: agentRuns.autoRunComment,
     }),
-    mode !== "test" && playgroundBookmarklet({ root, dir: playgroundDataDir }),
+    mode !== "test" && playgroundBookmarklet({
+      root,
+      dir: playgroundDataDir,
+      compiled: mode === "playground-prod",
+    }),
     playgroundExports({ dir: playgroundDataDir }),
     playgroundRuntimeProfiles({
-      modelsURL: "http://localhost:9020/api/chat/models",
+      modelsURL: `${captainURL}/api/chat/models`,
       permissionsURL:
-        "http://localhost:9020/api/captain/ai/permissions/catalog",
-      runtimesURL: "http://localhost:9020/api/chat/runtimes",
-      resolveURL: "http://localhost:9020/api/chat/runtime-profiles/resolve",
+        `${captainURL}/api/captain/ai/permissions/catalog`,
+      runtimesURL: `${captainURL}/api/chat/runtimes`,
+      resolveURL: `${captainURL}/api/chat/runtime-profiles/resolve`,
+      presetsResolveURL: `${captainURL}/api/chat/runtime-presets/resolve`,
     }),
     playgroundWorkspaceFiles({ cwd: workspaceRoot }),
     playgroundBlame({ cwd: workspaceRoot }),
@@ -135,6 +171,7 @@ export default defineConfig(({ mode }) => ({
       workspaceRoot,
       promptFile: resolve(root, "prompts/markdown-review.prompt"),
     }),
+    playgroundVisualEdits({ pagesDir: resolve(root, "src/pages"), workspaceRoot }),
     playgroundSources({
       pagesDir: resolve(root, "src/pages"),
       commentsDir: playgroundDataDir,
@@ -154,6 +191,10 @@ export default defineConfig(({ mode }) => ({
       {
         find: /^@flanksource\/clicky-ui\/icons$/,
         replacement: resolve(uiSrc, "icons.ts"),
+      },
+      {
+        find: /^@flanksource\/clicky-ui\/comments\/anchoring$/,
+        replacement: resolve(uiSrc, "comment-anchoring.ts"),
       },
       {
         find: /^@flanksource\/clicky-ui\/comments$/,
@@ -196,6 +237,10 @@ export default defineConfig(({ mode }) => ({
         replacement: resolve(uiSrc, "data.ts"),
       },
       {
+        find: /^@flanksource\/clicky-ui\/git$/,
+        replacement: resolve(uiSrc, "git.ts"),
+      },
+      {
         find: /^@flanksource\/clicky-ui\/expressions\/playground$/,
         replacement: resolve(uiSrc, "expressions/playground.ts"),
       },
@@ -211,6 +256,9 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     exclude: ["@flanksource/clicky-ui"],
+    // Only the lazy Source editor imports these. Discovered on first use, they force a
+    // re-optimization whose reload never reaches the page (hmr: false), leaving two React copies.
+    include: ["monaco-editor", "@flanksource/clicky-ui > @monaco-editor/react", "@flanksource/clicky-ui > monaco-yaml"],
   },
   test: {
     // The React artifact tests render through @testing-library, and the shared
@@ -253,17 +301,17 @@ export default defineConfig(({ mode }) => ({
         rewrite: (path) => path.slice("/oipa-api".length),
       },
     },
-    // Watch source changes without updating the open browser page.
+    // The compiled-shell editing server reloads live pages after changes.
     hmr: false,
     // Bind every interface so the playground is reachable from other devices
     // on the LAN; allowedHosts keeps hostname (.local, tunnel) access working,
     // which Vite otherwise rejects with "Blocked request".
     host: true,
     allowedHosts: true,
-    port: 5274,
+    port: mode === "playground-prod" ? 5275 : 5274,
     strictPort: true,
     fs: {
-      allow: [searchForWorkspaceRoot(root), ...externalRoots],
+      allow: [searchForWorkspaceRoot(root), ...externalRoots, ...vocabularyRoots],
     },
   },
 }));

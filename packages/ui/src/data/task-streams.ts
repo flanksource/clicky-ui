@@ -1,9 +1,10 @@
-import type { TaskSnapshot } from "./TaskSnapshot";
+import type { LogEntry, TaskSnapshot } from "./TaskSnapshot";
 
 /**
- * A task's stdout/stderr arrive as append-only deltas on their own SSE frames,
- * never on the task frames — clicky strips them there deliberately, so the tail
- * of a long-running process is not re-sent every time a duration ticks over.
+ * A task's stdout/stderr and logs arrive as append-only deltas on their own SSE
+ * frames, never on the task frames — clicky strips them there deliberately, so
+ * the tail of a long-running process is not re-sent every time a task frame
+ * changes.
  *
  * That makes where a client keeps the accumulated text a correctness question,
  * not a style one. Kept on the snapshot object, it is destroyed the next time a
@@ -21,7 +22,12 @@ export interface TaskStreams {
   /** Absolute stream offset one past the last byte held, per stream. */
   stdoutEnd: number;
   stderrEnd: number;
+  /** Log entries accumulated from `event: logs` deltas, oldest first. */
+  logs?: LogEntry[];
 }
+
+/** Retained log entries per task; the newest are kept. */
+export const MAX_TASK_LOGS = 1000;
 
 export const emptyTaskStreams: TaskStreams = {
   stdoutTruncated: false,
@@ -44,6 +50,18 @@ export interface TaskOutputDelta {
   offset: number;
   reset?: boolean;
   truncated?: boolean;
+}
+
+/**
+ * One `event: logs` frame. `reset` means `entries` replace what the client holds
+ * (first frame, or the server cleared its log); otherwise they are appended.
+ * Entries arrive in ascending `seq`.
+ */
+export interface TaskLogsDelta {
+  id: string;
+  groupId?: string;
+  entries: LogEntry[];
+  reset?: boolean;
 }
 
 const encoder = new TextEncoder();
@@ -88,6 +106,18 @@ export function applyTaskOutputDelta(current: TaskStreams, delta: TaskOutputDelt
 }
 
 /**
+ * Applies one logs frame. A reset replaces; an append skips any `seq` already
+ * held (a re-sent frame must not duplicate lines). Either way only the newest
+ * `MAX_TASK_LOGS` entries are retained.
+ */
+export function applyTaskLogsDelta(current: TaskStreams, delta: TaskLogsDelta): TaskStreams {
+  const held = delta.reset === true ? [] : (current.logs ?? []);
+  const seen = new Set(held.map((entry) => entry.seq));
+  const fresh = delta.entries.filter((entry) => !seen.has(entry.seq));
+  return { ...current, logs: [...held, ...fresh].slice(-MAX_TASK_LOGS) };
+}
+
+/**
  * Projects accumulated streams back onto a snapshot for rendering. The offset
  * bookkeeping stays here: it is how this client tracks its own position, not
  * something a consumer of a snapshot has any use for.
@@ -95,6 +125,7 @@ export function applyTaskOutputDelta(current: TaskStreams, delta: TaskOutputDelt
 export function withTaskStreams(snapshot: TaskSnapshot, streams: TaskStreams | undefined): TaskSnapshot {
   if (!streams) return snapshot;
   const merged: TaskSnapshot = { ...snapshot };
+  if (streams.logs !== undefined) merged.logs = streams.logs;
   if (streams.stdout !== undefined) {
     merged.stdout = streams.stdout;
     merged.stdoutTruncated = streams.stdoutTruncated;

@@ -1,4 +1,7 @@
+import { normalizeErrorDiagnostics } from "../data/diagnostics/error-diagnostics";
+import { ActionError } from "../data/diagnostics/ActionError";
 import { useState, type ReactNode } from "react";
+import { useCommentState } from "./comment-persistence";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { DropdownMenu, type DropdownMenuItem } from "../overlay/DropdownMenu";
@@ -15,7 +18,7 @@ import {
   UiRestart,
   UiTrash,
 } from "../icons";
-import { CommentAuthorAvatar } from "./CommentAuthor";
+import { CommentAuthorAvatar, CommentAuthorName } from "./CommentAuthor";
 import {
   ChecklistChips,
   FacetBadges,
@@ -25,11 +28,12 @@ import {
   StatusChip,
 } from "./CommentCardParts";
 import { CommentMarkdown } from "./CommentMarkdown";
+import { CommentPreview } from "./CommentPreview";
 import {
   assignmentMenuItems,
   type CommentActionRunner,
 } from "./comment-assign";
-import { authorDisplayName, truncatePlain } from "./comment-utils";
+import { truncatePlain } from "./comment-utils";
 import {
   resolveCommentStage,
   statusForCommentStage,
@@ -43,6 +47,9 @@ export type CommentCardProps = {
   compact?: boolean;
   /** Render expanded on first mount. */
   defaultExpanded?: boolean;
+  previewLines?: number;
+  /** Keep maximized bodies independent of persisted sidebar expansion. */
+  fullBody?: boolean;
   /** Custom body renderer; defaults to the lightweight CommentMarkdown. */
   renderBody?: (body: string) => ReactNode;
   /** Change this comment's status (roots only). */
@@ -101,17 +108,20 @@ function actionMenuItems(
   return items;
 }
 
+function commentActionError(error: unknown, operation: string) {
+  const diagnostics = normalizeErrorDiagnostics(error) ?? { message: String(error), context: [] };
+  return { ...diagnostics, message: `${operation}: ${diagnostics.message}` };
+}
+
 /** A runner for {@link assignmentMenuItems} that shows a failure through `setError`. */
-function reportingRunner(setError: (message: string) => void): CommentActionRunner {
+function reportingRunner(setError: (error: unknown) => void): CommentActionRunner {
   return (verb, action) => {
-    setError("");
+    setError(null);
     void (async () => {
       try {
         await action();
       } catch (cause) {
-        setError(
-          `Couldn't ${verb} comment: ${cause instanceof Error ? cause.message : "Unexpected error"}`,
-        );
+        setError(commentActionError(cause, `Couldn't ${verb} comment`));
       }
     })();
   };
@@ -146,7 +156,7 @@ function CommentBody(props: CommentCardProps) {
     onChecklistToggle,
     onMaximize,
   } = props;
-  const [actionError, setActionError] = useState("");
+  const [actionError, setActionError] = useState<unknown>(null);
   const isReply = Boolean(comment.parentId);
   const date = parseTimestamp(comment.createdAt);
   const resolved = statusForCommentStage(config, "resolved");
@@ -154,33 +164,27 @@ function CommentBody(props: CommentCardProps) {
   const closed = statusForCommentStage(config, "closed");
   const stage = resolveCommentStage(config, comment.status);
   const updateStatus = async (status: string) => {
-    setActionError("");
+    setActionError(null);
     try {
       await onUpdateStatus?.(status);
     } catch (error) {
-      setActionError(
-        `Couldn't update comment: ${error instanceof Error ? error.message : "Unexpected error"}`,
-      );
+      setActionError(commentActionError(error, "Couldn't update comment"));
     }
   };
   const close = async () => {
-    setActionError("");
+    setActionError(null);
     try {
       await onClose?.();
     } catch (error) {
-      setActionError(
-        `Couldn't close comment: ${error instanceof Error ? error.message : "Unexpected error"}`,
-      );
+      setActionError(commentActionError(error, "Couldn't close comment"));
     }
   };
   const copy = async () => {
-    setActionError("");
+    setActionError(null);
     try {
       await onCopy?.();
     } catch (error) {
-      setActionError(
-        `Couldn't copy comment: ${error instanceof Error ? error.message : "Unexpected error"}`,
-      );
+      setActionError(commentActionError(error, "Couldn't copy comment"));
     }
   };
   const menuItems = actionMenuItems(isReply, {
@@ -228,7 +232,7 @@ function CommentBody(props: CommentCardProps) {
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-baseline gap-1.5">
             <span className="truncate text-xs font-semibold text-foreground">
-              {authorDisplayName(comment.author)}
+              <CommentAuthorName author={comment.author} />
             </span>
             {date && (
               <span
@@ -295,21 +299,17 @@ function CommentBody(props: CommentCardProps) {
       </div>
       {comment.body.trim() && (
         <div className="text-[13px] leading-5 text-foreground">
+          {props.previewLines !== undefined ? <CommentPreview id={comment.id} lines={props.previewLines}>
+            {renderBody ? renderBody(comment.body) : <CommentMarkdown text={comment.body} {...(comment.vocabularyRefs ? { vocabularyRefs: comment.vocabularyRefs } : {})} {...(config.vocabulary ? { vocabulary: config.vocabulary } : {})} />}
+          </CommentPreview> : <>
           {renderBody ? (
             renderBody(comment.body)
           ) : (
-            <CommentMarkdown text={comment.body} />
-          )}
+            <CommentMarkdown {...(comment.vocabularyRefs ? { vocabularyRefs: comment.vocabularyRefs } : {})} text={comment.body} {...(config.vocabulary ? { vocabulary: config.vocabulary } : {})} />
+          )}</>}
         </div>
       )}
-      {actionError && (
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive"
-        >
-          {actionError}
-        </div>
-      )}
+      {actionError !== null && <ActionError error={actionError} context={[["Comment", comment.id], ["Anchor", comment.anchor ?? "Whole page"]]} />}
       {!isReply && (
         <ChecklistChips
           comment={comment}
@@ -338,13 +338,13 @@ function CommentBody(props: CommentCardProps) {
  */
 export function CommentCard(props: CommentCardProps) {
   const { comment, config, compact, defaultExpanded } = props;
-  const [expanded, setExpanded] = useState(defaultExpanded ?? false);
-  const [collapsedActionError, setCollapsedActionError] = useState("");
+  const [expanded, setExpanded] = useCommentState(`expanded:${comment.id}`, defaultExpanded ?? false);
+  const [collapsedActionError, setCollapsedActionError] = useState<unknown>(null);
   const isReply = Boolean(comment.parentId);
   const body = <CommentBody {...props} />;
 
   async function runCollapsedAction(action: "resolve" | "close" | "reopen") {
-    setCollapsedActionError("");
+    setCollapsedActionError(null);
     try {
       if (action === "close") {
         await props.onClose?.();
@@ -356,24 +356,20 @@ export function CommentCard(props: CommentCardProps) {
       );
       if (next) await props.onUpdateStatus?.(next.value);
     } catch (error) {
-      setCollapsedActionError(
-        `${action === "close" ? "Couldn't close comment" : "Couldn't update comment"}: ${error instanceof Error ? error.message : "Unexpected error"}`,
-      );
+      setCollapsedActionError(commentActionError(error, action === "close" ? "Couldn't close comment" : "Couldn't update comment"));
     }
   }
 
   async function copyCollapsed() {
-    setCollapsedActionError("");
+    setCollapsedActionError(null);
     try {
       await props.onCopy?.();
     } catch (error) {
-      setCollapsedActionError(
-        `Couldn't copy comment: ${error instanceof Error ? error.message : "Unexpected error"}`,
-      );
+      setCollapsedActionError(commentActionError(error, "Couldn't copy comment"));
     }
   }
 
-  if (!expanded) {
+  if (!expanded && !props.fullBody && props.previewLines === undefined) {
     return (
       <>
         <div
@@ -397,7 +393,7 @@ export function CommentCard(props: CommentCardProps) {
         >
           <CommentAuthorAvatar author={comment.author} bare />
           <span className="min-w-0 truncate text-[11px] font-semibold text-foreground">
-            {authorDisplayName(comment.author)}
+            <CommentAuthorName author={comment.author} />
           </span>
           {!isReply && (
             <>
@@ -409,7 +405,9 @@ export function CommentCard(props: CommentCardProps) {
           )}
           <span className="min-w-0 flex-1 truncate text-[12px] text-foreground/80">
             {comment.body.trim()
-              ? truncatePlain(comment.body)
+              ? comment.vocabularyRefs?.length
+                ? <CommentMarkdown text={comment.body} vocabularyRefs={comment.vocabularyRefs} {...(config.vocabulary ? { vocabulary: config.vocabulary } : {})} />
+                : truncatePlain(comment.body)
               : comment.rating === "positive"
                 ? "Positive rating"
                 : comment.rating === "negative"
@@ -489,14 +487,7 @@ export function CommentCard(props: CommentCardProps) {
             />
           </span>
         </div>
-        {collapsedActionError && (
-          <div
-            role="alert"
-            className="rounded-md border border-destructive/30 bg-destructive/5 px-2.5 py-2 text-xs text-destructive"
-          >
-            {collapsedActionError}
-          </div>
-        )}
+        {collapsedActionError !== null && <ActionError error={collapsedActionError} context={[["Comment", comment.id], ["Anchor", comment.anchor ?? "Whole page"]]} />}
       </>
     );
   }

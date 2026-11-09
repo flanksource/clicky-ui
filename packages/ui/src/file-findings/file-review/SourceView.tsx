@@ -6,7 +6,7 @@ import { tokenStyle } from "../../data/token-style";
 import { cn } from "../../lib/utils";
 import { CommentAuthorAvatar } from "../../comments/CommentAuthor";
 import type { Comment } from "../../comments/comment-types";
-import { getRoots, selectAnchorThreads } from "../../comments/comment-utils";
+import { authorDisplayName, getRoots, selectAnchorThreads } from "../../comments/comment-utils";
 import { lineAnchor } from "../findings-comments";
 import type { FileFinding } from "../types";
 import { blameAge, isUncommitted, type BlameLine } from "./blame";
@@ -148,7 +148,7 @@ export function SourceView({
                     className="flex w-full items-center gap-1.5 text-left font-sans text-[11px] text-amber-600 hover:underline [[data-theme=dark]_&]:text-amber-400"
                   >
                     <CommentAuthorAvatar author={root.author ?? null} size="xs" bare />
-                    <span className="shrink-0 font-medium text-foreground">{root.author?.name}</span>
+                    <span className="shrink-0 font-medium text-foreground" title={root.author?.name}>{authorDisplayName(root.author)}</span>
                     <span className="truncate text-muted-foreground">{root.body}</span>
                     {thread.length > 1 && <span className="shrink-0 text-muted-foreground">· {thread.length - 1} {thread.length === 2 ? "reply" : "replies"}</span>}
                   </button>

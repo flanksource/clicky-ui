@@ -36,7 +36,7 @@ export function TestTree({ className, actions }: { className?: string; actions?:
       className={cn("min-h-0", className)}
       roots={runner.tests}
       getKey={nodeKey}
-      getChildren={(node) => node.children}
+      getChildren={(node) => runner.adapters.resolveTreeChildren(node, runner)}
       selected={runner.selected}
       onSelect={(node) => runner.onSelect(node === runner.selected ? null : node)}
       expandAll={runner.expandAll}

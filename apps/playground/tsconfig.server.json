@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@flanksource/clicky-ui": ["../../packages/ui/src/index.ts"],
+      "@flanksource/clicky-ui/ai": ["../../packages/ui/src/ai.ts"],
+      "@flanksource/clicky-ui/ai/runtime-profile": ["../../packages/ui/src/runtime-profile.ts"],
+      "@flanksource/clicky-ui/chat": ["../../packages/ui/src/chat.ts"],
+      "@flanksource/clicky-ui/comments": ["../../packages/ui/src/comments.ts"],
+      "@flanksource/clicky-ui/comments/anchoring": ["../../packages/ui/src/comment-anchoring.ts"],
+      "@flanksource/clicky-ui/connections": ["../../packages/ui/src/connections.ts"],
+      "@flanksource/clicky-ui/data": ["../../packages/ui/src/data.ts"],
+      "@flanksource/clicky-ui/expressions": ["../../packages/ui/src/expressions.ts"],
+      "@flanksource/clicky-ui/expressions/playground": ["../../packages/ui/src/expressions/playground.ts"],
+      "@flanksource/clicky-ui/file-findings": ["../../packages/ui/src/file-findings.ts"],
+      "@flanksource/clicky-ui/git": ["../../packages/ui/src/git.ts"],
+      "@flanksource/clicky-ui/icons": ["../../packages/ui/src/icons.ts"],
+      "@flanksource/clicky-ui/monaco": ["../../packages/ui/src/monaco.ts"],
+      "@flanksource/clicky-ui/rpc": ["../../packages/ui/src/rpc.ts"],
+      "@flanksource/clicky-ui/utils": ["../../packages/ui/src/utils.ts"]
+    }
+  }
+}

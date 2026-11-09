@@ -1,6 +1,7 @@
 import { commentsToMarkdown, groupByPage } from "./markdown";
 import type { DashboardState } from "./dashboard-state";
 import { COMMENTS_ROUTE, type PageComment } from "./useComments";
+import { pageSourcePath } from "../documents/review-target";
 
 export function dashboardCopy({
   comments,
@@ -8,12 +9,14 @@ export function dashboardCopy({
   state,
   target,
   url,
+  vocabularyInstructions,
 }: {
   comments: PageComment[];
   selected: PageComment[];
   state: DashboardState;
   target: "LLM" | "Claude" | "Codex";
   url: string;
+  vocabularyInstructions: Record<string, string>;
 }): string {
   const origin = new URL(url).origin;
   const ids = new Set(selected.map((comment) => comment.id));
@@ -37,11 +40,12 @@ export function dashboardCopy({
   ].join("\n");
   const snapshot = commentsToMarkdown(groupByPage(threads), {
     labels: {},
+    vocabularyInstructions,
     pageUrl: (page) => `${origin}/?page=${encodeURIComponent(page)}`,
     pagePath: (page) =>
       page.startsWith("external:")
         ? page
-        : `apps/playground/src/pages/${page}.tsx`,
+        : pageSourcePath(page),
     screenshotUrl: (path) => new URL(path, origin).href,
     commentActionUrls: (id) => ({
       reply: `${origin}${COMMENTS_ROUTE}/${encodeURIComponent(id)}/replies`,

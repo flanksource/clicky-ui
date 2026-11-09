@@ -15,6 +15,18 @@ const adapter = (id: string, over: Partial<TestNodeAdapter>): TestNodeAdapter =>
 });
 
 describe("TestNodeAdapterRegistry.resolveDetail", () => {
+  it("keeps original children unless a matching adapter selects tree children", () => {
+    const parent: Test = { name: "parent", children: [node("child")] };
+    const reg = createTestRunnerRegistry([
+      adapter("unmatched", { match: () => false, treeChildren: () => [] }),
+    ]);
+    expect(reg.resolveTreeChildren(parent, runner)).toBe(parent.children);
+    expect(createTestRunnerRegistry([
+      adapter("leaf", { treeChildren: () => [] }),
+      adapter("later", { treeChildren: () => parent.children }),
+    ]).resolveTreeChildren(parent, runner)).toEqual([]);
+  });
+
   it("returns the first matching adapter that has renderDetail", () => {
     const reg = createTestRunnerRegistry([
       adapter("no-detail", { match: () => true }),

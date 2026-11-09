@@ -10,30 +10,46 @@ import {
   type RefObject,
 } from "react";
 import {
-  AppShell,
   CommentSidePanel,
+  CommentRail,
   DOCUMENT_ANCHOR,
+  Workspace,
   cn,
   useCommentContext,
   useFloatingZIndex,
+  useMediaQuery,
+  type WorkspacePaneSpec,
+  type WorkspaceSideArrangements,
 } from "@flanksource/clicky-ui";
-import { UiComment } from "@flanksource/clicky-ui/icons";
+import { CommentDraftPopover } from "@flanksource/clicky-ui/comments";
 import { CommentDashboard } from "./comments/CommentDashboard";
 import { PageErrorBoundary } from "./PageErrorBoundary";
+import { LIVE_SERVER } from "./live-server";
+import { useBrowserSession } from "./browser-mode/session";
+import { BrowserPage } from "./browser-mode/BrowserPage";
+import { VocabularyGenerationHost } from "./vocabularies/config";
+import { VocabularyAnchorTarget } from "./vocabularies/VocabularyAnchorTarget";
+import type { AgentAnchorState } from "@flanksource/page-runtime/schema";
 
 import {
   CommentOverlay,
   DialogCommentOverlay,
 } from "./comments/CommentOverlay";
 import { useReactGrabComments } from "./comments/useReactGrabComments";
-import { CommentCapture } from "./comments/CommentCapture";
+import { useReactGrabStyle } from "./visual-edit/useReactGrabStyle";
+import { useEditableSelection } from "./visual-edit/useEditableSelection";
+import type { EditableRoot } from "./visual-edit/editable-dom";
+import { styleEditBody } from "./visual-edit/style-edit-comment";
+import type { StyleChangeRequest } from "./visual-edit/SvgStylePanel";
+import type { StoredStyleEdit } from "../plugins/comments-store";
+import { useCommentDetails } from "./comments/useCommentDetails";
 import { PlaygroundCommentReview } from "./comments/PlaygroundCommentReview";
 import { useResolvedCommentReview } from "./comments/useResolvedCommentReview";
 import { AnnotationVisibilityProvider } from "./annotations";
 import { PageActions, PageManagementDialogs } from "./editor/PageManagement";
 import { usePageFolders } from "./editor/usePageFolders";
 import { usePageMoveDrag } from "./editor/usePageMoveDrag";
-import { useSource } from "./editor/useSource";
+import { fileSourceTarget, useSource } from "./editor/useSource";
 import { MarkdownPage } from "./markdown/MarkdownPage";
 import { usePageGuidance } from "./markdown/usePageGuidance";
 import { PlaygroundBanner as Banner } from "./PlaygroundShellParts";
@@ -46,7 +62,12 @@ import {
 import { ReviewProvider } from "./review/ReviewProvider";
 import { PlaygroundSidebarControls } from "./PlaygroundSidebarControls";
 import { useSidebarState } from "./sidebar-state";
-import { usePageActivity } from "./sidebar-activity";
+import { mergeActivity, usePageActivity } from "./sidebar-activity";
+import { useRepositoryNavigation } from "./documents/useRepositoryNavigation";
+import { WORKSPACE_STORAGE_KEY, explorerPane, useExplorerLayoutDefaults } from "./navigation/ExplorerPane";
+import { useNavigationTree } from "./navigation/useNavigationTree";
+import type { NavigationMenuDeps, PageActionState } from "./navigation/menus";
+import { useRecentSection } from "./recent-navigation";
 
 // Monaco is several megabytes and only ever needed once someone opens the
 // editor, so it must not sit in the entry chunk.
@@ -61,19 +82,26 @@ const MarkdownDocumentPage = lazy(() =>
     default: module.MarkdownDocumentPage,
   })),
 );
+const RepositoryDocumentPage = lazy(() => import("./documents/RepositoryDocumentPage").then((module) => ({ default: module.RepositoryDocumentPage })));
+const VisualEditOverlay = lazy(() => import("./visual-edit/VisualEditOverlay").then((module) => ({ default: module.VisualEditOverlay })));
+const SvgStylePanel = lazy(() => import("./visual-edit/SvgStylePanel").then((module) => ({ default: module.SvgStylePanel })));
+const RepositoryFolderPage = lazy(() => import("./documents/RepositoryFolderPage").then((module) => ({ default: module.RepositoryFolderPage })));
 import { useFeedbackCopy } from "./comments/useFeedbackCopy";
 import { useAgentRuns } from "./agent-runs/AgentRunsProvider";
+import { RunningSessionBars } from "./agent-runs/RunningSessionBars";
 import { usePromptRuns } from "./prompt-runs/PromptRunsProvider";
 import {
   type PageComment,
+  type PlaygroundCommentCreateInput,
   type PlaygroundComments,
 } from "./comments/useComments";
 import { useDomAnchors } from "./comments/useDomAnchors";
-import { overlayLabel } from "./comments/dom-anchor";
+import { commentAnchor, describeElement, overlayLabel } from "./comments/dom-anchor";
 import { describeMarkdown, parseMarkdownAnchor } from "./comments/markdown-anchor";
 import { screenshotCaptureSupported } from "./comments/screenshot";
 import {
   fallbackPageSlug,
+  findPage,
   loadPage,
   pageMeta,
   pageTitle,
@@ -82,10 +110,7 @@ import {
   type PageEntry,
 } from "./registry";
 import type { AnnotationVisibility, PlaygroundView } from "./route";
-import {
-  usePlaygroundNavigation,
-  type PageActionState,
-} from "./usePlaygroundNavigation";
+import { ReloadControl } from "./ReloadControl";
 
 const lazyPageCache = new Map<string, LazyExoticComponent<ComponentType>>();
 
@@ -121,6 +146,13 @@ export type PlaygroundShellProps = {
   onCaptureSelection: PlaygroundComments["captureSelection"];
 };
 
+/** With the editor open the left side is Explorer | Source, next to the page; otherwise the Explorer stands alone. */
+const EDITOR_SIDE_ARRANGEMENT: WorkspaceSideArrangements = { left: "columns" };
+const NO_SIDE_ARRANGEMENT: WorkspaceSideArrangements = {};
+
+/** What the Source pane edits: the page itself, or one of its helper modules (path relative to `src/pages`). */
+type EditTarget = { kind: "page" } | { kind: "file"; file: string; line?: number };
+
 function shortAnchorLabel(anchor: string): string {
   const markdown = parseMarkdownAnchor(anchor);
   if (markdown) return describeMarkdown(markdown);
@@ -151,23 +183,53 @@ export function PlaygroundShell({
   onCaptureSelection,
 }: PlaygroundShellProps) {
   const ctx = useCommentContext();
+  const browser = useBrowserSession();
+  const [frameAnchors, setFrameAnchors] = useState<AgentAnchorState[]>([]);
+  const [framePending, setFramePending] = useState(false);
+  // The page frame reports its anchors and pending edits; another page's frame starts from neither.
+  useEffect(() => { setFrameAnchors([]); setFramePending(false); }, [active?.slug]);
   const agentRuns = useAgentRuns();
+  const phone = useMediaQuery("(max-width: 767px)");
   const { openPrompt } = usePromptRuns();
   const [sidebar, setSidebar] = useSidebarState();
   const activity = usePageActivity();
-  const [editing, setEditing] = useState(false);
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const editing = editTarget !== null;
+  // A helper file belongs to the page that imports it; another page closes it.
+  useEffect(() => { setEditTarget((target) => (target?.kind === "file" ? null : target)); }, [active?.slug]);
+  // Design mode writes the same files Monaco edits, so the two never run together.
+  const [designing, setDesigning] = useState(false);
+  useEffect(() => { setDesigning(false); }, [active?.slug]);
   const [pageAction, setPageAction] = useState<PageActionState | null>(null);
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const [commentDraft, setCommentDraft] = useState<{ page: string; anchor: string; element: Element } | null>(null);
+  const activeDraft = commentDraft?.page === active?.slug && view === "preview" && annotations === "visible" ? commentDraft : null;
+  useEffect(() => { setCommentDraft(null); }, [active?.slug, view, annotations]);
   const markdownPage = active?.kind === "markdown";
+  const folderPage = active?.kind === "folder";
+  const repositoryDocument = active?.slug.startsWith("document:") === true;
+  const repositoryNavigation = useRepositoryNavigation({ activeSlug: active?.slug, pageHref });
   // A markdown page is always its own editor, so its source is always loaded.
-  const source = useSource(active?.slug, editing || markdownPage);
+  const editFile = editTarget?.kind === "file" && active?.kind === "component" ? editTarget : undefined;
+  const source = useSource(editFile ? fileSourceTarget(editFile.file) : active?.slug, !folderPage && (editing || markdownPage));
+  const visualEnabled = !browser && LIVE_SERVER && view === "preview" && active?.kind === "component" && !editing && !source.dirty;
+  const visualSelection = useEditableSelection({ page: active?.slug, enabled: visualEnabled });
+  const visualPending = visualSelection.pending || framePending;
+  const styleTarget = visualSelection.selected?.node.kind === "svg" ? visualSelection.selected : null;
   const pageFolders = usePageFolders();
-  const filesystemActionsDisabled = !import.meta.env.DEV || source.dirty || activity.loading || activity.error !== null;
-  const filesystemActionsDisabledReason = !import.meta.env.DEV
-    ? "Page filesystem actions are only available under vite dev"
+  const activityMap = useMemo(() => mergeActivity(activity.feedback, activity.updates), [activity.feedback, activity.updates]);
+  const onQueryChange = useCallback((query: string) => setSidebar({ query }, { replace: true }), [setSidebar]);
+  const sourceBusy = source.dirty || visualPending || framePending;
+  const filesystemActionsDisabled = !LIVE_SERVER || sourceBusy || !activity.updatesReady;
+  const filesystemActionsDisabledReason = !LIVE_SERVER
+    ? "Page filesystem actions require a live playground server"
     : source.dirty
       ? "Save or revert the source before changing pages"
-      : activity.error ?? (activity.loading ? "Loading feedback counts…" : undefined);
+      : visualPending
+        ? "Finish the visual edit before changing pages"
+      : !activity.updatesReady
+        ? activity.updatesError ?? "Loading page update dates…"
+        : undefined;
 
   // The provider's comments are typed without the element context the
   // locators live in; the same page's comments from the API carry it.
@@ -178,12 +240,13 @@ export function PlaygroundShell({
         : [],
     [active, allComments, view, markdownPage],
   );
-  const { pins, overlayPins, orphans, labels } = useDomAnchors(
+  const { pins, overlayPins, orphans, labels: domLabels } = useDomAnchors(
     { scrollRef: ctx.contentRef, contentRef },
-    pageComments,
+    browser ? [] : pageComments,
     ctx.registerAnchor,
   );
-  const unresolvedOrphans = orphans.filter((orphan) => orphan.unresolved).length;
+  const labels = browser ? Object.fromEntries(frameAnchors.map(anchor => [anchor.anchor, anchor.state === "moved" ? `${anchor.label} (moved)` : anchor.state === "orphaned" ? "Unavailable" : anchor.label])) : domLabels;
+  const unresolvedOrphans = browser ? frameAnchors.filter(anchor => anchor.state === "orphaned").length : orphans.filter((orphan) => orphan.unresolved).length;
 
   const pageMove = usePageMoveDrag({
     disabled: filesystemActionsDisabled,
@@ -191,23 +254,33 @@ export function PlaygroundShell({
     onNavigate,
   });
 
-  const navSections = usePlaygroundNavigation({
+  const navigationMenu = useMemo<NavigationMenuDeps>(
+    () => ({
+      actionsDisabled: filesystemActionsDisabled,
+      disabledReason: filesystemActionsDisabledReason,
+      setPageAction,
+      pageFor: findPage,
+      repository: repositoryNavigation.actions,
+    }),
+    [filesystemActionsDisabled, filesystemActionsDisabledReason, repositoryNavigation.actions],
+  );
+  const tree = useNavigationTree({
     activeSlug: active?.slug,
-    feedback: activity.feedback,
-    age: sidebar.age,
-    query: sidebar.query,
-    onQueryChange: (query) => setSidebar({ query }),
-    sort: sidebar.sort,
-    filters: sidebar.filters,
-    updates: activity.updates,
-    loading: commentsLoading || activity.loading,
-    folders: pageFolders.folders,
+    sidebar,
+    onQueryChange,
     pageHref,
-    actionsDisabled: filesystemActionsDisabled,
-    disabledReason: filesystemActionsDisabledReason,
     drag: pageMove.drag,
-    setPageAction,
+    menu: navigationMenu,
   });
+  const { recent, metadataError } = useRecentSection({
+    activeSlug: active?.slug,
+    activity: activityMap,
+    query: sidebar.query,
+    filters: sidebar.filters,
+    pageHref,
+    loading: activity.loading,
+  });
+  const layoutDefaults = useExplorerLayoutDefaults();
 
   // `contentRef` comes from the provider as a read-only RefObject; a callback
   // ref is the only way to attach it without fighting the React 18/19 ref types.
@@ -220,17 +293,13 @@ export function PlaygroundShell({
 
   useReactGrabComments({
     contentRef,
-    enabled: view === "preview" && Boolean(active) && !markdownPage,
+    enabled: !browser && view === "preview" && Boolean(active) && !markdownPage && !folderPage,
     onSelect: ({ anchor, element, screenshot }) => {
-      if (!(element instanceof HTMLElement)) {
-        throw new Error(
-          "React Grab comment selection requires an HTML element",
-        );
-      }
       onPrepareCommentSelection(anchor, element, screenshot);
       ctx.registerAnchor(anchor, null);
       ctx.registerAnchor(anchor, element);
-      ctx.focusAnchor(anchor);
+      if (!active) throw new Error("Comment selection needs an open page");
+      setCommentDraft({ page: active.slug, anchor, element });
     },
     onPrompt: ({ anchor, element }) => {
       if (!active) {
@@ -244,14 +313,35 @@ export function PlaygroundShell({
     },
   });
 
+  const selectVisualTarget = useCallback((target: EditableRoot | null) => {
+    visualSelection.select(target);
+    if (visualEnabled && !visualPending) setDesigning(true);
+  }, [visualSelection.select, visualEnabled, visualPending]);
+  useReactGrabStyle({ contentRef, enabled: !browser, onSelectTarget: selectVisualTarget, onBeforeCssEdit: visualSelection.beginCssEdit });
+  const requestStyleChange = useCallback(async (styleEdit: StoredStyleEdit): Promise<StyleChangeRequest> => {
+    const content = contentRef.current;
+    const element = styleTarget?.node.element;
+    if (!element || !content) throw new Error("Request change needs the styled element mounted on the page");
+    const anchor = commentAnchor(element, content);
+    if (anchor === null) throw new Error(`The styled <${element.localName}> cannot be anchored to a comment`);
+    if (!ctx.callbacks.onCreate) throw new Error("Comment creation is not configured");
+    onPrepareCommentSelection(anchor, element);
+    ctx.registerAnchor(anchor, null);
+    ctx.registerAnchor(anchor, element);
+    const input: PlaygroundCommentCreateInput = { body: styleEditBody(styleEdit), anchor, styleEdit };
+    await ctx.callbacks.onCreate(input);
+    return { onFocusThread: () => ctx.focusAnchor(anchor) };
+  }, [contentRef, ctx, onPrepareCommentSelection, styleTarget]);
+
   const feedback = useFeedbackCopy({ active, comments: ctx.comments, labels });
+  const detailTabs = useCommentDetails({ threadToMarkdown: feedback.threadToMarkdown });
   const { selectItem: selectReviewItem } =
     useResolvedCommentReview({
       allComments,
       activeSlug: active?.slug,
       selectedId: selectedCommentId,
       active: review === "resolved" && !commentsLoading,
-      pinsVersion: pins.length,
+      pinsVersion: browser ? frameAnchors.length : pins.length,
       context: ctx,
       onNavigate: onReviewNavigate,
     });
@@ -266,18 +356,30 @@ export function PlaygroundShell({
     };
   };
 
-  const PageComponent = active?.kind === "component" ? lazyPage(active) : null;
+  const PageComponent = !browser && active?.kind === "component" ? lazyPage(active) : null;
+  // The same element across shell re-renders (polling, pending flags) lets React bail out at the
+  // page boundary, so the artifact re-renders only for its own state and contexts — which also
+  // keeps Design mode's live prop overrides on screen.
+  const pageElement = useMemo(
+    () => PageComponent && (
+      <AnnotationVisibilityProvider value={annotations}>
+        <PageComponent />
+      </AnnotationVisibilityProvider>
+    ),
+    [PageComponent, annotations],
+  );
   const activeTitle = active ? pageTitle(active) : "";
   const activeMeta = active ? pageMeta(active) : undefined;
   const pageGuidance = usePageGuidance(active, activeTitle);
   const railVisible =
-    Boolean(active) && view === "preview" &&
+    Boolean(active) && !folderPage && view === "preview" &&
     // A markdown page shows its own threads; only the resolved-review queue needs the rail there.
     (!markdownPage || review === "resolved") &&
     (annotations === "visible" || review === "resolved") &&
     (review === "resolved" ||
       ctx.railMode !== "closed" ||
       ctx.comments.length > 0);
+  const openCommentCount = ctx.comments.filter(comment => !comment.parentId && ctx.config.statuses.some(status => status.value === comment.status && status.unresolved)).length;
   // Commenting inside a portaled dialog: lift the rail over the modal backdrop
   // so its composer can be clicked without closing the dialog.
   const floatingZIndex = useFloatingZIndex();
@@ -291,11 +393,19 @@ export function PlaygroundShell({
   const unsupportedView = active?.kind === "component" && (view === "source" || view === "problems");
   useEffect(() => {
     if (!unsupportedView) return;
-    setEditing(true);
+    setEditTarget({ kind: "page" });
     onViewChange("preview");
   }, [unsupportedView, onViewChange]);
   const actionPage = pageAction?.page ?? active;
+  const pageActions = active && !repositoryDocument && !folderPage ? (
+    <PageActions
+      disabled={filesystemActionsDisabled}
+      disabledReason={filesystemActionsDisabledReason}
+      onSelect={(action) => setPageAction({ action, page: active })}
+    />
+  ) : undefined;
   const shellActionProps: PlaygroundShellActionsProps = {
+    recent,
     view,
     annotations,
     showRejected,
@@ -310,93 +420,72 @@ export function PlaygroundShell({
       ? { filesystemActionsDisabledReason }
       : {}),
     onNewPage: (action) => setPageAction({ action }),
-    active: Boolean(active),
+    active: Boolean(active) && !folderPage,
     markdownPage,
     editing,
-    sourceDirty: source.dirty,
-    onToggleEditing: () => setEditing((on) => !on),
+    sourceDirty: sourceBusy,
+    onToggleEditing: () => {
+      setDesigning(false);
+      setEditTarget((target) => (target ? null : { kind: "page" }));
+    },
+    ...(visualPending ? { editingDisabledReason: "Finish the visual edit before opening the editor" } : {}),
+    designing,
+    onToggleDesign: () => {
+      setEditTarget(null);
+      setDesigning((on) => !on);
+    },
+    ...(!LIVE_SERVER
+      ? { designDisabledReason: "Design mode writes source through a live playground server" }
+      : source.dirty
+        ? { designDisabledReason: "Save or revert the source before Design mode" }
+        : visualPending
+          ? { designDisabledReason: "Finish the visual edit before leaving Design mode" }
+          : {}),
     reviewActive: review === "resolved",
     reviewCount: Object.values(activity.feedback).reduce((count, page) => count + page.resolvedCount, 0),
     onToggleReview: () => review === "resolved" ? onReviewExit() : onReviewNavigate(active?.slug ?? ""),
-    onCommentWholePage: () => ctx.focusAnchor(DOCUMENT_ANCHOR),
+    onCommentWholePage: () => { setCommentDraft(null); ctx.focusAnchor(DOCUMENT_ANCHOR); },
     feedbackCopied: feedback.copied,
     onCopyFeedback: feedback.copyFeedback,
     feedbackCopyActions: feedback.copyActions,
     pageCommentCount: ctx.comments.length,
+    problemsError: tree.problemsError,
   };
 
-  return (
-    <AppShell
-      brand={
-        <>
-          <span className="grid h-7 w-7 place-items-center rounded-md bg-primary text-sm font-bold text-primary-foreground">
-            P
-          </span>
-          <span className="truncate font-semibold tracking-tight">
-            Clicky UI · Playground
-          </span>
-        </>
-      }
-      sidebarHeader={<PlaygroundSidebarControls activeSlug={active?.slug} activity={activity} state={sidebar} onChange={setSidebar} error={activity.error} />}
-      sidebarWidth={300}
-      actions={
-        <>
-          {activeMeta?.appShellActions}
-          <PlaygroundShellActions {...shellActionProps} />
-        </>
-      }
-      mobileActions={
+  // Below the workspace's stacking width the header keeps only the compact cluster; the rest
+  // moves into the "More actions" row at the top of the page.
+  const headerActions = (
+    <>
+      <div className="hidden flex-wrap items-center justify-end gap-1.5 @3xl/workspace:flex">
+        {activeMeta?.appShellActions}
+        <PlaygroundShellActions {...shellActionProps} />
+        {pageActions}
+      </div>
+      <div className="flex items-center gap-1 @3xl/workspace:hidden">
         <PlaygroundMobileActions
           {...shellActionProps}
           moreOpen={moreActionsOpen}
           onToggleMore={() => setMoreActionsOpen((open) => !open)}
         />
-      }
-      {...(moreActionsOpen
-        ? {
-            toolbar: (
-              <>
-                {activeMeta?.appShellActions}
-                <PlaygroundShellActions {...shellActionProps} overflow />
-              </>
-            ),
-          }
-        : {})}
-      toolbarClassName="@3xl/app-shell:hidden [@media(pointer:coarse)]:[&_button]:min-h-11 [@media(pointer:coarse)]:[&_button]:min-w-11"
-      navSections={[{ items: [{ key: "comments", label: "Comments", icon: UiComment, to: pageHref(""), active: !active }] }, ...navSections]}
-      collapsedStorageKey="playground:sidebar:collapsed"
-      contentClassName="overflow-hidden"
-      contentWidth="full"
-      bodySplit={45}
-      bodySidebar={
-        editorOpen ? (
-          <Suspense
-            fallback={
-              <p className="border-r border-border p-density-3 text-xs text-muted-foreground">
-                Loading editor…
-              </p>
-            }
-          >
-            <SourceEditor
-              slug={active.slug}
-              source={source}
-              onClose={() => setEditing(false)}
-            />
-          </Suspense>
-        ) : undefined
-      }
-      bodyHeader={active ? <PlaygroundBodyHeader active={active} /> : undefined}
-      bodyActions={
-        active ? (
-          <PageActions
-            disabled={filesystemActionsDisabled}
-            disabledReason={filesystemActionsDisabledReason}
-            onSelect={(action) => setPageAction({ action, page: active })}
-          />
-        ) : undefined
-      }
+      </div>
+    </>
+  );
+  const moreActionsRow = moreActionsOpen && (
+    <div
+      data-playground-more-actions=""
+      className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border bg-muted/30 p-density-2 @3xl/workspace:hidden [@media(pointer:coarse)]:[&_button]:min-h-11 [@media(pointer:coarse)]:[&_button]:min-w-11"
     >
-      {!active ? <CommentDashboard comments={allComments} loading={commentsLoading} error={commentsError} pageHref={pageHref} /> : <div className="flex h-full min-h-0 flex-col md:flex-row">
+      {activeMeta?.appShellActions}
+      <PlaygroundShellActions {...shellActionProps} overflow />
+      {pageActions}
+    </div>
+  );
+  const pageContent = (
+    <div className="flex h-full min-h-0 flex-col">
+      {moreActionsRow}
+      {!active ? <div className="min-h-0 flex-1 overflow-auto"><CommentDashboard comments={allComments} loading={commentsLoading} error={commentsError} pageHref={pageHref} /></div> : <div className="flex min-h-0 flex-1 flex-col">
+        <RunningSessionBars key={active.slug} page={active.slug} />
+        <div className="flex min-h-0 flex-1">
         <div
           ref={attachScrollRef}
           className="relative min-w-0 flex-1 overflow-auto"
@@ -404,13 +493,13 @@ export function PlaygroundShell({
           <ReviewProvider
             page={active?.slug ?? ""}
             active={
-              view === "preview" && annotations === "visible" && Boolean(active) && !markdownPage
+              view === "preview" && annotations === "visible" && Boolean(active) && !markdownPage && !folderPage
             }
-            sourceDirty={source.dirty}
+            sourceDirty={sourceBusy}
             contentRef={contentRef}
             scrollRef={ctx.contentRef}
           >
-            <div ref={contentRef} data-review-content data-show-rejected={showRejected} className={cn("min-w-0 p-density-4", markdownPage && "h-full")}>
+            <div ref={contentRef} data-review-content data-show-rejected={showRejected} className={cn("min-w-0", browser ? "h-full" : "p-density-4", (markdownPage || folderPage) && "h-full")}>
               {pageFolders.error && (
                 <Banner tone="danger">{pageFolders.error}</Banner>
               )}
@@ -441,7 +530,13 @@ export function PlaygroundShell({
                 </Banner>
               )}
               <PageErrorBoundary page={active.slug}>
-              {active.kind === "markdown" ? (
+              {browser && active.kind !== "folder" && !repositoryDocument && view === "preview" ? (
+                <BrowserPage key={active.slug} slug={active.slug} sourceDirty={source.dirty} designing={designing} annotations={annotations} showRejected={showRejected} comments={pageComments} onAnchors={setFrameAnchors} onPending={setFramePending} onOpenSource={({ file, line }) => { setDesigning(false); setEditTarget({ kind: "file", file, line }); }} />
+              ) : active.kind === "folder" ? (
+                <Suspense fallback={<p role="status">Loading folder problems…</p>}>
+                  <RepositoryFolderPage key={active.slug} id={active.slug} onNavigate={onNavigate} />
+                </Suspense>
+              ) : active.kind === "markdown" ? (
                 view === "markdown" ? (
                   <Banner tone="danger">
                     view=markdown is the guidance export of a .tsx page; a
@@ -454,7 +549,10 @@ export function PlaygroundShell({
                       <p className="text-sm text-muted-foreground">Loading…</p>
                     }
                   >
-                    <MarkdownDocumentPage
+                    {repositoryDocument ? <RepositoryDocumentPage slug={active.slug} view={view} onViewChange={onViewChange} source={source} annotations={annotations} onLint={(file, promptId) => {
+                      if (!contentRef.current) throw new Error("AI review needs the document mounted");
+                      openPrompt({ page: active.slug, anchor: DOCUMENT_ANCHOR, element: onCaptureSelection(DOCUMENT_ANCHOR, contentRef.current), files: [file], ...(promptId ? { promptId } : {}) });
+                    }} /> : <MarkdownDocumentPage
                       slug={active.slug}
                       view={view}
                       onViewChange={onViewChange}
@@ -471,7 +569,7 @@ export function PlaygroundShell({
                           files: [file],
                         });
                       }}
-                    />
+                    />}
                   </Suspense>
                 )
               ) : unsupportedView ? (
@@ -481,15 +579,13 @@ export function PlaygroundShell({
                   markdown={pageGuidance.markdown}
                   error={pageGuidance.loadError}
                 />
-              ) : PageComponent ? (
+              ) : pageElement ? (
                 <Suspense
                   fallback={
                     <p className="text-sm text-muted-foreground">Loading…</p>
                   }
                 >
-                  <AnnotationVisibilityProvider value={annotations}>
-                    <PageComponent />
-                  </AnnotationVisibilityProvider>
+                  {pageElement}
                 </Suspense>
               ) : (
                 null
@@ -497,7 +593,44 @@ export function PlaygroundShell({
               </PageErrorBoundary>
             </div>
 
-            {view === "preview" && annotations === "visible" && (
+            {!designing && visualSelection.notice && <div role="status" className="p-2 text-sm">{visualSelection.notice}</div>}
+            {designing && visualEnabled && active.kind === "component" && (
+              <Suspense fallback={null}>
+                <VisualEditOverlay
+                  root={contentRef.current}
+                  page={active.slug}
+                  onPendingChange={visualSelection.onFacetPendingChange}
+                  selected={visualSelection.selected?.node.element ?? null}
+                  pending={visualPending}
+                  selectionNotice={visualSelection.notice}
+                  onSelect={selectVisualTarget}
+                  onOpenSource={({ file, line }) => {
+                    setDesigning(false);
+                    visualSelection.close();
+                    setEditTarget({ kind: "file", file, line });
+                  }}
+                />
+              </Suspense>
+            )}
+            {visualEnabled && styleTarget?.node.element.isConnected && active.kind === "component" && contentRef.current && (
+              <Suspense fallback={null}>
+                <SvgStylePanel
+                  key={styleTarget.key}
+                  element={styleTarget.node.element}
+                  root={contentRef.current}
+                  page={active.slug}
+                  requestStyleChange={requestStyleChange}
+                  onPendingChange={visualSelection.onSvgPendingChange}
+                  onClose={visualSelection.close}
+                  onOpenSource={({ file, line }) => {
+                    visualSelection.close();
+                    setDesigning(false);
+                    setEditTarget({ kind: "file", file, line });
+                  }}
+                />
+              </Suspense>
+            )}
+            {!browser && view === "preview" && annotations === "visible" && (
               <>
                 <CommentOverlay
                   pins={pins}
@@ -519,14 +652,20 @@ export function PlaygroundShell({
         </div>
 
         {railVisible && (
-          <div
-            data-comment-rail
-            // Stacked under the artifact on a phone: tall enough for a focused
-            // thread and its composer, with room under it for the fixed
-            // react-grab toolbar so it never covers the rail's controls.
-            className="relative max-h-[max(15rem,45dvh)] shrink-0 overflow-y-auto border-t border-border bg-background p-density-3 pb-16 md:max-h-none md:border-l md:border-t-0 md:pb-density-3"
+          <CommentRail
+            stacked={phone}
+            open={review === "resolved" || ctx.railMode !== "closed"}
+            onOpenChange={(open) => {
+              if (open) ctx.openCommentList();
+              else {
+                ctx.closeRail();
+                if (review === "resolved") onReviewExit();
+              }
+            }}
+            launcherLabel={`Open comments (${openCommentCount})`}
             {...(railOverDialog ? { style: { zIndex: floatingZIndex } } : {})}
           >
+            <div className="p-density-3">
             {review === "resolved" && (commentsLoading || commentsError) ? <p role="status">{commentsError ?? "Loading resolved feedback…"}</p> : review === "resolved" ? (
               <PlaygroundCommentReview
                 allComments={allComments}
@@ -559,8 +698,11 @@ export function PlaygroundShell({
               />
             ) : (
               <CommentSidePanel
-                className="w-full md:w-[320px]"
-                focusedAlignment="anchor"
+                hideComposer={Boolean(activeDraft)}
+                className="w-full"
+                previewLines={3}
+                detailTabs={detailTabs}
+                focusedAlignment={phone ? "flow" : "anchor"}
                 anchorLabels={labels}
                 formatAnchorLabel={shortAnchorLabel}
                 compact
@@ -572,17 +714,100 @@ export function PlaygroundShell({
                 ]}
                 threadToMarkdown={feedback.threadToMarkdown}
                 extraAssignItems={agentRuns.extraAssignItems}
-                renderRootDetails={(comment) => (
-                  <>
-                    <CommentCapture comment={comment} />
-                    {agentRuns.renderRunDetails(comment)}
-                  </>
-                )}
+                renderRootDetails={agentRuns.renderRunDetails}
               />
             )}
-          </div>
+            </div>
+          </CommentRail>
         )}
+        </div>
       </div>}
+      {activeDraft && <CommentDraftPopover
+        key={activeDraft.anchor}
+        reference={activeDraft.element}
+        anchor={activeDraft.anchor}
+        label={labels[activeDraft.anchor] ?? describeElement(activeDraft.element)}
+        config={ctx.config}
+        {...(ctx.callbacks.onMention ? { onMention: ctx.callbacks.onMention } : {})}
+        onDiscard={() => setCommentDraft(null)}
+        createActions={[{ id: "plain", label: "Post comment" }, ...(screenshotCaptureSupported() ? [{ id: "screenshot", label: "Post with screenshot" }] : [])]}
+        onCreate={async (input, action) => {
+          if (!ctx.callbacks.onCreate) throw new Error("Comment creation is not configured");
+          await ctx.callbacks.onCreate(input, action);
+          setCommentDraft(current => current === activeDraft ? null : current);
+          ctx.focusAnchor(activeDraft.anchor);
+        }}
+      />}
+    </div>
+  );
+
+  const panes: WorkspacePaneSpec[] = [
+    explorerPane({
+      title: "Clicky UI · Playground",
+      header: (
+        <>
+          {repositoryNavigation.controls}
+          <PlaygroundSidebarControls state={sidebar} onChange={setSidebar} olderCount={tree.olderCount} commentsError={activity.commentsError} updatesError={activity.updatesError} />
+          {metadataError && <p role="alert" className="py-density-1 text-xs text-destructive">{metadataError}</p>}
+        </>
+      ),
+      error: tree.error,
+      section: tree.section,
+      commentsHref: pageHref(""),
+      commentsActive: !active,
+    }),
+    {
+      id: "page",
+      label: active ? <PlaygroundBodyHeader active={active} /> : "Comments",
+      location: "center",
+      collapsible: false,
+      slots: { headerTrailing: headerActions },
+      contentClassName: "overflow-hidden",
+      content: pageContent,
+    },
+    ...(editorOpen
+      ? [
+          {
+            id: "editor",
+            label: "Source",
+            location: "left" as const,
+            width: 560,
+            minWidth: 320,
+            maxWidth: 1400,
+            contentClassName: "overflow-hidden",
+            content: (
+              <Suspense
+                fallback={
+                  <p className="p-density-3 text-xs text-muted-foreground">
+                    Loading editor…
+                  </p>
+                }
+              >
+                <SourceEditor
+                  file={editFile ? `src/pages/${editFile.file}` : `src/pages/${active.slug}.tsx`}
+                  source={source}
+                  revealLine={editFile?.line}
+                  onClose={() => setEditTarget(null)}
+                />
+              </Suspense>
+            ),
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <ReloadControl sourceDirty={sourceBusy}>{() => <>
+      <VocabularyGenerationHost />
+      <VocabularyAnchorTarget page={active?.slug} contentRef={contentRef} />
+      <Workspace
+        className="h-dvh"
+        panes={panes}
+        storageKey={WORKSPACE_STORAGE_KEY}
+        defaultValue={layoutDefaults}
+        sideArrangement={editorOpen ? EDITOR_SIDE_ARRANGEMENT : NO_SIDE_ARRANGEMENT}
+      />
+      {repositoryNavigation.dialogs}
       <PageManagementDialogs
         action={pageAction?.action ?? null}
         active={actionPage}
@@ -608,6 +833,6 @@ export function PlaygroundShell({
           return gone ? fallbackPageSlug(pages(), activeSlug) : activeSlug;
         }}
       />
-    </AppShell>
+    </>}</ReloadControl>
   );
 }

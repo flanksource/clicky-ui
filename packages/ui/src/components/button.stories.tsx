@@ -23,7 +23,7 @@ const meta = {
     size: {
       description: "Button size preset. `icon` creates a square icon-only button.",
       control: "select",
-      options: ["default", "sm", "lg", "icon"],
+      options: ["default", "xs", "sm", "lg", "icon"],
     },
     disabled: { description: "Disable pointer and keyboard activation.", control: "boolean" },
     loading: {
@@ -55,6 +55,9 @@ export const Link: Story = { args: { variant: "link" } };
 export const Sizes: Story = {
   render: (args) => (
     <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+      <Button {...args} size="xs">
+        Compact
+      </Button>
       <Button {...args} size="sm">
         Small
       </Button>

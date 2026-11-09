@@ -1,13 +1,11 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from "node:fs";
-import { join } from "node:path";
 import type { Violation } from "../../../packages/ui/src/data/lint/types";
+import { commentVocabularyItems } from "./vocabulary-registry";
+import {
+  vocabularyReferences,
+  type CommentVocabularyItem,
+} from "../../../packages/ui/src/comments/comment-vocabulary";
 import { externalUrl } from "../src/bookmarklet/model";
+import { parseEditableSource } from "./editable-source-marker";
 
 import {
   COMMENT_ELEMENT_HTML_LIMIT,
@@ -17,10 +15,17 @@ import {
   type CommentElementContext,
   type CommentLocator,
 } from "./comments-model";
-import {
-  assertStoredScreenshot,
-  stageScreenshotRemoval,
-} from "./comments-screenshots";
+import { assertStoredScreenshot } from "./comments-screenshots";
+import { commentsClient, type CodeRangeSelector } from "./comments-client";
+export {
+  readAll,
+  readPage,
+  writeAll,
+  lookupComment as findComment,
+  addReply,
+  patchComment,
+  removeComment,
+} from "./comments-client";
 import {
   COMMENT_STATUSES,
   RESOLVED_STATUS,
@@ -37,13 +42,15 @@ export const REVIEW_DECISIONS = [
 export type ReviewDecision = (typeof REVIEW_DECISIONS)[number];
 
 /**
- * On-disk shape for playground feedback. Deliberately structural rather than an
+ * Playground API projection of feedback. Deliberately structural rather than an
  * import of the library's `Comment` type: this module is loaded by Vite's config
  * bundler, where the `@flanksource/clicky-ui` source aliases do not apply.
  */
 export type StoredAuthor = {
   id?: string;
   name: string;
+  model?: string;
+  effort?: string;
   kind?: "user" | "agent";
   /** The agent that posted on `name`'s behalf, when another agent wrote the text. */
   via?: string;
@@ -87,8 +94,35 @@ export type StoredPromptRun = {
   variables?: Record<string, unknown>;
 };
 
+/** One attribute a visual style edit wanted to set; `from` is null when the element did not carry it. */
+export type StoredStyleChange = {
+  attribute: string;
+  from: string | number | null;
+  to: string | number | null;
+};
+
+/**
+ * A visual edit Design mode could not write back (its value is computed in
+ * code, spread, ...), asked of an agent instead. `marker` is the element's
+ * `data-editable-source`; the refusal is the visual-edits server's 422.
+ */
+export type StoredStyleEdit = {
+  marker: string;
+  tag: string;
+  changes: StoredStyleChange[];
+  refusal: {
+    reason: string;
+    file: string;
+    line: number;
+    column: number;
+    message: string;
+  };
+};
+
 export type StoredComment = {
   id: string;
+  version?: number;
+  rootId?: string;
   body: string;
   createdAt: string;
   updatedAt?: string;
@@ -108,10 +142,13 @@ export type StoredComment = {
   agentRun?: StoredAgentRun;
   element?: CommentElementContext;
   checklist?: StoredChecklistItem[];
+  vocabularyRefs?: CommentVocabularyItem[];
   refs?: StoredRefGroup[];
   promptRun?: StoredPromptRun;
   /** The lint findings a prompt run reported, kept verbatim. */
   lint?: { violations: Violation[] };
+  /** The refused visual style edit this comment asks an agent to make. */
+  styleEdit?: StoredStyleEdit;
 };
 
 /** Page slug → the comments left on that page. */
@@ -134,51 +171,6 @@ export type CommentPatch = {
 };
 
 export { COMMENT_STATUSES, RESOLVED_STATUS, UNRESOLVED_STATUSES };
-
-export const COMMENTS_FILENAME = "comments.json";
-
-export function commentsPath(dir: string): string {
-  return join(dir, COMMENTS_FILENAME);
-}
-
-export function readAll(dir: string): CommentsFile {
-  const file = commentsPath(dir);
-  if (!existsSync(file)) return {};
-
-  const raw = readFileSync(file, "utf8");
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (error) {
-    throw new Error(
-      `${file} is not valid JSON — fix or delete it (${(error as Error).message})`,
-    );
-  }
-
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`${file} must contain a JSON object keyed by page slug`);
-  }
-  for (const [page, list] of Object.entries(parsed)) {
-    if (!Array.isArray(list)) {
-      throw new Error(
-        `${file}: page "${page}" must map to an array of comments`,
-      );
-    }
-  }
-  return parsed as CommentsFile;
-}
-
-export function readPage(dir: string, page: string): StoredComment[] {
-  return readAll(dir)[page] ?? [];
-}
-
-export function writeAll(dir: string, data: CommentsFile): void {
-  mkdirSync(dir, { recursive: true });
-  const file = commentsPath(dir);
-  const tmp = `${file}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, "utf8");
-  renameSync(tmp, file);
-}
 
 export function assertPage(page: unknown): string {
   if (typeof page !== "string" || page === "") {
@@ -292,7 +284,10 @@ const LOCATOR_FIELDS: Record<CommentLocator["kind"], readonly string[]> = {
   text: ["tag", "text"],
   markdown: ["tag", "text"],
 };
-const OPTIONAL_LOCATOR_FIELDS: Record<CommentLocator["kind"], readonly string[]> = {
+const OPTIONAL_LOCATOR_FIELDS: Record<
+  CommentLocator["kind"],
+  readonly string[]
+> = {
   css: [],
   role: [],
   text: ["heading", "scope"],
@@ -317,42 +312,70 @@ function assertLocators(input: unknown): void {
     throw new Error("comment element locators must be a non-empty array");
   }
   for (const locator of input) {
-    if (locator === null || typeof locator !== "object" || Array.isArray(locator)) {
+    if (
+      locator === null ||
+      typeof locator !== "object" ||
+      Array.isArray(locator)
+    ) {
       throw new Error("comment element locator must be an object");
     }
     const entry = locator as Record<string, unknown>;
     const kind = entry["kind"];
     if (typeof kind !== "string" || !Object.hasOwn(LOCATOR_FIELDS, kind)) {
-      throw new Error(`comment element locator has unknown kind ${JSON.stringify(kind)}`);
+      throw new Error(
+        `comment element locator has unknown kind ${JSON.stringify(kind)}`,
+      );
     }
     const required = LOCATOR_FIELDS[kind as CommentLocator["kind"]];
     const optional = OPTIONAL_LOCATOR_FIELDS[kind as CommentLocator["kind"]];
     const unexpected = Object.keys(entry).find(
-      (key) => key !== "kind" && !required.includes(key) && !optional.includes(key),
+      (key) =>
+        key !== "kind" && !required.includes(key) && !optional.includes(key),
     );
     if (unexpected) {
-      throw new Error(`comment element ${kind} locator has unexpected field ${JSON.stringify(unexpected)}`);
+      throw new Error(
+        `comment element ${kind} locator has unexpected field ${JSON.stringify(unexpected)}`,
+      );
     }
-    for (const field of required) assertLocatorText(entry[field], `${kind}.${field}`);
+    for (const field of required)
+      assertLocatorText(entry[field], `${kind}.${field}`);
     if (kind === "markdown") {
       const { path, line } = entry;
       if (!Array.isArray(path)) {
-        throw new Error("comment element markdown locator path must be an array of heading texts");
+        throw new Error(
+          "comment element markdown locator path must be an array of heading texts",
+        );
       }
-      path.forEach((heading, index) => assertLocatorText(heading, `markdown.path[${index}]`));
-      if (line !== undefined && !(Number.isInteger(line) && (line as number) > 0)) {
-        throw new Error("comment element markdown locator line must be a positive integer");
+      path.forEach((heading, index) =>
+        assertLocatorText(heading, `markdown.path[${index}]`),
+      );
+      if (
+        line !== undefined &&
+        !(Number.isInteger(line) && (line as number) > 0)
+      ) {
+        throw new Error(
+          "comment element markdown locator line must be a positive integer",
+        );
       }
     }
-    if (entry["scope"] !== undefined) assertLocatorText(entry["scope"], "text.scope");
+    if (entry["scope"] !== undefined)
+      assertLocatorText(entry["scope"], "text.scope");
     if (entry["heading"] !== undefined) {
       const heading = entry["heading"];
-      if (heading === null || typeof heading !== "object" || Array.isArray(heading)) {
+      if (
+        heading === null ||
+        typeof heading !== "object" ||
+        Array.isArray(heading)
+      ) {
         throw new Error("comment element locator heading must be an object");
       }
       const fields = heading as Record<string, unknown>;
-      if (Object.keys(fields).some((key) => key !== "selector" && key !== "text")) {
-        throw new Error("comment element locator heading has unexpected fields");
+      if (
+        Object.keys(fields).some((key) => key !== "selector" && key !== "text")
+      ) {
+        throw new Error(
+          "comment element locator heading has unexpected fields",
+        );
       }
       assertLocatorText(fields["selector"], "heading.selector");
       assertLocatorText(fields["text"], "heading.text");
@@ -361,12 +384,90 @@ function assertLocators(input: unknown): void {
 }
 
 function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
 }
 
-/** Checklist, refs, prompt provenance and lint findings: only prompt runs write them. */
+function assertExactKeys(
+  value: unknown,
+  keys: readonly string[],
+  what: string,
+): Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${what} must be an object`);
+  }
+  const record = value as Record<string, unknown>;
+  const unexpected = Object.keys(record).find((key) => !keys.includes(key));
+  if (unexpected !== undefined) {
+    throw new Error(`${what} has unexpected field ${JSON.stringify(unexpected)}`);
+  }
+  const missing = keys.find((key) => !(key in record));
+  if (missing !== undefined) throw new Error(`${what} requires "${missing}"`);
+  return record;
+}
+
+const STYLE_EDIT_NAME = /^[A-Za-z][A-Za-z0-9.-]*$/;
+const STYLE_EDIT_TEXT_LIMIT = 4000;
+
+function assertStyleText(value: unknown, what: string): string {
+  if (typeof value !== "string" || value === "" || value.length > STYLE_EDIT_TEXT_LIMIT) {
+    throw new Error(`${what} must be a non-empty string of at most ${STYLE_EDIT_TEXT_LIMIT} characters`);
+  }
+  return value;
+}
+
+function assertStyleScalar(value: unknown, what: string): string | number {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error(`${what} must be a finite number`);
+    return value;
+  }
+  return assertStyleText(value, what);
+}
+
+function assertPosition(value: unknown, what: string): number {
+  if (!Number.isInteger(value) || (value as number) < 1) {
+    throw new Error(`${what} must be a positive integer`);
+  }
+  return value as number;
+}
+
+/** Strict validation of a `styleEdit`; the marker must parse as a `data-editable-source`. */
+export function assertStyleEdit(input: unknown): StoredStyleEdit {
+  const edit = assertExactKeys(input, ["marker", "tag", "changes", "refusal"], "styleEdit");
+  const marker = assertStyleText(edit["marker"], "styleEdit.marker");
+  parseEditableSource(marker);
+  const tag = assertStyleText(edit["tag"], "styleEdit.tag");
+  if (!STYLE_EDIT_NAME.test(tag)) throw new Error(`styleEdit.tag ${JSON.stringify(tag)} is not an element name`);
+  const changes = edit["changes"];
+  if (!Array.isArray(changes) || changes.length === 0) {
+    throw new Error("styleEdit.changes must be a non-empty array of {attribute, from, to}");
+  }
+  changes.forEach((entry, index) => {
+    const change = assertExactKeys(entry, ["attribute", "from", "to"], `styleEdit.changes[${index}]`);
+    const attribute = assertStyleText(change["attribute"], `styleEdit.changes[${index}].attribute`);
+    if (!STYLE_EDIT_NAME.test(attribute)) {
+      throw new Error(`styleEdit.changes[${index}].attribute ${JSON.stringify(attribute)} is not an attribute name`);
+    }
+    for (const key of ["from", "to"]) {
+      const value = change[key];
+      if (value === null || (value === "" && (attribute === "children" || attribute === "className"))) continue;
+      assertStyleScalar(value, `styleEdit.changes[${index}].${key}`);
+    }
+  });
+  const refusal = assertExactKeys(edit["refusal"], ["reason", "file", "line", "column", "message"], "styleEdit.refusal");
+  assertStyleText(refusal["reason"], "styleEdit.refusal.reason");
+  assertStyleText(refusal["file"], "styleEdit.refusal.file");
+  assertPosition(refusal["line"], "styleEdit.refusal.line");
+  assertPosition(refusal["column"], "styleEdit.refusal.column");
+  assertStyleText(refusal["message"], "styleEdit.refusal.message");
+  return input as StoredStyleEdit;
+}
+
+/** Checklist, refs, prompt provenance and lint findings (only prompt runs write them), and the style edit a user asked for. */
 function assertStructuredFields(candidate: Record<string, unknown>): void {
-  const { checklist, refs, promptRun, lint } = candidate;
+  const { checklist, refs, promptRun, lint, styleEdit } = candidate;
+  if (styleEdit !== undefined) assertStyleEdit(styleEdit);
   if (
     checklist !== undefined &&
     !(
@@ -400,7 +501,8 @@ function assertStructuredFields(candidate: Record<string, unknown>): void {
       typeof run.promptName !== "string" ||
       typeof run.runId !== "string" ||
       (run.sessionId !== undefined && typeof run.sessionId !== "string") ||
-      (run.variables !== undefined && (run.variables === null || typeof run.variables !== "object"))
+      (run.variables !== undefined &&
+        (run.variables === null || typeof run.variables !== "object"))
     ) {
       throw new Error(
         "promptRun must be {promptId, promptName, runId, sessionId?, variables}",
@@ -458,7 +560,8 @@ export function assertComment(input: unknown): StoredComment {
         (typeof run.target !== "object" ||
           run.target === null ||
           typeof run.target.label !== "string" ||
-          (run.target.channel !== undefined && typeof run.target.channel !== "string")))
+          (run.target.channel !== undefined &&
+            typeof run.target.channel !== "string")))
     ) {
       throw new Error(
         `agentRun must be {sessionId?, requestedAt, state: ${AGENT_RUN_STATES.join("|")}, target?: {label, channel?}}`,
@@ -485,176 +588,21 @@ export function assertComment(input: unknown): StoredComment {
   return input as StoredComment;
 }
 
-/**
- * Reads a listing request off the query string. Pure and exported so the query
- * vocabulary an agent has to get right is unit-tested, leaving the middleware a
- * thin HTTP shell.
- */
-/** Ids are UUIDs, so a comment is addressable without knowing its page. */
-export function findComment(
-  dir: string,
-  id: string,
-): { page: string; comment: StoredComment } | undefined {
-  for (const [page, list] of Object.entries(readAll(dir))) {
-    const comment = list.find((entry) => entry.id === id);
-    if (comment) return { page, comment };
-  }
-  return undefined;
-}
-
-function requireComment(
-  dir: string,
-  id: string,
-): { page: string; comment: StoredComment } {
-  const found = findComment(dir, id);
-  if (!found) throw new Error(`comment "${id}" not found`);
-  return found;
-}
-
-/** Walks up to the thread root so replies never nest more than one level. */
-function rootOf(
-  dir: string,
-  id: string,
-): { page: string; comment: StoredComment } {
-  const found = requireComment(dir, id);
-  const list = readPage(dir, found.page);
-
-  let current = found.comment;
-  const seen = new Set([current.id]);
-  while (current.parentId) {
-    const parent = list.find((entry) => entry.id === current.parentId);
-    if (!parent || seen.has(parent.id)) break;
-    seen.add(parent.id);
-    current = parent;
-  }
-  return { page: found.page, comment: current };
-}
-
-export function addComment(
+export async function addComment(
   dir: string,
   page: string,
   comment: StoredComment,
-): StoredComment {
+  selector?: CodeRangeSelector,
+): Promise<StoredComment> {
   assertPage(page);
-  assertComment(comment);
-
-  const data = readAll(dir);
-  const list = data[page] ?? [];
-  if (list.some((entry) => entry.id === comment.id)) {
-    throw new Error(
-      `comment id "${comment.id}" already exists on page "${page}"`,
-    );
-  }
-  data[page] = [...list, comment];
-  writeAll(dir, data);
-  return comment;
-}
-
-/**
- * Attaches a reply to `parentId`'s thread root, inheriting the root's page and
- * anchor — a caller only has to know the id it is answering.
- */
-export function addReply(
-  dir: string,
-  parentId: string,
-  reply: StoredComment,
-): StoredComment {
-  const root = rootOf(dir, parentId);
-  const { element: _rootOnly, ...replyFields } = reply;
-  return addComment(dir, root.page, {
-    ...replyFields,
-    parentId: root.comment.id,
-    anchor: root.comment.anchor ?? null,
-  });
-}
-
-export function patchComment(
-  dir: string,
-  id: string,
-  patch: CommentPatch,
-): StoredComment {
-  if (patch.status !== undefined) assertStatus(patch.status);
-  if (patch.rating !== undefined) assertRating(patch.rating);
-
-  const { page } = requireComment(dir, id);
-  const data = readAll(dir);
-  const list = data[page] ?? [];
-
-  const next = list.map((entry) => {
-    if (entry.id !== id) return entry;
-    const updated: StoredComment = {
-      ...entry,
-      ...(patch.body !== undefined ? { body: patch.body } : {}),
-      ...(patch.status !== undefined ? { status: patch.status } : {}),
-      ...(patch.rating !== undefined ? { rating: patch.rating } : {}),
-      ...(patch.updatedAt !== undefined ? { updatedAt: patch.updatedAt } : {}),
-      ...(typeof patch.closedAt === "string"
-        ? { closedAt: patch.closedAt }
-        : {}),
-      ...(patch.closedBy ? { closedBy: patch.closedBy } : {}),
-      ...(patch.assignee ? { assignee: patch.assignee } : {}),
-      ...(typeof patch.acknowledgedAt === "string"
-        ? { acknowledgedAt: patch.acknowledgedAt }
-        : {}),
-      ...(patch.acknowledgedBy
-        ? { acknowledgedBy: patch.acknowledgedBy }
-        : {}),
-      ...(patch.agentRun ? { agentRun: patch.agentRun } : {}),
-    };
-    if (patch.agentRun === null) delete updated.agentRun;
-    if (patch.closedAt === null) delete updated.closedAt;
-    if (patch.closedBy === null) delete updated.closedBy;
-    if (patch.assignee === null) delete updated.assignee;
-    if (patch.acknowledgedAt === null) delete updated.acknowledgedAt;
-    if (patch.acknowledgedBy === null) delete updated.acknowledgedBy;
-    return updated;
-  });
-  data[page] = next;
-  writeAll(dir, data);
-  return next.find((entry) => entry.id === id) as StoredComment;
-}
-
-/** Removes a comment and, when it is a thread root, every reply beneath it. */
-export function removeComment(dir: string, id: string): number {
-  const { page } = requireComment(dir, id);
-  const data = readAll(dir);
-  const list = data[page] ?? [];
-
-  const doomed = new Set([id]);
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const entry of list) {
-      if (
-        entry.parentId &&
-        doomed.has(entry.parentId) &&
-        !doomed.has(entry.id)
-      ) {
-        doomed.add(entry.id);
-        grew = true;
-      }
-    }
-  }
-
-  const removed = list.filter((entry) => doomed.has(entry.id));
-  const screenshotRemoval = stageScreenshotRemoval(dir, removed);
-  data[page] = list.filter((entry) => !doomed.has(entry.id));
-  try {
-    writeAll(dir, data);
-    screenshotRemoval.commit();
-  } catch (cause) {
-    try {
-      screenshotRemoval.rollback();
-      data[page] = list;
-      writeAll(dir, data);
-    } catch (rollbackCause) {
-      throw new Error(
-        `comment deletion failed (${String(cause)}) and rollback failed (${String(rollbackCause)})`,
-      );
-    }
-    throw new Error(
-      `comment deletion failed and was rolled back: ${String(cause)}`,
-    );
-  }
-  return doomed.size;
+  const { vocabularyRefs: _untrusted, ...fields } = comment;
+  const vocabularyRefs = vocabularyReferences(
+    comment.body,
+    commentVocabularyItems(dir),
+  );
+  const validated = vocabularyRefs.length
+    ? { ...fields, vocabularyRefs }
+    : fields;
+  assertComment(validated);
+  return commentsClient(dir).add(page, validated, selector);
 }

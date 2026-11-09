@@ -1,4 +1,4 @@
-import { ConnectionLoggingPolicy } from "../components/ConnectionLoggingPolicy";
+import { ConnectionLoggingSummary } from "./ConnectionLoggingSummary";
 import type { FieldControl } from "../components/json-schema-form-types";
 import type { PostExtensionContext } from "../components/json-schema-form-runtime-types";
 import { isPlainObject } from "../lib/collections";
@@ -28,7 +28,7 @@ export function ConnectionLoggingField({
     : {};
 
   return (
-    <ConnectionLoggingPolicy
+    <ConnectionLoggingSummary
       definition={connectionLoggingCapability(field)}
       value={properties}
       readOnly={field.readOnly ?? false}

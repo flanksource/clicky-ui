@@ -215,12 +215,12 @@ export function MultiGaugeJvmTable() {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
         <span>GC time:</span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-sm bg-[var(--fs-success-500)]" />
+          <span className="h-2 w-2 rounded-sm bg-[var(--clicky-success-500)]" />
           Avg
         </span>
         {[
-          { label: "P90", color: "fill-[var(--fs-warning)]" },
-          { label: "P95", color: "fill-[var(--fs-error)]" },
+          { label: "P90", color: "fill-[var(--clicky-warning)]" },
+          { label: "P95", color: "fill-[var(--clicky-error)]" },
           { label: "Max", color: "fill-muted-foreground" },
         ].map(({ label, color }) => (
           <span key={label} className="inline-flex items-center gap-1.5">

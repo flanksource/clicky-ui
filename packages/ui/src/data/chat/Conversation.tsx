@@ -1,7 +1,8 @@
+import { ActionError } from "../diagnostics/ActionError";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import { Icon } from "../Icon";
-import { UiArrowDown, UiCheck, UiCircleX, UiCopy, UiLoader } from "../../icons";
+import { UiArrowDown, UiLoader } from "../../icons";
 import { Message, type MessageActionHandlers } from "./Message";
 import type { ChatStatus, UIMessage } from "./types";
 
@@ -84,17 +85,19 @@ export function Conversation({
               <Message key={message.id} message={message} {...actions} />
             ))}
             {isWaiting && <LoadingIndicator />}
-            {errorText && (
-              <ErrorNotice
-                message={errorText}
-                error={error}
-                sessionId={sessionId}
-                model={model}
-                onClear={onClearError}
-              />
-            )}
+
           </div>
         )}
+
+        {errorText && <ActionError
+          error={error ?? errorText}
+          context={[
+            ...(sessionId ? [["Session", sessionId] as [string, string]] : []),
+            ...(model ? [["Model", model] as [string, string]] : []),
+          ]}
+          actions={onClearError && <button type="button" onClick={onClearError}>Dismiss</button>}
+          className="m-4"
+        />}
       </div>
 
       {!pinned && messages.length > 0 && (
@@ -126,71 +129,6 @@ function LoadingIndicator() {
     <div className="flex w-full max-w-[95%] items-center gap-2 text-sm text-muted-foreground">
       <Icon icon={UiLoader} className="size-4 shrink-0 animate-spin" />
       <span>Waiting for response...</span>
-    </div>
-  );
-}
-
-type ErrorReport = {
-  message: string;
-  error?: Error | undefined;
-  sessionId?: string | undefined;
-  model?: string | undefined;
-};
-
-/** Assembles a support-ready plain-text report: the error, the session/model
- *  that produced it, the page, and the full stack/cause — everything needed to
- *  file or triage the failure without a back-and-forth. */
-function buildErrorReport({ message, error, sessionId, model }: ErrorReport): string {
-  const lines = [`Error: ${message}`];
-  if (error?.name && error.name !== "Error") lines.push(`Type: ${error.name}`);
-  if (sessionId) lines.push(`Session: ${sessionId}`);
-  if (model) lines.push(`Model: ${model}`);
-  if (typeof window !== "undefined") lines.push(`Page: ${window.location.href}`);
-  if (typeof navigator !== "undefined" && navigator.userAgent) lines.push(`User agent: ${navigator.userAgent}`);
-  lines.push(`Time: ${new Date().toISOString()}`);
-  const cause = (error as { cause?: unknown } | undefined)?.cause;
-  const detail = error?.stack ?? (cause != null ? String(cause) : "");
-  if (detail.trim() && detail.trim() !== message) lines.push("", detail.trim());
-  return lines.join("\n");
-}
-
-function ErrorNotice({ message, error, sessionId, model, onClear }: ErrorReport & { onClear?: (() => void) | undefined }) {
-  const [copied, setCopied] = useState(false);
-  const copyReport = () => {
-    const clip = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
-    if (!clip) return;
-    void clip
-      .writeText(buildErrorReport({ message, error, sessionId, model }))
-      .then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      })
-      .catch(() => {});
-  };
-  return (
-    <div
-      role="alert"
-      className="flex w-full max-w-[95%] items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
-    >
-      <Icon icon={UiCircleX} className="mt-0.5 size-4 shrink-0" />
-      <div className="min-w-0 flex-1 whitespace-pre-wrap break-words">{message}</div>
-      <div className="flex shrink-0 items-center gap-2">
-        <button
-          type="button"
-          aria-label="Copy error details"
-          title="Copy session id, model, page and full error"
-          className="inline-flex items-center gap-1 text-xs underline-offset-2 hover:underline"
-          onClick={copyReport}
-        >
-          <Icon icon={copied ? UiCheck : UiCopy} className="size-3.5" />
-          {copied ? "Copied" : "Copy"}
-        </button>
-        {onClear && (
-          <button type="button" className="text-xs underline-offset-2 hover:underline" onClick={onClear}>
-            Dismiss
-          </button>
-        )}
-      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
-// The source lines a failed fixture step was written as: gavel reads them from
-// the step's YAML or markdown file and attaches them as `detail.source`
-// (parsers.SourceSnippet). A present-but-malformed field is reported by path,
+// The source lines a fixture step was written as: gavel reads them from the
+// step's YAML or markdown file and attaches them as `detail.source`
+// (parsers.SourceSnippet). Every step shows them on a tab named for the
+// language; a failed one also inline. A present-but-malformed field is reported by path,
 // like the typed step detail in stepKind.ts.
 
 import type { BriefSection } from "../test-runner";
@@ -73,6 +74,14 @@ export function withoutSource(detail: unknown): unknown {
   if (!isRecord(detail) || !("source" in detail)) return detail;
   const { source: _source, ...rest } = detail;
   return Object.keys(rest).length > 0 ? rest : undefined;
+}
+
+const SOURCE_LANGUAGE_LABELS: Record<string, string> = { yaml: "YAML", markdown: "Markdown", json: "JSON" };
+
+/** The detail tab a step's source shows under: its language (YAML, Markdown, JSON), else "Source". */
+export function sourceTabLabel(result: StepSourceResult): string {
+  const language = result.kind === "source" ? result.source.language : undefined;
+  return (language && SOURCE_LANGUAGE_LABELS[language]) || "Source";
 }
 
 export function sourceLocation({ file, line, endLine }: StepSource): string {

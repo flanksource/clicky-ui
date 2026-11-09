@@ -97,6 +97,8 @@ const FILTER_BAR_GAP_PX = 8;
 const FILTER_BAR_OVERFLOW_TRIGGER_ESTIMATE_PX = 44;
 
 export type FilterBarSearchProps = {
+  /** Search update delay in milliseconds; zero updates local filters immediately. */
+  debounceMs?: number;
   /** Controlled search text. */
   value: string;
   /** Called with the next search text. Debounced when `autoSubmit` is true. */
@@ -343,6 +345,11 @@ export type FilterBarEnumFilter = {
   /** Available enum options. */
   options: Array<{ value: string; label?: string }>;
   onChange: (value: string) => void;
+  /**
+   * The filter always holds one of its options — a data source, say. It has no
+   * clear button, Clear all leaves it alone, and it never counts as active.
+   */
+  required?: boolean;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -1455,6 +1462,7 @@ function EnumFilterValueControl({ filter }: { filter: FilterBarEnumFilter }) {
         : {})}
       className="w-full"
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
+      {...(filter.required !== undefined ? { required: filter.required } : {})}
     />
   );
 }
@@ -1578,6 +1586,7 @@ function EnumFilterField({
         : {})}
       className={cn(lookupFieldWidthClass(grow), filter.className)}
       {...(filter.disabled !== undefined ? { disabled: filter.disabled } : {})}
+      {...(filter.required !== undefined ? { required: filter.required } : {})}
     />
   );
 }
@@ -1631,10 +1640,11 @@ function SearchField({ search }: { search: FilterBarSearchProps }) {
   const [draft, setDraft] = useDebouncedTextDraft(
     search.value,
     search.onChange,
+    search.debounceMs,
   );
 
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2 md:flex-[1_1_14rem] md:min-w-[14rem] md:max-w-[24rem]">
+    <div className="flex min-w-0 flex-1 items-center gap-2 md:flex-[1_1_14rem] md:max-w-[24rem]">
       <label
         className={cn(
           "flex h-8 min-w-0 flex-1 items-center rounded-md border border-input bg-background px-3 text-sm",
@@ -2868,6 +2878,7 @@ function useAnchoredPopup(
 function useDebouncedTextDraft(
   value: string,
   onChange: (value: string) => void,
+  debounceMs = FILTER_INPUT_DEBOUNCE_MS,
 ) {
   const { autoSubmit } = useContext(FilterBarContext);
   const [draft, setDraft] = useState(value);
@@ -2893,17 +2904,17 @@ function useDebouncedTextDraft(
     }
     if (draft === value) return;
 
-    if (!autoSubmit || draft === "") {
+    if (!autoSubmit || draft === "" || debounceMs === 0) {
       latestOnChange.current(draft);
       return;
     }
 
     const timeoutId = window.setTimeout(() => {
       latestOnChange.current(draft);
-    }, FILTER_INPUT_DEBOUNCE_MS);
+    }, debounceMs);
 
     return () => window.clearTimeout(timeoutId);
-  }, [autoSubmit, draft, value]);
+  }, [autoSubmit, debounceMs, draft, value]);
 
   return [draft, setDraft] as const;
 }

@@ -8,6 +8,8 @@ import type {
 import type { FieldControl } from "../components/json-schema-form-types";
 import type { PostExtensionContext } from "../components/json-schema-form-runtime-types";
 import { connectionLoggingFormExtensions } from "./connectionLogging";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { ConnectionLoggingSummary } from "./ConnectionLoggingSummary";
 
 const capability: ConnectionLoggingCapability = {
   family: "http",
@@ -37,6 +39,86 @@ const capability: ConnectionLoggingCapability = {
     },
   ],
 };
+
+describe("compact connection logging", () => {
+  it("keeps incomplete durations editable without applying them", () => {
+    const onChange = vi.fn();
+    render(
+      <ConnectionLoggingSummary definition={capability} onChange={onChange} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit logging" }));
+    expect(
+      screen.getByRole("dialog", { name: "Edit connection logging" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("menu")).toBeNull();
+    fireEvent.change(screen.getByRole("textbox", { name: "Slow threshold" }), {
+      target: { value: "2" },
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("positive duration");
+    expect(screen.getByRole("button", { name: "Apply" })).toBeDisabled();
+    fireEvent.change(screen.getByRole("textbox", { name: "Slow threshold" }), {
+      target: { value: "2s" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({
+      "log.slowThreshold": "2s",
+    });
+  });
+  it("shows current levels without mounting the editor or preview", () => {
+    render(
+      <ConnectionLoggingSummary
+        definition={capability}
+        value={{ "log.level.http": "off" }}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Edit logging" })).toBeDefined();
+    expect(screen.getByText("Access summary")).toBeDefined();
+    expect(screen.getByText("off")).toBeDefined();
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+    expect(screen.queryByTestId("connection-log-preview")).toBeNull();
+  });
+  it("applies draft changes only on Apply and preserves other properties", () => {
+    const onChange = vi.fn();
+    render(
+      <ConnectionLoggingSummary
+        definition={capability}
+        value={{ kubecontext: "staging" }}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit logging" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Errors level" }), {
+      target: { value: "warn" },
+    });
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({
+      kubecontext: "staging",
+      "log.level.error": "warn",
+    });
+  });
+  it("discards cancelled changes and keeps read-only summaries uneditable", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <ConnectionLoggingSummary definition={capability} onChange={onChange} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit logging" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Errors level" }), {
+      target: { value: "warn" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onChange).not.toHaveBeenCalled();
+    rerender(
+      <ConnectionLoggingSummary
+        definition={capability}
+        onChange={onChange}
+        readOnly
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Edit logging" })).toBeNull();
+  });
+});
 
 function field(): FieldControl {
   return {

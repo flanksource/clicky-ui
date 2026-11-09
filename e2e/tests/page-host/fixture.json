@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "name": "Deployment diagram",
+  "entry": "diagram.tsx",
+  "locks": {},
+  "files": {
+    "package.json": "{\"dependencies\":{\"@flanksource/clicky-ui\":\"^0.3\",\"@flanksource/facet\":\"^0.1\"}}",
+    "diagram.tsx": "import { Arrow, BoxNode, Diagram } from \"@flanksource/facet\";\nimport \"./page.css\";\nexport default function DeploymentDiagram() { return <main className=\"p-8\"><h1 className=\"text-2xl font-bold\">Deployment path</h1><Diagram className=\"p-8\">{(id) => <div className=\"flex items-center justify-between gap-16\"><BoxNode id={id(\"source\")} title=\"Source\" className=\"w-64\">Approved change</BoxNode><BoxNode id={id(\"target\")} title=\"Deployment\" className=\"w-64\">Running service</BoxNode><Arrow from={id(\"source\")} to={id(\"target\")} /></div>}</Diagram></main>; }\n",
+    "notes.tsx": "export default () => <article><h1>Release notes</h1><p>Each page keeps its own library lock.</p></article>;\n",
+    "page.css": "@media print { body { print-color-adjust: exact; } main { break-inside: avoid; } }\n"
+  }
+}

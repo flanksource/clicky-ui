@@ -15,7 +15,7 @@ export async function runLint(slug: string, mode: LintMode): Promise<LinterResul
     body: JSON.stringify({ slug, mode }),
   });
   if (!(response.headers.get("content-type") ?? "").includes("application/json")) {
-    throw new Error("Linting only works under `vite dev`; the playground-gavel-lint middleware is not part of the build.");
+    throw new Error("Linting requires a live playground server. Start `pnpm run playground:prod` or `pnpm run dev:playground`.");
   }
   const payload = (await response.json()) as { results?: LinterResult[]; error?: string };
   if (!response.ok || !payload.results) {

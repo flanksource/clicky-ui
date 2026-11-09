@@ -1,0 +1,15 @@
+{
+  "runtimeDomain": "pages.example.com",
+  "embedders": ["https://app.example.com"],
+  "packageOrigin": "https://unpkg.com",
+  "registry": "https://registry.npmjs.org",
+  "managed": { "@flanksource/clicky-ui": "^0.3", "@flanksource/facet": "^0.1.74" },
+  "policy": { "dependencies": "strict", "allow": ["date-fns", "d3-*", "zod", "react-copy-to-clipboard"] },
+  "convert": { "origin": "https://esm.internal.example" },
+  "minReleaseAgeDays": 3,
+  "network": { "allow": ["https://api.example.com/*"] },
+  "csp": { "add": {} },
+  "links": "deny",
+  "sources": ["host", "opfs", "folder", "url", "hash"],
+  "readinessTimeoutMs": 15000
+}

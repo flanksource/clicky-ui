@@ -37,11 +37,11 @@ export function PropertyValuePreview({
     return (
       <div className="flex min-w-0 items-center gap-1.5">
         {field.prefix}
-        {/* A property row is one field with room for a checkbox glyph and its
-            own Edit button, so a boolean previews as the disabled checkbox the
+        {/* A property row is one field with room for a switch and its
+            own Edit button, so a boolean previews as the disabled switch the
             editor will hand back. Nested inside a collection preview
             (`presentation`) there is no such affordance — the whole summary
-            opens as a unit — so a disabled checkbox would be chrome promising
+            opens as a unit — so a disabled switch would be chrome promising
             an interaction the cell does not have, and it reads as text. */}
         {!ctx.presentation &&
         field.kind === "boolean" &&

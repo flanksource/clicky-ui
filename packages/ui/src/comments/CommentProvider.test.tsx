@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { memo } from "react";
+import { memo, useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { CommentProvider } from "./CommentProvider";
 import {
@@ -330,6 +330,45 @@ describe("CommentProvider", () => {
     );
 
     expect(onRender).not.toHaveBeenCalled();
+  });
+
+  it("switches persistence scope without remounting its children", () => {
+    sessionStorage.clear();
+    const mounted = vi.fn();
+    function ScopeProbe() {
+      const ctx = useCommentContext();
+      const actions = useCommentAnchorActionsOptional();
+      useEffect(() => mounted(), []);
+      return (
+        <>
+          <span data-testid="scope-state">{`${ctx.railMode}:${ctx.focusedAnchor ?? "none"}:${ctx.highlightAnchor ?? "none"}`}</span>
+          <button type="button" onClick={() => actions?.focusAnchor("row.1")}>focus</button>
+          <button type="button" onClick={() => ctx.setHighlightAnchor("row.1")}>highlight</button>
+        </>
+      );
+    }
+    const page = (persistenceKey: string) => (
+      <CommentProvider comments={comments} config={config} persistenceKey={persistenceKey}>
+        <ScopeProbe />
+      </CommentProvider>
+    );
+    const view = render(page("page-a"));
+    fireEvent.click(screen.getByText("focus"));
+    fireEvent.click(screen.getByText("highlight"));
+    const pageA = screen.getByTestId("scope-state").textContent;
+
+    view.rerender(page("page-b"));
+    const pageB = screen.getByTestId("scope-state").textContent;
+    fireEvent.click(screen.getByText("focus"));
+    view.rerender(page("page-a"));
+
+    expect({ mounts: mounted.mock.calls.length, pageA, pageB, backToA: screen.getByTestId("scope-state").textContent, pageBStored: sessionStorage.getItem("clicky.comment.page-b.focused-anchor") }).toEqual({
+      mounts: 1,
+      pageA: "focused:row.1:row.1",
+      pageB: "closed:none:none",
+      backToA: "focused:row.1:none",
+      pageBStored: JSON.stringify("row.1"),
+    });
   });
 });
 

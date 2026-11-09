@@ -32,6 +32,7 @@ import {
   type SessionInspectorLoadState,
 } from "./SessionInspector.remote";
 import { RemoteSessionStatus } from "./SessionInspector.remote-view";
+import type { SessionFeedSubscription } from "./session-feed";
 import type { SessionViewerProps } from "./SessionViewer";
 import {
   getSessionMetadata,
@@ -47,12 +48,14 @@ export type { SessionInspectorTab } from "./SessionInspector.tabs.model";
  * types forbid it and the component throws). With `src` the inspector fetches
  * the session and follows it while it is live; see `SessionInput` for the URL
  * contract. `follow` forces (`true`) or suppresses (`false`) the live stream
- * for `src` and for collection items that carry `src`.
+ * for `src` and for collection items that carry `src`. With `feed` the live
+ * changes come from the host (a shared task stream, say) rather than a follow
+ * EventSource the inspector opens itself.
  */
 export type SessionInspectorProps = SessionInspectorOptions &
   (
-    | { session: SessionInspectorInput; src?: never; follow?: boolean }
-    | { src: string; session?: never; follow?: boolean }
+    | { session: SessionInspectorInput; src?: never; follow?: boolean; feed?: never }
+    | { src: string; session?: never; follow?: boolean; feed?: SessionFeedSubscription }
   );
 
 export interface SessionInspectorOptions {
@@ -89,6 +92,7 @@ export function SessionInspector({
   session,
   src,
   follow,
+  feed,
   className,
   onLoadStateChange,
   ...options
@@ -102,7 +106,10 @@ export function SessionInspector({
     throw new Error("SessionInspector requires a `session` or a `src`");
   }
   const followOptions = follow === undefined ? {} : { follow };
-  const remote = useRemoteSession(src, followOptions);
+  const remote = useRemoteSession(src, {
+    ...followOptions,
+    ...(feed ? { feed } : {}),
+  });
   useReportLoadState({
     state: remote,
     enabled: src !== undefined,

@@ -41,6 +41,7 @@ import {
 /** What a sample yields: the discovered column shape plus the rows it came
  *  from, so the editor can preview the configured columns against real data. */
 export type ProfileSample = {
+  mappingInputRows?: Record<string, unknown>[];
   columns: ProfileColumn[];
   rows: Record<string, unknown>[];
   sourceDraft: ProfileWizardDraft;
@@ -160,7 +161,7 @@ export function ProfileWizardQueryStep({
   }
 
   return (
-    <div className="flex min-h-[32rem] flex-1 flex-col gap-3">
+    <div className="flex min-h-[32rem] min-w-0 flex-1 flex-col gap-3">
       <div className="flex items-center justify-between gap-4 rounded-lg border bg-muted/30 px-4 py-3">
         <div>
           <p className="text-sm font-medium">
@@ -293,6 +294,7 @@ export function ProfileWizardQueryStep({
           );
           filterColumns.current = profileSampleFilterColumns(result);
           onSample({
+            mappingInputRows: result.mappingInputRows,
             columns: result.columns ?? [],
             rows: result.rows ?? [],
             sourceDraft: nextDraft,

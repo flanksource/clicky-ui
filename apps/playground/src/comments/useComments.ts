@@ -27,11 +27,15 @@ import type {
 import type {
   StoredComment,
   StoredPromptRun,
+  StoredStyleEdit,
 } from "../../plugins/comments-store";
 import { overlayLabel, resolveAnchor } from "./dom-anchor";
 import { MARKDOWN_ROOT } from "./markdown-anchor";
 import { captureElementContext, captureElementHtml } from "./element-context";
 import { captureScreenshot } from "./screenshot";
+
+import { pageSourcePath } from "../documents/review-target";
+import { usePageReload } from "../page-reload";
 
 export const COMMENTS_ROUTE = "/__playground/comments";
 
@@ -74,8 +78,14 @@ export type PlaygroundComment = Comment & {
   element?: CommentElementContext;
   promptRun?: StoredPromptRun;
   lint?: StoredComment["lint"];
+  styleEdit?: StoredStyleEdit;
 };
 export type PageComment = PlaygroundComment & { page: string };
+
+/** What the playground posts for a new root: the library's input plus the refused style edit being requested. */
+export type PlaygroundCommentCreateInput = CommentCreateInput & {
+  styleEdit?: StoredStyleEdit;
+};
 
 /**
  * The root an anchor's locators are computed against. Dialog anchors get none:
@@ -98,17 +108,13 @@ export async function request<T>(url: string, init?: RequestInit): Promise<T> {
   if (
     !(response.headers.get("content-type") ?? "").includes("application/json")
   ) {
-    throw new Error(
-      "The playground comments API returned a non-JSON response. Run the playground with vite dev or vite preview.",
-    );
+    throw new ApiError(response.status, { message: "The playground API returned a non-JSON response. Start a live playground server.", context: [["Method", init?.method ?? "GET"], ["Endpoint", url], ["Status", String(response.status)]], details: [{ label: "Response", value: await response.text() }] });
   }
   const payload = (await response.json()) as T & { error?: string };
   if (!response.ok) {
     const fallback = `${init?.method ?? "GET"} ${url} failed (${response.status})`;
-    throw new ApiError(
-      response.status,
-      normalizeErrorDiagnostics(payload, fallback) ?? { message: fallback, context: [] },
-    );
+    const diagnostics = normalizeErrorDiagnostics(payload, fallback) ?? { message: fallback, context: [] };
+    throw new ApiError(response.status, { ...diagnostics, context: [...diagnostics.context, ["Method", init?.method ?? "GET"], ["Endpoint", url], ["Status", String(response.status)]] });
   }
   return payload;
 }
@@ -139,7 +145,9 @@ export async function fetchComments(
   const { comments } = await request<{ comments: PageComment[] }>(
     query === "" ? COMMENTS_ROUTE : `${COMMENTS_ROUTE}?${query}`,
   );
-  return comments;
+  return comments.map((comment) => comment.promptRun && comment.author
+    ? { ...comment, author: { ...comment.author, name: comment.promptRun.promptName } }
+    : comment);
 }
 
 export type PlaygroundComments = {
@@ -148,7 +156,7 @@ export type PlaygroundComments = {
   loading: boolean;
   /** Surfaced as a banner — a broken backend must never look like "no comments". */
   error: string | null;
-  create: (input: CommentCreateInput, actionId?: string) => Promise<void>;
+  create: (input: PlaygroundCommentCreateInput, actionId?: string) => Promise<void>;
   /** Captures an element's source, HTML and locators as the comments store them. */
   captureSelection: (
     anchor: string,
@@ -189,6 +197,7 @@ export function useComments(
     ) => Promise<CommentElementCaptureContext>;
   } = {},
 ): PlaygroundComments {
+  const reload = usePageReload();
   const captureRef = useRef(options.capture);
   captureRef.current = options.capture;
   const enabled = options.enabled !== false;
@@ -211,7 +220,7 @@ export function useComments(
   const captureSelection = useCallback(
     (anchor: string, target: Element) =>
       captureElementContext(target, {
-        fallbackSource: `apps/playground/src/pages/${page}.tsx`,
+        fallbackSource: pageSourcePath(page),
         ...locatorRoot(anchor, contentRef.current),
       }),
     [contentRef, page],
@@ -282,15 +291,8 @@ export function useComments(
   const mutate = useCallback(
     async (
       run: () => Promise<unknown>,
-      options: { rethrow?: boolean } = {},
     ) => {
-      try {
-        await run();
-        setError(null);
-      } catch (cause) {
-        setError(describeError(cause));
-        if (options.rethrow) throw cause;
-      }
+      await run();
       await refresh();
       window.dispatchEvent(new Event("playground-feedback-updated"));
     },
@@ -308,13 +310,19 @@ export function useComments(
   );
 
   const create = useCallback(
-    (input: CommentCreateInput, actionId = "plain") =>
+    (input: PlaygroundCommentCreateInput, actionId = "plain") =>
       mutate(
         async () => {
           if (actionId !== "plain" && actionId !== "screenshot") {
             throw new Error(
               `Unknown comment create action ${JSON.stringify(actionId)}`,
             );
+          }
+          let expectedSource: string | undefined;
+          if (input.reviewDecision) {
+            const payload = await request<{ source: string }>(`/__playground/sources?slug=${encodeURIComponent(page)}`);
+            if (typeof payload.source !== "string") throw new Error("Could not read review source");
+            expectedSource = payload.source;
           }
           if (captureRef.current) {
             const element = await captureRef.current(input, actionId);
@@ -324,8 +332,12 @@ export function useComments(
               author: PLAYGROUND_COMMENT_AUTHOR,
               anchor: input.anchor ?? null,
               ...(input.rating ? { rating: input.rating } : {}),
+              ...(input.styleEdit ? { styleEdit: input.styleEdit } : {}),
+              ...(input.reviewDecision ? { reviewDecision: input.reviewDecision, expectedSource } : {}),
+              ...(input.assignee ? { assignee: input.assignee } : {}),
               element,
             });
+            if (input.reviewDecision) await reload({ reason: "review", page });
             return;
           }
           const anchor = input.anchor ?? null;
@@ -362,47 +374,42 @@ export function useComments(
               })
             : anchor === null || anchor === DOCUMENT_ANCHOR
               ? Promise.resolve({
-                  source: `apps/playground/src/pages/${page}.tsx`,
+                  source: pageSourcePath(page),
                   html: captureElementHtml(target),
                 })
               : captureElementContext(target, {
-                  fallbackSource: `apps/playground/src/pages/${page}.tsx`,
+                  fallbackSource: pageSourcePath(page),
                   ...locatorRoot(anchor, content),
                 });
           const capturedContext = await context;
           const capturedScreenshot = await screenshot;
           const element: CommentElementCaptureContext = {
             ...capturedContext,
+            ...(page.startsWith("document:") ? { source: pageSourcePath(page) } : {}),
             ...(capturedScreenshot ? { screenshot: capturedScreenshot } : {}),
           };
 
-          let expectedSource: string | undefined;
-          if (input.reviewDecision) {
-            const response = await fetch(`/__playground/sources?slug=${encodeURIComponent(page)}`);
-            const payload = await response.json() as { source?: string; error?: string };
-            if (!response.ok || typeof payload.source !== "string") throw new Error(payload.error ?? "Could not read review source");
-            expectedSource = payload.source;
-          }
           await post(COMMENTS_ROUTE, {
             page,
             body: input.body,
             author: PLAYGROUND_COMMENT_AUTHOR,
             anchor,
             ...(input.rating ? { rating: input.rating } : {}),
+            ...(input.styleEdit ? { styleEdit: input.styleEdit } : {}),
             ...(input.reviewDecision
               ? { reviewDecision: input.reviewDecision }
               : {}),
+            ...(input.assignee ? { assignee: input.assignee } : {}),
             element,
             ...(expectedSource === undefined ? {} : { expectedSource }),
           });
-          if (input.reviewDecision) window.location.reload();
+          if (input.reviewDecision) await reload({ reason: "review", page });
           if (preparedSelection.current === prepared) {
             preparedSelection.current = null;
           }
         },
-        { rethrow: true },
       ),
-    [contentRef, mutate, page, post],
+    [contentRef, mutate, page, post, reload],
   );
 
   const reply = useCallback(
@@ -438,7 +445,6 @@ export function useComments(
             `Status ${JSON.stringify(status)} cannot be set directly; use acknowledge, assign, resolve or reopen`,
           );
         },
-        { rethrow: true },
       ),
     [mutate, post],
   );
@@ -450,7 +456,6 @@ export function useComments(
           post(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}/acknowledge`, {
             author: PLAYGROUND_COMMENT_AUTHOR,
           }),
-        { rethrow: true },
       ),
     [mutate, post],
   );
@@ -469,7 +474,6 @@ export function useComments(
                     ...(assignee.kind ? { kind: assignee.kind } : {}),
                   },
           }),
-        { rethrow: true },
       ),
     [mutate, post],
   );
@@ -481,7 +485,6 @@ export function useComments(
           post(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}/close`, {
             author: PLAYGROUND_COMMENT_AUTHOR,
           }),
-        { rethrow: true },
       ),
     [mutate, post],
   );
@@ -494,7 +497,6 @@ export function useComments(
             author: PLAYGROUND_COMMENT_AUTHOR,
             ...(runtime ? { runtime } : {}),
           }),
-        { rethrow: true },
       ),
     [mutate, post],
   );
@@ -507,7 +509,6 @@ export function useComments(
             author: PLAYGROUND_COMMENT_AUTHOR,
             body,
           }),
-        { rethrow: true },
       ),
     [mutate, post],
   );
@@ -530,7 +531,6 @@ export function useComments(
         () => request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, {
           method: "DELETE",
         }),
-        { rethrow: true },
       ),
     [mutate],
   );

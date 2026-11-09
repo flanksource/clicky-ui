@@ -84,10 +84,10 @@ export function OperationActionBar({
 }: OperationActionBarProps) {
   const queryClient = useQueryClient();
   const [activeAction, setActiveAction] = useState<ResolvedOperation | null>(
-    null
+    null,
   );
   const [actionResult, setActionResult] = useState<ExecutionResponse | null>(
-    null
+    null,
   );
   const [actionError, setActionError] = useState("");
   const [isExecutingAction, setIsExecutingAction] = useState(false);
@@ -113,9 +113,19 @@ export function OperationActionBar({
   }
 
   async function refreshDiscovery() {
+    const surface = activeAction
+      ? getOperationClickyMeta(activeAction)?.surface
+      : undefined;
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["openapi-spec"] }),
       queryClient.invalidateQueries({ queryKey: ["logs-entity-names"] }),
+      ...(surface
+        ? [
+            queryClient.invalidateQueries({
+              predicate: (query) => query.meta?.surface === surface,
+            }),
+          ]
+        : []),
     ]);
     await onExecuted?.();
   }
@@ -132,18 +142,18 @@ export function OperationActionBar({
         {
           ...packParameterValues(
             values,
-            activeAction.operation.parameters ?? []
+            activeAction.operation.parameters ?? [],
           ),
           ...getRequestValues?.(activeAction),
         },
-        { Accept: "application/json+clicky" }
+        { Accept: "application/json+clicky" },
       );
       setActionResult(response);
       if (!response.error) await refreshDiscovery();
     } catch (err) {
       setActionResult(null);
       setActionError(
-        err instanceof Error ? err.message : String(err ?? "Unknown error")
+        err instanceof Error ? err.message : String(err ?? "Unknown error"),
       );
     } finally {
       setIsExecutingAction(false);
@@ -175,7 +185,7 @@ export function OperationActionBar({
           {actions.map((op) => {
             const label = actionLabel(op);
             const icon = resolveActionIcon(
-              getOperationClickyMeta(op)?.toolHints?.icon
+              getOperationClickyMeta(op)?.toolHints?.icon,
             );
             const summary = op.operation.summary || op.operation.description;
             const tooltip =
@@ -249,11 +259,12 @@ export function OperationActionBar({
     </>
   );
 
-  function renderActionDialog({ body, footer }: SchemaActionFormSlots) {
+  function renderActionDialog({ body, footer, dirty }: SchemaActionFormSlots) {
     if (!activeAction) return null;
     return (
       <Modal
         open
+        confirmClose={dirty === true}
         onClose={() => setActiveAction(null)}
         title={actionLabel(activeAction)}
         size="2xl"

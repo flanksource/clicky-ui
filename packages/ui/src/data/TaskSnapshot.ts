@@ -6,11 +6,20 @@
 import type { PromptSnapshot } from "../hooks/use-prompts";
 
 export interface LogEntry {
+  /** Ascending per-task sequence number; the key log deltas are deduped by. */
+  seq: number;
   level: string;
   message: string;
+  /** RFC3339Nano. */
+  time: string;
 }
 
-export type TaskControlAction = "start" | "stop" | "restart" | "drain" | "retry";
+export type TaskControlAction =
+  | "start"
+  | "stop"
+  | "restart"
+  | "drain"
+  | "retry";
 
 export interface TaskWorkProgress {
   total: number;
@@ -82,9 +91,10 @@ export interface TaskExecDetails {
   pid?: number;
   status: string;
   exitCode: number;
+  /** RFC3339Nano. */
   started?: string;
-  /** Go time.Duration encoded as nanoseconds. */
-  duration?: number;
+  /** RFC3339Nano; absent while the process is still running. */
+  finished?: string;
   [key: string]: unknown;
 }
 
@@ -98,11 +108,16 @@ export interface TaskSnapshot {
   /** Parent group NAME (groups: empty). */
   group?: string;
   status: string;
-  duration?: string;
   error?: string;
   /** Latest log line. */
   message?: string;
+  /**
+   * Full log on the JSON endpoint. SSE `task` frames omit it; it arrives as
+   * `event: logs` deltas instead (see ./task-streams).
+   */
   logs?: LogEntry[];
+  /** Highest log `seq` the server has cleared; entries at or below it are gone. */
+  logsClearedThrough?: number;
   /** Group aggregates. */
   total?: number;
   completed?: number;
@@ -115,14 +130,17 @@ export interface TaskSnapshot {
   progress?: number;
   /** Progress denominator; 0/undefined means the task has no bounded progress. */
   maxValue?: number;
+  progressMetrics?: { unit?: string; bytes?: number; bytesPerSecond?: number };
   /** Stable parent-run id (tasks) or the run's own id (groups). */
   groupId?: string;
+  /** Stable parent group id when this snapshot is a nested group. */
+  parentGroupId?: string;
   kind?: string;
   labels?: Record<string, string>;
   owner?: string;
-  /** RFC3339. */
+  /** RFC3339Nano. Durations are derived from this and `finishedAt` — see `elapsedMs`. */
   startedAt?: string;
-  /** RFC3339. */
+  /** RFC3339Nano. */
   finishedAt?: string;
   href?: string;
   controls?: TaskControlAction[];

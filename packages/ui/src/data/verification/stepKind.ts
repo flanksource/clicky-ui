@@ -5,9 +5,19 @@
 // view and the copy brief read the same typed shape. A present-but-malformed
 // field is reported by path instead of being guessed at.
 
-import type { BriefSection } from "../test-runner";
+import type { BriefSection, Test } from "../test-runner";
 import { formatTestDuration } from "../test-runner";
 import type { VerifyNode } from "./verify-report";
+import type { ClickyDocument } from "../Clicky";
+import type { JsonSchemaObject } from "../../components/json-schema-form-types";
+import type {
+  LintSeverity,
+  Violation,
+  ViolationEntity,
+  ViolationImageRegion,
+  ViolationLocation,
+  ViolationUrlTarget,
+} from "../lint/types";
 
 export type StepRef = { id: string; kind: string };
 
@@ -51,9 +61,26 @@ export type WatcherEvent = {
   detail?: string;
 };
 
+export const STEP_FORM_STATES = ["answered", "rejected", "supplied", "unanswered"] as const;
+export type StepFormState = (typeof STEP_FORM_STATES)[number];
+
+export type StepForm = {
+  title: string;
+  description?: string;
+  schema: JsonSchemaObject;
+  values: Record<string, unknown>;
+  state: StepFormState;
+  answeredBy?: string;
+  answeredAt?: string;
+};
+
 export type StepDetail = {
   step: StepRef;
   outputs?: unknown;
+  /** What the step returned, rendered by its kind as a clicky document (a query step's rows). */
+  view?: ClickyDocument;
+  /** The form a `form` step (or a fixture's `params:`) showed, and how it was answered. */
+  form?: StepForm;
   exports: StepExport[];
   wait?: WaitDetail;
   attempts: StepAttempt[];
@@ -69,7 +96,7 @@ export type StepDetailResult =
   | { kind: "step"; step: StepDetail }
   | { kind: "invalid"; error: string };
 
-const STEP_KEYS = new Set(["step", "outputs", "exports", "wait", "attempts", "events", "background"]);
+const STEP_KEYS = new Set(["step", "outputs", "view", "form", "exports", "wait", "attempts", "events", "background"]);
 
 class StepDetailError extends Error {}
 
@@ -111,6 +138,29 @@ function oneOf<T extends string>(value: unknown, allowed: readonly T[], path: st
 /** `{ [key]: read(value) }` when the optional field is present, else `{}` — absent stays an absent key. */
 function optional<K extends string, T>(source: Rec, key: K, read: (value: unknown) => T): { [P in K]?: T } {
   return source[key] === undefined || source[key] === null ? {} : ({ [key]: read(source[key]) } as { [P in K]?: T });
+}
+
+/** A step's `view`: the clicky document (formatters.NewClickyDocument) its kind rendered. */
+function readView(value: unknown): ClickyDocument {
+  const view = record(value, "detail.view");
+  num(view.version, "detail.view.version");
+  record(view.node, "detail.view.node");
+  return view as unknown as ClickyDocument;
+}
+
+/** A step's `form`: the schema it showed, the values it ended with and how it was answered. */
+function readForm(value: unknown): StepForm {
+  const form = record(value, "detail.form");
+  const schema = record(form.schema, "detail.form.schema");
+  return {
+    title: str(form.title, "detail.form.title"),
+    schema: schema as JsonSchemaObject,
+    values: record(form.values, "detail.form.values"),
+    state: oneOf(form.state, STEP_FORM_STATES, "detail.form.state"),
+    ...optional(form, "description", (v) => str(v, "detail.form.description")),
+    ...optional(form, "answeredBy", (v) => str(v, "detail.form.answeredBy")),
+    ...optional(form, "answeredAt", (v) => str(v, "detail.form.answeredAt")),
+  };
 }
 
 /** Durations arrive as Go-style strings ("15s"); a bare number is nanoseconds like every other duration on the wire. */
@@ -225,6 +275,8 @@ function readStep(detail: Rec): StepDetail {
   return {
     step: { id: str(ref.id, "detail.step.id"), kind: str(ref.kind, "detail.step.kind") },
     ...(detail.outputs === undefined ? {} : { outputs: detail.outputs }),
+    ...optional(detail, "view", readView),
+    ...optional(detail, "form", readForm),
     exports: detail.exports == null ? [] : readExports(detail.exports),
     ...optional(detail, "wait", readWait),
     attempts: readAttempts(detail.attempts ?? []),
@@ -248,6 +300,232 @@ export function readStepDetail(detail: unknown): StepDetailResult {
     if (error instanceof StepDetailError) return { kind: "invalid", error: error.message };
     throw error;
   }
+}
+
+export type ViolationDetail = Violation & { locations: ViolationLocation[] };
+
+export type ViolationDetailResult =
+  | { kind: "none" }
+  | { kind: "violation"; violation: ViolationDetail }
+  | { kind: "invalid"; error: string };
+
+const SEVERITIES = ["error", "warning", "info"] as const satisfies readonly LintSeverity[];
+
+function readEntity(value: unknown, path: string): ViolationEntity {
+  const entity = record(value, path);
+  return {
+    kind: str(entity.kind, `${path}.kind`),
+    id: str(entity.id, `${path}.id`),
+    ...optional(entity, "name", (v) => str(v, `${path}.name`)),
+  };
+}
+
+const URL_STRATEGIES = ["css", "xpath", "testId", "role", "text"] as const;
+
+function readUrlTarget(value: unknown, path: string): ViolationUrlTarget {
+  const target = record(value, path);
+  const read: ViolationUrlTarget = {
+    url: str(target.url, `${path}.url`),
+    ...Object.assign({}, ...[...URL_STRATEGIES, "name"].map((key) => optional(target, key, (v) => str(v, `${path}.${key}`)))),
+  };
+  const strategies = URL_STRATEGIES.filter((key) => read[key] !== undefined);
+  if (strategies.length > 1) fail(path, `a target with at most one selector strategy (got ${strategies.join(", ")})`);
+  if (read.name !== undefined && read.role === undefined) fail(`${path}.name`, "paired with a role");
+  return read;
+}
+
+function readImage(value: unknown, path: string): ViolationImageRegion {
+  const image = record(value, path);
+  return {
+    src: str(image.src, `${path}.src`),
+    x: num(image.x, `${path}.x`),
+    y: num(image.y, `${path}.y`),
+    width: num(image.width, `${path}.width`),
+    height: num(image.height, `${path}.height`),
+  };
+}
+
+function readLocation(value: unknown, index: number): ViolationLocation {
+  const path = `detail.violation.locations[${index}]`;
+  const l = record(value, path);
+  const location: ViolationLocation = {
+    ...optional(l, "file", (v) => str(v, `${path}.file`)),
+    ...optional(l, "line", (v) => num(v, `${path}.line`)),
+    ...optional(l, "column", (v) => num(v, `${path}.column`)),
+    ...optional(l, "end_line", (v) => num(v, `${path}.end_line`)),
+    ...optional(l, "ref", (v) => str(v, `${path}.ref`)),
+    ...optional(l, "entity", (v) => readEntity(v, `${path}.entity`)),
+    ...optional(l, "url", (v) => readUrlTarget(v, `${path}.url`)),
+    ...optional(l, "image", (v) => readImage(v, `${path}.image`)),
+    ...optional(l, "message", (v) => str(v, `${path}.message`)),
+  };
+  if (!(location.file || location.entity || location.url || location.image || location.message)) {
+    fail(path, "a location naming a file, entity, url, image or message");
+  }
+  return location;
+}
+
+function readRule(value: unknown): NonNullable<Violation["rule"]> {
+  const path = "detail.violation.rule";
+  const rule = record(value, path);
+  return {
+    ...optional(rule, "method", (v) => str(v, `${path}.method`)),
+    ...optional(rule, "description", (v) => str(v, `${path}.description`)),
+    ...optional(rule, "pattern", (v) => str(v, `${path}.pattern`)),
+    ...optional(rule, "package", (v) => str(v, `${path}.package`)),
+  };
+}
+
+function readViolationRecord(value: unknown): ViolationDetail {
+  const path = "detail.violation";
+  const v = record(value, path);
+  return {
+    ...optional(v, "severity", (s) => oneOf(s, SEVERITIES, `${path}.severity`)),
+    ...optional(v, "message", (m) => str(m, `${path}.message`)),
+    ...optional(v, "rule", readRule),
+    ...optional(v, "source", (s) => str(s, `${path}.source`)),
+    ...optional(v, "file", (f) => str(f, `${path}.file`)),
+    ...optional(v, "line", (n) => num(n, `${path}.line`)),
+    locations: list(v.locations ?? [], `${path}.locations`).map(readLocation),
+  };
+}
+
+/**
+ * The lint violation a finding node carries in `detail.violation` (gavel
+ * models.Violation, published under fixtures.ViolationMetadataKey). Read apart
+ * from the typed step: a finding has no `detail.step`. A violation whose fields
+ * break the contract is "invalid" with the offending path.
+ */
+export function readViolation(detail: unknown): ViolationDetailResult {
+  if (!isRecord(detail) || detail.violation === undefined) return { kind: "none" };
+  try {
+    return { kind: "violation", violation: readViolationRecord(detail.violation) };
+  } catch (error) {
+    if (error instanceof StepDetailError) return { kind: "invalid", error: error.message };
+    throw error;
+  }
+}
+
+function withoutKey(detail: unknown, key: string): unknown {
+  if (!isRecord(detail) || !(key in detail)) return detail;
+  const rest = Object.fromEntries(Object.entries(detail).filter(([k]) => k !== key));
+  return Object.keys(rest).length > 0 ? rest : undefined;
+}
+
+/** `detail` without its `violation`, which the Locations section shows instead of the raw block. */
+export function withoutViolation(detail: unknown): unknown {
+  return withoutKey(detail, "violation");
+}
+
+/**
+ * What a query step ran (gavel fixtures.QueryMetadataKey): the query as authored,
+ * its `$(.params.x)` / `{{.params.x}}` references intact; the statement
+ * commons-db issued with them bound to driver placeholders; the bound values in
+ * placeholder order; the step's params by name; and the file the template came from.
+ */
+export type StepQuery = {
+  template: string;
+  sql?: string;
+  arguments?: unknown[];
+  params?: Record<string, unknown>;
+  queryFile?: string;
+  /** The connection the query runs on and where it points; never its secrets. */
+  connection?: StepQueryConnection;
+  /** The batches of a SQL program that have ended, with the rows each changed where the driver reports it. */
+  batches?: StepQueryBatch[];
+};
+
+export type StepQueryConnection = {
+  name: string;
+  type: string;
+  host?: string;
+  port?: string;
+  user?: string;
+  database?: string;
+};
+
+/** `run` is the batch's repetition under `GO <count>`, 1 for a batch that runs once. */
+export type StepQueryBatch = { batch: number; run: number; rowsAffected?: number };
+
+function readQueryConnection(value: unknown): StepQueryConnection {
+  const path = "detail.query.connection";
+  const c = record(value, path);
+  return {
+    name: str(c.name, `${path}.name`),
+    type: str(c.type, `${path}.type`),
+    ...optional(c, "host", (v) => str(v, `${path}.host`)),
+    ...optional(c, "port", (v) => str(v, `${path}.port`)),
+    ...optional(c, "user", (v) => str(v, `${path}.user`)),
+    ...optional(c, "database", (v) => str(v, `${path}.database`)),
+  };
+}
+
+function readQueryBatch(value: unknown, index: number): StepQueryBatch {
+  const path = `detail.query.batches[${index}]`;
+  const b = record(value, path);
+  return {
+    batch: num(b.batch, `${path}.batch`),
+    run: num(b.run, `${path}.run`),
+    ...optional(b, "rowsAffected", (v) => num(v, `${path}.rowsAffected`)),
+  };
+}
+
+export type StepQueryResult =
+  | { kind: "none" }
+  | { kind: "query"; query: StepQuery }
+  | { kind: "invalid"; error: string };
+
+function readQueryRecord(value: unknown): StepQuery {
+  const path = "detail.query";
+  const q = record(value, path);
+  return {
+    template: str(q.template, `${path}.template`),
+    ...optional(q, "sql", (v) => str(v, `${path}.sql`)),
+    ...optional(q, "arguments", (v) => list(v, `${path}.arguments`)),
+    ...optional(q, "params", (v) => record(v, `${path}.params`)),
+    ...optional(q, "queryFile", (v) => str(v, `${path}.queryFile`)),
+    ...optional(q, "connection", readQueryConnection),
+    ...optional(q, "batches", (v) => list(v, `${path}.batches`).map(readQueryBatch)),
+  };
+}
+
+/**
+ * The query a query step carries in `detail.query`, read apart from the typed
+ * step like the violation (a markdown query row has no `detail.step`). A record
+ * whose fields break the contract is "invalid" with the offending path.
+ */
+export function readQuery(detail: unknown): StepQueryResult {
+  if (!isRecord(detail) || detail.query === undefined) return { kind: "none" };
+  try {
+    return { kind: "query", query: readQueryRecord(detail.query) };
+  } catch (error) {
+    if (error instanceof StepDetailError) return { kind: "invalid", error: error.message };
+    throw error;
+  }
+}
+
+/** `detail` without its `query`, which the Query section shows instead of the raw block. */
+export function withoutQuery(detail: unknown): unknown {
+  return withoutKey(detail, "query");
+}
+
+/** Brief sections for the "Copy details" button: the template, the issued SQL and the params it bound. */
+export function stepQueryCopy(query: StepQuery): BriefSection[] {
+  const params = Object.entries(query.params ?? {});
+  return [
+    { title: query.queryFile ? `Template (${query.queryFile})` : "Template", lang: "sql", body: query.template },
+    ...(query.sql ? [{ title: "SQL", lang: "sql", body: query.sql }] : []),
+    ...(params.length > 0 ? [{ title: "Params", body: params.map(([name, value]) => `${name}=${formatExportValue(value)}`).join("\n") }] : []),
+    ...(query.arguments && query.arguments.length > 0
+      ? [{ title: "Arguments", body: query.arguments.map((value, i) => `${i + 1}: ${formatExportValue(value)}`).join("\n") }]
+      : []),
+  ];
+}
+
+/** How a `form` step's form was answered, or undefined for a node that is no (valid) form step. */
+export function stepFormState(node: Pick<Test, "detail">): StepFormState | undefined {
+  const parsed = readStepDetail(node.detail);
+  return parsed.kind === "step" ? parsed.step.form?.state : undefined;
 }
 
 /** The step detail when there is one, for matchers that only need to know. */

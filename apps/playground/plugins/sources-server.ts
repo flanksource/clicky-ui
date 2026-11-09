@@ -1,3 +1,4 @@
+import type { MiddlewareApp, ErrorLogger } from "./middleware";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, isAbsolute, relative, sep } from "node:path";
 import type { Plugin } from "vite";
@@ -14,8 +15,11 @@ import {
   listFolderPages,
   listFolders,
   pagePath,
+  pagesFilePath,
+  readPagesFile,
   readSource,
   sourceExists,
+  writePagesFile,
   writeSource,
 } from "./pages-store";
 
@@ -30,12 +34,15 @@ export type SourceRoute =
   | "mark-reviewable"
   | "delete-reviewable"
   | "write"
+  | "read-file"
+  | "write-file"
   | "move"
   | "delete";
 
 /**
  * `hasTarget` is whether the request names what it acts on — `?slug=` under
- * `/`, `?folder=` under `/folders`. Every destructive route needs one.
+ * `/`, `?folder=` under `/folders`, `?file=` under `/files`. Every destructive
+ * route needs one.
  */
 export function matchSourceRoute(
   method: string,
@@ -50,6 +57,11 @@ export function matchSourceRoute(
     if (method === "POST") return "mark-reviewable";
     if (method === "DELETE") return "delete-reviewable";
     return undefined;
+  }
+  if (pathname === "/files") {
+    if (!hasTarget) return undefined;
+    if (method === "GET") return "read-file";
+    return method === "PUT" ? "write-file" : undefined;
   }
   if (pathname !== "/") return undefined;
 
@@ -156,7 +168,7 @@ function optionalPositiveInteger(
   return value as number;
 }
 
-type SourceEvents = {
+export type SourceEvents = {
   created: (file: string) => void;
   changed: (file: string) => void;
   deleted: (file: string) => void;
@@ -179,26 +191,27 @@ export function announcePageMove(
   events.created(pagePath(pagesDir, nextSlug));
 }
 
-type SourcesOptions = {
+export type SourcesOptions = {
   pagesDir: string;
   commentsDir: string;
   /** Root that a read's `path` is relative to, so it matches the paths linters report. */
   workspaceRoot: string;
 };
 
-function handle(
+async function handle(
   { pagesDir, commentsDir, workspaceRoot }: SourcesOptions,
   events: SourceEvents,
   req: IncomingMessage,
   res: ServerResponse,
-): Promise<void> | void {
+): Promise<void> {
   const url = new URL(req.url ?? "/", "http://playground.local");
   const slugParam = url.searchParams.get("slug");
   const folderParam = url.searchParams.get("folder");
+  const fileParam = url.searchParams.get("file");
   const route = matchSourceRoute(
     req.method ?? "",
     url.pathname,
-    slugParam !== null || folderParam !== null,
+    slugParam !== null || folderParam !== null || fileParam !== null,
   );
   if (!route) {
     return sendJson(res, 405, {
@@ -208,7 +221,7 @@ function handle(
 
   switch (route) {
     case "mark-reviewable":
-      return readJsonBody(req).then((body) => {
+      return readJsonBody(req).then(async (body) => {
         const slug = assertSlug(body["slug"]);
         const line = optionalPositiveInteger(body, "line");
         const column = optionalPositiveInteger(body, "column");
@@ -229,7 +242,7 @@ function handle(
       });
 
     case "delete-reviewable":
-      return readJsonBody(req).then((body) => {
+      return readJsonBody(req).then(async (body) => {
         const slug = assertSlug(body["slug"]);
         const associated = body["associatedCommentIds"];
         if (
@@ -241,7 +254,7 @@ function handle(
             400,
           );
         }
-        const result = deleteReviewable({
+        const result = await deleteReviewable({
           pagesDir,
           commentsDir,
           slug,
@@ -266,7 +279,7 @@ function handle(
     }
 
     case "write":
-      return readJsonBody(req).then((body) => {
+      return readJsonBody(req).then(async (body) => {
         const slug = assertSlug(body["slug"] ?? slugParam);
         if (!sourceExists(pagesDir, slug)) {
           throw new PageStoreError(
@@ -275,11 +288,32 @@ function handle(
           );
         }
         writeSource(pagesDir, slug, requireSource(body));
+        events.changed(pagePath(pagesDir, slug));
         sendJson(res, 200, { slug });
       });
 
+    case "read-file": {
+      const file = readPagesFile(pagesDir, fileParam ?? "");
+      return sendJson(res, 200, {
+        ...file,
+        path: relative(workspaceRoot, pagesFilePath(pagesDir, file.file)),
+      });
+    }
+
+    case "write-file":
+      return readJsonBody(req).then(async (body) => {
+        const written = writePagesFile(
+          pagesDir,
+          fileParam ?? "",
+          requireSource(body),
+          requireString(body, "expectedHash"),
+        );
+        events.changed(pagesFilePath(pagesDir, written.file));
+        sendJson(res, 200, written);
+      });
+
     case "create-page":
-      return readJsonBody(req).then((body) => {
+      return readJsonBody(req).then(async (body) => {
         const slug = assertSlug(body["slug"]);
         createSource(
           pagesDir,
@@ -292,18 +326,18 @@ function handle(
       });
 
     case "create-folder":
-      return readJsonBody(req).then((body) => {
+      return readJsonBody(req).then(async (body) => {
         const folder = createFolder(pagesDir, assertSlug(body["folder"]));
         events.folderCreated(folderPath(pagesDir, folder));
         sendJson(res, 201, { folder });
       });
 
     case "move":
-      return readJsonBody(req).then((body) => {
+      return readJsonBody(req).then(async (body) => {
         const slug = assertSlug(body["slug"]);
         const nextSlug = assertSlug(body["nextSlug"]);
         const title = optionalTitle(body);
-        const result = movePage({
+        const result = await movePage({
           sourceRoot: dirname(pagesDir),
           pagesDir,
           commentsDir,
@@ -318,7 +352,7 @@ function handle(
     case "delete": {
       const slug = assertSlug(slugParam);
       const file = pagePath(pagesDir, slug);
-      const result = deletePage({ pagesDir, commentsDir, slug });
+      const result = await deletePage({ pagesDir, commentsDir, slug });
       events.deleted(file);
       return sendJson(res, 200, result);
     }
@@ -330,7 +364,7 @@ function handle(
       const files = listFolderPages(pagesDir, folder).map((slug) =>
         pagePath(pagesDir, slug),
       );
-      const result = deleteFolder({ pagesDir, commentsDir, folder });
+      const result = await deleteFolder({ pagesDir, commentsDir, folder });
       // One unlink per page so the glob drops each module, then the directory.
       for (const file of files) events.deleted(file);
       events.folderDeleted(directory);
@@ -368,30 +402,35 @@ export function playgroundSources(options: SourcesOptions): Plugin {
         folderDeleted: (folder) => server.watcher.emit("unlinkDir", folder),
       };
 
-      server.middlewares.use(SOURCES_ROUTE, (req, res, next) => {
-        void (async () => {
-          try {
-            await handle(options, events, req, res);
-          } catch (error) {
-            const message =
-              error instanceof Error ? error.message : String(error);
-            server.config.logger.error(
-              `[playground-sources] ${req.method} failed: ${message}`,
-            );
-            if (res.headersSent) {
-              next(error);
-              return;
-            }
-            sendJson(
-              res,
-              error instanceof PageStoreError ? error.statusCode : 400,
-              {
-                error: message,
-              },
-            );
-          }
-        })();
-      });
+      registerSourcesMiddleware({ ...options, middlewares: server.middlewares, logger: server.config.logger, events });
     },
   };
+}
+
+
+export function registerSourcesMiddleware({ middlewares, logger, events, ...options }: SourcesOptions & { middlewares: MiddlewareApp; logger: ErrorLogger; events: SourceEvents }): void {
+  middlewares.use(SOURCES_ROUTE, (req, res, next) => {
+    void (async () => {
+      try {
+        await handle(options, events, req, res);
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        logger.error(
+          `[playground-sources] ${req.method} failed: ${message}`,
+        );
+        if (res.headersSent) {
+          next(error);
+          return;
+        }
+        sendJson(
+          res,
+          error instanceof PageStoreError ? error.statusCode : 400,
+          {
+            error: message,
+          },
+        );
+      }
+    })();
+  });
 }

@@ -12,6 +12,7 @@ import {
 } from "../wizard/profileWizardModel";
 
 export type ProfileFieldStateProps = {
+  normalizedOnly?: boolean;
   discovered: ProfileColumn[];
   configured: ProfileColumn[];
   activeName: string;
@@ -30,6 +31,7 @@ export type ProfileFieldState = ReturnType<typeof useProfileFieldState>;
  */
 export function useProfileFieldState({
   discovered,
+  normalizedOnly = false,
   configured,
   activeName,
   onConfiguredChange,
@@ -41,8 +43,8 @@ export function useProfileFieldState({
     selection: "all",
   });
   const available = useMemo(
-    () => availableProfileFields(discovered, configured),
-    [configured, discovered],
+    () => availableProfileFields(discovered, normalizedOnly ? configured.filter((field) => discovered.some((item) => item.name === field.name)) : configured),
+    [configured, discovered, normalizedOnly],
   );
   const selectedNames = useMemo(
     () => new Set(configured.map((field) => field.name)),

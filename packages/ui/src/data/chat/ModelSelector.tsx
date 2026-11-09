@@ -9,7 +9,8 @@ import {
   effortLevelIcon,
   effortLevelLabel,
 } from "./effort-icons";
-import { providerIcon } from "./provider-icons";
+import { providerIcon, providerIconColor } from "./provider-icons";
+import { shortContextModelName } from "./ContextMeter.model";
 import type { ChatBudgetConfig, ChatModel } from "./types";
 
 export type ModelSelectorProps = {
@@ -40,13 +41,13 @@ export function ModelSelector({ models, value, onChange, className, size = "sm" 
       required
       size={size}
       className={cn("w-48", className)}
-      {...(SelectedGlyph ? { prefix: <SelectedGlyph className="size-4" /> } : {})}
+      {...(SelectedGlyph ? { prefix: <SelectedGlyph className={cn("size-4", providerIconColor(selected?.provider))} /> } : {})}
       options={models.map((m) => {
         const Icon = providerIcon(m.provider);
         return {
           value: m.id,
-          label: m.label,
-          ...(Icon ? { icon: <Icon className="size-4" /> } : {}),
+          label: shortContextModelName(m.label),
+          ...(Icon ? { icon: <Icon className={cn("size-4", providerIconColor(m.provider))} /> } : {}),
           disabled: m.configured === false,
         };
       })}

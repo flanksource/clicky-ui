@@ -153,7 +153,7 @@ export type DomAnchorRefs = {
 export function useDomAnchors(
   refs: DomAnchorRefs,
   comments: PlaygroundComment[],
-  registerAnchor: (anchor: string, el: HTMLElement | null) => void,
+  registerAnchor: (anchor: string, el: Element | null) => void,
 ): DomAnchors {
   const { scrollRef, contentRef } = refs;
   const [pins, setPins] = useState<AnchorPin[]>([]);
@@ -184,7 +184,7 @@ export function useDomAnchors(
           ? resolveComment(content, tally.anchor, locatorsFor(comments, tally.anchor))
           : null;
       const element = match ? match.element : resolveAnchor(content, tally.anchor);
-      if (!(element instanceof HTMLElement)) {
+      if (!element) {
         // A closed dialog is expected, not a broken anchor.
         if (dialog === null) {
           nextOrphans.push({

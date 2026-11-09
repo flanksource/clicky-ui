@@ -13,6 +13,7 @@ import {
   type DropdownMenuItem,
 } from "@flanksource/clicky-ui";
 import { UiRobotAi } from "@flanksource/clicky-ui/icons";
+import { AgentIdentityProvider, type AgentIdentityMetadata } from "@flanksource/clicky-ui/chat";
 
 import {
   fetchAgentSessions,
@@ -24,25 +25,34 @@ import {
   type AgentSessionSettings,
   type AgentSessionsFile,
   type AgentTarget,
-  type CaptainAgentTarget,
+  type SessionAgentTarget,
+  createAgentSession,
 } from "./agent-runs-api";
 import { AgentRunChip } from "./AgentRunChip";
+import { rememberAgentTarget } from "./agent-targets";
+import { AgentSendFailure } from "./AgentSendFailure";
 import { AgentSessionPanel } from "./AgentSessionPanel";
 import { RunAgentDialog } from "./RunAgentDialog";
-import { PLAYGROUND_COMMENT_CONFIG } from "../comments/useComments";
+import { fetchComments, PLAYGROUND_COMMENT_CONFIG } from "../comments/useComments";
 
 type AgentRunsContext = {
-  start: (comment: Comment) => Promise<void>;
+  /** Sends a thread; `target` first points the thread's page at that session. */
+  start: (comment: Comment, target?: AgentTarget) => Promise<void>;
   /** Menu entries for a comment's Assign menu. */
   extraAssignItems: (comment: Comment) => DropdownMenuItem[];
   /** The "sent to agent session" chip for a comment, or nothing. */
   renderRunDetails: (comment: Comment) => ReactNode;
   /** Settings and sessions, as last reported by the playground server. */
   data: AgentSessionsFile | null;
+  error: string | null;
   /** Opens the sessions panel, optionally focused on one captain session. */
   openPanel: (sessionId?: string) => void;
   /** The live captain session `page`'s threads go to; undefined for the playground session. */
-  target: CaptainAgentTarget | undefined;
+  target: SessionAgentTarget | undefined;
+  createSession: (project: string, runtime: AgentSessionRuntime) => Promise<void>;
+  busy: boolean;
+  changeSettings: (patch: Partial<AgentSessionSettings>) => void;
+  configureRuntime: () => void;
   /** Points `page`'s threads at a target; rejects when no `page` was given. */
   setTarget: (target: AgentTarget) => Promise<void>;
 };
@@ -70,7 +80,7 @@ function describeError(cause: unknown): string {
 
 function runAgentTitle(
   data: AgentSessionsFile | null,
-  target: CaptainAgentTarget | undefined,
+  target: SessionAgentTarget | undefined,
 ): string {
   if (target) return `Deliver this thread into the live captain session ${target.label}`;
   const model = data?.settings.runtime?.spec.model;
@@ -103,6 +113,7 @@ export function AgentRunsProvider({
   const [target, setTarget] = useState<DialogTarget | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [failedSend, setFailedSend] = useState<{ comment: Comment; error: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -136,6 +147,7 @@ export function AgentRunsProvider({
     async (next: AgentTarget) => {
       if (!page) throw new Error("AgentRunsProvider has no page to set a target for");
       await setPageAgentTarget(page, next);
+      rememberAgentTarget(next);
       await refresh();
     },
     [page, refresh],
@@ -149,15 +161,29 @@ export function AgentRunsProvider({
     [refresh, runAgent],
   );
 
+  const pointAt = useCallback(async (comment: Comment, next: AgentTarget) => {
+    const commentPage = "page" in comment && typeof comment.page === "string" ? comment.page : page ?? (await fetchComments()).find(entry => entry.id === comment.id)?.page;
+    if (!commentPage) throw new Error(`Cannot find the page for comment ${comment.id}`);
+    await setPageAgentTarget(commentPage, next);
+    rememberAgentTarget(next);
+    await refresh();
+  }, [page, refresh]);
+
+  const retry = useCallback(async (comment: Comment, next?: AgentTarget) => {
+    if (next) await pointAt(comment, next);
+    await send(comment);
+  }, [pointAt, send]);
+
   const openDialog = useCallback((next: DialogTarget) => {
     setDialogError(null);
     setTarget(next);
   }, []);
 
   const start = useCallback(
-    async (comment: Comment) => {
-      // A captain target is delivered into as it is, with no runtime to choose.
-      if (!hasRuntime && !pageTarget) {
+    async (comment: Comment, next?: AgentTarget) => {
+      if (next) await pointAt(comment, next);
+      // A session target is delivered into as it is, with no runtime to choose.
+      if (!hasRuntime && !(next ? next.kind !== "playground" : pageTarget)) {
         openDialog({ mode: "run", comment });
         return;
       }
@@ -170,11 +196,10 @@ export function AgentRunsProvider({
           openDialog({ mode: "run", comment });
           return;
         }
-        setPanelError(message);
-        setPanel({ focusSessionId: null });
+        setFailedSend({ comment, error: message });
       }
     },
-    [hasRuntime, openDialog, pageTarget, send],
+    [hasRuntime, openDialog, pageTarget, pointAt, send],
   );
 
   const act = useCallback(
@@ -208,6 +233,15 @@ export function AgentRunsProvider({
   const value = useMemo<AgentRunsContext>(
     () => ({
       data,
+      error: panelError,
+      busy,
+      changeSettings,
+      configureRuntime: () => openDialog({ mode: "configure", enableAutoRun: false }),
+      createSession: async (project, runtime) => {
+        if (!page) throw new Error("Select a page before creating a session");
+        await createAgentSession({ page, project, runtime });
+        await refresh();
+      },
       start,
       openPanel,
       target: pageTarget,
@@ -231,11 +265,11 @@ export function AgentRunsProvider({
       renderRunDetails: (comment) =>
         comment.agentRun ? (
           <div className="px-1">
-            <AgentRunChip comment={comment} onOpen={openPanel} />
+            <AgentRunChip comment={comment} managedSessions={data?.sessions ?? []} onOpen={openPanel} onRetry={next => retry(comment, next)} />
           </div>
         ) : null,
     }),
-    [changePageTarget, data, hasRuntime, openPanel, pageTarget, start],
+    [busy, changeSettings, openDialog, changePageTarget, data, panelError, hasRuntime, openPanel, pageTarget, retry, start, page, refresh],
   );
 
   const submitRuntime = (runtime: AgentSessionRuntime) => {
@@ -261,9 +295,26 @@ export function AgentRunsProvider({
     );
   };
 
+  const identities = useMemo(() => Object.fromEntries((data?.sessions ?? []).map(session => {
+    const { model, provider, effort } = session.runtime.spec;
+    const metadata: AgentIdentityMetadata = { model, ...(typeof provider === "string" ? { provider } : {}), ...(typeof effort === "string" ? { effort } : {}) };
+    return [session.sessionId, metadata];
+  })), [data]);
   return (
     <AgentRuns.Provider value={value}>
+      <AgentIdentityProvider identities={identities}>
       {children}
+      {failedSend && (
+        <AgentSendFailure
+          managedSessions={data?.sessions ?? []}
+          comment={failedSend.comment}
+          error={failedSend.error}
+          {...(pageTarget ? { targetLabel: pageTarget.label } : {})}
+          onRetry={next => retry(failedSend.comment, next)}
+          onClose={() => setFailedSend(null)}
+          onOpen={openPanel}
+        />
+      )}
       <RunAgentDialog
         open={target !== null}
         mode={target?.mode ?? "run"}
@@ -276,38 +327,16 @@ export function AgentRunsProvider({
       />
       <AgentSessionPanel
         open={panel !== null}
+        {...(page ? { page } : {})}
         data={data}
         focusSessionId={panel?.focusSessionId ?? null}
         error={panelError}
         busy={busy}
         onClose={() => setPanel(null)}
-        onSettings={changeSettings}
-        onChangeRuntime={() => openDialog({ mode: "configure", enableAutoRun: false })}
         onStop={(runId) => act(() => stopAgentSession(runId))}
         onForget={(runId) => act(() => forgetAgentSession(runId))}
       />
+      </AgentIdentityProvider>
     </AgentRuns.Provider>
-  );
-}
-
-/** Toolbar button that opens the agent sessions panel. */
-export function AgentSessionButton() {
-  const { data, openPanel } = useAgentRuns();
-  const running = data?.sessions.filter((session) => session.state === "running") ?? [];
-  return (
-    <button
-      type="button"
-      onClick={() => openPanel()}
-      title={
-        data && data.sessions.length > 0
-          ? `Agent sessions: ${running.length} running of ${data.sessions.length}${data.settings.autoRun ? " · auto-run on" : ""}`
-          : "No agent session yet"
-      }
-      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-    >
-      <UiRobotAi className="size-3.5" />
-      Agent sessions
-      {running.length > 0 && <span className="size-1.5 rounded-full bg-emerald-500" />}
-    </button>
   );
 }

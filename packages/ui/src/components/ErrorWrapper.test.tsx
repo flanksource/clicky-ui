@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ErrorWrapper } from "./ErrorWrapper";
+import type { ErrorDiagnostics } from "../data/diagnostics/error-diagnostics";
 
 function BrokenPage(): never {
   throw new Error("Unable to load the account dashboard", {
@@ -50,6 +51,29 @@ describe("ErrorWrapper", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("hands a custom fallback the normalized diagnostics with the React component stack", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    let received: ErrorDiagnostics | undefined;
+    render(
+      <ErrorWrapper
+        renderFallback={({ diagnostics }) => {
+          received = diagnostics;
+          return null;
+        }}
+      >
+        <BrokenPage />
+      </ErrorWrapper>,
+    );
+    await waitFor(() => expect(received?.stacktrace).toContain("React component stack:"));
+    expect({
+      message: received?.message,
+      cause: received?.context.find(([label]) => label === "cause")?.[1],
+    }).toEqual({
+      message: "Unable to load the account dashboard",
+      cause: "upstream request returned HTTP 502",
+    });
   });
 
   it("renders a full-page diagnostic fallback and copies a support-ready report", async () => {

@@ -5,17 +5,15 @@ import { StatStrip } from "../../StatStrip";
 import { Icon } from "../../Icon";
 import { Callout } from "../../Callout";
 import { Badge } from "../../Badge";
-import { CodeBlock } from "../../CodeBlock";
 import { Properties } from "../../Properties";
 /**
  * OpenTelemetry waterfall with grouped calls and an adjacent span inspector.
  */
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   Button,
   CopyButton,
   SearchInput,
-  Section,
   SplitPane,
   Switch,
 } from "../../../components";
@@ -60,7 +58,15 @@ const ROW_HEIGHT = 28;
 const NAME_COLUMN = "minmax(15rem, 36%) minmax(0, 1fr)";
 
 
-export function OtelTraceDetail({ trace: TRACE, selectedSpanId, onSelectSpan }: { trace: Trace; selectedSpanId?: string; onSelectSpan: (id: string) => void }) {
+export type OtelTraceDetailProps = {
+  trace: Trace;
+  selectedSpanId?: string;
+  onSelectSpan: (id: string) => void;
+  /** Places the trace title elsewhere, e.g. an app shell's top bar; rendered inline when unset. */
+  renderTitle?: (title: ReactNode) => ReactNode;
+};
+
+export function OtelTraceDetail({ trace: TRACE, selectedSpanId, onSelectSpan, renderTitle }: OtelTraceDetailProps) {
   const index = useMemo(() => indexTrace(TRACE), [TRACE]);
   const suspects = useMemo(() => misparented(index), [index]);
   const selected = selectedSpanId ?? TRACE.spans[0]?.spanId ?? "";
@@ -101,7 +107,8 @@ export function OtelTraceDetail({ trace: TRACE, selectedSpanId, onSelectSpan }: 
   return (
     <div className="space-y-8">
       <section className="space-y-4 rounded-xl border border-border bg-background p-density-4">
-        <TraceHeader index={index} trace={TRACE} />
+        {renderTitle ? renderTitle(<TraceTitle trace={TRACE} compact />) : <TraceTitle trace={TRACE} />}
+        <TraceStats index={index} trace={TRACE} />
         {TRACE.missingParents.length > 0 && <p role="status">Partial trace: {TRACE.missingParents.length} parent spans are missing from this source.</p>}
         {suspects.size > 0 && (
           <Callout variant="warning" title={`${suspects.size} spans run inside a nested agent but hang off its parent`}>
@@ -153,7 +160,39 @@ export function OtelTraceDetail({ trace: TRACE, selectedSpanId, onSelectSpan }: 
   );
 }
 
-function TraceHeader({ index, trace: TRACE }: { index: TraceIndex; trace: Trace }) {
+function TraceTitle({ trace: { summary }, compact }: { trace: Trace; compact?: boolean }) {
+  const status = summary.errors === 0 ? <Badge tone="success" variant="soft">no errors</Badge> : <Badge tone="danger" variant="soft">{summary.errors} errors</Badge>;
+  const meta = (
+    <>
+      <code>{summary.traceId}</code>
+      <CopyButton value={summary.traceId} label="Copy trace ID" />
+      <span>· {summary.services.join(", ")} · {new Date(summary.startedAt).toLocaleString()}</span>
+    </>
+  );
+  if (compact)
+    return (
+      <div className="flex min-w-0 flex-1 items-center gap-density-2">
+        <h1 className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-tight" title={summary.operation}>
+          <Tinted icon={UiRobotAi} color={CATEGORY_COLOR.agent} />
+          <span className="min-w-0 truncate">{shortOperation(summary.operation)}</span>
+        </h1>
+        {status}
+        <p className="hidden min-w-0 items-center gap-2 truncate text-xs text-muted-foreground lg:flex">{meta}</p>
+      </div>
+    );
+  return (
+    <div className="min-w-0 space-y-1">
+      <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+        <Tinted icon={UiRobotAi} color={CATEGORY_COLOR.agent} />
+        {shortOperation(summary.operation)}
+        {status}
+      </h2>
+      <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">{meta}</p>
+    </div>
+  );
+}
+
+function TraceStats({ index, trace: TRACE }: { index: TraceIndex; trace: Trace }) {
   const { summary } = TRACE;
   const by = (c: Category) => TRACE.spans.filter(span => category(span) === c);
   const llm = by("llm");
@@ -166,22 +205,6 @@ function TraceHeader({ index, trace: TRACE }: { index: TraceIndex; trace: Trace 
   const tokensOut = sum(llm, "gen_ai.usage.output_tokens");
   const ms = (spans: Span[]) => spans.reduce((total, span) => total + span.durationMs, 0);
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          
-          <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <Tinted icon={UiRobotAi} color={CATEGORY_COLOR.agent} />
-            {shortOperation(summary.operation)}
-            {summary.errors === 0 ? <Badge tone="success" variant="soft">no errors</Badge> : <Badge tone="danger" variant="soft">{summary.errors} errors</Badge>}
-          </h2>
-          <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <code>{summary.traceId}</code>
-            <CopyButton value={summary.traceId} label="Copy trace ID" />
-            <span>· {summary.services.join(", ")} · {new Date(summary.startedAt).toLocaleString()}</span>
-          </p>
-        </div>
-      </div>
       <StatStrip
         items={[
           { label: "Duration", value: duration(summary.durationMs), sub: `${summary.spanCount} spans`, icon: UiClock },
@@ -191,7 +214,6 @@ function TraceHeader({ index, trace: TRACE }: { index: TraceIndex; trace: Trace 
           { label: "Root self-time", value: duration(selfTimeMs(index, root)), sub: "not covered by any child span", icon: UiRobotAi, tone: "warning" },
         ]}
       />
-    </div>
   );
 }
 
@@ -301,7 +323,7 @@ function WaterfallRow({ index, row, active, pct, onSelect, suspects, onToggleSpa
           {toggleButton(open, () => onToggleGroup(row.id), "database group")}
           <Tinted icon={UiDatabase} color={CATEGORY_COLOR.db} />
           <span className="truncate"><span className="font-medium">{row.spans.length} DB calls</span> <span className="text-muted-foreground">{ops.map(([op, n]) => `${op} ×${n}`).join(", ")}</span></span>
-          {suspectCount > 0 && <><Tinted icon={UiWarningTriangle} color="var(--fs-warning)" label={`${suspectCount} calls run inside a nested agent but are parented elsewhere`} /><span className="text-muted-foreground">{suspectCount}</span></>}
+          {suspectCount > 0 && <><Tinted icon={UiWarningTriangle} color="var(--clicky-warning)" label={`${suspectCount} calls run inside a nested agent but are parented elsewhere`} /><span className="text-muted-foreground">{suspectCount}</span></>}
         </div>
         <div className="relative mr-12 h-full">
           <span className="absolute rounded-sm" style={{ left: pct(first), width: pct(end - first), top: 11, height: 6, background: CATEGORY_COLOR.db, opacity: 0.18 }} />
@@ -329,7 +351,7 @@ function WaterfallRow({ index, row, active, pct, onSelect, suspects, onToggleSpa
         <span className={`truncate ${c === "db" ? "" : "font-medium"}`}>{label}</span>
         {typeof table === "string" && <span className="truncate text-muted-foreground">{table}</span>}
         {row.childCount > 0 && collapsed.has(span.spanId) && <span className="text-muted-foreground">+{row.childCount}</span>}
-        {suspects.has(span.spanId) && <Tinted icon={UiWarningTriangle} color="var(--fs-warning)" label="Runs inside a nested agent but is parented elsewhere" />}
+        {suspects.has(span.spanId) && <Tinted icon={UiWarningTriangle} color="var(--clicky-warning)" label="Runs inside a nested agent but is parented elsewhere" />}
         {error && <Badge size="sm" tone="danger" variant="soft">error</Badge>}
       </div>
       <div className="relative mr-12 h-full">
@@ -351,7 +373,6 @@ function SpanDetail({ index, span, host, onSelect }: { index: TraceIndex; span: 
   const c = category(span);
   const ancestors: Span[] = [];
   for (let p = span.parentId ? index.byId.get(span.parentId) : undefined; p; p = p.parentId ? index.byId.get(p.parentId) : undefined) ancestors.unshift(p);
-  const attributes = Object.entries(span.attributes ?? {});
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
@@ -385,14 +406,45 @@ function SpanDetail({ index, span, host, onSelect }: { index: TraceIndex; span: 
       {c === "agent" && <AgentCard index={index} span={span} />}
       {c === "llm" && <LlmCard span={span} />}
       {c === "db" && <DbCard span={span} />}
-      <Section title={`All attributes (${attributes.length})`} defaultOpen={c === "other"}>
-        <Properties renderLabel={key => <code className="text-xs">{key}</code>} items={attributes.map(([key, value]) => ({ key, value }))} />
-      </Section>
-      {span.otlp && <Section title="OpenTelemetry metadata" defaultOpen={false}><CodeBlock language="json" source={JSON.stringify(span.otlp, null, 2)} jsonDefaultOpenDepth={4} copyable /></Section>}
-      <Section title={`Resource (${Object.keys(span.resource ?? {}).length})`} defaultOpen={false}>
-        <Properties renderLabel={key => <code className="text-xs">{key}</code>} items={Object.entries(span.resource ?? {}).map(([key, value]) => ({ key, value }))} />
-      </Section>
+      <SpanProperties key={span.spanId} span={span} attributesOpen={c === "other"} />
     </div>
+  );
+}
+
+/** One properties table whose section rows (attributes, resource, OTLP metadata) expand in place. */
+function SpanProperties({ span, attributesOpen }: { span: Span; attributesOpen: boolean }) {
+  const [open, setOpen] = useState(() => new Set(attributesOpen ? ["Attributes"] : []));
+  const sections = [
+    { title: "Attributes", values: span.attributes ?? {} },
+    { title: "Resource", values: span.resource ?? {} },
+    ...(span.otlp ? [{ title: "OpenTelemetry metadata", values: span.otlp }] : []),
+  ];
+  const toggle = (title: string) => setOpen(previous => {
+    const next = new Set(previous);
+    if (!next.delete(title)) next.add(title);
+    return next;
+  });
+  return (
+    <Properties
+      keyRef="otel-span"
+      items={sections.map(({ title, values }) => {
+        const entries = Object.entries(values);
+        return {
+          key: title,
+          value: `${entries.length} ${entries.length === 1 ? "key" : "keys"}`,
+          expandable: entries.length > 0,
+          expanded: open.has(title),
+          renderChildren: () => <Properties renderLabel={key => <code className="text-xs">{key}</code>} items={entries.map(([key, value]) => ({ key, value }))} />,
+        };
+      })}
+      renderLabel={(title, _value, item) => (
+        <button type="button" aria-expanded={item.expandable ? open.has(title) : undefined} disabled={!item.expandable} className="flex min-w-0 items-center gap-1 font-medium text-foreground disabled:text-muted-foreground" onClick={() => toggle(title)}>
+          <Icon icon={open.has(title) && item.expandable ? UiChevronDown : UiChevronRight} className="shrink-0 text-muted-foreground" />
+          <span className="truncate">{title}</span>
+        </button>
+      )}
+      renderValue={(_title, value) => <span className="text-xs text-muted-foreground">{value}</span>}
+    />
   );
 }
 

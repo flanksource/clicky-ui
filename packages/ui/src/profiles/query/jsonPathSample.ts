@@ -6,7 +6,7 @@ import { profileApiPath } from "../profileApi";
 
 /** Every sampled row in scope; empty where nothing has been sampled. */
 export function useJsonPathSampleRows(): unknown[] {
-  return useContext(JsonPathSampleRowsContext);
+  return useContext(JsonPathSampleRowsContext) ?? EMPTY_ROWS;
 }
 
 export function sampleRequestProfile(profile: unknown): Record<string, unknown> | null {
@@ -32,10 +32,11 @@ export function sampleRequestProfile(profile: unknown): Record<string, unknown> 
  * and the path typed by hand rather than picked.
  */
 export function useJsonPathSample(profile: unknown): unknown[] {
+  const retained = useContext(JsonPathSampleRowsContext);
   const request = useMemo(() => sampleRequestProfile(profile), [profile]);
   const { data } = useQuery({
     queryKey: ["jsonpath-sample", JSON.stringify(request)],
-    enabled: request !== null,
+    enabled: request !== null && retained === undefined,
     // The sample is a query against someone's backend, so it is fetched once per
     // profile shape and reused by every column's picker rather than re-run as
     // the form re-renders.
@@ -55,7 +56,7 @@ export function useJsonPathSample(profile: unknown): unknown[] {
       return result.rows ?? EMPTY_ROWS;
     },
   });
-  return data ?? EMPTY_ROWS;
+  return retained ?? data ?? EMPTY_ROWS;
 }
 
 /**
@@ -90,7 +91,7 @@ const EMPTY_ROWS: unknown[] = [];
 // inspector far from the draft it is editing, so that page samples once here and
 // every column field reads the result — one request per editor rather than one
 // per column, and no query client needed at the leaf.
-export const JsonPathSampleRowsContext = createContext<unknown[]>(EMPTY_ROWS);
+export const JsonPathSampleRowsContext = createContext<unknown[] | undefined>(undefined);
 
 // The keys /profile/sample accepts. It decodes with DisallowUnknownFields, so
 // this is a whitelist rather than a tidy-up: one stray key and the whole request
@@ -107,6 +108,9 @@ const SAMPLE_PROFILE_KEYS = [
   "params",
   "imports",
   "namespace",
+  "processors",
+  "search",
+  "spans",
 ] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {

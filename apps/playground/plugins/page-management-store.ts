@@ -10,7 +10,6 @@ import {
 import { dirname, join } from "node:path";
 
 import { readAll, writeAll, type CommentsFile } from "./comments-store";
-import { stageScreenshotRemoval } from "./comments-screenshots";
 import {
   planPageReferenceUpdates,
   readTypeScriptSources,
@@ -70,7 +69,11 @@ export type DeleteFolderOptions = {
   commentsDir: string;
   folder: string;
   /** Seam for exercising the rollback, mirroring `movePage.writeReference`. */
-  writeComments?: (dir: string, comments: CommentsFile) => void;
+  writeComments?: (
+    dir: string,
+    comments: CommentsFile,
+    previous: CommentsFile,
+  ) => Promise<void>;
 };
 
 export type DeleteFolderResult = {
@@ -102,7 +105,7 @@ function commentsAfterMove(
   return { comments: next, movedComments: moved.length, changed: true };
 }
 
-function rollbackMove(options: {
+async function rollbackMove(options: {
   pagesDir: string;
   slug: string;
   nextSlug: string;
@@ -111,24 +114,15 @@ function rollbackMove(options: {
   comments: CommentsFile;
   referenceEdits: readonly PageReferenceEdit[];
   writeReference: (file: string, source: string) => void;
-}): void {
-  const {
-    pagesDir,
-    slug,
-    nextSlug,
-    source,
-    commentsDir,
-    comments,
-    referenceEdits,
-    writeReference,
-  } = options;
+}): Promise<void> {
+  const { pagesDir, slug, nextSlug, source, referenceEdits, writeReference } =
+    options;
   if (slug !== nextSlug && sourceExists(pagesDir, nextSlug)) {
     mkdirSync(dirname(pagePath(pagesDir, slug)), { recursive: true });
     renameSync(pagePath(pagesDir, nextSlug), pagePath(pagesDir, slug));
   }
   writeSource(pagesDir, slug, source);
   for (const edit of referenceEdits) writeReference(edit.file, edit.source);
-  writeAll(commentsDir, comments);
 }
 
 function writeTextFile(file: string, source: string): void {
@@ -141,7 +135,7 @@ function writeTextFile(file: string, source: string): void {
   }
 }
 
-function prepareMove(options: MovePageOptions): PreparedMove {
+async function prepareMove(options: MovePageOptions): Promise<PreparedMove> {
   const { sourceRoot, pagesDir, commentsDir, slug, nextSlug, title } = options;
   const source = readSource(pagesDir, slug);
   const nextSource =
@@ -158,16 +152,16 @@ function prepareMove(options: MovePageOptions): PreparedMove {
     oldSlug: slug,
     newSlug: nextSlug,
   });
-  const comments = readAll(commentsDir);
+  const comments = await readAll(commentsDir);
   const commentMove = commentsAfterMove(comments, slug, nextSlug);
   return { source, comments, commentMove, referencePlan };
 }
 
-function applyMove(options: {
+async function applyMove(options: {
   move: MovePageOptions;
   prepared: PreparedMove;
   writeReference: (file: string, source: string) => void;
-}): void {
+}): Promise<void> {
   const { move, prepared, writeReference } = options;
   if (move.slug !== move.nextSlug) {
     mkdirSync(dirname(pagePath(move.pagesDir, move.nextSlug)), {
@@ -188,29 +182,45 @@ function applyMove(options: {
   for (const edit of prepared.referencePlan.edits)
     writeReference(edit.file, edit.nextSource);
   if (prepared.commentMove.changed)
-    writeAll(move.commentsDir, prepared.commentMove.comments);
+    await writeAll(
+      move.commentsDir,
+      prepared.commentMove.comments,
+      prepared.comments,
+    );
 }
 
-export function movePage(options: MovePageOptions): MovePageResult {
+export async function movePage(
+  options: MovePageOptions,
+): Promise<MovePageResult> {
   const { pagesDir, slug, nextSlug } = options;
   if (!sourceExists(pagesDir, slug)) {
     throw new PageStoreError(`page "${slug}" does not exist`, 404);
   }
   // Moving rewrites the page's title and its importers as TypeScript.
   if (pageExtension(pagePath(pagesDir, slug)) !== ".tsx") {
-    throw new PageStoreError(`page "${slug}" is a markdown page; only .tsx pages can be moved or renamed`, 400);
+    throw new PageStoreError(
+      `page "${slug}" is a markdown page; only .tsx pages can be moved or renamed`,
+      400,
+    );
   }
   if (slug !== nextSlug && sourceExists(pagesDir, nextSlug)) {
     throw new PageStoreError(`page "${nextSlug}" already exists`, 409);
   }
   const writeReference = options.writeReference ?? writeTextFile;
-  const prepared = prepareMove(options);
+  const prepared = await prepareMove(options);
+
+  if (readSource(pagesDir, slug) !== prepared.source) {
+    throw new PageStoreError(
+      "page source changed while loading feedback; reload and try again",
+      409,
+    );
+  }
 
   try {
-    applyMove({ move: options, prepared, writeReference });
+    await applyMove({ move: options, prepared, writeReference });
   } catch (cause) {
     try {
-      rollbackMove({
+      await rollbackMove({
         pagesDir,
         slug,
         nextSlug,
@@ -242,10 +252,10 @@ export function movePage(options: MovePageOptions): MovePageResult {
   };
 }
 
-export function deletePage(options: DeletePageOptions): {
+export async function deletePage(options: DeletePageOptions): Promise<{
   slug: string;
   deletedComments: number;
-} {
+}> {
   const { pagesDir, commentsDir, slug } = options;
   if (!sourceExists(pagesDir, slug)) {
     throw new PageStoreError(`page "${slug}" does not exist`, 404);
@@ -253,31 +263,18 @@ export function deletePage(options: DeletePageOptions): {
 
   const file = pagePath(pagesDir, slug);
   const backup = `${file}.${randomUUID()}.delete.tmp`;
-  const comments = readAll(commentsDir);
+  const comments = await readAll(commentsDir);
   const deletedComments = comments[slug]?.length ?? 0;
   const changed = Object.hasOwn(comments, slug);
   const nextComments = { ...comments };
   delete nextComments[slug];
-  const screenshotRemoval = stageScreenshotRemoval(
-    commentsDir,
-    comments[slug] ?? [],
-  );
 
+  renameSync(file, backup);
   try {
-    renameSync(file, backup);
-  } catch (cause) {
-    screenshotRemoval.rollback();
-    throw cause;
-  }
-  try {
-    if (changed) writeAll(commentsDir, nextComments);
-    unlinkSync(backup);
-    screenshotRemoval.commit();
+    if (changed) await writeAll(commentsDir, nextComments, comments);
   } catch (cause) {
     try {
-      screenshotRemoval.rollback();
       if (existsSync(backup)) renameSync(backup, file);
-      if (changed) writeAll(commentsDir, comments);
     } catch (rollbackCause) {
       throw new PageStoreError(
         `page deletion failed (${String(cause)}) and rollback failed (${String(rollbackCause)})`,
@@ -290,6 +287,7 @@ export function deletePage(options: DeletePageOptions): {
     );
   }
 
+  unlinkSync(backup);
   return { slug, deletedComments };
 }
 
@@ -303,7 +301,9 @@ export function deletePage(options: DeletePageOptions): {
  * the pages directory would be a directory full of `.tsx` files that the
  * registry glob would happily list as artifacts while it exists.
  */
-export function deleteFolder(options: DeleteFolderOptions): DeleteFolderResult {
+export async function deleteFolder(
+  options: DeleteFolderOptions,
+): Promise<DeleteFolderResult> {
   const { pagesDir, commentsDir, folder } = options;
   const target = folderPath(pagesDir, folder);
   if (!existsSync(target)) {
@@ -311,7 +311,7 @@ export function deleteFolder(options: DeleteFolderOptions): DeleteFolderResult {
   }
 
   const deletedPages = listFolderPages(pagesDir, folder);
-  const comments = readAll(commentsDir);
+  const comments = await readAll(commentsDir);
   const nextComments = { ...comments };
   let deletedComments = 0;
   for (const slug of deletedPages) {
@@ -321,29 +321,13 @@ export function deleteFolder(options: DeleteFolderOptions): DeleteFolderResult {
   const changed = deletedPages.some((slug) => Object.hasOwn(comments, slug));
   const backup = join(dirname(pagesDir), `.${randomUUID()}.folder-delete.tmp`);
   const writeComments = options.writeComments ?? writeAll;
-  const deletedPageComments = deletedPages.flatMap(
-    (slug) => comments[slug] ?? [],
-  );
-  const screenshotRemoval = stageScreenshotRemoval(
-    commentsDir,
-    deletedPageComments,
-  );
 
+  renameSync(target, backup);
   try {
-    renameSync(target, backup);
-  } catch (cause) {
-    screenshotRemoval.rollback();
-    throw cause;
-  }
-  try {
-    if (changed) writeComments(commentsDir, nextComments);
-    rmSync(backup, { recursive: true, force: true });
-    screenshotRemoval.commit();
+    if (changed) await writeComments(commentsDir, nextComments, comments);
   } catch (cause) {
     try {
-      screenshotRemoval.rollback();
       if (existsSync(backup)) renameSync(backup, target);
-      if (changed) writeAll(commentsDir, comments);
     } catch (rollbackCause) {
       throw new PageStoreError(
         `folder deletion failed (${String(cause)}) and rollback failed (${String(rollbackCause)})`,
@@ -356,5 +340,6 @@ export function deleteFolder(options: DeleteFolderOptions): DeleteFolderResult {
     );
   }
 
+  rmSync(backup, { recursive: true, force: true });
   return { folder, deletedPages, deletedComments };
 }
