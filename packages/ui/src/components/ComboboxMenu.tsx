@@ -284,7 +284,7 @@ function ComboboxOptionDescription({
   responsive?: boolean;
 }) {
   return description ? (
-    <span className={cn("text-xs font-normal leading-4 text-muted-foreground", responsive ? "min-w-0 whitespace-normal [overflow-wrap:anywhere] @min-[28rem]/combobox-options:max-w-[55%] @min-[28rem]/combobox-options:shrink-0 @min-[28rem]/combobox-options:truncate" : inline ? "min-w-0 max-w-[55%] shrink-0 truncate" : "mt-0.5 block whitespace-pre-line")}>
+    <span className={cn("text-xs font-normal leading-4 text-muted-foreground", responsive ? "min-w-0 whitespace-normal [overflow-wrap:anywhere] @min-[28rem]/combobox-options:max-w-[55%] @min-[28rem]/combobox-options:shrink-0 @min-[28rem]/combobox-options:truncate" : inline ? "min-w-0 truncate" : "mt-0.5 block whitespace-pre-line")}>
       {description}
     </span>
   ) : null;

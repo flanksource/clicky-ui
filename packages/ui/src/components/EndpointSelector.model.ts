@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import type { StaticIconComponent } from "../data/Icon";
 import type { SecretKeySelectorProps, SecretKeyValue } from "./SecretKeySelector";
 import type {
   WorkloadKind,
@@ -59,6 +61,20 @@ export type EndpointUrlSelectorProps = Omit<
   "value" | "onChange"
 >;
 
+/**
+ * A consumer-owned mode shown beside the built-in ones (after URL). Selecting
+ * it clears the endpoint value and renders `content` in place of the mode's
+ * fields; it stays selected while the endpoint value is empty.
+ */
+export type EndpointExtraMode = {
+  id: string;
+  label: string;
+  icon?: StaticIconComponent;
+  /** Start on this mode when the endpoint value is empty, e.g. its own fields are filled. */
+  active: boolean;
+  content: ReactNode;
+};
+
 export type EndpointSelectorProps = {
   value: EndpointSelectorValue | undefined;
   onChange: (value: EndpointSelectorValue | undefined) => void;
@@ -79,6 +95,7 @@ export type EndpointSelectorProps = {
   showScheme?: boolean;
   showPath?: boolean;
   showIngressPort?: boolean;
+  extraMode?: EndpointExtraMode;
   className?: string;
 };
 
@@ -204,6 +221,14 @@ function validateWorkloadValue(value: EndpointWorkloadValue) {
   if (value.path && !value.path.startsWith("/")) {
     throw new Error(`Endpoint path "${value.path}" must start with /`);
   }
+}
+
+/** No endpoint chosen yet: nothing set, or a URL source with nothing typed. */
+export function emptyEndpointValue(value: EndpointSelectorValue | undefined) {
+  return (
+    value === undefined ||
+    (value.mode === "url" && serializeSecretRef(value.source) === "")
+  );
 }
 
 export function serializeEndpointValue(

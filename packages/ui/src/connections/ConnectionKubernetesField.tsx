@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Combobox } from "../components/Combobox";
 import { InputField } from "../components/InputField";
-import { Button } from "../components/button";
 import { UiFileCog, UiNetwork, UiFolder } from "../icons";
 import { LocalPathPicker } from "../components/LocalPathPicker";
 import {
@@ -88,13 +87,14 @@ export function ConnectionKubernetesField({
   };
   if (isContext)
     return (
-      <div className="space-y-2">
+      <div className="space-y-2" title={field.description}>
         <Combobox
           ariaLabel="Kubecontext"
           label={
             <UiNetwork className="size-4 text-muted-foreground" aria-hidden />
           }
           value={value}
+          placeholder="Current context"
           options={[
             { value: "", label: "Use current context" },
             ...contexts.map((name) => ({ value: name, label: name })),
@@ -126,23 +126,27 @@ export function ConnectionKubernetesField({
         value={value}
         onChange={changeFile}
         aria-label="Kubeconfig file"
+        placeholder="$KUBECONFIG"
+        title={field.description}
         className="min-w-0 flex-1"
         prefix={
           <UiFileCog className="size-4 text-muted-foreground" aria-hidden />
         }
+        suffix={
+          typeof window !== "undefined" &&
+          isLocalHostname(window.location.hostname) && (
+            <button
+              type="button"
+              aria-label="Browse kubeconfig files"
+              title="Browse kubeconfig files"
+              className="inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+              onClick={() => setOpen(true)}
+            >
+              <UiFolder className="size-4" aria-hidden />
+            </button>
+          )
+        }
       />
-      {typeof window !== "undefined" &&
-        isLocalHostname(window.location.hostname) && (
-          <Button
-            type="button"
-            variant="outline"
-            aria-label="Browse kubeconfig files"
-            title="Browse kubeconfig files"
-            onClick={() => setOpen(true)}
-          >
-            <UiFolder className="size-4" aria-hidden />
-          </Button>
-        )}
       {open && (
         <LocalPathPicker
           open={open}

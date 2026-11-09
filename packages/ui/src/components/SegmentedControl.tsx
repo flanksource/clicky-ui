@@ -97,7 +97,8 @@ export function SegmentedControl<T extends string = string>({
       aria-label={ariaLabel}
       className={cn(
         "inline-flex items-center rounded-md bg-muted p-0.5",
-        size === "md" && "h-control-h",
+        // A wrapped track grows a row per line; a fixed height would clip them.
+        size === "md" && (wrap ? "min-h-control-h" : "h-control-h"),
         size === "lg" && "gap-density-2 bg-transparent p-0",
         wrap && "flex-wrap",
         className,
@@ -138,6 +139,7 @@ export function SegmentedControl<T extends string = string>({
               size === "lg" && "rounded-lg text-left",
               option.description ? "whitespace-normal" : "whitespace-nowrap",
               SIZE_CLASSES[size],
+              size === "md" && wrap && "h-auto py-1",
               active
                 ? size === "lg"
                   ? "border-primary/70 bg-primary/10 text-foreground shadow-sm ring-1 ring-primary/25"

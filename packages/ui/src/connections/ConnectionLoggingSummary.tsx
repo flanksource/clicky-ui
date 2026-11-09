@@ -29,14 +29,35 @@ export function ConnectionLoggingSummary({
       return updated;
     });
   };
+  const entries: Array<[string, string]> = [
+    ...definition.events.map((event): [string, string] => [
+      event.label,
+      effectiveConnectionLogLevel(event, value),
+    ]),
+    [
+      definition.thresholdLabel,
+      value["log.slowThreshold"] ?? definition.slowThreshold,
+    ],
+  ];
+  const summary = entries.map(([label, level]) => `${label}: ${level}`).join("\n");
   return (
     <section
       aria-label="Connection logging"
-      className="space-y-2 rounded-md border border-border p-3"
+      className="flex min-w-0 items-center gap-3 rounded-md border border-border py-1 pl-3 pr-1"
     >
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-medium">Logging</h3>
-        {!readOnly && (
+      <h3 className="shrink-0 text-sm font-medium">Logging</h3>
+      <dl
+        className="flex w-0 min-w-0 flex-1 gap-x-4 overflow-hidden whitespace-nowrap text-xs"
+        title={summary}
+      >
+        {entries.map(([label, level]) => (
+          <div key={label} className="flex items-baseline gap-1.5">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="font-mono">{level}</dd>
+          </div>
+        ))}
+      </dl>
+      {!readOnly && (
           <DropdownMenu
             role="dialog"
             label="Edit logging"
@@ -118,24 +139,7 @@ export function ConnectionLoggingSummary({
               </div>
             )}
           </DropdownMenu>
-        )}
-      </div>
-      <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        {definition.events.map((event) => (
-          <div key={event.property} className="flex items-baseline gap-1.5">
-            <dt className="text-muted-foreground">{event.label}</dt>
-            <dd className="font-mono">
-              {effectiveConnectionLogLevel(event, value)}
-            </dd>
-          </div>
-        ))}
-        <div className="flex items-baseline gap-1.5">
-          <dt className="text-muted-foreground">{definition.thresholdLabel}</dt>
-          <dd className="font-mono">
-            {value["log.slowThreshold"] ?? definition.slowThreshold}
-          </dd>
-        </div>
-      </dl>
+      )}
     </section>
   );
 }

@@ -3,6 +3,7 @@ import { EndpointSelector } from "./EndpointSelector";
 import {
   parseEndpointValue,
   serializeEndpointValue,
+  type EndpointExtraMode,
   type EndpointSelectorValue,
 } from "./EndpointSelector.model";
 import {
@@ -20,6 +21,8 @@ export type SecretFormFieldProps = SecretFormExtensionOptions & {
   field: FieldControl;
   namespace: string;
   allowWorkload: boolean;
+  /** An extra endpoint mode beside URL and the workload modes (`allowWorkload` only). */
+  endpointExtraMode?: EndpointExtraMode;
 };
 
 function defaultSecretValue(source: unknown): SecretKeyValue | undefined {
@@ -53,7 +56,8 @@ function useFieldDraft<T>({
   onChange: (next: unknown) => void;
 }): [T | undefined, (next: T | undefined) => void] {
   const rawString = typeof raw === "string" ? raw : "";
-  const [draft, setDraft] = useState<T | undefined>();
+  // Boxed so a committed clear stays cleared instead of falling back to the seed.
+  const [draft, setDraft] = useState<{ value: T | undefined }>();
   const committed = useRef(rawString);
 
   useEffect(() => {
@@ -64,7 +68,7 @@ function useFieldDraft<T>({
 
   const commit = useCallback(
     (next: T | undefined) => {
-      setDraft(next);
+      setDraft({ value: next });
       const serialized = serialize(next);
       committed.current = serialized;
       onChange(serialized);
@@ -72,13 +76,14 @@ function useFieldDraft<T>({
     [onChange, serialize],
   );
 
-  return [draft ?? parsed ?? seeded, commit];
+  return [draft ? draft.value : (parsed ?? seeded), commit];
 }
 
 export function SecretFormField({
   field,
   namespace,
   allowWorkload,
+  endpointExtraMode,
   loaders,
   secretSources,
   urlSources,
@@ -153,6 +158,7 @@ export function SecretFormField({
         showPath
         showIngressPort
         allowCustomPort
+        {...(endpointExtraMode ? { extraMode: endpointExtraMode } : {})}
       />
     );
   }

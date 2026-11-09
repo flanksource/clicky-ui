@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "../lib/utils";
-import { UiWarningTriangle } from "../icons";
+import {
+  UiK8sEndpoint,
+  UiK8sIngress,
+  UiK8sPod,
+  UiK8sService,
+  UiLink,
+  UiServer,
+  UiWarningTriangle,
+} from "../icons";
+import type { StaticIconComponent } from "../data/Icon";
 import { Combobox, type ComboboxOption } from "./Combobox";
 import {
   DEFAULT_PREFERRED_ENDPOINT_PORTS,
@@ -26,6 +35,7 @@ import type {
   EndpointWorkloadValue,
   EndpointWorkloadMode,
 } from "./EndpointSelector.model";
+import { emptyEndpointValue } from "./EndpointSelector.model";
 const MODE_LABELS: Record<EndpointMode, string> = {
   url: "URL",
   service: "Service",
@@ -33,6 +43,14 @@ const MODE_LABELS: Record<EndpointMode, string> = {
   "api-proxy": "API proxy",
   ingress: "Ingress",
   "port-forward": "Port-forward",
+};
+const MODE_ICONS: Record<EndpointMode, StaticIconComponent> = {
+  url: UiLink,
+  service: UiK8sService,
+  "cluster-ip": UiK8sEndpoint,
+  "api-proxy": UiServer,
+  ingress: UiK8sIngress,
+  "port-forward": UiK8sPod,
 };
 const DEFAULT_MODE_KINDS: Record<EndpointWorkloadMode, WorkloadKind[]> = {
   service: ["service"],
@@ -123,12 +141,18 @@ export function EndpointSelector({
   showScheme = false,
   showPath = false,
   showIngressPort = false,
+  extraMode,
   className,
 }: EndpointSelectorProps) {
   const fallbackMode = defaultMode ?? modes[0];
   if (!fallbackMode || !modes.includes(fallbackMode)) {
     throw new Error(
       "EndpointSelector requires a default mode included in modes",
+    );
+  }
+  if (extraMode && (modes as string[]).includes(extraMode.id)) {
+    throw new Error(
+      `EndpointSelector extra mode "${extraMode.id}" collides with a built-in mode`,
     );
   }
   if (value && !modes.includes(value.mode)) {
@@ -140,8 +164,11 @@ export function EndpointSelector({
     );
   }
 
-  const [activeMode, setActiveMode] = useState<EndpointMode>(
-    value?.mode ?? fallbackMode,
+  const extraId = extraMode?.id;
+  const [selectedMode, setActiveMode] = useState<string>(
+    extraMode?.active && emptyEndpointValue(value)
+      ? extraMode.id
+      : (value?.mode ?? fallbackMode),
   );
   const [resources, setResources] = useState<EndpointResources>({});
   const resourcesRef = useRef<EndpointResources>({});
@@ -149,11 +176,20 @@ export function EndpointSelector({
   const modesKey = modes.join(",");
 
   useEffect(() => {
-    setActiveMode(
-      (current) =>
-        value?.mode ?? (modes.includes(current) ? current : fallbackMode),
-    );
-  }, [value, fallbackMode, modesKey]);
+    setActiveMode((current) => {
+      if (current === extraId && emptyEndpointValue(value)) return current;
+      return (
+        value?.mode ??
+        ((modes as string[]).includes(current) ? current : fallbackMode)
+      );
+    });
+  }, [value, fallbackMode, modesKey, extraId]);
+
+  const extraActive = extraMode !== undefined && selectedMode === extraId;
+  // The extra mode renders its own content; the built-in branches below see URL.
+  const activeMode: EndpointMode = extraActive
+    ? "url"
+    : (selectedMode as EndpointMode);
 
   const enabledKinds = useMemo(
     () =>
@@ -234,12 +270,33 @@ export function EndpointSelector({
     value,
   ]);
 
-  const modeOptions = useMemo<SegmentedOption<EndpointMode>[]>(
-    () => modes.map((mode) => ({ id: mode, label: MODE_LABELS[mode] })),
-    [modes],
-  );
+  const extraLabel = extraMode?.label;
+  const extraIcon = extraMode?.icon;
+  const modeOptions = useMemo<SegmentedOption<string>[]>(() => {
+    const builtIn: SegmentedOption<string>[] = modes.map((mode) => ({
+      id: mode,
+      label: MODE_LABELS[mode],
+      icon: MODE_ICONS[mode],
+      iconClassName: "text-muted-foreground",
+    }));
+    if (extraId === undefined || extraLabel === undefined) return builtIn;
+    const extra: SegmentedOption<string> = {
+      id: extraId,
+      label: extraLabel,
+      ...(extraIcon ? { icon: extraIcon } : {}),
+      iconClassName: "text-muted-foreground",
+    };
+    const after = modes.indexOf("url") + 1;
+    return [...builtIn.slice(0, after), extra, ...builtIn.slice(after)];
+  }, [modes, extraId, extraLabel, extraIcon]);
 
-  const selectMode = (nextMode: EndpointMode) => {
+  const selectMode = (next: string) => {
+    if (next === extraId) {
+      setActiveMode(next);
+      if (!emptyEndpointValue(value)) onChange(undefined);
+      return;
+    }
+    const nextMode = next as EndpointMode;
     setActiveMode(nextMode);
     if (nextMode === "url") {
       onNamespaceChange?.(undefined);
@@ -344,14 +401,16 @@ export function EndpointSelector({
   return (
     <div className={cn("@container/endpoint space-y-density-2", className)}>
       <SegmentedControl
-        value={activeMode}
+        value={selectedMode}
         options={modeOptions}
         onChange={selectMode}
         wrap
         aria-label="Endpoint access mode"
       />
 
-      {activeMode === "url" ? (
+      {extraActive ? (
+        extraMode.content
+      ) : activeMode === "url" ? (
         (() => {
           if (!urlSelector) {
             throw new Error("EndpointSelector url mode requires urlSelector");
