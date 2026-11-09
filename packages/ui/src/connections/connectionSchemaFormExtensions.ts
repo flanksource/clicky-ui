@@ -1,7 +1,22 @@
 import { createElement } from "react";
 import { JsonSchemaForm } from "../components/JsonSchemaForm";
-import type { PostExtension } from "../components/json-schema-form-runtime-types";
-import type { JsonSchemaObject } from "../components/json-schema-form-types";
+import { effectiveProperties } from "../components/json-schema-form-conditionals";
+import { rehydrateRefs } from "../components/json-schema-form-refs";
+import type {
+  PostExtension,
+  PostExtensionContext,
+  PreExtension,
+} from "../components/json-schema-form-runtime-types";
+import type {
+  FieldControl,
+  JsonSchemaObject,
+  JsonSchemaProperty,
+} from "../components/json-schema-form-types";
+import { isPlainObject } from "../lib/collections";
+import { ConnectionHostPortField } from "./ConnectionHostPortField";
+import { InputField } from "../components/InputField";
+import type { EndpointExtraMode } from "../components/EndpointSelector.model";
+import { UiHardDrive } from "../icons";
 import type { SecretValueSource } from "../components/SecretKeySelector";
 import { type SecretFormLoaders } from "../components/secret-form-extension";
 import { stripTrailingSlashes } from "../lib/string";
@@ -41,6 +56,12 @@ export type ConnectionSchemaFormExtensionsOptions = {
   schema: JsonSchemaObject;
   /** Defaults to `fetch`, the request the dashboard and Test / Resolve use. */
   fetcher?: ConnectionJsonFetcher;
+  /**
+   * Where kubeconfig / kubecontext are edited: `"form"` (default) renders them
+   * as a form row; `"external"` leaves them out for a host that places
+   * `ConnectionKubernetesContext` elsewhere, e.g. in the dialog header.
+   */
+  kubernetes?: "form" | "external";
 };
 
 export type ConnectionSecretSources = {
@@ -97,6 +118,89 @@ export function connectionSecretSources(
   };
 }
 
+/** The selected connection type's root fields and its nested `properties` fields. */
+type ConnectionBranch = {
+  root: Record<string, JsonSchemaProperty>;
+  nested: Record<string, JsonSchemaProperty>;
+};
+
+type RootEditor = Required<
+  Pick<PostExtensionContext, "rootValue" | "onRootChange">
+>;
+
+const hoisted = (prop: JsonSchemaProperty | undefined) =>
+  prop?.["x-clicky-hoist"] === true;
+
+/** A hoisted host and port render as one `host : port` row. */
+const pairsHostPort = (branch: ConnectionBranch) =>
+  hoisted(branch.nested.host) && hoisted(branch.nested.port);
+
+/**
+ * The editable URL selector whose mode tabs carry the `host : port` pair as
+ * one more mode, when the branch has both.
+ */
+const hostPortEndpointKey = (branch: ConnectionBranch) =>
+  pairsHostPort(branch)
+    ? Object.keys(branch.root).find((key) => {
+        const prop = branch.root[key];
+        return (
+          prop?.["x-clicky-component"] === "k8s-url-selector" &&
+          prop.readOnly !== true
+        );
+      })
+    : undefined;
+
+/** An editable namespace picker renders beside the name, on the name's row. */
+const namespaceBesideName = (branch: ConnectionBranch) =>
+  branch.root.name !== undefined &&
+  branch.root.name.readOnly !== true &&
+  branch.root.namespace?.["x-clicky-component"] === NAMESPACE_COMPONENT &&
+  branch.root.namespace.readOnly !== true;
+
+/** kubeconfig / kubecontext render as one row in place of their own section. */
+const kubernetesOnOneRow = (branch: ConnectionBranch) =>
+  branch.nested.kubeconfig !== undefined && branch.nested.kubecontext !== undefined;
+
+function rootEditor(context: {
+  rootValue?: Record<string, unknown> | undefined;
+  onRootChange?: ((next: Record<string, unknown>) => void) | undefined;
+}): RootEditor | undefined {
+  return context.rootValue && context.onRootChange
+    ? { rootValue: context.rootValue, onRootChange: context.onRootChange }
+    : undefined;
+}
+
+function rootProperties(root: Record<string, unknown>): Record<string, unknown> {
+  return isPlainObject(root.properties) ? root.properties : {};
+}
+
+/** Writes one key of the connection's `properties` map; an empty value removes it. */
+function setRootProperty(editor: RootEditor, key: string, next: string) {
+  const properties = { ...rootProperties(editor.rootValue) };
+  if (next) properties[key] = next;
+  else delete properties[key];
+  editor.onRootChange({ ...editor.rootValue, properties });
+}
+
+/** A `properties.<key>` field rendered outside its object, editing the root value. */
+function rootPropertyField(
+  editor: RootEditor,
+  key: string,
+  schema: JsonSchemaProperty,
+): FieldControl {
+  return {
+    key,
+    kind: "string",
+    label: schema.title ?? key,
+    ...(schema.description ? { description: schema.description } : {}),
+    required: false,
+    schema,
+    value: rootProperties(editor.rootValue)[key],
+    onChange: (next) =>
+      setRootProperty(editor, key, typeof next === "string" ? next : ""),
+  };
+}
+
 function namespaceQuery(namespace: string): string {
   return namespace ? `&namespace=${encodeURIComponent(namespace)}` : "";
 }
@@ -150,6 +254,7 @@ export function connectionSchemaFormExtensions({
   apiBase,
   schema,
   fetcher = fetchJson,
+  kubernetes = "form",
 }: ConnectionSchemaFormExtensionsOptions): Required<ConnectionFormExtensions> {
   const sources = connectionSecretSources(schema);
   const namespacesUrl = `${stripTrailingSlashes(apiBase)}/connections/namespaces`;
@@ -158,13 +263,168 @@ export function connectionSchemaFormExtensions({
       apiBase,
       fetcher: (url) => fetcher(kubernetesURL(url, selection)),
     });
+  const resolvedSchema = rehydrateRefs(schema);
+  const branchOf = (root: Record<string, unknown>): ConnectionBranch => {
+    const properties = effectiveProperties(resolvedSchema, root).properties;
+    return { root: properties, nested: properties.properties?.properties ?? {} };
+  };
+  const base = `${stripTrailingSlashes(apiBase)}/connections`;
+  const kubernetesField = (field: FieldControl, context: PostExtensionContext) =>
+    createElement(ConnectionKubernetesField, { field, context, base, fetcher });
+
+  const layoutPre: PreExtension = (field, ctx) => {
+    const editor = rootEditor(ctx);
+    if (!editor || field.readOnly) return field;
+    const branch = branchOf(editor.rootValue);
+    if (hoisted(field.schema) && pairsHostPort(branch)) {
+      if (field.key === "port") return null;
+      // The URL selector's Host:Port mode renders the pair.
+      if (field.key === "host" && hostPortEndpointKey(branch)) return null;
+      if (field.key === "host") {
+        return { ...field, label: `${field.label}:${branch.nested.port?.title ?? "Port"}` };
+      }
+    }
+    // The endpoint mode tabs need the full row to stay on one line.
+    if (field.schema["x-clicky-component"] === "k8s-url-selector") {
+      return { ...field, colSpan: "full" };
+    }
+    if (namespaceBesideName(branch)) {
+      // The name's row renders the namespace picker beside it.
+      if (field.key === "namespace") return null;
+      if (field.key === "name") return { ...field, colSpan: "full" };
+    }
+    return field;
+  };
+
+  const namespaceField = (field: FieldControl, root: Record<string, unknown>) =>
+    createElement(ConnectionNamespaceField, {
+      field,
+      selection: connectionKubernetesSelection(root),
+      fetcher,
+      namespacesUrl,
+    });
+
+  const columnLabel = (text: string) =>
+    createElement("span", { className: "text-sm font-medium" }, text);
+
+  /** Kubeconfig and kubecontext on one labelled row. */
+  const kubernetesRow = (editor: RootEditor, branch: ConnectionBranch) => {
+    const { kubeconfig, kubecontext } = branch.nested;
+    if (!kubeconfig || !kubecontext) {
+      throw new Error("connection kubernetes row needs kubeconfig and kubecontext");
+    }
+    return createElement(
+      "div",
+      { className: "grid grid-cols-1 gap-x-2 gap-y-1.5 sm:grid-cols-2", role: "group", "aria-label": "Kubernetes" },
+      columnLabel(kubeconfig.title ?? "Kubeconfig"),
+      columnLabel(kubecontext.title ?? "Kubecontext"),
+      kubernetesField(rootPropertyField(editor, "kubeconfig", kubeconfig), editor),
+      kubernetesField(rootPropertyField(editor, "kubecontext", kubecontext), editor),
+    );
+  };
+
+  /** The URL selector's `Host:Port` mode: host and port inputs editing `properties`. */
+  const hostPortEndpointMode = (
+    editor: RootEditor,
+    branch: ConnectionBranch,
+  ): EndpointExtraMode => {
+    const { host, port } = branch.nested;
+    if (!host || !port) {
+      throw new Error("connection Host:Port mode needs host and port");
+    }
+    const values = rootProperties(editor.rootValue);
+    const text = (key: string) =>
+      typeof values[key] === "string" ? values[key] : "";
+    const hostLabel = host.title ?? "Host";
+    return {
+      id: "host-port",
+      label: hostLabel,
+      icon: UiHardDrive,
+      active: text("host") !== "" || text("port") !== "",
+      content: createElement(
+        "div",
+        { className: "space-y-1" },
+        createElement(ConnectionHostPortField, {
+          host: createElement(InputField, {
+            "aria-label": hostLabel,
+            placeholder: hostLabel,
+            ...(host.description ? { title: host.description } : {}),
+            value: text("host"),
+            onChange: (next: string) => setRootProperty(editor, "host", next),
+          }),
+          port: text("port"),
+          portSchema: port,
+          onPortChange: (next) => setRootProperty(editor, "port", next),
+        }),
+        host.description
+          ? createElement(
+              "p",
+              { className: "text-xs text-muted-foreground" },
+              host.description,
+            )
+          : null,
+      ),
+    };
+  };
+
   const namespacePost: PostExtension = (field, nodes, context) => {
+    const editor = context ? rootEditor(context) : undefined;
+    const branch = editor ? branchOf(editor.rootValue) : undefined;
+    if (editor && branch && field.key === "name" && namespaceBesideName(branch)) {
+      const namespace = branch.root.namespace!;
+      const namespaceControl: FieldControl = {
+        key: "namespace",
+        kind: "string",
+        label: namespace.title ?? "Namespace",
+        required: false,
+        schema: namespace,
+        value: editor.rootValue.namespace,
+        onChange: (next) => editor.onRootChange({ ...editor.rootValue, namespace: next }),
+      };
+      return {
+        label: createElement(
+          "div",
+          { className: "grid grid-cols-2 gap-2" },
+          nodes.label,
+          columnLabel(namespaceControl.label),
+        ),
+        value: createElement(
+          "div",
+          { className: "grid grid-cols-2 gap-2" },
+          nodes.value,
+          namespaceField(namespaceControl, editor.rootValue),
+        ),
+      };
+    }
+    if (
+      editor &&
+      branch &&
+      !field.readOnly &&
+      field.key === "host" &&
+      hoisted(field.schema) &&
+      pairsHostPort(branch)
+    ) {
+      const port = rootProperties(editor.rootValue).port;
+      return {
+        ...nodes,
+        value: createElement(ConnectionHostPortField, {
+          host: nodes.value,
+          port: typeof port === "string" ? port : "",
+          portSchema: branch.nested.port ?? {},
+          onPortChange: (next) => setRootProperty(editor, "port", next),
+        }),
+      };
+    }
     if (
       field.key === "properties" &&
       field.schema.properties?.kubeconfig &&
       field.schema.properties?.kubecontext
     ) {
       const { kubeconfig, kubecontext, ...others } = field.schema.properties;
+      const kubernetesOnRow =
+        !field.readOnly && editor && branch && kubernetesOnOneRow(branch)
+          ? kubernetesRow(editor, branch)
+          : undefined;
       // Hoisted fields (host/port/database) already render beside the URL.
       const rest = Object.fromEntries(
         Object.entries(others).filter(([, property]) => property["x-clicky-hoist"] !== true),
@@ -195,11 +455,12 @@ export function connectionSchemaFormExtensions({
         value: createElement(
           "div",
           { className: "space-y-4" },
-          renderGroup("Kubernetes resolution", {
-            type: "object",
-            "x-columns": 2,
-            properties: { kubeconfig, kubecontext },
-          }),
+          kubernetes === "external" ? null : kubernetesOnRow ??
+            renderGroup("Kubernetes resolution", {
+                type: "object",
+                "x-columns": 2,
+                properties: { kubeconfig, kubecontext },
+              }),
           Object.keys(rest).length
             ? renderGroup(field.label, { ...field.schema, type: "object", properties: rest })
             : null,
@@ -213,20 +474,16 @@ export function connectionSchemaFormExtensions({
       (component === "k8s-context-selector" ||
         component === "k8s-kubeconfig-selector")
     ) {
-      return {
-        ...nodes,
-        value: createElement(ConnectionKubernetesField, {
-          field,
-          context,
-          base: `${stripTrailingSlashes(apiBase)}/connections`,
-          fetcher,
-        }),
-      };
+      return { ...nodes, value: kubernetesField(field, context ?? {}) };
     }
     if (
       !field.readOnly &&
       (component === "k8s-secret-selector" || component === "k8s-url-selector")
     ) {
+      const hostPortMode =
+        editor && branch && field.key === hostPortEndpointKey(branch)
+          ? hostPortEndpointMode(editor, branch)
+          : undefined;
       return {
         ...nodes,
         value: createElement(ConnectionSecretField, {
@@ -237,6 +494,7 @@ export function connectionSchemaFormExtensions({
             typeof context?.rootValue?.namespace === "string"
               ? context.rootValue.namespace
               : "",
+          endpointExtraMode: hostPortMode,
           ...sources,
         }),
       };
@@ -246,15 +504,7 @@ export function connectionSchemaFormExtensions({
       field.schema["x-clicky-component"] !== NAMESPACE_COMPONENT
     )
       return nodes;
-    return {
-      label: nodes.label,
-      value: createElement(ConnectionNamespaceField, {
-        field,
-        selection,
-        fetcher,
-        namespacesUrl,
-      }),
-    };
+    return { label: nodes.label, value: namespaceField(field, context?.rootValue ?? {}) };
   };
-  return { pre: [], post: [namespacePost] };
+  return { pre: [layoutPre], post: [namespacePost] };
 }

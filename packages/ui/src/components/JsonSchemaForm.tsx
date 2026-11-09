@@ -226,6 +226,7 @@ export function JsonSchemaForm({
               onChange={onChange}
               ctx={ctx}
               discKey={discKey}
+              {...(hiddenKeys ? { hiddenKeys } : {})}
             />
           ) : (
             objectRows

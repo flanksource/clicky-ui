@@ -1856,6 +1856,19 @@ describe("JsonSchemaForm discriminator wizard", () => {
     fireEvent.click(screen.getByRole("button", { name: /change type/i }));
     expect(onChange).toHaveBeenCalledWith({ name: "x" });
   });
+
+  it("locks the kind when hiddenKeys hides the discriminator: branch fields, no header or change affordance", () => {
+    render(<JsonSchemaForm schema={schema} value={{ type: "postgres" }} onChange={vi.fn()} hiddenKeys={["type"]} />);
+    expect(screen.getByText("Name")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /change type/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("postgres")).not.toBeInTheDocument();
+  });
+
+  it("honours hiddenKeys for the branch fields of a chosen kind", () => {
+    render(<JsonSchemaForm schema={schema} value={{ type: "postgres" }} onChange={vi.fn()} hiddenKeys={["name"]} />);
+    expect(screen.queryByText("Name")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /change type/i })).toBeInTheDocument();
+  });
 });
 
 describe("JsonSchemaForm x-clicky-order", () => {

@@ -104,7 +104,7 @@ export function ComboboxControl({
       className={cn(
         "relative flex items-center",
         tags &&
-          "flex-wrap gap-1 rounded-md border border-input bg-background px-2 py-1 text-foreground focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1",
+          "flex-wrap gap-1 rounded-md border border-input bg-background px-2 py-0.5 text-foreground focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1",
         tags && (size ? controlMinHeightClass[size] : "min-h-control-h"),
         tags && actionPadding,
         tags && invalid && "border-destructive focus-within:ring-destructive",

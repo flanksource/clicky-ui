@@ -32,6 +32,10 @@ export {
   type ConnectionSchemaFormExtensionsOptions,
   type ConnectionSecretSources,
 } from "./connections/connectionSchemaFormExtensions";
+export {
+  ConnectionKubernetesContext,
+  type ConnectionKubernetesContextProps,
+} from "./connections/ConnectionKubernetesContext";
 export * from "./connections/connectionDashboard";
 export * from "./connections/connectionDashboardQuery";
 export * from "./connections/connectionDashboardRow";
