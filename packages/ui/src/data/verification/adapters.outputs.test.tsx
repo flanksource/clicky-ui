@@ -53,9 +53,9 @@ describe("verification outputs tab", () => {
     expect(screen.queryByText("verified")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Outputs" }));
     expect(screen.getByText("verified")).toBeInTheDocument();
-    expect(screen.queryByText("todo_prompt · run")).not.toBeInTheDocument();
+    expect(document.querySelector("[data-fixture-detail]")).toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: "Detail" }));
-    expect(screen.getByText("todo_prompt · run")).toBeInTheDocument();
+    expect(document.querySelector("[data-fixture-detail]")).not.toBeNull();
     expect(screen.queryByText("verified")).not.toBeInTheDocument();
   });
 
@@ -73,7 +73,7 @@ describe("verification outputs tab", () => {
   it("omits Outputs when the step has no outputs", () => {
     render(<Panel node={withOutputs(undefined)} />);
     expect(screen.queryByRole("tab", { name: "Outputs" })).not.toBeInTheDocument();
-    expect(screen.getByText("todo_prompt · run")).toBeInTheDocument();
+    expect(document.querySelector("[data-fixture-detail]")).not.toBeNull();
   });
 
   it("shows the newly selected step's outputs and returns to Detail for a step without outputs", () => {
@@ -84,7 +84,7 @@ describe("verification outputs tab", () => {
     expect(screen.getByText("verified")).toBeInTheDocument();
     view.rerender(<Panel node={withOutputs(undefined)} />);
     expect(screen.queryByRole("tab", { name: "Outputs" })).not.toBeInTheDocument();
-    expect(screen.getByText("todo_prompt · run")).toBeInTheDocument();
+    expect(document.querySelector("[data-fixture-detail]")).not.toBeNull();
   });
 
   it("keeps invalid step details visible rather than offering a partially parsed Outputs tab", () => {

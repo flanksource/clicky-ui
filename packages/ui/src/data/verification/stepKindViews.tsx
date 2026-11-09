@@ -8,7 +8,7 @@ import { cn } from "../../lib/utils";
 import { Button } from "../../components/button";
 import { SegmentedControl, type SegmentedOption } from "../../components/SegmentedControl";
 import { Badge, type BadgeSize, type BadgeTone } from "../Badge";
-import { UiHourglass } from "../../icons";
+import { UiDatabase, UiHourglass } from "../../icons";
 import { CodeBlock } from "../CodeBlock";
 import { JsonView } from "../JsonView";
 import { JsonSchemaForm } from "../../components/JsonSchemaForm";
@@ -27,6 +27,8 @@ import {
   type StepFormState,
   type StepExport,
   type StepQuery,
+  type StepQueryBatch,
+  type StepQueryConnection,
   type WaitCondition,
   type WaitDetail,
   type WaitOutcome,
@@ -151,18 +153,58 @@ export function StepQuerySection({ query }: { query: StepQuery }) {
       : { id: "sql", label: "SQL", title: "No issued statement was recorded", disabled: true },
   ];
   return (
-    <Section
-      name="query"
-      title="Query"
-      aside={<SegmentedControl size="sm" value={view} options={options} onChange={setView} aria-label="Query view" />}
-    >
+    <Section name="query" title="Query">
+      {query.connection && <QueryConnection connection={query.connection} />}
       {query.queryFile ? <div className="break-all font-mono text-[11px] text-muted-foreground" title={query.queryFile}>{query.queryFile}</div> : null}
       <div className="min-w-0" data-query-code={view}>
-        <CodeBlock language="sql" source={view === "sql" && query.sql ? query.sql : query.template} copyable />
+        <CodeBlock
+          language="sql"
+          source={view === "sql" && query.sql ? query.sql : query.template}
+          copyable
+          toolbar={<SegmentedControl size="sm" value={view} options={options} onChange={setView} aria-label="Query view" />}
+        />
       </div>
       {params.length > 0 && <ValueTable name="params" keyLabel="Param" rows={params} />}
       {args.length > 0 && <ValueTable name="arguments" keyLabel="Argument" rows={args.map((value, i) => [String(i + 1), value])} />}
+      {(query.batches?.length ?? 0) > 0 && <QueryBatches batches={query.batches!} />}
     </Section>
+  );
+}
+
+/** The connection's name and type, then where it points — host, user and database — as copyable label badges. */
+function QueryConnection({ connection }: { connection: StepQueryConnection }) {
+  const host = connection.host && connection.port ? `${connection.host}:${connection.port}` : connection.host;
+  const targets: [string, string | undefined][] = [["host", host], ["user", connection.user], ["db", connection.database]];
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px]" data-query-connection="">
+      <UiDatabase className="shrink-0 text-muted-foreground" aria-hidden />
+      <span className="font-medium">{connection.name}</span>
+      <span className="text-muted-foreground">{connection.type}</span>
+      {targets.map(([label, value]) =>
+        value ? (
+          <span key={label} className="inline-flex min-w-0" data-query-target={label}>
+            <Badge variant="label" size="xs" label={label} value={value} maxWidth={48} />
+          </span>
+        ) : null,
+      )}
+    </div>
+  );
+}
+
+function batchLabel({ batch, run }: { batch: number; run: number }): string {
+  return run > 1 ? `batch ${batch} run ${run}` : `batch ${batch}`;
+}
+
+/** The program's batches that have ended, each with the rows it changed where reported. */
+function QueryBatches({ batches }: { batches: StepQueryBatch[] }) {
+  return (
+    <div className="flex min-w-0 flex-wrap gap-1" data-query-batches="">
+      {batches.map((batch) => (
+        <Badge key={`${batch.batch}:${batch.run}`} size="xs" clickToCopy={false} tone="success">
+          {batchLabel(batch)} done{batch.rowsAffected !== undefined ? ` · ${batch.rowsAffected} row(s)` : ""}
+        </Badge>
+      ))}
+    </div>
   );
 }
 
@@ -242,12 +284,15 @@ function stepPosition({ rowIndex, line }: ExecutionHeader): string | undefined {
   return line !== undefined ? `line ${line}` : undefined;
 }
 
-/** Where a fixture step came from (file · step · section), its kind and state, and when it ran. */
+/**
+ * Where a fixture step came from (file · step · section), its execution kind and state, and when it ran.
+ * A typed step's kind is already the detail header's tool badge, so an execution kind equal to it is not repeated.
+ */
 export function ExecutionHeaderView({ header, stepKind }: { header: ExecutionHeader; stepKind?: string }) {
   const place = [stepPosition(header), header.sectionPath].filter(Boolean).join(" · ");
-  const kinds = [header.kind, stepKind].filter((kind, i, all): kind is string => !!kind && all.indexOf(kind) === i);
+  const kind = header.kind !== stepKind ? header.kind : undefined;
   const window = header.startedAt && header.finishedAt ? `${clockTime(header.startedAt)} → ${clockTime(header.finishedAt)}` : header.startedAt ? `started ${clockTime(header.startedAt)}` : undefined;
-  if (!header.file && !place && kinds.length === 0 && !header.state && !window && header.durationNs === undefined) return null;
+  if (!header.file && !place && !kind && !header.state && !window && header.durationNs === undefined) return null;
   return (
     <div className="min-w-0 space-y-1" data-execution-header="">
       {(header.file || place) && (
@@ -258,7 +303,7 @@ export function ExecutionHeaderView({ header, stepKind }: { header: ExecutionHea
         </div>
       )}
       <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-        {kinds.map((kind) => <Badge key={kind} size="xs" clickToCopy={false}>{kind}</Badge>)}
+        {kind && <Badge size="xs" clickToCopy={false}>{kind}</Badge>}
         {header.state && <Badge size="xs" clickToCopy={false} tone={STATE_TONE[header.state] ?? "neutral"}>{header.state}</Badge>}
         {window && <span className="font-mono">{window}</span>}
         {header.durationNs !== undefined && <span>{formatTestDuration(header.durationNs)}</span>}
@@ -273,6 +318,37 @@ export function FailureCallout({ children }: { children: ReactNode }) {
     <div className={cn("whitespace-pre-wrap break-words rounded border px-2 py-1.5 text-sm", ALERT_ROW)} data-failure-callout="">
       {children}
     </div>
+  );
+}
+
+// ── Failed tests ────────────────────────────────────────────────────────────
+
+function failedLeaves(node: Test): Test[] {
+  if (!node.children?.length) return node.failed || node.timed_out ? [node] : [];
+  return node.children.flatMap(failedLeaves);
+}
+
+/** A test step's failing cases: name, location and the assertion message of each. */
+export function StepFailedTestsSection({ node }: { node: Test }) {
+  const failed = node.children?.length ? failedLeaves(node) : [];
+  if (failed.length === 0) return null;
+  return (
+    <Section name="failed-tests" title={`Failed tests (${failed.length})`}>
+      <ul className="space-y-1.5">
+        {failed.map((test, index) => (
+          <li key={test.task_id ?? `${test.name}-${index}`} className={cn("space-y-0.5 rounded border px-2 py-1.5", ALERT_ROW)} data-failed-test={test.name}>
+            <div className="flex min-w-0 items-baseline gap-2 text-sm">
+              <span className="min-w-0 break-words font-medium">{test.name}</span>
+              {test.file && (
+                <span className="shrink-0 font-mono text-[11px] opacity-80">{test.line ? `${test.file}:${test.line}` : test.file}</span>
+              )}
+              {test.duration !== undefined && <span className="ml-auto shrink-0 text-[11px] opacity-80">{formatTestDuration(test.duration)}</span>}
+            </div>
+            {test.message && <pre className="whitespace-pre-wrap break-words font-mono text-xs">{test.message}</pre>}
+          </li>
+        ))}
+      </ul>
+    </Section>
   );
 }
 
@@ -333,10 +409,6 @@ export function StepKindSections({ step, renderWait }: { step: StepDetail; rende
   const viewOutputs = selectTab && step.outputs !== undefined ? () => selectTab("outputs") : undefined;
   return (
     <>
-      <div className="text-[11px] text-muted-foreground" data-step-ref="">
-        {step.step.kind} · {step.step.id}
-        {step.background && " · background"}
-      </div>
       {step.wait && (renderWait ? renderWait(step.wait) : <StepWait wait={step.wait} {...(viewOutputs ? { onViewOutputs: viewOutputs } : {})} />)}
       {step.events.length > 0 && (
         <Section name="events" title="Events">

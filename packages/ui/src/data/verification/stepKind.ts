@@ -429,7 +429,46 @@ export type StepQuery = {
   arguments?: unknown[];
   params?: Record<string, unknown>;
   queryFile?: string;
+  /** The connection the query runs on and where it points; never its secrets. */
+  connection?: StepQueryConnection;
+  /** The batches of a SQL program that have ended, with the rows each changed where the driver reports it. */
+  batches?: StepQueryBatch[];
 };
+
+export type StepQueryConnection = {
+  name: string;
+  type: string;
+  host?: string;
+  port?: string;
+  user?: string;
+  database?: string;
+};
+
+/** `run` is the batch's repetition under `GO <count>`, 1 for a batch that runs once. */
+export type StepQueryBatch = { batch: number; run: number; rowsAffected?: number };
+
+function readQueryConnection(value: unknown): StepQueryConnection {
+  const path = "detail.query.connection";
+  const c = record(value, path);
+  return {
+    name: str(c.name, `${path}.name`),
+    type: str(c.type, `${path}.type`),
+    ...optional(c, "host", (v) => str(v, `${path}.host`)),
+    ...optional(c, "port", (v) => str(v, `${path}.port`)),
+    ...optional(c, "user", (v) => str(v, `${path}.user`)),
+    ...optional(c, "database", (v) => str(v, `${path}.database`)),
+  };
+}
+
+function readQueryBatch(value: unknown, index: number): StepQueryBatch {
+  const path = `detail.query.batches[${index}]`;
+  const b = record(value, path);
+  return {
+    batch: num(b.batch, `${path}.batch`),
+    run: num(b.run, `${path}.run`),
+    ...optional(b, "rowsAffected", (v) => num(v, `${path}.rowsAffected`)),
+  };
+}
 
 export type StepQueryResult =
   | { kind: "none" }
@@ -445,6 +484,8 @@ function readQueryRecord(value: unknown): StepQuery {
     ...optional(q, "arguments", (v) => list(v, `${path}.arguments`)),
     ...optional(q, "params", (v) => record(v, `${path}.params`)),
     ...optional(q, "queryFile", (v) => str(v, `${path}.queryFile`)),
+    ...optional(q, "connection", readQueryConnection),
+    ...optional(q, "batches", (v) => list(v, `${path}.batches`).map(readQueryBatch)),
   };
 }
 
