@@ -444,6 +444,7 @@ export {
   type PromptRunSummary,
 } from "./use-prompt-run-stream";
 export { SessionTail, type SessionTailProps } from "./SessionTail";
+export type { SessionFeedHandlers, SessionFeedSubscription } from "./session-feed";
 export {
   SessionInspector,
   type SessionInspectorOptions,
