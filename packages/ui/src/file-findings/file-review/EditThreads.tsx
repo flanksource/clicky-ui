@@ -3,7 +3,9 @@ import { cn } from "../../lib/utils";
 import { CommentDraftCard } from "../../comments/CommentDraftCard";
 import { CommentThread } from "../../comments/CommentThread";
 import type { Comment, CommentCallbacks, CommentConfig, CommentCreateAction } from "../../comments/comment-types";
+import { DOCUMENT_ANCHOR } from "../../comments/comment-types";
 import type { FileReviewThreadOptions } from "./FileReview";
+import { FileDraftCard, FileThreadCard, type FileThreadEntry } from "./FileThreads";
 
 /** A people's thread placed on lines of the file being edited. */
 export type EditThreadEntry = { anchor: string; label: string; startLine: number; thread: Comment[] };
@@ -25,8 +27,16 @@ export function EditThreads({
   onFocus,
   onCreate,
   onDiscardDraft,
+  files,
 }: {
   entries: readonly EditThreadEntry[];
+  /** File-level threads (and a new file comment), led at the top of the rail rather than listed apart. */
+  files?: {
+    entries: readonly FileThreadEntry[];
+    drafting: boolean;
+    onCreate: NonNullable<CommentCallbacks["onCreate"]>;
+    onDiscardDraft: () => void;
+  };
   draft: { anchor: string; label: string } | null;
   focused: string | null;
   config: CommentConfig;
@@ -44,7 +54,7 @@ export function EditThreads({
     // jsdom has no scrollIntoView; every browser does.
     [...cards].find((card) => card.dataset.cardAnchor === focused)?.scrollIntoView?.({ block: "nearest" });
   }, [focused]);
-  if (entries.length === 0 && !draft) return null;
+  if (entries.length === 0 && !draft && !files?.drafting && !files?.entries.length) return null;
   return (
     <aside ref={rail} data-edit-threads="" aria-label="Comments on the source" className="w-80 shrink-0 space-y-2 overflow-y-auto border-l border-border p-2">
       {draft && (
@@ -59,6 +69,21 @@ export function EditThreads({
           />
         </div>
       )}
+      {files?.drafting && (
+        <div data-comment-draft={DOCUMENT_ANCHOR} className="rounded-lg border border-primary/50 bg-card shadow-lg">
+          <FileDraftCard config={config} composerActions={composerActions} onCreate={files.onCreate} onDiscard={files.onDiscardDraft} />
+        </div>
+      )}
+      {files?.entries.map((entry) => (
+        <div
+          key={entry.anchor}
+          data-card-anchor={entry.anchor}
+          data-file-thread={entry.anchor}
+          className={cn("rounded-lg border bg-card", entry.anchor === focused ? "border-primary/50 shadow-lg" : "border-border shadow-sm")}
+        >
+          <FileThreadCard entry={entry} config={config} callbacks={callbacks} options={options} renderRootDetails={renderRootDetails} />
+        </div>
+      ))}
       {entries.map((entry) => (
         <div
           key={entry.anchor}

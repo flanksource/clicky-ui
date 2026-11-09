@@ -228,12 +228,41 @@ describe("FileReview patch comments in Preview", () => {
       comments: { items: [rootComment("e1", placed, "Which dashboard?"), rootComment("e2", gone, "Where did it go?")] },
     });
     await waitFor(() => expect(withAttr(container, "data-anchor-box", placed)).not.toHaveLength(0));
-    const list = within(container.querySelector<HTMLElement>("[data-file-threads]")!);
+    const rail = container.querySelector<HTMLElement>("[data-comment-sidebar]")!;
+    const card = within(rail.querySelector<HTMLElement>(`[data-file-thread="${CSS.escape(gone)}"]`)!);
     expect({
       gone: withAttr(container, "data-anchor-box", gone).length,
-      listed: list.getByText("Element not found").textContent,
-      body: list.getByText("Where did it go?").textContent,
-    }).toEqual({ gone: 0, listed: "Element not found", body: "Where did it go?" });
+      separateList: container.querySelector("section[data-file-threads]") !== null,
+      listed: card.getByText("Element not found").textContent,
+      body: card.getByText("Where did it go?").textContent,
+    }).toEqual({ gone: 0, separateList: false, listed: "Element not found", body: "Where did it go?" });
+  });
+
+  it("puts file comments in the margin rail ahead of the placed cards, and the file draft there too", async () => {
+    const onCreate = vi.fn(async () => {});
+    const { container } = review({
+      path: MD_PATH,
+      source: MD,
+      view: "preview",
+      comments: { items: [rootComment("t3", paragraph, "Check the tag"), rootComment("d1", DOCUMENT_ANCHOR, "Needs an owner")], callbacks: { onCreate }, targets: { document: true } },
+    });
+    await waitFor(() => expect(withAttr(container, "data-anchor-box", paragraph)).not.toHaveLength(0));
+    const rail = container.querySelector<HTMLElement>("[data-comment-sidebar]")!;
+    const order = () => [...rail.querySelectorAll<HTMLElement>("[data-card-anchor]")].map((card) => card.dataset.cardAnchor);
+    const listed = order();
+    fireEvent.click(screen.getByRole("button", { name: "Comment" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Comment on file" }));
+    await post("Add a changelog entry", "Post comment");
+    await waitFor(() => expect(onCreate).toHaveBeenCalled());
+    expect({
+      listed,
+      separateList: container.querySelector("section[data-file-threads]") !== null,
+      posted: onCreate.mock.calls[0]![0],
+    }).toEqual({
+      listed: [DOCUMENT_ANCHOR, paragraph],
+      separateList: false,
+      posted: expect.objectContaining({ body: "Add a changelog entry", anchor: DOCUMENT_ANCHOR }),
+    });
   });
 });
 
@@ -293,6 +322,18 @@ describe("FileReview Edit and Review", () => {
   it("has no toggle without onSourceChange", () => {
     review();
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+  });
+
+  it("lists file comments at the top of the edit rail beside the editor, not in a separate list above it", async () => {
+    const fileThread = rootComment("d1", DOCUMENT_ANCHOR, "Needs an owner");
+    const { container } = review({ onSourceChange: vi.fn(), comments: { items: [thread, fileThread] } });
+    await screen.findByTestId("editor");
+    const cards = [...container.querySelectorAll<HTMLElement>("[data-edit-threads] [data-card-anchor], [data-edit-threads] [data-file-thread]")];
+    expect({
+      separateList: container.querySelector("section[data-file-threads]") !== null,
+      order: cards.map((card) => card.dataset.fileThread ?? card.dataset.cardAnchor),
+      body: within(cards[0]!).getByText("Needs an owner").textContent,
+    }).toEqual({ separateList: false, order: [DOCUMENT_ANCHOR, threadAnchor], body: "Needs an owner" });
   });
 
   it("opens in Edit, and Review is the read-only listing with threads under their lines", async () => {
