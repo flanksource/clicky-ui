@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  defaultPlaceholder,
   fieldInputId,
   isEmptyValue,
   normalizeColSpan,
@@ -113,6 +114,17 @@ describe("matchesFieldFilter", () => {
   });
   it("returns false when neither key nor title contains the query", () => {
     expect(matchesFieldFilter({ key: "email", prop: { type: "string", title: "Email" }, filter: "phone" })).toBe(false);
+  });
+});
+
+describe("defaultPlaceholder", () => {
+  it.each([
+    ["the scalar default over examples", { default: "30s", examples: ["1m"] }, "30s"],
+    ["the first scalar example without a default", { examples: ["127.0.0.1:18080", "0.0.0.0:80"] }, "127.0.0.1:18080"],
+    ["nothing for an object example", { examples: [{ a: 1 }] }, ""],
+    ["nothing without default or examples", {}, ""],
+  ])("returns %s", (_name, schema, expected) => {
+    expect(defaultPlaceholder({ type: "string", ...schema })).toBe(expected);
   });
 });
 

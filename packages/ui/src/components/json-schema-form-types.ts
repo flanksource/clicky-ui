@@ -22,6 +22,9 @@ export interface JsonSchemaProperty {
   enum?: unknown[];
   const?: unknown;
   default?: unknown;
+  // Standard JSON Schema keyword. The first scalar example is the input's
+  // placeholder when there is no scalar default.
+  examples?: unknown[];
   // Standard JSON Schema string format. `date`/`date-time` drive a date control.
   format?: string;
   // Standard JSON Schema 2020-12 keyword. When true the form renders the field
