@@ -23,6 +23,8 @@ const columns: DataTableColumn<TraceFeedRecord>[] = [
   { key: "summary", label: "Record" },
 ];
 
+const captureViewPrefix = "capture:";
+
 /** A bounded, paged view over heterogeneous trace captures. The source owns
  * querying and resume tokens; paused viewers keep the capture running. */
 export function TraceFeed({ kinds, loadPage, follow, renderCapture, presentation = "text" }: TraceFeedProps) {
@@ -40,8 +42,9 @@ export function TraceFeed({ kinds, loadPage, follow, renderCapture, presentation
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState(() => {
     const value = new URLSearchParams(window.location.search).get("feedView");
-    return value === "raw" || value === "captures" ? value : "stream";
+    return value === "raw" || (value?.startsWith(captureViewPrefix) && kinds.includes(value.slice(captureViewPrefix.length))) ? value : "stream";
   });
+  const viewKind = view.startsWith(captureViewPrefix) ? view.slice(captureViewPrefix.length) : undefined;
   useEffect(() => {
     const values = new URLSearchParams(window.location.search);
     if (view !== "stream") values.set("feedView", view); else values.delete("feedView");
@@ -79,6 +82,8 @@ export function TraceFeed({ kinds, loadPage, follow, renderCapture, presentation
     }
     return [...grouped.entries()];
   }, [rows]);
+  const kindCaptures = captures.filter(([, capture]) => capture.kind === viewKind);
+  const viewLabel = view === "raw" ? "Raw stream" : viewKind ?? "Event stream";
   const change = (next: Partial<TraceFeedRequest>) => { setHistory([]); setEnded(false); setSelected(undefined); setRequest(previous => ({ ...previous, ...next, cursor: "" })); };
   return <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
     <FilterBar className="shrink-0" filters={[
@@ -93,8 +98,12 @@ export function TraceFeed({ kinds, loadPage, follow, renderCapture, presentation
       <span role="status" className="whitespace-nowrap text-xs text-muted-foreground">{!kinds.length ? "No captures armed" : ended || !follow ? "Capture complete" : paused ? "Paused" : "Following"}</span>
     </>} />
     {error && <p role="alert">{error.message}</p>}
-    <Tabs tabs={[{ id: "stream", label: "Event stream" }, { id: "captures", label: "Captures" }, { id: "raw", label: "Raw stream" }]} value={view} onChange={value => { setView(value); setSelected(undefined); }} />
-    <div role="tabpanel" aria-label={view === "raw" ? "Raw stream" : view === "captures" ? "Captures" : "Event stream"} className="flex min-h-0 flex-1 flex-col overflow-auto">
+    <Tabs className="shrink-0 flex-wrap" tabs={[
+      { id: "stream", label: "Event stream" },
+      ...kinds.map(kind => ({ id: `${captureViewPrefix}${kind}`, label: kind, count: rows.filter(row => row.kind === kind).length })),
+      { id: "raw", label: "Raw stream" },
+    ]} value={view} onChange={value => { setView(value); setSelected(undefined); }} />
+    <div role="tabpanel" aria-label={viewLabel} className="flex min-h-0 flex-1 flex-col overflow-auto">
       {view === "stream" ? <>
         <TraceEventStream rows={rows} presentation={presentation} following={!!follow && !paused && !request.cursor} onSelect={setSelected} />
         {selected && <div className="min-h-0 max-h-[40%] shrink-0 overflow-auto rounded border border-border p-3"><Button size="sm" variant="ghost" onClick={() => setSelected(undefined)}>Close event details</Button><TraceView kind={selected.kind} rows={[selected.record]} /></div>}
@@ -102,12 +111,12 @@ export function TraceFeed({ kinds, loadPage, follow, renderCapture, presentation
         <DataTable data={rows} columns={columns} onRowClick={setSelected} emptyMessage="Waiting for records from the armed captures" />
         {selected && <pre aria-label="Raw record" className="mt-3 overflow-auto rounded border border-border bg-muted p-3 text-xs">{JSON.stringify(selected.record, null, 2)}</pre>}
       </> : <div className="space-y-4">
-        {!captures.length && <p className="text-sm text-muted-foreground">Waiting for records from the armed captures</p>}
-        {captures.map(([key, capture]) => {
+        {!kindCaptures.length && <p className="text-sm text-muted-foreground">Waiting for {viewKind} records</p>}
+        {kindCaptures.map(([key, capture]) => {
           const rendered = renderCapture?.(capture);
           if (rendered === null) return null;
           return <section key={key} aria-label={`${capture.kind} ${capture.stream}`}>
-          {captures.length > 1 && <h3 className="mb-2 text-sm font-medium">{capture.kind} · {capture.stream}</h3>}
+          {kindCaptures.length > 1 && <h3 className="mb-2 text-sm font-medium">{capture.stream}</h3>}
           {rendered === undefined ? <TraceView kind={capture.kind} rows={capture.records} /> : rendered}
         </section>;
         })}

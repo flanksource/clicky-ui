@@ -23,6 +23,8 @@ export {
   type StepQueryBatch,
   type StepQueryConnection,
   type StepQueryResult,
+  type StepQuerySample,
+  type StepQuerySession,
   type ViolationDetail,
   type ViolationDetailResult,
   type StepAttempt,

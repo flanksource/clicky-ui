@@ -22,7 +22,7 @@ describe("TraceFeed", () => {
     expect(window.location.hash).toBe("#event");
   });
 	 it("lets a host supply capture presentation while keeping its raw records on demand", async () => {
-    window.history.replaceState(null, "", "/?feedView=captures");
+    window.history.replaceState(null, "", "/?feedView=capture:process");
     const rows = [{ runId: "example", kind: "process", stream: "capture", seq: 1, timestamp: null, summary: "raw process", record: { pid: 123 } }];
     render(<TraceFeed kinds={["process"]} loadPage={async () => ({ rows, nextCursor: "" })} renderCapture={() => <p>Process tree</p>} />);
     expect(await screen.findByText("Process tree")).toBeInTheDocument();
@@ -32,27 +32,27 @@ describe("TraceFeed", () => {
     expect(screen.queryByText("Process tree")).not.toBeInTheDocument();
   });
   it("opens the kind-specific renderer with all page records before the raw stream is requested", async () => {
-    window.history.replaceState(null, "", "/?feedView=captures");
+    window.history.replaceState(null, "", "/?feedView=capture:http");
     const rows = httpExchangeRows.map((record, index) => ({
       runId: "example", kind: "http", stream: "proxy", seq: index + 1,
       timestamp: null, summary: `raw exchange ${index + 1}`, record,
     }));
     render(<TraceFeed kinds={["http"]} loadPage={async () => ({ rows, nextCursor: "" })} />);
     expect(await screen.findByText("https://api.example.com/v1/cycles/run")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Captures" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: `http ${rows.length}` })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("columnheader", { name: /Seq/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Raw stream" }));
     expect(await screen.findByText("raw exchange 1")).toBeInTheDocument();
     expect(screen.queryByText("https://api.example.com/v1/cycles/run")).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("raw exchange 1"));
     expect(screen.getByLabelText("Raw record").textContent).toBe(JSON.stringify(rows[0]!.record, null, 2));
-    fireEvent.click(screen.getByRole("tab", { name: "Captures" }));
+    fireEvent.click(screen.getByRole("tab", { name: `http ${rows.length}` }));
     expect(await screen.findByText("https://api.example.com/v1/cycles/run")).toBeInTheDocument();
     expect(screen.queryByLabelText("Raw record")).not.toBeInTheDocument();
   });
 
   it("renders every capture stream separately and retains the selected tab in the URL", async () => {
-    window.history.replaceState(null, "", "/?feedView=captures");
+    window.history.replaceState(null, "", "/?feedView=capture:ticks");
     const rows = ["first", "second"].map((stream, index) => ({
       runId: "example", kind: "ticks", stream, seq: 1,
       timestamp: null, summary: stream, record: { tick: index + 1, label: `${stream} tick` },
@@ -62,6 +62,21 @@ describe("TraceFeed", () => {
     expect(await screen.findByText("second tick")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Raw stream" }));
     expect(new URLSearchParams(window.location.search).get("feedView")).toBe("raw");
+  });
+
+  it("renders one tab per armed kind that shows only that kind's captures", async () => {
+    const rows = [
+      { runId: "example", kind: "ticks", stream: "clock", seq: 1, timestamp: null, summary: "tick", record: { label: "clock tick" } },
+      { runId: "example", kind: "tocks", stream: "clock", seq: 2, timestamp: null, summary: "tock", record: { label: "clock tock" } },
+    ];
+    render(<TraceFeed kinds={["ticks", "tocks", "idle"]} loadPage={async () => ({ rows, nextCursor: "" })} />);
+    expect((await screen.findAllByRole("tab")).map(tab => tab.textContent)).toEqual(["Event stream", "ticks1", "tocks1", "idle", "Raw stream"]);
+    fireEvent.click(screen.getByRole("tab", { name: "tocks 1" }));
+    expect(await screen.findByText("clock tock")).toBeInTheDocument();
+    expect(screen.queryByText("clock tick")).not.toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get("feedView")).toBe("capture:tocks");
+    fireEvent.click(screen.getByRole("tab", { name: "idle" }));
+    expect(screen.getByText("Waiting for idle records")).toBeInTheDocument();
   });
 
   it("keeps controls visible for empty captures and requests the next server page", async () => {

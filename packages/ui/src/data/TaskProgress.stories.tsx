@@ -1,7 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import { TaskProgress } from "./TaskProgress";
 import type { LogEntry, TaskSnapshot } from "./TaskSnapshot";
+import {
+  CAPTAIN_SESSION_LIVE_ENTRY,
+  CAPTAIN_SESSION_LIVE_TEXT,
+  CAPTAIN_SESSION_REF,
+  captainSessionFrame,
+  withCaptainSessionFetch,
+} from "./TaskSession.story-support";
+import { createTaskSessionFeed } from "./task-session-feed";
 
 const meta: Meta<typeof TaskProgress> = {
   title: "Charts/TaskProgress",
@@ -255,6 +263,51 @@ export const FailedWithRetry: Story = {
       },
     ],
     onControl: fn(),
+  },
+};
+
+const captainSessionFeed = createTaskSessionFeed();
+
+export const CaptainSession: Story = {
+  decorators: [withCaptainSessionFetch],
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A task that drives a captain session (`session: {type: "captain", id, href, summary}`). The row draws the session\'s model, context gauge, action count and latest tool call from the server-computed `summary` — it reads and follows nothing. Expanding it opens the session inspector in a first "Session" tab: it reads the transcript once and takes live entries from `sessionFeed` (`useTaskRun(...).sessionFeed`), the session frames multiplexed on the task stream. Without a feed the transcript is read once and not followed.',
+      },
+    },
+  },
+  args: {
+    snapshots: run("running", [
+      {
+        name: "Run prompt",
+        status: "running",
+        startedAt: new Date(Date.now() - 8_000).toISOString(),
+        session: CAPTAIN_SESSION_REF,
+      },
+    ]),
+    sessionFeed: captainSessionFeed.feed,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const summary = await canvas.findByTestId("session-task-summary");
+    await expect(within(summary).getByText("6 actions")).toBeInTheDocument();
+    await expect(within(summary).getByText("claude-opus-4-8")).toBeInTheDocument();
+    await expect(within(summary).getByLabelText("Context 8% used")).toBeInTheDocument();
+
+    await userEvent.click(canvas.getByText("Run prompt"));
+
+    await expect(await canvas.findByRole("button", { name: "Session" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    await expect(await canvas.findByTestId("task-session-detail")).toBeInTheDocument();
+
+    // The inspector subscribes to the feed before it reads the transcript, so a
+    // frame sent now reaches it whenever the read lands.
+    captainSessionFeed.dispatch("session", captainSessionFrame(CAPTAIN_SESSION_LIVE_ENTRY));
+    await waitFor(() => expect(canvas.getByText(CAPTAIN_SESSION_LIVE_TEXT)).toBeInTheDocument());
   },
 };
 

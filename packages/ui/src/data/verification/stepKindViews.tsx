@@ -8,7 +8,11 @@ import { cn } from "../../lib/utils";
 import { Button } from "../../components/button";
 import { SegmentedControl, type SegmentedOption } from "../../components/SegmentedControl";
 import { Badge, type BadgeSize, type BadgeTone } from "../Badge";
-import { UiDatabase, UiHourglass } from "../../icons";
+import { UiDatabase, UiHourglass, UiWarningTriangle } from "../../icons";
+import { formatBytes, formatShort } from "../../lib/format";
+import { MetricTile } from "../diagnostics/MetricTile";
+import { Sparkline } from "../charts/Sparkline";
+import type { GaugeTone } from "../Gauge";
 import { CodeBlock } from "../CodeBlock";
 import { JsonView } from "../JsonView";
 import { JsonSchemaForm } from "../../components/JsonSchemaForm";
@@ -29,6 +33,8 @@ import {
   type StepQuery,
   type StepQueryBatch,
   type StepQueryConnection,
+  type StepQuerySample,
+  type StepQuerySession,
   type WaitCondition,
   type WaitDetail,
   type WaitOutcome,
@@ -154,7 +160,7 @@ export function StepQuerySection({ query }: { query: StepQuery }) {
   ];
   return (
     <Section name="query" title="Query">
-      {query.connection && <QueryConnection connection={query.connection} />}
+      {(query.connection || query.session) && <QueryConnection connection={query.connection} session={query.session} />}
       {query.queryFile ? <div className="break-all font-mono text-[11px] text-muted-foreground" title={query.queryFile}>{query.queryFile}</div> : null}
       <div className="min-w-0" data-query-code={view}>
         <CodeBlock
@@ -167,19 +173,39 @@ export function StepQuerySection({ query }: { query: StepQuery }) {
       {params.length > 0 && <ValueTable name="params" keyLabel="Param" rows={params} />}
       {args.length > 0 && <ValueTable name="arguments" keyLabel="Argument" rows={args.map((value, i) => [String(i + 1), value])} />}
       {(query.batches?.length ?? 0) > 0 && <QueryBatches batches={query.batches!} />}
+      {(query.diagnose || query.diagnoseError) && (
+        <QueryDiagnose samples={query.diagnose ?? []} dropped={query.diagnoseDropped} error={query.diagnoseError} engine={query.session?.engine} />
+      )}
     </Section>
   );
 }
 
-/** The connection's name and type, then where it points — host, user and database — as copyable label badges. */
-function QueryConnection({ connection }: { connection: StepQueryConnection }) {
-  const host = connection.host && connection.port ? `${connection.host}:${connection.port}` : connection.host;
-  const targets: [string, string | undefined][] = [["host", host], ["user", connection.user], ["db", connection.database]];
+/** `spid 57` (SQL Server), `pid 4121` (Postgres), `conn 88` (MySQL), `query <id>` (ClickHouse); undefined when the id is unknown. */
+function sessionLabel({ engine, sessionId, queryId }: StepQuerySession): string | undefined {
+  switch (engine) {
+    case "sqlserver": return `spid ${sessionId}`;
+    case "postgres": return `pid ${sessionId}`;
+    case "mysql": return `conn ${sessionId}`;
+    case "clickhouse": return queryId ? `query ${queryId}` : undefined;
+    default: return `${engine} ${sessionId}`;
+  }
+}
+
+/** The connection's name and type, then where it points — host, user and database — and the server session, as copyable label badges. */
+function QueryConnection({ connection, session }: { connection: StepQueryConnection | undefined; session: StepQuerySession | undefined }) {
+  const host = connection?.host && connection.port ? `${connection.host}:${connection.port}` : connection?.host;
+  const targets: [string, string | undefined][] = [["host", host], ["user", connection?.user], ["db", connection?.database], ["server", session?.server]];
+  const sessionText = session && sessionLabel(session);
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px]" data-query-connection="">
       <UiDatabase className="shrink-0 text-muted-foreground" aria-hidden />
-      <span className="font-medium">{connection.name}</span>
-      <span className="text-muted-foreground">{connection.type}</span>
+      {connection && <span className="font-medium">{connection.name}</span>}
+      {connection && <span className="text-muted-foreground">{connection.type}</span>}
+      {sessionText && (
+        <span className="inline-flex min-w-0" data-query-session="">
+          <Badge size="xs" tone="info" maxWidth={40}>{sessionText}</Badge>
+        </span>
+      )}
       {targets.map(([label, value]) =>
         value ? (
           <span key={label} className="inline-flex min-w-0" data-query-target={label}>
@@ -204,6 +230,86 @@ function QueryBatches({ batches }: { batches: StepQueryBatch[] }) {
           {batchLabel(batch)} done{batch.rowsAffected !== undefined ? ` · ${batch.rowsAffected} row(s)` : ""}
         </Badge>
       ))}
+    </div>
+  );
+}
+
+type DiagnoseMetric = {
+  label: string;
+  /** Postgres reports no CPU, IO or memory per session, so these stay hidden for it. */
+  hiddenFor?: readonly string[];
+  value: (sample: StepQuerySample) => string;
+  tone?: (sample: StepQuerySample) => GaugeTone;
+  /** Shown only when this holds (Blocked by, only while blocked). */
+  when?: (sample: StepQuerySample) => boolean;
+};
+
+const NO_CPU_OR_IO = ["postgres"] as const;
+
+const DIAGNOSE_METRICS: DiagnoseMetric[] = [
+  { label: "State", value: (s) => s.state || s.command || "unknown" },
+  { label: "Elapsed", value: (s) => formatDelay(s.elapsedMs ?? 0) },
+  { label: "CPU", hiddenFor: NO_CPU_OR_IO, value: (s) => formatDelay(s.cpuMs ?? 0) },
+  { label: "Logical reads", hiddenFor: NO_CPU_OR_IO, value: (s) => formatShort(s.logicalReads ?? 0) },
+  { label: "Reads", hiddenFor: NO_CPU_OR_IO, value: (s) => formatShort(s.reads ?? 0) },
+  { label: "Writes", hiddenFor: NO_CPU_OR_IO, value: (s) => formatShort(s.writes ?? 0) },
+  { label: "Memory", hiddenFor: NO_CPU_OR_IO, value: (s) => formatBytes(s.memoryBytes ?? 0) },
+  {
+    label: "Wait",
+    value: (s) => (s.waitType ? `${s.waitType}${s.waitMs ? ` ${formatDelay(s.waitMs)}` : ""}` : "none"),
+    tone: (s) => (s.waitType ? "warning" : "neutral"),
+  },
+  { label: "Blocked by", value: (s) => String(s.blockedBy), tone: () => "danger", when: (s) => (s.blockedBy ?? 0) > 0 },
+];
+
+const DIAGNOSE_SPARKS: { key: "cpu" | "logicalReads"; label: string; hiddenFor: readonly string[]; read: (s: StepQuerySample) => number }[] = [
+  { key: "cpu", label: "CPU", hiddenFor: NO_CPU_OR_IO, read: (s) => s.cpuMs ?? 0 },
+  { key: "logicalReads", label: "Logical reads", hiddenFor: NO_CPU_OR_IO, read: (s) => s.logicalReads ?? 0 },
+];
+
+/**
+ * AutoDiagnose output for a slow statement: the latest sample of its server
+ * session as metric tiles (those its engine reports), the sample count, and CPU
+ * and logical-reads trends across the samples. A diagnose error — the sampler
+ * could not read the server's activity views — shows as a warning; the query is
+ * unaffected.
+ */
+function QueryDiagnose({ samples, dropped, error, engine }: { samples: StepQuerySample[]; dropped: number | undefined; error: string | undefined; engine: string | undefined }) {
+  const latest = samples[samples.length - 1];
+  const sampleEngine = latest?.engine ?? engine;
+  const visible = (metric: { hiddenFor?: readonly string[] | undefined }) => !(sampleEngine && metric.hiddenFor?.includes(sampleEngine));
+  const count = `${samples.length} sample${samples.length === 1 ? "" : "s"}${dropped ? ` · ${dropped} older dropped` : ""}`;
+  return (
+    <div className="min-w-0 space-y-1.5" data-query-diagnose="">
+      {error && (
+        <div className="flex items-start gap-1.5 text-[11px] text-yellow-700 dark:text-yellow-400" data-query-diagnose-error="">
+          <UiWarningTriangle className="mt-px shrink-0" aria-hidden />
+          <span className="min-w-0 break-words">{error}</span>
+        </div>
+      )}
+      {latest && (
+        <>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground" data-query-diagnose-count="">{count}</div>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-1">
+            {DIAGNOSE_METRICS.filter((m) => visible(m) && (m.when?.(latest) ?? true)).map((m) => (
+              <MetricTile key={m.label} label={m.label} value={m.value(latest)} tone={m.tone?.(latest) ?? "neutral"} />
+            ))}
+          </div>
+          {latest.waitResource && (
+            <div className="break-all font-mono text-[11px] text-muted-foreground" data-query-diagnose-wait-resource="">{latest.waitResource}</div>
+          )}
+          {samples.length > 1 && (
+            <div className="flex flex-wrap gap-3">
+              {DIAGNOSE_SPARKS.filter(visible).map((spark) => (
+                <div key={spark.key} className="flex items-center gap-1.5 text-[10px] text-muted-foreground" data-query-spark={spark.key}>
+                  <span>{spark.label}</span>
+                  <Sparkline values={samples.map(spark.read)} width={96} height={22} />
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

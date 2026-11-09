@@ -36,14 +36,14 @@ function CountBadges({ node }: { node: Test }) {
   if (s.total === 0) return null;
   return (
     <span className="flex shrink-0 items-center gap-1">
-      {s.passed > 0 && <Badge tone="success" variant="solid" size="xxs" count={s.passed} />}
-      {s.failed > 0 && <Badge tone="danger" variant="solid" size="xxs" count={s.failed} />}
-      {s.warned > 0 && <Badge tone="warning" variant="outline" size="xxs" count={s.warned} />}
-      {s.timedout > 0 && <Badge tone="warning" variant="solid" size="xxs" count={s.timedout} />}
-      {s.aborted > 0 && <Badge tone="neutral" variant="soft" size="xxs" count={s.aborted} />}
-      {s.skipped > 0 && <Badge tone="neutral" variant="soft" size="xxs" count={s.skipped} />}
-      {s.running > 0 && <Badge tone="info" variant="solid" size="xxs" count={s.running} />}
-      {s.pending > 0 && <Badge tone="neutral" variant="soft" size="xxs" count={s.pending} />}
+      {s.passed > 0 && <Badge tone="success" variant="outline" className="rounded-sm" size="xxs" count={s.passed} />}
+      {s.failed > 0 && <Badge tone="danger" variant="outline" className="rounded-sm" size="xxs" count={s.failed} />}
+      {s.warned > 0 && <Badge tone="warning" variant="outline" className="rounded-sm" size="xxs" count={s.warned} />}
+      {s.timedout > 0 && <Badge tone="danger" variant="outline" className="rounded-sm" size="xxs" count={s.timedout} />}
+      {s.aborted > 0 && <Badge tone="neutral" variant="outline" className="rounded-sm" size="xxs" count={s.aborted} />}
+      {s.skipped > 0 && <Badge tone="neutral" variant="outline" className="rounded-sm" size="xxs" count={s.skipped} />}
+      {s.running > 0 && <Badge tone="info" variant="outline" className="rounded-sm" size="xxs" count={s.running} />}
+      {s.pending > 0 && <Badge tone="neutral" variant="outline" className="rounded-sm" size="xxs" count={s.pending} />}
     </span>
   );
 }
