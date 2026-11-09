@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
@@ -40,8 +40,13 @@ export type ModalProps = {
    * unsaved edits and clear it (or pass `false`) once there is nothing to lose.
    */
   confirmClose?: boolean | ConfirmCloseOptions;
-  /** Header title and accessible dialog label when it is a string. */
+  /**
+   * Header title. Also names the dialog unless `aria-label` is set: a string
+   * title as is, a rich title by its rendered text.
+   */
   title?: ReactNode;
+  /** Accessible dialog name, for a title whose text does not name it. */
+  "aria-label"?: string;
   /**
    * Secondary header content rendered on its own row directly beneath the title.
    * The title stays a single row alongside the expand/close buttons, so a tall
@@ -121,6 +126,7 @@ export function Modal({
   onClose,
   confirmClose = false,
   title,
+  "aria-label": ariaLabel,
   subtitle,
   size = "md",
   closeOnBackdrop = false,
@@ -134,6 +140,13 @@ export function Modal({
   children,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const [titleText, setTitleText] = useState<string>();
+  // A rich title has no string to name the dialog by, so name it by the text
+  // the title rendered. Portaled dialogs are only commentable when named.
+  useLayoutEffect(() => {
+    setTitleText(titleRef.current?.textContent?.replace(/\s+/g, " ").trim() || undefined);
+  });
   const closeTimerRef = useRef<number | undefined>(undefined);
   const openFrameRef = useRef<number | undefined>(undefined);
   const [present, setPresent] = useState(open);
@@ -236,7 +249,7 @@ export function Modal({
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
-        aria-label={typeof title === "string" ? title : undefined}
+        aria-label={ariaLabel ?? (typeof title === "string" ? title : titleText)}
         data-state={mobileVisible ? "open" : "closed"}
         className={cn(
           "relative flex w-full flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl",
@@ -294,7 +307,7 @@ export function Modal({
                 </Button>
               )}
               {title ? (
-                <h2 className="text-sm font-semibold flex-1 max-sm:text-base max-sm:leading-6">
+                <h2 ref={titleRef} className="text-sm font-semibold flex-1 max-sm:text-base max-sm:leading-6">
                   {title}
                 </h2>
               ) : (

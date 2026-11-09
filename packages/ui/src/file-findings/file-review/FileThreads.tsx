@@ -61,38 +61,82 @@ export function FileThreads({
         <div className="max-h-72 space-y-2 overflow-y-auto border-t border-border p-2">
           {drafting && (
             <div className="rounded-lg border border-primary/50 bg-card">
-              <CommentDraftCard
-                label="Comment on file"
-                anchor={DOCUMENT_ANCHOR}
-                config={config}
-                onCreate={onCreate}
-                onDiscard={onDiscardDraft}
-                {...(composerActions ? { createActions: composerActions } : {})}
-              />
+              <FileDraftCard config={config} composerActions={composerActions} onCreate={onCreate} onDiscard={onDiscardDraft} />
             </div>
           )}
-          {entries.map(({ anchor, label, note, thread }) => (
-            <div key={anchor} data-file-thread={anchor} className="rounded-lg border border-border bg-card">
-              <div className="px-2 pt-2 text-[11px] text-muted-foreground">
-                <span className="font-medium">{label}</span>
-                {note && <span> — {note}</span>}
-              </div>
-              <CommentThread
-                {...options}
-                comments={thread}
-                config={config}
-                anchor={anchor}
-                compact
-                defaultExpanded
-                hideComposer={thread.length > 0}
-                composerPlaceholder="Add a comment…"
-                {...callbacks}
-                {...(renderRootDetails ? { renderRootDetails } : {})}
-              />
+          {entries.map((entry) => (
+            <div key={entry.anchor} data-file-thread={entry.anchor} className="rounded-lg border border-border bg-card">
+              <FileThreadCard entry={entry} config={config} callbacks={callbacks} options={options} renderRootDetails={renderRootDetails} />
             </div>
           ))}
         </div>
       )}
     </section>
+  );
+}
+
+/** The composer for a new comment on the whole file, as a card's content. */
+export function FileDraftCard({
+  config,
+  composerActions,
+  onCreate,
+  onDiscard,
+}: {
+  config: CommentConfig;
+  composerActions: readonly CommentCreateAction[] | undefined;
+  onCreate: NonNullable<CommentCallbacks["onCreate"]>;
+  onDiscard: () => void;
+}) {
+  return (
+    <CommentDraftCard
+      label="Comment on file"
+      anchor={DOCUMENT_ANCHOR}
+      config={config}
+      onCreate={onCreate}
+      onDiscard={onDiscard}
+      {...(composerActions ? { createActions: composerActions } : {})}
+    />
+  );
+}
+
+/**
+ * One file-level thread as a card's content: what it is on (and why it is not
+ * placed in the text), then the thread. The caller supplies the card frame, so
+ * the same thread reads alike in this list and in a comment rail.
+ */
+export function FileThreadCard({
+  entry: { anchor, label, note, thread },
+  config,
+  callbacks,
+  options,
+  renderRootDetails,
+  defaultExpanded = true,
+}: {
+  entry: FileThreadEntry;
+  config: CommentConfig;
+  callbacks: CommentCallbacks;
+  options: FileReviewThreadOptions;
+  renderRootDetails: ((comment: Comment) => ReactNode) | undefined;
+  defaultExpanded?: boolean;
+}) {
+  return (
+    <>
+      <div className="px-2 pt-2 text-[11px] text-muted-foreground">
+        <span className="font-medium">{label}</span>
+        {note && <span> — {note}</span>}
+      </div>
+      <CommentThread
+        {...options}
+        comments={thread}
+        config={config}
+        anchor={anchor}
+        compact
+        defaultExpanded={defaultExpanded}
+        hideComposer={thread.length > 0}
+        composerPlaceholder="Add a comment…"
+        {...callbacks}
+        {...(renderRootDetails ? { renderRootDetails } : {})}
+      />
+    </>
   );
 }

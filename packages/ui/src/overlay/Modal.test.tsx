@@ -35,6 +35,42 @@ afterEach(() => {
 });
 
 describe("Modal", () => {
+  describe("accessible name", () => {
+    const richTitle = (
+      <span>
+        <svg aria-hidden />
+        New <b>Postgres</b> connection
+      </span>
+    );
+
+    it.each([
+      { case: "a string title", props: { title: "Detail" }, name: "Detail" },
+      { case: "the text of a rich title", props: { title: richTitle }, name: "New Postgres connection" },
+      { case: "an explicit aria-label over the title", props: { title: richTitle, "aria-label": "Create connection" }, name: "Create connection" },
+    ])("is named from $case", ({ props, name }) => {
+      render(
+        <Modal open onClose={() => {}} {...props}>
+          <p>body</p>
+        </Modal>,
+      );
+      expect(getDialog()).toHaveAttribute("aria-label", name);
+    });
+
+    it("follows a rich title whose text changes", () => {
+      const { rerender } = render(
+        <Modal open onClose={() => {}} title={<span>New <b>Postgres</b> connection</span>}>
+          <p>body</p>
+        </Modal>,
+      );
+      rerender(
+        <Modal open onClose={() => {}} title={<span>New <b>Redis</b> connection</span>}>
+          <p>body</p>
+        </Modal>,
+      );
+      expect(getDialog()).toHaveAttribute("aria-label", "New Redis connection");
+    });
+  });
+
   it("renders the expand toggle by default and starts at the configured size", () => {
     render(
       <Modal open onClose={() => {}} size="lg" title="Detail">
