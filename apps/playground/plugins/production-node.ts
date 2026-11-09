@@ -42,7 +42,7 @@ export async function startProductionServer(options: { root: string; port: numbe
       response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }).end(JSON.stringify(profile)); return;
     }
     const name = url.pathname.startsWith("/frame/") ? "bootstrap.html" : url.pathname.slice(1);
-    if (!["bootstrap.html", "sw.js", "boot.js", "page-agent.js", "devtools-hook.js"].includes(name)) { next(); return; }
+    if (!["bootstrap.html", "sw.js", "boot.js", "page-agent.js", "export-compiler.js", "devtools-hook.js"].includes(name)) { next(); return; }
     void readFile(resolve(runtime, name)).then(bytes => {
       response.writeHead(200, { "Content-Type": extname(name) === ".html" ? "text/html" : "text/javascript", "Cache-Control": "no-store", "Service-Worker-Allowed": "/frame/" }).end(bytes);
     }).catch(next);

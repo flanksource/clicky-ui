@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   familyForModel,
   familiesFromRuntimeCatalog,
@@ -16,7 +16,7 @@ import { AgentIdentity, shortContextModelName } from "@flanksource/clicky-ui/cha
 
 import { type AgentTarget, type CaptainSessionOption } from "./agent-runs-api";
 import { useAgentRuns } from "./AgentRunsProvider";
-import { captainAgentTarget } from "./agent-targets";
+import { captainAgentTarget, rememberedAgentTarget } from "./agent-targets";
 import { useCaptainSessions } from "./useCaptainSessions";
 
 const PLAYGROUND = "playground";
@@ -141,11 +141,13 @@ export function AgentTargetPicker() {
       );
       return;
     }
-    const next: AgentTarget = session
+    apply(session
       ? managed.some((entry) => entry.sessionId === session.id)
         ? { kind: "managed", sessionId: session.id, label: session.title }
         : captainAgentTarget(session)
-      : { kind: "playground" };
+      : { kind: "playground" });
+  };
+  const apply = (next: AgentTarget) => {
     setSaving(true);
     setTarget(next)
       .then(() => setError(null))
@@ -154,6 +156,20 @@ export function AgentTargetPicker() {
       )
       .finally(() => setSaving(false));
   };
+
+  // A page nobody pointed anywhere yet starts on the session last chosen for any page, while it is live.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current || data === null || sessions === null) return;
+    restored.current = true;
+    if (target !== undefined) return;
+    try {
+      const remembered = rememberedAgentTarget();
+      if (remembered && live.some((session) => session.id === remembered.sessionId)) apply(remembered);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    }
+  });
 
   return (
     <div className="space-y-1">

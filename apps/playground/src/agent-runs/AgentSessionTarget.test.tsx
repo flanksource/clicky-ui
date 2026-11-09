@@ -30,7 +30,7 @@ beforeEach(() => {
     return data.settings;
   });
 });
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); localStorage.clear(); });
 
 function SessionControls({ page, runAgent }: { page?: string; runAgent: () => Promise<void> }) {
   return <AgentRunsProvider {...(page ? { page } : {})} runAgent={runAgent}><AgentSessionButton /></AgentRunsProvider>;
@@ -112,6 +112,28 @@ describe("page agent target controls", () => {
     fireEvent.mouseDown(await screen.findByRole("option", { name: /Playground agent/ }));
     await waitFor(() => expect(setPageAgentTarget).toHaveBeenLastCalledWith("welcome", { kind: "playground" }));
     expect(runAgent).not.toHaveBeenCalled();
+  });
+  it.each([
+    { name: "points a page without a target at the last live Captain session chosen", remembered: FIRST, expected: [["other", { kind: "captain", sessionId: FIRST.id, label: "Review changes · codex" }]] },
+    { name: "leaves a page on the playground agent when the remembered session is no longer live", remembered: { ...FIRST, id: "ended" }, expected: [] },
+  ])("$name", async ({ remembered, expected }) => {
+    localStorage.setItem("playground.agent-target", JSON.stringify({ kind: "captain", sessionId: remembered.id, label: "Review changes · codex" }));
+    render(<SessionControls page="other" runAgent={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Agent" }));
+    fireEvent.click(screen.getByRole("button", { name: "All sessions…" }));
+    const picker = await screen.findByRole("combobox", { name: "Send comments to" });
+    await waitFor(() => expect(picker.hasAttribute("disabled")).toBe(false));
+    await waitFor(() => expect(vi.mocked(setPageAgentTarget).mock.calls).toEqual(expected));
+  });
+  it("remembers the session chosen for one page in localStorage", async () => {
+    render(<SessionControls page="welcome" runAgent={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Agent" }));
+    fireEvent.click(screen.getByRole("button", { name: "All sessions…" }));
+    const picker = await screen.findByRole("combobox", { name: "Send comments to" });
+    await waitFor(() => expect(picker.hasAttribute("disabled")).toBe(false));
+    fireEvent.click(picker);
+    fireEvent.mouseDown(await screen.findByRole("option", { name: /Fix layout/ }));
+    await waitFor(() => expect(localStorage.getItem("playground.agent-target")).toBe(JSON.stringify({ kind: "captain", sessionId: SECOND.id, label: "Fix layout · claude" })));
   });
   it("shows the saved target for each page when navigating", async () => {
     data.settings.targets = { welcome: { kind: "captain", sessionId: FIRST.id, label: "Review changes · codex" }, other: { kind: "captain", sessionId: SECOND.id, label: "Fix layout · claude" } };
