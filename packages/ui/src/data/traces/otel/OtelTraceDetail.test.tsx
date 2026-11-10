@@ -20,6 +20,12 @@ it("opens a grouped call's inspector and steps to the next visible span", () => 
   expect(screen.getByText("SELECT * FROM customers", { selector: "pre" })).toBeTruthy();
 });
 
+it("renders the trace title through renderTitle instead of inline", () => {
+  render(<OtelTraceDetail trace={traceExample} selectedSpanId="root" onSelectSpan={() => undefined} renderTitle={title => <header data-testid="slot">{title}</header>} />);
+  expect(screen.getByTestId("slot")).toContainElement(screen.getByRole("heading", { level: 1 }));
+  expect(screen.queryByRole("heading", { level: 2 })).toBeNull();
+});
+
 it("clips long SQL statements until explicitly expanded", () => {
   const statement = "SELECT * FROM orders; ".repeat(100);
   const trace = { ...traceExample, spans: traceExample.spans.map(span => span.spanId === "orders" ? { ...span, attributes: { ...span.attributes, "db.statement": statement } } : span) };
