@@ -63,6 +63,8 @@ export {
   type EntityExplorerAppProps,
   type SurfaceActionLabels,
 } from "./rpc/EntityExplorerApp";
+export { ExplorerNavPortal, type ExplorerNavPortalProps } from "./rpc/ExplorerNav";
+export { EntitySurface, type EntitySurfaceProps } from "./rpc/EntitySurface";
 export {
   ACCEPT_OPTIONS,
   VIEW_OPTIONS,

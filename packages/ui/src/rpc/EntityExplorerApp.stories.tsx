@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
+import { ExplorerNavPortal } from "./ExplorerNav";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { EntityExplorerApp } from "./EntityExplorerApp";
 import { RouterProvider } from "./RouterProvider";
@@ -7,7 +8,13 @@ import { useMemoryRouter } from "./router";
 import { FAKE_CLIENT } from "./rpc-story.fixtures";
 import { ThemeProvider } from "../hooks/theme-provider";
 
-function Showcase({ initialPath = "/widgets" }: { initialPath?: string }) {
+function Showcase({
+  initialPath = "/widgets",
+  actions,
+}: {
+  initialPath?: string;
+  actions?: ReactNode;
+}) {
   const queryClient = useMemo(
     () => new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }),
     [],
@@ -19,7 +26,11 @@ function Showcase({ initialPath = "/widgets" }: { initialPath?: string }) {
       <QueryClientProvider client={queryClient}>
         <RouterProvider adapter={router}>
           <div className="h-[640px] overflow-auto rounded-md border border-border p-4">
-            <EntityExplorerApp client={FAKE_CLIENT} showApiExplorer={false} />
+            <EntityExplorerApp
+              client={FAKE_CLIENT}
+              showApiExplorer={false}
+              {...(actions ? { actions } : {})}
+            />
           </div>
         </RouterProvider>
       </QueryClientProvider>
@@ -46,6 +57,20 @@ export default meta;
 type Story = StoryObj<typeof EntityExplorerApp>;
 
 export const Default: Story = {};
+
+/** A drill-down page mounts `ExplorerNavPortal`: the top bar's surface title becomes
+ *  a breadcrumb back to the surface listing, followed by the page's own title. */
+export const DrillDownBreadcrumb: Story = {
+  render: () => (
+    <Showcase
+      actions={
+        <ExplorerNavPortal parentHref="/widgets">
+          <h1 className="min-w-0 truncate text-base font-semibold tracking-tight">Widget 42</h1>
+        </ExplorerNavPortal>
+      }
+    />
+  ),
+};
 
 /** Lands on the Orders surface — status text, priority badges, monospace totals,
  *  channel tag chips and a placed time-range filter; click an order # to open its
