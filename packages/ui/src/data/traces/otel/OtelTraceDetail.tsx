@@ -10,7 +10,7 @@ import { Properties } from "../../Properties";
 /**
  * OpenTelemetry waterfall with grouped calls and an adjacent span inspector.
  */
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
   Button,
   CopyButton,
@@ -60,7 +60,15 @@ const ROW_HEIGHT = 28;
 const NAME_COLUMN = "minmax(15rem, 36%) minmax(0, 1fr)";
 
 
-export function OtelTraceDetail({ trace: TRACE, selectedSpanId, onSelectSpan }: { trace: Trace; selectedSpanId?: string; onSelectSpan: (id: string) => void }) {
+export type OtelTraceDetailProps = {
+  trace: Trace;
+  selectedSpanId?: string;
+  onSelectSpan: (id: string) => void;
+  /** Places the trace title elsewhere, e.g. an app shell's top bar; rendered inline when unset. */
+  renderTitle?: (title: ReactNode) => ReactNode;
+};
+
+export function OtelTraceDetail({ trace: TRACE, selectedSpanId, onSelectSpan, renderTitle }: OtelTraceDetailProps) {
   const index = useMemo(() => indexTrace(TRACE), [TRACE]);
   const suspects = useMemo(() => misparented(index), [index]);
   const selected = selectedSpanId ?? TRACE.spans[0]?.spanId ?? "";
@@ -101,7 +109,8 @@ export function OtelTraceDetail({ trace: TRACE, selectedSpanId, onSelectSpan }: 
   return (
     <div className="space-y-8">
       <section className="space-y-4 rounded-xl border border-border bg-background p-density-4">
-        <TraceHeader index={index} trace={TRACE} />
+        {renderTitle ? renderTitle(<TraceTitle trace={TRACE} compact />) : <TraceTitle trace={TRACE} />}
+        <TraceStats index={index} trace={TRACE} />
         {TRACE.missingParents.length > 0 && <p role="status">Partial trace: {TRACE.missingParents.length} parent spans are missing from this source.</p>}
         {suspects.size > 0 && (
           <Callout variant="warning" title={`${suspects.size} spans run inside a nested agent but hang off its parent`}>
@@ -153,7 +162,39 @@ export function OtelTraceDetail({ trace: TRACE, selectedSpanId, onSelectSpan }: 
   );
 }
 
-function TraceHeader({ index, trace: TRACE }: { index: TraceIndex; trace: Trace }) {
+function TraceTitle({ trace: { summary }, compact }: { trace: Trace; compact?: boolean }) {
+  const status = summary.errors === 0 ? <Badge tone="success" variant="soft">no errors</Badge> : <Badge tone="danger" variant="soft">{summary.errors} errors</Badge>;
+  const meta = (
+    <>
+      <code>{summary.traceId}</code>
+      <CopyButton value={summary.traceId} label="Copy trace ID" />
+      <span>· {summary.services.join(", ")} · {new Date(summary.startedAt).toLocaleString()}</span>
+    </>
+  );
+  if (compact)
+    return (
+      <div className="flex min-w-0 flex-1 items-center gap-density-2">
+        <h1 className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-tight" title={summary.operation}>
+          <Tinted icon={UiRobotAi} color={CATEGORY_COLOR.agent} />
+          <span className="min-w-0 truncate">{shortOperation(summary.operation)}</span>
+        </h1>
+        {status}
+        <p className="hidden min-w-0 items-center gap-2 truncate text-xs text-muted-foreground lg:flex">{meta}</p>
+      </div>
+    );
+  return (
+    <div className="min-w-0 space-y-1">
+      <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+        <Tinted icon={UiRobotAi} color={CATEGORY_COLOR.agent} />
+        {shortOperation(summary.operation)}
+        {status}
+      </h2>
+      <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">{meta}</p>
+    </div>
+  );
+}
+
+function TraceStats({ index, trace: TRACE }: { index: TraceIndex; trace: Trace }) {
   const { summary } = TRACE;
   const by = (c: Category) => TRACE.spans.filter(span => category(span) === c);
   const llm = by("llm");
@@ -166,22 +207,6 @@ function TraceHeader({ index, trace: TRACE }: { index: TraceIndex; trace: Trace 
   const tokensOut = sum(llm, "gen_ai.usage.output_tokens");
   const ms = (spans: Span[]) => spans.reduce((total, span) => total + span.durationMs, 0);
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          
-          <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <Tinted icon={UiRobotAi} color={CATEGORY_COLOR.agent} />
-            {shortOperation(summary.operation)}
-            {summary.errors === 0 ? <Badge tone="success" variant="soft">no errors</Badge> : <Badge tone="danger" variant="soft">{summary.errors} errors</Badge>}
-          </h2>
-          <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <code>{summary.traceId}</code>
-            <CopyButton value={summary.traceId} label="Copy trace ID" />
-            <span>· {summary.services.join(", ")} · {new Date(summary.startedAt).toLocaleString()}</span>
-          </p>
-        </div>
-      </div>
       <StatStrip
         items={[
           { label: "Duration", value: duration(summary.durationMs), sub: `${summary.spanCount} spans`, icon: UiClock },
@@ -191,7 +216,6 @@ function TraceHeader({ index, trace: TRACE }: { index: TraceIndex; trace: Trace 
           { label: "Root self-time", value: duration(selfTimeMs(index, root)), sub: "not covered by any child span", icon: UiRobotAi, tone: "warning" },
         ]}
       />
-    </div>
   );
 }
 
