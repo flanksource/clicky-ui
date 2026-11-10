@@ -26,3 +26,4 @@ export {
   type ClickyTreeItem,
   type ClickyViewOptions,
 } from "./data/Clicky";
+export { useClickyTableMenu } from "./data/useClickyTableMenu";
