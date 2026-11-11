@@ -71,7 +71,7 @@ describe("CommentComposer", () => {
 
     fireEvent.click(screen.getByRole("button", { name: `${label} rating` }));
     setCommentDraft(screen.getByTestId("comment-compose-input"), "This comparison is clear");
-    fireEvent.click(screen.getByTestId("comment-compose-send"));
+    fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
 
     expect(onCreate).toHaveBeenCalledWith(
       expect.objectContaining({ body: "This comparison is clear", rating }),
@@ -116,7 +116,7 @@ describe("CommentComposer", () => {
     );
 
     setCommentDraft(screen.getByTestId("comment-compose-input"), "Review this balance");
-    const send = screen.getByTestId("comment-compose-send");
+    const send = screen.getByRole("button", { name: "Post comment" });
     fireEvent.click(send);
     fireEvent.click(send);
 
@@ -125,6 +125,7 @@ describe("CommentComposer", () => {
     expect(send).toHaveAttribute("aria-busy", "true");
 
     await act(async () => request.resolve());
+    expect(send).not.toHaveAttribute("aria-busy");
     expect(screen.getByTestId("comment-compose-input")).toHaveTextContent(/^$/);
   });
 
@@ -144,7 +145,8 @@ describe("CommentComposer", () => {
     );
 
     setCommentDraft(screen.getByTestId("comment-compose-input"), "Review this balance");
-    fireEvent.click(screen.getByRole("button", { name: "Post with screenshot" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send options" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Post with screenshot" }));
     fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
 
     expect(onCreate).toHaveBeenCalledExactlyOnceWith(

@@ -25,6 +25,40 @@ export function unionBranches(schema: JsonSchemaProperty): JsonSchemaProperty[] 
   return [];
 }
 
+// A plain string: no enum, const, pattern or format to keep a value apart from
+// any other text, so one value and a list of them are the same field.
+function plainString(schema: JsonSchemaProperty): boolean {
+  return schema.type === "string" && schema.enum === undefined && schema.const === undefined
+    && schema.pattern === undefined && schema.format === undefined;
+}
+
+/**
+ * The array branch of a `string | string[]` union — one value or several of
+ * the same kind, which reads as one tag list rather than a format switch — or
+ * undefined for any other union.
+ */
+export function stringListBranch(branches: JsonSchemaProperty[]): JsonSchemaProperty | undefined {
+  if (branches.length !== 2) return undefined;
+  const list = branches.find((branch) => branch.type === "array");
+  const one = branches.find((branch) => branch !== list);
+  if (!list || !one || !plainString(one)) return undefined;
+  const items = list.items;
+  return items === undefined || plainString(items) ? list : undefined;
+}
+
+/** A `string | string[]` value as the tags it holds; an empty string holds none. */
+export function stringListTags(value: unknown): unknown {
+  if (typeof value === "string") return value === "" ? [] : [value];
+  return value ?? [];
+}
+
+/** Tags back to the union's value: one tag is the string form, more an array, none unset. */
+export function stringListValue(tags: unknown): unknown {
+  if (!Array.isArray(tags)) return tags;
+  if (tags.length === 0) return undefined;
+  return tags.length === 1 && typeof tags[0] === "string" ? tags[0] : tags;
+}
+
 export function branchType(schema: JsonSchemaProperty): string {
   if (schema.const === null) return "null";
   if (schema.const !== undefined) return typeof schema.const;

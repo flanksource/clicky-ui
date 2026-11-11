@@ -9,10 +9,12 @@ vi.mock("../mdx-editor", () => ({
     value,
     onChange,
     images,
+    mdxSyntax,
   }: {
     value: string;
     onChange: (value: string) => void;
     images?: { imagePreviewHandler?: (source: string) => Promise<string> };
+    mdxSyntax?: boolean;
   }) => {
     const [resolved, setResolved] = useState("");
     const source = /!\[[^\]]*\]\(([^)]+)\)/.exec(value)?.[1] ?? "";
@@ -22,7 +24,12 @@ vi.mock("../mdx-editor", () => ({
     return (
       <>
         <img alt="Embedded" src={resolved} />
-        <textarea aria-label="Rich body" value={value} onChange={(event) => onChange(event.target.value)} />
+        <textarea
+          aria-label="Rich body"
+          data-mdx-syntax={String(mdxSyntax === true)}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
       </>
     );
   },
@@ -84,6 +91,16 @@ describe("DocumentRichEditor", () => {
 
     await waitFor(() => expect(screen.getByRole("img", { name: "Embedded" })).toHaveAttribute("src", "/api/file/7/image?path=img%2Fa.png"));
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["slide.mdx", "true"],
+    ["SLIDE.MDX", "true"],
+    ["guide.md", "false"],
+  ])("parses %s with mdxSyntax=%s", async (path, expected) => {
+    render(<DocumentRichEditor path={path} value={"# Slide\n"} onChange={vi.fn()} />);
+
+    expect(await screen.findByRole("textbox", { name: "Rich body" })).toHaveAttribute("data-mdx-syntax", expected);
   });
 
   it("tells the reader to use Source when the frontmatter is not closed", () => {

@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useHistoryRoute } from "./use-history-route";
 
@@ -34,6 +34,35 @@ describe("useHistoryRoute history mode", () => {
 });
 
 describe("useHistoryRoute navigation guard", () => {
+  it("preserves Back and Forward entries when an asynchronous decision rejects leaving", async () => {
+    window.history.replaceState(null, "", "/?page=a");
+    let blocked = false;
+    let decide: ((allowed: boolean) => void) | undefined;
+    const { result } = renderHook(() => useHistoryRoute({ parse: (_path, search) => ({ page: new URLSearchParams(search).get("page") ?? "" }), build: route => `/?page=${route.page}`, beforeNavigate: () => blocked ? new Promise<boolean>(resolve => { decide = resolve; }) : true }));
+    act(() => result.current[1]({ page: "b" }));
+    act(() => result.current[1]({ page: "c" }));
+    blocked = true;
+    act(() => window.history.back());
+    await waitFor(() => expect(decide).toBeTypeOf("function"));
+    await act(async () => decide!(false));
+    await waitFor(() => expect(window.location.search).toBe("?page=c"));
+    expect(result.current[0].page).toBe("c");
+    blocked = false;
+    act(() => window.history.back());
+    await waitFor(() => expect(result.current[0].page).toBe("b"));
+    act(() => window.history.forward());
+    await waitFor(() => expect(result.current[0].page).toBe("c"));
+  });
+  it("keeps the route mounted until an asynchronous save decision succeeds", async () => {
+    window.history.replaceState(null, "", "/?page=draft");
+    let decide!: (allowed: boolean) => void;
+    const gate = new Promise<boolean>(resolve => { decide = resolve; });
+    const { result } = renderHook(() => useHistoryRoute({ parse: (_path, search) => ({ page: new URLSearchParams(search).get("page") ?? "" }), build: route => `/?page=${route.page}`, beforeNavigate: () => gate }));
+    act(() => result.current[1]({ page: "next" }));
+    expect(result.current[0].page).toBe("draft");
+    await act(async () => decide(true));
+    expect(result.current[0].page).toBe("next");
+  });
   it("retains the draft route for rejected navigation and browser history changes", () => {
     window.history.replaceState(null, "", "/?page=draft");
     const beforeNavigate = vi.fn(() => false);

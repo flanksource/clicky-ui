@@ -55,6 +55,47 @@ describe("scalar union controls", () => {
   });
 });
 
+describe("string or list of strings", () => {
+  const company: JsonSchemaProperty = { oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }] };
+  const commit = (text: string) => {
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: text } });
+    fireEvent.keyDown(input, { key: "," });
+  };
+
+  it.each<[string, JsonSchemaProperty]>([
+    ["oneOf", company],
+    ["anyOf, array first", { anyOf: [{ type: "array", items: { type: "string" } }, { type: "string" }] }],
+  ])("renders one tag field with no format switch (%s)", (_, schema) => {
+    render(<ScalarForm schema={schema} initial="Acme" />);
+    expect(screen.queryByRole("combobox", { name: "Parameter format" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove Acme" })).toBeInTheDocument();
+  });
+
+  it("keeps one tag as the string form and writes a second as the list form", () => {
+    render(<ScalarForm schema={company} initial={undefined} />);
+    commit("Acme");
+    expect(screen.getByRole("status")).toHaveTextContent('{"parameter":"Acme"}');
+    commit("Globex");
+    expect(screen.getByRole("status")).toHaveTextContent('{"parameter":["Acme","Globex"]}');
+  });
+
+  it("unsets the value when the last tag is removed", () => {
+    render(<ScalarForm schema={company} initial="Acme" />);
+    fireEvent.click(screen.getByRole("button", { name: "Remove Acme" }));
+    expect(screen.getByRole("status")).toHaveTextContent("{}");
+  });
+
+  it.each<[string, JsonSchemaProperty]>([
+    ["a formatted string", { oneOf: [{ type: "string", format: "date" }, { type: "array", items: { type: "string" } }] }],
+    ["an enum list", { oneOf: [{ type: "string" }, { type: "array", items: { type: "string", enum: ["a", "b"] } }] }],
+  ])("keeps the format switch for %s, whose one value and list differ", (_, schema) => {
+    render(<ScalarForm schema={schema} initial={undefined} />);
+    expect(screen.getByRole("combobox", { name: "Parameter format" })).toBeInTheDocument();
+  });
+});
+
 const ownerRef: JsonSchemaProperty = {
   type: "object", additionalProperties: false, required: ["kind", "name"],
   properties: { kind: { title: "Kind", enum: ["policy", "plan"] }, name: { title: "Name", type: "string" } },

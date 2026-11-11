@@ -230,8 +230,8 @@ function CommentBody(props: CommentCardProps) {
       <div className="flex items-start gap-2.5">
         <CommentAuthorAvatar author={comment.author} />
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-baseline gap-1.5">
-            <span className="truncate text-xs font-semibold text-foreground">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+            <span className="min-w-0 truncate text-xs font-semibold text-foreground">
               <CommentAuthorName author={comment.author} />
             </span>
             {date && (

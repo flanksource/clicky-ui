@@ -204,6 +204,7 @@ export {
 } from "./data/Properties";
 export { formatPropertyLabel } from "./data/properties-utils";
 export { LogViewer, type LogViewerProps } from "./data/LogViewer";
+export { parseLogSections, type LogSection } from "./data/log-sections";
 export {
   LogsTable,
   type LogsTableInput,
@@ -538,6 +539,18 @@ export {
 } from "./data/task-copy";
 export { TaskProgress, type TaskProgressProps } from "./data/TaskProgress";
 export { TaskManager, type TaskManagerProps } from "./data/TaskManager";
+export {
+  TaskPoolUsage,
+  TaskRunConcurrency,
+  type TaskPoolUsageProps,
+  type TaskRunConcurrencyProps,
+} from "./data/TaskPoolUsage";
+export {
+  TASK_POOL_METRIC_RUN_ID,
+  taskPoolMetrics,
+  taskConcurrencyMetrics,
+  taskMetricSeries,
+} from "./data/task-pool-metrics";
 export {
   taskQueryKeys,
   type TaskRunQueryKeyOptions,

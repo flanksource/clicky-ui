@@ -296,6 +296,7 @@ function RichBody({ path, value, onChange, resolveImageUrl }: DocumentRichEditor
         value={body}
         onChange={(next) => onChange(header + next)}
         commitInitialMarkdownNormalize={false}
+        mdxSyntax={/\.mdx$/i.test(path)}
         {...(images ? { images } : {})}
       />
     );

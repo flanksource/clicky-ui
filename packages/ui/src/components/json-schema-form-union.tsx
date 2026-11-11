@@ -1,9 +1,29 @@
 import { useRef, useState } from "react";
 import { Select } from "./select";
-import { unionBranches, matchesUnionBranch, branchTitle, branchType, seedUnionBranch } from "./json-schema-form-union-model";
+import {
+  unionBranches, matchesUnionBranch, branchTitle, branchType, seedUnionBranch,
+  stringListBranch, stringListTags, stringListValue,
+} from "./json-schema-form-union-model";
 import type { FieldControl, RenderContext } from "./json-schema-form-types";
 
 export function UnionControl({ field, fieldId, ctx }: { field: FieldControl; fieldId: string; ctx: RenderContext }) {
+  const list = stringListBranch(unionBranches(field.schema));
+  return list
+    ? <StringListControl field={field} list={list} ctx={ctx} />
+    : <BranchControl field={field} fieldId={fieldId} ctx={ctx} />;
+}
+
+// A `string | string[]` union is one tag field: a single value reads as one
+// tag, and the value keeps the string form until a second tag is added.
+function StringListControl({ field, list, ctx }: { field: FieldControl; list: FieldControl["schema"]; ctx: RenderContext }) {
+  const { oneOf: _oneOf, anyOf: _anyOf, ...base } = field.schema;
+  const prop = { ...base, ...list, title: field.label };
+  const nodes = ctx.render.renderFieldNodes({ key: field.key, prop, required: field.required,
+    value: stringListTags(field.value), onChange: (tags) => field.onChange(stringListValue(tags)), instancePath: ctx.instancePath }, ctx);
+  return <>{nodes?.value}</>;
+}
+
+function BranchControl({ field, fieldId, ctx }: { field: FieldControl; fieldId: string; ctx: RenderContext }) {
   const drafts = useRef(new Map<number, unknown>());
   const [preferred, setPreferred] = useState<number | null>(null);
   const branches = unionBranches(field.schema);
