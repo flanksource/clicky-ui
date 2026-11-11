@@ -3745,6 +3745,38 @@
       "note": "Kubernetes Job."
     },
     {
+      "consumerName": "k8s-service",
+      "group": "kubernetes",
+      "status": "NEW",
+      "outline": "incumbent",
+      "filled": "skip",
+      "note": "Kubernetes Service glyph from the Kubernetes community icon, without its blue heptagon badge."
+    },
+    {
+      "consumerName": "k8s-endpoint",
+      "group": "kubernetes",
+      "status": "NEW",
+      "outline": "incumbent",
+      "filled": "skip",
+      "note": "Kubernetes Endpoints glyph from the Kubernetes community icon, without its blue heptagon badge."
+    },
+    {
+      "consumerName": "k8s-ingress",
+      "group": "kubernetes",
+      "status": "NEW",
+      "outline": "incumbent",
+      "filled": "skip",
+      "note": "Kubernetes Ingress glyph from the Kubernetes community icon, without its blue heptagon badge."
+    },
+    {
+      "consumerName": "k8s-pod",
+      "group": "kubernetes",
+      "status": "NEW",
+      "outline": "incumbent",
+      "filled": "skip",
+      "note": "Kubernetes Pod glyph from the Kubernetes community icon, without its blue heptagon badge."
+    },
+    {
       "consumerName": "profiler-back-trace",
       "group": "tracing-observability",
       "status": "NEW",
