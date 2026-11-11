@@ -31,6 +31,8 @@ async function serveConnections(gavel: GavelEndpoint, gavelFailure: () => "http"
     expect(init?.signal).toBeInstanceOf(AbortSignal);
     const failure = target.hostname === "gavel.local" ? gavelFailure() : null;
     if (failure === "network") throw new TypeError("Connection refused");
+    // A gavel with agent delivery refuses the route list for lack of a scope.
+    if (target.pathname === "/api/v1/comments/routes") return Response.json({ error: "scope is required" }, { status: 400 });
     return Response.json(compatible, failure === "http" ? { status: 503, statusText: "Service Unavailable" } : { status: 200 });
   });
   vi.stubGlobal("fetch", probes);

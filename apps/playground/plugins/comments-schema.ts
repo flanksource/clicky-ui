@@ -317,7 +317,7 @@ export const COMMENT_TOOLS: CommentTool[] = [
     name: "associate_external_page",
     label: "Associate external page",
     description:
-      "Create a comment set for a URL, or associate a new query variant with mergeInto. Use an existing association when present; ask the human to choose Merge or New for unfamiliar query variants.",
+      "Create a comment set for a URL, or associate a new query variant with mergeInto. Reuse an exact association when present; otherwise associate the first existing set with the same origin, path and fragment.",
     method: "POST",
     path: "/__playground/external-pages",
     annotations: { idempotentHint: true },

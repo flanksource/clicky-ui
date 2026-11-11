@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { createServer, type ViteDevServer } from "vite";
 import { playgroundBookmarklet } from "./bookmarklet-server";
 import { BOOKMARKLET_ROUTE } from "../src/bookmarklet/model";
@@ -22,4 +22,8 @@ it("keeps development bookmarklet bundling and plain API mounting working", asyn
   const response = await fetch(`http://127.0.0.1:${address.port}${BOOKMARKLET_ROUTE}`);
   expect(response.status).toBe(200);
   expect(await response.text()).toContain("bookmarkletTest");
+  writeFileSync(join(root, "src/bookmarklet/host.ts"), "document.documentElement.dataset.bookmarkletChanged = 'ready';");
+  await vi.waitFor(async () => {
+    expect(await (await fetch(`http://127.0.0.1:${address.port}${BOOKMARKLET_ROUTE}`)).text()).toContain("bookmarkletChanged");
+  }, { timeout: 5000 });
 }, 30_000);

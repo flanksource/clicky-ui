@@ -12,5 +12,11 @@ if (!addr) throw new Error("stub gavel needs --addr");
 const [host, port] = addr.split(":");
 createServer((req, res) => {
   res.setHeader("Content-Type", "application/json");
+  // A gavel with agent delivery refuses the route list for lack of a scope.
+  if (req.url === "/api/v1/comments/routes") {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ error: "scope is required" }));
+    return;
+  }
   res.end(JSON.stringify(req.url === "/api/launch/openapi" ? { paths: { "/api/launch/linters": { get: {} }, "/api/launch/lint/filter": { post: {} }, "/api/launch/lint/ignore": { post: {} } } } : { args, cwd: process.cwd(), pid: process.pid, url: req.url }));
 }).listen(Number(port), host);

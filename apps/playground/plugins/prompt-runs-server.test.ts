@@ -146,10 +146,9 @@ describe("playground prompt runs", () => {
             dir,
             gavelURL: captainURL,
             workspace: REPO_ROOT,
-            onCreated: agentRuns.autoRunComment,
           }),
         ),
-        playgroundComments({ dir, onCreated: agentRuns.autoRunComment }),
+        playgroundComments({ dir }),
       ],
       server: { host: "127.0.0.1", port: 0 },
     });
@@ -390,14 +389,16 @@ describe("playground prompt runs", () => {
     expect(comment?.agentRun).toBeUndefined();
   });
 
-  it("hands the result to the agent session on behalf of the requester when auto-run is on", async () => {
+  it("leaves the result to its human even when the page auto-runs: gavel routes only human-authored roots", async () => {
     await fetch(`${baseUrl}/__playground/agent-sessions/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        autoRun: true,
-        runtime: { spec: { model: "m-1" } },
-      }),
+      body: JSON.stringify({ runtime: { spec: { model: "m-1" } } }),
+    });
+    await fetch(`${baseUrl}/__playground/agent-sessions/targets`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ page: PAGE, autoRun: true }),
     });
     captain.nextSummary = {
       event: "done",
@@ -405,21 +406,12 @@ describe("playground prompt runs", () => {
     };
     const { run } = (await (await startRun()).json()) as { run: PromptRun };
     await settled(run.runId);
+    // Give a would-be background delivery time to start.
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    await vi.waitFor(
-      async () =>
-        expect((await pageComments())[0]?.agentRun?.state).toBe("sent"),
-      {
-        timeout: 3000,
-      },
-    );
-    const chat = captain.callsTo("POST", /^\/api\/v1\/prompt\/run$/);
-    expect(chat).toHaveLength(1);
-    expect(JSON.stringify(chat[0]?.body)).toContain("Label overflows its box.");
-    expect((await pageComments())[0]).toMatchObject({
-      status: "in_progress",
-      assignee: { name: "m-1", kind: "agent" },
-    });
+    const [comment] = await pageComments();
+    expect(comment?.body).toContain("Label overflows its box.");
+    expect(comment?.agentRun).toBeUndefined();
   });
 
   it.each([

@@ -14,7 +14,7 @@ export async function buildProductionShell(root: string) {
   const facet = resolve(root, "../../../facet", manifest.exports["."].import);
   await build({ configFile: false, root, base: PRODUCTION_ASSET_BASE, logLevel: "warn", plugins: [playgroundProduction({ root }), playgroundPageActivity(resolve(root, "src/pages")), react(), tailwindcss()], define: { "import.meta.env.PLAYGROUND_LIVE": "true", "import.meta.env.PLAYGROUND_BROWSER_MODE": "true" }, resolve: { dedupe: ["react", "react-dom"], alias: [{ find: /^@flanksource\/facet$/, replacement: facet }] }, build: { outDir, emptyOutDir: true, sourcemap: true } });
   await build({ configFile: false, root, logLevel: "warn", define: { "process.env.NODE_ENV": JSON.stringify("development") }, worker: { format: "es" }, build: { outDir, emptyOutDir: false, lib: { entry: resolve(root, "src/bookmarklet/host.ts"), formats: ["es"], fileName: () => "bookmarklet-entry.js" } } });
-  await writeFile(resolve(outDir, "bookmarklet.js"), `(() => { const url = document.currentScript.src; import(new URL("${PRODUCTION_ASSET_BASE}bookmarklet-entry.js", url).href).then(module => module.installBookmarklet(url)).catch(error => window.alert("Playground grabber: " + error.message)); })();`);
+  await writeFile(resolve(outDir, "bookmarklet.js"), `(() => { const url = document.currentScript.src; import(new URL("${PRODUCTION_ASSET_BASE}bookmarklet-entry.js", url).href).then(module => module.installBookmarklet({ playground: url })).catch(error => window.alert("Playground grabber: " + error.message)); })();`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await buildProductionShell(resolve(dirname(fileURLToPath(import.meta.url)), ".."));

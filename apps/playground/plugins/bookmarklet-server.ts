@@ -1,11 +1,31 @@
-import { resolve } from "node:path";
-import { readFileSync } from "node:fs";
-import { build, type Plugin, type Rollup } from "vite";
+import { isAbsolute, resolve } from "node:path";
+import { existsSync, readFileSync, watch, type FSWatcher } from "node:fs";
+import { build, type InlineConfig, type Plugin } from "vite";
 import { registerBookmarkletMiddleware } from "./bookmarklet-middleware";
 export { registerBookmarkletMiddleware } from "./bookmarklet-middleware";
 import {
   BOOKMARKLET_ROUTE,
 } from "../src/bookmarklet/model";
+
+/** The grabber host as one classic script defining `PlaygroundGrabber`; shared by the bookmarklet and the Chrome extension. */
+export function grabberHostBuild(root: string) {
+  return {
+    configFile: false,
+    root,
+    logLevel: "warn",
+    publicDir: false,
+    define: { "process.env.NODE_ENV": JSON.stringify("production") },
+    build: {
+      emptyOutDir: false,
+      lib: {
+        entry: resolve(root, "src/bookmarklet/host.ts"),
+        name: "PlaygroundGrabber",
+        formats: ["iife"],
+      },
+      rolldownOptions: { output: { codeSplitting: false } },
+    },
+  } satisfies InlineConfig;
+}
 
 export function playgroundBookmarklet(options: {
   root: string;
@@ -14,29 +34,12 @@ export function playgroundBookmarklet(options: {
 }): Plugin {
   let script = "";
   let bundleError: string | undefined;
-  let watcher: Rollup.RollupWatcher | undefined;
-  const bundle = async (watch: boolean) => {
-    let ready: () => void;
-    let failed: (reason: unknown) => void;
-    const first = new Promise<void>((yes, no) => {
-      ready = yes;
-      failed = no;
-    });
-    const result = await build({
-      configFile: false,
-      root: options.root,
-      logLevel: "warn",
-      build: {
-        write: false,
-        emptyOutDir: false,
-        ...(watch ? { watch: {} } : {}),
-        lib: {
-          entry: resolve(options.root, "src/bookmarklet/host.ts"),
-          name: "PlaygroundGrabber",
-          formats: ["iife"],
-        },
-        rolldownOptions: { output: { codeSplitting: false } },
-      },
+  let dependencies = new Set<string>();
+  const bundle = async () => {
+    const config = grabberHostBuild(options.root);
+    await build({
+      ...config,
+      build: { ...config.build, write: false },
       plugins: [
         {
           name: "playground-bookmarklet-output",
@@ -48,22 +51,11 @@ export function playgroundBookmarklet(options: {
               throw new Error("Bookmarklet entry was not emitted");
             script = entry.code;
             bundleError = undefined;
-            ready();
+            dependencies = new Set([...this.getModuleIds()].map(path => path.split("?")[0]!));
           },
         },
       ],
     });
-    if ("on" in result) {
-      watcher = result;
-      watcher.on("event", (event) => {
-        if (event.code === "ERROR") {
-          script = "";
-          bundleError = event.error.message;
-          failed(event.error);
-        }
-      });
-    }
-    await first;
   };
 
   return {
@@ -72,12 +64,28 @@ export function playgroundBookmarklet(options: {
       if (options.compiled) {
         script = readFileSync(resolve(options.root, "dist", BOOKMARKLET_ROUTE.slice(1)), "utf8");
       } else {
-        await bundle(true);
+        await bundle();
+        let rebuild = Promise.resolve();
+        const watchers = new Map<string, FSWatcher>();
+        const observe = () => {
+          for (const path of dependencies) {
+            if (!isAbsolute(path) || !existsSync(path) || watchers.has(path)) continue;
+            const watcher = watch(path, { persistent: false }, () => changed(path));
+            watcher.on("error", cause => { script = ""; bundleError = cause.message; });
+            watchers.set(path, watcher);
+          }
+        };
+        const changed = (path: string) => {
+          if (!dependencies.has(path)) return;
+          rebuild = rebuild.then(bundle).then(observe).catch((cause: unknown) => {
+            script = "";
+            bundleError = cause instanceof Error ? cause.message : String(cause);
+          });
+        };
+        observe();
+        server.httpServer?.once("close", () => { for (const watcher of watchers.values()) watcher.close(); });
       }
       registerBookmarkletMiddleware({ middlewares: server.middlewares, dir: options.dir, script: () => script, bundleError: () => bundleError });
-      server.httpServer?.once("close", () => {
-        void watcher?.close();
-      });
     },
     configurePreviewServer(server) {
       script = readFileSync(
@@ -91,7 +99,7 @@ export function playgroundBookmarklet(options: {
       registerBookmarkletMiddleware({ middlewares: server.middlewares, dir: options.dir, script: () => script, bundleError: () => bundleError });
     },
     async generateBundle() {
-      await bundle(false);
+      await bundle();
       this.emitFile({
         type: "asset",
         fileName: BOOKMARKLET_ROUTE.slice(1),

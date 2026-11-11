@@ -4,6 +4,7 @@ import type { GavelEndpoint } from "./gavel-launch-server";
 import { vocabularyReferences } from "../../../packages/ui/src/comments/comment-vocabulary";
 import { commentVocabularyItems } from "./vocabulary-registry";
 import { LaunchHttpError } from "./launch-client";
+import type { DeliverTarget, GavelAgentSession, Route, RouteInput } from "../src/comments/gavel-delivery";
 import type {
   CommentsFile,
   StoredAuthor,
@@ -107,6 +108,8 @@ export class CommentsClient {
       );
     }
     const text = await response.text();
+    // Gavel answers a delete (DELETE /routes/{id}) 204 with no body.
+    if (response.status === 204) return undefined as T;
     let body: unknown;
     try {
       body = JSON.parse(text);
@@ -318,6 +321,39 @@ export class CommentsClient {
       author,
     );
     return project(c)[0]!;
+  }
+  /** Hands a thread root to an agent through gavel; gavel records the outcome under the comment's `agentRun`, and a failed delivery answers 502. */
+  async deliver(
+    options: { id: string; version: number; requestId: string; target: DeliverTarget },
+    author = localUser,
+  ): Promise<StoredComment> {
+    const c = await this.request<NativeComment>(
+      `/${encodeURIComponent(options.id)}/deliver`,
+      {
+        method: "POST",
+        body: JSON.stringify({ expectedVersion: options.version, requestId: options.requestId, target: options.target }),
+      },
+      author,
+    );
+    return project(c)[0]!;
+  }
+  /** The live agent sessions gavel can deliver to. */
+  async agentSessions(): Promise<GavelAgentSession[]> {
+    const sessions = await this.request<GavelAgentSession[]>(`/agent-sessions?${new URLSearchParams({ scope: this.scope })}`);
+    if (!Array.isArray(sessions)) throw new Error("Gavel comments returned an invalid agent session list");
+    return sessions;
+  }
+  async routes(): Promise<Route[]> {
+    const routes = await this.request<Route[]>(`/routes?${new URLSearchParams({ scope: this.scope })}`);
+    if (!Array.isArray(routes)) throw new Error("Gavel comments returned an invalid route list");
+    return routes;
+  }
+  /** Creates (no `id`) or replaces a route; gavel delivers new human comments under its `targetPrefix` to its target while it is enabled. */
+  saveRoute(route: RouteInput): Promise<Route> {
+    return this.request<Route>("/routes", { method: "PUT", body: JSON.stringify(route) });
+  }
+  async deleteRoute(id: string): Promise<void> {
+    await this.request<undefined>(`/routes/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 }
 async function findComment(client: CommentsClient, id: string) {

@@ -253,8 +253,8 @@ describe("playgroundEditableSource", () => {
       const hash = sourceHash(plain);
 
       expect(transform(plain, id)!.code).toBe(
-        'export default () => <svg><rect x={1} data-editable-source="flanksource/_d/diagram.tsx:1:27#0@' +
-          `${hash}" /><path d="M0 0" data-editable-source="flanksource/_d/diagram.tsx:1:41#1@${hash}"></path></svg>;`,
+        'import { editableElement as __playgroundEditableElement } from "@flanksource/page-runtime/editing";export default () => <svg>{__playgroundEditableElement(<rect x={1} data-editable-source="flanksource/_d/diagram.tsx:1:27#0@' +
+          `${hash}" />)}{__playgroundEditableElement(<path d="M0 0" data-editable-source="flanksource/_d/diagram.tsx:1:41#1@${hash}"></path>)}</svg>;`,
       );
     });
 

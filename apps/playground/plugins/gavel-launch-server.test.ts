@@ -58,7 +58,7 @@ describe("onDemandGavel", () => {
   it("reuses a launch server that already answers without starting one", async () => {
     const addr = await freeAddr();
     const [host, port] = addr.split(":");
-    const running = createServer((_req, res) => { res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify({ paths: { "/api/launch/linters": { get: {} }, "/api/launch/lint/filter": { post: {} }, "/api/launch/lint/ignore": { post: {} } } })); });
+    const running = createServer((req, res) => { res.setHeader("Content-Type", "application/json"); if (req.url === "/api/v1/comments/routes") { res.statusCode = 400; res.end(JSON.stringify({ error: "scope is required" })); return; } res.end(JSON.stringify({ paths: { "/api/launch/linters": { get: {} }, "/api/launch/lint/filter": { post: {} }, "/api/launch/lint/ignore": { post: {} } } })); });
     servers.push(running);
     await new Promise<void>((resolve) => running.listen(Number(port), host, resolve));
     const gavel = endpoint({ addr, command: ["/nonexistent/gavel"] });

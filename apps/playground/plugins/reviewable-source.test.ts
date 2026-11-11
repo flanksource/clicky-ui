@@ -31,10 +31,10 @@ describe("reviewable source edits", () => {
     });
 
     expect(marked).toContain('id="first" data-review-id="review-first"');
-    expect(deleteReviewableSource(marked, "review-first")).toContain(
+    expect(deleteReviewableSource(marked, "review-first").source).toContain(
       '<section id="second">Two</section>',
     );
-    expect(deleteReviewableSource(marked, "review-first")).not.toContain("One");
+    expect(deleteReviewableSource(marked, "review-first").source).not.toContain("One");
   });
 
   it("marks and removes only the selected row of a literal mapped array", () => {
@@ -47,7 +47,7 @@ export default function Page() { return <main>{VARIANTS.map((variant) => <sectio
 
     expect(marked).toContain('reviewId: "review-first"');
     expect(marked).toContain("data-review-id={variant.reviewId}");
-    const deleted = deleteReviewableSource(marked, "review-first");
+    const { source: deleted } = deleteReviewableSource(marked, "review-first");
     expect(deleted).not.toContain('id: "first"');
     expect(deleted).toContain('id: "second"');
   });

@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { recordSourceEdit } from "./source-lineage";
+import { editableOpenings } from "./editable-jsx";
 
 import { readAll, writeAll, addComment, removeComment } from "./comments-store";
 import type { StoredComment } from "./comments-store";
@@ -116,7 +118,7 @@ export async function deleteReviewable(
   },
 ): Promise<{ removedComments: number; source: string }> {
   const current = currentSource(request);
-  const source = deleteReviewableSource(current, request.reviewId);
+  const { source, removed } = deleteReviewableSource(current, request.reviewId);
   const all = await readAll(request.commentsDir);
   const pageComments = all[request.slug] ?? [];
   const requestedIds = new Set(request.associatedCommentIds);
@@ -167,5 +169,7 @@ export async function deleteReviewable(
     }
     throw cause;
   }
+  const openings = editableOpenings(current, request.slug);
+  recordSourceEdit({ file: pagePath(request.pagesDir, request.slug), before: current, after: source, deleted: { ordinal: openings.filter(opening => opening.start < removed.start).length, count: openings.filter(opening => opening.start >= removed.start && opening.start < removed.end).length } });
   return { removedComments: doomed.length, source };
 }

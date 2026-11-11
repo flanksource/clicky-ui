@@ -5,11 +5,13 @@ import { relative, sep } from "node:path";
 import type { Plugin } from "vite";
 
 import { isSvgEditableTag, validateSvgAttributes } from "../src/visual-edit/svg-schemas";
-import { editableOpenings } from "./editable-jsx";
+import { editableOpenings, editableOpeningNodes, parseTsx } from "./editable-jsx";
+import ts from "typescript";
 import { parseEditableSource, type EditableSourceMarker } from "./editable-source-marker";
 import { diskModuleHost, pageModuleGraph } from "./page-module-graph";
 import { PAGE_SLUG_PATTERN, PageStoreError, pagePath, pagesFilePath, writePagesFile } from "./pages-store";
 import { sourceHash } from "./source-hash";
+import { recordSourceEdit, resolveOrdinal, sharedLineage, type VisualEditLineage } from "./source-lineage";
 import { setSvgAttributes } from "./svg-edit-source";
 import { deleteSvgElement } from "./svg-delete-source";
 import {
@@ -24,7 +26,7 @@ import {
 import { VISUAL_EDITS_ROUTE, type VisualEdit, type VisualEditRequest, type VisualEditResponse } from "./visual-edits-contract";
 
 /** Per file, the content hashes reached from earlier hashes through visual edits only. */
-export type VisualEditLineage = Map<string, Map<string, string>>;
+export type { VisualEditLineage } from "./source-lineage";
 
 export type VisualEditResult = { statusCode: number; body: VisualEditResponse; written?: string };
 
@@ -32,15 +34,6 @@ export function createVisualEditLineage(): VisualEditLineage {
   return new Map();
 }
 
-function reaches(lineage: VisualEditLineage, file: string, from: string, to: string): boolean {
-  const steps = lineage.get(file);
-  const seen = new Set<string>();
-  for (let hash: string | undefined = from; hash !== undefined && !seen.has(hash); hash = steps?.get(hash)) {
-    if (hash === to) return true;
-    seen.add(hash);
-  }
-  return false;
-}
 
 class InvalidRequest extends Error {}
 
@@ -154,7 +147,8 @@ function apply({ pagesDir, workspaceRoot, lineage, request }: ApplyVisualEditOpt
   const contents = new Map(graph.files.map((file) => [rel(file), readFileSync(file, "utf8")]));
   const callSiteSource = contents.get(marker.file)!;
   const diskHash = sourceHash(callSiteSource);
-  if (diskHash !== marker.hash && !reaches(lineage, callSite, marker.hash, diskHash)) {
+  const ordinal = resolveOrdinal({ lineage, file: callSite, from: marker.hash, to: diskHash, ordinal: marker.ordinal });
+  if (ordinal === null) {
     return {
       statusCode: 409,
       body: {
@@ -164,6 +158,8 @@ function apply({ pagesDir, workspaceRoot, lineage, request }: ApplyVisualEditOpt
       },
     };
   }
+
+  marker.ordinal = ordinal;
 
   if (edit.kind === "attributes" || edit.kind === "delete") {
     const opening = editableOpenings(callSiteSource, marker.file)[marker.ordinal];
@@ -215,13 +211,10 @@ function apply({ pagesDir, workspaceRoot, lineage, request }: ApplyVisualEditOpt
   }
   for (const item of written) {
     const file = pagesFilePath(pagesDir, item.file);
-    if (edit.kind === "delete") {
-      lineage.delete(file);
-      continue;
-    }
-    const steps = lineage.get(file) ?? new Map<string, string>();
-    steps.set(sourceHash(contents.get(item.file)!), item.hash);
-    lineage.set(file, steps);
+    const openings = editableOpeningNodes(parseTsx(contents.get(item.file)!, item.file));
+    const opening = openings[marker.ordinal];
+    const end = opening ? (ts.isJsxOpeningElement(opening.node) ? opening.node.parent : opening.node).end : 0;
+    recordSourceEdit({ lineage, file, before: contents.get(item.file)!, after: patches.get(item.file)!, ...(edit.kind === "delete" ? { deleted: { ordinal: marker.ordinal, count: openings.filter(candidate => candidate.ordinal >= marker.ordinal && candidate.start < end).length } } : {}) });
   }
   return {
     statusCode: 200,
@@ -283,7 +276,7 @@ export function playgroundVisualEdits(options: { pagesDir: string; workspaceRoot
 
 
 export function registerVisualEditsMiddleware({ middlewares, logger, changed, ...options }: { middlewares: MiddlewareApp; logger: ErrorLogger; pagesDir: string; workspaceRoot: string; changed: (file: string) => void }): void {
-  const lineage = createVisualEditLineage();
+  const lineage = sharedLineage;
   middlewares.use(VISUAL_EDITS_ROUTE, (req, res, next) => {
     void (async () => {
       try {

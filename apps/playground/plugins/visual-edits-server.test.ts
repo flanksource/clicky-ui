@@ -64,6 +64,17 @@ describe("applyVisualEdit", () => {
     });
   });
 
+  it("edits the original surviving SVG marker after deleting its preceding sibling", () => {
+    const source = 'export default () => <svg><g><rect fill="red"/></g><rect fill="blue"/></svg>';
+    writeFileSync(file("flanksource/svg.tsx"), source);
+    const group = marker("flanksource/svg.tsx", 0);
+    const survivor = marker("flanksource/svg.tsx", 2);
+    expect(apply({ page: "flanksource/svg", source: group, edit: { kind: "delete" } }).statusCode).toBe(200);
+    expect(apply({ page: "flanksource/svg", source: survivor, edit: { kind: "attributes", values: { fill: "green" } } }).statusCode).toBe(200);
+    expect(disk("flanksource/svg.tsx")).toBe('export default () => <svg><rect fill="green"/></svg>');
+    expect(apply({ page: "flanksource/svg", source: group, edit: { kind: "delete" } }).statusCode).toBe(409);
+  });
+
   it("does not write a resolved SVG label when a companion attribute is computed", () => {
     const source = 'import { label } from "./_d/label"; export default () => <svg><text fill={paint}>{label}</text></svg>';
     const label = 'export const label = "Gateway";';
@@ -260,7 +271,7 @@ describe("applyVisualEdit", () => {
     ["a missing page", { source: "x", edit: {} }],
     ["an invalid slug", { page: "../x", source: "x", edit: {} }],
     ["a malformed marker", { page: "flanksource/diagrams", source: "nope", edit: { kind: "style", prop: "variant", value: "a" } }],
-    ["an unknown edit kind", { page: "flanksource/diagrams", source: "a.tsx:1:1#0@0123456789ab", edit: { kind: "delete" } }],
+    ["an unknown edit kind", { page: "flanksource/diagrams", source: "a.tsx:1:1#0@0123456789ab", edit: { kind: "unsupported" } }],
     ["a style value with quotes", { page: "flanksource/diagrams", source: "a.tsx:1:1#0@0123456789ab", edit: { kind: "style", prop: "variant", value: 'a"b' } }],
     ["a style prop other than variant/role", { page: "flanksource/diagrams", source: "a.tsx:1:1#0@0123456789ab", edit: { kind: "style", prop: "className", value: "a" } }],
     ["a missing text field", { page: "flanksource/diagrams", source: "a.tsx:1:1#0@0123456789ab", edit: { kind: "text", prop: "title", from: "a" } }],
