@@ -1,5 +1,7 @@
 import type { VocabularyDeclarationItem } from "@flanksource/clicky-ui/comments";
 
+import { GIT_STATE_GROUPS, type GitStateExample, type GitStateGroupId, type GitTone } from "./_states";
+
 export type GitObject =
   | "repository"
   | "branch"
@@ -17,6 +19,76 @@ export type GitObjectItem = VocabularyDeclarationItem & {
   value: string;
   detail: string;
 };
+export type GitDiffStatItem = VocabularyDeclarationItem & {
+  presentation: "diffStat";
+  additions: number;
+  deletions: number;
+  files?: number;
+  detail: string;
+};
+export type GitStateItem = VocabularyDeclarationItem & {
+  group: GitStateGroupId;
+  state: string;
+  tone: GitTone;
+  example: GitStateExample;
+};
+export type GitVocabularyItem = GitObjectItem | GitDiffStatItem | GitStateItem;
+export const isGitDiffStat = (item: GitVocabularyItem): item is GitDiffStatItem =>
+  item.type === "git-diff-stat";
+export const isGitState = (item: GitVocabularyItem): item is GitStateItem =>
+  item.type.startsWith("git-state-");
+
+const stateItems: GitStateItem[] = GIT_STATE_GROUPS.flatMap((group) =>
+  Object.entries(group.states).map(([state, definition]) => ({
+    type: `git-state-${group.id}`,
+    id: `git-state-${group.id}/${state}`,
+    label: `${group.title} · ${definition.label}`,
+    description: `${definition.hint}. Glyph in the ${definition.tone} tone: the tone carries the state, the glyph its kind.`,
+    group: group.id,
+    state,
+    tone: definition.tone,
+    example: definition.example,
+    references: [
+      "src/vocabularies/git/index.tsx",
+      "src/vocabularies/git/_states.ts",
+      "src/vocabularies/git/_theme.ts",
+    ],
+  })),
+);
+
+const diffStats: GitDiffStatItem[] = [
+  {
+    type: "git-diff-stat",
+    id: "git-diff-stat/lines",
+    label: "Diff stat",
+    description:
+      "Line changes as +additions in green and -deletions in red, followed by a five-block proportion bar. Use it beside a commit, branch, pull request or file; hide the bar where space is tight.",
+    presentation: "diffStat",
+    additions: 24,
+    deletions: 7,
+    detail: "24 additions, 7 deletions",
+    references: [
+      "src/vocabularies/git/index.tsx",
+      "src/vocabularies/git/_parts.tsx",
+    ],
+  },
+  {
+    type: "git-diff-stat",
+    id: "git-diff-stat/files",
+    label: "Diff stat with files",
+    description:
+      "A diff stat prefixed with its changed-file count, for change sets spanning several files such as a commit, branch comparison or pull request.",
+    presentation: "diffStat",
+    additions: 24,
+    deletions: 7,
+    files: 4,
+    detail: "4 changed files, 24 additions, 7 deletions",
+    references: [
+      "src/vocabularies/git/index.tsx",
+      "src/vocabularies/git/_parts.tsx",
+    ],
+  },
+];
 
 const objects: {
   object: GitObject;
@@ -122,7 +194,7 @@ const providers = [
   },
 ] as const;
 
-export const GIT_VOCABULARY: GitObjectItem[] = [
+export const GIT_VOCABULARY: GitVocabularyItem[] = [
   ...objects.map((item) => ({
     ...item,
     type: "git-object",
@@ -152,4 +224,6 @@ export const GIT_VOCABULARY: GitObjectItem[] = [
         ],
       })),
   ),
+  ...diffStats,
+  ...stateItems,
 ];
