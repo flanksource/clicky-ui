@@ -1,0 +1,21 @@
+@config "../tailwind.config.ts";
+@import "tailwindcss";
+
+/* The popup and panel are scanned for utilities explicitly: they live outside the playground's own scan root. */
+@source "./";
+@source "../src/bookmarklet";
+@source "../src/agent-runs/AgentPicker.tsx";
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+/* The popup is a fixed-width column that grows with its content; wide enough for the runtime bar's model name (Chrome caps popups at 800px). */
+body[data-popup],
+body[data-popup] #app {
+  width: 460px;
+  height: auto;
+}
