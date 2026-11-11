@@ -17,6 +17,7 @@ function element(value: unknown): string {
 export function validateReviewHostMessage(value: unknown): ReviewHostMessage {
   const m = record(value, "review"); text(m.requestId);
   switch (m.type) {
+    case "review-remove": keys(m, ["type", "requestId", "id", "removed"], "review"); id(m.id); bool(m.removed); break;
     case "review-list": keys(m, ["type", "requestId"], "review"); break;
     case "review-select": keys(m, ["type", "requestId", "id"], "review"); if (m.id !== null) id(m.id); break;
     case "review-visibility": keys(m, ["type", "requestId", "visible", "showRejected"], "review"); bool(m.visible); bool(m.showRejected); break;

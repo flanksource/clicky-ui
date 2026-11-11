@@ -16,6 +16,7 @@ export function createRemoteReview(options: RemoteReviewOptions) {
     });
   }
   return {
+    remove: (id: string, removed: boolean) => request({ type: "review-remove", requestId: crypto.randomUUID(), id, removed }),
     list: () => request({ type: "review-list", requestId: crypto.randomUUID() }),
     select: (id: string | null) => request({ type: "review-select", requestId: crypto.randomUUID(), id }),
     setVisibility: (settings: { visible: boolean; showRejected: boolean }) => request({ type: "review-visibility", requestId: crypto.randomUUID(), ...settings }),

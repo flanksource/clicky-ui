@@ -77,7 +77,7 @@ export async function bootFrame(): Promise<void> {
     else if (m.type === "reload") location.reload();
     else if (m.type === "theme") { document.documentElement.dataset.theme = m.theme; document.documentElement.dataset.density = m.density; }
     else if (m.type === "data") { latestData = m.data; receiveData(m.data); updateData?.(m.data); }
-    else if (m.type === "mode" || m.type === "pick" || m.type === "page" || m.type === "pins" || m.type === "highlight" || m.type === "scroll" || m.type === "design-override" || m.type === "design-write" || m.type === "design-write-result" || m.type === "review-list" || m.type === "review-select" || m.type === "review-visibility" || m.type === "review-action") {
+    else if (m.type === "mode" || m.type === "pick" || m.type === "page" || m.type === "pins" || m.type === "highlight" || m.type === "scroll" || m.type === "design-override" || m.type === "design-write" || m.type === "design-write-result" || m.type === "review-remove" || m.type === "review-list" || m.type === "review-select" || m.type === "review-visibility" || m.type === "review-action") {
       if (!agent) throw new Error("page agent is not ready");
       agent.receive(m);
     }

@@ -6,9 +6,11 @@
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
+    "./editing": "./src/editing.ts",
     "./build": "./src/build/index.ts",
     "./sw": "./src/sw/index.ts",
     "./frame": "./src/frame/index.ts",
+    "./frame/agent": "./src/frame/agent.ts",
     "./host": "./src/host/index.ts",
     "./host/link": "./src/host/link/index.ts",
     "./dev": "./src/dev/index.ts",

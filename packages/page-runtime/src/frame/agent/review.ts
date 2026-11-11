@@ -4,6 +4,7 @@ import type { ReviewAction, ReviewElement, ReviewFrameMessage, ReviewHostMessage
 import { REVIEW_ID, validateReviewHostMessage } from "../../host/review/validation.ts";
 import { resolvePageOwner, isPageElement } from "./owner.ts";
 import { elementRect } from "./overlay.ts";
+import { setRemoved } from "../../editing.ts";
 
 export function createReviewAgent(options: { root: HTMLElement; send(message: ReviewFrameMessage): void; error(error: Error): void; componentName(element: Element): string | null; containedAnchors(element: Element): string[] }) {
   let visible = false;
@@ -78,6 +79,7 @@ export function createReviewAgent(options: { root: HTMLElement; send(message: Re
       if (disposed) throw new Error("Review agent is disposed");
       const m = validateReviewHostMessage(value);
       try {
+        if (m.type === "review-remove") { setRemoved(`review:${m.id}`, m.removed); selected = null; state(m.requestId); return; }
         if (m.type === "review-action") action({ node: target(m.id), id: m.id, action: m.action, requestId: m.requestId });
         else {
           if (m.type === "review-visibility") { visible = m.visible; showRejected = m.showRejected; }

@@ -49,7 +49,7 @@ export async function buildStatic(options: BuildStaticOptions = {}): Promise<voi
     ...failOnUnresolved,
     input: resolve(root, "src/frame/page-agent.ts"),
     plugins,
-    external: ["react", "react-dom/client", "react/jsx-runtime", "react/jsx-dev-runtime", "@flanksource/clicky-ui/comments"],
+    external: ["/__runtime/editing.js", "react", "react-dom/client", "react/jsx-runtime", "react/jsx-dev-runtime", "@flanksource/clicky-ui/comments"],
     platform: "browser",
     transform: { jsx: { runtime: "automatic", development: true }, define: { "process.env.NODE_ENV": JSON.stringify("development") } },
     output: { file: resolve(outDir, "page-agent.js"), format: "es", sourcemap: true, codeSplitting: false },
@@ -65,6 +65,7 @@ export async function buildStatic(options: BuildStaticOptions = {}): Promise<voi
   });
   await build({ ...failOnUnresolved, input: resolve(root, "src/frame/devtools-hook.ts"), plugins, platform: "browser", transform: { define: { "process.env.NODE_ENV": JSON.stringify("development") } }, output: { file: resolve(outDir, "devtools-hook.js"), format: "iife" } });
   await writeFile(resolve(outDir, "bootstrap.html"), frameDocument().html);
+  await build({ input: resolve(root, "src/editing.ts"), external: ["react"], platform: "browser", output: { file: resolve(outDir, "editing.js"), format: "es" } });
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {

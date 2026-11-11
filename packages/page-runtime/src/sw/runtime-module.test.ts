@@ -2,12 +2,18 @@ import { describe, expect, it } from "vitest";
 import { exampleLock } from "../link/testing-fixtures.ts";
 import { memoryCaches } from "../link/testing-cache.ts";
 import { createRouter } from "./router.ts";
-import { BASE_PLUGINS } from "./compiler.ts";
+import { BASE_PLUGINS, rewriteImports } from "./compiler.ts";
+import { rewriteLinkImports } from "./link-compiler.ts";
 import type { RuntimeProfile } from "../schema.ts";
 import { PAGE_AGENT_URL } from "./runtime-module.ts";
 
 const origin = "https://runtime.example";
 const profile: RuntimeProfile = { runtimeDomain: "runtime.example", embedders: ["https://host.example"], packageOrigin: "https://packages.example", registry: "https://registry.example", managed: {}, policy: { dependencies: "strict" }, minReleaseAgeDays: 0, network: { allow: [] }, csp: { add: {} }, links: "deny", sources: ["host"], readinessTimeoutMs: 1000 };
+
+it.each([rewriteImports, rewriteLinkImports])("links the JSX shim to the registered editing runtime with %s", async rewrite => {
+  const code = 'import { editableElement } from "/__runtime/editing.js"; export { editableElement };';
+  expect(await rewrite({ code, path: "/__runtime/jsx-dev-runtime.js", lock: exampleLock(), sources: [], links: [] })).toBe(code);
+});
 
 describe("export modules", () => {
   async function exportRouter() {

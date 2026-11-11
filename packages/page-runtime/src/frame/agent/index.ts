@@ -21,6 +21,7 @@ export type PageAgentOptions = {
   send: (message: AgentFrameMessage) => void;
   error: (error: Error) => void;
   picker?: ReactGrabAPI;
+  toolbar?: boolean;
   sourceContext?: AgentSourceContext;
 } & PageSourceContext;
 
@@ -58,11 +59,11 @@ export function startPageAgent(options: PageAgentOptions) {
     };
     api.deactivate();
     if (disposed || version !== revision) return;
-    overlay.highlight(anchor);
+    overlay.highlight(mode === "design" ? anchor : null);
     const selection = { anchor, label: describeElement(owner.element), element: context, rect: elementRect(owner.element) };
     if (mode === "design") design.select(owner, selection); else options.send({ type: "selection", selection });
   }
-  api.registerPlugin({ name: plugin, actions: REVIEW_ACTIONS.map((action) => ({
+  api.registerPlugin({ name: plugin, ...(options.toolbar === false ? { theme: { toolbar: { enabled: false } } } : {}), actions: REVIEW_ACTIONS.map((action) => ({
     id: `review-${action}`, label: action === "mark" ? "Make reviewable" : action === "approved" ? "Approve" : action === "rejected" ? "Reject with comment" : action === "revision_requested" ? "Request revision" : action === "delete" ? "Delete source and feedback" : "Export review content",
     enabled: ({ element }) => review.enabled() && isPageElement({ element, root: options.root }) && (action === "mark" ? !element.closest("[data-review-id]") : Boolean(element.closest("[data-review-id]"))),
     onAction: ({ element, hideContextMenu, cleanup }) => { hideContextMenu(); cleanup(); review.action(element, action); },
@@ -80,7 +81,7 @@ export function startPageAgent(options: PageAgentOptions) {
   function pick() { picking = true; api.setEnabled(true); api.setToolbarState({ defaultAction: "comment" }); api.activate(); }
   function receive(value: AgentHostMessage): void {
     if (disposed) throw new Error("page agent is disposed");
-    if (value.type === "review-list" || value.type === "review-select" || value.type === "review-visibility" || value.type === "review-action") { review.receive(value); return; }
+    if (value.type === "review-remove" || value.type === "review-list" || value.type === "review-select" || value.type === "review-visibility" || value.type === "review-action") { review.receive(value); return; }
     const m = validateAgentHostMessage(value);
     switch (m.type) {
       case "mode":
@@ -106,7 +107,7 @@ export function startPageAgent(options: PageAgentOptions) {
         if (!element) throw new Error(`cannot scroll to orphaned anchor ${m.anchor}`);
         element.scrollIntoView({ behavior: m.behavior ?? "smooth", block: m.block ?? "center" });
         if (m.offset !== undefined) window.scrollBy({ top: -m.offset, behavior: "instant" });
-        overlay.highlight(m.anchor); break;
+        break;
       }
       default: throw new Error(`page agent message ${m.type} requires a dedicated handler`);
     }

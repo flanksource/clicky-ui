@@ -40,7 +40,7 @@ describe.each([{ width: 1920, height: 1080 }, { width: 2560, height: 1440 }])("p
     expect((await events()).find((message) => message.type === "selection")).toMatchObject({ selection: { anchor: expect.stringContaining('[role="dialog"][aria-label="Revenue"]'), element: { source: "modal-report.tsx:4:10", componentName: "Modal" } } });
     await browser("click", "#pins");
     await browser("wait", "--fn", 'document.querySelector("[data-page-agent]").shadowRoot.querySelector("button") !== null');
-    expect(await inspection()).toMatchObject({ pins: 1, highlighted: true, overlayInRoot: false });
+    expect(await inspection()).toMatchObject({ pins: 1, highlighted: false, overlayInRoot: false });
     const position = (await inspection()).position;
     await browser("click", "#modal-move");
     await browser("wait", "--fn", `JSON.parse(document.querySelector("#events").textContent).filter(message => message.type === "anchors").at(-1).anchors[0].rect.top > ${position.top + 20}`);
@@ -110,10 +110,11 @@ describe.each([{ width: 1920, height: 1080 }, { width: 2560, height: 1440 }])("p
   it("bridges registered component anchors, scrolls, forwards shortcuts, and disposes observers", async () => {
     await open(viewport);
     await browser("click", "#registered-pin");
-    await browser("click", "#highlight");
-    expect(await inspection()).toMatchObject({ pins: 1, highlighted: true });
     await browser("click", "#scroll");
     await browser("wait", "--fn", "window.scrollY > 500");
+    expect(await inspection()).toMatchObject({ pins: 1, highlighted: false });
+    await browser("click", "#highlight");
+    expect(await inspection()).toMatchObject({ pins: 1, highlighted: true });
     expect((await events()).filter((m) => m.type === "geometry").at(-1)).toMatchObject({ scrollY: expect.any(Number) });
     await browser("press", "Alt+c");
     await browser("press", "Escape");

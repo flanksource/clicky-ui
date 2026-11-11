@@ -2,7 +2,7 @@ import type { FrameConfig, HostMessage, PageLock, RuntimeError, RuntimePolicy, R
 import { validateHostMessage, validateSourcePath, validateLock } from "../host/validation.ts";
 import { compilePage, moduleUrl, requestModuleUrl, rewriteImports } from "./compiler.ts";
 import type { MdxPlugins } from "./compile.ts";
-import { DEV_SHIM, DEV_SHIM_URL } from "./compile.ts";
+import { COMPILER_REVISION, DEV_SHIM, DEV_SHIM_URL } from "./compile.ts";
 import { CONTENT_TYPES, extensionOf } from "./content-types.ts";
 import { runtimeError, RuntimeFailure } from "./errors.ts";
 import { keys, permitsNetwork, record, validateProfile } from "./profile.ts";
@@ -131,7 +131,7 @@ export function createRouter(options: RouterOptions) {
     activity.decodedBytes = byteLength(code); activity.source = "compiled";
     const asModule = url.searchParams.has("module") || /\.(tsx?|jsx?|mdx?|mjs)$/.test(path) || url.searchParams.has("raw") || url.searchParams.has("url");
     if (!asModule) { activity.outputBytes = activity.decodedBytes; return new Response(code, { headers: { "content-type": CONTENT_TYPES[extensionOf(path)] ?? "application/octet-stream" } }); }
-    const hash = await digest(new TextEncoder().encode(serial({ code, lock: saved.lock, query: [...url.searchParams], paths: Object.keys(saved.files) })));
+    const hash = await digest(new TextEncoder().encode(serial({ compiler: COMPILER_REVISION, code, lock: saved.lock, query: [...url.searchParams], paths: Object.keys(saved.files) })));
     const cacheKey = `${options.origin}/__runtime/compiled/${encodeURIComponent(hash)}`;
     const hit = await (await output).match(cacheKey);
     if (hit) { activity.source = "cache"; activity.cache = "storage"; activity.outputBytes = hit.headers.has("content-length") ? Number(hit.headers.get("content-length")) : (await hit.clone().arrayBuffer()).byteLength; return hit; }

@@ -11,6 +11,7 @@ import { resolveSpecifier } from "./composition.ts";
 import { RuntimeFailure } from "./errors.ts";
 import { sourceCandidates } from "./candidates.ts";
 import type { WorkerActivity } from "../activity-schema.ts";
+import { RUNTIME_MODULES } from "./runtime-module.ts";
 
 export type CompilerOptions = { path: string; code: string; lock: PageLock; sources: string[]; plugins: MdxPlugins; activity?: WorkerActivity };
 export const BASE_PLUGINS: MdxPlugins = { remarkFrontmatter, remarkGfm, remarkAlert, rehypeRaw };
@@ -34,7 +35,7 @@ function canonical(specifier: string, options: { path: string; lock: PageLock; s
   const source = parsed.pathname.startsWith("/src/");
   const converted = parsed.pathname.startsWith("/esm/");
   const prefix = source ? "/src/" : converted ? "/esm/" : "/npm/";
-  if (parsed.pathname === DEV_SHIM_URL) return target;
+  if (parsed.pathname === DEV_SHIM_URL || Object.hasOwn(RUNTIME_MODULES, parsed.pathname)) return target;
   if (!parsed.pathname.startsWith(prefix)) throw new Error(`${options.path}: unsupported module URL ${target}`);
   const relative = parsed.pathname.slice(prefix.length);
   const listing = source ? options.sources : Object.keys(options.lock.integrity);

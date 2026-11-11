@@ -11,6 +11,7 @@ import type { CommonJsSource } from "../link/types.ts";
 
 /** Where page modules import the development JSX runtime from: a shim that marks host elements. */
 export const DEV_SHIM_URL = "/__runtime/jsx-dev-runtime.js";
+export const COMPILER_REVISION = "editable-boundaries-v1";
 
 /**
  * Adds `data-source` to host elements from jsxDEV's source argument. MDX's development output passes a full
@@ -18,12 +19,13 @@ export const DEV_SHIM_URL = "/__runtime/jsx-dev-runtime.js";
  */
 export const DEV_SHIM = [
   'import { jsxDEV as base } from "react/jsx-dev-runtime";',
+  'import { editableElement } from "/__runtime/editing.js";',
   'export { Fragment } from "react/jsx-dev-runtime";',
   "export function jsxDEV(type, props, key, isStatic, source, self) {",
   '  if (typeof type === "string" && source && source.columnNumber !== undefined && !(props && "data-source" in props)) {',
   '    props = { ...props, "data-source": `${source.fileName}:${source.lineNumber}:${source.columnNumber}` };',
   "  }",
-  "  return base(type, props, key, isStatic, source, self);",
+  "  return editableElement(base(type, props, key, isStatic, source, self));",
   "}",
   "",
 ].join("\n");
@@ -85,6 +87,6 @@ export async function compileMdx({ path, code, sourcePath = path }: PageSourceIn
 export async function compileSource(input: PageSourceInput, mdx: { compile: MdxCompile; plugins: MdxPlugins }): Promise<string> {
   if (input.commonjs) return compileCommonJsSource({ path: input.path, code: input.code, conversion: input.commonjs });
   if (input.extension === ".mdx" || input.extension === ".md") return compileMdx(input, mdx.compile, mdx.plugins);
-  if ([".ts", ".tsx", ".jsx"].includes(input.extension)) return compileScript(input);
+  if ([".ts", ".tsx", ".jsx"].includes(input.extension)) return useDevShim(compileScript(input));
   throw new Error(`${input.path}: the compiler takes .ts, .tsx, .jsx, .md and .mdx sources, not ${input.extension}`);
 }

@@ -24,6 +24,7 @@ export function mountAgentOverlay(options: { root: Element; send: (message: Agen
   document.documentElement.append(host);
   let saved: AgentPin[] = [];
   let selected: string | null = null;
+  let highlighted: string | null = null;
   let pending = 0;
   let last = "";
 
@@ -56,7 +57,7 @@ export function mountAgentOverlay(options: { root: Element; send: (message: Agen
     pending = 0;
     pins.replaceChildren();
     const states = saved.map(drawPin);
-    const element = selected ? target(selected) : null;
+    const element = highlighted ? target(highlighted) : null;
     highlight.hidden = !element;
     if (element) for (const [key, value] of Object.entries(elementRect(element))) highlight.style.setProperty(key, `${value}px`);
     const geometry = { type: "geometry" as const, scrollX: window.scrollX, scrollY: window.scrollY, width: window.innerWidth, height: window.innerHeight };
@@ -81,7 +82,7 @@ export function mountAgentOverlay(options: { root: Element; send: (message: Agen
       }).map((pin) => pin.anchor))];
     },
     update(anchors: AgentPin[], focus?: string | null) { saved = anchors; if (focus !== undefined) selected = focus; last = ""; schedule(); },
-    highlight(anchor: string | null) { selected = anchor; schedule(); },
+    highlight(anchor: string | null) { highlighted = anchor; schedule(); },
     dispose() {
       observer.disconnect(); resize.disconnect(); cancelAnimationFrame(pending);
       window.removeEventListener("scroll", schedule, true); window.removeEventListener("resize", schedule); host.remove();

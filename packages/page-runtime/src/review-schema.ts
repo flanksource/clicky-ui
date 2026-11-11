@@ -4,6 +4,7 @@ export type ReviewAction = "mark" | "approved" | "rejected" | "revision_requeste
 export type ReviewElement = { id: string; selection: AgentSelection; domId?: string };
 export type ReviewContent = { html: string; svg?: string };
 export type ReviewHostMessage =
+  | { type: "review-remove"; requestId: string; id: string; removed: boolean }
   | { type: "review-list"; requestId: string }
   | { type: "review-select"; requestId: string; id: string | null }
   | { type: "review-visibility"; requestId: string; visible: boolean; showRejected: boolean }

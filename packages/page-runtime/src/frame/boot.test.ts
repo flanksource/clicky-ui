@@ -76,7 +76,9 @@ it("starts the agent after styles and before mounting, routes commands, and disp
   commands.forEach(command);
   const reviews: HostMessage[] = [{ type: "review-list", requestId: "list" }, { type: "review-select", requestId: "select", id: null }, { type: "review-visibility", requestId: "visibility", visible: true, showRejected: false }, { type: "review-action", requestId: "action", id: "summary", action: "approved" }];
   reviews.forEach(command);
-  expect(fixture.receiveAgent.mock.calls).toEqual([...commands, ...reviews].map((message) => [message]));
+  const removal: HostMessage = { type: "review-remove", requestId: "removal", id: "summary", removed: true };
+  command(removal);
+  expect(fixture.receiveAgent.mock.calls).toEqual([...commands, ...reviews, removal].map((message) => [message]));
   window.dispatchEvent(new Event("pagehide"));
   expect([fixture.disposeAgent.mock.calls.length, fixture.stopStyles.mock.calls.length, fixture.disposeBridge.mock.calls.length]).toEqual([1, 1, 1]);
 });

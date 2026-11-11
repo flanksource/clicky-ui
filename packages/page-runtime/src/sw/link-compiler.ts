@@ -9,6 +9,7 @@ import { CANONICAL_CANDIDATES, defineNodeEnv, parseClause, stylesheetModule } fr
 import { moduleUrl } from "./compiler.ts";
 import { pageSourceModule, pageSourcePath, validatePageSourceLinks, type PageSourceLock } from "../link/page-sources.ts";
 import type { LinkActivity } from "./link-activity.ts";
+import { RUNTIME_MODULES } from "./runtime-module.ts";
 
 type Context = { path: string; lock: PageSourceLock; links: StoredLink[]; sources: string[] };
 const SOURCE_SUFFIXES = ["", ".tsx", ".ts", ".jsx", ".js", ".mdx", ".md", "/index.tsx", "/index.ts", "/index.js"];
@@ -22,7 +23,7 @@ function resolveLinked(specifier: string, options: Context): string {
   let target = replacement ? linkUrl(replacement.id, replacement.build.entries[specifier]!) : BASE_PACKAGES.includes(packageName(specifier)) ? resolveSpecifier({ imports: options.lock.map.imports, scopes: {} }, specifier, options.path) : resolution ? (resolution.startsWith("/npm/") ? mountLinkTarget(owner!, resolution) : linkUrl(owner!.id, resolution)) : specifier.startsWith(".") || specifier.startsWith("/") ? new URL(specifier, `https://runtime.invalid${options.path}`).pathname : resolveSpecifier(options.lock.map, specifier, options.path);
   if (!target || /^(?:node:|https?:|data:|blob:)/.test(target)) throw new Error(`${options.path}: import ${specifier} is outside the library set; allowed packages: ${Object.keys(options.lock.versions).join(", ")}`);
   if (target.startsWith("/src/") && options.lock.pageSources) target = pageSourceModule({ page: decodeURIComponent(target.slice(5)), roots: options.lock.pageSources }) ?? target;
-  if (target === DEV_SHIM_URL) return target;
+  if (target === DEV_SHIM_URL || Object.hasOwn(RUNTIME_MODULES, target)) return target;
   const parsed = new URL(target, "https://runtime.invalid");
   const linked = options.links.find((link) => parsed.pathname.startsWith(`/link/${link.id}/`));
   const prefix = linked ? `/link/${linked.id}/` : parsed.pathname.startsWith("/src/") ? "/src/" : "/npm/";

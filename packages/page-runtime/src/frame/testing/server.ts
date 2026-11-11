@@ -82,7 +82,7 @@ export async function startRuntimeTestServer(options: { local?: boolean } = {}) 
     if (url.pathname.startsWith("/registry")) { registryRequests++; res.statusCode = 500; res.end("registry must not be used"); return; }
     if (url.pathname === "/image.svg" || url.pathname === "/delayed.css") { await new Promise((resolve) => setTimeout(resolve, 180)); res.setHeader("content-type", url.pathname.endsWith("svg") ? "image/svg+xml" : "text/css"); res.end(url.pathname.endsWith("svg") ? SVG : "h1 { color: rgb(1, 2, 3); }"); return; }
     const file = url.pathname.startsWith("/frame/") ? "bootstrap.html" : url.pathname.slice(1);
-    if (!["bootstrap.html", "sw.js", "boot.js", "page-agent.js", "export-compiler.js", "devtools-hook.js"].includes(file)) { res.statusCode = 404; res.end("missing"); return; }
+    if (!["bootstrap.html", "sw.js", "boot.js", "page-agent.js", "editing.js", "export-compiler.js", "devtools-hook.js"].includes(file)) { res.statusCode = 404; res.end("missing"); return; }
     res.setHeader("content-type", file.endsWith("html") ? "text/html" : "text/javascript"); res.end(await readFile(resolve(output, file)));
   })().catch((error: unknown) => { res.statusCode = 500; res.end(String(error)); }); });
   runtimeOrigin = await listen(server);

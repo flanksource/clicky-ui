@@ -41,7 +41,7 @@ export function validateFrameMessage(value: unknown): FrameMessage {
 export function validateHostMessage(value: unknown): HostMessage {
   const m = record(value, "message");
   switch (m.type) {
-    case "review-list": case "review-select": case "review-visibility": case "review-action": return validateReviewHostMessage(m);
+    case "review-remove": case "review-list": case "review-select": case "review-visibility": case "review-action": return validateReviewHostMessage(m);
     case "design-override": case "design-write": case "design-write-result":
     case "mode": case "pick": case "page": case "capture-vocabulary": case "pins": case "highlight": case "scroll": return validateAgentHostMessage(m);
     case "open": {
