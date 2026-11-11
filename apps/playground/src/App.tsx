@@ -18,6 +18,7 @@ import { VocabularyReference } from "./vocabularies/VocabularyReference";
 import { useVocabulary } from "./vocabularies/context";
 import { ExternalWorkspace } from "./bookmarklet/ExternalWorkspace";
 import { allowDocumentNavigation } from "./documents/navigation-guard";
+import { editState } from "./visual-edit/edit-state";
 import {
   fallbackPageSlug,
   findPage,
@@ -35,7 +36,11 @@ export function App() {
   const { vocabulary } = useVocabulary();
   const commentConfig = useMemo(() => ({ ...PLAYGROUND_COMMENT_CONFIG, ...(vocabulary ? { vocabulary } : {}) }), [vocabulary]);
   const [route, navigateRoute] = useHistoryRoute<PlaygroundRoute>({
-    beforeNavigate: (next) => allowDocumentNavigation(next.page),
+    beforeNavigate: (next, current) => {
+      if (next.page === current.page && next.view === current.view) return allowDocumentNavigation(next.page);
+      const allowed = editState.confirm();
+      return typeof allowed === "boolean" ? allowed && allowDocumentNavigation(next.page) : allowed.then(value => value && allowDocumentNavigation(next.page));
+    },
     parse: (_pathname, search) => {
       const parsed = parsePlaygroundRoute(
         search,

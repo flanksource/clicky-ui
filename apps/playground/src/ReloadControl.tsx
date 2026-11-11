@@ -5,6 +5,7 @@ import { Button } from "@flanksource/clicky-ui";
 import { validateCatalog, type PackageCatalog } from "@flanksource/page-runtime/catalog";
 import { usePackageUpdates } from "./browser-mode/usePackageUpdates";
 import { PlaygroundBanner } from "./PlaygroundShellParts";
+import { editState } from "./visual-edit/edit-state";
 
 const preferenceKey = "playground.page-reloads";
 type Mode = "manual" | "automatic";
@@ -19,6 +20,8 @@ function readMode(): Mode {
 }
 
 function hasDrafts() {
+  const edits = editState.snapshot();
+  if (edits.draft?.dirty || edits.draft?.saving || edits.writes > 0) return true;
   for (let index = 0; index < sessionStorage.length; index++) {
     const key = sessionStorage.key(index);
     if (

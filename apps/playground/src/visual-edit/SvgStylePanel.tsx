@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { beginEditWrite, editState, useSvgDraft, useEditState } from "./edit-state";
 import { createPortal } from "react-dom";
 import { ActionError, Button, JsonSchemaForm, useFloatingZIndex, type JsonSchemaObject } from "@flanksource/clicky-ui";
 import { UiClose, UiLinkExternal } from "@flanksource/clicky-ui/icons";
@@ -61,6 +62,7 @@ function instancesOf(root: HTMLElement, element: Element, markerValue: string, b
 
 /** A floating panel beside an SVG element: schema-driven fields previewed live, saved as literal JSX attributes. */
 export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleChange, onClose, onPendingChange }: SvgStylePanelProps) {
+  const leaving = useEditState().leaving !== null;
   const tag = element.localName;
   const markerValue = element.getAttribute(EDITABLE_SOURCE_ATTRIBUTE);
   if (markerValue === null) throw new Error(`<${tag}> has no ${EDITABLE_SOURCE_ATTRIBUTE}; it was not written in a page module`);
@@ -108,7 +110,10 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
   const busyRef = useRef(busy);
   busyRef.current = busy;
 
-  const connected = useCallback(() => nodes.filter((node) => node.isConnected), [nodes]);
+  const connected = useCallback(() => {
+    const present = nodes.filter(node => node.isConnected);
+    return present.length ? present : instancesOf(root, element, markerValue, baseline).filter(node => node.isConnected);
+  }, [nodes, root, element, markerValue, baseline]);
 
   /** Restores the baseline on every previewed attribute; returns the failure, if any. */
   const revertPreview = useCallback((): Error | null => {
@@ -153,6 +158,7 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
   );
 
   const dismiss = useCallback(() => {
+    if (!editState.leave(onClose)) return;
     if (edits.pending || requesting) {
       setInteractionNotice("Wait for the current save or request to finish");
       return;
@@ -190,6 +196,7 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
   }, []);
 
   const save = async () => {
+    const finish = beginEditWrite();
     setInteractionNotice(null);
     const saved = diff.changes;
     const previous: AttributeSnapshot = Object.fromEntries(Object.keys(saved).map((name) => [name, originalProps[name] ?? null]));
@@ -201,6 +208,8 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
       Object.assign(originalProps, saved);
       setBaseline((current) => ({ ...current, ...saved }));
     }
+    finish(outcome === "applied" ? undefined : new Error("SVG changes were not saved; check the style panel for details"));
+    return outcome === "applied";
   };
 
   const revert = () => {
@@ -211,7 +220,11 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
     setValues(baseline);
     setRequested(null);
     edits.dismissFailure();
+    if (!failure) editState.clearError();
+    return failure === null;
   };
+
+  useSvgDraft({ page, dirty: changeNames.length > 0 || invalidMessages.length > 0, saving: edits.saving, canSave: !edits.pending && !previewCss.pending && !previewCss.error && changeNames.length > 0 && invalidMessages.length === 0, save, discard: revert });
 
   const refusal = edits.failure?.refusal ?? null;
   const request = async () => {
@@ -234,6 +247,7 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
   };
 
   const openSource = (target: SourceTarget) => {
+    if (!editState.leave(() => onOpenSource(target))) return;
     if (edits.pending || requesting) {
       setInteractionNotice("Wait for the current save or request to finish");
       return;
@@ -257,7 +271,7 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
       aria-busy={edits.saving ? true : undefined}
       data-svg-style-panel=""
       style={{ position: "fixed", left: position.left, top: position.top, zIndex, width: "min(520px, calc(100vw - 16px))", maxHeight: "calc(100vh - 16px)" }}
-      className="flex flex-col overflow-hidden rounded-lg border border-border bg-card text-xs text-foreground shadow-lg"
+      className={`flex flex-col overflow-hidden rounded-lg border border-border bg-card text-xs text-foreground shadow-lg${leaving ? " invisible" : ""}`}
     >
       <div className="flex items-start gap-density-2 border-b border-border p-density-2">
         <div className="min-w-0 flex-1">
@@ -295,7 +309,10 @@ export function SvgStylePanel({ element, root, page, onOpenSource, requestStyleC
           idPrefix={idPrefix}
         />
         <SvgDeleteButton disabled={busy && !edits.saving} saving={edits.saving} instances={root.querySelectorAll(`[${EDITABLE_SOURCE_ATTRIBUTE}="${markerValue}"]`).length} onDelete={async () => {
-          if (await edits.commit({ markerValue, nodes: connected(), edit: { kind: "delete" } }) === "applied") window.location.reload();
+          const finish = beginEditWrite();
+          const outcome = await edits.commit({ markerValue, nodes: connected(), edit: { kind: "delete" } });
+          finish(outcome === "applied" ? undefined : new Error("SVG deletion failed; the element was restored"));
+          if (outcome === "applied") onClose();
         }} />
         {!live.supported ? <p className="text-muted-foreground">Live preview off: {live.reason}</p> : null}
         {invalidMessages.length > 0 ? (

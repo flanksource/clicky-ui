@@ -38,6 +38,8 @@ import {
 import { useReactGrabComments } from "./comments/useReactGrabComments";
 import { useReactGrabStyle } from "./visual-edit/useReactGrabStyle";
 import { useEditableSelection } from "./visual-edit/useEditableSelection";
+import { editState } from "./visual-edit/edit-state";
+import { EditStatus } from "./visual-edit/EditStatus";
 import type { EditableRoot } from "./visual-edit/editable-dom";
 import { styleEditBody } from "./visual-edit/style-edit-comment";
 import type { StyleChangeRequest } from "./visual-edit/SvgStylePanel";
@@ -431,6 +433,7 @@ export function PlaygroundShell({
     ...(visualPending ? { editingDisabledReason: "Finish the visual edit before opening the editor" } : {}),
     designing,
     onToggleDesign: () => {
+      if (!editState.leave(() => setDesigning(on => !on))) return;
       setEditTarget(null);
       setDesigning((on) => !on);
     },
@@ -482,6 +485,7 @@ export function PlaygroundShell({
   );
   const pageContent = (
     <div className="flex h-full min-h-0 flex-col">
+      <EditStatus />
       {moreActionsRow}
       {!active ? <div className="min-h-0 flex-1 overflow-auto"><CommentDashboard comments={allComments} loading={commentsLoading} error={commentsError} pageHref={pageHref} /></div> : <div className="flex min-h-0 flex-1 flex-col">
         <RunningSessionBars key={active.slug} page={active.slug} />

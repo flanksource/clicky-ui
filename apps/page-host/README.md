@@ -20,7 +20,7 @@ pnpm --dir ../facet run build:css
 pnpm --dir ../facet run build:runtime
 ```
 
-The static runtime bundles `@flanksource/*` dependencies such as facet. Build with `--dev` to take them from sibling checkouts of this workspace (each `../<repo>` or `../<repo>/packages/*` whose `package.json` declares the package) instead of the installed releases:
+To test unpublished changes in `@flanksource/*` dependencies the static runtime bundles, build with `--dev` to take them from sibling checkouts of this workspace (each `../<repo>` or `../<repo>/packages/*` whose `package.json` declares the package) instead of the installed releases:
 
 ```bash
 pnpm --filter @flanksource/page-runtime build --dev

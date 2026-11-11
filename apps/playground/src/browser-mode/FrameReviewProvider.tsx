@@ -9,6 +9,7 @@ import type { BrowserSession } from "./session";
 import { FrameReviewControls } from "./FrameReviewControls";
 import { publishReviewBlob, reviewBlob } from "./review-export";
 import { reviewSourcePosition } from "./review-source";
+import { beginEditWrite } from "../visual-edit/edit-state";
 
 type Pending = { element: ReviewElement } & ({ action: "rejected" | "revision_requested" } | { action: "delete"; containedAnchors: string[] });
 type Props = { session: BrowserSession; page: string; active: boolean; sourceDirty: boolean; contentRef: RefObject<HTMLElement | null>; scrollRef: RefObject<HTMLElement | null>; children: ReactNode };
@@ -33,7 +34,7 @@ export function FrameReviewProvider({ session, page, active, sourceDirty, conten
     const source = await request<{ source: string }>(`/__playground/sources?slug=${encodeURIComponent(page)}`);
     if (typeof source.source !== "string") throw new Error("Could not read page source");
     await request("/__playground/sources/reviewables", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: page, expectedSource: source.source, ...body }) });
-    await session.reload({ reason: "review", page });
+    if (method === "POST") await session.reload({ reason: "review", page });
   };
   handle.current = async action => {
     if (action.action === "export") return;
@@ -65,14 +66,28 @@ export function FrameReviewProvider({ session, page, active, sourceDirty, conten
   const submit = async () => {
     if (!pending) throw new Error("No review decision is pending");
     setBusy(true); setError(null);
+    const finish = pending.action === "delete" ? beginEditWrite() : null;
     try {
       if (pending.action === "delete") {
         const anchors = new Set(pending.containedAnchors);
-        await mutate("DELETE", { reviewId: pending.element.id, associatedCommentIds: context.comments.filter(comment => !comment.parentId && comment.anchor && anchors.has(comment.anchor)).map(comment => comment.id) });
+        if (!adapter.current) throw new Error("Review frame is unavailable");
+        const remote = adapter.current;
+        const associatedCommentIds = context.comments.filter(comment => !comment.parentId && comment.anchor && anchors.has(comment.anchor)).map(comment => comment.id);
+        await remote.remove(pending.element.id, true);
+        window.dispatchEvent(new CustomEvent("playground-feedback-visibility", { detail: { ids: associatedCommentIds, hidden: true } }));
+        try { await mutate("DELETE", { reviewId: pending.element.id, associatedCommentIds }); }
+        catch (cause) {
+          window.dispatchEvent(new CustomEvent("playground-feedback-visibility", { detail: { ids: associatedCommentIds, hidden: false } }));
+          try { await remote.remove(pending.element.id, false); }
+          catch (rollbackError) { throw new AggregateError([cause, rollbackError], "Deletion failed and the frame could not restore the element"); }
+          throw cause;
+        }
+        window.dispatchEvent(new Event("playground-feedback-updated"));
+        finish?.();
       }
       else await createDecision(pending.element, pending.action, draft.trim());
       setPending(null); setDraft("");
-    } catch (cause) { setError(cause); } finally { setBusy(false); }
+    } catch (cause) { finish?.(cause); setError(cause); } finally { setBusy(false); }
   };
   const exportsFor = (id: string): DropdownMenuItem[] => (["Copy", "Copy link", "Download"] as const).flatMap(action => (["svg", "png", "html"] as ExportFormat[]).map(format => ({ group: action, label: format.toUpperCase(), onSelect: () => {
     const title = `${page}-${id}`.replace(/[^A-Za-z0-9_-]/g, "-");

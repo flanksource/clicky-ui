@@ -58,7 +58,7 @@ function PageError({
     setBusy(true);
     setError("");
     // Auto-run delivers a new comment as it is posted, so the page must already point at the chosen session.
-    const autoRun = comment === null && agents.data?.settings.autoRun === true;
+    const autoRun = comment === null && agents.autoRun;
     try {
       if (send && target && autoRun) await agents.setTarget(target);
       const saved =

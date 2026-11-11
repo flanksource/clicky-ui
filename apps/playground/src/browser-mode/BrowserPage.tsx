@@ -24,6 +24,7 @@ import { readBrowserRuntime, useBrowserRuntimeVersion, type DependencyScope } fr
 import { DependencyApproval } from "./DependencyApproval";
 import type { EffectiveProfile } from "./runtime-profile";
 import { loadBrowserProject, prepareBrowserProject, projectFor } from "./load-project";
+import { beginEditWrite } from "../visual-edit/edit-state";
 
 export function BrowserPage({ slug, designing, annotations, showRejected, comments, onAnchors, onPending, onOpenSource, sourceDirty = false }: { slug: string; designing: boolean; annotations: "visible" | "hidden"; showRejected: boolean; comments: import("../comments/useComments").PageComment[]; onAnchors: (anchors: AgentAnchorState[]) => void; onPending: (pending: boolean) => void; onOpenSource: (target: { file: string; line: number }) => void; sourceDirty?: boolean }) {
   const session = useBrowserSession();
@@ -208,13 +209,21 @@ export function BrowserPage({ slug, designing, annotations, showRejected, commen
     else if (message.type === "design-selection") { if (pending) { setDesignError("Save or discard the current visual edit before selecting another element"); return; } setDesign(message); session.accept(message.selection); setDesignError(""); setDesignResult(null); }
     else if (message.type === "design-override-result" && !message.ok) setDesignError(message.error);
     else if (message.type === "design-write-request") void (async () => {
+      const finish = beginEditWrite();
       try {
         const result = await postVisualEdit(message.request);
         bridge!.send(validateHostMessage({ type: "design-write-result", requestId: message.requestId, result }));
         setDesignResult(result);
-        if (result.status === "applied") { setPending(false); onPending(false); await reload({ reason: "review", page: slug }); }
+        if (result.status === "applied") { setPending(false); onPending(false); if (message.request.edit.kind === "delete") setDesign(null); }
         else setDesignError(result.error);
-      } catch (error) { setDesignError(String(error)); }
+        if (message.request.edit.kind === "delete") { setPending(false); onPending(false); }
+        finish(result.status === "applied" ? undefined : new Error(result.error));
+      } catch (error) {
+        const failure = error instanceof Error ? error.message : String(error);
+        bridge!.send(validateHostMessage({ type: "design-write-result", requestId: message.requestId, result: { status: "invalid", error: failure } }));
+        setDesignError(failure);
+        finish(error);
+      }
     })();
   };
   const exportHtml = async () => {

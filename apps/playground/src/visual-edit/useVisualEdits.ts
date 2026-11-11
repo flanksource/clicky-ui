@@ -3,6 +3,7 @@ import { parseEditableSource } from "../../plugins/editable-source-marker";
 import type { VisualEdit, VisualEditCandidate, VisualEditResponse } from "../../plugins/visual-edits-contract";
 import { overrideCallSite } from "./react-override";
 import { postVisualEdit } from "./visual-edits-api";
+import { setRemoved } from "@flanksource/page-runtime/editing";
 
 type AttributeEdit = Extract<VisualEdit, { kind: "attributes" }>;
 type DeleteEdit = Extract<VisualEdit, { kind: "delete" }>;
@@ -56,7 +57,7 @@ function previewProps({ edit }: VisualEditCommit): Record<string, unknown> {
     case "attributes":
       return Object.fromEntries(Object.entries(edit.values).map(([name, value]) => [name, value ?? undefined]));
     case "delete":
-      throw new Error("Deletion is applied to source before reloading the page");
+      throw new Error("Deletion uses the editable boundary instead of attribute overrides");
   }
 }
 
@@ -94,7 +95,8 @@ export function useVisualEdits({ page, live }: { page: string; live: boolean }) 
     attempt.current = null;
     setStatus("idle");
     setCandidates([]);
-    if (!live || !current || current.edit.kind === "delete") return null;
+    if (current?.edit.kind === "delete") { setRemoved(`source:${current.markerValue}`, false); return null; }
+    if (!live || !current) return null;
     return overrideProps(current.nodes, current.markerValue, revertProps(current));
   }, [live]);
 
@@ -151,6 +153,7 @@ export function useVisualEdits({ page, live }: { page: string; live: boolean }) 
   const commit = useCallback(async (next: VisualEditCommit): Promise<VisualEditOutcome> => {
     if (attempt.current) throw new Error("a visual edit is already in flight");
     attempt.current = next;
+    if (next.edit.kind === "delete") setRemoved(`source:${next.markerValue}`, true);
     if (live && next.edit.kind !== "delete") {
       const previewError = overrideProps(next.nodes, next.markerValue, previewProps(next));
       if (previewError) {

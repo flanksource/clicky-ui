@@ -19,7 +19,7 @@ const { start, setTarget, session } = vi.hoisted(() => ({
   session: { id: "session-kit", title: "Fix kit", source: "claude", model: "example-model", inCmux: false },
 }));
 vi.mock("./agent-runs/AgentRunsProvider", () => ({
-  useAgentRuns: () => ({ start, setTarget, target: undefined, data: { settings: { autoRun: false }, sessions: [] } }),
+  useAgentRuns: () => ({ start, setTarget, target: undefined, autoRun: false, data: { settings: { grouping: "shared" }, sessions: [], pages: {} } }),
 }));
 vi.mock("./agent-runs/useCaptainSessions", () => ({
   useCaptainSessions: () => ({ sessions: [session], error: null }),

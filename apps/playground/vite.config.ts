@@ -37,7 +37,7 @@ import { playgroundBlame } from "./plugins/blame-server";
 import { playgroundProduction } from "./plugins/production-server";
 import { playgroundReactDevtoolsHook } from "./plugins/react-devtools-hook";
 import { fixedGavel, onDemandGavel } from "./plugins/gavel-launch-server";
-import { authorizeDocumentDirectory, playgroundRepositoryDocuments } from "./plugins/repository-documents-server";
+import { playgroundRepositoryDocuments } from "./plugins/repository-documents-server";
 import { playgroundNavigation } from "./plugins/navigation-server";
 import { playgroundVocabularies } from "./plugins/vocabularies-server";
 import { playgroundConnections } from "./plugins/connections-server";
@@ -109,14 +109,12 @@ const agentRuns = createAgentRuns({
   captainURL,
   cwd: workspaceRoot,
   skillPath: resolve(workspaceRoot, ".agents/skills/clicky-ui-playground/SKILL.md"),
-  resolveDocumentDirectory: (page) => authorizeDocumentDirectory({ dir: playgroundDataDir, endpoint: gavelEndpoint, page }),
 });
 const promptRuns = createPromptRuns({
   dir: playgroundDataDir,
   gavelURL: localEnv.PLAYGROUND_GAVEL_URL,
   endpoint: gavelEndpoint,
   workspace: workspaceRoot,
-  onCreated: agentRuns.autoRunComment,
 });
 
 export default defineConfig(({ mode }) => ({
@@ -148,7 +146,6 @@ export default defineConfig(({ mode }) => ({
     playgroundComments({
       dir: playgroundDataDir,
       pagesDir: resolve(root, "src/pages"),
-      onCreated: agentRuns.autoRunComment,
     }),
     mode !== "test" && playgroundBookmarklet({
       root,

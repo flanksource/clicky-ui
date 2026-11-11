@@ -27,6 +27,6 @@
       "@flanksource/clicky-ui/utils": ["../../packages/ui/src/utils.ts"]
     }
   },
-  "include": ["src", "plugins", "vite.config.ts", "../../packages/page-runtime/src/**/*.d.ts", "../../packages/ui/src/**/*.d.ts"],
+  "include": ["src", "plugins", "extension", "vite.config.ts", "../../packages/page-runtime/src/**/*.d.ts", "../../packages/ui/src/**/*.d.ts"],
   "exclude": ["src/pages"]
 }

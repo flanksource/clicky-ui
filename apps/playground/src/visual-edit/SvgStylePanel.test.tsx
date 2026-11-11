@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { VisualEditResponse } from "../../plugins/visual-edits-contract";
 import { overrideCallSite } from "./react-override";
@@ -93,6 +93,14 @@ it("previews a valid edit on the call site and waits out a number that is mid-ty
   expect(overrides.mock.calls).toEqual([[[rect], MARKER, { fill: "#ff0000" }]]);
 });
 
+it("previews on the restored element after a deletion rollback remounts it", () => {
+  const { rect } = mountPanel();
+  const restored = rect.cloneNode(true);
+  rect.replaceWith(restored);
+  fireEvent.change(field("width"), { target: { value: "120" } });
+  expect(overrides.mock.calls.at(-1)).toEqual([[restored], MARKER, { width: 120 }]);
+});
+
 it("saves only the changed attributes and keeps them as the new baseline", async () => {
   const { rect } = mountPanel();
   fetchMock.mockResolvedValue(jsonResponse(200, { status: "applied", file: "flanksource/_facet-diagrams/call-path.tsx", path: "src/pages/x.tsx", line: 42, hash: "bbbbbbbbbbbb" }));
@@ -173,11 +181,15 @@ it("opens the source at the marker's line", () => {
   expect(onOpenSource).toHaveBeenCalledWith({ file: "flanksource/_facet-diagrams/call-path.tsx", line: 42 });
 });
 
-it("reverts an unsaved preview and closes on Escape", () => {
+it("requires explicit discard before closing an unsaved preview on Escape", async () => {
   const { rect, onClose } = mountPanel();
   fireEvent.change(field("fill"), { target: { value: "#ff0000" } });
 
   fireEvent.keyDown(document, { key: "Escape" });
+
+  expect(onClose).not.toHaveBeenCalled();
+  const { editState } = await import("./edit-state");
+  await act(async () => editState.resolve(false));
 
   expect(overrides.mock.calls).toEqual([
     [[rect], MARKER, { fill: "#ff0000" }],

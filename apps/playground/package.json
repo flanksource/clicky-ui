@@ -8,8 +8,9 @@
     "dev": "pnpm run prepare:editor && vite dev",
     "playground:prod": "node scripts/playground-prod.mjs",
     "build": "pnpm run prepare:editor && tsc -b --noEmit && vite build",
+    "build:extension": "pnpm run prepare:editor && tsx --tsconfig tsconfig.server.json plugins/chrome-extension-build.ts",
     "preview": "vite preview",
-    "lint": "oxlint src plugins vite.config.ts --deny-warnings",
+    "lint": "oxlint src plugins extension vite.config.ts --deny-warnings",
     "check": "pnpm run prepare:editor && tsc -b --noEmit && pnpm run lint",
     "test": "vitest run"
   },
@@ -43,6 +44,7 @@
     "css.escape": "catalog:",
     "jsdom": "catalog:",
     "magic-string": "catalog:",
+    "sharp": "catalog:",
     "tailwindcss": "catalog:",
     "ts-morph": "catalog:",
     "tsx": "catalog:",

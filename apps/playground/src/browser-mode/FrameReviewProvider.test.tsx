@@ -51,6 +51,7 @@ it.each(["control", "picker"])("maps the frame's contained anchors to root Gavel
   const send = vi.fn((message: HostMessage) => queueMicrotask(() => {
     if (message.type === "review-visibility") session.receive({ type: "review-state", requestId: message.requestId, elements: [element], selected: null, visible: true, showRejected: false });
     if (message.type === "review-action") session.receive({ type: "review-action-request", requestId: message.requestId, action: "delete", element, containedAnchors });
+    if (message.type === "review-remove") session.receive({ type: "review-state", requestId: message.requestId, elements: [], selected: null, visible: true, showRejected: false });
   }));
   const reload = vi.fn();
   session.attach({ bridge: { send } as unknown as PageBridge, frame, reload });
@@ -78,7 +79,9 @@ it.each(["control", "picker"])("maps the frame's contained anchors to root Gavel
     const dialog = within(await screen.findByRole("dialog"));
     expect(fetcher).not.toHaveBeenCalled();
     fireEvent.click(dialog.getByRole("button", { name: "Delete source and feedback" }));
-    await vi.waitFor(() => expect(reload).toHaveBeenCalledWith({ reason: "review", page: "diagram" }));
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(reload).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: "review-remove", id: "summary", removed: true }));
     const deletion = fetcher.mock.calls.find(call => call[0] === "/__playground/sources/reviewables");
     expect(deletion?.[1]?.method).toBe("DELETE");
     expect(JSON.parse(String(deletion?.[1]?.body))).toEqual({ slug: "diagram", expectedSource: "export default () => null;", reviewId: "summary", associatedCommentIds: ["root-review", "nested-feedback", "nested-second-thread", "recovered-feedback"] });
