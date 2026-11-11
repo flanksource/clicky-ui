@@ -1,6 +1,14 @@
 // Derived from react-grab (MIT, Copyright (c) 2025 Aiden Bai): packages/react-grab/src/components/toolbar/index.tsx
-import { createEffect, createSignal, on, onCleanup, onMount, type Component } from "solid-js";
-import type { Position } from "../../types.js";
+import {
+  createEffect,
+  createSignal,
+  For,
+  on,
+  onCleanup,
+  onMount,
+  type Component,
+} from "solid-js";
+import type { Position, ToolbarButton } from "../../types.js";
 import { cn } from "../../utils/cn.js";
 import { loadToolbarState, saveToolbarState, type SnapEdge, type ToolbarState } from "./state.js";
 import { IconSelect } from "../icons/icon-select.jsx";
@@ -54,7 +62,21 @@ interface ToolbarProps {
   onSelectHoverChange?: (isHovered: boolean) => void;
   onContainerRef?: (element: HTMLDivElement) => void;
   onToggleToolbarMenu?: () => void;
+  buttons?: ToolbarButton[];
 }
+
+const TOOLBAR_PLUGIN_ICON_SIZE_PX = 14;
+
+// Plugin buttons carry trusted SVG markup (24x24, currentColor); size it to the
+// built-in icons.
+const mountButtonIcon = (container: HTMLElement, markup: string): void => {
+  container.innerHTML = markup;
+  const svg = container.querySelector("svg");
+  if (!svg) throw new Error("toolbar button icon must be SVG markup");
+  svg.setAttribute("width", String(TOOLBAR_PLUGIN_ICON_SIZE_PX));
+  svg.setAttribute("height", String(TOOLBAR_PLUGIN_ICON_SIZE_PX));
+  svg.setAttribute("aria-hidden", "true");
+};
 
 interface FreezeHandlersOptions {
   shouldFreezeInteractions?: boolean;
@@ -82,6 +104,8 @@ export const Toolbar: Component<ToolbarProps> = (props) => {
   const [isToolbarHovered, setIsToolbarHovered] = createSignal(false);
   const [selectIconRotationDeg, setSelectIconRotationDeg] = createSignal(0);
   const [hoveredActionId, setHoveredActionId] = createSignal<string | null>(null);
+  // Bumped after a plugin button click so its pressed() is read again.
+  const [pluginButtonTick, setPluginButtonTick] = createSignal(0);
 
   const releaseInteractionFreeze = () => {
     unfreezeUpdatesCallback?.();
@@ -793,6 +817,38 @@ export const Toolbar: Component<ToolbarProps> = (props) => {
               tooltipPosition={tooltipPosition()}
               tooltip="Style"
             />
+            <For each={props.buttons ?? []}>
+              {(button) => {
+                const isPressed = () => {
+                  pluginButtonTick();
+                  return button.pressed?.() ?? false;
+                };
+                const handleClick = drag.createDragAwareHandler(() => {
+                  button.onClick();
+                  setPluginButtonTick((tick) => tick + 1);
+                });
+                return (
+                  <ToolbarActionButton
+                    actionId={button.id}
+                    label={button.label}
+                    isActive={isPressed()}
+                    class={actionButtonClass}
+                    wrapperClass={actionButtonWrapperClass()}
+                    onClick={handleClick}
+                    {...createFreezeHandlers(button.id)}
+                    icon={
+                      <span
+                        class={cn("flex items-center justify-center", actionIconClass(isPressed()))}
+                        ref={(element) => mountButtonIcon(element, button.icon)}
+                      />
+                    }
+                    tooltipVisible={isTooltipVisible(button.id)}
+                    tooltipPosition={tooltipPosition()}
+                    tooltip={button.label}
+                  />
+                );
+              }}
+            </For>
           </>
         }
       />

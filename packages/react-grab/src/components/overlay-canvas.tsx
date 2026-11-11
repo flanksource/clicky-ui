@@ -20,6 +20,7 @@ import {
 import { nativeCancelAnimationFrame, nativeRequestAnimationFrame } from "../utils/native-raf.js";
 import { supportsDisplayP3 } from "../utils/supports-display-p3.js";
 import { adjustLerpForFrameDuration } from "../utils/adjust-lerp-for-frame-duration.js";
+import { getLayoutViewportSize } from "../utils/get-layout-viewport-size.js";
 
 const DEFAULT_LAYER_STYLE = {
   borderColor: OVERLAY_BORDER_COLOR_DEFAULT,
@@ -88,14 +89,15 @@ export const OverlayCanvas: Component<OverlayCanvasProps> = (props) => {
     if (!canvasRef) return;
 
     devicePixelRatio = Math.max(window.devicePixelRatio || 1, MIN_DEVICE_PIXEL_RATIO);
-    // Size to the layout viewport (documentElement.clientWidth/Height), not
+    // Size to the layout viewport (the scrolling element's clientWidth/Height), not
     // window.innerWidth/Height. Under browser zoom the latter shrink to the
     // visual viewport while getBoundingClientRect — which positions the boxes —
     // keeps returning full layout coordinates, so a canvas sized to innerWidth
     // draws the selection box off-canvas for anything past the shrunken edge
     // (the "selection box gone entirely when zoomed" bug).
-    canvasWidth = document.documentElement.clientWidth || window.innerWidth;
-    canvasHeight = document.documentElement.clientHeight || window.innerHeight;
+    const layoutViewport = getLayoutViewportSize(document);
+    canvasWidth = layoutViewport.width || window.innerWidth;
+    canvasHeight = layoutViewport.height || window.innerHeight;
 
     canvasRef.width = canvasWidth * devicePixelRatio;
     canvasRef.height = canvasHeight * devicePixelRatio;

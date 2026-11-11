@@ -307,6 +307,21 @@ export interface ContextMenuAction {
   onAction: (context: ContextMenuActionContext) => void | Promise<void>;
 }
 
+// A standalone icon button a plugin adds to the toolbar. Domain-agnostic: the
+// toolbar renders it like its built-in buttons and calls onClick; it never
+// activates grab mode itself.
+export interface ToolbarButton {
+  id: string;
+  // Tooltip and accessible name.
+  label: string;
+  // Trusted SVG markup (any square viewBox, currentColor); rendered inline at the toolbar's icon size.
+  icon: string;
+  // Read when the toolbar renders and after each click of this button. A host
+  // that changes the state elsewhere re-registers its plugin to refresh it.
+  pressed?: () => boolean;
+  onClick: () => void;
+}
+
 // A predicate over a DOM element (e.g. "is this element grabbable?").
 export interface ElementPredicate {
   (element: Element): boolean;
@@ -385,6 +400,7 @@ export interface PluginConfig {
   theme?: DeepPartial<Theme>;
   options?: SettableOptions;
   actions?: ContextMenuAction[];
+  toolbarButtons?: ToolbarButton[];
   hooks?: PluginHooks;
   cleanup?: () => undefined;
 }
@@ -394,8 +410,9 @@ export interface Plugin {
   theme?: DeepPartial<Theme>;
   options?: SettableOptions;
   actions?: ContextMenuAction[];
+  toolbarButtons?: ToolbarButton[];
   hooks?: PluginHooks;
-  setup?: (api: ReactGrabAPI, hooks: ActionContextHooks) => PluginConfig | void;
+  setup?:(api: ReactGrabAPI, hooks: ActionContextHooks) => PluginConfig | void;
 }
 
 export interface Options {
@@ -615,6 +632,7 @@ export interface ReactGrabRendererProps {
   onContextMenuHide?: () => void;
   toolbarMenuPosition?: DropdownAnchor | null;
   toolbarMenuActions?: ContextMenuAction[];
+  toolbarButtons?: ToolbarButton[];
   defaultActionId?: string;
   onSetDefaultAction?: (actionId: string) => void;
   onToggleToolbarMenu?: () => void;

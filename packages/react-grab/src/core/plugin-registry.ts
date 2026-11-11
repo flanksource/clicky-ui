@@ -8,6 +8,7 @@ import type {
   PluginHooks,
   Theme,
   ContextMenuAction,
+  ToolbarButton,
   ReactGrabAPI,
   ReactGrabState,
   PromptModeContext,
@@ -55,7 +56,18 @@ interface PluginStoreState {
   theme: Required<Theme>;
   options: OptionsState;
   actions: ContextMenuAction[];
+  toolbarButtons: ToolbarButton[];
 }
+
+const assertToolbarButton = (button: ToolbarButton, seenIds: Set<string>): void => {
+  if (!button.id) throw new Error("toolbar button requires a non-empty id");
+  if (!button.label) throw new Error(`toolbar button "${button.id}" requires a label`);
+  if (!button.icon.trimStart().startsWith("<svg")) {
+    throw new Error(`toolbar button "${button.id}" icon must be SVG markup`);
+  }
+  if (seenIds.has(button.id)) throw new Error(`duplicate toolbar button id "${button.id}"`);
+  seenIds.add(button.id);
+};
 
 type HookName = keyof PluginHooks;
 
@@ -69,6 +81,7 @@ const createPluginRegistry = (initialOptions: SettableOptions = {}) => {
     theme: DEFAULT_THEME,
     options: { ...DEFAULT_OPTIONS, ...initialOptions },
     actions: [],
+    toolbarButtons: [],
   });
 
   const createPluginStoreState = (
@@ -77,6 +90,8 @@ const createPluginRegistry = (initialOptions: SettableOptions = {}) => {
     let mergedTheme: Required<Theme> = DEFAULT_THEME;
     let mergedOptions: OptionsState = { ...DEFAULT_OPTIONS, ...initialOptions };
     const allContextMenuActions: ContextMenuAction[] = [];
+    const allToolbarButtons: ToolbarButton[] = [];
+    const toolbarButtonIds = new Set<string>();
 
     for (const { config } of registeredPlugins) {
       if (config.theme) {
@@ -92,12 +107,20 @@ const createPluginRegistry = (initialOptions: SettableOptions = {}) => {
           allContextMenuActions.push(action);
         }
       }
+
+      if (config.toolbarButtons) {
+        for (const button of config.toolbarButtons) {
+          assertToolbarButton(button, toolbarButtonIds);
+          allToolbarButtons.push(button);
+        }
+      }
     }
 
     return {
       theme: mergedTheme,
       options: mergedOptions,
       actions: allContextMenuActions,
+      toolbarButtons: allToolbarButtons,
     };
   };
 
@@ -105,6 +128,7 @@ const createPluginRegistry = (initialOptions: SettableOptions = {}) => {
     setStore("theme", nextStore.theme);
     setStore("options", { ...nextStore.options, ...directOptionOverrides });
     setStore("actions", nextStore.actions);
+    setStore("toolbarButtons", nextStore.toolbarButtons);
   };
 
   const recomputeStore = () => {
@@ -168,6 +192,9 @@ const createPluginRegistry = (initialOptions: SettableOptions = {}) => {
         actions: plugin.actions
           ? [...plugin.actions, ...(setupConfig.actions ?? [])]
           : setupConfig.actions,
+        toolbarButtons: plugin.toolbarButtons
+          ? [...plugin.toolbarButtons, ...(setupConfig.toolbarButtons ?? [])]
+          : setupConfig.toolbarButtons,
         hooks: plugin.hooks ? { ...plugin.hooks, ...setupConfig.hooks } : setupConfig.hooks,
       };
     } catch (error) {

@@ -33,6 +33,7 @@ export type {
   ActivationMode,
   ContextMenuAction,
   ContextMenuActionContext,
+  ToolbarButton,
   ActionContext,
   ActionContextHooks,
   OpenFileActionHooks,

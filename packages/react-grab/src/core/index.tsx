@@ -4165,6 +4165,7 @@ export const init = (rawOptions?: Options): ReactGrabAPI => {
                 toolbarMenuActions={pluginRegistry.store.actions.filter(
                   (action) => action.showInToolbarMenu === true,
                 )}
+                toolbarButtons={pluginRegistry.store.toolbarButtons}
                 defaultActionId={currentToolbarState()?.defaultAction ?? DEFAULT_ACTION_ID}
                 onSetDefaultAction={handleSetDefaultAction}
                 onToggleToolbarMenu={handleToggleToolbarMenu}
@@ -4341,6 +4342,7 @@ export const init = (rawOptions?: Options): ReactGrabAPI => {
 export { getStack, formatElementInfo } from "./context.js";
 export { isInstrumentationActive } from "bippy";
 export { DEFAULT_THEME } from "./theme.js";
+export { commentPlugin } from "./plugins/comment.js";
 
 export type {
   Options,
