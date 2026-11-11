@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { editor } from "monaco-editor";
 import { Button } from "../components/button";
+import { ErrorWrapper } from "../components/ErrorWrapper";
 import { JsonSchemaForm } from "../components/JsonSchemaForm";
 import type {
   JsonSchemaObject,
@@ -174,7 +175,14 @@ export function DocumentEditor({
           />
         )}
         {mode === "rich" && (
-          <DocumentRichEditor path={path} value={value} onChange={onChange} {...(resolveImageUrl ? { resolveImageUrl } : {})} />
+          <DocumentRichEditor
+            path={path}
+            value={value}
+            onChange={onChange}
+            frontmatterSchema={schema ?? null}
+            {...(formOptions ? { formOptions } : {})}
+            {...(resolveImageUrl ? { resolveImageUrl } : {})}
+          />
         )}
         {mode === "form" && schema && (
           <DocumentForm path={path} value={value} onChange={onChange} schema={schema} {...(formOptions ? { formOptions } : {})} />
@@ -228,6 +236,11 @@ export function DocumentForm({ path, value, onChange, schema, formOptions }: Doc
         </p>
       )}
       {form && (
+        <ErrorWrapper
+          renderFallback={({ error: failure, reset }) => (
+            <FormFailure message={failure.message} value={value} reset={reset} />
+          )}
+        >
         <JsonSchemaForm
           size="sm"
           inline
@@ -252,8 +265,26 @@ export function DocumentForm({ path, value, onChange, schema, formOptions }: Doc
           }
           onChange={(next) => updateForm(objectRoot ? next : next.document)}
         />
+        </ErrorWrapper>
       )}
     </>
+  );
+}
+
+/**
+ * A form that could not render this document (a value its schema cannot
+ * show, such as a list where an object is required) is reported in place of
+ * the form, and retried once the source changes.
+ */
+function FormFailure({ message, value, reset }: { message: string; value: string; reset: () => void }) {
+  const failedOn = useRef(value);
+  useEffect(() => {
+    if (value !== failedOn.current) reset();
+  }, [value, reset]);
+  return (
+    <p role="alert" className="text-sm text-destructive">
+      The form cannot show this document: {message}. Use Source to fix it.
+    </p>
   );
 }
 
@@ -262,11 +293,19 @@ export type DocumentRichEditorProps = {
   value: string;
   onChange: (source: string) => void;
   resolveImageUrl?: ((src: string) => string) | undefined;
+  /**
+   * The frontmatter's JSON Schema. When set, a collapsible Properties form
+   * above the body edits the frontmatter, opening a --- block on a page that
+   * has none.
+   */
+  frontmatterSchema?: JsonSchemaObject | null | undefined;
+  formOptions?: DocumentEditorProps["formOptions"];
 };
 
 /**
  * The MDX rich-text editor over a markdown file. Frontmatter stays out of the
- * editor and is written back unchanged ahead of each edit; `resolveImageUrl`
+ * body editor and is written back unchanged ahead of each body edit, or edited
+ * in the Properties form when `frontmatterSchema` is given; `resolveImageUrl`
  * decides where a relative image previews from without touching the markdown.
  */
 export function DocumentRichEditor(props: DocumentRichEditorProps) {
@@ -277,7 +316,28 @@ export function DocumentRichEditor(props: DocumentRichEditorProps) {
   );
 }
 
-function RichBody({ path, value, onChange, resolveImageUrl }: DocumentRichEditorProps) {
+function RichBody({ frontmatterSchema, formOptions, ...props }: DocumentRichEditorProps) {
+  if (!frontmatterSchema) return <RichMarkdown {...props} />;
+  return (
+    <div className="flex flex-col gap-2">
+      <details open data-slot="frontmatter-form" className="rounded-md border border-border px-3 py-2">
+        <summary className="cursor-pointer select-none text-sm font-medium text-muted-foreground">Properties</summary>
+        <div className="pt-2">
+          <DocumentForm
+            path={props.path}
+            value={props.value}
+            onChange={props.onChange}
+            schema={frontmatterSchema}
+            {...(formOptions ? { formOptions } : {})}
+          />
+        </div>
+      </details>
+      <RichMarkdown {...props} />
+    </div>
+  );
+}
+
+function RichMarkdown({ path, value, onChange, resolveImageUrl }: DocumentRichEditorProps) {
   const images = useMemo(
     () =>
       resolveImageUrl

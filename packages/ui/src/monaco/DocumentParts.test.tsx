@@ -56,6 +56,17 @@ describe("DocumentForm", () => {
     expect(onChange.mock.calls.map(([source]) => JSON.parse(source as string))).toEqual(["api"]);
   });
 
+  it("reports a value its schema cannot show in place of the form, and retries once the source changes", () => {
+    const schema = { type: "object", properties: { env: { type: "object", additionalProperties: { type: "string" } } } } as const;
+    const { rerender } = render(<DocumentForm path="checks.md" value={"---\nenv: [bad]\n---\n"} onChange={vi.fn()} schema={schema} />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Use Source to fix it");
+
+    rerender(<DocumentForm path="checks.md" value={"---\nenv: {A: b}\n---\n"} onChange={vi.fn()} schema={schema} />);
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("shows the parse error and calls nothing when the source is not a valid document", () => {
     const onChange = vi.fn();
     render(<DocumentForm path="config.json" value="{" onChange={onChange} schema={SCHEMA} />);
@@ -101,6 +112,35 @@ describe("DocumentRichEditor", () => {
     render(<DocumentRichEditor path={path} value={"# Slide\n"} onChange={vi.fn()} />);
 
     expect(await screen.findByRole("textbox", { name: "Rich body" })).toHaveAttribute("data-mdx-syntax", expected);
+  });
+
+  it("edits frontmatter in a Properties form above the body, keeping the body", async () => {
+    const onChange = vi.fn();
+    const schema = { type: "object", properties: { title: { type: "string" } } } as const;
+    render(<DocumentRichEditor path="guide.md" value={"---\ntitle: Guide\n---\n# Guide\n"} onChange={onChange} frontmatterSchema={schema} />);
+
+    expect(screen.getByText("Properties").closest("details")).toHaveAttribute("open");
+    fireEvent.change(screen.getByRole("textbox", { name: /title/i }), { target: { value: "Handbook" } });
+
+    expect(onChange.mock.calls).toEqual([["---\ntitle: Handbook\n---\n# Guide\n"]]);
+    expect(await screen.findByRole("textbox", { name: "Rich body" })).toHaveValue("# Guide\n");
+  });
+
+  it("opens a frontmatter block from the Properties form on a page without one", () => {
+    const onChange = vi.fn();
+    const schema = { type: "object", properties: { title: { type: "string" } } } as const;
+    render(<DocumentRichEditor path="guide.md" value={"# Guide\n"} onChange={onChange} frontmatterSchema={schema} />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: /title/i }), { target: { value: "Guide" } });
+
+    expect(onChange.mock.calls).toEqual([["---\ntitle: Guide\n---\n# Guide\n"]]);
+  });
+
+  it("shows no Properties form without a frontmatter schema", async () => {
+    render(<DocumentRichEditor path="guide.md" value={"# Guide\n"} onChange={vi.fn()} />);
+
+    await screen.findByRole("textbox", { name: "Rich body" });
+    expect(screen.queryByText("Properties")).not.toBeInTheDocument();
   });
 
   it("tells the reader to use Source when the frontmatter is not closed", () => {

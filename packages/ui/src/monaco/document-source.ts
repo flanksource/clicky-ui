@@ -31,7 +31,9 @@ export function structuredDocument(source: string, path: string) {
   });
   if (doc.errors.length)
     throw new Error(doc.errors.map((error) => error.message).join("\n"));
-  const value: unknown = json ? JSON.parse(parts.data) : doc.toJS();
+  const parsed: unknown = json ? JSON.parse(parts.data) : doc.toJS();
+  // Markdown frontmatter is a mapping: absent or empty frontmatter is an empty one.
+  const value = parts.markdown && parsed == null ? {} : parsed;
   assertAcyclic(value);
   return { parts, value, doc, json };
 }
@@ -62,6 +64,11 @@ export function changeStructuredDocument(
     }
     data = doc.toString();
     if (source.includes("\r\n")) data = data.replace(/\r?\n/g, "\r\n");
+  }
+  if (parts.markdown && !parts.prefix) {
+    // A first frontmatter edit opens the --- block the page did not have.
+    const newline = source.includes("\r\n") ? "\r\n" : "\n";
+    return `---${newline}${data}---${newline}${parts.suffix}`;
   }
   return parts.prefix + data + parts.suffix;
 }

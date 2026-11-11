@@ -46,6 +46,23 @@ describe("document source", () => {
       }),
     ).toContain('"unknown":42');
   });
+  it.each([
+    ["no frontmatter", "# Guide\n"],
+    ["empty frontmatter", "---\n---\n# Guide\n"],
+  ])("reads %s as an empty mapping", (_, source) => {
+    expect(structuredDocument(source, "guide.md").value).toEqual({});
+  });
+  it.each([
+    ["\n", "# Guide\n\nBody\n", "---\ntitle: Guide\n---\n# Guide\n\nBody\n"],
+    ["\r\n", "# Guide\r\n", "---\r\ntitle: Guide\r\n---\r\n# Guide\r\n"],
+  ])("opens a frontmatter block with %j line endings on the first edit of a page without one", (_, source, expected) => {
+    expect(changeStructuredDocument(source, "guide.md", { title: "Guide" })).toBe(expected);
+  });
+  it("adds the first field to empty frontmatter in place", () => {
+    expect(changeStructuredDocument("---\n---\n# Guide\n", "guide.md", { title: "Guide" })).toBe(
+      "---\ntitle: Guide\n---\n# Guide\n",
+    );
+  });
   it("rejects broken frontmatter", () => {
     expect(() => structuredDocument("---\nname: [\n", "page.md")).toThrow();
   });
