@@ -34,6 +34,8 @@ export interface DiffLineTarget {
   side: DiffSide;
   line: number;
   content: string;
+  /** The clicked gutter button, for anchoring a popover such as a comment draft. */
+  element: HTMLElement;
 }
 
 /** A node rendered as a full-width row directly below the row at `(side, line)`. */
@@ -454,8 +456,8 @@ function Gutter({
         <button
           type="button"
           aria-label={`Comment on line ${value}`}
-          onClick={() => onLineAction({ side, line: value, content: line.content })}
-          className="absolute inset-y-0 left-0.5 flex items-center rounded-sm bg-background text-primary opacity-0 hover:text-primary/80 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover:opacity-100"
+          onClick={(event) => onLineAction({ side, line: value, content: line.content, element: event.currentTarget })}
+          className="absolute inset-y-0 left-0.5 flex items-center rounded-sm text-primary opacity-0 hover:text-primary/80 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover:opacity-100"
         >
           <UiAdd className="size-3.5" />
         </button>

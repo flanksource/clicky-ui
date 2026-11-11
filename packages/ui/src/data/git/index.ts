@@ -12,6 +12,7 @@ export {
   type GitFileChangeStatus,
   type GitFileListProps,
 } from "./GitChangeList";
+export { DiffStat, type DiffStatProps } from "./DiffStat";
 export { formatGitCommitDateHeader } from "./git-dates";
 export * from "./types";
 export { gitWebLink, shortSha } from "./git-links";

@@ -244,11 +244,13 @@ describe("CodeDiff line actions and widgets", () => {
     );
     await waitFor(() => expect(diffLineTypes(container)).toEqual(["context", "remove", "add"]));
 
-    fireEvent.click(container.querySelector('[data-diff-line="add"] button') as HTMLElement);
-    expect(onLineAction).toHaveBeenLastCalledWith({ side: "new", line: 2, content: "B" });
+    const added = container.querySelector('[data-diff-line="add"] button') as HTMLElement;
+    fireEvent.click(added);
+    expect(onLineAction).toHaveBeenLastCalledWith({ side: "new", line: 2, content: "B", element: added });
 
-    fireEvent.click(container.querySelector('[data-diff-line="context"] button') as HTMLElement);
-    expect(onLineAction).toHaveBeenLastCalledWith({ side: "new", line: 1, content: "a" });
+    const context = container.querySelector('[data-diff-line="context"] button') as HTMLElement;
+    fireEvent.click(context);
+    expect(onLineAction).toHaveBeenLastCalledWith({ side: "new", line: 1, content: "a", element: context });
   });
 
   it("calls onLineAction with side 'old' for deleted lines", async () => {
@@ -258,9 +260,10 @@ describe("CodeDiff line actions and widgets", () => {
     );
     await waitFor(() => expect(diffLineTypes(container)).toEqual(["context", "remove", "add"]));
 
-    fireEvent.click(container.querySelector('[data-diff-line="remove"] button') as HTMLElement);
+    const removed = container.querySelector('[data-diff-line="remove"] button') as HTMLElement;
+    fireEvent.click(removed);
     expect(onLineAction).toHaveBeenCalledTimes(1);
-    expect(onLineAction).toHaveBeenCalledWith({ side: "old", line: 2, content: "b" });
+    expect(onLineAction).toHaveBeenCalledWith({ side: "old", line: 2, content: "b", element: removed });
   });
 
   it("labels each gutter button 'Comment on line N' and keeps it keyboard-focusable", async () => {
@@ -291,10 +294,10 @@ describe("CodeDiff line actions and widgets", () => {
     expect(buttons).toHaveLength(4);
     buttons.forEach((button) => fireEvent.click(button));
     expect(onLineAction.mock.calls.map(([target]) => target)).toEqual([
-      { side: "old", line: 1, content: "a" },
-      { side: "new", line: 1, content: "a" },
-      { side: "old", line: 2, content: "b" },
-      { side: "new", line: 2, content: "B" },
+      { side: "old", line: 1, content: "a", element: buttons[0] },
+      { side: "new", line: 1, content: "a", element: buttons[1] },
+      { side: "old", line: 2, content: "b", element: buttons[2] },
+      { side: "new", line: 2, content: "B", element: buttons[3] },
     ]);
   });
 

@@ -94,13 +94,24 @@ export function timeseriesStreamInterval(refreshMs: number): string | null {
  * streams as `sqlserver.cpu` from `/api/v1/metrics/stream`, the same single
  * segment the server's `GET {prefix}/metrics/{id}` route reads. A url with no
  * such prefix has no stream endpoint, so it is null and keeps fetching.
+ *
+ * Widgets append ids to a URL path, so callers percent-encode them
+ * (`encodeURIComponent("run-1:cpu")`). The stream sends ids as query values,
+ * which encode themselves, so the id's path part is decoded first; sent as is
+ * it would reach the server double-encoded and name no series.
  */
 export function timeseriesStreamAddress(baseUrl: string, id: string): { baseUrl: string; id: string } | null {
-  if (baseUrl !== "") return { baseUrl, id };
+  if (baseUrl !== "") return { baseUrl, id: decodePathId(id) };
   const query = id.indexOf("?");
   const slash = id.lastIndexOf("/", query === -1 ? id.length : query);
   if (slash === -1 || slash === id.length - 1 || slash === query - 1) return null;
-  return { baseUrl: id.slice(0, slash + 1), id: id.slice(slash + 1) };
+  return { baseUrl: id.slice(0, slash + 1), id: decodePathId(id.slice(slash + 1)) };
+}
+
+function decodePathId(id: string): string {
+  const query = id.indexOf("?");
+  const path = query === -1 ? id : id.slice(0, query);
+  return decodeURIComponent(path) + (query === -1 ? "" : id.slice(query));
 }
 
 export function timeseriesStreamUrl(group: TimeseriesStreamGroup, ids: readonly string[]): string {

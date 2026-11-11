@@ -48,6 +48,17 @@ describe("TestTreeNode count badges", () => {
     renderRow({ name: "rule", children: warnedLeaves } as Test);
     expect(screen.getByText("3")).toBeTruthy();
   });
+  // A container whose children all passed already says so with its green
+  // outcome icon; a lone green count repeats it.
+  it.each([1, 4])("shows no badge on a container whose %i children all passed", (count) => {
+    const passedLeaves = Array.from({ length: count }, (_, i) => ({ name: `p${i}`, passed: true }));
+    renderRow({ name: "step", children: passedLeaves } as Test);
+    expect(screen.queryByText(String(count))).toBeNull();
+  });
+  it("keeps the passed count beside another status", () => {
+    renderRow({ name: "plan", children: [{ name: "ok", passed: true }, { name: "ok2", passed: true }, { name: "broken", failed: true }] } as Test);
+    expect([screen.getByText("2").parentElement?.className.includes("border-green-500"), screen.getByText("1").parentElement?.className.includes("border-red-500")]).toEqual([true, true]);
+  });
 });
 
 describe("TestTreeNode message line", () => {

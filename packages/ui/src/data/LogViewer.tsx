@@ -1,9 +1,30 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { AnsiHtml } from "./AnsiHtml";
+import { parseLogSections, type LogSection } from "./log-sections";
+
+function renderSections(sections: LogSection[]): ReactNode[] {
+  return sections.map((section, i) =>
+    section.kind === "text" ? (
+      <AnsiHtml key={i} as="span" text={section.text} />
+    ) : (
+      <details key={i} open={!section.closed} className="block" data-log-group={section.name}>
+        <summary className="cursor-pointer select-none opacity-80 hover:opacity-100">
+          {section.name || "group"}
+          <span className="ml-1 opacity-60">({section.lines} {section.lines === 1 ? "line" : "lines"})</span>
+        </summary>
+        <div className="border-l border-current/20 pl-2">{renderSections(section.children)}</div>
+      </details>
+    ),
+  );
+}
 
 export type LogViewerProps = {
-  /** Raw log text separated by newlines; ANSI SGR escapes are styled. */
+  /**
+   * Raw log text separated by newlines; ANSI SGR escapes are styled and
+   * GitHub Actions `::group::`/`::endgroup::` markers render as collapsible
+   * sections.
+   */
   logs: string;
   /** Number of lines shown before the viewer is expanded. Ignored when `maxHeight` is set. */
   collapsedLines?: number;
@@ -55,6 +76,8 @@ export function LogViewer({
 
   const collapsedHeight = maxHeight ?? `${collapsedLines * 1.4}em`;
   const shown = expanded || maxHeight ? logs : lines.slice(0, collapsedLines).join("\n");
+  const sections = useMemo(() => parseLogSections(shown), [shown]);
+  const grouped = sections.some((section) => section.kind === "group");
 
   return (
     <div className={cn("relative", className)}>
@@ -68,7 +91,7 @@ export function LogViewer({
         style={{ maxHeight: expanded ? `${maxExpandedVh}vh` : collapsedHeight }}
         data-log-variant={variant}
       >
-        <AnsiHtml as="span" text={shown} />
+        {grouped ? renderSections(sections) : <AnsiHtml as="span" text={shown} />}
       </pre>
       {hasMore && (
         <button

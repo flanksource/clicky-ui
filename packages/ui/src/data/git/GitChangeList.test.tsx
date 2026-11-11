@@ -230,8 +230,9 @@ describe("GitDiffPanel line annotations", () => {
     await waitFor(() => expect(screen.getByText("looks good")).toBeInTheDocument());
     const addRow = document.querySelector('[data-diff-line="add"]') as HTMLElement;
     expect(addRow.nextElementSibling?.getAttribute("data-diff-widget")).toBe("c1");
-    fireEvent.click(addRow.querySelector("button") as HTMLElement);
-    expect(onLineAction).toHaveBeenCalledWith({ side: "new", line: 2, content: "B" });
+    const button = addRow.querySelector("button") as HTMLElement;
+    fireEvent.click(button);
+    expect(onLineAction).toHaveBeenCalledWith({ side: "new", line: 2, content: "B", element: button });
   });
 
   it("renders no gutter buttons without onLineAction", async () => {

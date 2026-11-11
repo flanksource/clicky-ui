@@ -10,7 +10,9 @@ import type { Test } from "./types";
 const stdout = "connecting\nconnected\nloading\nloaded\nvalidating\nvalidated\nsaving\nsaved";
 const stderr = "warning: slow response\nretrying\nretry exhausted";
 const combined = `${stdout}\n${stderr}`;
-const preview = `${stdout}\nwarning: slow response\nretrying`;
+// The preview is the output's last ten lines: a long-running step's latest
+// progress and its final error, not its first lines.
+const preview = combined.split("\n").slice(-10).join("\n");
 const node: Test = { name: "sync records", failed: true, stdout, stderr };
 
 function Panel({ test = node, controlled = false }: { test?: Test; controlled?: boolean }) {
@@ -28,9 +30,11 @@ function Panel({ test = node, controlled = false }: { test?: Test; controlled?: 
 }
 
 describe("test output", () => {
-  it("combines both streams into one ten-line detail preview", () => {
+  it("combines both streams into one detail preview of the last ten lines", () => {
     const { container } = render(<Panel />);
-    expect([...container.querySelectorAll("pre")].map((el) => el.textContent)).toEqual([preview]);
+    expect([...container.querySelectorAll("pre")].map((el) => el.textContent)).toEqual([
+      "connected\nloading\nloaded\nvalidating\nvalidated\nsaving\nsaved\nwarning: slow response\nretrying\nretry exhausted",
+    ]);
     expect(screen.queryByText("stderr")).not.toBeInTheDocument();
   });
 

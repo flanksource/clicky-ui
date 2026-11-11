@@ -33,4 +33,20 @@ describe("SessionFilesPanel", () => {
       }),
     ).toBeInTheDocument();
   });
+
+  it("shows only written files until the Read toggle is pressed", () => {
+    render(<SessionFilesPanel files={FILES} />);
+    const readPath = FILES.read[0]!;
+    const readToggle = screen.getByRole("button", { name: /^Read/ });
+
+    expect(screen.getByRole("button", { name: /^Written/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(readToggle).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("treeitem", { name: readPath })).toBeNull();
+
+    fireEvent.click(readToggle);
+    expect(screen.getByRole("treeitem", { name: readPath })).toBeInTheDocument();
+  });
 });

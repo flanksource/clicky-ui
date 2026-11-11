@@ -29,3 +29,25 @@ const sample = Array.from({ length: 40 }, (_, i) => `[line ${i + 1}] processing 
 export const Default: Story = { args: { logs: sample } };
 
 export const Short: Story = { args: { logs: "line 1\nline 2\nline 3" } };
+
+export const Groups: Story = {
+  args: {
+    variant: "terminal",
+    maxHeight: "none",
+    logs: [
+      "Run ./build.sh",
+      "::group::Install dependencies",
+      "resolved 214 packages",
+      "::group::Native modules",
+      "compiled sharp",
+      "::endgroup::",
+      "::endgroup::",
+      "::group::Compile",
+      "tsc --build",
+      "built 38 files",
+      "::endgroup::",
+      "::group::Test",
+      "running 12 suites…",
+    ].join("\n"),
+  },
+};

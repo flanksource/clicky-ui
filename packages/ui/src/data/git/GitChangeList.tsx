@@ -33,6 +33,7 @@ import type {
   GitFileChangeItem,
 } from "./types";
 import { gitWebLink } from "./git-links";
+import { DiffStat } from "./DiffStat";
 export type {
   GitCommitItem,
   GitDiffLoader,
@@ -610,38 +611,6 @@ function splitPath(path: string): { directory: string; basename: string } {
   };
 }
 
-function DiffBars({
-  additions = 0,
-  deletions = 0,
-}: {
-  additions?: number;
-  deletions?: number;
-}) {
-  const total = additions + deletions;
-  const maxBars = 5;
-  const addBars = total > 0 ? Math.round((additions / total) * maxBars) : 0;
-  const delBars = total > 0 ? maxBars - addBars : 0;
-  return (
-    <span className="inline-flex gap-px" aria-hidden>
-      {Array.from({ length: addBars }).map((_, index) => (
-        <span
-          key={`a${index}`}
-          className="inline-block h-2 w-1.5 rounded-sm bg-emerald-500"
-        />
-      ))}
-      {Array.from({ length: delBars }).map((_, index) => (
-        <span
-          key={`d${index}`}
-          className="inline-block h-2 w-1.5 rounded-sm bg-rose-500"
-        />
-      ))}
-      {total === 0 && (
-        <span className="inline-block h-2 w-1.5 rounded-sm bg-muted-foreground/30" />
-      )}
-    </span>
-  );
-}
-
 function FileRow({
   file,
   loadDiff,
@@ -701,19 +670,10 @@ function FileRow({
         <span className="shrink-0 text-[11px] text-muted-foreground">
           {status.label}
         </span>
-        <span className="shrink-0 tabular-nums text-emerald-600 dark:text-emerald-400">
-          +{file.additions ?? 0}
-        </span>
-        <span className="shrink-0 tabular-nums text-rose-600 dark:text-rose-400">
-          -{file.deletions ?? 0}
-        </span>
-        <DiffBars
-          {...(file.additions !== undefined
-            ? { additions: file.additions }
-            : {})}
-          {...(file.deletions !== undefined
-            ? { deletions: file.deletions }
-            : {})}
+        <DiffStat
+          className="shrink-0 gap-2"
+          additions={file.additions ?? 0}
+          deletions={file.deletions ?? 0}
         />
         {href && (
           <a

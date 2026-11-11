@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { fireEvent, render, within } from "@testing-library/react";
 import { TestDetailPanel, TestRunnerProvider, emptyTestFilters, type Test, type TestRunnerContext } from "../test-runner";
 import { verificationAdapters } from "./adapters";
-import { readQuery } from "./stepKind";
+import { readQuery, stepQueryCopy } from "./stepKind";
 
 const TEMPLATE = "SELECT guid FROM AsActivity WHERE StatusCode = $(.params.status) AND Size > {{.params.size}}";
 const SQL = "SELECT guid FROM AsActivity WHERE StatusCode = @p1 AND Size > @p2";
@@ -112,6 +112,17 @@ describe("a query step's connection and batches", () => {
     expect(target("host")).toHaveTextContent(`${HOST}:${PORT}`);
     expect(target("user")).toHaveTextContent(USER);
     expect(target("db")).toHaveTextContent(DATABASE);
+  });
+
+  it("copies the connection ahead of the template, as the badges show it", () => {
+    expect(stepQueryCopy({ ...query, connection }).slice(0, 2)).toEqual([
+      { title: "Connection", body: `lab (sql_server)\nhost: ${HOST}:${PORT}\nuser: ${USER}\ndb: ${DATABASE}` },
+      { title: "Template", lang: "sql", body: TEMPLATE },
+    ]);
+    expect(stepQueryCopy({ ...query, connection: { name: "lab", type: "sqlite", database: "/data/lab.db" } })[0]).toEqual({
+      title: "Connection",
+      body: "lab (sqlite)\ndb: /data/lab.db",
+    });
   });
 
   it("omits the badges a connection has no value for (a sqlite file has only its database)", () => {

@@ -95,6 +95,7 @@ describe("formatProfileValue", () => {
     [2048, "bytes", "2 KB"],
     [1_500_000_000, "nanoseconds", "1.5 s"],
     [250_000, "nanoseconds", "250 µs"],
+	[30, "ns", "30 ns"],
     [90_000_000, "nanoseconds", "90 ms"],
     [1200, "count", "1.2K"],
     [3, "objects", "3 objects"],

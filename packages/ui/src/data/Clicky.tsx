@@ -204,7 +204,7 @@ export type ClickyNode = {
     | "object-graph"
     | "execution-tree";
   plain?: string;
-  filterValue?: string | number | boolean;
+  filterValue?: string | number | boolean | null;
   style?: ClickyStyle;
   text?: string;
   children?: ClickyNode[];
@@ -2960,7 +2960,7 @@ export function ClickyTable({
       ...(column.filterKey ? { filterKey: column.filterKey } : {}),
       serverFilterValue: (value) => {
         const node = value as ClickyNode;
-        return node.filterValue ?? clickyNodeText(node);
+        return node.filterValue !== undefined ? node.filterValue : clickyNodeText(node);
       },
       serverFilterLabel: (value) => clickyNodeText(value as ClickyNode),
       ...(column.grow !== undefined ? { grow: column.grow } : {}),
@@ -3955,8 +3955,8 @@ function isExecutionResponse(value: unknown): value is ExecutionResponse {
  */
 function clickyNodeSortValue(
   node: ClickyNode | null | undefined,
-): string | number | boolean {
-  return node?.filterValue ?? clickyNodeText(node);
+): string | number | boolean | null {
+  return node?.filterValue !== undefined ? node.filterValue : clickyNodeText(node);
 }
 
 /**

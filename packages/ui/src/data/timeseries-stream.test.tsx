@@ -201,6 +201,9 @@ describe("createTimeseriesStream frames", () => {
     ["a slash in the query stays in the id", "", "/m/profile:pods?ns=a/b", { baseUrl: "/m/", id: "profile:pods?ns=a/b" }],
     ["a bare id has no stream endpoint", "", "cpu", null],
     ["a url ending in a slash names no id", "", "/api/v1/metrics/", null],
+    ["a path-encoded id is decoded for the stream", "/api/v1/tasks/metrics/", "run-1%3Acpu", { baseUrl: "/api/v1/tasks/metrics/", id: "run-1:cpu" }],
+    ["a path-encoded url id is decoded for the stream", "", "/m/run-1%3Acpu", { baseUrl: "/m/", id: "run-1:cpu" }],
+    ["an id's query part is left encoded", "", "/m/profile%3Apods?ns=a%26b", { baseUrl: "/m/", id: "profile:pods?ns=a%26b" }],
   ])("timeseriesStreamAddress: %s", (_name, baseUrl, id, expected) => {
     expect(timeseriesStreamAddress(baseUrl, id)).toEqual(expected);
   });

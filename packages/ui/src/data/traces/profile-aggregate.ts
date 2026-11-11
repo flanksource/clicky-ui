@@ -94,16 +94,23 @@ export function formatProfileValue(value: number, unit: string): string {
     case "bytes":
       return formatBytes(value);
     case "nanoseconds":
+    case "ns":
+      if (Math.abs(value) < 1e3) return `${formatShort(value)} ns`;
       return Math.abs(value) < NANOS_PER_MS ? `${formatShort(value / 1e3)} µs` : formatDuration(value / NANOS_PER_MS);
     case "microseconds":
+    case "us":
       return Math.abs(value) < 1e3 ? `${formatShort(value)} µs` : formatDuration(value / 1e3);
     case "milliseconds":
+    case "ms":
       return formatDuration(value);
     case "seconds":
       return formatDuration(value, { from: "s" });
     case "count":
+    case "samples":
     case "":
       return formatShort(value);
+    case "percent":
+      return `${formatShort(value)}%`;
     default:
       return `${formatShort(value)} ${unit}`;
   }

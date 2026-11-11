@@ -48,7 +48,10 @@ export function TestFailureDetail({ failure }: { failure: FailureDetail }) {
   );
 }
 
-/** Combined output, with a ten-line preview linking to the panel's Stdout tab. */
+/**
+ * Combined output, with a preview of its last ten lines — where a long run's
+ * latest progress and its final error are — linking to the panel's Stdout tab.
+ */
 export function TestOutput({ node, view = "preview" }: { node: Test; view?: "preview" | "full" }) {
   const selectTab = useSelectDetailTab();
   if (!node.stdout && !node.stderr) return null;
@@ -59,7 +62,7 @@ export function TestOutput({ node, view = "preview" }: { node: Test; view?: "pre
     <div className="space-y-1">
       {preview && <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Output</div>}
       <LogViewer
-        logs={preview ? lines.slice(0, 10).join("\n") : output}
+        logs={preview ? lines.slice(-10).join("\n") : output}
         variant="terminal"
         maxHeight="none"
         collapsedLines={lines.length}

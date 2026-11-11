@@ -30,10 +30,15 @@ const NAME_TONE: Record<string, string> = {
 
 const MESSAGE_STATUSES = new Set(["failed", "timedout", "warned", "aborted", "skipped"]);
 
-/** Per-status roll-up count badges shown on a container row. */
+/**
+ * Per-status roll-up count badges shown on a container row. A roll-up that is
+ * all passed shows none: the row's green outcome icon already says so, and a
+ * lone green count only repeats it. The passed count shows beside any other
+ * status.
+ */
 function CountBadges({ node }: { node: Test }) {
   const s = sum(node);
-  if (s.total === 0) return null;
+  if (s.total === 0 || s.passed === s.total) return null;
   return (
     <span className="flex shrink-0 items-center gap-1">
       {s.passed > 0 && <Badge tone="success" variant="outline" className="rounded-sm" size="xxs" count={s.passed} />}

@@ -608,7 +608,9 @@ export function withoutQuery(detail: unknown): unknown {
 /** Brief sections for the "Copy details" button: the template, the issued SQL and the params it bound. */
 export function stepQueryCopy(query: StepQuery): BriefSection[] {
   const params = Object.entries(query.params ?? {});
+  const connection = query.connection;
   return [
+    ...(connection ? [{ title: "Connection", body: connectionCopy(connection) }] : []),
     { title: query.queryFile ? `Template (${query.queryFile})` : "Template", lang: "sql", body: query.template },
     ...(query.sql ? [{ title: "SQL", lang: "sql", body: query.sql }] : []),
     ...(params.length > 0 ? [{ title: "Params", body: params.map(([name, value]) => `${name}=${formatExportValue(value)}`).join("\n") }] : []),
@@ -616,6 +618,19 @@ export function stepQueryCopy(query: StepQuery): BriefSection[] {
       ? [{ title: "Arguments", body: query.arguments.map((value, i) => `${i + 1}: ${formatExportValue(value)}`).join("\n") }]
       : []),
   ];
+}
+
+/** The connection as the badges show it: `name (type)`, then host:port, user and db where known. */
+function connectionCopy(connection: StepQueryConnection): string {
+  const host = connection.host && (connection.port ? `${connection.host}:${connection.port}` : connection.host);
+  return [
+    `${connection.name} (${connection.type})`,
+    host && `host: ${host}`,
+    connection.user && `user: ${connection.user}`,
+    connection.database && `db: ${connection.database}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /** How a `form` step's form was answered, or undefined for a node that is no (valid) form step. */

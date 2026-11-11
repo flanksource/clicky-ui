@@ -18,6 +18,7 @@ import type { TaskHeaderExtra } from "./TaskHeaderExtras";
 import type { TaskExtraTabs } from "./TaskStreamTabs";
 import { taskQueryKeys } from "./task-query-keys";
 import { taskSegments, taskStatusColor, taskStatusIcon } from "./task-status";
+import { TaskPoolUsage, TaskRunConcurrency } from "./TaskPoolUsage";
 
 // TaskManager is the generic clicky-ui task-manager view: it lists every run
 // (TaskRunMeta) from GET {basePath}/tasks with kind/status filters, and expands
@@ -67,6 +68,8 @@ export interface TaskManagerProps {
   renderRunDetails?: (run: TaskRunMeta, snapshots: TaskSnapshot[]) => ReactNode;
   controlUrl?: (run: TaskRunMeta, action: TaskControlAction) => string | undefined;
   showTaskControls?: (run: TaskRunMeta) => boolean;
+  /** Show the worker-pool gauges above the run listing. Default true. */
+  showPool?: boolean;
 }
 
 type RunTableRow = Record<string, unknown> & {
@@ -184,6 +187,7 @@ export function TaskManager({
   renderRunDetails,
   controlUrl,
   showTaskControls,
+  showPool = true,
 }: TaskManagerProps) {
   const [kindFilter, setKindFilter] = useState<string>(kind ?? "");
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -263,36 +267,39 @@ export function TaskManager({
   );
 
   return (
-    <DataTable
-      {...(className ? { className } : {})}
-      data={rows}
-      columns={columns}
-      emptyMessage="No background tasks."
-      externalFilters={filters}
-      filterBarProps={{ trailing: <span className="text-xs text-muted-foreground">{status}</span> }}
-      getRowId={(row) => row.id}
-      defaultSort={{ key: "startedAt", dir: "desc" }}
-      expandedRowIds={openId ? [openId] : []}
-      onExpandedRowIdsChange={(ids) => {
-        const next = ids.find((id) => id !== openId) ?? null;
-        if (onSelectRun) onSelectRun(next);
-        else setLocalSelectedId(next);
-      }}
-      renderExpandedRow={(row) => (
-        <ExpandedRun
-          run={row.run}
-          basePath={basePath}
-          pollMs={pollMs}
-          runsQueryKey={runsQueryKey}
-          extraTabs={extraTabs}
-          headerExtra={headerExtra}
-          sessionRenderers={sessionRenderers}
-          renderRunDetails={renderRunDetails}
-          controlUrl={controlUrl}
-          showTaskControls={showTaskControls}
-        />
-      )}
-    />
+    <>
+      {showPool && <TaskPoolUsage basePath={apiBase} className="mb-3" />}
+      <DataTable
+        {...(className ? { className } : {})}
+        data={rows}
+        columns={columns}
+        emptyMessage="No background tasks."
+        externalFilters={filters}
+        filterBarProps={{ trailing: <span className="text-xs text-muted-foreground">{status}</span> }}
+        getRowId={(row) => row.id}
+        defaultSort={{ key: "startedAt", dir: "desc" }}
+        expandedRowIds={openId ? [openId] : []}
+        onExpandedRowIdsChange={(ids) => {
+          const next = ids.find((id) => id !== openId) ?? null;
+          if (onSelectRun) onSelectRun(next);
+          else setLocalSelectedId(next);
+        }}
+        renderExpandedRow={(row) => (
+          <ExpandedRun
+            run={row.run}
+            basePath={basePath}
+            pollMs={pollMs}
+            runsQueryKey={runsQueryKey}
+            extraTabs={extraTabs}
+            headerExtra={headerExtra}
+            sessionRenderers={sessionRenderers}
+            renderRunDetails={renderRunDetails}
+            controlUrl={controlUrl}
+            showTaskControls={showTaskControls}
+          />
+        )}
+      />
+    </>
   );
 }
 
@@ -395,6 +402,7 @@ function ExpandedRun({
           <span key={key} className="font-mono">{key}={value}</span>
         ))}
       </div>
+      <TaskRunConcurrency basePath={apiBase} runId={runId} />
       {renderRunDetails?.(run, snapshots)}
       <TaskProgress
         snapshots={snapshots}
