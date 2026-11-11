@@ -1,9 +1,11 @@
 import { describeElement, resolveAnchor } from "../comments/dom-anchor";
-import type { AnchorState } from "./model";
+import type { AnchorState, Presentation } from "./model";
+import { mountFabMovement, type FabPosition } from "./host-fab";
 import { mountSidebarResize } from "./host-resize";
 import { draftPosition } from "./draft-position";
+import { GAVEL_FILLED_SVG } from "./gavel-icon";
 
-export function mountHost(frameUrl: string, focus: (anchor: string) => void, onWidth: (width: number) => void, onPresentation: (floating: boolean) => void) {
+export function mountHost(frameUrl: string, focus: (anchor: string) => void, onWidth: (width: number) => void, onPresentation: (mode: Presentation) => void, onPosition: (position: FabPosition) => void = () => {}, onOpenChange: (open: boolean) => void = () => {}) {
   const root = document.createElement("div");
   root.id = "playground-grabber";
   root.setAttribute("data-react-grab-ignore", "");
@@ -15,9 +17,11 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void, onW
     .resize { position: absolute; top: 0; height: 100%; width: 5px; background: #8886; cursor: col-resize; pointer-events: auto; touch-action: none; }
     .resize:hover, .resize:focus-visible { background: #2563eb; outline: 2px solid white; }
     .resize[hidden], iframe[hidden] ~ .resize { display: none; }
-    .fab { position: absolute; right: 20px; bottom: 20px; width: 48px; height: 48px; border: 2px solid white; border-radius: 50%; background: #2563eb; color: white; font: 600 24px system-ui; cursor: pointer; pointer-events: auto; box-shadow: 0 2px 12px #0004; }
+    .fab { position: absolute; right: 20px; bottom: 20px; width: 48px; height: 48px; padding: 0; border: 2px solid white; border-radius: 50%; background: #2563eb; color: white; cursor: pointer; pointer-events: auto; box-shadow: 0 2px 12px #0004; }
+    .fab svg { display: block; width: 26px; height: 26px; margin: auto; pointer-events: none; }
     .fab[hidden] { display: none; }
-    :host([data-mode=draft]) .resize { display: none; }
+    :host(:not([data-mode=rail])) .resize { display: none; }
+    :host([data-mode=compact]) iframe { inset: auto; border-radius: 10px; }
     :host([data-mode=draft]) iframe { inset: auto; border-radius: 10px; }
     .pin { position: absolute; pointer-events: auto; min-width: 22px; height: 22px; padding: 0 4px; border: 1px solid #fff; border-radius: 12px; color: white; background: #2563eb; font: 600 12px system-ui; cursor: pointer; transform: translate(-50%, -50%); }
     .highlight { position: absolute; border: 2px solid #2563eb; background: #2563eb18; box-sizing: border-box; pointer-events: none; }
@@ -34,18 +38,24 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void, onW
   const fab = document.createElement("button");
   fab.className = "fab";
   fab.type = "button";
-  fab.textContent = "+";
-  fab.setAttribute("aria-label", "Restore playground comments");
-  fab.title = "Restore playground comments";
-  fab.hidden = true;
-  let mode: "rail" | "draft" = "rail";
-  let minimized = false;
+  fab.innerHTML = GAVEL_FILLED_SVG;
+  fab.setAttribute("aria-label", "Playground actions");
+  fab.title = "Playground actions; drag or use arrow keys to move";
+  fab.hidden = false;
+  frame.hidden = true;
+  let mode: Presentation = "compact";
+  root.setAttribute("data-mode", mode);
+  let minimized = true;
   let previousMinimized = false;
   let draftAnchor: string | null = null;
   let draftHeight = 260;
   let draftBox = { left: 8, top: 8, bottom: 8 };
-  const restore = () => { minimized = false; frame.hidden = false; fab.hidden = true; frame.focus(); };
-  fab.addEventListener("click", restore);
+  let dialogOpen = false;
+  const movement = mountFabMovement(fab, position => { onPosition(position); schedule(); });
+  let previousMode: Presentation = "compact";
+  const setMinimized = (value: boolean) => { if (minimized === value) return; minimized = value; onOpenChange(!value); };
+  const restore = () => { setMinimized(false); frame.hidden = false; fab.hidden = true; frame.focus(); };
+  fab.addEventListener("click", () => { restore(); onPresentation(mode); schedule(); });
   shadow.append(style, pins, highlight, frame, sizing.handle, fab);
   document.documentElement.append(root);
   let anchors: string[] = [];
@@ -56,7 +66,13 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void, onW
 
   function recompute() {
     pending = 0;
-    if (mode === "draft") {
+    if (mode === "compact" && !dialogOpen) {
+      const { x, y } = movement.position();
+      const width = Math.min(400, window.innerWidth - 16);
+      const height = Math.min(480, window.innerHeight - 16);
+      Object.assign(frame.style, { left: `${Math.max(8, Math.min(x, window.innerWidth - width - 8))}px`, top: `${Math.max(8, Math.min(y - height, window.innerHeight - height - 8))}px`, width: `${width}px`, height: `${height}px` });
+    }
+    if (mode === "draft" && !dialogOpen) {
       const target = draftAnchor ? resolveAnchor(document.body, draftAnchor) : null;
       if (target) draftBox = target.getBoundingClientRect();
       const position = draftPosition(draftBox, { width: window.innerWidth, height: window.innerHeight }, draftHeight);
@@ -119,17 +135,18 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void, onW
     frame.style.removeProperty("top");
     frame.style.removeProperty("height");
     sizing.layout(preferredWidth, maximized);
-    onPresentation(false);
+    onPresentation("rail");
   }
   function showRail() {
     railLayout();
     restore();
   }
   const resume = () => { frame.hidden = minimized; fab.hidden = !minimized; };
-  function closeDraft(posted: boolean) {
-    railLayout();
-    if (posted || !previousMinimized) restore();
-    else { minimized = true; resume(); }
+  function closeDraft() {
+    if (previousMode === "rail") railLayout();
+    else { mode = "compact"; root.setAttribute("data-mode", mode); onPresentation(mode); schedule(); }
+    if (!previousMinimized) restore();
+    else { setMinimized(true); resume(); }
   }
   let preferredWidth = 400;
   let maximized = false;
@@ -138,24 +155,34 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void, onW
     frame,
     restore,
     showRail,
-    minimize() { minimized = true; frame.hidden = true; fab.hidden = false; fab.focus(); },
+    compact() { mode = "compact"; root.setAttribute("data-mode", mode); restore(); onPresentation(mode); schedule(); },
+    position: movement.layout,
+    dialog(open: boolean) {
+      dialogOpen = open;
+      if (open) Object.assign(frame.style, { left: "0", top: "0", width: "100vw", height: "100vh" });
+      else if (mode === "rail") railLayout();
+      else schedule();
+    },
+    minimize() { setMinimized(true); frame.hidden = true; fab.hidden = false; fab.focus(); },
+    /** Whether the sidebar is closed to the FAB (a sidebar hidden only while picking an element is still open). */
+    minimized: () => minimized,
     resume,
     /** A new URL drops any floating draft but never reopens a minimized sidebar. */
     pageChanged() {
-      if (mode === "draft") closeDraft(false);
+      if (mode === "draft") closeDraft();
       else resume();
     },
-    draft(active: boolean, anchor?: string, posted = false) {
+    draft(active: boolean, anchor?: string) {
       if (active) {
         if (!anchor) throw new Error("Floating comment requires an anchor");
-        if (mode !== "draft") previousMinimized = minimized;
+        if (mode !== "draft") { previousMinimized = minimized; previousMode = mode; }
         draftAnchor = anchor;
         mode = "draft";
         root.setAttribute("data-mode", mode);
         restore();
-        onPresentation(true);
+        onPresentation("draft");
         schedule();
-      } else closeDraft(posted);
+      } else closeDraft();
     },
     draftSize(height: number) { draftHeight = height; schedule(); },
     layout(width: number, detail: boolean) {
@@ -186,6 +213,7 @@ export function mountHost(frameUrl: string, focus: (anchor: string) => void, onW
     },
     close() {
       sizing.close();
+      movement.close();
       observer.disconnect();
       resize.disconnect();
       cancelAnimationFrame(pending);

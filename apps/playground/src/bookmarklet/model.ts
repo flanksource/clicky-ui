@@ -41,6 +41,7 @@ export type Selection = {
 };
 
 export type HostState = { url: string; title: string; selection?: Selection };
+export type Presentation = "compact" | "draft" | "rail";
 export type AnchorState = {
   anchor: string;
   label: string;
@@ -48,13 +49,17 @@ export type AnchorState = {
   top?: number;
 };
 export type HostMessage =
-  | { type: "presentation"; floating: boolean }
+  | { type: "presentation"; mode: Presentation }
+  | { type: "fab-position"; x: number; y: number }
   | { type: "sidebar-width"; width: number }
   | { type: "state"; state: HostState }
   | { type: "anchors"; anchors: AnchorState[] }
   | { type: "focus"; anchor: string }
   | { type: "error"; error: string };
 export type PanelMessage =
+  | { type: "open-rail" }
+  | { type: "dialog"; open: boolean }
+  | { type: "fab-position"; x: number; y: number }
   | { type: "minimize" }
   | { type: "draft"; active: boolean; posted?: boolean; anchor?: string }
   | { type: "draft-size"; height: number }
@@ -63,6 +68,8 @@ export type PanelMessage =
   | { type: "close" }
   | { type: "pick"; screenshot?: boolean }
   | { type: "page" }
+  /** The panel changed this site's agent session; the host persists it in the page's grabber settings. `null` clears it. */
+  | { type: "settings"; session: string | null }
   | {
       type: "scroll";
       anchor: string;

@@ -54,6 +54,18 @@ export function BookmarkletInstall() {
             browser internal pages and cross-origin frame contents are
             unsupported.
           </p>
+          <p className="text-muted-foreground">
+            For pages that block the bookmarklet, use the Chrome extension: run{" "}
+            <code>pnpm --filter playground build:extension</code>, then load{" "}
+            <code>apps/playground/extension/dist</code> unpacked from{" "}
+            <code>chrome://extensions</code> with Developer mode on, then click
+            its toolbar button and turn on Enabled on this site. The React
+            Grab toolbar then appears on that site, now and on every page
+            load, until you switch it off. In the popup, global defaults
+            choose the backend (this playground, or a gavel dashboard with a
+            project) and its address, for example when this playground is not
+            on port 5274. This site overrides them for the current site only.
+          </p>
           {error && (
             <p role="alert" className="text-destructive">
               {error}
