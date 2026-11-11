@@ -1,33 +1,34 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentRunsProvider, useAgentRuns } from "./AgentRunsProvider";
 import { AgentSessionButton } from "./AgentSessionButton";
-import { fetchAgentSessions, fetchCaptainSessions, setPageAgentTarget, updateAgentSessionSettings, type AgentSessionsFile, type AgentTarget } from "./agent-runs-api";
+import { fetchAgentSessions, fetchCaptainSessions, setPageAgentRoute, updateAgentSessionSettings, type AgentSessionsView, type AgentTarget } from "./agent-runs-api";
 
 vi.mock("./agent-runs-api", async importOriginal => ({
   ...await importOriginal<typeof import("./agent-runs-api")>(),
   fetchAgentSessions: vi.fn(),
   fetchCaptainSessions: vi.fn(),
-  setPageAgentTarget: vi.fn(),
+  setPageAgentRoute: vi.fn(),
   updateAgentSessionSettings: vi.fn(),
 }));
 const FIRST = { id: "session-a", source: "codex", title: "Review changes", model: "example-model", inCmux: false };
 const SECOND = { id: "session-b", source: "claude", title: "Fix layout", model: "example-model", inCmux: false };
-let data: AgentSessionsFile;
+let data: AgentSessionsView;
 beforeEach(() => {
-  data = { settings: { grouping: "shared", autoRun: false }, sessions: [] };
+  data = { settings: { grouping: "shared" }, sessions: [], pages: {} };
   vi.mocked(fetchAgentSessions).mockImplementation(async () => data);
   vi.mocked(fetchCaptainSessions).mockResolvedValue([FIRST, SECOND]);
   vi.mocked(updateAgentSessionSettings).mockImplementation(async patch => {
     data = { ...data, settings: { ...data.settings, ...patch } };
     return data.settings;
   });
-  vi.mocked(setPageAgentTarget).mockImplementation(async (page, target: AgentTarget) => {
-    const targets = { ...data.settings.targets };
-    if (target.kind === "captain") targets[page] = target;
-    else delete targets[page];
-    data = { ...data, settings: { ...data.settings, targets } };
-    return data.settings;
+  vi.mocked(setPageAgentRoute).mockImplementation(async (page, change) => {
+    const pages = { ...data.pages };
+    const autoRun = change.autoRun ?? pages[page]?.autoRun ?? false;
+    if (change.target?.kind === "captain" || (!change.target && pages[page])) pages[page] = { target: change.target ?? pages[page]!.target, autoRun };
+    else if (change.target) delete pages[page];
+    data = { ...data, pages };
+    return pages[page] ?? { target: { kind: "playground" }, autoRun: false };
   });
 });
 afterEach(() => { cleanup(); vi.clearAllMocks(); localStorage.clear(); });
@@ -51,6 +52,45 @@ describe("page agent target controls", () => {
     fireEvent.click(screen.getByRole("button", { name: "Choose playground model" }));
     await screen.findByRole("dialog", { name: "Agent runtime" });
     expect(screen.queryByRole("dialog", { name: "Agent" })).toBeNull();
+  });
+  describe("auto-run", () => {
+    const SESSION = { kind: "captain" as const, sessionId: FIRST.id, label: "Review changes · codex" };
+    const openMenu = () => fireEvent.click(screen.getByRole("button", { name: "Agent" }));
+
+    it("switches a page that sends to a session on without asking for a runtime, and shows gavel's answer", async () => {
+      data.pages = { welcome: { target: SESSION, autoRun: false } };
+      render(<SessionControls page="welcome" runAgent={vi.fn()} />);
+      openMenu();
+      const toggle = await screen.findByRole("switch", { name: "Auto-run new comments on this page" });
+      await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("false"));
+
+      fireEvent.click(toggle);
+
+      await waitFor(() => expect(setPageAgentRoute).toHaveBeenCalledWith("welcome", { autoRun: true }));
+      await waitFor(() => expect(screen.getByRole("switch", { name: "Auto-run new comments on this page" }).getAttribute("aria-checked")).toBe("true"));
+      expect(screen.queryByRole("dialog", { name: "Agent runtime" })).toBeNull();
+    });
+
+    it("asks for the playground agent's runtime first, then saves it and switches the page on", async () => {
+      render(<SessionControls page="welcome" runAgent={vi.fn()} />);
+      openMenu();
+      const toggle = await screen.findByRole("switch", { name: "Auto-run new comments on this page" });
+      await waitFor(() => expect(toggle.hasAttribute("disabled")).toBe(false));
+
+      fireEvent.click(toggle);
+
+      await screen.findByRole("dialog", { name: "Agent runtime" });
+      expect(setPageAgentRoute).not.toHaveBeenCalled();
+    });
+
+    it("is not offered where there is no page to route", async () => {
+      render(<SessionControls runAgent={vi.fn()} />);
+      openMenu();
+
+      const toggle = await screen.findByRole("switch", { name: "Auto-run new comments on this page" });
+
+      expect(toggle.hasAttribute("disabled")).toBe(true);
+    });
   });
   it("deduplicates live and managed sessions and leaves ended sessions in the history dialog", async () => {
     const managed = { runId: "run-a", sessionId: "captain-a", page: null, runtime: { spec: { model: "example-model" } }, startedAt: "2026-11-04T12:00:00Z", state: "running" as const };
@@ -91,7 +131,7 @@ describe("page agent target controls", () => {
     expect(screen.queryByRole("option", { name: /Review changes/ })).toBeNull();
     expect(screen.getByRole("option", { name: /Playground agent/ })).toBeDefined();
     expect(screen.getByRole("button", { name: "New session…" })).toBeDefined();
-    expect(setPageAgentTarget).not.toHaveBeenCalled();
+    expect(setPageAgentRoute).not.toHaveBeenCalled();
   });
   it("changes a page's Captain session and returns it to the playground agent without sending", async () => {
     const runAgent = vi.fn();
@@ -102,19 +142,19 @@ describe("page agent target controls", () => {
     await waitFor(() => expect(picker.hasAttribute("disabled")).toBe(false));
     fireEvent.click(picker);
     fireEvent.mouseDown(await screen.findByRole("option", { name: /Review changes/ }));
-    await waitFor(() => expect(setPageAgentTarget).toHaveBeenLastCalledWith("welcome", { kind: "captain", sessionId: FIRST.id, label: "Review changes · codex" }));
+    await waitFor(() => expect(setPageAgentRoute).toHaveBeenLastCalledWith("welcome", { target: { kind: "captain", sessionId: FIRST.id, label: "Review changes · codex" } }));
     await waitFor(() => expect(picker.hasAttribute("disabled")).toBe(false));
     fireEvent.click(picker);
     fireEvent.mouseDown(await screen.findByRole("option", { name: /Fix layout/ }));
-    await waitFor(() => expect(setPageAgentTarget).toHaveBeenLastCalledWith("welcome", { kind: "captain", sessionId: SECOND.id, label: "Fix layout · claude" }));
+    await waitFor(() => expect(setPageAgentRoute).toHaveBeenLastCalledWith("welcome", { target: { kind: "captain", sessionId: SECOND.id, label: "Fix layout · claude" } }));
     await waitFor(() => expect(picker.hasAttribute("disabled")).toBe(false));
     fireEvent.click(picker);
     fireEvent.mouseDown(await screen.findByRole("option", { name: /Playground agent/ }));
-    await waitFor(() => expect(setPageAgentTarget).toHaveBeenLastCalledWith("welcome", { kind: "playground" }));
+    await waitFor(() => expect(setPageAgentRoute).toHaveBeenLastCalledWith("welcome", { target: { kind: "playground" } }));
     expect(runAgent).not.toHaveBeenCalled();
   });
   it.each([
-    { name: "points a page without a target at the last live Captain session chosen", remembered: FIRST, expected: [["other", { kind: "captain", sessionId: FIRST.id, label: "Review changes · codex" }]] },
+    { name: "points a page without a target at the last live Captain session chosen", remembered: FIRST, expected: [["other", { target: { kind: "captain", sessionId: FIRST.id, label: "Review changes · codex" } }]] },
     { name: "leaves a page on the playground agent when the remembered session is no longer live", remembered: { ...FIRST, id: "ended" }, expected: [] },
   ])("$name", async ({ remembered, expected }) => {
     localStorage.setItem("playground.agent-target", JSON.stringify({ kind: "captain", sessionId: remembered.id, label: "Review changes · codex" }));
@@ -123,7 +163,7 @@ describe("page agent target controls", () => {
     fireEvent.click(screen.getByRole("button", { name: "All sessions…" }));
     const picker = await screen.findByRole("combobox", { name: "Send comments to" });
     await waitFor(() => expect(picker.hasAttribute("disabled")).toBe(false));
-    await waitFor(() => expect(vi.mocked(setPageAgentTarget).mock.calls).toEqual(expected));
+    await waitFor(() => expect(vi.mocked(setPageAgentRoute).mock.calls).toEqual(expected));
   });
   it("remembers the session chosen for one page in localStorage", async () => {
     render(<SessionControls page="welcome" runAgent={vi.fn()} />);
@@ -136,7 +176,10 @@ describe("page agent target controls", () => {
     await waitFor(() => expect(localStorage.getItem("playground.agent-target")).toBe(JSON.stringify({ kind: "captain", sessionId: SECOND.id, label: "Fix layout · claude" })));
   });
   it("shows the saved target for each page when navigating", async () => {
-    data.settings.targets = { welcome: { kind: "captain", sessionId: FIRST.id, label: "Review changes · codex" }, other: { kind: "captain", sessionId: SECOND.id, label: "Fix layout · claude" } };
+    data.pages = {
+      welcome: { target: { kind: "captain", sessionId: FIRST.id, label: "Review changes · codex" }, autoRun: false },
+      other: { target: { kind: "captain", sessionId: SECOND.id, label: "Fix layout · claude" }, autoRun: false },
+    };
     const runAgent = vi.fn();
     const view = render(<SessionControls page="welcome" runAgent={runAgent} />);
     fireEvent.click(screen.getByRole("button", { name: "Agent" }));
@@ -144,7 +187,7 @@ describe("page agent target controls", () => {
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Send comments to" }).textContent).toContain("Review changes · codex"));
     view.rerender(<SessionControls page="other" runAgent={runAgent} />);
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Send comments to" }).textContent).toContain("Fix layout · claude"));
-    expect(setPageAgentTarget).not.toHaveBeenCalled();
+    expect(setPageAgentRoute).not.toHaveBeenCalled();
   });
   it("does not offer page targeting on the global comments dashboard", async () => {
     render(<SessionControls runAgent={vi.fn()} />);
@@ -160,8 +203,27 @@ describe("page agent target controls", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send to another target" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: /Fix layout/ }));
     await waitFor(() => expect(runAgent).toHaveBeenCalledWith("failed", undefined));
-    expect(setPageAgentTarget).toHaveBeenCalledWith("other", { kind: "captain", sessionId: SECOND.id, label: "Fix layout · claude" });
-    expect(vi.mocked(setPageAgentTarget).mock.invocationCallOrder[0]).toBeLessThan(runAgent.mock.invocationCallOrder[0]!);
+    expect(setPageAgentRoute).toHaveBeenCalledWith("other", { target: { kind: "captain", sessionId: SECOND.id, label: "Fix layout · claude" } });
+    expect(vi.mocked(setPageAgentRoute).mock.invocationCallOrder[0]).toBeLessThan(runAgent.mock.invocationCallOrder[0]!);
+  });
+  it("retries in a new session without changing the page's target", async () => {
+    const runAgent = vi.fn().mockResolvedValue(undefined);
+    render(<AgentRunsProvider runAgent={runAgent}><FailedThread /></AgentRunsProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Send failed" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send to another target" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Retry in a new session" }));
+    await waitFor(() => expect(runAgent).toHaveBeenCalledWith("failed", undefined, { fresh: true }));
+    expect(setPageAgentRoute).not.toHaveBeenCalled();
+  });
+  it("does not offer a new session for a page that sends to a live session", async () => {
+    data.pages = { other: { target: { kind: "captain", sessionId: FIRST.id, label: "Review changes · codex" }, autoRun: false } };
+    render(<AgentRunsProvider page="other" runAgent={vi.fn()}><FailedThread /></AgentRunsProvider>);
+    await waitFor(() => expect(fetchAgentSessions).toHaveBeenCalled());
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+    fireEvent.click(screen.getByRole("button", { name: "Send failed" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send to another target" }));
+    await screen.findByRole("menuitem", { name: "Send to Playground agent" });
+    expect(screen.queryByRole("menuitem", { name: "Retry in a new session" })).toBeNull();
   });
   it("points the comment's page at a chosen session before sending, without asking for a runtime", async () => {
     const runAgent = vi.fn().mockResolvedValue(undefined);
@@ -175,12 +237,12 @@ describe("page agent target controls", () => {
     await waitFor(() => expect(fetchAgentSessions).toHaveBeenCalled());
     fireEvent.click(screen.getByRole("button", { name: "Send chosen" }));
     await waitFor(() => expect(runAgent).toHaveBeenCalledWith("page-error", undefined));
-    expect(setPageAgentTarget).toHaveBeenCalledWith("oipa/kit", target);
-    expect(vi.mocked(setPageAgentTarget).mock.invocationCallOrder[0]).toBeLessThan(runAgent.mock.invocationCallOrder[0]!);
+    expect(setPageAgentRoute).toHaveBeenCalledWith("oipa/kit", { target });
+    expect(vi.mocked(setPageAgentRoute).mock.invocationCallOrder[0]).toBeLessThan(runAgent.mock.invocationCallOrder[0]!);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
   it("does not send if saving the new target fails, and retries that choice on the next attempt", async () => {
-    vi.mocked(setPageAgentTarget).mockRejectedValueOnce(new Error("Could not save target"));
+    vi.mocked(setPageAgentRoute).mockRejectedValueOnce(new Error("Could not save target"));
     const runAgent = vi.fn().mockResolvedValue(undefined);
     render(<AgentRunsProvider runAgent={runAgent}><FailedThread /></AgentRunsProvider>);
     fireEvent.click(screen.getByRole("button", { name: "Send failed" }));
@@ -190,6 +252,6 @@ describe("page agent target controls", () => {
     expect(runAgent).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Retry send" }));
     await waitFor(() => expect(runAgent).toHaveBeenCalledOnce());
-    expect(setPageAgentTarget).toHaveBeenNthCalledWith(2, "other", { kind: "captain", sessionId: SECOND.id, label: "Fix layout · claude" });
+    expect(setPageAgentRoute).toHaveBeenNthCalledWith(2, "other", { target: { kind: "captain", sessionId: SECOND.id, label: "Fix layout · claude" } });
   });
 });

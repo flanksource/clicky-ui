@@ -18,12 +18,12 @@ import { AgentIdentityProvider, type AgentIdentityMetadata } from "@flanksource/
 import {
   fetchAgentSessions,
   forgetAgentSession,
-  setPageAgentTarget,
+  setPageAgentRoute,
   stopAgentSession,
   updateAgentSessionSettings,
   type AgentSessionRuntime,
   type AgentSessionSettings,
-  type AgentSessionsFile,
+  type AgentSessionsView,
   type AgentTarget,
   type SessionAgentTarget,
   createAgentSession,
@@ -33,9 +33,14 @@ import { rememberAgentTarget } from "./agent-targets";
 import { AgentSendFailure } from "./AgentSendFailure";
 import { AgentSessionPanel } from "./AgentSessionPanel";
 import { RunAgentDialog } from "./RunAgentDialog";
-import { fetchComments, PLAYGROUND_COMMENT_CONFIG } from "../comments/useComments";
+import { useProjectSession } from "./useProjectSession";
+import { fetchComments, PLAYGROUND_COMMENT_CONFIG, type AgentRunOptions } from "../comments/useComments";
 
 type AgentRunsContext = {
+  project?: string;
+  selectProject?: (project: string) => void;
+  savedRuntime?: AgentSessionRuntime;
+  ready: boolean;
   /** Sends a thread; `target` first points the thread's page at that session. */
   start: (comment: Comment, target?: AgentTarget) => Promise<void>;
   /** Menu entries for a comment's Assign menu. */
@@ -43,12 +48,16 @@ type AgentRunsContext = {
   /** The "sent to agent session" chip for a comment, or nothing. */
   renderRunDetails: (comment: Comment) => ReactNode;
   /** Settings and sessions, as last reported by the playground server. */
-  data: AgentSessionsFile | null;
+  data: AgentSessionsView | null;
   error: string | null;
   /** Opens the sessions panel, optionally focused on one captain session. */
   openPanel: (sessionId?: string) => void;
   /** The live captain session `page`'s threads go to; undefined for the playground session. */
   target: SessionAgentTarget | undefined;
+  /** Whether gavel delivers new human comments on `page` to its target as they are created. */
+  autoRun: boolean;
+  /** Switches `autoRun` for `page`; absent on routes that have no page. */
+  setAutoRun?: (enabled: boolean) => void;
   createSession: (project: string, runtime: AgentSessionRuntime) => Promise<void>;
   busy: boolean;
   changeSettings: (patch: Partial<AgentSessionSettings>) => void;
@@ -79,7 +88,7 @@ function describeError(cause: unknown): string {
 }
 
 function runAgentTitle(
-  data: AgentSessionsFile | null,
+  data: AgentSessionsView | null,
   target: SessionAgentTarget | undefined,
 ): string {
   if (target) return `Deliver this thread into the live captain session ${target.label}`;
@@ -98,14 +107,17 @@ function runAgentTitle(
 export function AgentRunsProvider({
   runAgent,
   page,
+  projectScope = false,
   children,
 }: {
-  runAgent: (id: string, runtime?: AgentSessionRuntime) => Promise<void>;
+  runAgent: (id: string, runtime?: AgentSessionRuntime, options?: AgentRunOptions) => Promise<void>;
   /** The page whose agent target "Run agent" describes and `setTarget` changes. */
   page?: string;
+  projectScope?: boolean;
   children: ReactNode;
 }) {
-  const [data, setData] = useState<AgentSessionsFile | null>(null);
+  const [data, setData] = useState<AgentSessionsView | null>(null);
+  const projectSession = useProjectSession(projectScope, page, data);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [panel, setPanel] = useState<{ focusSessionId: string | null } | null>(
     null,
@@ -138,7 +150,10 @@ export function AgentRunsProvider({
     };
   }, [refresh]);
 
-  const pageTarget = page ? data?.settings.targets?.[page] : undefined;
+  const pageRoute = page ? data?.pages[page] : undefined;
+  const selectedTarget = projectScope ? projectSession.target : pageRoute?.target;
+  const pageTarget = selectedTarget?.kind === "playground" ? undefined : selectedTarget;
+  const autoRun = pageRoute?.autoRun ?? false;
   // New and replacement sessions start with the configured runtime, so only a
   // playground without one needs the runtime dialog.
   const hasRuntime = data?.settings.runtime !== undefined;
@@ -146,33 +161,43 @@ export function AgentRunsProvider({
   const changePageTarget = useCallback(
     async (next: AgentTarget) => {
       if (!page) throw new Error("AgentRunsProvider has no page to set a target for");
-      await setPageAgentTarget(page, next);
+      await setPageAgentRoute(page, { target: next });
+      if (projectScope) projectSession.remember({ target: next });
       rememberAgentTarget(next);
       await refresh();
     },
-    [page, refresh],
+    [page, refresh, projectScope, projectSession],
   );
 
   const send = useCallback(
-    async (comment: Comment, runtime?: AgentSessionRuntime) => {
-      await runAgent(comment.id, runtime);
+    async (comment: Comment, options: { runtime?: AgentSessionRuntime; explicitTarget?: boolean; fresh?: boolean } = {}) => {
+      const { runtime, explicitTarget = false, fresh = false } = options;
+      if (projectScope && !explicitTarget && (!projectSession.ready || !pageTarget)) throw new Error("Choose an available project session before sending feedback");
+      await (fresh ? runAgent(comment.id, runtime, { fresh: true }) : runAgent(comment.id, runtime));
+      if (projectScope && runtime) projectSession.remember({ runtime });
       await refresh();
     },
-    [refresh, runAgent],
+    [refresh, runAgent, projectScope, projectSession, pageTarget],
   );
 
   const pointAt = useCallback(async (comment: Comment, next: AgentTarget) => {
     const commentPage = "page" in comment && typeof comment.page === "string" ? comment.page : page ?? (await fetchComments()).find(entry => entry.id === comment.id)?.page;
     if (!commentPage) throw new Error(`Cannot find the page for comment ${comment.id}`);
-    await setPageAgentTarget(commentPage, next);
+    await setPageAgentRoute(commentPage, { target: next });
+    if (projectScope) projectSession.remember({ target: next });
     rememberAgentTarget(next);
     await refresh();
-  }, [page, refresh]);
+  }, [page, refresh, projectScope, projectSession]);
 
   const retry = useCallback(async (comment: Comment, next?: AgentTarget) => {
     if (next) await pointAt(comment, next);
-    await send(comment);
+    await send(comment, { explicitTarget: !!next });
   }, [pointAt, send]);
+
+  /** A new playground-managed session for the thread; the page's route and target stay as they are. */
+  const retryFresh = useCallback((comment: Comment) => send(comment, { fresh: true }), [send]);
+  // A page that sends to a live session, or a project session, has no playground-managed run to restart.
+  const canRetryFresh = !projectScope && !pageTarget;
 
   const openDialog = useCallback((next: DialogTarget) => {
     setDialogError(null);
@@ -188,7 +213,7 @@ export function AgentRunsProvider({
         return;
       }
       try {
-        await send(comment);
+        await send(comment, { explicitTarget: !!next });
       } catch (cause) {
         const message = describeError(cause);
         // The runtime was cleared since the last poll; ask for one instead.
@@ -214,15 +239,21 @@ export function AgentRunsProvider({
   );
 
   const changeSettings = useCallback(
-    (patch: Partial<AgentSessionSettings>) => {
-      // Auto-run starts sessions on its own, so it needs a runtime first.
-      if (patch.autoRun && !hasRuntime) {
+    (patch: Partial<AgentSessionSettings>) => act(() => updateAgentSessionSettings(patch)),
+    [act],
+  );
+
+  const setAutoRun = useCallback(
+    (enabled: boolean) => {
+      if (!page) throw new Error("AgentRunsProvider has no page to set auto-run for");
+      // Auto-run on the playground agent starts sessions on its own, so it needs a runtime first.
+      if (enabled && !hasRuntime && !pageTarget) {
         openDialog({ mode: "configure", enableAutoRun: true });
         return;
       }
-      act(() => updateAgentSessionSettings(patch));
+      act(() => setPageAgentRoute(page, { autoRun: enabled }));
     },
-    [act, hasRuntime, openDialog],
+    [act, hasRuntime, openDialog, page, pageTarget],
   );
 
   const openPanel = useCallback(
@@ -232,19 +263,26 @@ export function AgentRunsProvider({
 
   const value = useMemo<AgentRunsContext>(
     () => ({
+      ready: projectSession.ready,
+      ...(projectScope ? { project: projectSession.project, selectProject: (project: string) => { try { projectSession.remember({ project }); } catch (cause) { setPanelError(describeError(cause)); } }, ...(projectSession.runtime ? { savedRuntime: projectSession.runtime } : {}) } : {}),
       data,
-      error: panelError,
+      error: projectSession.error ?? panelError,
       busy,
       changeSettings,
       configureRuntime: () => openDialog({ mode: "configure", enableAutoRun: false }),
       createSession: async (project, runtime) => {
         if (!page) throw new Error("Select a page before creating a session");
-        await createAgentSession({ page, project, runtime });
+        const result = await createAgentSession({ page, project, runtime });
+        const target = { kind: "managed" as const, sessionId: result.session.sessionId, label: result.session.label ?? result.session.sessionId };
+        if (projectScope) projectSession.remember({ project, runtime, target });
+        rememberAgentTarget(target);
         await refresh();
       },
       start,
       openPanel,
       target: pageTarget,
+      autoRun,
+      ...(page ? { setAutoRun } : {}),
       setTarget: changePageTarget,
       extraAssignItems: (comment) =>
         comment.parentId
@@ -265,11 +303,11 @@ export function AgentRunsProvider({
       renderRunDetails: (comment) =>
         comment.agentRun ? (
           <div className="px-1">
-            <AgentRunChip comment={comment} managedSessions={data?.sessions ?? []} onOpen={openPanel} onRetry={next => retry(comment, next)} />
+            <AgentRunChip comment={comment} managedSessions={data?.sessions ?? []} onOpen={openPanel} onRetry={next => retry(comment, next)} {...(canRetryFresh ? { onRetryFresh: () => retryFresh(comment) } : {})} />
           </div>
         ) : null,
     }),
-    [busy, changeSettings, openDialog, changePageTarget, data, panelError, hasRuntime, openPanel, pageTarget, retry, start, page, refresh],
+    [busy, changeSettings, openDialog, changePageTarget, data, panelError, hasRuntime, openPanel, pageTarget, autoRun, setAutoRun, retry, retryFresh, canRetryFresh, start, page, refresh, projectScope, projectSession],
   );
 
   const submitRuntime = (runtime: AgentSessionRuntime) => {
@@ -278,13 +316,13 @@ export function AgentRunsProvider({
     setDialogError(null);
     const work =
       target.mode === "run"
-        ? send(target.comment, runtime)
-        : updateAgentSessionSettings({
-            runtime,
-            ...(target.enableAutoRun ? { autoRun: true } : {}),
-          }).then(refresh);
+        ? send(target.comment, { runtime })
+        : updateAgentSessionSettings({ runtime })
+            .then(() => (target.enableAutoRun && page ? setPageAgentRoute(page, { autoRun: true }) : undefined))
+            .then(refresh);
     work.then(
       () => {
+        if (projectScope) projectSession.remember({ runtime });
         setTarget(null);
         setStarting(false);
       },
@@ -311,6 +349,7 @@ export function AgentRunsProvider({
           error={failedSend.error}
           {...(pageTarget ? { targetLabel: pageTarget.label } : {})}
           onRetry={next => retry(failedSend.comment, next)}
+          {...(canRetryFresh ? { onRetryFresh: () => retryFresh(failedSend.comment) } : {})}
           onClose={() => setFailedSend(null)}
           onOpen={openPanel}
         />
@@ -319,7 +358,7 @@ export function AgentRunsProvider({
         open={target !== null}
         mode={target?.mode ?? "run"}
         grouping={data?.settings.grouping ?? "shared"}
-        current={data?.settings.runtime}
+        current={projectSession.runtime ?? data?.settings.runtime}
         error={dialogError}
         busy={starting}
         onClose={() => setTarget(null)}

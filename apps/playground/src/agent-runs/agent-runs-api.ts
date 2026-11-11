@@ -3,9 +3,10 @@ import type {
   AgentSessionGrouping,
   AgentSessionRuntime,
   AgentSessionSettings,
-  AgentSessionsFile,
+  AgentSessionsView,
   AgentTarget,
   CaptainAgentTarget,
+  PageAgentRoute,
   SessionAgentTarget,
 } from "../../plugins/agent-session-store";
 import type { CaptainSessionOption } from "../../plugins/agent-runs-server";
@@ -16,9 +17,10 @@ export type {
   AgentSessionGrouping,
   AgentSessionRuntime,
   AgentSessionSettings,
-  AgentSessionsFile,
+  AgentSessionsView,
   AgentTarget,
   CaptainAgentTarget,
+  PageAgentRoute,
   SessionAgentTarget,
   CaptainSessionOption,
 };
@@ -37,7 +39,7 @@ export function createAgentSession(options: {
   page: string;
   project: string;
   runtime: AgentSessionRuntime;
-}): Promise<{ session: AgentSession; settings: AgentSessionSettings }> {
+}): Promise<{ session: AgentSession; route: PageAgentRoute }> {
   return request(`${AGENT_SESSIONS_ROUTE}/sessions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -49,9 +51,9 @@ export function agentSessionSrc(sessionId: string): string {
   return `${AGENT_PROXY_ROUTE}/sessions/${encodeURIComponent(sessionId)}`;
 }
 
-/** Settings plus every stored session, running ones verified against captain. */
-export function fetchAgentSessions(): Promise<AgentSessionsFile> {
-  return request<AgentSessionsFile>(AGENT_SESSIONS_ROUTE);
+/** Settings, every stored session (running ones verified against captain), and each page's gavel route. */
+export function fetchAgentSessions(): Promise<AgentSessionsView> {
+  return request<AgentSessionsView>(AGENT_SESSIONS_ROUTE);
 }
 
 export async function updateAgentSessionSettings(
@@ -76,20 +78,24 @@ export async function fetchCaptainSessions(page?: string): Promise<CaptainSessio
   return sessions;
 }
 
-/** Sends `page`'s threads to a live captain session, or back to the playground's own. */
-export async function setPageAgentTarget(
+/**
+ * Sets where `page`'s threads go (a live session, or the playground's own
+ * agent) and/or whether gavel delivers new comments there automatically. Both
+ * live in the one gavel route under the page's comment target.
+ */
+export async function setPageAgentRoute(
   page: string,
-  target: AgentTarget,
-): Promise<AgentSessionSettings> {
-  const { settings } = await request<{ settings: AgentSessionSettings }>(
+  change: { target?: AgentTarget; autoRun?: boolean },
+): Promise<PageAgentRoute> {
+  const { route } = await request<{ route: PageAgentRoute }>(
     `${AGENT_SESSIONS_ROUTE}/targets`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ page, target }),
+      body: JSON.stringify({ page, ...change }),
     },
   );
-  return settings;
+  return route;
 }
 
 export async function stopAgentSession(runId: string): Promise<void> {

@@ -15,7 +15,7 @@ export function CreateAgentSessionDialog({
   project: string;
   onClose: () => void;
 }) {
-  const { data, createSession } = useAgentRuns();
+  const { data, createSession, savedRuntime } = useAgentRuns();
   const [projects, setProjects] = useState<AgentProject[]>([]);
   const [project, setProject] = useState(initialProject);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +52,7 @@ export function CreateAgentSessionDialog({
       open
       mode="create"
       grouping="page"
-      current={data?.settings.runtime}
+      current={savedRuntime ?? data?.settings.runtime}
       error={error}
       busy={busy}
       onRun={(runtime) => void submit(runtime)}

@@ -7,6 +7,27 @@ import { PageReloadProvider } from "../page-reload";
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("feedback loading scope", () => {
+  it("shows a pending root immediately and replaces it with the server result", async () => {
+    let complete!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => init?.method === "POST" ? new Promise<Response>(resolve => { complete = resolve; }) : Promise.resolve(Response.json({ comments: [] }))));
+    const { result } = renderHook(() => useComments("optimistic", { current: null }, { capture: async () => ({ source: "optimistic.tsx", html: "<p>Target</p>" }) }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    let posting!: Promise<void>;
+    act(() => { posting = result.current.create({ body: "Check alignment" }); });
+    expect(result.current.comments).toMatchObject([{ body: "Check alignment", submission: { state: "sending" } }]);
+    await waitFor(() => expect(complete).toBeTypeOf("function"));
+    const saved = { id: "saved-root", body: "Check alignment", createdAt: "2026-01-01T00:00:00Z", author: null };
+    await act(async () => { complete(Response.json(saved)); await posting; });
+    expect(result.current.comments).toEqual([saved]);
+  });
+
+  it("retains a failed optimistic root with its content and error", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => init?.method === "POST" ? Response.json({ error: "Storage unavailable" }, { status: 503 }) : Response.json({ comments: [] })));
+    const { result } = renderHook(() => useComments("optimistic", { current: null }, { capture: async () => ({ source: "optimistic.tsx", html: "<p>Target</p>" }) }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { await expect(result.current.create({ body: "Keep this draft" })).rejects.toThrow(); });
+    expect(result.current.comments).toMatchObject([{ body: "Keep this draft", submission: { state: "failed", error: "Storage unavailable" } }]);
+  });
   it.each(["element", "frame"])("posts a %s review decision before reloading through the host callback", async (mode) => {
     const source = "export default () => <div />;";
     const fetcher = vi.fn(async (url: string, init?: RequestInit) => Response.json(

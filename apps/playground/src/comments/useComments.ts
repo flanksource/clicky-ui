@@ -36,6 +36,7 @@ import { captureScreenshot } from "./screenshot";
 
 import { pageSourcePath } from "../documents/review-target";
 import { usePageReload } from "../page-reload";
+import { beginEditWrite } from "../visual-edit/edit-state";
 
 export const COMMENTS_ROUTE = "/__playground/comments";
 
@@ -150,6 +151,11 @@ export async function fetchComments(
     : comment);
 }
 
+export type AgentRunOptions = {
+  /** Start a new playground-managed session instead of reusing the page's; refused for a page that sends to a live session. */
+  fresh?: boolean;
+};
+
 export type PlaygroundComments = {
   comments: PlaygroundComment[];
   allComments: PageComment[];
@@ -178,7 +184,7 @@ export type PlaygroundComments = {
    * Send a thread to the shared agent session. `runtime` is required only when
    * no session is live, in which case it starts one.
    */
-  runAgent: (id: string, runtime?: AgentSessionRuntime) => Promise<void>;
+  runAgent: (id: string, runtime?: AgentSessionRuntime, options?: AgentRunOptions) => Promise<void>;
   commentAndReopen: (id: string, body: string) => Promise<void>;
   updateRating: (id: string, rating: CommentRating) => Promise<void>;
   remove: (id: string) => Promise<void>;
@@ -209,6 +215,10 @@ export function useComments(
   const [allComments, setAllComments] = useState<PageComment[]>([]);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
+  const [outbox, setOutbox] = useState<PageComment[]>([]);
+  const [hiddenRoots, setHiddenRoots] = useState<Set<string>>(new Set());
+  const posting = useRef(0);
+  const mutationVersion = useRef(0);
   const preparedSelection = useRef<{
     page: string;
     anchor: string;
@@ -248,12 +258,14 @@ export function useComments(
 
   const refresh = useCallback(async () => {
     if (!enabled) return;
+    const version = mutationVersion.current;
     try {
       const [pageComments, everyComment] = await Promise.all([
         page === "" ? Promise.resolve([]) : fetchComments({ page }),
         options.all ? fetchComments() : Promise.resolve([]),
       ]);
       if (scopeRef.current !== scope) return;
+      if (posting.current > 0 || version !== mutationVersion.current) return;
       setComments((previous) => JSON.stringify(previous) === JSON.stringify(pageComments) ? previous : pageComments);
       const selected = options.all ? everyComment : pageComments;
       setAllComments((previous) => JSON.stringify(previous) === JSON.stringify(selected) ? previous : selected);
@@ -287,6 +299,19 @@ export function useComments(
       window.removeEventListener("focus", update);
     };
   }, [enabled, options.poll, refresh]);
+  useEffect(() => {
+    const update = () => { void refresh(); };
+    window.addEventListener("playground-feedback-updated", update);
+    return () => window.removeEventListener("playground-feedback-updated", update);
+  }, [refresh]);
+  useEffect(() => {
+    const update = (event: Event) => {
+      const { ids, hidden } = (event as CustomEvent<{ ids: string[]; hidden: boolean }>).detail;
+      setHiddenRoots(previous => { const next = new Set(previous); for (const id of ids) { if (hidden) next.add(id); else next.delete(id); } return next; });
+    };
+    window.addEventListener("playground-feedback-visibility", update);
+    return () => window.removeEventListener("playground-feedback-visibility", update);
+  }, []);
 
   const mutate = useCallback(
     async (
@@ -301,7 +326,7 @@ export function useComments(
 
   const post = useCallback(
     (url: string, payload: Record<string, unknown>) =>
-      request(url, {
+      request<PlaygroundComment>(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -309,9 +334,10 @@ export function useComments(
     [],
   );
 
-  const create = useCallback(
+  const persistCreate = useCallback(
     (input: PlaygroundCommentCreateInput, actionId = "plain") =>
-      mutate(
+      (async () => {
+        const result = await (
         async () => {
           if (actionId !== "plain" && actionId !== "screenshot") {
             throw new Error(
@@ -326,7 +352,8 @@ export function useComments(
           }
           if (captureRef.current) {
             const element = await captureRef.current(input, actionId);
-            await post(COMMENTS_ROUTE, {
+            if (actionId === "screenshot" && element.screenshot?.status !== "captured") throw new Error("Screenshot could not be captured; the comment was not sent");
+            const saved = await post(COMMENTS_ROUTE, {
               page,
               body: input.body,
               author: PLAYGROUND_COMMENT_AUTHOR,
@@ -338,7 +365,7 @@ export function useComments(
               element,
             });
             if (input.reviewDecision) await reload({ reason: "review", page });
-            return;
+            return saved;
           }
           const anchor = input.anchor ?? null;
           const content = contentRef.current;
@@ -383,13 +410,14 @@ export function useComments(
                 });
           const capturedContext = await context;
           const capturedScreenshot = await screenshot;
+          if (actionId === "screenshot" && capturedScreenshot?.status !== "captured") throw new Error("Screenshot could not be captured; the comment was not sent");
           const element: CommentElementCaptureContext = {
             ...capturedContext,
             ...(page.startsWith("document:") ? { source: pageSourcePath(page) } : {}),
             ...(capturedScreenshot ? { screenshot: capturedScreenshot } : {}),
           };
 
-          await post(COMMENTS_ROUTE, {
+          const saved = await post(COMMENTS_ROUTE, {
             page,
             body: input.body,
             author: PLAYGROUND_COMMENT_AUTHOR,
@@ -407,10 +435,42 @@ export function useComments(
           if (preparedSelection.current === prepared) {
             preparedSelection.current = null;
           }
-        },
-      ),
-    [contentRef, mutate, page, post, reload],
+          return saved;
+        })();
+        await refresh();
+        window.dispatchEvent(new Event("playground-feedback-updated"));
+        return result;
+      })(),
+    [contentRef, page, post, reload, refresh],
   );
+
+  const create = useCallback(async (input: PlaygroundCommentCreateInput, actionId = "plain") => {
+    if (input.reviewDecision || input.styleEdit) { await persistCreate(input, actionId); return; }
+    const id = `pending-${crypto.randomUUID()}`;
+    const entry: PageComment = { ...input, id, page, createdAt: new Date().toISOString(), author: PLAYGROUND_COMMENT_AUTHOR, submission: { state: "sending" } };
+    setOutbox(previous => [...previous, entry]);
+    posting.current++;
+    mutationVersion.current++;
+    const finish = beginEditWrite();
+    try {
+      const saved = await persistCreate(input, actionId);
+      posting.current--;
+      mutationVersion.current++;
+      if (scopeRef.current === scope) {
+        setComments(previous => [...previous.filter(comment => comment.id !== saved.id), saved]);
+        setAllComments(previous => [...previous.filter(comment => comment.id !== saved.id), { ...saved, page }]);
+      }
+      setOutbox(previous => previous.filter(comment => comment.id !== id));
+      finish();
+    } catch (cause) {
+      posting.current--;
+      mutationVersion.current++;
+      const message = describeError(cause);
+      setOutbox(previous => previous.map(comment => comment.id === id ? { ...comment, submission: { state: "failed", error: message } } : comment));
+      finish(cause);
+      throw cause;
+    }
+  }, [page, persistCreate, scope]);
 
   const reply = useCallback(
     (input: CommentReplyInput) =>
@@ -490,12 +550,13 @@ export function useComments(
   );
 
   const runAgent = useCallback(
-    (id: string, runtime?: AgentSessionRuntime) =>
+    (id: string, runtime?: AgentSessionRuntime, options?: AgentRunOptions) =>
       mutate(
         () =>
           post(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}/agent-run`, {
             author: PLAYGROUND_COMMENT_AUTHOR,
             ...(runtime ? { runtime } : {}),
+            ...(options?.fresh ? { fresh: true } : {}),
           }),
       ),
     [mutate, post],
@@ -536,8 +597,8 @@ export function useComments(
   );
 
   return {
-    comments,
-    allComments,
+    comments: [...comments, ...outbox.filter(comment => comment.page === page)].filter(comment => !hiddenRoots.has(comment.id) && !hiddenRoots.has(comment.parentId ?? "")),
+    allComments: [...allComments, ...outbox.filter(comment => options.all || comment.page === page)].filter(comment => !hiddenRoots.has(comment.id) && !hiddenRoots.has(comment.parentId ?? "")),
     loading: loading || (enabled && loadedScope !== scope && error === null),
     error,
     create,

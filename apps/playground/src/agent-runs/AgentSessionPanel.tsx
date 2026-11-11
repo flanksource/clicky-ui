@@ -15,7 +15,7 @@ import { RuntimeIdentity } from "./RuntimeIdentity";
 import {
   agentSessionSrc,
   type AgentSession,
-  type AgentSessionsFile,
+  type AgentSessionsView,
 } from "./agent-runs-api";
 
 const STATE_TONE: Record<AgentSession["state"], BadgeTone> = {
@@ -155,7 +155,7 @@ export function AgentSessionPanel({
 }: {
   open: boolean;
   page?: string;
-  data: AgentSessionsFile | null;
+  data: AgentSessionsView | null;
   /** Session to select when the panel opens, e.g. from a thread's chip. */
   focusSessionId: string | null;
   error: string | null;

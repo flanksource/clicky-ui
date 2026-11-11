@@ -2,22 +2,20 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Button, Modal } from "@flanksource/clicky-ui";
 import {
   SpecRuntimeBar,
-  compactAISpecRuntime,
-  familiesFromRuntimeCatalog,
   type AISpecRuntimeValue,
-  type SpecRuntimeFamily,
 } from "@flanksource/clicky-ui/ai";
-import type { ChatModel } from "@flanksource/clicky-ui/chat";
 
 import type {
   AgentSessionGrouping,
   AgentSessionRuntime,
 } from "./agent-runs-api";
+import { fetchModelCatalog, fetchRuntimeCatalog } from "./runtime-catalog";
 import {
-  availableRuntimeCatalog,
-  fetchModelCatalog,
-  fetchRuntimeCatalog,
-} from "./runtime-catalog";
+  agentRuntimeFamilies,
+  runtimeOfSpecValue,
+  specValueOfRuntime,
+  type RuntimeCatalog,
+} from "./runtime-families";
 
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
@@ -61,21 +59,6 @@ function intro(
     : "No agent session is running. This starts the playground's one shared session; later comments are sent into it.";
 }
 
-type Catalog = { families: SpecRuntimeFamily[]; models: ChatModel[] };
-
-/** The configured runtime when it is still offered, else the first agent runtime's default. */
-function initialValue(
-  families: SpecRuntimeFamily[],
-  current: AgentSessionRuntime | undefined,
-): AISpecRuntimeValue {
-  if (current) return current.spec as AISpecRuntimeValue;
-  const mode = families[0]?.modes[0];
-  return {
-    mode: "agent",
-    ...(mode?.defaultModel ? { model: mode.defaultModel } : {}),
-  };
-}
-
 function RuntimeChooser({
   catalog,
   current,
@@ -86,7 +69,7 @@ function RuntimeChooser({
   onRun,
   onCancel,
 }: {
-  catalog: Catalog;
+  catalog: RuntimeCatalog;
   current: AgentSessionRuntime | undefined;
   mode: RunAgentDialogMode;
   grouping: AgentSessionGrouping;
@@ -96,10 +79,9 @@ function RuntimeChooser({
   onCancel: () => void;
 }) {
   const [value, setValue] = useState<AISpecRuntimeValue>(() =>
-    initialValue(catalog.families, current),
+    specValueOfRuntime(catalog.families, current),
   );
-  const spec = compactAISpecRuntime(value);
-  const model = spec.model;
+  const chosen = runtimeOfSpecValue(value, current?.presets);
 
   return (
     <div className="space-y-4 text-sm">
@@ -123,9 +105,9 @@ function RuntimeChooser({
           Cancel
         </Button>
         <Button
-          disabled={busy || !model}
+          disabled={busy || !chosen}
           onClick={() => {
-            if (model) onRun({ spec: { ...spec, model } });
+            if (chosen) onRun(chosen);
           }}
         >
           {busy ? COPY[mode].busy : COPY[mode].submit}
@@ -163,7 +145,7 @@ export function RunAgentDialog({
   fields?: ReactNode;
   canSubmit?: boolean;
 }) {
-  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [catalog, setCatalog] = useState<RuntimeCatalog | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -171,15 +153,8 @@ export function RunAgentDialog({
     setCatalog(null);
     setLoadError(null);
     Promise.all([fetchRuntimeCatalog(), fetchModelCatalog()]).then(
-      ([runtimes, models]) => {
-        const agents = availableRuntimeCatalog(runtimes, { mode: "agent" });
-        setCatalog({
-          // familiesFromRuntimeCatalog falls back to built-in families for an
-          // empty list, so an empty agent catalog must stay empty here.
-          families: agents.length ? familiesFromRuntimeCatalog(agents) : [],
-          models,
-        });
-      },
+      ([runtimes, models]) =>
+        setCatalog({ families: agentRuntimeFamilies(runtimes), models }),
       (cause: unknown) => setLoadError(describeError(cause)),
     );
   }, [open]);

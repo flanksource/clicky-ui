@@ -22,7 +22,7 @@ function runTone(state: AgentRun["state"]) {
  * its error details; otherwise a playground session opens its panel, and a
  * captain target (not one of the playground's sessions) is a plain label.
  */
-export function AgentRunChip({ comment, onOpen, onRetry, managedSessions = [] }: { comment: Comment; onOpen: (sessionId?: string) => void; onRetry: (target?: AgentTarget) => Promise<void>; managedSessions?: AgentSession[] }) {
+export function AgentRunChip({ comment, onOpen, onRetry, onRetryFresh, managedSessions = [] }: { comment: Comment; onOpen: (sessionId?: string) => void; onRetry: (target?: AgentTarget) => Promise<void>; onRetryFresh?: () => Promise<void>; managedSessions?: AgentSession[] }) {
   const [showFailure, setShowFailure] = useState(false);
   const run = comment.agentRun;
   if (!run) return null;
@@ -50,6 +50,7 @@ export function AgentRunChip({ comment, onOpen, onRetry, managedSessions = [] }:
             comment={comment}
             error={run.error ?? "The hand-off failed without recording an error."}
             onRetry={onRetry}
+            {...(onRetryFresh ? { onRetryFresh } : {})}
             onClose={() => setShowFailure(false)}
             onOpen={onOpen}
           />

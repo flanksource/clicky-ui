@@ -12,7 +12,7 @@ export function RunningSessionBars({ page }: { page: string }) {
   const visible = new Map<string, CaptainSessionOption>();
   for (const session of sessions ?? []) visible.set(session.captainId ?? session.id, session);
   for (const session of data?.sessions ?? []) {
-    const targeted = Object.entries(data?.settings.targets ?? {}).some(([key, target]) => pageInSessionScope(key, page) && target.sessionId === session.sessionId);
+    const targeted = Object.entries(data?.pages ?? {}).some(([key, route]) => route.target.kind !== "playground" && pageInSessionScope(key, page) && route.target.sessionId === session.sessionId);
     if (session.state !== "running" || !(targeted || (session.page ? pageInSessionScope(session.page, page) : session.purpose !== "target" && data?.settings.grouping === "shared"))) continue;
     if ([...visible.values()].some(live => live.id === session.sessionId || live.captainId === session.sessionId)) continue;
     visible.set(session.sessionId, {

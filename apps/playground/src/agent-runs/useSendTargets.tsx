@@ -6,9 +6,10 @@ import { RuntimeIdentity } from "./RuntimeIdentity";
 import { useCaptainSessions } from "./useCaptainSessions";
 
 /** "Send to …" menu entries: the playground agent, running managed sessions and live captain sessions. */
-export function useSendTargets({ managedSessions, onSelect }: { managedSessions: AgentSession[]; onSelect: (target: AgentTarget) => void }) {
+export function useSendTargets({ managedSessions, onSelect, onFresh }: { managedSessions: AgentSession[]; onSelect: (target: AgentTarget) => void; onFresh?: () => void }) {
   const { sessions, error } = useCaptainSessions();
   const items: DropdownMenuItem[] = [
+    ...(onFresh ? [{ label: "Retry in a new session", title: "Start a new playground session for this thread instead of reusing the page's", onSelect: onFresh } satisfies DropdownMenuItem] : []),
     { label: "Send to Playground agent", onSelect: () => onSelect({ kind: "playground" }) },
     ...managedSessions.filter(session => session.purpose === "target" && session.state === "running").map(session => ({ label: <span className="flex items-center gap-2">Send to {session.label}<RuntimeIdentity runtime={session.runtime} /></span>, onSelect: () => onSelect({ kind: "managed", sessionId: session.sessionId, label: session.label! }) })),
     ...(sessions ?? []).map(session => ({ label: <span className="flex items-center gap-2">Send to {captainAgentTarget(session).label}<AgentIdentity {...(session.model ? { model: session.model } : { provider: session.source })} /></span>, title: session.cwd ?? session.id, onSelect: () => onSelect(captainAgentTarget(session)) })),

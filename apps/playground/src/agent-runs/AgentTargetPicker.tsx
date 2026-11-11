@@ -14,7 +14,7 @@ import {
 import { CreateAgentSessionDialog } from "./CreateAgentSessionDialog";
 import { AgentIdentity, shortContextModelName } from "@flanksource/clicky-ui/chat";
 
-import { type AgentTarget, type CaptainSessionOption } from "./agent-runs-api";
+import { fetchAgentProjects, type AgentProject, type AgentTarget, type CaptainSessionOption } from "./agent-runs-api";
 import { useAgentRuns } from "./AgentRunsProvider";
 import { captainAgentTarget, rememberedAgentTarget } from "./agent-targets";
 import { useCaptainSessions } from "./useCaptainSessions";
@@ -33,11 +33,19 @@ function sessionDescription(session: CaptainSessionOption): string {
  * user already runs), which captain delivers into through its own channel.
  */
 export function AgentTargetPicker() {
-  const { data, target, setTarget } = useAgentRuns();
+  const { data, target, setTarget, project: savedProject, selectProject } = useAgentRuns();
   const { sessions, error: loadError } = useCaptainSessions();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [project, setProject] = useState("");
+  const [projectFilter, setProject] = useState("");
+  const project = savedProject ?? projectFilter;
+  const [projects, setProjects] = useState<AgentProject[]>([]);
+  useEffect(() => {
+    if (!selectProject) return;
+    let active = true;
+    fetchAgentProjects().then(result => { if (active) setProjects(result.projects); }).catch((cause: unknown) => { if (active) setError(String(cause)); });
+    return () => { active = false; };
+  }, [Boolean(selectProject)]);
   const [agent, setAgent] = useState("");
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
@@ -160,7 +168,7 @@ export function AgentTargetPicker() {
   // A page nobody pointed anywhere yet starts on the session last chosen for any page, while it is live.
   const restored = useRef(false);
   useEffect(() => {
-    if (restored.current || data === null || sessions === null) return;
+    if (selectProject || restored.current || data === null || sessions === null) return;
     restored.current = true;
     if (target !== undefined) return;
     try {
@@ -186,12 +194,12 @@ export function AgentTargetPicker() {
                 <Select
                   aria-label="Filter sessions by project"
                   value={project}
-                  onChange={(event) => setProject(event.target.value)}
+                  onChange={(event) => selectProject ? selectProject(event.target.value) : setProject(event.target.value)}
                   options={[
-                    { value: "", label: "All projects" },
+                    ...(selectProject ? projects.map(entry => ({ value: entry.path, label: entry.label })) : [{ value: "", label: "All projects" }]),
                     ...Array.from(
                       new Set(
-                        live.flatMap((entry) => (entry.cwd ? [entry.cwd] : [])),
+                        live.flatMap((entry) => (!selectProject && entry.cwd ? [entry.cwd] : [])),
                       ),
                     )
                       .sort()

@@ -28,10 +28,10 @@ import { UiRefresh, UiStack } from "@flanksource/clicky-ui/icons";
 import type { CommentElementCaptureContext } from "../../plugins/comments-model";
 import { ApiError } from "../comments/useComments";
 import {
-  availableRuntimeCatalog,
   fetchModelCatalog,
   fetchRuntimeCatalog,
 } from "../agent-runs/runtime-catalog";
+import { availableRuntimeCatalog } from "../agent-runs/runtime-families";
 import {
   fetchPrompt,
   fetchPrompts,

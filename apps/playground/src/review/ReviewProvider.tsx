@@ -34,6 +34,8 @@ import {
 import { writeClipboard } from "../comments/clipboard";
 import { LIVE_SERVER } from "../live-server";
 import { usePageReload } from "../page-reload";
+import { EditingScope, setRemoved } from "@flanksource/page-runtime/editing";
+import { beginEditWrite } from "../visual-edit/edit-state";
 import { useBrowserSession } from "../browser-mode/session";
 import { FrameReviewProvider } from "../browser-mode/FrameReviewProvider";
 import { request } from "../comments/useComments";
@@ -248,6 +250,7 @@ function LocalReviewProvider({
     if (kind !== "delete" && !draft.trim()) return;
     setBusy(true);
     setDialogError(null);
+    const finish = kind === "delete" ? beginEditWrite() : null;
     try {
       if (sourceDirty) throw new Error("Save or revert the source before reviewing an element");
       if (kind === "delete") {
@@ -270,13 +273,18 @@ function LocalReviewProvider({
             return target !== null && element.contains(target);
           })
           .map((comment) => comment.id);
-        await mutateSource("DELETE", {
+        setRemoved(`review:${page}:${id}`, true);
+        window.dispatchEvent(new CustomEvent("playground-feedback-visibility", { detail: { ids: associatedCommentIds, hidden: true } }));
+        try { await mutateSource("DELETE", {
           slug: page,
           reviewId: id,
           associatedCommentIds,
           expectedSource: await sourceRequest(page),
         });
-        await reload({ reason: "review", page });
+        } catch (cause) { setRemoved(`review:${page}:${id}`, false); window.dispatchEvent(new CustomEvent("playground-feedback-visibility", { detail: { ids: associatedCommentIds, hidden: false } })); throw cause; }
+        setPending(null);
+        window.dispatchEvent(new Event("playground-feedback-updated"));
+        finish?.();
       } else {
         await context.callbacks.onCreate?.({
           anchor: anchorFor(id),
@@ -287,6 +295,7 @@ function LocalReviewProvider({
         setDraft("");
       }
     } catch (cause) {
+      finish?.(cause);
       setDialogError(cause);
     } finally {
       setBusy(false);
@@ -413,7 +422,7 @@ function LocalReviewProvider({
   }, []);
 
   return (
-    <>
+    <EditingScope scope={page}>
       {children}
       {active && (
         <div
@@ -559,6 +568,6 @@ function LocalReviewProvider({
           </label>
         )}
       </Modal>
-    </>
+    </EditingScope>
   );
 }

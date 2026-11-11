@@ -2,9 +2,8 @@ import { useEffect, useRef, type RefObject } from "react";
 import { commentPlugin, type ContextMenuActionContext } from "@flanksource/react-grab";
 
 import type { CommentScreenshotCapture } from "../../plugins/comments-model";
-import { writeClipboard } from "./clipboard";
-import { copyContextMarkdown } from "./copy-context";
 import { commentAnchor, commentTarget } from "./dom-anchor";
+import { grabberPlugin, registerGrabberPlugin } from "./react-grab-actions";
 import { captureScreenshot, screenshotCaptureSupported } from "./screenshot";
 
 type Selection = {
@@ -24,9 +23,7 @@ export function useReactGrabComments(options: {
   current.current = options;
 
   useEffect(() => {
-    let registered = false;
-    let hadCommentPlugin = false;
-    let previousDefaultAction: string | undefined;
+    let unregister: (() => void) | undefined;
 
     const anchorOf = (element: Element) => {
       const { contentRef, enabled } = current.current;
@@ -49,90 +46,37 @@ export function useReactGrabComments(options: {
       context.cleanup();
       return { anchor, element: commentTarget(context.element, content) };
     };
-    const select = (
-      context: ContextMenuActionContext,
-      withScreenshot: boolean,
-    ) => {
-      const selection = selectionFor(context);
-      current.current.onSelect({
-        ...selection,
-        ...(withScreenshot
-          ? { screenshot: captureScreenshot(selection.element) }
-          : {}),
-      });
-    };
-    // copyScreenshot puts the element's PNG and its copy context on the
-    // clipboard as one item. Everything starts synchronously, inside the
-    // action's gesture, which both getDisplayMedia and the clipboard require.
-    const copyScreenshot = (context: ContextMenuActionContext) => {
-      const text = copyContextMarkdown([context.element]);
-      context.hideContextMenu();
-      context.cleanup();
-      const image = captureScreenshot(context.element).then((capture) => {
-        if (capture.status !== "captured") {
-          throw new Error(`screenshot ${capture.reason}`);
-        }
-        return fetch(capture.dataUrl).then((response) => response.blob());
-      });
-      writeClipboard(text, image).catch((error: unknown) => {
-        console.error("[playground] Copy screenshot failed:", error);
-      });
-    };
+    const plugin = grabberPlugin({
+      enabled,
+      captureSupported: screenshotCaptureSupported,
+      capture: captureScreenshot,
+      onComment: (context, { screenshot }) => {
+        const selection = selectionFor(context);
+        current.current.onSelect({
+          ...selection,
+          ...(screenshot ? { screenshot: captureScreenshot(selection.element) } : {}),
+        });
+      },
+      extraActions: [
+        {
+          id: "playground-prompt",
+          label: "Prompt…",
+          enabled,
+          onAction: (context) => current.current.onPrompt(selectionFor(context)),
+        },
+      ],
+    });
     const register = () => {
       const grab = window.__REACT_GRAB__;
-      if (!grab || registered) return;
-      hadCommentPlugin = grab.getPlugins().includes("comment");
-      previousDefaultAction = grab.getToolbarState()?.defaultAction;
-      if (hadCommentPlugin) grab.unregisterPlugin("comment");
-      grab.registerPlugin({
-        name: "playground-comments",
-        hooks: {
-          transformCopyContent: (_content, elements) =>
-            copyContextMarkdown(elements),
-        },
-        actions: [
-          {
-            id: "playground-copy-screenshot",
-            label: "Copy screenshot",
-            enabled: screenshotCaptureSupported,
-            onAction: copyScreenshot,
-          },
-          {
-            id: "comment",
-            label: "Comment",
-            enabled,
-            onAction: (context) => select(context, false),
-          },
-          {
-            id: "playground-comment-screenshot",
-            label: "Comment with screenshot",
-            enabled: (context) =>
-              screenshotCaptureSupported() && enabled(context),
-            onAction: (context) => select(context, true),
-          },
-          {
-            id: "playground-prompt",
-            label: "Prompt…",
-            enabled,
-            onAction: (context) =>
-              current.current.onPrompt(selectionFor(context)),
-          },
-        ],
-      });
-      grab.setToolbarState({ defaultAction: "comment" });
-      registered = true;
+      if (!grab || unregister) return;
+      unregister = registerGrabberPlugin({ grab, plugin, comment: commentPlugin });
     };
 
     window.addEventListener("react-grab:init", register);
     register();
     return () => {
       window.removeEventListener("react-grab:init", register);
-      if (!registered) return;
-      const grab = window.__REACT_GRAB__;
-      if (!grab) return;
-      grab.unregisterPlugin("playground-comments");
-      if (hadCommentPlugin) grab.registerPlugin(commentPlugin);
-      grab.setToolbarState({ defaultAction: previousDefaultAction ?? "copy" });
+      unregister?.();
     };
   }, []);
 }

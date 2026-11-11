@@ -3,12 +3,14 @@ import { Button, ErrorDetails, Modal, SplitButton, type Comment } from "@flankso
 import type { AgentTarget, AgentSession } from "./agent-runs-api";
 import { useSendTargets } from "./useSendTargets";
 
-export function AgentSendFailure({ comment, error, targetLabel, onRetry, onClose, onOpen, managedSessions = [] }: {
+export function AgentSendFailure({ comment, error, targetLabel, onRetry, onRetryFresh, onClose, onOpen, managedSessions = [] }: {
   managedSessions?: AgentSession[];
   comment: Comment;
   error: string;
   targetLabel?: string;
   onRetry: (target?: AgentTarget) => Promise<void>;
+  /** Present only where a new playground-managed session can be started for the thread. */
+  onRetryFresh?: () => Promise<void>;
   onClose: () => void;
   onOpen: (sessionId?: string) => void;
 }) {
@@ -20,14 +22,11 @@ export function AgentSendFailure({ comment, error, targetLabel, onRetry, onClose
   const detail = retryError ?? error;
   const reason = /failed \(exit \d+\): ([^\r\n]+)$/.exec(detail)?.[1] ?? detail;
 
-  const retry = async (next?: AgentTarget) => {
+  const attempt = async (work: () => Promise<void>) => {
     setSending(true);
     setRetryError(null);
-    if (next) setRetryTarget(next);
-    const destination = next ?? retryTarget;
     try {
-      if (destination) await onRetry(destination);
-      else await onRetry();
+      await work();
       onClose();
     } catch (cause) {
       setRetryError(cause instanceof Error ? cause.message : String(cause));
@@ -35,7 +34,16 @@ export function AgentSendFailure({ comment, error, targetLabel, onRetry, onClose
       setSending(false);
     }
   };
-  const { items: targets, error: sessionsError, loading: sessionsLoading } = useSendTargets({ managedSessions, onSelect: next => void retry(next) });
+  const retry = (next?: AgentTarget) => {
+    if (next) setRetryTarget(next);
+    const destination = next ?? retryTarget;
+    return attempt(() => (destination ? onRetry(destination) : onRetry()));
+  };
+  const { items: targets, error: sessionsError, loading: sessionsLoading } = useSendTargets({
+    managedSessions,
+    onSelect: next => void retry(next),
+    ...(onRetryFresh ? { onFresh: () => void attempt(onRetryFresh) } : {}),
+  });
 
   return (
     <Modal

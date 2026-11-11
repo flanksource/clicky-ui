@@ -21,7 +21,7 @@ function ReviewHarness() {
 
 describe("review submission failures", () => {
   afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
-  it("reloads the frame after deleting reviewable source", async () => {
+  it("deletes reviewable source without reloading", async () => {
     vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
     vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue(Object.assign([new DOMRect(0, 0, 100, 100)], { item: () => null }));
     const fetcher = vi.fn(async () => Response.json({ source: "export default () => null;" }));
@@ -31,7 +31,8 @@ describe("review submission failures", () => {
     fireEvent.click(await screen.findByRole("button", { name: `Delete ${REVIEW_ID}` }));
     const dialog = within(screen.getByRole("dialog"));
     fireEvent.click(dialog.getByRole("button", { name: "Delete source and feedback" }));
-    await vi.waitFor(() => expect(reload).toHaveBeenCalledExactlyOnceWith({ reason: "review", page: "flanksource/facet-diagrams" }));
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(reload).not.toHaveBeenCalled();
     expect(fetcher).toHaveBeenCalledWith("/__playground/sources/reviewables", expect.objectContaining({ method: "DELETE" }));
   });
   it("keeps copyable failure details and the draft inside the review dialog", async () => {

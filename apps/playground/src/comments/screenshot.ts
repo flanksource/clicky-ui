@@ -2,6 +2,7 @@ import type {
   CommentScreenshotCapture,
   CommentScreenshotUnavailableReason,
 } from "../../plugins/comments-model";
+import { viewportCrop, type HostViewportRect, type ScreenshotTarget } from "./screenshot-viewport";
 
 type CapturedTabTrack = MediaStreamTrack & {
   getCaptureHandle?: () => { handle: string } | null;
@@ -21,11 +22,7 @@ let captureHandle: string | undefined;
 let captureVersion = 0;
 const CAPTURE_TIMEOUT_MS = 10_000;
 
-export type HostViewportRect = { x: number; y: number; width: number; height: number };
-export type ScreenshotTarget = {
-  rect: HostViewportRect;
-  isLive: () => boolean;
-};
+export type { HostViewportRect, ScreenshotTarget } from "./screenshot-viewport";
 
 function stopStream(stream: MediaStream): void {
   stream.getTracks().forEach((track) => track.stop());
@@ -125,7 +122,8 @@ export function releaseScreenshotCapture(): void {
   pendingDisplayStream = undefined;
 }
 
-function nextPaint(): Promise<void> {
+/** Resolves once the browser has painted what the DOM looks like now. */
+export function nextPaint(): Promise<void> {
   return new Promise((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
   });
@@ -134,32 +132,12 @@ function nextPaint(): Promise<void> {
 function frameRectForElement(
   video: HTMLVideoElement,
   target: Element | ScreenshotTarget,
-): { x: number; y: number; width: number; height: number } {
-  const bounds = "rect" in target ? target.rect : target.getBoundingClientRect();
-  const live = "rect" in target ? target.isLive() : target.isConnected;
-  if (!live || !Object.values({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }).every(Number.isFinite) || bounds.width <= 0 || bounds.height <= 0) {
-    throw new Error("selected element is no longer visible");
-  }
-  if (!video.videoWidth || !video.videoHeight) {
-    throw new Error("captured tab has no video frame");
-  }
-  const scaleX = video.videoWidth / window.innerWidth;
-  const scaleY = video.videoHeight / window.innerHeight;
-  if (
-    !Number.isFinite(scaleX) ||
-    !Number.isFinite(scaleY) ||
-    Math.abs(scaleX - scaleY) > Math.max(scaleX, scaleY) * 0.02
-  ) {
-    throw new Error("captured tab has invalid viewport dimensions");
-  }
-  const x = Math.max(0, Math.floor(bounds.x * scaleX));
-  const y = Math.max(0, Math.floor(bounds.y * scaleY));
-  const right = Math.min(video.videoWidth, Math.ceil((bounds.x + bounds.width) * scaleX));
-  const bottom = Math.min(video.videoHeight, Math.ceil((bounds.y + bounds.height) * scaleY));
-  if (right <= x || bottom <= y) {
-    throw new Error("selected element is outside the captured viewport");
-  }
-  return { x, y, width: right - x, height: bottom - y };
+): HostViewportRect {
+  return viewportCrop({
+    target,
+    frame: { width: video.videoWidth, height: video.videoHeight },
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+  });
 }
 
 async function frameToDataUrl(
