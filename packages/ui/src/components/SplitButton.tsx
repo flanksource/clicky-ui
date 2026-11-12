@@ -64,7 +64,7 @@ export function SplitButton({
         onClick={onClick}
         className={className}
       >
-        {icon && <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} />}
+        {!loading && icon && <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} />}
         {label}
       </Button>
     );
@@ -80,7 +80,7 @@ export function SplitButton({
         onClick={onClick}
         className="rounded-r-none"
       >
-        {icon && <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} />}
+        {!loading && icon && <Icon {...(typeof icon === "string" ? { name: icon } : { icon })} />}
         {label}
       </Button>
       <DropdownMenu
