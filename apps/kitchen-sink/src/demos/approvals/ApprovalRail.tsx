@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   Button,
   CommentCard,
@@ -61,71 +62,12 @@ const COMMENT_CONFIG: CommentConfig = {
   ],
 };
 
-function DecisionPanel({
-  approval,
-  decision,
-  onDecide,
-  checks,
-}: {
+type DecisionProps = {
   approval: Approval;
-  decision: ApprovalState | "pending";
   onDecide: (state: ApprovalState | "pending") => void;
-  checks: ApprovalCheck[];
-}) {
-  const openChecks = checks.filter((check) => check.tone !== "ok").length;
-  const blocked = checks.some((check) => check.tone === "bad");
+};
 
-  if (decision !== "pending") {
-    const approved = decision === "approved";
-    return (
-      <Panel
-        className={MV_CARD}
-        headerClassName={MV_HEAD}
-        bodyClassName="px-4 pb-4 pt-[14px]"
-        icon={ICONS.awaiting}
-        title={<MvSecTitle eyebrow="Decision" />}
-      >
-        <div className="space-y-density-3">
-          {/* `.apr-result` — the outcome wash, no border, colour carries it. */}
-          <div
-            className={
-              approved
-                ? "flex items-start gap-density-2 rounded-mv-md bg-mv-accent-soft px-[13px] py-3 text-mv-base text-mv-accent"
-                : "flex items-start gap-density-2 rounded-mv-md bg-mv-negative-soft px-[13px] py-3 text-mv-base text-mv-negative"
-            }
-          >
-            <Icon
-              icon={approved ? ICONS.paid : ICONS.reversal}
-              className="mt-0.5 shrink-0 text-base"
-            />
-            <span>
-              <b className="block font-semibold">
-                {approved ? "Approved" : "Rejected"}
-              </b>
-              {approval.resolvedBy
-                ? `${approval.resolvedBy} · ${approval.resolvedAt}`
-                : approved
-                  ? "Queued. Idempotency key recorded — a repeat evaluation is a no-op."
-                  : "Nothing was applied. Leave a reason so the rule owner can amend."}
-            </span>
-          </div>
-          {/* Only a decision taken in this session can be taken back; a
-              fixture-resolved request has no local override to drop. */}
-          {approval.resolvedBy === undefined && (
-            <Button
-              size="sm"
-              variant="outline"
-              className={`w-full rounded-mv-md ${MV_BTN_GHOST}`}
-              onClick={() => onDecide("pending")}
-            >
-              Undo
-            </Button>
-          )}
-        </div>
-      </Panel>
-    );
-  }
-
+function DecisionShell({ children }: { children: ReactNode }) {
   return (
     <Panel
       className={MV_CARD}
@@ -134,6 +76,93 @@ function DecisionPanel({
       icon={ICONS.awaiting}
       title={<MvSecTitle eyebrow="Decision" />}
     >
+      {children}
+    </Panel>
+  );
+}
+
+function resultDetail(approval: Approval, approved: boolean): string {
+  if (approval.resolvedBy) return `${approval.resolvedBy} · ${approval.resolvedAt}`;
+  return approved
+    ? "Queued. Idempotency key recorded — a repeat evaluation is a no-op."
+    : "Nothing was applied. Leave a reason so the rule owner can amend.";
+}
+
+function DecisionResult({ approval, approved, onDecide }: DecisionProps & { approved: boolean }) {
+  return (
+    <div className="space-y-density-3">
+      {/* `.apr-result` — the outcome wash, no border, colour carries it. */}
+      <div
+        className={
+          approved
+            ? "flex items-start gap-density-2 rounded-mv-md bg-mv-accent-soft px-[13px] py-3 text-mv-base text-mv-accent"
+            : "flex items-start gap-density-2 rounded-mv-md bg-mv-negative-soft px-[13px] py-3 text-mv-base text-mv-negative"
+        }
+      >
+        <Icon
+          icon={approved ? ICONS.paid : ICONS.reversal}
+          className="mt-0.5 shrink-0 text-base"
+        />
+        <span>
+          <b className="block font-semibold">
+            {approved ? "Approved" : "Rejected"}
+          </b>
+          {resultDetail(approval, approved)}
+        </span>
+      </div>
+      {/* Only a decision taken in this session can be taken back; a
+          fixture-resolved request has no local override to drop. */}
+      {approval.resolvedBy === undefined && (
+        <Button
+          size="sm"
+          variant="outline"
+          className={`w-full rounded-mv-md ${MV_BTN_GHOST}`}
+          onClick={() => onDecide("pending")}
+        >
+          Undo
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function CheckWarning({ checks }: { checks: ApprovalCheck[] }) {
+  if (checks.some((check) => check.tone === "bad")) {
+    return (
+      <p className="text-mv-sm leading-5 text-mv-negative">
+        A pre-flight check failed. Approving anyway will post a change the
+        ledger flagged.
+      </p>
+    );
+  }
+  const openChecks = checks.filter((check) => check.tone !== "ok").length;
+  if (openChecks === 0) return null;
+  return (
+    <p className="text-mv-sm leading-5 text-mv-warm">
+      {openChecks} check{openChecks > 1 ? "s" : ""} still open.
+    </p>
+  );
+}
+
+function DecisionPanel({
+  approval,
+  decision,
+  onDecide,
+  checks,
+}: DecisionProps & {
+  decision: ApprovalState | "pending";
+  checks: ApprovalCheck[];
+}) {
+  if (decision !== "pending") {
+    return (
+      <DecisionShell>
+        <DecisionResult approval={approval} approved={decision === "approved"} onDecide={onDecide} />
+      </DecisionShell>
+    );
+  }
+
+  return (
+    <DecisionShell>
       <div className="space-y-density-2">
         <Button
           className={`h-auto w-full rounded-mv-md py-2.5 text-mv-lg ${MV_BTN_PRIMARY}`}
@@ -163,18 +192,9 @@ function DecisionPanel({
           <span className="font-mono text-mv-xs">ledger.approve</span> scope may
           act.
         </p>
-        {blocked ? (
-          <p className="text-mv-sm leading-5 text-mv-negative">
-            A pre-flight check failed. Approving anyway will post a change the
-            ledger flagged.
-          </p>
-        ) : openChecks > 0 ? (
-          <p className="text-mv-sm leading-5 text-mv-warm">
-            {openChecks} check{openChecks > 1 ? "s" : ""} still open.
-          </p>
-        ) : null}
+        <CheckWarning checks={checks} />
       </div>
-    </Panel>
+    </DecisionShell>
   );
 }
 

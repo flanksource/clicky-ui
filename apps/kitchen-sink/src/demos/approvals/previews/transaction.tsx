@@ -12,8 +12,7 @@ import {
   PreviewTable,
   TD_CLASS,
   TD_NUM_CLASS,
-  TH_CLASS,
-  TH_NUM_CLASS,
+  PreviewHead,
 } from "./shared";
 
 export function TransactionPreview({
@@ -68,16 +67,7 @@ export function TransactionPreview({
       </DocGrid>
 
       <PreviewTable minWidth={780}>
-        <thead>
-          <tr>
-            <th className={TH_CLASS}>Account</th>
-            <th className={TH_CLASS}>Description</th>
-            <th className={TH_NUM_CLASS}>Qty</th>
-            <th className={TH_NUM_CLASS}>Unit</th>
-            <th className={TH_NUM_CLASS}>Tax</th>
-            <th className={TH_NUM_CLASS}>Gross</th>
-          </tr>
-        </thead>
+        <PreviewHead text={["Account", "Description"]} numeric={["Qty", "Unit", "Tax", "Gross"]} />
         <tbody>
           {change.lines.map((line) => (
             <tr key={line.code} className="border-b border-mv-hair last:border-0">
