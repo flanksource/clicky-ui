@@ -17,6 +17,7 @@ import type { IconComponent } from "../../icons/types";
 import { Checkbox } from "../../components/Checkbox";
 import {
   CodeDiff,
+  type DiffLineSelection,
   type DiffLineTarget,
   type DiffLineWidget,
 } from "../CodeDiff";
@@ -59,6 +60,8 @@ export type GitDiffPanelProps = {
   onLineAction?: (target: DiffLineTarget) => void;
   /** Forwarded to `CodeDiff`: rows rendered under the matching diff line. */
   lineWidgets?: DiffLineWidget[];
+  /** Forwarded to `CodeDiff`: selection (e.g. staging) boxes on changed lines and hunk headers. */
+  lineSelection?: DiffLineSelection;
 };
 
 type GitCommitListBaseProps<T extends GitCommitItem> = {
@@ -235,6 +238,7 @@ export function GitDiffPanel({
   maxHeightClassName = "max-h-[520px]",
   onLineAction,
   lineWidgets,
+  lineSelection,
 }: GitDiffPanelProps) {
   if (loading) {
     return (
@@ -303,6 +307,7 @@ export function GitDiffPanel({
         {...(language ? { language } : {})}
         {...(onLineAction ? { onLineAction } : {})}
         {...(lineWidgets ? { lineWidgets } : {})}
+        {...(lineSelection ? { lineSelection } : {})}
       />
     </div>
   );

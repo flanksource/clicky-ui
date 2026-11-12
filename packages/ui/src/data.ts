@@ -17,10 +17,12 @@ export {
   CodeDiff,
   type CodeDiffProps,
   type CodeDiffView,
+  type DiffLineSelection,
   type DiffLineTarget,
   type DiffLineWidget,
   type DiffSide,
 } from "./data/CodeDiff";
+export type { DiffSelectionState, DiffSelectionTarget } from "./data/code-diff-selection";
 export { CodeLine, type CodeLineProps } from "./data/CodeLine";
 export { SymbolBadge, type SymbolBadgeProps, type SymbolBadgeStyle } from "./data/SymbolBadge";
 export {

@@ -235,6 +235,28 @@ describe("GitDiffPanel line annotations", () => {
     expect(onLineAction).toHaveBeenCalledWith({ side: "new", line: 2, content: "B", element: button });
   });
 
+  it("forwards lineSelection so a single-file diff can stage lines and hunks", async () => {
+    const onChange = vi.fn();
+    render(
+      <GitDiffPanel
+        payload={payload}
+        lineSelection={{
+          isSelected: () => false,
+          onChange,
+          label: (target, selected) => `${selected ? "Unstage" : "Stage"} ${target.side} line ${target.line}`,
+          hunkLabel: (hunk, selected) => `${selected ? "Unstage" : "Stage"} hunk ${hunk}`,
+        }}
+      />,
+    );
+    await waitFor(() => expect(document.querySelector("[data-diff-line]")).not.toBeNull());
+    fireEvent.click(screen.getByRole("checkbox", { name: "Stage new line 2" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Stage hunk 1" }));
+    expect(onChange.mock.calls).toEqual([
+      [[{ side: "new", line: 2 }], true],
+      [[{ side: "old", line: 2 }, { side: "new", line: 2 }], true],
+    ]);
+  });
+
   it("renders no gutter buttons without onLineAction", async () => {
     render(<GitDiffPanel payload={payload} />);
     await waitFor(() => expect(document.querySelector("[data-diff-line]")).not.toBeNull());
