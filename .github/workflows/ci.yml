@@ -70,7 +70,7 @@ jobs:
         uses: flanksource/gavel@4c5015446610371c852fd866bfbe0efa77f24c9d # v0.0.80
         with:
           version: v0.0.80
-          args: lint --changed
+          args: ${{ github.event_name == 'pull_request' && 'lint --changed' || 'lint' }}
           comment-header: gavel-lint
           artifact-name: gavel-lint-results
 
