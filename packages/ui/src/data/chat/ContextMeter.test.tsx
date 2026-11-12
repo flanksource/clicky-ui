@@ -15,6 +15,8 @@ describe("ContextMeter", () => {
   it.each([
     ["anthropic/claude-opus-4-8", "Opus 4.8"],
     ["Claude Opus 4.8", "Opus 4.8"],
+    ["Claude  Opus   4.8   fast  mode", "Opus 4.8 fast-mode"],
+    ["opus 4.8x", "Opus 4.8x"],
     ["claude-agent-sonnet-5", "Sonnet 5"],
     ["claude-code-haiku-4-5", "Haiku 4.5"],
     ["claude-opus-5-5", "Opus 5.5"],

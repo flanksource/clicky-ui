@@ -10,19 +10,17 @@ export function shortContextModelName(model: string): string {
     }
   }
 
-  const humanClaude = label
-    .toLowerCase()
-    .trim()
-    .match(
-      /^(?:claude\s+)?(fable|opus|sonnet|haiku)(?:\s+(\d+(?:\.\d+)*))?(?:\s+(.+))?$/,
-    );
-  if (humanClaude) {
-    const tier = humanClaude[1]!;
-    const version = humanClaude[2];
-    const rest = humanClaude[3];
-    const name = tier.charAt(0).toUpperCase() + tier.slice(1);
+  // A human-written name ("Claude Opus 4.8 fast") is read word by word: a
+  // single regex over the whole label backtracks polynomially on runs of spaces.
+  const words = label.toLowerCase().trim().split(/\s+/);
+  let word = words[0] === "claude" ? 1 : 0;
+  const humanTier = words[word];
+  if (humanTier && ["fable", "opus", "sonnet", "haiku"].includes(humanTier)) {
+    word += 1;
+    const version = /^\d+(?:\.\d+)*$/.test(words[word] ?? "") ? words[word++] : undefined;
+    const name = humanTier.charAt(0).toUpperCase() + humanTier.slice(1);
     const head = version ? `${name} ${version}` : name;
-    const tail = (rest ?? "").trim().replace(/\s+/g, "-");
+    const tail = words.slice(word).join("-");
     return tail ? `${head} ${tail}` : head;
   }
   if (label.toLowerCase().startsWith("gpt-")) return label.replace(/^gpt/i, "GPT");
