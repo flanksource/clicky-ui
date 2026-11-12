@@ -84,6 +84,18 @@ describe("DropdownMenu", () => {
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 
+  it("reports each open change once to onOpenChange: on open, on item selection and on Escape", () => {
+    const onOpenChange = vi.fn();
+    render(<DropdownMenu label="Download" items={items()} onOpenChange={onOpenChange} />);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    const trigger = screen.getByRole("button", { name: /download/i });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("menuitem", { name: "JSON" }));
+    fireEvent.click(trigger);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onOpenChange.mock.calls).toEqual([[true], [false], [true], [false]]);
+  });
+
   it("closes on Escape", () => {
     render(<DropdownMenu label="Download" items={items()} />);
     fireEvent.click(screen.getByRole("button", { name: /download/i }));
