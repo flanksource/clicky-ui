@@ -83,6 +83,35 @@ describe("PromptIndicator", () => {
     expect(indicator()).toHaveAccessibleName("2 pending");
   });
 
+  it("closes the open answer dialog when the prompt API moves to another base path", async () => {
+    stubPromptStream([pendingRegion]);
+    const { rerender } = render(<PromptIndicator basePath="/api/todos" />);
+    fireEvent.click(await screen.findByRole("button", { name: "1 pending" }));
+    fireEvent.click(within(panel()).getByRole("button", { name: new RegExp(pendingRegion.title) }));
+    expect(await screen.findByRole("dialog", { name: pendingRegion.title })).toBeInTheDocument();
+
+    rerender(<PromptIndicator basePath="/api/runs/r2" />);
+
+    expect(screen.queryByRole("dialog", { name: pendingRegion.title })).toBeNull();
+  });
+
+  it("keeps the next prompt's dialog open when an earlier, already closed prompt's answer lands", async () => {
+    let finish: (value: { ok: boolean; text: () => Promise<string> }) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn(() => new Promise((resolve) => { finish = resolve; })));
+    stubPromptStream([pendingRegion, pendingTarget]);
+    render(<PromptIndicator basePath="/api/todos" autoOpen />);
+
+    const first = await screen.findByRole("dialog", { name: pendingRegion.title });
+    fireEvent.click(within(first).getByText("Submit"));
+    fireEvent.keyDown(first, { key: "Escape" });
+    expect(await screen.findByRole("dialog", { name: pendingTarget.title })).toBeInTheDocument();
+
+    finish({ ok: true, text: async () => "" });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    expect(screen.getByRole("dialog", { name: pendingTarget.title })).toBeInTheDocument();
+  });
+
   it("leaves the dialog closed until asked without autoOpen", async () => {
     stubPromptStream([pendingRegion]);
     render(<PromptIndicator basePath="/api/todos" />);

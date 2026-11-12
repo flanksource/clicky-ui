@@ -89,6 +89,44 @@ describe("PromptForm", () => {
     await waitFor(() => expect(screen.getByText("Submit").closest("button")).not.toBeDisabled());
   });
 
+  it("answers a newly handed prompt with its own values, clearing the previous prompt's error and busy state", async () => {
+    const refusal = "prompt p7 is already answered";
+    const next: PromptSnapshot = { ...prompt, id: "p8", title: "Purge the next batch?", value: { expectedActivities: REVIEWED + 5 } };
+    const fetchMock = stubFetch({ ok: false, text: async () => refusal });
+    const { rerender } = render(<PromptForm prompt={prompt} basePath={BASE} />);
+    fireEvent.click(screen.getByText("Submit"));
+    expect(await screen.findByText(refusal)).toBeInTheDocument();
+
+    let finish: (value: { ok: boolean; text: () => Promise<string> }) => void = () => {};
+    fetchMock.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    fireEvent.click(screen.getByText("Submit"));
+    await waitFor(() => expect(screen.getByText("Submit").closest("button")).toBeDisabled());
+
+    rerender(<PromptForm prompt={next} basePath={BASE} />);
+    expect(screen.queryByText(refusal)).toBeNull();
+    expect(screen.getByText("Submit").closest("button")).not.toBeDisabled();
+
+    fetchMock.mockResolvedValue({ ok: true, text: async () => "" });
+    fireEvent.click(screen.getByText("Submit"));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    const [url, init] = fetchMock.mock.calls[2]!;
+    expect([url, JSON.parse(init.body)]).toEqual([`${BASE}/prompts/${next.id}/answer`, { values: next.value }]);
+    finish({ ok: true, text: async () => "" });
+  });
+
+  it("keeps the user's edits when a refetched snapshot of the same prompt arrives", async () => {
+    const edited = REVIEWED + 2;
+    const fetchMock = stubFetch({ ok: true, text: async () => "" });
+    const { rerender } = render(<PromptForm prompt={prompt} basePath={BASE} />);
+    fireEvent.change(screen.getByRole("textbox", { name: /Reviewed staged count/ }), { target: { value: String(edited) } });
+
+    rerender(<PromptForm prompt={{ ...prompt, value: { ...prompt.value } }} basePath={BASE} />);
+    fireEvent.click(screen.getByText("Submit"));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).toEqual({ values: { expectedActivities: edited } });
+  });
+
   it("resolves the schema's x-clicky-lookup fields through the supplied fetcher", async () => {
     const lookupFetcher = vi.fn().mockResolvedValue([{ value: "lab", label: "lab (sql_server)" }]);
     const lookupUrl = "/api/v1/connection?types=sql_server";
