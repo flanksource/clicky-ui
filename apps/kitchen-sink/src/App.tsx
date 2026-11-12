@@ -18,12 +18,8 @@ import {
   findDemoEntry,
   findDemoGroup,
 } from "./demo-catalog";
-import {
-  ViewportPicker,
-  ViewportStage,
-  parseViewportMode,
-  type ViewportMode,
-} from "./ViewportStage";
+import { ViewportPicker, ViewportStage } from "./ViewportStage";
+import { parseViewportMode, type ViewportMode } from "./viewport-mode";
 
 type Route = { demo: string; viewport: ViewportMode };
 
