@@ -81,6 +81,7 @@ describe("readStepDetail", () => {
     ["an attempt without a status", { step: STEP, attempts: [{ attempt: 1 }] }, "detail.attempts[0].status must be a string"],
     ["duplicate attempt numbers", { step: STEP, attempts: [{ attempt: 1, status: "failed" }, { attempt: 1, status: "passed" }] }, "detail.attempts[1].attempt must be the sequence number 2"],
     ["an invalid attempt result", { step: STEP, attempts: [{ attempt: 1, status: "failed", result: { name: 4 } }] }, "detail.attempts[0].result.name must be a string"],
+    ["an attempt result whose detail is not an object", { step: STEP, attempts: [{ attempt: 1, status: "running", result: { name: "run", detail: "waiting" } }] }, "detail.attempts[0].result.detail must be an object"],
     ["an event of an unknown type", { step: STEP, events: [{ type: "toast" }] }, 'detail.events[0].type must be one of alert, console, pageerror, response (got "toast")'],
     ["a background flag that is not a boolean", { step: STEP, background: "yes" }, "detail.background must be a boolean"],
   ])("reports %s as invalid, naming the field", (_name, detail, error) => {
