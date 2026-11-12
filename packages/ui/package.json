@@ -63,6 +63,11 @@
       "import": "./dist/data.js",
       "require": "./dist/data.cjs"
     },
+    "./git": {
+      "types": "./dist/git.d.ts",
+      "import": "./dist/git.js",
+      "require": "./dist/git.cjs"
+    },
     "./comments": {
       "types": "./dist/comments.d.ts",
       "import": "./dist/comments.js",
