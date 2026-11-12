@@ -526,7 +526,10 @@ export {
 } from "./data/task-query-keys";
 export { TaskManagerButton, type TaskManagerButtonProps } from "./data/TaskManagerButton";
 export { PromptDialog, type PromptDialogProps } from "./data/PromptDialog";
+export { PromptForm, type PromptFormProps } from "./data/PromptForm";
 export { PromptBanner, type PromptBannerProps } from "./data/PromptBanner";
+export { PromptIndicator, type PromptIndicatorProps } from "./data/PromptIndicator";
+export { PromptList, type PromptListProps } from "./data/PromptList";
 export {
   usePrompts,
   answerPrompt,

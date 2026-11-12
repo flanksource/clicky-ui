@@ -207,6 +207,12 @@ const fixtureStepCopyAdapter: TestNodeAdapter = {
 export type VerificationAdapterOptions = {
   /** Override the wait section while retaining the fixture's other detail sections. */
   renderWait?: (wait: WaitDetail) => ReactNode;
+  /**
+   * The answerable form of a step waiting on a person (`node.waiting`), shown in
+   * its own section at the top of the step's detail. The host resolves which
+   * pending prompt belongs to the node and answers it (e.g. with PromptForm).
+   */
+  renderPendingPrompt?: (node: Test) => ReactNode;
 };
 
 export function verificationAdapters(options: VerificationAdapterOptions = {}): TestNodeAdapterRegistry {

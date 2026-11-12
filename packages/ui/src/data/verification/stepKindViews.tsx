@@ -11,6 +11,7 @@ import { CodeBlock } from "../CodeBlock";
 import { JsonView } from "../JsonView";
 import type { StepSourceResult } from "./stepSource";
 import { formatTestDuration, useSelectDetailTab } from "../test-runner";
+import { UiHourglass } from "../../icons";
 import {
   clockTime,
   formatDelay,
@@ -37,6 +38,19 @@ function Section({ name, title, aside, children }: { name: string; title: string
       </div>
       {children}
     </section>
+  );
+}
+
+/** The host's answerable form for a step waiting on a person. */
+export function StepPendingFormSection({ children }: { children: ReactNode }) {
+  return (
+    <Section
+      name="pending-form"
+      title="Form"
+      aside={<Badge tone="warning" size="xs" icon={UiHourglass} clickToCopy={false}>Awaiting answer</Badge>}
+    >
+      {children}
+    </Section>
   );
 }
 
