@@ -34,6 +34,9 @@ lint:
   - file: .gavel.yaml
     rule: omar-brand-names
     source: betterleaks
+  # The kitchen-sink is a demo app, not shipped code (decided by the maintainer).
+  - file: apps/kitchen-sink/**
+    source: react-doctor
 pre:
 - name: build
   run: pnpm --filter @flanksource/clicky-ui run build
