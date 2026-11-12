@@ -223,14 +223,22 @@ export function verificationAdapters(options: VerificationAdapterOptions = {}): 
     detailAttempts: ({ node }) => {
       const detail = readStepDetail(node.detail);
       if (detail.kind !== "step") return [];
-      return detail.step.attempts.map((attempt) => ({
-        id: attempt.attempt, status: attempt.status,
-        ...(attempt.durationMs !== undefined ? { durationMs: attempt.durationMs } : {}),
-        node: attempt.result ? verifyNodeTest(attempt.result) : {
+      const live = detail.step.attempts.length - 1;
+      return detail.step.attempts.map((attempt, index) => {
+        const attemptNode: Test = attempt.result ? verifyNodeTest(attempt.result) : {
           name: node.name, message: `Attempt ${attempt.attempt}: execution evidence was not stored in this report.`,
           detail: { step: detail.step.step },
-        },
-      }));
+        };
+        // The step waits in its last attempt; that one keeps the step's identity so the host finds its prompt.
+        const waiting = node.waiting === true && index === live;
+        return {
+          id: attempt.attempt, status: attempt.status,
+          ...(attempt.durationMs !== undefined ? { durationMs: attempt.durationMs } : {}),
+          node: waiting
+            ? { ...attemptNode, name: node.name, ...(node.task_id !== undefined ? { task_id: node.task_id } : {}), waiting: true }
+            : attemptNode,
+        };
+      });
     },
     detailTabs: ({ node }) => {
       const detail = readStepDetail(node.detail);
