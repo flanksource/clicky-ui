@@ -42,7 +42,7 @@ describe("nullable fields", () => {
     render(<Harness schema={schema} initial={undefined} />);
     expect(screen.getByRole("status")).toHaveTextContent("{}");
     expect(
-      screen.queryByRole("combobox", { name: /format/ }),
+      screen.queryByRole("radiogroup", { name: /format/ }),
     ).not.toBeInTheDocument();
   });
   it("resolves nullable fields through bundled references and hides clear in read-only forms", () => {
@@ -87,7 +87,7 @@ describe("nullable fields", () => {
   ])("renders one text control and clears to actual null for %j", (schema) => {
     render(<Harness schema={schema} initial="initial" required />);
     expect(
-      screen.queryByRole("combobox", { name: /format/ }),
+      screen.queryByRole("radiogroup", { name: /format/ }),
     ).not.toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: "Clear Field to null" }),
@@ -107,7 +107,7 @@ describe("nullable fields", () => {
     );
     expect(container.querySelector('input[type="date"]')).toBeTruthy();
     expect(
-      screen.queryByRole("combobox", { name: /format/ }),
+      screen.queryByRole("radiogroup", { name: /format/ }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent('{"field":null}');
   });
@@ -131,12 +131,10 @@ describe("nullable fields", () => {
         initial="plain text"
       />,
     );
-    expect(screen.getByRole("combobox", { name: "Field format" })).toHaveValue(
-      "1",
-    );
-    fireEvent.change(screen.getByRole("combobox", { name: "Field format" }), { target: { value: "0" } });
-    expect(screen.getByRole("combobox", { name: "Field format" })).toHaveValue("0");
-    fireEvent.change(screen.getByRole("combobox", { name: "Field format" }), { target: { value: "1" } });
+    expect(screen.getByRole("radio", { name: "Text" })).toBeChecked();
+    fireEvent.click(screen.getByRole("radio", { name: "Date" }));
+    expect(screen.getByRole("radio", { name: "Date" })).toBeChecked();
+    fireEvent.click(screen.getByRole("radio", { name: "Text" }));
     expect(screen.getByRole("status")).toHaveTextContent('{"field":"plain text"}');
   });
 });

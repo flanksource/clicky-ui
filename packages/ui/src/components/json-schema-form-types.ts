@@ -15,7 +15,10 @@ export type * from "./json-schema-form-listener-types";
 // Every `x-*` key declared here must also be documented in the published
 // meta-schema, schemas/json-schema-form.schema.json (enforced by its test).
 export interface JsonSchemaProperty {
-  "x-object-display"?: "flat" | "accordion";
+  // "row" lays the object's fields out side by side as one compact control
+  // (like SecretKeySelector): no visible per-field labels, the object's own
+  // label names the row.
+  "x-object-display"?: "flat" | "accordion" | "row";
   type?: JsonSchemaType | JsonSchemaType[];
   description?: string;
   title?: string;

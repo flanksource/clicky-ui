@@ -69,7 +69,30 @@ export function ObjectControl({
     ...(typeof field.schema["x-classes"] === "string"
       ? { "x-classes": field.schema["x-classes"] }
       : {}),
+    ...(field.schema["x-object-display"] === "row"
+      ? { "x-object-display": "row" as const }
+      : {}),
   };
+  const childCtx: RenderContext = {
+    ...ctx,
+    readOnly: ctx.readOnly || field.readOnly === true,
+    depth: ctx.depth + 1,
+  };
+  const onChange = (next: Record<string, unknown>) => field.onChange(next);
+  if (subSchema["x-object-display"] === "row" && ctx.layout.mode !== "properties") {
+    return (
+      <div
+        data-jsf-object-row=""
+        className={cn(
+          "flex w-full min-w-0 flex-wrap items-start",
+          fieldInnerGapClass[ctx.size],
+          subSchema["x-classes"],
+        )}
+      >
+        {ctx.render.renderObjectFields(subSchema, obj, onChange, childCtx)}
+      </div>
+    );
+  }
   // No border/box: nested objects render as flat headed sections (see
   // ObjectSection in renderFieldRow) rather than progressively indented
   // sub-forms, so deep schemas stay readable as a single column.
@@ -92,16 +115,7 @@ export function ObjectControl({
         ? { className: subSchema["x-classes"] }
         : {})}
     >
-      {ctx.render.renderObjectFields(
-        subSchema,
-        obj,
-        (next) => field.onChange(next),
-        {
-          ...ctx,
-          readOnly: ctx.readOnly || field.readOnly === true,
-          depth: ctx.depth + 1,
-        },
-      )}
+      {ctx.render.renderObjectFields(subSchema, obj, onChange, childCtx)}
     </FieldsGrid>
   );
 }

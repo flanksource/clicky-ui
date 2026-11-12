@@ -7,8 +7,8 @@
   "allOf": [{ "$ref": "https://json-schema.org/draft/2020-12/schema" }],
   "properties": {
     "x-object-display": {
-      "description": "Presentation of this nested object: flat headed fields or a collapsible accordion section. Overrides the form-level objectDisplay option.",
-      "enum": ["flat", "accordion"]
+      "description": "Presentation of this nested object: flat headed fields, a collapsible accordion section, or a single compact row of unlabelled controls under the object's own label (row). Overrides the form-level objectDisplay option.",
+      "enum": ["flat", "accordion", "row"]
     },
     "title": {
       "description": "The field label. A missing title falls back to the property key; an explicit empty string renders no label at all (for a field whose host already names it)."

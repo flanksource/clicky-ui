@@ -49,12 +49,12 @@ type Story = StoryObj<typeof meta>;
 export const NestedObjectBranches: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const format = canvas.getByRole("combobox", { name: "Due date format" });
-    await expect(within(format).getAllByRole("option").map((option) => option.textContent))
+    const format = canvas.getByRole("radiogroup", { name: "Due date format" });
+    await expect(within(format).getAllByRole("radio").map((option) => option.textContent))
       .toEqual(["Field Answer", "Calculation Answer", "Open questions", "Not applicable"]);
-    fireEvent.change(format, { target: { value: "0" } });
+    fireEvent.click(within(format).getByRole("radio", { name: "Field Answer" }));
     fireEvent.change(canvas.getByRole("textbox", { name: /^Name/ }), { target: { value: "DueDate" } });
-    await expect(canvas.getByRole("combobox", { name: "Due date format" })).toHaveValue("0");
+    await expect(canvas.getByRole("radio", { name: "Field Answer" })).toBeChecked();
     await expect(canvas.queryByRole("textbox", { name: /^Type/ })).not.toBeInTheDocument();
     await expect(canvas.getByRole("status")).toHaveTextContent('{"dueDate":{"type":"field","fieldRef":{"name":"DueDate"}}}');
   },

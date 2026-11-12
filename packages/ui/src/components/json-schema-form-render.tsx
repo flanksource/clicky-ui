@@ -487,8 +487,10 @@ export function renderObjectFields(
   const columns = ctx.layout.mode !== "stacked" ? 1 : normalizeColumns(schema["x-columns"]);
   const arrayEntries = entries.filter(([, prop]) => prop.type === "array");
   const compactArrays = ctx.layout.mode !== "properties" && arrayEntries.length > 3;
+  const rowDisplay = schema["x-object-display"] === "row" && ctx.layout.mode !== "properties";
   const rows = entries.flatMap(([key, prop]) => {
     if (hidden.has(key)) return [];
+    if (rowDisplay) return renderRowCell(fieldArgs(key, prop), ctx);
     if (compactArrays && prop.type === "array" && prop["x-hidden"] !== false && (!Array.isArray(value[key]) || value[key].length === 0)) return [];
     const row = renderFieldRow(fieldArgs(key, prop), ctx);
     if (!row) return [];
@@ -514,7 +516,7 @@ export function renderObjectFields(
     // child of the FieldsGrid and snaps to its label/value tracks.
     return [<div key={key} className="contents">{row}</div>];
   });
-  if (compactArrays && !ctx.readOnly && !ctx.presentation) {
+  if (compactArrays && !rowDisplay && !ctx.readOnly && !ctx.presentation) {
     const available = arrayEntries.filter(([key, prop]) =>
       !hidden.has(key) && prop["x-hidden"] === undefined && (!Array.isArray(value[key]) || prop.maxItems === undefined || value[key].length < prop.maxItems),
     );
@@ -540,6 +542,25 @@ export function renderObjectFields(
     }
   }
   return rows;
+}
+
+// renderRowCell renders one field of an `x-object-display: "row"` object as a
+// flex cell: the control (plus its error) with a screen-reader-only label, so
+// the fields read as one compact control under the object's own label.
+function renderRowCell(args: FieldArgs, ctx: RenderContext): ReactNode[] {
+  const nodes = renderFieldNodes(args, ctx);
+  if (!nodes) return [];
+  const label = args.prop.title || args.key;
+  const instancePath = args.instancePath ?? appendInstancePath(ctx.instancePath, args.key);
+  return [
+    <div key={args.key} data-jsf-row-cell={args.key} title={label} className="min-w-0 flex-1 basis-40">
+      <label htmlFor={fieldInputId(instancePath, ctx.idPrefix)} className="sr-only">
+        {label}
+        {args.required ? " (required)" : ""}
+      </label>
+      {nodes.value}
+    </div>,
+  ];
 }
 
 // rendersFullWidth reports whether a property renders as a full-width block

@@ -114,7 +114,7 @@ export function toStringArray(value: unknown): string[] {
 export function rendersAsSection(field: FieldControl, mode: FormLayout["mode"]): boolean {
   return (
     mode !== "properties" &&
-    (field.kind === "object" ||
+    ((field.kind === "object" && field.schema["x-object-display"] !== "row") ||
       field.layout === "table" ||
       field.arrayDisplay === "accordion" ||
       field.arrayDisplay === "cards" ||
