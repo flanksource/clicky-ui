@@ -681,6 +681,14 @@
       "note": ""
     },
     {
+      "consumerName": "minus",
+      "group": "layout-dashboard",
+      "status": "NEW",
+      "outline": "ph:minus-light",
+      "filled": "ph:minus-bold",
+      "note": "Minimize a panel to its launcher"
+    },
+    {
       "consumerName": "edit",
       "group": "forms-editing",
       "status": "NEW",
