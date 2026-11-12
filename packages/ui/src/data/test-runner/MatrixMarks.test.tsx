@@ -48,6 +48,7 @@ describe("MatrixLegend", () => {
       ["error", "error · never started"],
       ["pending", "pending · queued"],
       ["absent", "not in this run"],
+      ["na", "N/A · not for this country"],
       [null, "elapsed · total duration"],
     ]);
   });
@@ -206,6 +207,7 @@ describe("EmptyMatrixCell", () => {
     { outcome: "error", detail: "never started", mark: "error", text: "never started" },
     { outcome: "queued", detail: undefined, mark: "pending", text: "pending" },
     { outcome: "absent", detail: undefined, mark: "absent", text: "not in this run" },
+    { outcome: "na", detail: undefined, mark: "na", text: "N/A" },
   ])("draws $outcome ($detail) as the $mark mark", ({ outcome, detail, mark, text }) => {
     const { container } = render(<EmptyMatrixCell outcome={outcome} {...(detail ? { detail } : {})} title="plan.yaml in dev" />);
     const cell = container.querySelector("[data-empty-cell]")!;
