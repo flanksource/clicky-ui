@@ -53,7 +53,9 @@ describe("a step waiting on its form", () => {
 
   it.each([
     ["no stored result", {}],
-    ["a partial result", { result: { name: STEP, framework: "fixture", running: true } }],
+    ["a partial fixture result", { result: { name: STEP, framework: "fixture", running: true } }],
+    ["a partial result without fixture metadata", { result: { name: STEP, running: true, detail: { note: "awaiting reviewer" } } }],
+    ["a bare partial result", { result: { name: STEP, running: true } }],
   ])("renders the pending form on the live attempt of a retried step with %s, and not on the earlier attempt", (_, live) => {
     const renderPendingPrompt = vi.fn(hostForm);
     renderDetail(retried(live), { renderPendingPrompt });

@@ -175,6 +175,7 @@ function readAttemptResult(value: unknown, path: string): VerifyNode {
     if (node[key] !== undefined) bool(node[key], `${path}.${key}`);
   }
   if (node.duration !== undefined) nonnegative(node.duration, `${path}.duration`);
+  if (node.detail !== undefined) record(node.detail, `${path}.detail`);
   if (node.children !== undefined) list(node.children, `${path}.children`).forEach((child, i) => readAttemptResult(child, `${path}.children[${i}]`));
   return { ...node, name: str(node.name, `${path}.name`) } as VerifyNode;
 }

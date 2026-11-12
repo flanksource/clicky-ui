@@ -215,6 +215,17 @@ export type VerificationAdapterOptions = {
   renderPendingPrompt?: (node: Test) => ReactNode;
 };
 
+// The attempt a step is waiting in: it carries the step's name and task id (the
+// host finds the step's prompt by them) and `waiting`, and, when its result has
+// nothing marking it a fixture step, the step reference, so the fixture detail
+// (and its pending form) still renders it.
+function liveAttemptNode(step: Test, attempt: Test, ref: { id: string; kind: string }): Test {
+  const live: Test = { ...attempt, name: step.name, ...(step.task_id !== undefined ? { task_id: step.task_id } : {}), waiting: true };
+  if (isFixtureNode(live)) return live;
+  // readStepDetail has already checked that an attempt result's detail is an object.
+  return { ...live, detail: { ...(attempt.detail as Record<string, unknown> | undefined), step: ref } };
+}
+
 export function verificationAdapters(options: VerificationAdapterOptions = {}): TestNodeAdapterRegistry {
   const fixtureAdapter: TestNodeAdapter = {
     id: "verification-fixture",
@@ -234,9 +245,7 @@ export function verificationAdapters(options: VerificationAdapterOptions = {}): 
         return {
           id: attempt.attempt, status: attempt.status,
           ...(attempt.durationMs !== undefined ? { durationMs: attempt.durationMs } : {}),
-          node: waiting
-            ? { ...attemptNode, name: node.name, ...(node.task_id !== undefined ? { task_id: node.task_id } : {}), waiting: true }
-            : attemptNode,
+          node: waiting ? liveAttemptNode(node, attemptNode, detail.step.step) : attemptNode,
         };
       });
     },
