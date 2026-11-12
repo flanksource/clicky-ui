@@ -601,6 +601,14 @@
       "note": ""
     },
     {
+      "consumerName": "paper-plane-right",
+      "group": "ui-controls",
+      "status": "NEW",
+      "outline": "ph:paper-plane-right-light",
+      "filled": "ph:paper-plane-right-fill",
+      "note": "Comment send action."
+    },
+    {
       "consumerName": "arrow-down",
       "group": "navigation",
       "status": "NEW",
@@ -847,6 +855,14 @@
       "outline": "ph:check-light",
       "filled": "ph:check-circle-fill",
       "note": "Filled variant uses ph:check-circle-fill (circle) instead of ph:check-fill (rounded square) per design preference."
+    },
+    {
+      "consumerName": "checks",
+      "group": "approval-review",
+      "status": "NEW",
+      "outline": "ph:checks-light",
+      "filled": "ph:checks-bold",
+      "note": "Double tick: a message the recipient has acted on, as in chat delivery receipts"
     },
     {
       "consumerName": "check-thin -> check",
