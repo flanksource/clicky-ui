@@ -335,6 +335,14 @@ export interface JsonSchemaFormProps extends FormErrorProps {
    */
   lookupFetcher?: LookupFetcher;
   /**
+   * Where the commons-db connections service is mounted (e.g. `/api/v1`). When
+   * set, a `format: "connection"` lookup ends with a "New {type} connection…"
+   * footer that opens the create dialog against it and selects the result. The
+   * create dialog needs a react-query QueryClientProvider from the host. Left
+   * unset, the picker offers only what the lookup returns.
+   */
+  connectionApiBase?: string;
+  /**
    * Evaluates the `when.expr` of `x-on-change` listeners. The form has no
    * built-in expression language; a schema that uses `expr` without this prop
    * fails loudly instead of guessing.

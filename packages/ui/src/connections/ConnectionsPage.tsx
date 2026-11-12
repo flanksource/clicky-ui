@@ -2,15 +2,20 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Button } from "../components/button";
 import { JsonSchemaForm } from "../components/JsonSchemaForm";
-import type { JsonSchemaObject } from "../components/json-schema-form-types";
 import { isPlainObject } from "../lib/collections";
 import { Modal } from "../overlay/Modal";
 import { useConfirm } from "../overlay/useConfirm";
 import { createOperationsApiClient, type SharedOperationsApiClient } from "../rpc/apiClient";
 import { useOperationLookupFetcher } from "../rpc/operationLookupFetcher";
-import { SchemaActionForm, type FormActionsRenderer } from "../rpc/SchemaActionForm";
-import type { ResolvedOperation } from "../rpc/types";
+import type { FormActionsRenderer } from "../rpc/SchemaActionForm";
 import { ConnectionDashboardSurface } from "./connectionDashboard";
+import { ConnectionFormDialog } from "./ConnectionFormDialog";
+import {
+  CONNECTION_ERROR_BOX,
+  errorMessage,
+  useConnectionFormExtensions,
+  useConnectionSchema,
+} from "./connectionFormSupport";
 import {
   CONNECTION_DASHBOARD_QUERY_KEY,
   type ConnectionLinkRenderer,
@@ -19,19 +24,14 @@ import {
 import { useConnectionDashboard } from "./connectionDashboardQuery";
 import { ConnectionTestButton } from "./connectionTestButton";
 import {
-  connectionFormExtensions,
   createConnectionAction,
   isPlainLeftClick,
   isReadOnlyConnection,
-  mergeConnectionFormExtensions,
   updateConnectionAction,
   type ConnectionFormExtensions,
 } from "./connectionsPageModel";
-import { connectionSchemaFormExtensions } from "./connectionSchemaFormExtensions";
 
 const CONNECTION_DETAIL_QUERY_KEY = "connection-detail";
-const ERROR_BOX =
-  "rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive";
 
 export type ConnectionsPageProps = {
 	/** Optional actions beside each connection, outside its edit link. */
@@ -81,26 +81,11 @@ export function ConnectionsPage({
   const queryClient = useQueryClient();
   const client = useMemo(() => createOperationsApiClient({ baseUrl: apiBase }), [apiBase]);
   const schema = useConnectionSchema(client);
-  const schemaExtensions = useMemo((): {
-    extensions?: Required<ConnectionFormExtensions>;
-    error?: string;
-  } => {
-    if (!schema.data) return {};
-    try {
-      return {
-        extensions: connectionSchemaFormExtensions({ apiBase, schema: schema.data }),
-      };
-    } catch (err) {
-      return { error: errorMessage(err) };
-    }
-  }, [apiBase, schema.data]);
-  const extensions = useMemo(
-    () =>
-      connectionFormExtensions(
-        mergeConnectionFormExtensions(schemaExtensions.extensions, formExtensions),
-      ),
-    [schemaExtensions.extensions, formExtensions],
-  );
+  const { extensions, error: schemaExtensionsError } = useConnectionFormExtensions({
+    apiBase,
+    schema: schema.data,
+    host: formExtensions,
+  });
   const renderConnectionLink = useCallback<ConnectionLinkRenderer>(
     (connection, link) => (
       <a
@@ -148,9 +133,9 @@ export function ConnectionsPage({
             }
           : {})}
       />
-      {schemaExtensions.error && (creating || selected) ? (
+      {schemaExtensionsError && (creating || selected) ? (
         <Modal open onClose={() => (creating ? setCreating(undefined) : onSelect(undefined))} title="Connection form" size="2xl">
-          <div className={ERROR_BOX}>{schemaExtensions.error}</div>
+          <div className={CONNECTION_ERROR_BOX}>{schemaExtensionsError}</div>
         </Modal>
       ) : creating && !catalogReadOnly ? (
         <ConnectionFormDialog
@@ -235,7 +220,7 @@ function ConnectionEditDialog({
     return (
       <Modal open onClose={onClose} title="Edit connection" size="2xl">
         {detail.isError ? (
-          <div className={ERROR_BOX}>{errorMessage(detail.error)}</div>
+          <div className={CONNECTION_ERROR_BOX}>{errorMessage(detail.error)}</div>
         ) : (
           <div className="text-sm text-muted-foreground">Loading connection…</div>
         )}
@@ -312,67 +297,12 @@ function ConnectionEditDialog({
             {testAction(context)}
           </>
         )}
-        notice={deleteError ? <div className={ERROR_BOX}>{deleteError}</div> : null}
+        notice={deleteError ? <div className={CONNECTION_ERROR_BOX}>{deleteError}</div> : null}
         onClose={onClose}
         onSaved={onChanged}
       />
       {dialog}
     </>
-  );
-}
-
-function ConnectionFormDialog({
-  apiBase,
-  client,
-  action,
-  lockedValues,
-  initialValue,
-  title,
-  submitLabel,
-  extensions,
-  footerActions,
-  notice,
-  onClose,
-  onSaved,
-}: {
-  apiBase: string;
-  client: SharedOperationsApiClient;
-  action: ResolvedOperation;
-  lockedValues?: Record<string, string>;
-  initialValue?: Record<string, unknown>;
-  title: string;
-  submitLabel: string;
-  extensions: Required<ConnectionFormExtensions>;
-  footerActions: FormActionsRenderer;
-  notice?: ReactNode;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  return (
-    <SchemaActionForm
-      client={client}
-      action={action}
-      submitLabel={submitLabel}
-      formPre={extensions.pre}
-      formPost={extensions.post}
-      footerActions={footerActions}
-      {...(lockedValues ? { lockedValues } : {})}
-      {...(initialValue ? { initialValue } : {})}
-      onSuccess={onSaved}
-      renderLayout={({ body, footer, dirty }) => (
-        <Modal open onClose={onClose} confirmClose={dirty === true} title={title} size="2xl" footer={footer}>
-          <div className="space-y-4">
-            {body}
-            {notice}
-          </div>
-        </Modal>
-      )}
-      fallback={
-        <div className={ERROR_BOX}>
-          {`GET ${apiBase}/connection served no connection JSON Schema (Accept: application/schema+json).`}
-        </div>
-      }
-    />
   );
 }
 
@@ -425,11 +355,11 @@ function ConnectionViewDialog({
             {...(lookupFetcher ? { lookupFetcher } : {})}
           />
         ) : missingSchema ? (
-          <div className={ERROR_BOX}>
+          <div className={CONNECTION_ERROR_BOX}>
             {`GET ${apiBase}/connection served no connection JSON Schema (Accept: application/schema+json).`}
           </div>
         ) : schema.isError ? (
-          <div className={ERROR_BOX}>{errorMessage(schema.error)}</div>
+          <div className={CONNECTION_ERROR_BOX}>{errorMessage(schema.error)}</div>
         ) : (
           <div className="text-sm text-muted-foreground">Loading form…</div>
         )}
@@ -438,24 +368,7 @@ function ConnectionViewDialog({
   );
 }
 
-/**
- * The served connection schema, under the key SchemaActionForm reads, so the
- * page, the editor and the read-only view share one request. `null` means the
- * service served no schema.
- */
-function useConnectionSchema(client: SharedOperationsApiClient) {
-  return useQuery<JsonSchemaObject | null>({
-    queryKey: ["entity-schema", createConnectionAction.path],
-    queryFn: async () => (await client.getSchema(createConnectionAction.path)) ?? null,
-    staleTime: 5 * 60 * 1000,
-    retry: 0,
-  });
-}
-
 function rejectReadOnlyEdit(): never {
   throw new Error("a read-only connection view cannot change its value");
 }
 
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}

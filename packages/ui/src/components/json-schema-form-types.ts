@@ -535,4 +535,18 @@ export interface FieldOption {
   // Optional hue, resolved from the schema's x-enum-tones. Used where a value
   // is rendered as a coloured mark (e.g. the accordion array's item glyph).
   tone?: FieldTone;
+  // Optional right-aligned marks beside the option, e.g. how a connection is
+  // reached (proxy / svc / via). Rendered by lookup pickers as small badges.
+  badges?: FieldOptionBadge[];
+  // Optional section header the option is listed under by lookup pickers, e.g.
+  // a connection's type. Options sharing a group are listed together.
+  group?: string;
+}
+
+// FieldOptionBadge is one small mark on an option row. `icon` is a runtime icon
+// name or a rendered node; `tone` is the hue.
+export interface FieldOptionBadge {
+  label: string;
+  icon?: LabelIconSpec;
+  tone?: FieldTone;
 }

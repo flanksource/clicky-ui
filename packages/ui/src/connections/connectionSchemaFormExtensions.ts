@@ -69,7 +69,8 @@ export type ConnectionSecretSources = {
   urlSources: SecretValueSource[];
 };
 
-const fetchJson: ConnectionJsonFetcher = async <T>(url: string) => {
+/** The default `ConnectionJsonFetcher`: a GET with `Accept: application/json` that throws on a non-2xx answer. */
+export const fetchConnectionJson: ConnectionJsonFetcher = async <T>(url: string) => {
   const response = await fetch(url, {
     headers: { Accept: "application/json" },
   });
@@ -208,7 +209,7 @@ function namespaceQuery(namespace: string): string {
 /** The secret-catalog loaders, on `{apiBase}/connections/{secrets,workloads,…}`. */
 export function connectionSecretLoaders({
   apiBase,
-  fetcher = fetchJson,
+  fetcher = fetchConnectionJson,
 }: {
   apiBase: string;
   fetcher?: ConnectionJsonFetcher;
@@ -253,7 +254,7 @@ export function connectionSecretLoaders({
 export function connectionSchemaFormExtensions({
   apiBase,
   schema,
-  fetcher = fetchJson,
+  fetcher = fetchConnectionJson,
   kubernetes = "form",
 }: ConnectionSchemaFormExtensionsOptions): Required<ConnectionFormExtensions> {
   const sources = connectionSecretSources(schema);

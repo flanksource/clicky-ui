@@ -54,6 +54,10 @@ export type SchemaActionFormSlots = {
   body: ReactNode;
   footer?: ReactNode;
   dirty?: boolean;
+  // The live form value and its setter, once the schema form is showing, so a
+  // host layout can place controls over it (e.g. a dialog-header picker).
+  value?: Record<string, unknown>;
+  onValueChange?: (next: Record<string, unknown>) => void;
 };
 
 export type SchemaActionFormProps = {
@@ -77,6 +81,11 @@ export type SchemaActionFormProps = {
   // the modal's pinned footer while standalone consumers retain the inline
   // layout below.
   renderLayout?: (slots: SchemaActionFormSlots) => ReactNode;
+  // Property keys the form omits from rendering; their values still submit.
+  hiddenKeys?: string[];
+  // Returns why the current value must not be submitted (shown under the form,
+  // Save disabled), or undefined when it may be.
+  submitBlocker?: (value: Record<string, unknown>) => string | undefined;
   // Rendered when the resource exposes no JSON Schema (or schema forms are not
   // applicable to this action) — the existing parameter form.
   fallback: ReactNode;
@@ -97,6 +106,8 @@ export function SchemaActionForm({
   formPost,
   footerActions,
   renderLayout,
+  hiddenKeys,
+  submitBlocker,
   fallback,
 }: SchemaActionFormProps) {
   const method = action.method.toUpperCase();
@@ -193,8 +204,10 @@ export function SchemaActionForm({
   const dirty =
     JSON.stringify(value) !== JSON.stringify(baseline) ||
     (view === "yaml" && yamlText !== stringifyYaml(value));
+  const blocked = submitBlocker?.(value);
   const canSubmit =
     validForm &&
+    !blocked &&
     !yamlError &&
     (view !== "yaml" || yamlValidation.status === "valid");
   const handleValidationChange = useCallback((next: MonacoValidationState) => {
@@ -326,6 +339,7 @@ export function SchemaActionForm({
             value={value}
             onChange={setValue}
             errors={formErrors}
+            {...(hiddenKeys ? { hiddenKeys } : {})}
             {...(formPre ? { pre: formPre } : {})}
             {...(formPost ? { post: formPost } : {})}
             {...(lookupFetcher ? { lookupFetcher } : {})}
@@ -373,6 +387,7 @@ export function SchemaActionForm({
           )}
         </div>
       )}
+      {blocked && <p className="text-xs text-destructive">{blocked}</p>}
       {error && (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
           {error}
@@ -414,7 +429,7 @@ export function SchemaActionForm({
       )}
     </div>
   );
-  return <>{renderSlots({ body, footer })}</>;
+  return <>{renderSlots({ body, footer, value, onValueChange: setValue })}</>;
 }
 
 type SubmitTarget = {

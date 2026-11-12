@@ -283,10 +283,34 @@ export type OperationLookupFilterType =
    */
   | "value";
 
+/** One mark on a lookup option, e.g. how a connection is reached. */
+export interface OperationLookupBadge {
+  label: string;
+  /** Runtime icon name, resolved by the icon provider. */
+  icon?: string;
+  /** A FieldTone name. */
+  tone?: string;
+}
+
+/**
+ * A lookup option as the server sends it: the rendered label node plus the
+ * optional presentation the picker draws around it.
+ */
+export type OperationLookupNode = ClickyNode & {
+  /** Runtime icon name for the leading glyph. */
+  icon?: string;
+  description?: string;
+  /** A FieldTone name applied to the whole option. */
+  tone?: string;
+  badges?: OperationLookupBadge[];
+  /** Section header the option is listed under. */
+  group?: string;
+};
+
 export interface OperationLookupFilter {
   label?: string;
-  options?: Record<string, ClickyNode>;
-  selected?: Record<string, ClickyNode>;
+  options?: Record<string, OperationLookupNode>;
+  selected?: Record<string, OperationLookupNode>;
   multi?: boolean;
   type?: OperationLookupFilterType;
   /** True when `options` is only the head of a larger set (server-side capped). */

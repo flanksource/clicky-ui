@@ -10,7 +10,9 @@ import { ClearableFieldGroup } from "./clearable-field-group";
 import { NumberStepperControl } from "./json-schema-form-number-stepper";
 import { RadioGroupControl, SegmentedEnumControl } from "./json-schema-form-enum-choice";
 import { GridControl } from "./json-schema-form-grid";
+import { ConnectionLookupControl } from "./json-schema-form-connection";
 import { LookupTreeControl } from "./json-schema-form-lookup-tree";
+import { fieldOptionToComboboxOption } from "./lookup-option-view";
 import { TagsComboboxControl } from "./json-schema-form-tags-combobox";
 import { resolveLookupScope, useLookupFetcher } from "./form-lookup-context";
 import type { FieldControl, FieldOption } from "./json-schema-form-types";
@@ -468,10 +470,26 @@ export function LookupControl({
     );
   }
 
+  // A `format: "connection"` field is picked by its `connection://` ref from a
+  // typed, grouped picker that can create the connection it is missing.
+  if (field.schema.format === "connection") {
+    return (
+      <ConnectionLookupControl
+        field={field}
+        fieldId={fieldId}
+        readOnly={readOnly}
+        size={size}
+        options={options}
+        loading={loading}
+        onSearch={onSearch}
+      />
+    );
+  }
+
   return (
     <Combobox
       id={fieldId}
-      options={withSyntheticValue(options, value)}
+      options={withSyntheticValue(options, value).map(fieldOptionToComboboxOption)}
       {...(field.nullable ? { clearable: true, clearLabel: `Clear ${field.label} to null`, onClear: () => field.onChange(null) } : {})}
       value={value}
       disabled={readOnly}

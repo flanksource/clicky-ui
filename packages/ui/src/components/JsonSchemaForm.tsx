@@ -8,6 +8,7 @@ import { FieldsGrid } from "./json-schema-form-layout";
 import { FormErrorSummary } from "./json-schema-form-error-display";
 import { unmatchedFormErrors } from "./json-schema-form-errors";
 import { FormLookupProvider } from "./FormLookupProvider";
+import { FormConnectionContext } from "./form-connection-context";
 import { DiscriminatedForm } from "./json-schema-form-discriminator";
 import { rehydrateRefs } from "./json-schema-form-refs";
 import { renderApi, renderObjectFields } from "./json-schema-form-render";
@@ -90,6 +91,7 @@ export function JsonSchemaForm({
   persistPreferences = true,
   preferencesStorageKey = DEFAULT_PREFERENCES_STORAGE_KEY,
   lookupFetcher,
+  connectionApiBase,
   expressionEvaluator,
   applyDefaults = true,
 }: JsonSchemaFormProps) {
@@ -186,6 +188,7 @@ export function JsonSchemaForm({
 
   return (
     <FormLookupProvider {...(lookupFetcher ? { fetcher: lookupFetcher } : {})}>
+      <FormConnectionContext.Provider value={connectionApiBase}>
       <div data-json-schema-form className={cn("relative flex flex-col", fieldInnerGapClass[effectiveSize])}>
         {showPreferencesMenu && !inPickerPhase && (
           <PreferencesMenu
@@ -238,6 +241,7 @@ export function JsonSchemaForm({
           </p>
         )}
       </div>
+      </FormConnectionContext.Provider>
     </FormLookupProvider>
   );
 }

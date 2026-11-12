@@ -16,6 +16,11 @@
  * - Register `FlanksourceIcon` as the fallback icon provider
  *   (`setFallbackIconProvider(clickyIconProvider(FlanksourceIcon))`) so the
  *   connection-type picker shows each type's icon.
+ * - `ConnectionPicker` picks one connection from the options a lookup returned
+ *   (icon, endpoint and badges come from the server), by its `connection://`
+ *   ref. `JsonSchemaForm` renders it for a `format: "connection"` lookup field,
+ *   and given a `connectionApiBase` its footer opens `CreateConnectionDialog`,
+ *   which POSTs a new connection to `{apiBase}/connection` and selects it.
  */
 export * from "./connections/ConnectionsPage";
 export {
@@ -25,9 +30,34 @@ export {
   type ConnectionFormExtensions,
 } from "./connections/connectionsPageModel";
 export {
+  ConnectionPicker,
+  type ConnectionCreateRequest,
+  type ConnectionPickerProps,
+} from "./connections/ConnectionPicker";
+export {
+  CreateConnectionDialog,
+  type CreateConnectionDialogProps,
+} from "./connections/CreateConnectionDialog";
+export {
+  ConnectionFormDialog,
+  type ConnectionFormDialogProps,
+} from "./connections/ConnectionFormDialog";
+export {
+  useConnectionFormExtensions,
+  useConnectionSchema,
+} from "./connections/connectionFormSupport";
+export {
+  connectionRef,
+  connectionTypeLabel,
+  connectionTypeMeta,
+  connectionTypeOfIcon,
+  type ConnectionTypeMeta,
+} from "./connections/connectionTypes";
+export {
   connectionSchemaFormExtensions,
   connectionSecretLoaders,
   connectionSecretSources,
+  fetchConnectionJson,
   type ConnectionJsonFetcher,
   type ConnectionSchemaFormExtensionsOptions,
   type ConnectionSecretSources,

@@ -315,6 +315,7 @@ export {
   useLookupFetcher,
   resolveLookupScope,
 } from "./components/form-lookup-context";
+export { useConnectionApiBase } from "./components/form-connection-context";
 export { DEFAULT_FORM_SIZE } from "./components/json-schema-form-size";
 export type { FormSize } from "./components/json-schema-form-size";
 export {
@@ -355,6 +356,7 @@ export type {
   FieldControl,
   FieldControlKind,
   FieldOption,
+  FieldOptionBadge,
   EnumDisplay,
   ArrayDisplay,
   ArrayItemAction,
