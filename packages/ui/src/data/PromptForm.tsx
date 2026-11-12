@@ -13,8 +13,6 @@ export interface PromptFormProps {
   onResolved?: (() => void) | undefined;
   /** Resolves the options of the schema's `x-clicky-lookup` fields (e.g. a connection picker). */
   lookupFetcher?: LookupFetcher | undefined;
-  /** Where the connections service is mounted; lets a `format: "connection"` field create the connection it is missing. */
-  connectionApiBase?: string | undefined;
   /** Prefix for the form's field ids; give each copy of the same prompt on a page its own. Defaults to `prompt-<id>`. */
   idPrefix?: string | undefined;
   /**
@@ -29,10 +27,18 @@ export interface PromptFormProps {
 // JsonSchemaForm and POSTs the answer back to the prompt manager: Submit sends
 // the values, Cancel sends `{cancelled: true}`. PromptDialog is this form in a
 // Modal; a host can also render it inline, beside what the prompt is about.
-export function PromptForm({ prompt, basePath, onResolved, lookupFetcher, connectionApiBase, idPrefix, frame }: PromptFormProps) {
+export function PromptForm({ prompt, basePath, onResolved, lookupFetcher, idPrefix, frame }: PromptFormProps) {
   const [value, setValue] = useState<Record<string, unknown>>(() => ({ ...prompt.value }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Handed another prompt, start over from its value; a refetched snapshot of the same prompt keeps the edits.
+  const [answering, setAnswering] = useState(prompt.id);
+  if (answering !== prompt.id) {
+    setAnswering(prompt.id);
+    setValue({ ...prompt.value });
+    setBusy(false);
+    setError(null);
+  }
 
   const resolve = async (answer: { values?: Record<string, unknown>; cancelled?: boolean }) => {
     setBusy(true);
@@ -54,7 +60,6 @@ export function PromptForm({ prompt, basePath, onResolved, lookupFetcher, connec
       onChange={setValue}
       idPrefix={idPrefix ?? `prompt-${prompt.id}`}
       {...(lookupFetcher ? { lookupFetcher } : {})}
-      {...(connectionApiBase ? { connectionApiBase } : {})}
     />
   );
   const actions = (

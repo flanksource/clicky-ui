@@ -19,8 +19,6 @@ export interface PromptIndicatorProps extends PromptFilter {
   className?: string | undefined;
   /** Passed to the answer dialog to resolve the schema's `x-clicky-lookup` fields. */
   lookupFetcher?: LookupFetcher | undefined;
-  /** Passed to the answer dialog so a `format: "connection"` field can create the connection it is missing. */
-  connectionApiBase?: string | undefined;
   /**
    * Open each prompt's answer dialog once, as soon as it becomes pending:
    * closing it without answering leaves it pending in the panel rather than
@@ -38,13 +36,18 @@ export function PromptIndicator({
   enabled,
   className,
   lookupFetcher,
-  connectionApiBase,
   autoOpen = false,
   state: _ignoredState,
   ...filter
 }: PromptIndicatorProps) {
   const { prompts, pending } = usePrompts({ ...filter, basePath, ...(enabled !== undefined ? { enabled } : {}) });
   const [active, setActive] = useState<PromptSnapshot | null>(null);
+  // An open prompt belongs to the API it came from; answering it on another would post its id there.
+  const [activeBase, setActiveBase] = useState(basePath);
+  if (activeBase !== basePath) {
+    setActiveBase(basePath);
+    setActive(null);
+  }
   const ordered = useMemo(() => orderPrompts(prompts), [prompts]);
   const count = useMemo(() => summarizePrompts(prompts).pending, [prompts]);
 
@@ -54,7 +57,10 @@ export function PromptIndicator({
     if (!unopened || active) return;
     autoOpened.current.add(unopened.id);
     setActive(unopened);
-  }, [unopened?.id, active]);
+  }, [unopened, active]);
+
+  // A dialog's answer can land after it was closed and another opened: clear only the prompt it was for.
+  const closePrompt = (id: string) => setActive((current) => (current?.id === id ? null : current));
 
   const label = count > 0 ? `${count} pending` : "Prompts";
   return (
@@ -104,10 +110,8 @@ export function PromptIndicator({
           prompt={active}
           basePath={basePath}
           open={true}
-          onClose={() => setActive(null)}
-          onResolved={() => setActive(null)}
+          onClose={() => closePrompt(active.id)}
           lookupFetcher={lookupFetcher}
-          connectionApiBase={connectionApiBase}
         />
       ) : null}
     </>
