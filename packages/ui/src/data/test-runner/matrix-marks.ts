@@ -10,6 +10,7 @@ import {
   UiHourglass,
   UiLoader,
   UiPass,
+  UiProhibit,
   UiSkipCircle,
   UiSkipForward,
   UiWarningCircle,
@@ -39,6 +40,8 @@ export const MATRIX_MARKS = {
   error: { icon: UiWarningTriangleFilled, tone: "text-red-600 dark:text-red-400", bar: "bg-red-800", label: "error", legend: "error · never started", attention: true },
   pending: { icon: UiHourglass, tone: "text-muted-foreground", label: "pending", legend: "pending · queued", attention: false },
   absent: { icon: UiCircleOutline, tone: "text-muted-foreground/60", label: "not in this run", attention: false },
+  /** A plan or case its country does not apply to: not run here, by design. */
+  na: { icon: UiProhibit, tone: "text-muted-foreground/60", label: "N/A", legend: "N/A · not for this country", attention: false },
 } satisfies Record<string, MatrixMarkToken>;
 
 export type MatrixMarkKey = keyof typeof MATRIX_MARKS;
