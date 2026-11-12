@@ -11,6 +11,7 @@ import { severityRank } from "../data/lint/stats";
 import { cn } from "../lib/utils";
 import type { Monaco } from "../monaco";
 import { MonacoEditor } from "../monaco/MonacoEditor";
+import { sourceCommentActions, type SourceComments } from "../monaco/source-comments";
 import {
   FINDINGS_COMMENT_CONFIG,
   findingsToComments,
@@ -38,6 +39,12 @@ export type AnnotatedCodeProps = {
   onChange?: ((source: string) => void) | undefined;
   /** Shows each line's worst finding as `rule · message` after the line's text. */
   inlineChips?: boolean | undefined;
+  /**
+   * People's threads on line ranges: a gutter marker on each range, and a
+   * Comment action on the selection (plus a click on an empty gutter line)
+   * that calls `onCreate`. Lines a finding covers do not start threads from the gutter.
+   */
+  sourceComments?: SourceComments | undefined;
   className?: string | undefined;
 };
 
@@ -62,6 +69,7 @@ const GLYPH: Record<LintSeverity, string> = {
   warning: `${GLYPH_BASE} bg-amber-500`,
   info: `${GLYPH_BASE} bg-sky-500`,
 };
+const THREAD_GLYPH = `${GLYPH_BASE} bg-primary`;
 const CHIP_BASE = "ml-6 italic";
 const CHIP: Record<LintSeverity, string> = {
   error: `${CHIP_BASE} text-red-500`,
@@ -75,7 +83,8 @@ function markerSeverity(monaco: Monaco, severity: LintSeverity): number {
 }
 
 function modelPath(workDir: string | undefined, file: string): string {
-  return encodeURI(`file://${workDir ? (workDir.startsWith("/") ? workDir : `/${workDir}`) : ""}/${file}`);
+  const path = file.startsWith("/") ? file : `${workDir ?? ""}/${file}`;
+  return `file:///${path.replace(/^\/+/, "").split("/").map(encodeURIComponent).join("/")}`;
 }
 
 /** The editor-model markers for `findings`: the finding's range when it has one, else the rest of its line. */
@@ -145,6 +154,7 @@ function CodeBody({
   getFindingActions,
   onChange,
   inlineChips,
+  sourceComments,
   className,
 }: AnnotatedCodeProps & {
   mounted: MountedEditor | null;
@@ -189,6 +199,31 @@ function CodeBody({
       monaco.editor.setModelMarkers(model, MARKER_OWNER, []);
     };
   }, [mounted, findings, inlineChips]);
+
+  const threads = useRef(sourceComments);
+  useEffect(() => {
+    threads.current = sourceComments;
+  });
+  const threadsEnabled = sourceComments !== undefined;
+  const canStartThreads = sourceComments?.onCreate !== undefined;
+  useEffect(() => {
+    if (!mounted || !threadsEnabled) return;
+    const actions = sourceCommentActions(mounted.editor, () => {
+      const current = threads.current;
+      return current && { ...current, canCreateOnLine: (line) => !findingCovering(findings, line) && (current.canCreateOnLine?.(line) ?? true) };
+    });
+    return () => actions.dispose();
+  }, [mounted, threadsEnabled, canStartThreads, findings]);
+  useEffect(() => {
+    if (!mounted || !sourceComments) return;
+    const decorations = mounted.editor.createDecorationsCollection(
+      sourceComments.ranges.map((range) => ({
+        range: { startLineNumber: range.startLine, startColumn: 1, endLineNumber: range.endLine, endColumn: 1 },
+        options: { isWholeLine: true, glyphMarginClassName: THREAD_GLYPH, glyphMarginHoverMessage: { value: "Open comment" } },
+      })),
+    );
+    return () => decorations.clear();
+  }, [mounted, sourceComments]);
 
   // Clicking a line a finding covers focuses its thread in the rail.
   useEffect(() => {
@@ -241,16 +276,18 @@ function CodeBody({
           onMount={(editor, monaco) => onMount({ editor, monaco })}
         />
       </div>
-      <div className="shrink-0 overflow-y-auto border-l border-border px-density-3">
-        <CommentSidePanel
-          focusedAlignment="anchor"
-          formatAnchorLabel={(anchor) => `line ${lineOfAnchor(anchor)}`}
-          renderRootDetails={(comment) => {
-            const finding = findingsById.get(comment.id);
-            return finding && getFindingActions ? <ProblemActions items={getFindingActions(finding)} /> : null;
-          }}
-        />
-      </div>
+      {findings.length > 0 && (
+        <div className="shrink-0 overflow-y-auto border-l border-border px-density-3">
+          <CommentSidePanel
+            focusedAlignment="anchor"
+            formatAnchorLabel={(anchor) => `line ${lineOfAnchor(anchor)}`}
+            renderRootDetails={(comment) => {
+              const finding = findingsById.get(comment.id);
+              return finding && getFindingActions ? <ProblemActions items={getFindingActions(finding)} /> : null;
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

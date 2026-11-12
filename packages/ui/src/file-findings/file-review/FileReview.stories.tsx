@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, waitFor, within } from "storybook/test";
+import { capturePatch, patchAnchor } from "../../comments/anchoring/patch-anchor";
 import type { Comment, CommentCallbacks } from "../../comments/comment-types";
 import { MonacoProvider } from "../../monaco/MonacoProvider";
-import { FileReview, type FileReviewLayout, type FileReviewProps, type FileReviewView } from "./FileReview";
+import { FileReview, type FileReviewCommentTargets, type FileReviewLayout, type FileReviewProps, type FileReviewView } from "./FileReview";
 import { emptyProblemFilters, type ProblemFilters } from "./problem-filters";
 import { CODE_FILE, CODE_SOURCE, LONG_DOC, SHORT_DOC, type DocFixture } from "./FileReview.fixtures";
 import { quoteAnchor } from "./quote-anchor";
@@ -22,8 +23,10 @@ function useLocalComments(initial: Comment[], onCreate?: CommentCallbacks["onCre
   const [comments, setComments] = useState(initial);
   const nextId = useRef(0);
   const callbacks = useMemo<CommentCallbacks>(() => {
-    const add = (comment: Pick<Comment, "body" | "anchor" | "parentId" | "status">) =>
-      setComments((current) => [...current, { ...comment, id: `local-${++nextId.current}`, createdAt: new Date().toISOString(), author: YOU }]);
+    const add = (comment: Pick<Comment, "body" | "anchor" | "parentId" | "status">) => {
+      const added = { ...comment, id: `local-${++nextId.current}`, createdAt: new Date().toISOString(), author: YOU };
+      setComments((current) => [...current, added]);
+    };
     return {
       onCreate: async (input) => {
         await onCreate?.(input);
@@ -44,9 +47,11 @@ type HarnessProps = Partial<Omit<FileReviewProps, "comments" | "findings">> & {
   withBlame?: boolean;
   editable?: boolean;
   onCreate?: CommentCallbacks["onCreate"];
+  anchoring?: "quote" | "patch";
+  targets?: FileReviewCommentTargets;
 };
 
-function Harness({ fixture = SHORT_DOC, withComments = false, withFindings = false, withBlame = false, editable = false, onCreate, ...props }: HarnessProps) {
+function Harness({ fixture = SHORT_DOC, withComments = false, withFindings = false, withBlame = false, editable = false, onCreate, anchoring, targets, ...props }: HarnessProps) {
   const [view, setView] = useState<FileReviewView>(props.view ?? "preview");
   const [layout, setLayout] = useState<FileReviewLayout>(props.layout ?? "margin");
   const [problemFilters, setProblemFilters] = useState<ProblemFilters>(emptyProblemFilters);
@@ -61,7 +66,7 @@ function Harness({ fixture = SHORT_DOC, withComments = false, withFindings = fal
       onViewChange={setView}
       layout={layout}
       onLayoutChange={setLayout}
-      {...(withComments ? { comments } : {})}
+      {...(withComments ? { comments: { ...comments, ...(anchoring ? { anchoring } : {}), ...(targets ? { targets } : {}) } } : {})}
       {...(withFindings ? { findings: fixture.findings, problemFilters, onProblemFiltersChange: setProblemFilters } : {})}
       {...(withBlame ? { blame: fixture.blame } : {})}
       {...(editable ? { onSourceChange: setSource } : {})}
@@ -108,7 +113,7 @@ export const AllFeatures: Story = {
 
     await userEvent.click(await canvas.findByRole("button", { name: "Comment" }));
     await userEvent.type(canvas.getByTestId("comment-compose-input"), "Which registry?");
-    await userEvent.click(canvas.getByTestId("comment-compose-send"));
+    await userEvent.click(canvas.getByRole("button", { name: "Post comment" }));
 
     const anchor = quoteAnchor({ path: ["Release checklist", "Cutting the build"], prefix: "builds the", quote: "artifacts", suffix: "and publishes" });
     await waitFor(() => expect(args.onCreate).toHaveBeenCalledWith(expect.objectContaining({ anchor, body: "Which registry?" })));
@@ -186,7 +191,7 @@ export const CodeFile: Story = {
 
     await userEvent.click(await canvas.findByRole("button", { name: "Comment" }));
     await userEvent.type(canvas.getByTestId("comment-compose-input"), "Off by one?");
-    await userEvent.click(canvas.getByTestId("comment-compose-send"));
+    await userEvent.click(canvas.getByRole("button", { name: "Post comment" }));
 
     const column = CODE_SOURCE.split("\n")[11]!.indexOf("attempts");
     const anchor = sourceAnchor(locateSource(CODE_SOURCE, { line: 12, column }, { line: 12, column: column + "attempts".length })!);
@@ -201,4 +206,43 @@ export const CodeFile: Story = {
 export const EditableSource: Story = {
   tags: ["browser"],
   args: { withFindings: true, editable: true, view: "source" },
+};
+
+const PATCH_THREAD: Comment = {
+  id: "patch-1",
+  body: "Is a green day still the bar for major versions?",
+  status: "open",
+  anchor: patchAnchor(capturePatch(SHORT_DOC.source, 7, 7)),
+  createdAt: "2026-10-24T09:00:00.000Z",
+  author: YOU,
+};
+
+/**
+ * An editable file whose threads are git-style patch anchors (`r:`): select
+ * lines in the editor, the Source listing or the Preview and the thread keeps
+ * to those lines as the text changes. Switch **Edit / Review** in the header;
+ * the Comment menu comments on an element or the whole file.
+ */
+export const PatchComments: Story = {
+  tags: ["browser"],
+  args: {
+    fixture: { ...SHORT_DOC, comments: [PATCH_THREAD] },
+    withComments: true,
+    editable: true,
+    selectToComment: true,
+    anchoring: "patch",
+    targets: { element: true, document: true, screenshot: true },
+    view: "source",
+    className: "h-[720px]",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Review" }));
+    const thread = await waitFor(() => {
+      const el = canvasElement.querySelector<HTMLElement>('[data-source-line="7"] [data-source-thread]');
+      if (!el) throw new Error("the patch thread is not listed under line 7 yet");
+      return el;
+    });
+    await expect(thread).toHaveTextContent("Is a green day still the bar");
+  },
 };

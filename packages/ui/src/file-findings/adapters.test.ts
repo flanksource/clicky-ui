@@ -77,6 +77,29 @@ describe("lintFindings", () => {
     ]);
   });
 
+  it("places a violation only at its file locations, leaving entity and url locations out", () => {
+    const findings = lintFindings([
+      lintResult({
+        linter: "data-lint",
+        violations: [
+          {
+            file: "checks/loops.sql",
+            line: 120,
+            message: "P-1001 x3",
+            locations: [
+              { file: "checks/loops.sql", line: 120 },
+              { entity: { kind: "Policy", id: "p1" } },
+              { url: { url: "https://oipa.example.com/p/1", css: ".row" } },
+            ],
+          },
+          { message: "P-1002 x4", locations: [{ entity: { kind: "Policy", id: "p2" } }] },
+        ],
+      }),
+    ]);
+
+    expect(findings.map((f) => `${f.file}:${f.line} ${f.message}`)).toEqual(["checks/loops.sql:120 P-1001 x3"]);
+  });
+
   it("prefers the violation's own source over the linter name", () => {
     const [finding] = lintFindings([
       lintResult({ linter: "eslint", violations: [{ file: "a.ts", line: 3, source: "typescript-eslint", message: "m" }] }),
@@ -224,6 +247,38 @@ describe("groupFindingsByFile", () => {
     expect(leaf?.findings.map((f) => f.line)).toEqual([2, 9]);
   });
 
+  it("gives folder nodes a ref to their folder path, the deepest one for a folded chain", () => {
+    const tree = groupFindingsByFile([
+      finding("pkg/server/handler.go", WORK_DIR),
+      finding("pkg/server/routes/api.go", WORK_DIR),
+      finding("pkg/store/db.go", WORK_DIR),
+    ]);
+
+    const refs = (nodes: FileTreeNode[]): string[] =>
+      nodes.flatMap((n) => [`${n.kind} ${n.name} -> ${n.ref.file}`, ...refs(n.children ?? [])]);
+    expect(refs(tree)).toEqual([
+      "folder pkg -> pkg",
+      "folder server -> pkg/server",
+      "file routes/api.go -> pkg/server/routes/api.go",
+      "file handler.go -> pkg/server/handler.go",
+      "file store/db.go -> pkg/store/db.go",
+    ]);
+  });
+
+  it("gives each work-dir root folder a ref to the root of its work dir", () => {
+    const tree = groupFindingsByFile([
+      finding("src/App.tsx", "/repo/gavel/web"),
+      finding("src/main.tsx", "/repo/gavel/web"),
+      finding("src/App.tsx", "/repo/gavel/ui"),
+      finding("src/main.tsx", "/repo/gavel/ui"),
+    ]);
+
+    expect(tree.map((n) => ({ kind: n.kind, ref: n.ref }))).toEqual([
+      { kind: "folder", ref: { workDir: "/repo/gavel/ui", file: "src" } },
+      { kind: "folder", ref: { workDir: "/repo/gavel/web", file: "src" } },
+    ]);
+  });
+
   it("keeps the same relative path under two work dirs apart, labelled by work dir", () => {
     const tree = groupFindingsByFile([finding("src/App.tsx", "/repo/gavel/web"), finding("src/App.tsx", "/repo/gavel/ui")]);
 
@@ -234,5 +289,37 @@ describe("groupFindingsByFile", () => {
 
   it("returns an empty tree for no findings", () => {
     expect(groupFindingsByFile([])).toEqual([]);
+  });
+
+  it("lists files that have no findings with a zero count, merged with files that do", () => {
+    const tree = groupFindingsByFile(
+      [finding("pkg/server/handler.go", WORK_DIR, 4)],
+      [
+        { workDir: WORK_DIR, file: "pkg/server/handler.go" },
+        { workDir: WORK_DIR, file: "pkg/server/routes.go" },
+        { workDir: WORK_DIR, file: "README.md" },
+      ],
+    );
+
+    expect(outline(tree)).toEqual(["pkg/server/ (1)", "  handler.go (1)", "  routes.go (0)", "README.md (0)"]);
+    const routes = tree[0]!.children!.find((n) => n.name === "routes.go")!;
+    expect({ kind: routes.kind, ref: routes.ref, findings: routes.findings }).toEqual({
+      kind: "file",
+      ref: { workDir: WORK_DIR, file: "pkg/server/routes.go" },
+      findings: [],
+    });
+  });
+
+  it("builds a tree from files alone", () => {
+    expect(outline(groupFindingsByFile([], [{ file: "a/b.md" }, { file: "c.md" }]))).toEqual(["a/b.md (0)", "c.md (0)"]);
+  });
+
+  it("gives each work dir of a listed file its own root", () => {
+    const tree = groupFindingsByFile([], [
+      { workDir: "/repo/gavel/web", file: "src/App.tsx" },
+      { workDir: "/repo/gavel/ui", file: "src/App.tsx" },
+    ]);
+
+    expect(outline(tree)).toEqual(["gavel/ui/src/App.tsx (0)", "gavel/web/src/App.tsx (0)"]);
   });
 });

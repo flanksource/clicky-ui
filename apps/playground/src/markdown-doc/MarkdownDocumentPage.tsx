@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@flanksource/clicky-ui";
 import { useCommentContext } from "@flanksource/clicky-ui/comments";
-import { FileReview, lintFindings, type FileReviewLayout } from "@flanksource/clicky-ui/file-findings";
+import { FileReview, isBuiltinFileReviewView, lintFindings, type FileReviewLayout } from "@flanksource/clicky-ui/file-findings";
 import { MonacoProvider } from "@flanksource/clicky-ui/monaco";
 import { UiSparkles } from "@flanksource/clicky-ui/icons";
 
@@ -72,7 +72,9 @@ export function MarkdownDocumentPage({ slug, view, onViewChange, source, annotat
   };
   // The keydown listener is bound once; it always calls the latest save.
   const saveRef = useRef(saveAndLint);
-  saveRef.current = saveAndLint;
+  useEffect(() => {
+    saveRef.current = saveAndLint;
+  });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "s" || !(event.metaKey || event.ctrlKey)) return;
@@ -147,7 +149,10 @@ export function MarkdownDocumentPage({ slug, view, onViewChange, source, annotat
           path={path}
           source={draft}
           view={view}
-          onViewChange={onViewChange}
+          onViewChange={(next) => {
+            if (!isBuiltinFileReviewView(next)) throw new Error(`MarkdownDocumentPage: FileReview chose view "${next}", but this page passes no tabs`);
+            onViewChange(next);
+          }}
           findings={findings}
           {...(annotations === "visible" ? { comments } : {})}
           selectToComment
