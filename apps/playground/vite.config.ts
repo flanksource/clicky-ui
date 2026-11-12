@@ -104,6 +104,7 @@ const externalAliases: Alias[] = envList("PLAYGROUND_EXTERNAL_ALIASES").map(
 const gavelEndpoint = localEnv.PLAYGROUND_GAVEL_URL ? fixedGavel(localEnv.PLAYGROUND_GAVEL_URL) : onDemandGavel({ workspace: workspaceRoot, command: [localEnv.PLAYGROUND_GAVEL_BINARY ?? "gavel"], localRoots: [workspaceRoot, ...envList("PLAYGROUND_LOCAL_ROOTS").map((path) => existingPath("PLAYGROUND_LOCAL_ROOTS", path))] });
 configureComments({ dir: playgroundDataDir, endpoint: gavelEndpoint, workspace: workspaceRoot });
 const captainURL = "http://localhost:9020";
+const gavelEditURL = localEnv.PLAYGROUND_GAVEL_EDIT_URL ?? "http://127.0.0.1:9094";
 const agentRuns = createAgentRuns({
   dir: playgroundDataDir,
   captainURL,
@@ -230,6 +231,14 @@ export default defineConfig(({ mode }) => ({
         replacement: resolve(uiSrc, "utils.ts"),
       },
       {
+        find: /^@flanksource\/clicky-ui\/hooks$/,
+        replacement: resolve(uiSrc, "hooks.ts"),
+      },
+      {
+        find: /^@flanksource\/clicky-ui\/components$/,
+        replacement: resolve(uiSrc, "components.ts"),
+      },
+      {
         find: /^@flanksource\/clicky-ui\/data$/,
         replacement: resolve(uiSrc, "data.ts"),
       },
@@ -296,6 +305,17 @@ export default defineConfig(({ mode }) => ({
         target: localEnv.PLAYGROUND_OIPA_URL ?? "http://localhost:8020",
         changeOrigin: true,
         rewrite: (path) => path.slice("/oipa-api".length),
+      },
+      // `gavel edit --no-open --port 9094 <paths>`: its file API rejects writes whose
+      // Origin is not its own host, so the proxy presents the target's origin.
+      "/gavel-edit-api": {
+        target: gavelEditURL,
+        changeOrigin: true,
+        rewrite: (path) => path.slice("/gavel-edit-api".length),
+        configure: (proxy) =>
+          proxy.on("proxyReq", (request) => {
+            if (request.getHeader("origin")) request.setHeader("origin", new URL(gavelEditURL).origin);
+          }),
       },
     },
     // The compiled-shell editing server reloads live pages after changes.

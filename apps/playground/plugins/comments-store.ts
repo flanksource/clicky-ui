@@ -77,6 +77,8 @@ export type StoredAgentRun = {
   error?: string;
   /** The live captain session it went to, when not the playground's own; `channel` once delivered. */
   target?: { label: string; channel?: string };
+  /** When the agent first replied in the thread after the hand-off. */
+  repliedAt?: string;
 };
 
 /** One finding of a structured comment, rendered as a chip and toggled by status. */

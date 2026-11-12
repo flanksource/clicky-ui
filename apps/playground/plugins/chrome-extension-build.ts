@@ -29,6 +29,8 @@ function clickyUiAliases(uiSrc: string): Alias[] {
     ["ai", "ai.ts"],
     ["ai\\/runtime-profile", "runtime-profile.ts"],
     ["utils", "utils.ts"],
+    ["hooks", "hooks.ts"],
+    ["components", "components.ts"],
     ["data", "data.ts"],
     ["git", "git.ts"],
     ["expressions\\/playground", "expressions/playground.ts"],
