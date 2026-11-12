@@ -1,13 +1,13 @@
 {
   "name": "@flanksource/page-runtime",
   "version": "0.0.0",
-  "private": true,
   "description": "Browser-mode page runtime for facet and clicky-ui pages: library runtime sets, the module service worker and the page frame.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
     "./editing": "./src/editing.ts",
-    "./build": "./src/build/index.ts",
+    "./build": { "types": "./src/build/index.ts", "default": "./dist/build/index.mjs" },
+    "./build/dependencies": { "types": "./src/build/dependencies.ts", "default": "./dist/build/dependencies.mjs" },
     "./sw": "./src/sw/index.ts",
     "./frame": "./src/frame/index.ts",
     "./frame/agent": "./src/frame/agent.ts",
@@ -24,7 +24,8 @@
     "./static/*": "./dist/static/*"
   },
   "scripts": {
-    "build": "tsx scripts/build-static.ts",
+    "build": "tsx scripts/build.ts",
+    "build:builder": "tsx scripts/build-builder.ts",
     "serve-packages": "tsx scripts/serve-packages.ts",
     "check-fragment": "tsx scripts/check-fragment.ts",
     "spike": "tsx spikes/run.ts",

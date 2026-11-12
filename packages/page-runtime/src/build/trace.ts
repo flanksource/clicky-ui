@@ -100,7 +100,7 @@ function stringLiteral(expression: string): string | null {
 const formats = new Map<string, { format: "esm" | "commonjs"; code: string; module: ReturnType<typeof parseSync>["module"] }>();
 
 /** Parses a JavaScript file once and classifies it by its syntax, which is what a browser cares about. */
-export function moduleFormat(path: string) {
+export function moduleFormat(path: string): { format: "esm" | "commonjs"; code: string; module: ReturnType<typeof parseSync>["module"] } {
   const code = readFileSync(path, "utf8");
   const known = formats.get(path);
   if (known?.code === code) return known;

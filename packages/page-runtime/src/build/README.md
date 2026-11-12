@@ -1,9 +1,45 @@
 # Library runtime build
 
-Build the library's normal ESM dist first, then call `buildLibraryRuntime` from `@flanksource/page-runtime/build`. It traces the installed dependency closure, preserving installed versions and nested dependency scopes. Converted CommonJS packages import other packages through the fragment, so the React family stays shared. Browser files under dist are checked even when an entry barrel does not reach them.
+The shared builder ships compiled JavaScript and declarations as `@flanksource/page-runtime-build`. Build its distribution from the clicky-ui workspace before packing it:
+
+```sh
+pnpm --dir packages/page-runtime run build:builder
+mkdir -p .tmp
+pnpm --dir packages/page-runtime/dist/build --config.ignoreScripts=true pack --out ../../../../.tmp/page-runtime-build.tgz
+```
+
+The package is assembled from `builder-package.json`; it excludes browser host dependencies. The parent clicky-ui repository publishes it through `.github/workflows/release.yml` on pushes to `main`, alongside the Clicky UI release matrix. The workflow selects the next stable patch from registry history, updates `builder-package.json`, builds and tests the compiler, publishes `dist/build` with provenance, then commits the version and creates a `page-runtime-build@<version>` tag. First publication uses the version already declared in the manifest. Registry authentication and network failures stop the release.
+
+The parent CI workflow's `runtime-builder` job builds and tests the same package on pull requests and uploads `page-runtime-build.tgz` for inspection. Downstream dependency and lockfile updates follow a successful CI publication. The workspace's `@flanksource/page-runtime/build` export uses the same compiled implementation.
+
+Configure the npm trusted publisher for `@flanksource/page-runtime-build` with organization `flanksource`, repository `clicky-ui`, and workflow filename `release.yml`. The package's repository metadata matches that parent repository for provenance. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
+
+## Installed dependency runtimes
 
 ```ts
-import { buildLibraryRuntime } from "@flanksource/page-runtime/build";
+import { buildDependencyRuntime, runtimeEntries } from "@flanksource/page-runtime-build/dependencies";
+
+const root = "/workspace/render-environment";
+await buildDependencyRuntime({
+  root,
+  outDir: `${root}/page-runtime/browser`,
+  entries: runtimeEntries({ root, libraries: ["@flanksource/facet"] }),
+  target: "browser",
+});
+```
+
+`root` contains the installed dependency environment and its lockfile. `entries` contains package specifiers and subpaths; `runtimeEntries` combines the React base set with a library's published fragment. `target` selects Node or browser resolution conditions. `outDir` receives relocatable ESM chunks, styles, assets and `runtime.json` with entry mappings, integrity and input hashes. CommonJS entry facades expose both named exports and the original default value. `external` maps shared base entries to precompiled modules, preserving React identity across additional dependency closures. `exports` optionally limits an entry to requested bindings; published barrel indexes allow unrelated optional features to stay outside that closure.
+
+`ensureDependencyRuntime` takes the same options with `cacheDir` in place of `outDir`. It serializes competing processes, keys compilation by the lockfile, compiler, ABI, target and entry selection, validates library input hashes on reuse, and publishes immutable generations. Older generations remain available to active readers. Compilation failures leave the previous pointer intact.
+
+`dependencyRuntimePlugin({ root, cacheDir, base })` connects a prepared runtime to Vite or Rolldown. The base includes its manifest plus `root`. Node builds import its modules externally; browser development serves its ESM modules directly. Additional package imports compile into the shared cache and reuse the base's React family. CSS imports are passed to the host's stylesheet pipeline.
+
+## Library fragments
+
+Build the library's normal ESM dist first, then call `buildLibraryRuntime` from `@flanksource/page-runtime-build`. It traces the installed dependency closure, preserving installed versions and nested dependency scopes. Converted CommonJS packages import other packages through the fragment, so the React family stays shared. Browser files under dist are checked even when an entry barrel does not reach them.
+
+```ts
+import { buildLibraryRuntime } from "@flanksource/page-runtime-build";
 
 const { fragment, barrels } = await buildLibraryRuntime({
   libraryDir: "/workspace/my-library",

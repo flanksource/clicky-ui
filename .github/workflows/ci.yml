@@ -12,6 +12,37 @@ env:
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
 
 jobs:
+  runtime-builder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build runtime builder
+        run: pnpm --filter @flanksource/page-runtime run build:builder
+      - name: Verify runtime builder
+        run: |
+          pnpm --filter @flanksource/page-runtime exec vitest run src/build scripts/release-version.test.ts scripts/release-version-cli.test.ts
+          pnpm --filter @flanksource/clicky-ui exec vitest run scripts/release-config.test.ts
+      - name: Pack runtime builder
+        run: |
+          mkdir -p .tmp
+          pnpm --dir packages/page-runtime/dist/build --config.ignoreScripts=true pack --out "${GITHUB_WORKSPACE}/.tmp/page-runtime-build.tgz"
+      - name: Upload runtime builder
+        uses: actions/upload-artifact@v4
+        with:
+          name: page-runtime-build
+          path: .tmp/page-runtime-build.tgz
+          retention-days: 7
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20

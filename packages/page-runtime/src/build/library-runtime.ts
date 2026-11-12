@@ -10,8 +10,8 @@ import { traceRecipeDependencies } from "./recipe-dependencies.ts";
 import { validateCompilerPlugins } from "../sw/compiler-plugins.ts";
 import { ClosureTracer, createResolver, EMPTY_MODULE, exportEntries, IMPORT_CONDITIONS, packageName, resolveEntry, type FragmentSpec } from "./trace.ts";
 
-export const BASE_PACKAGES = ["react", "react-dom", "scheduler", "@tanstack/react-query", "jotai"];
-export const BASE_ENTRIES = ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom", "react-dom/client", "react-dom/server", "scheduler", "@tanstack/react-query", "jotai"];
+import { BASE_PACKAGES, BASE_ENTRIES } from "./base.ts";
+export { BASE_PACKAGES, BASE_ENTRIES } from "./base.ts";
 export type LibraryRuntimeOptions = { libraryDir: string; outDir: string; base?: Fragment; aliases?: Record<string, string> };
 export type BuiltLibraryRuntime = { fragment: Fragment; barrels: BarrelIndex };
 
