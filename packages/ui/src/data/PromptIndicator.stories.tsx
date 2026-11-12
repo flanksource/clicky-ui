@@ -79,7 +79,7 @@ class FakePromptEventSource {
 }
 
 const fakeAnswerFetch: typeof fetch = async (input) =>
-  String(input).endsWith("/answer") ? new Response("", { status: 204 }) : new Response("not found", { status: 404 });
+  String(input).endsWith("/answer") ? new Response(null, { status: 204 }) : new Response("not found", { status: 404 });
 
 const withFakePromptApi: Decorator = (Story) => {
   const original = useRef<{ eventSource: typeof EventSource; fetch: typeof fetch } | null>(null);
