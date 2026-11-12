@@ -35,7 +35,7 @@ describe("openTodoModal", () => {
     expect([root.hasAttribute("data-react-grab-ignore"), root.shadowRoot!.querySelector("[role=dialog]")?.getAttribute("aria-modal")]).toEqual([true, "true"]);
   });
 
-  it.each(["todo-created", "todo-commented", "cancel"])("closes when the form reports %s", (type) => {
+  it.each(["todo-saved", "cancel"])("closes when the form reports %s", (type) => {
     const onClose = vi.fn();
     open({ onClose });
     fromForm(framedWindow(), { source: "gavel-react-grab", type, ref: "T-1" });

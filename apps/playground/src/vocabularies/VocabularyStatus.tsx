@@ -1,66 +1,37 @@
 import { useState } from "react";
-import { ActionError, Button, DropdownMenu, StatusDot, useConfirm } from "@flanksource/clicky-ui";
-import type { BackendConnection } from "../../plugins/connections-server";
+import { ActionError, Button, DropdownMenu, StatusDot } from "@flanksource/clicky-ui";
 import { RuntimeConfigurationDialog, RuntimeStatusSection } from "../browser-mode/RuntimeStatus";
 import { useRuntimeRoute } from "../browser-mode/runtime-route";
 import { useVocabulary } from "./context";
-import { restartEndpoint, restartVerb, useBackendConnections } from "../useBackendConnections";
+import { useBackendConnections } from "../useBackendConnections";
 import { NAVIGATION_ROUTE } from "../navigation/types";
-
-const MANAGEMENT_LABEL = { "on-demand": "Not running · the playground starts it when needed", external: "Run outside the playground" } as const;
 
 /** `problemsError`: the navigation response could not attach repository lint counts. */
 export function VocabularyStatus({ problemsError }: { problemsError?: string | undefined }) {
   const state = useVocabulary();
   const backends = useBackendConnections();
-  const { confirm, dialog } = useConfirm();
   const [runtimeOpen, setRuntimeOpen] = useState(false);
   const [, setRuntimeTab] = useRuntimeRoute("tab");
-  async function restartBackend(connection: BackendConnection, closeMenu: () => void) {
-    if (connection.management === "playground") {
-      // The open menu would float above the dialog (floating content clears the top modal), so it closes first.
-      closeMenu();
-      if (!(await confirm({
-        title: `Restart ${connection.name}?`,
-        message: `Stops the ${connection.name} server the playground started (pid ${connection.pid}) and starts it again from its binary, so a rebuild takes effect.`,
-        warning: "Requests in progress on that server fail.",
-        confirmLabel: "Restart",
-        remember: { key: `playground.restart-${connection.name.toLowerCase()}` },
-      }))) return;
-    }
-    await backends.restart(connection);
-  }
   const unavailable = state.error !== null || backends.error !== null;
   const disconnected = backends.connections?.some(connection => connection.status === "disconnected");
   const incompatible = backends.connections?.some(connection => connection.status === "incompatible");
   const lintUnavailable = problemsError !== undefined;
-  const restarting = backends.restarting;
-  const restartFailed = backends.restartError;
-  const loading = restarting !== null || (!unavailable && !disconnected && !incompatible && !lintUnavailable && (!state.snapshot || !backends.connections));
-  const label = unavailable ? "Playground status: unavailable" : restarting ? `Playground status: ${restarting.verb === "Restart" ? "restarting" : "starting"} ${restarting.name}` : restartFailed ? `Playground status: could not ${restartFailed.verb.toLowerCase()} ${restartFailed.name}` : disconnected ? "Playground status: disconnected" : incompatible ? "Playground status: incompatible" : state.failures.length ? "Playground status: preview issues" : lintUnavailable ? "Playground status: lint counts unavailable" : loading ? "Playground status: loading" : "Playground status: ready";
-  return <>{dialog}<RuntimeConfigurationDialog open={runtimeOpen} onClose={() => setRuntimeOpen(false)} /><DropdownMenu align="right" menuLabel="Playground status" menuClassName="w-[360px] max-w-[calc(100vw-24px)] max-h-[70dvh] overflow-auto [&_summary>div:last-child]:max-w-full [&_summary>div:last-child]:flex-wrap" trigger={
+  const loading = !unavailable && !disconnected && !incompatible && !lintUnavailable && (!state.snapshot || !backends.connections);
+  const label = unavailable ? "Playground status: unavailable" : disconnected ? "Playground status: disconnected" : incompatible ? "Playground status: incompatible" : state.failures.length ? "Playground status: preview issues" : lintUnavailable ? "Playground status: lint counts unavailable" : loading ? "Playground status: loading" : "Playground status: ready";
+  return <><RuntimeConfigurationDialog open={runtimeOpen} onClose={() => setRuntimeOpen(false)} /><DropdownMenu align="right" menuLabel="Playground status" menuClassName="w-[360px] max-w-[calc(100vw-24px)] max-h-[70dvh] overflow-auto [&_summary>div:last-child]:max-w-full [&_summary>div:last-child]:flex-wrap" trigger={
     <Button variant="ghost" size="icon" aria-label={label} title={label} className="shrink-0 [@media(pointer:coarse)]:size-11">
-      <span aria-hidden="true">{loading && !unavailable ? <span className="inline-block size-2.5 rounded-full bg-muted-foreground/40" /> : <StatusDot size="md" status={unavailable || restartFailed || disconnected ? "error" : incompatible || state.failures.length || lintUnavailable ? "warning" : "success"} />}</span>
+      <span aria-hidden="true">{loading && !unavailable ? <span className="inline-block size-2.5 rounded-full bg-muted-foreground/40" /> : <StatusDot size="md" status={unavailable || disconnected ? "error" : incompatible || state.failures.length || lintUnavailable ? "warning" : "success"} />}</span>
     </Button>
   }>{closeMenu => <div className="space-y-3 p-3 text-xs">
-    {/* The open menu would float above the dialog, so it closes first (as for restarts). */}
+    {/* The open menu would float above the dialog, so it closes first. */}
     <RuntimeStatusSection onOpenConfiguration={tab => { closeMenu(); if (tab) setRuntimeTab(tab); setRuntimeOpen(true); }} />
     <h2 className="font-semibold">Connections</h2>
     {!backends.connections && backends.error === null && <p role="status" className="text-muted-foreground">Checking connections…</p>}
-    {backends.connections?.map(connection => {
-      const verb = restartVerb(connection);
-      const failed = restartFailed?.name === connection.name ? restartFailed : null;
-      return <div key={connection.name} className="space-y-1">
+    {backends.connections?.map(connection => <div key={connection.name} className="space-y-1">
         <div className="flex items-center justify-between gap-3"><span className="font-medium">{connection.name}</span><span className="flex items-center gap-1.5"><StatusDot status={backends.error !== null || connection.status === "incompatible" ? "warning" : connection.status === "connected" ? "success" : "error"} />{backends.error !== null ? "Unknown" : connection.status === "connected" ? "Connected" : connection.status === "incompatible" ? "Incompatible" : "Disconnected"}</span></div>
         <p className="break-all text-muted-foreground">{connection.url}</p>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-muted-foreground">{connection.management === "playground" ? `Started by the playground · pid ${connection.pid}` : MANAGEMENT_LABEL[connection.management]}</span>
-          {connection.management !== "external" && <Button size="sm" variant="outline" aria-label={`${verb} ${connection.name}`} disabled={restarting !== null} onClick={() => void restartBackend(connection, closeMenu)}>{restarting?.name === connection.name ? `${restarting.verb}ing…` : verb}</Button>}
-        </div>
-        {failed && <ActionError title={`Could not ${failed.verb.toLowerCase()} ${connection.name}`} error={failed.error} context={[["Operation", `${failed.verb} ${connection.name}`], ["Method", "POST"], ["Endpoint", restartEndpoint(connection.name)]]} />}
         {backends.error === null && connection.error && <ActionError title={`${connection.name} connection unavailable`} error={connection.error} context={[["Server", connection.url]]} />}
-      </div>;
-    })}
+      </div>)}
     {backends.error !== null && <ActionError title="Connection status unavailable" error={backends.error} context={[["Endpoint", "/__playground/connections"]]} />}
     <Button size="sm" variant="outline" disabled={backends.refreshing} onClick={backends.retry}>{backends.refreshing ? "Checking connections…" : "Refresh connections"}</Button>
     {lintUnavailable && <>

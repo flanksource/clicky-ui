@@ -5,6 +5,7 @@ import { useAgentRuns } from "./AgentRunsProvider";
 import { agentSessionSrc, type CaptainSessionOption } from "./agent-runs-api";
 import { useCaptainSessions } from "./useCaptainSessions";
 import { pageInSessionScope } from "./session-scope";
+import { readPageTargets } from "./page-targets";
 
 export function RunningSessionBars({ page }: { page: string }) {
   const { data, error: managedError, openPanel } = useAgentRuns();
@@ -12,7 +13,7 @@ export function RunningSessionBars({ page }: { page: string }) {
   const visible = new Map<string, CaptainSessionOption>();
   for (const session of sessions ?? []) visible.set(session.captainId ?? session.id, session);
   for (const session of data?.sessions ?? []) {
-    const targeted = Object.entries(data?.pages ?? {}).some(([key, route]) => route.target.kind !== "playground" && pageInSessionScope(key, page) && route.target.sessionId === session.sessionId);
+    const targeted = Object.entries(readPageTargets()).some(([key, target]) => pageInSessionScope(key, page) && target.sessionId === session.sessionId);
     if (session.state !== "running" || !(targeted || (session.page ? pageInSessionScope(session.page, page) : session.purpose !== "target" && data?.settings.grouping === "shared"))) continue;
     if ([...visible.values()].some(live => live.id === session.sessionId || live.captainId === session.sessionId)) continue;
     visible.set(session.sessionId, {

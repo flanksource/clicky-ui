@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchCaptainSessions, type CaptainSessionOption } from "./agent-runs-api";
+import { readPageTargets } from "./page-targets";
+import { pageInSessionScope } from "./session-scope";
 
 export function useCaptainSessions(page?: string) {
   const [sessions, setSessions] = useState<CaptainSessionOption[] | null>(null);
@@ -10,7 +12,8 @@ export function useCaptainSessions(page?: string) {
     setError(null);
     const load = async () => {
       try {
-        const next = await fetchCaptainSessions(page);
+        const linked = page ? Object.entries(readPageTargets()).filter(([key]) => pageInSessionScope(key, page)).map(([, target]) => target.sessionId) : [];
+        const next = await fetchCaptainSessions(page, linked);
         if (active) { setSessions(next); setError(null); }
       } catch (cause) {
         if (active) setError(cause instanceof Error ? cause.message : String(cause));

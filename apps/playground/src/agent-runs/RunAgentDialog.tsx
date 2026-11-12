@@ -22,7 +22,7 @@ function describeError(cause: unknown): string {
 }
 
 /** `run` starts a session for a thread; `configure` only saves the runtime new sessions use. */
-export type RunAgentDialogMode = "run" | "configure" | "create" | "assign";
+export type RunAgentDialogMode = "run" | "configure" | "create" | "assign" | "assign-all";
 
 const COPY: Record<
   RunAgentDialogMode,
@@ -48,6 +48,11 @@ const COPY: Record<
     submit: "Start session and send",
     busy: "Sending…",
   },
+  "assign-all": {
+    title: "Assign all to a new session",
+    submit: "Start session and send all",
+    busy: "Sending…",
+  },
 };
 
 function intro(
@@ -61,6 +66,8 @@ function intro(
   }
   if (mode === "assign")
     return "Starts a new agent session with this runtime and sends it this thread. The page's agent settings stay as they are.";
+  if (mode === "assign-all")
+    return "Starts a new agent session with this runtime and sends it every open thread on this page in one message. The page's agent settings stay as they are.";
   return grouping === "page"
     ? "No agent session is running for this page. This starts the page's session; later comments on the page are sent into it."
     : "No agent session is running. This starts the playground's one shared session; later comments are sent into it.";

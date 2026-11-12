@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchAgentProjects, fetchCaptainSessions, setPageAgentRoute, type AgentSessionRuntime, type AgentTarget, type AgentSessionsView } from "./agent-runs-api";
+import { fetchAgentProjects, fetchCaptainSessions, type AgentSessionRuntime, type AgentTarget, type AgentSessionsView } from "./agent-runs-api";
 import { readProjectSession, saveProjectSession, type ProjectSessions } from "./project-session";
 
 export function useProjectSession(enabled: boolean, page: string | undefined, data: AgentSessionsView | null) {
@@ -34,8 +34,7 @@ export function useProjectSession(enabled: boolean, page: string | undefined, da
     if (!target) { setBound(binding); return; }
     const validate = async () => {
       if (target.kind === "captain" && !(await fetchCaptainSessions()).some(session => session.id === target.sessionId || session.captainId === target.sessionId)) throw new Error(`${target.label} is no longer live; switch or create a session`);
-      if (!active) return;
-      await setPageAgentRoute(page, { target });
+      if (target.kind === "managed" && !data.sessions.some(session => session.sessionId === target.sessionId && session.state === "running") && !(await fetchCaptainSessions()).some(session => session.managed && session.id === target.sessionId)) throw new Error(`${target.label} is no longer running; switch or create a session`);
     };
     validate().then(() => {
       if (active) { setBound(binding); setError(null); }

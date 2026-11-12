@@ -298,7 +298,7 @@ function RailContents({
   const ctx = useCommentContext();
   const { snapshot } = useVocabulary();
   const agentRuns = useAgentRuns();
-  deliveryReady.current = agentRuns.ready && (!agentRuns.autoRun || !!agentRuns.target);
+  deliveryReady.current = agentRuns.ready;
   useHostDialog(visible);
   const [review, setReview] = useState(false);
   const [selected, setSelected] = useState<string>();

@@ -18,7 +18,7 @@ import {
 import { normalizeErrorDiagnostics, type ErrorDiagnostics } from "@flanksource/clicky-ui";
 import { QUOTE_PREFIX, parseQuoteAnchor, resolveQuote, sourceBlockOf } from "@flanksource/clicky-ui/file-findings";
 
-import type { AgentSessionRuntime } from "../../plugins/agent-session-store";
+import type { AgentSessionRuntime, SessionAgentTarget } from "../../plugins/agent-session-store";
 import type {
   CommentElementCaptureContext,
   CommentElementContext,
@@ -152,8 +152,10 @@ export async function fetchComments(
 }
 
 export type AgentRunOptions = {
-  /** Start a new playground-managed session instead of reusing the page's; refused for a page that sends to a live session. */
+  /** Start a new playground-managed session instead of reusing the page's; refused together with a `target`. */
   fresh?: boolean;
+  /** The live session this browser chose for the comment's page; the server checks it is still there. Absent sends to the playground's agent. */
+  target?: SessionAgentTarget;
 };
 
 export type PlaygroundComments = {
@@ -185,6 +187,8 @@ export type PlaygroundComments = {
    * no session is live, in which case it starts one.
    */
   runAgent: (id: string, runtime?: AgentSessionRuntime, options?: AgentRunOptions) => Promise<void>;
+  /** Send every open thread of `page` to one session in a single delivery; the options are `runAgent`'s. */
+  runAgentBatch: (page: string, runtime?: AgentSessionRuntime, options?: AgentRunOptions) => Promise<void>;
   commentAndReopen: (id: string, body: string) => Promise<void>;
   updateRating: (id: string, rating: CommentRating) => Promise<void>;
   remove: (id: string) => Promise<void>;
@@ -557,6 +561,22 @@ export function useComments(
             author: PLAYGROUND_COMMENT_AUTHOR,
             ...(runtime ? { runtime } : {}),
             ...(options?.fresh ? { fresh: true } : {}),
+            ...(options?.target ? { target: options.target } : {}),
+          }),
+      ),
+    [mutate, post],
+  );
+
+  const runAgentBatch = useCallback(
+    (targetPage: string, runtime?: AgentSessionRuntime, options?: AgentRunOptions) =>
+      mutate(
+        () =>
+          post(`${COMMENTS_ROUTE}/agent-run/batch`, {
+            author: PLAYGROUND_COMMENT_AUTHOR,
+            page: targetPage,
+            ...(runtime ? { runtime } : {}),
+            ...(options?.fresh ? { fresh: true } : {}),
+            ...(options?.target ? { target: options.target } : {}),
           }),
       ),
     [mutate, post],
@@ -610,6 +630,7 @@ export function useComments(
     assign,
     close,
     runAgent,
+    runAgentBatch,
     commentAndReopen,
     updateRating,
     remove,

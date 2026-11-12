@@ -57,10 +57,9 @@ function PageError({
   const post = async (send: boolean, target?: AgentTarget) => {
     setBusy(true);
     setError("");
-    // Auto-run delivers a new comment as it is posted, so the page must already point at the chosen session.
+    // Auto-run has gavel deliver a new comment to the playground's agent as it is posted, so there is nothing to send.
     const autoRun = comment === null && agents.autoRun;
     try {
-      if (send && target && autoRun) await agents.setTarget(target);
       const saved =
         comment ??
         (await request<Comment>(COMMENTS_ROUTE, {

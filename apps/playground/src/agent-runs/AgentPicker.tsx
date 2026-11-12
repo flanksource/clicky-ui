@@ -16,6 +16,8 @@ export type AgentPickerSession = {
   model?: string | undefined;
   cwd?: string | undefined;
   status?: string | undefined;
+  /** The session has ended and delivering to it resumes it; shown in place of its status. */
+  resumable?: boolean | undefined;
 };
 
 export type AgentPickerProps = {
@@ -54,6 +56,13 @@ export type AgentPickerProps = {
     /** Offers a "New session" choice; choosing it shows the runtime bar. */
     onNew?: () => void;
     onAll?: () => void;
+    /** Page-level "assign every open thread": to a listed session, or to a new one. */
+    assignAll?: {
+      /** Open threads that would be sent; the buttons are disabled at zero. */
+      count: number;
+      onSession: (session: AgentPickerSession) => void;
+      onNew: () => void;
+    } | undefined;
   } | undefined;
 };
 
@@ -76,28 +85,35 @@ function InlineRuntimeBar({ runtime, catalog, onChange }: { runtime: AgentSessio
   );
 }
 
-function SessionRow({ session, label, pressed, onSelect }: { session: AgentPickerSession; label: string; pressed: boolean | undefined; onSelect: () => void }) {
+function SessionRow({ session, label, pressed, onSelect, assignAll }: { session: AgentPickerSession; label: string; pressed: boolean | undefined; onSelect: () => void; assignAll?: { disabled: boolean; onAssign: () => void } | undefined }) {
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="h-auto w-full justify-start gap-2 py-2 text-left"
-      aria-label={label}
-      {...(pressed === undefined ? {} : { "aria-pressed": pressed })}
-      title={`${session.title}\n${session.cwd ?? ""}\n${session.id}`}
-      onClick={onSelect}
-    >
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="truncate">{session.title}</span>
-        <span className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <AgentIdentity {...(session.model ? { model: session.model } : { provider: session.source })} identityId={session.id} />
-          <span className="truncate">{session.cwd?.split("/").filter(Boolean).at(-1) ?? session.id.slice(0, 12)}</span>
+    <div className="flex items-center gap-1">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-auto min-w-0 flex-1 justify-start gap-2 py-2 text-left"
+        aria-label={label}
+        {...(pressed === undefined ? {} : { "aria-pressed": pressed })}
+        title={`${session.title}\n${session.cwd ?? ""}\n${session.id}`}
+        onClick={onSelect}
+      >
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="truncate">{session.title}</span>
+          <span className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <AgentIdentity {...(session.model ? { model: session.model } : { provider: session.source })} identityId={session.id} />
+            <span className="truncate">{session.cwd?.split("/").filter(Boolean).at(-1) ?? session.id.slice(0, 12)}</span>
+          </span>
         </span>
-      </span>
-      <Badge variant="soft" tone="info" clickToCopy={false}>
-        {session.status ?? "running"}
-      </Badge>
-    </Button>
+        <Badge variant="soft" tone={session.resumable ? "neutral" : "info"} clickToCopy={false}>
+          {session.resumable ? "resumes" : (session.status ?? "running")}
+        </Badge>
+      </Button>
+      {assignAll && (
+        <Button size="sm" variant="outline" aria-label={`Assign all to ${session.title}`} disabled={assignAll.disabled} onClick={assignAll.onAssign}>
+          Assign all
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -202,6 +218,25 @@ export function AgentPicker(props: AgentPickerProps) {
               <span className="text-muted-foreground">runs the model above</span>
             </Button>
           )}
+          {sessions.assignAll && (
+            <div className="space-y-1">
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full"
+                aria-label="Assign all to a new session"
+                disabled={busy || sessions.assignAll.count === 0}
+                onClick={sessions.assignAll.onNew}
+              >
+                Assign all to a new session
+              </Button>
+              <p className="text-muted-foreground">
+                {sessions.assignAll.count === 0
+                  ? "No open threads on this page"
+                  : `${sessions.assignAll.count} open ${sessions.assignAll.count === 1 ? "thread" : "threads"}`}
+              </p>
+            </div>
+          )}
           {sessions.items.map((session) => (
             <SessionRow
               key={session.id}
@@ -209,6 +244,7 @@ export function AgentPicker(props: AgentPickerProps) {
               label={sessions.selectLabel(session)}
               pressed={sessions.onNew ? sessions.selectedId === session.id : undefined}
               onSelect={() => sessions.onSelect(session)}
+              assignAll={sessions.assignAll && { disabled: busy || sessions.assignAll.count === 0, onAssign: () => sessions.assignAll?.onSession(session) }}
             />
           ))}
           {sessions.onAll && (

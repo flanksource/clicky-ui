@@ -16,7 +16,7 @@ import { AgentIdentity, shortContextModelName } from "@flanksource/clicky-ui/cha
 
 import { fetchAgentProjects, type AgentProject, type AgentTarget, type CaptainSessionOption } from "./agent-runs-api";
 import { useAgentRuns } from "./AgentRunsProvider";
-import { captainAgentTarget, rememberedAgentTarget } from "./agent-targets";
+import { rememberedAgentTarget, sessionAgentTarget } from "./agent-targets";
 import { useCaptainSessions } from "./useCaptainSessions";
 
 const PLAYGROUND = "playground";
@@ -24,7 +24,7 @@ const CAPTAIN_PREFIX = "captain:";
 
 function sessionDescription(session: CaptainSessionOption): string {
   const folder = session.cwd?.split("/").filter(Boolean).at(-1);
-  return [folder, session.model ? shortContextModelName(session.model) : undefined].filter(Boolean).join(" · ");
+  return [folder, session.model ? shortContextModelName(session.model) : undefined, session.resumable ? "resumes" : undefined].filter(Boolean).join(" · ");
 }
 
 /**
@@ -118,7 +118,7 @@ export function AgentTargetPicker() {
         value: `${CAPTAIN_PREFIX}${session.id}`,
         label: managed.some((entry) => entry.sessionId === session.id)
           ? session.title
-          : captainAgentTarget(session).label,
+          : sessionAgentTarget(session).label,
         description: sessionDescription(session),
         group: "Live captain sessions",
         title: session.cwd ?? session.id,
@@ -152,7 +152,7 @@ export function AgentTargetPicker() {
     apply(session
       ? managed.some((entry) => entry.sessionId === session.id)
         ? { kind: "managed", sessionId: session.id, label: session.title }
-        : captainAgentTarget(session)
+        : sessionAgentTarget(session)
       : { kind: "playground" });
   };
   const apply = (next: AgentTarget) => {

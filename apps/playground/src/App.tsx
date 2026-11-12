@@ -112,7 +112,7 @@ export function App() {
             onUpdateRating={comments.updateRating}
             onDelete={comments.remove}
           >
-            <AgentRunsProvider runAgent={comments.runAgent} {...(route.page ? { page: route.page } : {})}>
+            <AgentRunsProvider runAgent={comments.runAgent} runBatch={comments.runAgentBatch} {...(route.page ? { page: route.page } : {})}>
             <PromptRunsProvider>
             {isExternal ? (
               <ExternalWorkspace

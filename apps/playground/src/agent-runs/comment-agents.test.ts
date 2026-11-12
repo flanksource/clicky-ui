@@ -1,13 +1,14 @@
 import { expect, it } from "vitest";
 import { commentAgentSessions } from "./comment-agents";
-import type { AgentSession, AgentSessionsView } from "./agent-runs-api";
+import type { AgentSession, AgentSessionsView, SessionAgentTarget } from "./agent-runs-api";
 import type { PageComment } from "../comments/useComments";
 
 const session = (id: string, page: string | null): AgentSession => ({ sessionId: id, runId: id, page, runtime: { spec: { model: "opus" } }, startedAt: "2026-11-04", state: "ended" });
-it("retains historical thread IDs and merges matching page, target and shared associations", () => {
+it("retains historical thread IDs and merges matching page, browser-chosen target and shared associations", () => {
   const comment: PageComment = { id: "thread", body: "Review", createdAt: "2026-11-04", page: "example", author: { name: "Agent", sessionId: "historical" }, agentRun: { sessionId: "page", state: "done", requestedAt: "2026-11-04" } };
-  const data: AgentSessionsView = { settings: { grouping: "shared" }, pages: { example: { target: { kind: "captain", sessionId: "page", label: "Current" }, autoRun: false } }, sessions: [session("page", "example"), session("other", "other"), session("shared", null)] };
-  const result = commentAgentSessions([comment], data);
+  const pageTarget: SessionAgentTarget = { kind: "captain", sessionId: "page", label: "Current" };
+  const data: AgentSessionsView = { settings: { grouping: "shared" }, pages: { example: { autoRun: false } }, sessions: [session("page", "example"), session("other", "other"), session("shared", null)] };
+  const result = commentAgentSessions([comment], data, pageTarget);
   expect(result.map(({ id, associations }) => ({ id, associations }))).toEqual([
     { id: "historical", associations: ["Author"] },
     { id: "page", associations: ["Thread hand-off", "Page target", "Page session"] },

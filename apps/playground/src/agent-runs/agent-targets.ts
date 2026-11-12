@@ -3,6 +3,11 @@ export function captainAgentTarget(session: CaptainSessionOption): CaptainAgentT
   return { kind: "captain", sessionId: session.id, label: `${session.title} · ${session.source}` };
 }
 
+/** A session gavel manages is a `managed` target, which gavel resumes once it has ended; any other listed session is a live captain one. */
+export function sessionAgentTarget(session: CaptainSessionOption): SessionAgentTarget {
+  return session.managed ? { kind: "managed", sessionId: session.id, label: session.title } : captainAgentTarget(session);
+}
+
 const REMEMBERED_TARGET = "playground.agent-target";
 
 /** Records the session target last chosen for any page; choosing the playground agent forgets it. */

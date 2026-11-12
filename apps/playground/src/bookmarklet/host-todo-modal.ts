@@ -2,7 +2,7 @@ import { TODO_MESSAGE_SOURCE } from "../comments/gavel-todo";
 import { bookmarkletParentOrigin } from "./origin";
 
 const MODAL_ID = "playground-grabber-todo";
-const DONE_TYPES = ["todo-created", "todo-commented", "cancel"];
+const DONE_TYPES = ["todo-saved", "cancel"];
 const CLOSE_EVENT = "close-todo-modal";
 
 /** Closes the open todo modal, if any, as its own close button does. */
@@ -11,11 +11,8 @@ export function closeTodoModal() {
 }
 
 /**
- * The modal over the page that shows the dashboard's new-todo form. The form is
- * framed through the extension's relay page (a page's CSP may refuse to frame the
- * dashboard itself), which forwards the form's `gavel-react-grab` messages:
- * `embed-ready` makes this ship the screenshot to attach, and `todo-created`,
- * `todo-commented` and `cancel` close the modal.
+ * Frames the extension's offline todo form. `embed-ready` hands over the
+ * screenshot; `todo-saved` closes only after the extension has persisted it.
  */
 export function openTodoModal(options: { relay: string; target: string; parentOrigin?: string; attachment?: { blob: Blob; name: string }; onClose?: () => void }): { close: () => void } {
   closeTodoModal();

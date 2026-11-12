@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Badge, Button, DropdownMenu } from "@flanksource/clicky-ui";
 import { UiChevronDown, UiRobotAi } from "@flanksource/clicky-ui/icons";
-import { useAgentRuns } from "./AgentRunsProvider";
+import { useAgentRuns, type AssignAllChoice } from "./AgentRunsProvider";
 import { AgentPicker } from "./AgentPicker";
+import { sessionAgentTarget } from "./agent-targets";
 import { useCaptainSessions } from "./useCaptainSessions";
 import type { CaptainSessionOption } from "./agent-runs-api";
 
@@ -15,8 +17,11 @@ export function AgentSessionButton({ compact = false }: { compact?: boolean }) {
     openPanel,
     autoRun,
     setAutoRun,
+    assignAll,
+    openThreads,
   } = useAgentRuns();
   const { sessions, error } = useCaptainSessions();
+  const [assignError, setAssignError] = useState<string | null>(null);
   const active = new Map<string, CaptainSessionOption>();
   for (const session of sessions ?? [])
     active.set(session.captainId ?? session.id, session);
@@ -39,6 +44,10 @@ export function AgentSessionButton({ compact = false }: { compact?: boolean }) {
     });
   }
   const failure = error ?? managedError;
+  const assign = (choice: AssignAllChoice, close: () => void) => {
+    setAssignError(null);
+    assignAll?.(choice).then(close, (cause: unknown) => setAssignError(cause instanceof Error ? cause.message : String(cause)));
+  };
   return (
     <DropdownMenu
       role="dialog"
@@ -58,7 +67,7 @@ export function AgentSessionButton({ compact = false }: { compact?: boolean }) {
             <>
               Agent
               <Badge variant="soft" clickToCopy={false}>
-                {active.size}
+                {[...active.values()].filter((session) => !session.resumable).length}
               </Badge>
               <UiChevronDown className="size-3" />
             </>
@@ -98,11 +107,24 @@ export function AgentSessionButton({ compact = false }: { compact?: boolean }) {
                   </p>
                 ),
               })}
-          error={failure ? `Sessions unavailable: ${failure}` : null}
+          error={assignError ?? (failure ? `Sessions unavailable: ${failure}` : null)}
           sessions={{
             items: [...active.values()],
             state: sessions !== null ? "ready" : error ? "error" : "loading",
             selectLabel: (session) => `Inspect session ${session.id}`,
+            ...(assignAll
+              ? {
+                  assignAll: {
+                    count: openThreads,
+                    onNew: () => assign({ kind: "new" }, close),
+                    onSession: (picked) => {
+                      const session = [...active.values()].find((candidate) => candidate.id === picked.id);
+                      if (!session) throw new Error(`Session ${picked.id} is no longer listed`);
+                      assign({ kind: "session", target: sessionAgentTarget(session) }, close);
+                    },
+                  },
+                }
+              : {}),
             onSelect: (picked) => {
               const session = [...active.values()].find((candidate) => candidate.id === picked.id);
               close();

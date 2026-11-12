@@ -6,12 +6,14 @@ import type { PageComment } from "../comments/useComments";
 import { useAgentRuns } from "./AgentRunsProvider";
 import { agentSessionSrc } from "./agent-runs-api";
 import { commentAgentSessions } from "./comment-agents";
+import { readPageTarget } from "./page-targets";
 import { RuntimeIdentity } from "./RuntimeIdentity";
 
 export function CommentAgents({ thread }: { thread: readonly Comment[] }) {
   const { data, error } = useAgentRuns();
   const [selected, setSelected] = useState<string>();
-  const sessions = commentAgentSessions(thread, data);
+  const page = (thread[0] as PageComment | undefined)?.page;
+  const sessions = commentAgentSessions(thread, data, page ? readPageTarget(page) : undefined);
   const inspected = sessions.find(entry => entry.id === selected);
   const people = thread.flatMap(comment => [
     ...(comment.author?.kind === "agent" ? [{ author: comment.author, role: "Author" }] : []),

@@ -13,13 +13,12 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PageErrorBoundary } from "./PageErrorBoundary";
 
-const { start, setTarget, session } = vi.hoisted(() => ({
+const { start, session } = vi.hoisted(() => ({
   start: vi.fn().mockResolvedValue(undefined),
-  setTarget: vi.fn().mockResolvedValue(undefined),
   session: { id: "session-kit", title: "Fix kit", source: "claude", model: "example-model", inCmux: false },
 }));
 vi.mock("./agent-runs/AgentRunsProvider", () => ({
-  useAgentRuns: () => ({ start, setTarget, target: undefined, autoRun: false, data: { settings: { grouping: "shared" }, sessions: [], pages: {} } }),
+  useAgentRuns: () => ({ start, target: undefined, autoRun: false, data: { settings: { grouping: "shared" }, sessions: [], pages: {} } }),
 }));
 vi.mock("./agent-runs/useCaptainSessions", () => ({
   useCaptainSessions: () => ({ sessions: [session], error: null }),

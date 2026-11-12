@@ -1,10 +1,11 @@
 import type { Comment } from "@flanksource/clicky-ui/comments";
-import type { AgentSession, AgentSessionsView } from "./agent-runs-api";
+import type { AgentSession, AgentSessionsView, SessionAgentTarget } from "./agent-runs-api";
 import type { PageComment } from "../comments/useComments";
 
 export type CommentAgentSession = { id: string; associations: string[]; session?: AgentSession; label?: string };
 
-export function commentAgentSessions(thread: readonly Comment[], data: AgentSessionsView | null): CommentAgentSession[] {
+/** `pageTarget` is the session the browser chose for the thread's page, which is kept in localStorage rather than in `data`. */
+export function commentAgentSessions(thread: readonly Comment[], data: AgentSessionsView | null, pageTarget?: SessionAgentTarget): CommentAgentSession[] {
   const found = new Map<string, CommentAgentSession>();
   const add = (id: string | undefined, association: string, label?: string) => {
     if (!id) return;
@@ -25,8 +26,7 @@ export function commentAgentSessions(thread: readonly Comment[], data: AgentSess
   }
   const page = (thread[0] as PageComment | undefined)?.page;
   if (page) {
-    const target = data?.pages[page]?.target;
-    if (target && target.kind !== "playground") add(target.sessionId, "Page target", target.label);
+    if (pageTarget) add(pageTarget.sessionId, "Page target", pageTarget.label);
     for (const session of data?.sessions ?? []) {
       if (session.page === page) add(session.sessionId, "Page session");
       else if (session.page === null && session.purpose !== "target" && data?.settings.grouping === "shared") add(session.sessionId, "Shared session");

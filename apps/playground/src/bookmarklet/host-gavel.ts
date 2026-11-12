@@ -22,9 +22,9 @@ const TODO_MODAL_ID = "playground-grabber-todo";
 
 export type GavelTodoOptions = {
   grab: ReactGrabAPI;
-  /** The dashboard origin: where the form lives and screenshots are uploaded. */
+  /** The dashboard origin: where queued todos sync and clipboard screenshots upload. */
   server: string;
-  /** The extension page that frames the dashboard's new-todo form. */
+  /** The extension's bundled offline todo form. */
   todoRelay: string;
   /** Takes the screenshot with the grabber's own UI hidden. */
   capture: (target: Element | ScreenshotTarget) => Promise<CommentScreenshotCapture>;

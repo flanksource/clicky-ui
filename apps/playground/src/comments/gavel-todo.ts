@@ -4,7 +4,7 @@ import type { ContextMenuActionContext, ReactGrabAPI } from "@flanksource/react-
  * The grabbed-element todo formatting of gavel's React Grab bookmarklet, ported
  * to typed modules: the title and Markdown body of a todo for an element, the
  * dashboard's embed form URL, the screenshot attachment Markdown, and the
- * `/@fs/` open-file hook. The dashboard's embed form creates the todo; nothing
+ * `/@fs/` open-file hook. The extension's local form captures the todo; nothing
  * here talks to gavel.
  */
 

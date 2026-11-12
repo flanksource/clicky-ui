@@ -54,6 +54,44 @@ describe("AgentPicker sessions", () => {
     expect(bar.textContent).not.toContain("example-agent");
   });
 
+  it("says an ended managed session resumes, where a running one shows its status", () => {
+    const ended: AgentPickerSession = { id: "managed-1", title: "welcome threads", source: "claude", status: "ended", resumable: true };
+    render(<AgentPicker sessions={sessions({ items: [FIRST, ended] })} />);
+    expect(screen.getByText("resumes")).toBeTruthy();
+    expect(screen.queryByText("ended")).toBeNull();
+    expect(screen.getByText("running")).toBeTruthy();
+  });
+
+  describe("assigning every open thread", () => {
+    const assignAll = (overrides: Partial<NonNullable<NonNullable<AgentPickerProps["sessions"]>["assignAll"]>> = {}) => ({ count: 3, onSession: vi.fn(), onNew: vi.fn(), ...overrides });
+
+    it("assigns all to a chosen session or to a new session, and says how many threads that is", () => {
+      const all = assignAll();
+      render(<AgentPicker sessions={sessions({ assignAll: all })} />);
+      fireEvent.click(screen.getByRole("button", { name: "Assign all to Fix layout" }));
+      expect(all.onSession).toHaveBeenCalledWith(SECOND);
+      fireEvent.click(screen.getByRole("button", { name: "Assign all to a new session" }));
+      expect(all.onNew).toHaveBeenCalledOnce();
+      expect(screen.getByText("3 open threads")).toBeTruthy();
+    });
+
+    it("disables every assign-all button, saying why, when the page has no open thread", () => {
+      render(<AgentPicker sessions={sessions({ assignAll: assignAll({ count: 0 }) })} />);
+      const buttons = screen.getAllByRole("button", { name: /^Assign all to / });
+      expect(buttons.map((button) => [button.getAttribute("aria-label"), button.hasAttribute("disabled")])).toEqual([
+        ["Assign all to a new session", true],
+        ["Assign all to Review changes", true],
+        ["Assign all to Fix layout", true],
+      ]);
+      expect(screen.getByText("No open threads on this page")).toBeTruthy();
+    });
+
+    it("offers no assign-all buttons unless asked to", () => {
+      render(<AgentPicker sessions={sessions()} />);
+      expect(screen.queryByRole("button", { name: /^Assign all to / })).toBeNull();
+    });
+  });
+
   it("offers no New session choice, and marks nothing selected, unless asked to", () => {
     render(<AgentPicker sessions={sessions()} />);
     expect(screen.queryByRole("button", { name: "New session" })).toBeNull();

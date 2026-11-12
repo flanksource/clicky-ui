@@ -7,10 +7,9 @@ import { DensityProvider, ThemeProvider } from "@flanksource/clicky-ui";
 
 const snapshot = { revision: "one", catalogs: [], items: [] };
 const connections = [
-  { name: "Gavel", url: "http://gavel.local", status: "connected", management: "external" },
-  { name: "Captain", url: "http://captain.local", status: "connected", management: "external" },
+  { name: "Gavel", url: "http://gavel.local", status: "connected" },
+  { name: "Captain", url: "http://captain.local", status: "connected" },
 ];
-const RESTART_ENDPOINT = "/__playground/connections/gavel/restart";
 function mockVocabularyFetch(fetch: typeof globalThis.fetch) {
   vi.stubGlobal("fetch", (url: string, init?: RequestInit) => url === "/__playground/connections" ? Promise.resolve(Response.json({ connections })) : fetch(url, init));
 }
@@ -138,58 +137,22 @@ it("keeps the lint-count failure behind a warning status dot", async () => {
   expect({ title: screen.getByText("Lint counts unavailable").textContent, message: screen.getByText(problemsError).textContent }).toEqual({ title: "Lint counts unavailable", message: problemsError });
 });
 
-function mockBackends(gavel: Record<string, unknown>, restart: () => Response | Promise<Response>) {
+it("lists each backend with its address and offers no way to start or restart it", async () => {
   const calls: string[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     calls.push(`${init?.method ?? "GET"} ${url}`);
-    if (url === RESTART_ENDPOINT) return restart();
-    return Response.json(url === "/__playground/connections" ? { connections: [{ ...connections[0], ...gavel }, connections[1]] } : snapshot);
+    return Response.json(url === "/__playground/connections" ? { connections: [{ ...connections[0], status: "incompatible", error: "Gavel at http://gavel.local is incompatible. Rebuild and restart Gavel." }, connections[1]] } : snapshot);
   }));
-  return calls;
-}
-
-it("restarts the Gavel server the playground started once confirmed, and shows the new process", async () => {
-  const [OLD_PID, NEW_PID] = [4101, 4202];
-  let respond!: () => void;
-  const calls = mockBackends(
-    { status: "incompatible", error: "Gavel at http://gavel.local is incompatible. Rebuild and restart Gavel.", management: "playground", pid: OLD_PID },
-    () => new Promise(resolve => { respond = () => resolve(Response.json({ connections: [{ ...connections[0], management: "playground", pid: NEW_PID }, connections[1]] })); }),
-  );
   render(<VocabularyProvider><Consumer /></VocabularyProvider>);
   fireEvent.click(await screen.findByRole("button", { name: "Playground status: incompatible" }));
-  expect(screen.getByText(`Started by the playground · pid ${OLD_PID}`)).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Restart Captain" })).toBeNull();
-  expect(screen.getByText("Run outside the playground")).toBeTruthy();
 
-  fireEvent.click(screen.getByRole("button", { name: "Restart Gavel" }));
-  const dialog = await screen.findByRole("dialog", { name: "Restart Gavel?" });
-  expect({ menuOpen: screen.queryByRole("heading", { name: "Connections" }) !== null, mentionsPid: dialog.textContent?.includes(`pid ${OLD_PID}`), posted: calls.includes(`POST ${RESTART_ENDPOINT}`) }).toEqual({ menuOpen: false, mentionsPid: true, posted: false });
-  fireEvent.click(screen.getByRole("button", { name: "Restart" }));
-
-  await screen.findByRole("button", { name: "Playground status: restarting Gavel" });
-  respond();
-  fireEvent.click(await screen.findByRole("button", { name: "Playground status: ready" }));
-  expect(screen.getByText(`Started by the playground · pid ${NEW_PID}`)).toBeTruthy();
-  expect(calls.filter(call => call === `POST ${RESTART_ENDPOINT}`)).toHaveLength(1);
-  expect(screen.getAllByText("Connected")).toHaveLength(2);
-});
-
-it("starts an on-demand Gavel without asking, and reports a failed start until connections are refreshed", async () => {
-  const failure = "gavel launch serve exited (1) before http://gavel.local answered: listen tcp: bind: address already in use";
-  const calls = mockBackends({ status: "disconnected", error: "Connection refused", management: "on-demand" }, () => Response.json({ error: failure }, { status: 502 }));
-  render(<VocabularyProvider><Consumer /></VocabularyProvider>);
-  fireEvent.click(await screen.findByRole("button", { name: "Playground status: disconnected" }));
-  expect(screen.getByText("Not running · the playground starts it when needed")).toBeTruthy();
-
-  fireEvent.click(screen.getByRole("button", { name: "Start Gavel" }));
-  await screen.findByText("Could not start Gavel");
-  expect({ dialog: screen.queryByRole("dialog", { name: /Gavel/ }), posts: calls.filter(call => call === `POST ${RESTART_ENDPOINT}`).length, message: screen.getByText(failure).textContent }).toEqual({ dialog: null, posts: 1, message: failure });
-  expect((screen.getByRole("button", { name: "Start Gavel" }) as HTMLButtonElement).disabled).toBe(false);
-  expect(screen.getByRole("button", { name: "Playground status: could not start Gavel" })).toBeTruthy();
-
-  fireEvent.click(screen.getByRole("button", { name: "Refresh connections" }));
-  await screen.findByRole("button", { name: "Playground status: disconnected" });
-  expect(screen.queryByText("Could not start Gavel")).toBeNull();
+  expect({
+    addresses: ["http://gavel.local", "http://captain.local"].map(url => screen.getByText(url, { selector: "p" }).textContent),
+    actions: screen.queryAllByRole("button", { name: /^(Start|Restart) / }).length,
+    notes: screen.queryAllByText(/Run outside the playground|Started by the playground|Not running/).length,
+    posts: calls.filter(call => call.startsWith("POST ")),
+  }).toEqual({ addresses: ["http://gavel.local", "http://captain.local"], actions: 0, notes: 0, posts: [] });
+  expect(screen.getByRole("button", { name: "Refresh connections" })).toBeTruthy();
 });
 
 it.each(["disconnected", "incompatible"])("shows independent backend %s state and clears the status dot after retry", async status => {
