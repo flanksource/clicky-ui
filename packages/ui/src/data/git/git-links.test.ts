@@ -40,6 +40,19 @@ describe("native Git provider links", () => {
       `${repo.web}?version=GTqa`,
     );
   });
+  it("keeps GitLab branch and tag references distinct", () => {
+    const repo = {
+      provider: "gitlab" as const,
+      web: "https://gitlab.example/acme/rules",
+    };
+    expect([
+      gitWebLink(repo, { ref: "refs/heads/release/qa" }),
+      gitWebLink(repo, { ref: "refs/tags/release/qa" }),
+    ]).toEqual([
+      `${repo.web}/-/tree/release/qa?ref_type=heads`,
+      `${repo.web}/-/tree/release/qa?ref_type=tags`,
+    ]);
+  });
   it("rejects an unqualified ref and abbreviated commit", () => {
     const repo = {
       provider: "github" as const,

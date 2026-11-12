@@ -6,12 +6,12 @@ function escapePath(path: string) {
 
 // A branch or tag from a fully qualified ref; the diff's side grammar always qualifies them.
 function refVersion(ref: string) {
-  const match = ref.match(/^refs\/(heads|tags)\/(.+)$/);
-  if (!match || !match[2])
+  const [, kind, name] = ref.match(/^refs\/(heads|tags)\/(.+)$/) ?? [];
+  if (!kind || !name)
     throw new Error(
       `Git ref "${ref}" must be refs/heads/<branch> or refs/tags/<tag>`,
     );
-  return { name: match[2], azurePrefix: match[1] === "heads" ? "GB" : "GT" };
+  return { name, kind, azurePrefix: kind === "heads" ? "GB" : "GT" };
 }
 
 export function gitWebLink(repo: GitWebRepository, target: GitTarget): string {
@@ -29,7 +29,10 @@ export function gitWebLink(repo: GitWebRepository, target: GitTarget): string {
     const version = refVersion(target.ref);
     if (repo.provider === "azure_devops")
       return `${repo.web}?${new URLSearchParams({ version: version.azurePrefix + version.name })}`;
-    return `${repo.web}${sub}/tree/${escapePath(version.name)}`;
+    const tree = `${repo.web}${sub}/tree/${escapePath(version.name)}`;
+    return repo.provider === "gitlab"
+      ? `${tree}?${new URLSearchParams({ ref_type: version.kind })}`
+      : tree;
   }
   if (!/^[0-9a-f]{40}$/i.test(target.commit))
     throw new Error(

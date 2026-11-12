@@ -18,7 +18,7 @@ export function Source() {
 const reviewURL = gitWebLink(repository, { pullRequest: 7 });
 ```
 
-`provider` accepts `github`, `gitlab`, or `azure_devops`. `web` is the repository's web URL, without a trailing slash or `.git` suffix. Targets select a full 40-character commit SHA, a file at that commit, a qualified branch/tag ref (`refs/heads/main`, `refs/tags/v1`), or a positive pull request number. File paths are relative to the repository root. Azure links preserve the distinction between branches and tags.
+`provider` accepts `github`, `gitlab`, or `azure_devops`. `web` is the repository's web URL, without a trailing slash or `.git` suffix. Targets select a full 40-character commit SHA, a file at that commit, a qualified branch/tag ref (`refs/heads/main`, `refs/tags/v1`), or a positive pull request number. File paths are relative to the repository root. Azure and GitLab links preserve the distinction between a branch and a tag of the same name (`version=GB…`/`GT…`, `ref_type=heads|tags`).
 
 `GitCommitList` and `GitFileList`, exported by the main library, also accept `repository` metadata on each item. File items additionally supply `commit`. An explicit `href` takes precedence over a derived link.
 
