@@ -101,7 +101,8 @@ export async function resolvePage(options: ResolveOptions): Promise<PageLock> {
   const fetcher = options.fetch ?? fetch; const now = options.now ?? Date.now();
   const requests = { ...profile.managed, ...profile.dependencies, ...options.manifest.dependencies, ...options.manifest.pageRuntime?.pages?.[options.page] };
   const versions: Record<string, string> = {}; const manifests: PackageManifest[] = []; const fragments: Fragment[] = []; const indices: BarrelIndex[] = [];
-  for (const name of ["@flanksource/clicky-ui", "@flanksource/facet"]) {
+  const required = ["@flanksource/clicky-ui", "@flanksource/facet"];
+  for (const name of [...required, ...Object.keys(profile.managed).filter(name => !required.includes(name)).sort()]) {
     if (!requests[name]) throw new Error(`${options.page}: missing managed range for ${name}`);
     const local = links.find(link => link.build.library === name);
     if (local) {

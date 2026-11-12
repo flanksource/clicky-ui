@@ -2,6 +2,8 @@ import { compile } from "tailwindcss";
 import autoprefixer from "autoprefixer";
 import postcss from "postcss";
 import type { PageStylesRecipe } from "../../schema.ts";
+import { cascadeOrder } from "../../styles.ts";
+export { layerOrder } from "../../styles.ts";
 
 export type { PageStylesRecipe };
 export type LibraryStyles = {
@@ -15,7 +17,6 @@ export type LibraryStyles = {
   recipe: PageStylesRecipe;
 };
 export type CompilerLoaders = Required<Pick<NonNullable<Parameters<typeof compile>[1]>, "loadStylesheet" | "loadModule">>;
-export const layerOrder = "@layer theme, base, facet, components, utilities;";
 
 /** Deterministic library order: a library that is extended comes before its extender, and ties are sorted by name. */
 export function orderLibraries(libraries: LibraryStyles[]): LibraryStyles[] {
@@ -38,20 +39,14 @@ export function orderLibraries(libraries: LibraryStyles[]): LibraryStyles[] {
   return ordered;
 }
 
-/** Only the most-derived recipes compile: their presets already include the libraries they extend. */
-function compiledLibraries(libraries: LibraryStyles[]): LibraryStyles[] {
-  const extended = new Set(libraries.flatMap((library) => library.recipe.extends ?? []));
-  return libraries.filter((library) => !extended.has(library.name));
-}
-
 export async function compileLibraries(options: { libraries: LibraryStyles[]; loaders: CompilerLoaders }) {
   const entries: Record<string, LibraryStyles> = {};
-  const entry = compiledLibraries(options.libraries).map((library, index) => {
+  const entry = orderLibraries(options.libraries).map((library, index) => {
     const id = `page-runtime:recipe-${index}`;
     entries[id] = library;
     return `@import "${id}";`;
   });
-  return compile([layerOrder, ...entry].join("\n"), {
+  return compile([cascadeOrder(orderLibraries(options.libraries).map(library => library.recipe.layer)), ...entry].join("\n"), {
     loadStylesheet: async (id, base) => {
       const library = entries[id];
       if (library) return { path: id, base: library.base, content: library.recipe.entry };

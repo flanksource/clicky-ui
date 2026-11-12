@@ -14,11 +14,12 @@ export type WorkerActivity = {
 };
 export type TailwindActivity = { kind: "libraries" | "candidates"; startMs: number; durationMs: number; candidates: number; cssBytes: number; cacheHit: boolean };
 export type RuntimeResolution = { versions: Record<string, string>; base: Record<string, string>; managed: string[]; importMapBytes: number; scopes: number };
-export type ActivityMessage = { type: "activity"; load: string; navigationStart: number; records: WorkerActivity[]; timeline: Array<{ phase: string; atMs: number }>; tailwind: TailwindActivity[]; runtime?: RuntimeResolution };
+export type ActivityMessage = { type: "activity"; load: string; navigationStart: number; records: WorkerActivity[]; timeline: Array<{ phase: string; atMs: number }>; tailwind: TailwindActivity[]; runtime?: RuntimeResolution; styles?: Record<string, string> };
 
 export function validateActivity(value: unknown): ActivityMessage {
   const m = record(value, "activity");
-  keys(m, ["type", "load", "navigationStart", "records", "timeline", "tailwind", "runtime"], "activity");
+  keys(m, ["type", "load", "navigationStart", "records", "timeline", "tailwind", "runtime", "styles"], "activity");
+  if (m.styles !== undefined) for (const [name, value] of Object.entries(record(m.styles, 'styles'))) { string(name, 128); string(value, 65536, true); }
   if (m.type !== "activity") throw new Error("activity.type: expected activity");
   string(m.load, 256); number(m.navigationStart);
   for (const item of array(m.records, 32)) validateRequest(item);

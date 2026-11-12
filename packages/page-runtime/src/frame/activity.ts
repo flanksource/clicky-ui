@@ -1,6 +1,7 @@
 import type { FrameConfig, FrameMessage } from "../schema.ts";
 import type { ActivityMessage, RuntimeResolution, TailwindActivity, WorkerActivity } from "../activity-schema.ts";
 import { validateActivity } from "../activity-schema.ts";
+import { inspectStyles } from '../styles.ts';
 
 export function runtimeResolution(options: { config: FrameConfig; importMap: string }): RuntimeResolution {
   const { config } = options;
@@ -22,7 +23,7 @@ export function createFrameActivity(options: { send: (message: FrameMessage) => 
   const snapshot = (): ActivityMessage => ({ type: "activity", load, navigationStart, records: [], timeline: performance.getEntriesByType("mark").filter((mark) => mark.name.startsWith("page-runtime:")).slice(-64).map((mark) => ({ phase: mark.name.slice(13), atMs: mark.startTime })), tailwind: builds.splice(0, 32), ...(runtime ? { runtime } : {}) });
   const flush = () => {
     clearTimeout(timer); timer = undefined;
-    const message = snapshot(); const pending = records; records = [];
+    const message = { ...snapshot(), styles: inspectStyles(document) }; const pending = records; records = [];
     options.send({ ...message, records: pending.slice(0, 32) });
     for (let index = 32; index < pending.length; index += 32) options.send({ type: "activity", load, navigationStart, records: pending.slice(index, index + 32), timeline: [], tailwind: [] });
   };

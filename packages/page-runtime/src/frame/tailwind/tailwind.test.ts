@@ -1,7 +1,8 @@
 import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
-import { compileLibraries, layerOrder, orderLibraries, transformCss, validateRecipe, type LibraryStyles, type PageStylesRecipe } from "./recipe.ts";
+import { compileLibraries, orderLibraries, transformCss, validateRecipe, type LibraryStyles, type PageStylesRecipe } from "./recipe.ts";
+import { cascadeOrder } from '../../styles.ts';
 import { loadTailwind } from "./runtime.ts";
 import clicky from "../../../../ui/src/page-styles.ts";
 import preset from "../../../../ui/src/tailwind-preset.ts";
@@ -57,17 +58,17 @@ describe("runtime tailwind recipes", () => {
     const libraries = [library("first", "@layer components { .first { color: red; } }"), library("second", "@layer components { .second { color: blue; } }")];
     const compiler = await compileLibraries({ libraries, loaders });
     const css = compiler.build(["block", "p-[13px]"]);
-    expect(css).toContain(layerOrder);
+    expect(css).toContain(cascadeOrder(libraries.map(library => library.recipe.layer)));
     expect(css.indexOf(".first")).toBeLessThan(css.indexOf(".second"));
     expect(css).toContain("display: block");
     expect(css).toContain("padding: 13px");
   });
 
-  it("compiles only the most-derived recipe when one library extends another", async () => {
+  it("merges parent compiler entries before derived entries in their own resolution contexts", async () => {
     const libraries = [library("base-lib", "@layer components { .base-lib { color: red; } }"), library("derived", "@layer components { .derived { color: blue; } }", { extends: ["base-lib"] })];
     const css = (await compileLibraries({ libraries, loaders })).build(["block"]);
     expect(css).toContain(".derived");
-    expect(css).not.toContain(".base-lib");
+    expect(css.indexOf('.base-lib')).toBeLessThan(css.indexOf('.derived'));
   });
 
   it("applies transforms synchronously in library order", () => {

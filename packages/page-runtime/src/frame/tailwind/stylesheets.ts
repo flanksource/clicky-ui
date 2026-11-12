@@ -1,7 +1,8 @@
-import { layerOrder } from "./recipe.ts";
+import { cascadeOrder } from "../../styles.ts";
 
 /** Imports base stylesheets in their declared cascade layers and waits for every import to load. */
 export function insertBaseStyles(options: { document: Document; stylesheets: Array<{ url: string; layer: string }>; timeoutMs: number }): { links: HTMLStyleElement[]; ready: Promise<void> } {
+  const layerOrder = cascadeOrder(options.stylesheets.map(sheet => sheet.layer));
   const links = options.stylesheets.map(({ url, layer }) => {
     const link = options.document.createElement("style");
     link.textContent = `${layerOrder}\n@import url(${JSON.stringify(url)}) layer(${layer});`;

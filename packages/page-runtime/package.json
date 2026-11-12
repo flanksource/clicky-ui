@@ -5,6 +5,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
+    "./styles": "./src/styles.ts",
     "./editing": "./src/editing.ts",
     "./build": { "types": "./src/build/index.ts", "default": "./dist/build/index.mjs" },
     "./build/dependencies": { "types": "./src/build/dependencies.ts", "default": "./dist/build/dependencies.mjs" },

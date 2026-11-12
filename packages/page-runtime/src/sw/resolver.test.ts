@@ -71,6 +71,17 @@ describe("resolvePage", () => {
     };
     return { calls, fetcher };
   }
+  it('loads additional managed theme runtime fragments into the page lock', async () => {
+    const { fetcher } = registryFixture();
+    const name = 'example-theme';
+    const fetchTheme: typeof fetch = async input => {
+      const url = String(input);
+      if (url.endsWith(`${name}@1.0.0/dist/runtime/importmap.json`)) return Response.json(fragment(name, { [`${name}/theme`]: `${name}@1.0.0/dist/theme.js` }));
+      return fetcher(input);
+    };
+    const lock = await resolvePage({ page: 'report.tsx', profile: { ...PROFILE, managed: { ...PROFILE.managed, [name]: '^1' } }, manifest: { dependencies: {} }, fetch: fetchTheme, now: Date.parse('2026-01-10') });
+    expect({ version: lock.versions[name], module: lock.map.imports[`${name}/theme`] }).toEqual({ version: '1.0.0', module: '/npm/example-theme@1.0.0/dist/theme.js' });
+  });
   it("resolves unpublished local packages and subpaths without contacting their registry", async () => {
     const { fetcher, calls } = registryFixture();
     const link = exampleLink();
