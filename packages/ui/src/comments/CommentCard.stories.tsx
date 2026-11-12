@@ -49,6 +49,30 @@ export const AssignedToAgent: Story = {
   },
 };
 
+const opus = { id: "claude:s-1", name: "claude-opus-5-5", kind: "agent" as const };
+const handOffs = [
+  { title: "Queued", agentRun: { requestedAt: "2026-01-02T00:00:00.000Z", state: "queued" as const, target: { label: "Fix header" } } },
+  { title: "Sent", agentRun: { requestedAt: "2026-01-02T00:00:00.000Z", state: "sent" as const, target: { label: "Fix header" } } },
+  { title: "Replied", agentRun: { requestedAt: "2026-01-02T00:00:00.000Z", state: "sent" as const, repliedAt: "2026-01-02T00:03:00.000Z", target: { label: "Fix header" } } },
+  { title: "Failed", agentRun: { requestedAt: "2026-01-02T00:00:00.000Z", state: "error" as const, error: "agent session s-1 is no longer live", target: { label: "Fix header" } } },
+];
+
+/** A thread handed to an agent: the provider's glyph, where it went, and a chat-style tick. */
+export const AgentHandOff: Story = {
+  args: { comment: root },
+  render: (args) => (
+    <div className="space-y-3">
+      {handOffs.map(({ title, agentRun }) => (
+        <CommentCard key={title} {...args} comment={{ ...root, id: `hand-off-${title}`, status: "in_progress", assignee: opus, agentRun }} />
+      ))}
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const stages = within(canvasElement).getAllByTestId("agent-delivery").map((chip) => chip.getAttribute("data-delivery"));
+    await expect(stages).toEqual(["queued", "sent", "replied", "failed"]);
+  },
+};
+
 export const AcknowledgeAndAssign: Story = {
   args: {
     comment: { ...root, status: "open" },

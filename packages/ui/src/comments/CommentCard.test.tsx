@@ -18,6 +18,32 @@ const root: Comment = {
 };
 
 describe("CommentCard", () => {
+  const agent = { id: "claude:s-1", name: "claude-opus-5-5", kind: "agent" as const };
+  const handedOff = (agentRun: NonNullable<Comment["agentRun"]>): Comment => ({ ...root, status: "in_progress", assignee: agent, agentRun });
+  const REQUESTED = "2026-01-01T00:01:00.000Z";
+
+  it.each([
+    { run: { requestedAt: REQUESTED, state: "queued" as const }, stage: "queued", tick: "Queued" },
+    { run: { requestedAt: REQUESTED, state: "sent" as const }, stage: "sent", tick: "Sent" },
+    { run: { requestedAt: REQUESTED, state: "sent" as const, repliedAt: "2026-01-01T00:02:00.000Z" }, stage: "replied", tick: "Replied" },
+    { run: { requestedAt: REQUESTED, state: "error" as const, error: "session gone" }, stage: "failed", tick: "Hand-off failed" },
+  ])("shows where an agent's thread went with a $stage tick", ({ run, stage, tick }) => {
+    render(<CommentCard comment={handedOff({ ...run, target: { label: "Fix header" } })} config={config} />);
+    const chip = screen.getByTestId("agent-delivery");
+    expect([chip.getAttribute("data-delivery"), chip.textContent, screen.getByLabelText(tick) !== null]).toEqual([stage, "Fix header", true]);
+  });
+
+  it("keeps the plain assignee chip for an agent holding a thread without a hand-off", () => {
+    render(<CommentCard comment={{ ...root, status: "in_progress", assignee: agent }} config={config} />);
+    expect([screen.queryByTestId("agent-delivery"), screen.getByText("Assigned to claude-opus-5-5") !== null]).toEqual([null, true]);
+  });
+
+  it("retains the optimistic body without a separate sending label", () => {
+    render(<CommentCard comment={{ ...root, submission: { state: "sending" } }} config={config} />);
+    expect(screen.getByText(root.body)).toBeVisible();
+    expect(screen.queryByText("Sending…")).not.toBeInTheDocument();
+  });
+
   it.each([
     ["positive", "Positive rating"],
     ["negative", "Negative rating"],

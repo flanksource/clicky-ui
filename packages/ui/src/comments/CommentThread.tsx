@@ -3,6 +3,7 @@ import { cn } from "../lib/utils";
 import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { CommentComposer } from "./CommentComposer";
 import { CommentThreadList } from "./CommentThreadList";
+import type { CommentDetailOptions } from "./comment-detail";
 import { buildThreadListHandlers } from "./comment-utils";
 import type {
   Comment,
@@ -12,7 +13,7 @@ import type {
   CommentCreateAction,
 } from "./comment-types";
 
-export type CommentThreadProps = CommentCallbacks & {
+export type CommentThreadProps = CommentCallbacks & CommentDetailOptions & {
   /** Comments for this thread (typically pre-filtered to one anchor). */
   comments: Comment[];
   config: CommentConfig;
@@ -49,6 +50,9 @@ export function CommentThread({
   compact = false,
   autoFocusComposer = false,
   defaultExpanded = false,
+  previewLines,
+  detailTabs,
+  onMaximizedChange,
   composerPlaceholder,
   hideComposer = false,
   createActions,
@@ -85,6 +89,9 @@ export function CommentThread({
         config={config}
         compact={compact}
         defaultExpanded={defaultExpanded}
+        {...(previewLines !== undefined ? { previewLines } : {})}
+        {...(detailTabs ? { detailTabs } : {})}
+        {...(onMaximizedChange ? { onMaximizedChange } : {})}
         {...(renderRootMeta ? { renderRootMeta } : {})}
         {...(renderRootDetails ? { renderRootDetails } : {})}
         {...(renderBody ? { renderBody } : {})}

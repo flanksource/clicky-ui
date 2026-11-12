@@ -1,3 +1,4 @@
+import { setCommentDraft } from "../test/comment-editor";
 import {
   act,
   fireEvent,
@@ -22,6 +23,13 @@ const nextFrame = () =>
   act(() => new Promise<void>((done) => requestAnimationFrame(() => done())));
 
 describe("CommentComposer", () => {
+  it("opens an always-open composer even when the previous persisted state was collapsed", () => {
+    const config = { statuses: DEFAULT_COMMENT_STATUSES };
+    const view = render(<CommentComposer config={config} />);
+    expect(screen.queryByTestId("comment-compose-input")).toBeNull();
+    view.rerender(<CommentComposer config={config} collapsible={false} />);
+    expect(screen.getByTestId("comment-compose-input")).toBeVisible();
+  });
   it("leaves focus alone when an always-open composer mounts", async () => {
     render(
       <CommentComposer
@@ -62,16 +70,14 @@ describe("CommentComposer", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: `${label} rating` }));
-    fireEvent.change(screen.getByTestId("comment-compose-input"), {
-      target: { value: "This comparison is clear" },
-    });
-    fireEvent.click(screen.getByTestId("comment-compose-send"));
+    setCommentDraft(screen.getByTestId("comment-compose-input"), "This comparison is clear");
+    fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
 
     expect(onCreate).toHaveBeenCalledWith(
       expect.objectContaining({ body: "This comparison is clear", rating }),
     );
     await waitFor(() =>
-      expect(screen.getByTestId("comment-compose-input")).toHaveValue(""),
+      expect(screen.getByTestId("comment-compose-input")).toHaveTextContent(/^$/),
     );
   });
 
@@ -86,7 +92,7 @@ describe("CommentComposer", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Positive rating" }));
-    fireEvent.click(screen.getByTestId("comment-compose-send"));
+    fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
 
     expect(onCreate).toHaveBeenCalledWith(
       expect.objectContaining({ body: "", rating: "positive" }),
@@ -109,18 +115,18 @@ describe("CommentComposer", () => {
       />,
     );
 
-    fireEvent.change(screen.getByTestId("comment-compose-input"), {
-      target: { value: "Review this balance" },
-    });
-    const send = screen.getByTestId("comment-compose-send");
+    setCommentDraft(screen.getByTestId("comment-compose-input"), "Review this balance");
+    const send = screen.getByRole("button", { name: "Post comment" });
     fireEvent.click(send);
     fireEvent.click(send);
 
     expect(onCreate).toHaveBeenCalledTimes(1);
     expect(send).toBeDisabled();
+    expect(send).toHaveAttribute("aria-busy", "true");
 
     await act(async () => request.resolve());
-    expect(screen.getByTestId("comment-compose-input")).toHaveValue("");
+    expect(send).not.toHaveAttribute("aria-busy");
+    expect(screen.getByTestId("comment-compose-input")).toHaveTextContent(/^$/);
   });
 
   it("offers two submit actions for one draft and keeps the selected action while posting", async () => {
@@ -138,18 +144,18 @@ describe("CommentComposer", () => {
       />,
     );
 
-    fireEvent.change(screen.getByTestId("comment-compose-input"), {
-      target: { value: "Review this balance" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Post with screenshot" }));
+    setCommentDraft(screen.getByTestId("comment-compose-input"), "Review this balance");
+    fireEvent.click(screen.getByRole("button", { name: "Send options" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Post with screenshot" }));
     fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
 
     expect(onCreate).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({ body: "Review this balance" }),
       "screenshot",
     );
+    await vi.waitFor(() => expect(screen.getByTestId("comment-compose-input")).toHaveTextContent(/^$/));
     expect(screen.getByRole("button", { name: "Post comment" })).toBeDisabled();
     await act(async () => request.resolve());
-    expect(screen.getByTestId("comment-compose-input")).toHaveValue("");
+    expect(screen.getByTestId("comment-compose-input")).toHaveTextContent(/^$/);
   });
 });

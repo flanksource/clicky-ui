@@ -1,6 +1,8 @@
 import { Badge } from "../data/Badge";
+import { Icon, type StaticIconComponent } from "../data/Icon";
 import { cn } from "../lib/utils";
-import { UiRobotAi, UiThumbsDown, UiThumbsUp } from "../icons";
+import { UiCheck, UiChecks, UiClock, UiRobotAi, UiThumbsDown, UiThumbsUp, UiWarningTriangle } from "../icons";
+import { agentDeliveryStage, agentGlyph, type AgentDeliveryStage } from "./agent-delivery";
 import {
   resolveFacetOption,
   resolveStatusConfig,
@@ -9,6 +11,8 @@ import {
 import { resolveCommentStage } from "../lib/comment-stage";
 import type {
   Comment,
+  CommentAgentRun,
+  CommentAuthor,
   CommentConfig,
   CommentRating,
   CommentReviewDecision,
@@ -58,6 +62,44 @@ export function RatingChip({ rating }: { rating: CommentRating | undefined }) {
   );
 }
 
+const DELIVERY_TICK: Record<AgentDeliveryStage, { icon: StaticIconComponent; className: string; label: string }> = {
+  queued: { icon: UiClock, className: "text-muted-foreground", label: "Queued" },
+  sent: { icon: UiCheck, className: "text-muted-foreground", label: "Sent" },
+  replied: { icon: UiChecks, className: "text-primary", label: "Replied" },
+  failed: { icon: UiWarningTriangle, className: "text-destructive", label: "Hand-off failed" },
+};
+
+function deliveryTitle(stage: AgentDeliveryStage, run: CommentAgentRun, label: string): string {
+  const at = (iso: string) => new Date(iso).toLocaleString();
+  if (stage === "failed") return `Hand-off to ${label} failed: ${run.error ?? "no reason recorded"}`;
+  if (stage === "replied") return run.repliedAt ? `${label} replied ${at(run.repliedAt)}` : `${label} handled this thread`;
+  if (stage === "sent") return `Sent to ${label} ${at(run.requestedAt)}`;
+  return `Queued for ${label} since ${at(run.requestedAt)}`;
+}
+
+/** An agent's hold on a thread: its provider's glyph, where the thread went, and a chat-style delivery tick. */
+function AgentDeliveryChip({ assignee, run }: { assignee: CommentAuthor; run: CommentAgentRun }) {
+  const stage = agentDeliveryStage(run);
+  const glyph = agentGlyph(assignee.model ?? assignee.name);
+  const tick = DELIVERY_TICK[stage];
+  const label = run.target?.label ?? assignee.name;
+  return (
+    <Badge
+      variant="soft"
+      tone={stage === "failed" ? "danger" : "neutral"}
+      size="xs"
+    >
+      <span data-testid="agent-delivery" data-delivery={stage} title={deliveryTitle(stage, run, label)} className="inline-flex min-w-0 items-center gap-1">
+        <Icon icon={glyph.icon} className={cn("size-3 shrink-0", glyph.className)} />
+        <span className="max-w-40 truncate">{label}</span>
+        <span role="img" aria-label={tick.label} className="inline-flex shrink-0">
+          <Icon icon={tick.icon} className={cn("size-3.5", tick.className)} />
+        </span>
+      </span>
+    </Badge>
+  );
+}
+
 export function StatusChip({
   comment,
   config,
@@ -70,6 +112,8 @@ export function StatusChip({
   const stage = resolveCommentStage(config, comment.status);
   const closedBy = stage === "closed" ? comment.closedBy : undefined;
   const assignee = stage === "active" ? comment.assignee : undefined;
+  if (assignee?.kind === "agent" && comment.agentRun)
+    return <AgentDeliveryChip assignee={assignee} run={comment.agentRun} />;
   const icon = assignee?.kind === "agent" ? UiRobotAi : status.icon;
   const title = assignee
     ? comment.acknowledgedAt

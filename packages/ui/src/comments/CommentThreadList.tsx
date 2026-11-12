@@ -1,16 +1,17 @@
-import { useRef, useState, type HTMLAttributes, type ReactNode } from "react";
+import { useEffect, useRef, type HTMLAttributes, type ReactNode } from "react";
+import { useCommentState } from "./comment-persistence";
 import { cn } from "../lib/utils";
-import { Button } from "../components/button";
 import { copyText } from "../components/clipboard";
-import { Markdown } from "../data/Markdown";
 import { Tabs } from "../layout/Tabs";
 import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { Modal } from "../overlay/Modal";
+import { CommentReplyInput } from "./CommentReplyInput";
+import type { CommentDetailOptions } from "./comment-detail";
 import { CommentCard } from "./CommentCard";
 import { buildReplyMap, getRoots, sortReplies } from "./comment-utils";
 import type { Comment, CommentAuthor, CommentConfig } from "./comment-types";
 
-export type CommentThreadListProps = {
+export type CommentThreadListProps = CommentDetailOptions & {
   comments: Comment[];
   config: CommentConfig;
   compact?: boolean;
@@ -24,7 +25,7 @@ export type CommentThreadListProps = {
   getThreadProps?: (comment: Comment) => HTMLAttributes<HTMLDivElement>;
   /** Custom body renderer forwarded to each card. */
   renderBody?: (body: string) => ReactNode;
-  /** Serialize a root and its replies for Copy and the Markdown preview. */
+  /** Serialize a root and its replies for Copy. Render a preview of it through `detailTabs`. */
   threadToMarkdown?: (thread: readonly Comment[]) => string;
   onUpdateStatus?: (id: string, status: string) => void | Promise<void>;
   onClose?: (id: string) => void | Promise<void>;
@@ -41,58 +42,6 @@ export type CommentThreadListProps = {
   onReply?: (parent: Comment, body: string) => void | Promise<void>;
 };
 
-function ReplyInput({
-  onSubmit,
-  onCancel,
-}: {
-  onSubmit: (body: string) => void | Promise<void>;
-  onCancel: () => void;
-}) {
-  const [body, setBody] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const submittingRef = useRef(false);
-  async function send() {
-    if (!body.trim() || submittingRef.current) return;
-    submittingRef.current = true;
-    setSubmitting(true);
-    try {
-      await onSubmit(body.trim());
-      setBody("");
-    } finally {
-      submittingRef.current = false;
-      setSubmitting(false);
-    }
-  }
-  return (
-    <div className="ml-6 flex gap-1.5 py-1" aria-busy={submitting}>
-      <input
-        autoFocus
-        value={body}
-        disabled={submitting}
-        onChange={(e) => setBody(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            void send();
-          }
-          if (e.key === "Escape") onCancel();
-        }}
-        placeholder="Write a reply…"
-        data-testid="comment-reply-input"
-        className="h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:border-primary/40 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:text-base"
-      />
-      <Button
-        size="sm"
-        className="h-7 text-xs [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:px-4 [@media(pointer:coarse)]:text-sm"
-        disabled={submitting || !body.trim()}
-        onClick={() => void send()}
-      >
-        Send
-      </Button>
-    </div>
-  );
-}
-
 /**
  * Renders a list of threaded comments: each root with its sorted replies and an
  * optional inline reply box. Fully controlled — mutations route through the
@@ -103,6 +52,9 @@ export function CommentThreadList({
   config,
   compact = false,
   defaultExpanded = false,
+  previewLines,
+  detailTabs = [],
+  onMaximizedChange,
   renderRootMeta,
   renderRootDetails,
   getThreadProps,
@@ -117,28 +69,30 @@ export function CommentThreadList({
   onDelete,
   onReply,
 }: CommentThreadListProps) {
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useCommentState<string | null>(`thread-list:${comments[0]?.anchor ?? "general"}:replying`, null);
   // Maximizing is owned here, not by the card: a thread is the unit a reader
   // wants enlarged, and only this list knows a root's replies.
-  const [maximizedRootId, setMaximizedRootId] = useState<string | null>(null);
-  const [maximizedTab, setMaximizedTab] = useState<"thread" | "markdown">(
-    "thread",
+  const [maximizedRootId, setMaximizedRootId] = useCommentState<string | null>(`thread-list:${comments[0]?.anchor ?? "general"}:maximized`, null);
+  const [maximizedTab, setMaximizedTab] = useCommentState<string>(
+    `thread-list:${comments[0]?.anchor ?? "general"}:tab`, "thread",
   );
-  // Which message in the maximized thread has its reply composer open.
-  const [modalReplyTo, setModalReplyTo] = useState<string | null>(null);
+  const replyBar = useRef<HTMLDivElement>(null);
   const roots = getRoots(comments);
   const replyMap = buildReplyMap(comments);
-
-  if (roots.length === 0) return null;
-
   const maximizedRoot = roots.find((root) => root.id === maximizedRootId);
+  const isMaximized = Boolean(maximizedRoot);
+  useEffect(() => {
+    if (!isMaximized) return;
+    onMaximizedChange?.(true);
+    return () => onMaximizedChange?.(false);
+  }, [isMaximized, onMaximizedChange]);
+  if (roots.length === 0) return null;
   const maximizedThread = maximizedRoot
     ? [maximizedRoot, ...sortReplies(replyMap.get(maximizedRoot.id) ?? [])]
     : [];
 
   function closeMaximized() {
     setMaximizedRootId(null);
-    setModalReplyTo(null);
     setMaximizedTab("thread");
   }
 
@@ -186,6 +140,7 @@ export function CommentThreadList({
                 config={config}
                 compact={compact}
                 defaultExpanded={defaultExpanded}
+                {...(previewLines !== undefined ? { previewLines } : {})}
                 onMaximize={() => setMaximizedRootId(root.id)}
                 {...(threadToMarkdown
                   ? { onCopy: () => copyText(threadToMarkdown(thread)) }
@@ -204,6 +159,7 @@ export function CommentThreadList({
                       config={config}
                       compact={compact}
                       defaultExpanded={defaultExpanded}
+                      {...(previewLines !== undefined ? { previewLines } : {})}
                       onMaximize={() => setMaximizedRootId(root.id)}
                       {...(threadToMarkdown
                         ? { onCopy: () => copyText(threadToMarkdown(thread)) }
@@ -215,7 +171,9 @@ export function CommentThreadList({
                 </div>
               )}
               {onReply && replyingTo === root.id && (
-                <ReplyInput
+                <CommentReplyInput
+                  parentId={root.id}
+                  config={config}
                   onCancel={() => setReplyingTo(null)}
                   onSubmit={async (body) => {
                     await onReply(root, body);
@@ -228,22 +186,13 @@ export function CommentThreadList({
         })}
       </div>
       {maximizedRoot && (
-        <Modal open onClose={closeMaximized} title="Comment thread" size="lg">
+        <Modal open onClose={closeMaximized} title="Comment thread" size="xl" className="h-[min(800px,90dvh)]"
+          subtitle={<Tabs tabs={[{ id: "thread", label: "Thread" }, ...detailTabs.map(({ id, label }) => ({ id, label }))]} value={maximizedTab} onChange={setMaximizedTab} />}
+          footer={onReply && <div ref={replyBar}><CommentReplyInput key={maximizedRoot.id} pinned parentId={maximizedRoot.id} config={config} onCancel={() => {}} onSubmit={body => onReply(maximizedRoot, body)} /></div>}
+        >
           <div className="space-y-3" data-testid="comment-thread-modal">
-            {threadToMarkdown && (
-              <Tabs
-                tabs={[
-                  { id: "thread", label: "Thread" },
-                  { id: "markdown", label: "Markdown" },
-                ]}
-                value={maximizedTab}
-                onChange={(tab) =>
-                  setMaximizedTab(tab === "markdown" ? "markdown" : "thread")
-                }
-              />
-            )}
-            {maximizedTab === "markdown" && threadToMarkdown ? (
-              <Markdown text={threadToMarkdown(maximizedThread)} />
+            {detailTabs.some(tab => tab.id === maximizedTab) ? (
+              detailTabs.find(tab => tab.id === maximizedTab)?.render(maximizedThread)
             ) : (
               <div className="space-y-2">
                 {/* No onMaximize inside: the thread is already maximized. */}
@@ -253,6 +202,7 @@ export function CommentThreadList({
                       comment={message}
                       config={config}
                       defaultExpanded
+                      fullBody
                       {...(threadToMarkdown
                         ? {
                             onCopy: () =>
@@ -262,20 +212,11 @@ export function CommentThreadList({
                       {...(renderBody ? { renderBody } : {})}
                       {...cardHandlers(message.id)}
                       {...(onReply
-                        ? { onReply: () => setModalReplyTo(message.id) }
+                        ? { onReply: () => replyBar.current?.querySelector<HTMLElement>('[role="textbox"]')?.focus() }
                         : {})}
                     />
                     {message.id === maximizedRoot.id &&
                       renderRootDetails?.(maximizedRoot)}
-                    {onReply && modalReplyTo === message.id && (
-                      <ReplyInput
-                        onCancel={() => setModalReplyTo(null)}
-                        onSubmit={async (body) => {
-                          await onReply(maximizedRoot, body);
-                          setModalReplyTo(null);
-                        }}
-                      />
-                    )}
                   </div>
                 ))}
               </div>
