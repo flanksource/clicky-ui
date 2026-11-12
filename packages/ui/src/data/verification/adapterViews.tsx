@@ -7,7 +7,7 @@
 import type { ReactNode } from "react";
 import { JsonView } from "../JsonView";
 import { readStepDetail, splitExecutionDetail, waitDecidedBy, type WaitDetail } from "./stepKind";
-import { ExecutionHeaderView, FailureCallout, MalformedStepDetail, StepKindSections, StepSourceSection } from "./stepKindViews";
+import { ExecutionHeaderView, FailureCallout, MalformedStepDetail, StepKindSections, StepPendingFormSection, StepSourceSection } from "./stepKindViews";
 import { readStepSource, withoutSource } from "./stepSource";
 import {
   Expectation,
@@ -122,7 +122,14 @@ function FailureMessage({ node, cause, error }: { node: Test; cause: string | un
   );
 }
 
-export function FixtureDetail({ node, renderWait }: { node: Test; renderWait?: (wait: WaitDetail) => ReactNode }) {
+export type FixtureDetailProps = {
+  node: Test;
+  renderWait?: (wait: WaitDetail) => ReactNode;
+  /** The answerable form of a step waiting on a person (`node.waiting`); the host owns the prompt it answers. */
+  renderPendingPrompt?: (node: Test) => ReactNode;
+};
+
+export function FixtureDetail({ node, renderWait, renderPendingPrompt }: FixtureDetailProps) {
   const context = node.context as FixtureContext | undefined;
   const command = context?.command ?? node.command;
   const cwd = context?.cwd ?? node.work_dir;
@@ -130,9 +137,11 @@ export function FixtureDetail({ node, renderWait }: { node: Test; renderWait?: (
   const { header, rest } = splitExecutionDetail(node.detail);
   // A typed step shows its own sections, so the raw block keeps only what they don't cover.
   const rawDetail = withoutSource(stepDetail.kind === "step" ? splitExecutionDetail(stepDetail.step.rest).rest : rest);
+  const pendingForm = node.waiting === true && renderPendingPrompt ? renderPendingPrompt(node) : null;
   return (
     <div className="space-y-4 p-density-4">
       <ExecutionHeaderView header={header} {...(stepDetail.kind === "step" ? { stepKind: stepDetail.step.step.kind } : {})} />
+      {pendingForm != null && <StepPendingFormSection>{pendingForm}</StepPendingFormSection>}
       <FailureMessage node={node} cause={stepDetail.kind === "step" ? stepDetail.step.wait?.cause : undefined} error={header.error} />
       {command && (
         <div className="min-w-0 space-y-1">
