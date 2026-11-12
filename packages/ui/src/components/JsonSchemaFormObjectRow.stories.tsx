@@ -30,10 +30,10 @@ const schema: JsonSchemaObject = {
   },
 };
 
-function Demo() {
+function Demo({ className = "max-w-3xl" }: { className?: string }) {
   const [value, setValue] = useState<Record<string, unknown>>({ fieldRef: { kind: "policy" } });
   return (
-    <div className="max-w-3xl">
+    <div className={className}>
       <JsonSchemaForm schema={schema} value={value} onChange={setValue} persistPreferences={false} />
       <output className="mt-4 block font-mono text-xs">{JSON.stringify(value)}</output>
     </div>
@@ -53,5 +53,18 @@ export const ReferenceRow: Story = {
     const canvas = within(canvasElement);
     fireEvent.change(canvas.getByRole("textbox", { name: /^Name/ }), { target: { value: "StartDate" } });
     await expect(canvas.getByRole("status")).toHaveTextContent('{"fieldRef":{"kind":"policy","name":"StartDate"}}');
+  },
+};
+
+// Like SecretKeySelector, the row never wraps: in a narrow value column the
+// controls shrink side by side instead of stacking one per line.
+export const NarrowColumn: Story = {
+  tags: ["browser"],
+  args: { className: "w-[22rem]" },
+  play: async ({ canvasElement }) => {
+    const cells = Array.from(canvasElement.querySelectorAll("[data-jsf-row-cell]"));
+    await expect(cells).toHaveLength(3);
+    const tops = new Set(cells.map((cell) => Math.round(cell.getBoundingClientRect().top)));
+    await expect(tops.size).toBe(1);
   },
 };

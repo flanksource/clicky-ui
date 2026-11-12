@@ -58,8 +58,8 @@ export function SessionFilesPanel({
       return next;
     });
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-background">
-      <div className="flex items-center justify-between gap-density-2 border-b border-border bg-muted/30 px-density-3 py-density-2 text-xs text-muted-foreground">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-background">
+      <div className="flex shrink-0 items-center justify-between gap-density-2 border-b border-border bg-muted/30 px-density-3 py-density-2 text-xs text-muted-foreground">
         <span>
           {roots.reduce((count, node) => count + countFiles(node), 0)} files
         </span>
@@ -106,7 +106,7 @@ export function SessionFilesPanel({
               !node.children.length && wasWritten(node) && "border-l-amber-500/60",
             )
           }
-          className="pb-1"
+          className="min-h-0 flex-1 pb-1"
         />
       )}
     </div>

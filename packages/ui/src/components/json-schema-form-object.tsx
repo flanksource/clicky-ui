@@ -84,7 +84,7 @@ export function ObjectControl({
       <div
         data-jsf-object-row=""
         className={cn(
-          "flex w-full min-w-0 flex-wrap items-start",
+          "flex w-full min-w-0 flex-nowrap items-start",
           fieldInnerGapClass[ctx.size],
           subSchema["x-classes"],
         )}

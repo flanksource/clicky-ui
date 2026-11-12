@@ -34,6 +34,14 @@ describe("SessionFilesPanel", () => {
     ).toBeInTheDocument();
   });
 
+  it("fills the panel height and scrolls the tree inside the card", () => {
+    const { container } = render(<SessionFilesPanel files={FILES} />);
+
+    expect(container.firstElementChild).toHaveClass("flex", "h-full", "min-h-0", "flex-col");
+    const treeBody = screen.getByRole("tree", { name: "Session files" }).parentElement!.parentElement!;
+    expect(treeBody).toHaveClass("min-h-0", "flex-1");
+  });
+
   it("shows only written files until the Read toggle is pressed", () => {
     render(<SessionFilesPanel files={FILES} />);
     const readPath = FILES.read[0]!;

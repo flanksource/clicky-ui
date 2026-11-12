@@ -488,7 +488,7 @@ export function renderObjectFields(
   const arrayEntries = entries.filter(([, prop]) => prop.type === "array");
   const compactArrays = ctx.layout.mode !== "properties" && arrayEntries.length > 3;
   const rowDisplay = schema["x-object-display"] === "row" && ctx.layout.mode !== "properties";
-  const rows = entries.flatMap(([key, prop]) => {
+  const rows = entries.flatMap(([key, prop]): ReactNode[] => {
     if (hidden.has(key)) return [];
     if (rowDisplay) return renderRowCell(fieldArgs(key, prop), ctx);
     if (compactArrays && prop.type === "array" && prop["x-hidden"] !== false && (!Array.isArray(value[key]) || value[key].length === 0)) return [];
@@ -553,7 +553,7 @@ function renderRowCell(args: FieldArgs, ctx: RenderContext): ReactNode[] {
   const label = args.prop.title || args.key;
   const instancePath = args.instancePath ?? appendInstancePath(ctx.instancePath, args.key);
   return [
-    <div key={args.key} data-jsf-row-cell={args.key} title={label} className="min-w-0 flex-1 basis-40">
+    <div key={args.key} data-jsf-row-cell={args.key} title={label} className="min-w-0 flex-1 basis-0">
       <label htmlFor={fieldInputId(instancePath, ctx.idPrefix)} className="sr-only">
         {label}
         {args.required ? " (required)" : ""}
