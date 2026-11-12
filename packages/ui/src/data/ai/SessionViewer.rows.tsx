@@ -208,6 +208,17 @@ export function WaitGroupRow({
   );
 }
 
+// The prompt's first visible line without its markdown block marker, so a
+// long prompt collapses to one readable line; HTML comments never render.
+function firstPromptLine(text: string | undefined): string | undefined {
+  const line = text
+    ?.replace(/<!--[\s\S]*?-->/g, "")
+    .split("\n")
+    .map((candidate) => candidate.replace(/^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+\.\s+)?/, "").trim())
+    .find(Boolean);
+  return line || undefined;
+}
+
 function UserRow({
   event,
   initialPrompt,
@@ -221,7 +232,10 @@ function UserRow({
   showRowMetadata: boolean;
   showRaw: boolean;
 }) {
-  const [expanded, setExpanded] = useState(!initialPromptSummary);
+  const promptSummary = initialPrompt
+    ? initialPromptSummary || firstPromptLine(event.text)
+    : undefined;
+  const [expanded, setExpanded] = useState(!promptSummary);
   return (
     <li
       data-event-kind="user"
@@ -234,25 +248,25 @@ function UserRow({
         )}
       >
         <div className="min-w-0">
-          {initialPrompt && initialPromptSummary ? (
+          {promptSummary ? (
             <button
               type="button"
-              aria-label={`Initial prompt · ${initialPromptSummary}`}
+              aria-label={`Initial prompt · ${promptSummary}`}
               aria-expanded={expanded}
               onClick={() => setExpanded((open) => !open)}
-              className="block min-w-0 max-w-full text-right"
+              className="block w-full min-w-0 max-w-full text-right"
             >
               <span className="mb-0.5 block text-xs font-medium text-muted-foreground">
                 Initial prompt
               </span>
-              <span className="flex items-start gap-2 break-words rounded-lg px-density-3 py-density-2 text-left text-sm leading-relaxed text-foreground hover:underline">
-                <span className="min-w-0 flex-1 font-medium">
-                  {initialPromptSummary}
+              <span className="flex items-center gap-2 rounded-lg px-density-3 py-density-2 text-left text-sm text-foreground hover:underline">
+                <span className="min-w-0 flex-1 truncate font-medium" title={promptSummary}>
+                  {promptSummary}
                 </span>
                 <Icon
                   icon={UiChevronDown}
                   className={cn(
-                    "mt-0.5 size-3.5 shrink-0 transition-transform",
+                    "size-3.5 shrink-0 transition-transform",
                     expanded && "rotate-180",
                   )}
                 />

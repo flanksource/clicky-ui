@@ -62,6 +62,11 @@ describe("SessionInspector", () => {
     expect(
       within(initialPrompt).getByText("Initial prompt"),
     ).toBeInTheDocument();
+    fireEvent.click(
+      within(initialPrompt).getByRole("button", {
+        name: "Initial prompt · Review parser",
+      }),
+    );
     expect(
       await within(initialPrompt).findByRole("heading", {
         name: "Review parser",

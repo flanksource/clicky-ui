@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { SessionRow } from "./SessionViewer.rows";
 import { normalizeSession, type SessionEvent } from "./SessionViewer.model";
@@ -89,6 +89,29 @@ describe("file session rows", () => {
 });
 
 describe("user session rows", () => {
+  it("collapses an initial prompt without a summary to its first line until expanded", async () => {
+    const prompt =
+      "<!-- gavel:effort:effort -->\n<!--\nmulti-line note\n-->\n## Think hard\n\nYou are implementing the todo item below.\n\n- PR: #356";
+    const event = normalizeSession({
+      messages: [{ id: "prompt", role: "user", parts: [{ type: "text", text: prompt }] }],
+    })[0];
+    if (!event) throw new Error("expected a user event");
+
+    render(
+      <ul>
+        <SessionRow event={event} initialPrompt last defaultExpanded />
+      </ul>,
+    );
+    const summary = screen.getByRole("button", { name: "Initial prompt · Think hard" });
+    expect(summary).toHaveAttribute("aria-expanded", "false");
+    expect(within(summary).getByText("Think hard")).toHaveClass("truncate");
+    expect(screen.queryByText("You are implementing the todo item below.")).not.toBeInTheDocument();
+
+    fireEvent.click(summary);
+    expect(summary).toHaveAttribute("aria-expanded", "true");
+    expect(await screen.findByText("You are implementing the todo item below.")).toBeInTheDocument();
+  });
+
   it("shows the initial prompt without a filled bubble while keeping later user messages accented", () => {
     const event = normalizeSession({
       messages: [{ id: "prompt", role: "user", parts: [{ type: "text", text: "# Prompt detail" }] }],
