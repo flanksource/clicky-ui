@@ -1,0 +1,31 @@
+name: Page Runtime
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @flanksource/clicky-ui build
+      - run: pnpm --filter @flanksource/react-grab build
+      - run: pnpm --filter @flanksource/page-runtime build
+      - run: pnpm --filter @flanksource/page-runtime check
+      - run: pnpm --filter @flanksource/page-runtime exec vitest run
+      - run: pnpm --dir packages/page-runtime/dist/build --config.ignoreScripts=true pack --out "$GITHUB_WORKSPACE/page-runtime-build.tgz"
+      - run: pnpm --dir packages/page-runtime --config.ignoreScripts=true pack --out "$GITHUB_WORKSPACE/page-runtime.tgz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: page-runtime-build
+          path: |
+            page-runtime-build.tgz
+            page-runtime.tgz

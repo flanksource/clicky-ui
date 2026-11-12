@@ -1,7 +1,7 @@
 {
   "name": "@flanksource/clicky-ui",
   "version": "0.3.59",
-  "description": "Flanksource Clicky UI — React component library built on shadcn/ui with light/dark and density theming.",
+  "description": "Flanksource Clicky UI \u2014 React component library built on shadcn/ui with light/dark and density theming.",
   "homepage": "https://github.com/flanksource/clicky-ui#readme",
   "bugs": "https://github.com/flanksource/clicky-ui/issues",
   "license": "Apache-2.0",
@@ -28,6 +28,7 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./comments/anchoring": { "types": "./dist/comment-anchoring.d.ts", "import": "./dist/comment-anchoring.js", "require": "./dist/comment-anchoring.cjs" },
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
@@ -147,6 +148,12 @@
       "import": "./dist/tailwind-preset.js",
       "require": "./dist/tailwind-preset.cjs",
       "default": "./dist/tailwind-preset.js"
+    },
+    "./runtime/*": "./dist/runtime/*",
+    "./page-styles": {
+      "types": "./dist/page-styles.d.ts",
+      "import": "./dist/page-styles.js",
+      "require": "./dist/page-styles.cjs"
     }
   },
   "publishConfig": {
@@ -154,7 +161,7 @@
   },
   "scripts": {
     "dev": "vite dev",
-    "build": "pnpm run build:icons && pnpm run check:public-exports && vite build && node scripts/rewrite-declaration-imports.mjs && pnpm run check:declarations && vite build --mode cjs && node scripts/build-styles.mjs",
+    "build": "tsx ../page-runtime/scripts/run-package-build.ts",
     "build:icons": "tsx scripts/build-icons.ts",
     "build:icons:force": "tsx scripts/build-icons.ts --force",
     "download:icons": "tsx scripts/download-icons.ts",
@@ -167,9 +174,14 @@
     "test": "pnpm run build:icons && vitest run",
     "vitest": "vitest",
     "lint": "oxlint -c .oxlintrc.json src --deny-warnings",
-    "check": "pnpm run build:icons && tsc -b --noEmit && pnpm run check:public-exports && pnpm run lint"
+    "check": "pnpm run build:icons && tsc -b --noEmit && pnpm run check:public-exports && pnpm run lint",
+    "build:artifacts": "pnpm run build:icons && pnpm run check:public-exports && vite build && node scripts/rewrite-declaration-imports.mjs && pnpm run check:declarations && vite build --mode cjs && node scripts/build-styles.mjs && tsx scripts/build-runtime.ts",
+    "test:runtime-set": "gavel test --work-dir ../page-runtime --framework vitest --recursive=false -- --config ../../packages/ui/scripts/test-runtime-set.config.ts"
   },
   "dependencies": {
+    "modern-screenshot": "catalog:",
+    "@medv/finder": "catalog:",
+    "dom-accessibility-api": "catalog:",
     "@codemirror/autocomplete": "catalog:",
     "@codemirror/commands": "catalog:",
     "@codemirror/lang-json": "catalog:",
