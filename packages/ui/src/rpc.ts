@@ -79,6 +79,7 @@ export {
   type SchemaActionFormSlots,
 } from "./rpc/SchemaActionForm";
 export { useOperationLookupFetcher } from "./rpc/operationLookupFetcher";
+export { lookupNodePresentation } from "./rpc/lookupOptionPresentation";
 export {
   CommandForm,
   type CommandFormProps,
