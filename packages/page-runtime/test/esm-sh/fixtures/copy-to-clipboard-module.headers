@@ -1,0 +1,13 @@
+HTTP/2 200 
+date: Sat, 07 Nov 2026 18:11:14 GMT
+content-type: application/javascript; charset=utf-8
+access-control-allow-origin: *
+access-control-expose-headers: X-TypeScript-Types
+cache-control: public, max-age=31536000, immutable
+last-modified: Sat, 07 Nov 2026 18:11:13 GMT
+server: cloudflare
+vary: Accept-Encoding
+x-typescript-types: https://esm.sh/copy-to-clipboard@3.3.3/index.d.ts
+cf-cache-status: MISS
+cf-ray: a56e4c96fd6c09b9-HFA
+

@@ -8,6 +8,11 @@ permissions:
   contents: write
   id-token: write
 
+concurrency:
+  # Auto-bump runs must not replace a pending source release in this group.
+  group: release-${{ github.ref }}-${{ startsWith(github.event.head_commit.message, 'chore(release):') }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -20,9 +25,34 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - name: "@flanksource/react-grab"
+            directory: packages/react-grab
+            manifest: package.json
+            build_package: "@flanksource/react-grab"
+            build_script: build
+            publish_directory: packages/react-grab
+            tag: react-grab
+          - name: "@flanksource/page-runtime-build"
+            directory: packages/page-runtime
+            manifest: builder-package.json
+            build_package: "@flanksource/page-runtime"
+            build_script: build:builder
+            publish_directory: packages/page-runtime/dist/build
+            tag: page-runtime-build
           - name: "@flanksource/clicky-ui"
             directory: packages/ui
+            manifest: package.json
+            build_package: "@flanksource/clicky-ui"
+            build_script: build
+            publish_directory: packages/ui
             tag: clicky-ui
+          - name: "@flanksource/page-runtime"
+            directory: packages/page-runtime
+            manifest: package.json
+            build_package: "@flanksource/page-runtime"
+            build_script: build
+            publish_directory: packages/page-runtime
+            tag: page-runtime
     steps:
       # Authenticate as a GitHub App so the bump commit/tag can be pushed to the
       # protected main branch. The App must be on the branch ruleset's bypass list
@@ -45,7 +75,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
@@ -61,47 +91,47 @@ jobs:
 
       - name: Bump patch version
         id: bump
-        working-directory: ${{ matrix.directory }}
         # Derive the next version from the highest version already published on
         # npm, not from package.json/git — they can drift when a prior release
         # publishes but its bump commit never lands back on main.
         env:
           TAG_PREFIX: ${{ matrix.tag }}
-        run: |
-          name=$(node -p "require('./package.json').name")
-          published=$(npm view "$name" versions --json 2>/dev/null \
-            | jq -r 'if type == "array" then .[] else empty end' \
-            | sort -V | tail -1)
-          if [ -z "$published" ]; then
-            # Never published. The version in package.json is the intended
-            # first release, so take it as-is rather than bumping past it.
-            new_version="v$(node -p "require('./package.json').version")"
-            echo "First publish of $name at ${new_version#v}"
-          else
-            echo "Highest published version: $published"
-            npm version "$published" --no-git-tag-version --allow-same-version >/dev/null
-            new_version=$(npm version patch --no-git-tag-version)
-          fi
-          echo "version=${new_version#v}" >> "$GITHUB_OUTPUT"
-          echo "tag=${TAG_PREFIX}@${new_version#v}" >> "$GITHUB_OUTPUT"
+          MANIFEST: ${{ github.workspace }}/${{ matrix.directory }}/${{ matrix.manifest }}
+        run: pnpm --filter @flanksource/page-runtime exec tsx scripts/release-version.ts "$MANIFEST" "$TAG_PREFIX"
+
+      - name: Build builder dependencies
+        if: matrix.name == '@flanksource/page-runtime-build'
+        run: pnpm --filter @flanksource/clicky-ui build
 
       - name: Build library
-        run: pnpm --filter ${{ matrix.name }} run build
+        if: matrix.name != '@flanksource/page-runtime'
+        run: pnpm --filter ${{ matrix.build_package }} run ${{ matrix.build_script }}
+
+      - name: Build complete runtime
+        if: matrix.name == '@flanksource/page-runtime'
+        run: |
+          pnpm --filter @flanksource/clicky-ui build
+          pnpm --filter @flanksource/react-grab build
+          pnpm --filter @flanksource/page-runtime build
+
+      - name: Verify runtime builder
+        if: matrix.name == '@flanksource/page-runtime-build'
+        run: |
+          pnpm --filter @flanksource/page-runtime exec vitest run src/build scripts/release-version.test.ts scripts/release-version-cli.test.ts
+          pnpm --filter @flanksource/clicky-ui exec vitest run scripts/release-config.test.ts
 
       - name: Publish to npm
-        working-directory: ${{ matrix.directory }}
-        env:
-          NPM_CONFIG_PROVENANCE: "true"
-        run: pnpm publish --access public --no-git-checks
+        working-directory: ${{ matrix.publish_directory }}
+        run: pnpm publish --access public --provenance --no-git-checks
 
       - name: Commit, tag, and push
         env:
           NAME: ${{ matrix.name }}
-          DIRECTORY: ${{ matrix.directory }}
+          MANIFEST: ${{ matrix.directory }}/${{ matrix.manifest }}
           VERSION: ${{ steps.bump.outputs.version }}
           TAG: ${{ steps.bump.outputs.tag }}
         run: |
-          git add "${DIRECTORY}/package.json"
+          git add "${MANIFEST}"
           git commit -m "chore(release): ${NAME}@${VERSION}"
           git tag "${TAG}"
           # Rebase before pushing: an earlier matrix entry may have landed its

@@ -1,0 +1,81 @@
+{
+  "name": "@flanksource/page-runtime",
+  "version": "0.1.0",
+  "description": "Browser-mode page runtime for facet and clicky-ui pages: library runtime sets, the module service worker and the page frame.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": ["src", "dist/build", "dist/static", "scripts/run-package-build.ts", "!**/*.test.*", "!**/*.browser.*"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flanksource/clicky-ui.git",
+    "directory": "packages/page-runtime"
+  },
+  "exports": {
+    "./styles": "./src/styles.ts",
+    "./editing": "./src/editing.ts",
+    "./build": { "types": "./src/build/index.ts", "default": "./dist/build/index.mjs" },
+    "./build/dependencies": { "types": "./src/build/dependencies.ts", "default": "./dist/build/dependencies.mjs" },
+    "./sw": "./src/sw/index.ts",
+    "./frame": "./src/frame/index.ts",
+    "./frame/agent": "./src/frame/agent.ts",
+    "./host": "./src/host/index.ts",
+    "./host/link": "./src/host/link/index.ts",
+    "./dev": "./src/dev/index.ts",
+    "./publication": "./src/publication/index.ts",
+    "./catalog": "./src/publication/schema.ts",
+    "./publication/cli": "./scripts/run-package-build.ts",
+    "./link": "./src/link/index.ts",
+    "./link/build": "./src/link/build.ts",
+    "./schema": "./src/schema.ts",
+    "./markers": "./src/markers.ts",
+    "./static/*": "./dist/static/*"
+  },
+  "scripts": {
+    "build": "tsx scripts/build.ts",
+    "build:builder": "tsx scripts/build-builder.ts",
+    "serve-packages": "tsx scripts/serve-packages.ts",
+    "check-fragment": "tsx scripts/check-fragment.ts",
+    "spike": "tsx spikes/run.ts",
+    "test": "vitest run",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "lint": "oxlint src spikes scripts --deny-warnings",
+    "check": "tsc -p tsconfig.json --noEmit && pnpm run lint"
+  },
+  "dependencies": {
+    "@flanksource/react-grab": "workspace:*",
+    "@mdx-js/mdx": "catalog:",
+    "autoprefixer": "catalog:",
+    "bippy": "catalog:",
+    "es-module-lexer": "catalog:",
+    "postcss": "catalog:",
+    "rehype-raw": "catalog:",
+    "remark-frontmatter": "catalog:",
+    "remark-gfm": "catalog:",
+    "remark-github-blockquote-alert": "catalog:",
+    "rolldown": "catalog:",
+    "sucrase": "catalog:",
+    "tailwindcss": "catalog:"
+  },
+  "peerDependencies": {
+    "@flanksource/clicky-ui": "^0.3.60",
+    "react": "^18.3.1 || ^19.0.0",
+    "react-dom": "^18.3.1 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@flanksource/clicky-ui": "workspace:*",
+    "@flanksource/facet": "catalog:",
+    "@playwright/test": "catalog:",
+    "@tailwindcss/node": "catalog:",
+    "@tailwindcss/oxide": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "fake-indexeddb": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-grab": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

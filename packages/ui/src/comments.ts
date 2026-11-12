@@ -1,4 +1,7 @@
 export * from "./comments/comment-types";
+export * from "./comments/anchoring";
+export { captureVocabularyPreviews, type VocabularyPreviewImage } from "./comments/vocabulary-capture";
+export { VocabularyPreview } from "./comments/VocabularyPreview";
 export * from "./comments/comment-utils";
 export {
   assignTargetItems,
