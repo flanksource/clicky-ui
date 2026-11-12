@@ -3,9 +3,7 @@ import { Icon } from "../data/Icon";
 import { HoverCard } from "../overlay/HoverCard";
 import { resolveSize, type SizeToken } from "../lib/size";
 import { useDensityValue } from "../hooks/use-density";
-import { UiRobotAi } from "../icons";
-import { modelProvider } from "../data/chat/ContextMeter.model";
-import { providerIcon, providerIconColor } from "../data/chat/provider-icons";
+import { agentGlyph } from "./agent-delivery";
 import { AgentIdentity } from "../data/chat/AgentIdentity";
 import { authorDisplayName } from "./comment-utils";
 import type { CommentAuthor as CommentAuthorModel } from "./comment-types";
@@ -75,7 +73,7 @@ function AgentChip({
   size: number;
 }) {
   const icon = author.icon;
-  const provider = modelProvider(author.model ?? author.name);
+  const glyph = agentGlyph(author.model ?? author.name);
   return (
     <span
       role="img"
@@ -86,8 +84,8 @@ function AgentChip({
       <Icon
         {...(typeof icon === "string"
           ? { name: icon }
-          : { icon: icon ?? providerIcon(provider) ?? UiRobotAi })}
-        {...(providerIconColor(provider) ? { className: providerIconColor(provider)! } : {})}
+          : { icon: icon ?? glyph.icon })}
+        {...(glyph.className ? { className: glyph.className } : {})}
         width={Math.max(10, Math.round(size * 0.6))}
         height={Math.max(10, Math.round(size * 0.6))}
       />
