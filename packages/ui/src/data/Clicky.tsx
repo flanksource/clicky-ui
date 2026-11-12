@@ -304,6 +304,8 @@ export type ClickyRowDetailTitle = (row: Record<string, unknown>) => ReactNode;
 export type ClickyProps = {
   /** Clicky document, node, or JSON string to render. */
   data?: ClickyDocument | ClickyNode | string;
+  /** Host actions listed in a table result's overflow menu, ahead of export and debug. */
+  menuActions?: DataTableMenuAction[];
   /** Remote URL to fetch when `data` is not provided. */
   url?: string;
   /**
@@ -496,11 +498,15 @@ export function Clicky(props: ClickyProps) {
         },
       }),
   );
-  const { actions: tableMenuActions, dialog: exportDialog } = useClickyTableMenu({
+  const { actions: resultMenuActions, dialog: exportDialog } = useClickyTableMenu({
     url: props.url,
     download: props.download,
     pagination: props.pagination,
   });
+  const tableMenuActions = useMemo(
+    () => [...(props.menuActions ?? []), ...resultMenuActions],
+    [props.menuActions, resultMenuActions],
+  );
 
   const content = (
     <>
