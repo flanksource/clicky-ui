@@ -1,3 +1,0 @@
-import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{t}from"./react-pByjoP3I.js";import{t as n}from"./jsx-runtime-BG4KOiPz.js";import{i as r,n as i,r as a,t as o}from"./fixtures-Dyx-VAUO.js";function s(){let[e,t]=(0,c.useState)(`root`);return(0,l.jsx)(a,{trace:i,selectedSpanId:e,onSelectSpan:t})}var c,l,u,d,f;function p(){return(p=e((()=>{c=t(),r(),o(),l=n(),u={title:`Data/Traces/OpenTelemetry detail`,component:a,parameters:{layout:`fullscreen`},args:{trace:i,onSelectSpan:()=>void 0}},d={render:()=>(0,l.jsx)(s,{})},f=[`Default`],d.parameters={...d.parameters,docs:{...d.parameters?.docs,source:{originalSource:`{
-  render: () => <Interactive />
-}`,...d.parameters?.docs?.source}}}})))()}p();export{d as Default,f as __namedExportsOrder,u as default};
