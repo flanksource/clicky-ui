@@ -42,6 +42,13 @@ export type Selection = {
 
 export type HostState = { url: string; title: string; selection?: Selection };
 export type Presentation = "compact" | "draft" | "rail";
+/** The presentations a user picks for the panel; `compact` is the hover popover. */
+export type PanelMode = Exclude<Presentation, "draft">;
+
+export function panelMode(input: unknown): PanelMode {
+  if (input !== "rail" && input !== "compact") throw new Error(`Invalid panel mode ${JSON.stringify(input)}`);
+  return input;
+}
 export type AnchorState = {
   anchor: string;
   label: string;
@@ -52,6 +59,7 @@ export type HostMessage =
   | { type: "presentation"; mode: Presentation }
   | { type: "fab-position"; x: number; y: number }
   | { type: "sidebar-width"; width: number }
+  | { type: "hover-size"; width: number; height: number }
   | { type: "state"; state: HostState }
   | { type: "anchors"; anchors: AnchorState[] }
   | { type: "focus"; anchor: string }
@@ -63,7 +71,10 @@ export type PanelMessage =
   | { type: "minimize" }
   | { type: "draft"; active: boolean; posted?: boolean; anchor?: string }
   | { type: "draft-size"; height: number }
-  | { type: "ready"; width: number }
+  /** `mode` and `hover` restore the panel's remembered presentation; a panel without them opens as a hover popover. */
+  | { type: "ready"; width: number; mode?: PanelMode; hover?: { width: number; height: number } }
+  /** The user switched an open panel between the side rail and the hover popover. */
+  | { type: "presentation-request"; mode: PanelMode }
   | { type: "sidebar-layout"; width: number; maximized: boolean }
   | { type: "close" }
   | { type: "pick"; screenshot?: boolean }

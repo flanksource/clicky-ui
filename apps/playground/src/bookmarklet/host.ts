@@ -5,7 +5,8 @@ import type { CommentScreenshotCapture } from "../../plugins/comments-model";
 import { SIDEBAR_PLUGIN_NAME, grabberPlugin, registerGrabberPlugin, sidebarButtonPlugin } from "../comments/react-grab-actions";
 import { captureScreenshot, releaseScreenshotCapture, screenshotCaptureSupported } from "../comments/screenshot";
 import type { ScreenshotTarget } from "../comments/screenshot-viewport";
-import { bridgeMessage, envelope, externalTitle, type HostMessage, type HostState } from "./model";
+import { bridgeMessage, envelope, externalTitle, panelMode, type HostMessage, type HostState } from "./model";
+import { hoverSize } from "./host-hover-resize";
 import { mountHost } from "./host-dom";
 import { withOverlaysHidden } from "./host-capture";
 import { commentPlugin } from "@flanksource/react-grab/core";
@@ -54,7 +55,15 @@ export function installBookmarklet(options: HostOptions) {
   const error = (cause: unknown) => { ui.resume(); send({ type: "error", error: cause instanceof Error ? cause.message : String(cause) }); };
   // The toolbar's sidebar button is registered once the picker exists; until then there is nothing to refresh.
   let sidebarChanged = (_open: boolean) => {};
-  const ui = mountHost(frameSrc,anchor => send({ type: "focus", anchor }), width => send({ type: "sidebar-width", width }), mode => send({ type: "presentation", mode }), position => send({ type: "fab-position", ...position }), open => sidebarChanged(open));
+  const ui = mountHost({
+    frameUrl: frameSrc,
+    focus: anchor => send({ type: "focus", anchor }),
+    onWidth: width => send({ type: "sidebar-width", width }),
+    onPresentation: mode => send({ type: "presentation", mode }),
+    onPosition: position => send({ type: "fab-position", ...position }),
+    onOpenChange: open => sidebarChanged(open),
+    onHoverSize: size => send({ type: "hover-size", ...size }),
+  });
 
   // A supplied capture runs with the grabber's own UI hidden; screen sharing (the bookmarklet's) shows the browser's picker instead.
   const takeScreenshot = (target: Element | ScreenshotTarget) => options.capture
@@ -127,8 +136,12 @@ export function installBookmarklet(options: HostOptions) {
     if (!message) return;
     try {
       switch (message["type"]) {
-        case "ready": ui.layout(sidebarWidth(message["width"]), false); ready = true; ui.root.shadowRoot?.querySelector(".error")?.remove(); send({ type: "state", state }); break;
-        case "sidebar-layout":
+        case "ready":
+          ui.layout(sidebarWidth(message["width"]), false);
+          if (message["hover"] !== undefined) ui.hoverLayout(hoverSize(message["hover"]));
+          if (message["mode"] !== undefined) ui.preferPresentation(panelMode(message["mode"]));
+          ready = true; ui.root.shadowRoot?.querySelector(".error")?.remove(); send({ type: "state", state }); break;
+        case "presentation-request": ui.setPresentation(panelMode(message["mode"])); break;        case "sidebar-layout":
           if (typeof message["maximized"] !== "boolean") throw new Error("Invalid detail mode");
           ui.layout(sidebarWidth(message["width"]), message["maximized"]); break;
         case "minimize": agent.receive({ type: "mode", mode: "off" }); ui.minimize(); break;
@@ -182,7 +195,7 @@ export function installBookmarklet(options: HostOptions) {
     closed = true; version++; clearTimeout(startup); clearInterval(navigation); window.removeEventListener("message", onMessage); releaseScreenshotCapture(); agent.dispose(); releaseGrab(); ui.close(); delete window.__PLAYGROUND_GRABBER__;
     options.onClose?.();
   }
-  window.__PLAYGROUND_GRABBER__ = { focus() { agent.receive({ type: "mode", mode: "off" }); ui.compact(); ui.frame.focus(); }, close };
+  window.__PLAYGROUND_GRABBER__ = { focus() { agent.receive({ type: "mode", mode: "off" }); ui.open(); ui.frame.focus(); }, close };
 }
 
 const currentScript = document.currentScript as HTMLScriptElement | null;

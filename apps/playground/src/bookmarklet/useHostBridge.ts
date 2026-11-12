@@ -3,7 +3,8 @@ import { useCommentRailWidth } from "@flanksource/clicky-ui/comments";
 import { sidebarWidth } from "./host-resize";
 import { bookmarkletPeerOrigin, matchesBookmarkletParent } from "./origin";
 import { parseAnchors, parseFabPosition, parseHostState, parsePresentation, validateParentOrigin } from "./bridge-parse";
-import { bridgeMessage, envelope, type AnchorState, type HostState, type PanelMessage, type Presentation } from "./model";
+import { hoverSize, type HoverSize } from "./host-hover-resize";
+import { bridgeMessage, envelope, panelMode, type AnchorState, type HostState, type PanelMessage, type PanelMode, type Presentation } from "./model";
 
 /**
  * How a panel reaches its host. `parentOrigin` names the document whose state
@@ -20,6 +21,24 @@ export function playgroundConnection(search: string): HostConnection {
 }
 
 let connection = playgroundConnection(location.search);
+
+const MODE_KEY = "playground.bookmarklet.mode";
+const HOVER_KEY = "playground.bookmarklet.hover";
+
+/** The rail-or-hover mode and hover size the user last left the panel in; throws on a corrupt record. */
+export function storedPresentation(): { mode?: PanelMode; hover?: HoverSize } {
+  const mode = localStorage.getItem(MODE_KEY);
+  const hover = localStorage.getItem(HOVER_KEY);
+  return {
+    ...(mode !== null ? { mode: panelMode(mode) } : {}),
+    ...(hover !== null ? { hover: hoverSize(JSON.parse(hover)) } : {}),
+  };
+}
+
+/** Asks the host to show the panel as the side rail or the hover popover. */
+export function requestPanelMode(mode: PanelMode) {
+  sendToHost({ type: "presentation-request", mode });
+}
 
 /** Panels with another frame URL contract (the extension's gavel panel) attach before they render. */
 export function connectHostBridge(next: HostConnection) {
@@ -64,7 +83,11 @@ export function useHostBridge() {
       if (!message) return;
       try {
         if (message["type"] === "presentation") {
-          setPresentation(parsePresentation(message["mode"]));
+          const next = parsePresentation(message["mode"]);
+          setPresentation(next);
+          if (next !== "draft") localStorage.setItem(MODE_KEY, next);
+        } else if (message["type"] === "hover-size") {
+          localStorage.setItem(HOVER_KEY, JSON.stringify(hoverSize({ width: message["width"], height: message["height"] })));
         } else if (message["type"] === "fab-position") {
           localStorage.setItem("playground.bookmarklet.position", JSON.stringify(parseFabPosition(message)));
         } else if (message["type"] === "sidebar-width") {
@@ -86,7 +109,14 @@ export function useHostBridge() {
       }
     };
     window.addEventListener("message", receive);
-    sendToHost({ type: "ready", width });
+    try {
+      sendToHost({ type: "ready", width, ...storedPresentation() });
+    } catch (cause) {
+      setError(`The remembered panel layout is invalid, so it was reset: ${cause instanceof Error ? cause.message : String(cause)}`);
+      localStorage.removeItem(MODE_KEY);
+      localStorage.removeItem(HOVER_KEY);
+      sendToHost({ type: "ready", width });
+    }
     try {
       const stored = localStorage.getItem("playground.bookmarklet.position");
       if (stored) sendToHost({ type: "fab-position", ...JSON.parse(stored) as { x: number; y: number } });

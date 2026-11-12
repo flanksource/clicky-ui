@@ -34,6 +34,7 @@ import {
   type Presentation,
 } from "./model";
 import { sendToHost, useHostBridge } from "./useHostBridge";
+import { useHostDialog } from "./useHostDialog";
 import { FloatingDraft } from "./FloatingDraft";
 
 type PageSession = { page: ExternalPage; state: HostState };
@@ -298,18 +299,7 @@ function RailContents({
   const { snapshot } = useVocabulary();
   const agentRuns = useAgentRuns();
   deliveryReady.current = agentRuns.ready && (!agentRuns.autoRun || !!agentRuns.target);
-  useEffect(() => {
-    if (!visible) return;
-    let previous = false;
-    const update = () => {
-      const open = !!document.querySelector('[aria-modal="true"], [role="listbox"], [role="menu"]');
-      if (open !== previous) { previous = open; sendToHost({ type: "dialog", open }); }
-    };
-    const observer = new MutationObserver(update);
-    observer.observe(document.body, { subtree: true, childList: true });
-    update();
-    return () => { observer.disconnect(); if (previous) sendToHost({ type: "dialog", open: false }); };
-  }, [visible]);
+  useHostDialog(visible);
   const [review, setReview] = useState(false);
   const [selected, setSelected] = useState<string>();
   const labels = Object.fromEntries(
