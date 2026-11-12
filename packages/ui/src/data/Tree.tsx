@@ -22,7 +22,11 @@ export type TreeProps<T> = Omit<
    * are owned externally.
    */
   showControls?: boolean;
-  /** Keep search visible for small or empty trees. */
+  /**
+   * Search box visibility. Omitted: shown for trees with more than 20 edges or
+   * a `searchQuery`. `true`: always shown. `false`: never shown — a parent that
+   * owns the filter input still filters through `searchQuery`.
+   */
   showSearch?: boolean;
   /** Placeholder and accessible name of the search box, e.g. "Filter tests". */
   searchLabel?: string;
@@ -246,7 +250,7 @@ export function Tree<T>({
   className,
   ariaLabel,
   showControls = true,
-  showSearch = false,
+  showSearch,
   searchLabel,
   searchQuery,
   onSearchQueryChange,
@@ -272,16 +276,19 @@ export function Tree<T>({
   // revealKey drives the path reveal; it follows selectedKey except when the
   // selection came from clicking a row in this tree.
   const [reveal, setReveal] = useState({ selectedKey, revealKey: selectedKey, clickedKey: null as TreeKey | null });
-  if (reveal.selectedKey !== selectedKey) {
-    const fromTree = selectedKey !== null && selectedKey === reveal.clickedKey;
-    setReveal({ selectedKey, revealKey: fromTree ? reveal.revealKey : selectedKey, clickedKey: null });
-  }
-  const revealKey = reveal.revealKey;
   const [revealInteraction, setRevealInteraction] = useState({
     selectedKey: null as TreeKey | null,
     overrides: new Map<TreeKey, boolean>(),
     bulk: false,
   });
+  if (reveal.selectedKey !== selectedKey) {
+    const fromTree = selectedKey !== null && selectedKey === reveal.clickedKey;
+    setReveal({ selectedKey, revealKey: fromTree ? reveal.revealKey : selectedKey, clickedKey: null });
+    // An external selection is a fresh reveal: toggles and bulk controls made
+    // for an earlier visit to the same key no longer apply.
+    if (!fromTree) setRevealInteraction({ selectedKey: null, overrides: new Map(), bulk: false });
+  }
+  const revealKey = reveal.revealKey;
   const previousExpandAll = useRef(expandAll);
   useEffect(() => {
     if (previousExpandAll.current === expandAll) return;
@@ -292,8 +299,8 @@ export function Tree<T>({
     () => countTreeEdges(roots, nodeProps.getChildren),
     [roots, nodeProps.getChildren],
   );
-  const showFilter = showSearch || totalEdges > 20 || Boolean(searchQuery);
-  const activeFilter = showFilter ? filterQuery : "";
+  const showFilter = showSearch ?? (totalEdges > 20 || Boolean(searchQuery));
+  const activeFilter = showFilter || showSearch === false ? filterQuery : "";
   const filteredTree = useMemo(
     () =>
       filterTreeRoots(

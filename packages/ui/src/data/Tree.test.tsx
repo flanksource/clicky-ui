@@ -128,6 +128,23 @@ describe("Tree", () => {
     expect(screen.getByLabelText("Filter tree nodes")).toBeInTheDocument();
   });
 
+  it("hides its own filter input when showSearch is false but still applies a parent-owned query", () => {
+    render(
+      <Tree<Node>
+        roots={makeLargeTree()}
+        getChildren={(node) => node.children}
+        getKey={(node) => node.id}
+        renderRow={({ node }) => <span>{node.label}</span>}
+        showSearch={false}
+        searchQuery="needle"
+      />,
+    );
+
+    expect(screen.queryByLabelText("Filter tree nodes")).toBeNull();
+    expect(screen.getByText("needle node")).toBeInTheDocument();
+    expect(screen.queryByText("leaf 0-0")).toBeNull();
+  });
+
   it("keeps filter controls before the semantic tree and uses icon-only controls", () => {
     renderTree(makeLargeTree());
 
@@ -280,6 +297,20 @@ describe("Tree", () => {
       expect(screen.getByText("r").closest("[role=treeitem]")).toHaveAttribute("aria-expanded", "true");
     });
 
+    it("keeps every child of an already-open ancestor, narrowing only closed ancestors to the path", () => {
+      render(<Tree<Node> {...props} roots={makeDeepTree()} selected={leaf} defaultOpen={(node) => node.id === "r"} />);
+
+      const root = screen.getByText("r").closest("[role=treeitem]")!;
+      const shown = ["x", "y", "z", "other", "sibling"].filter((label) => screen.queryByText(label) !== null);
+      fireEvent.click(root.querySelector('button[aria-label="Collapse"]')!);
+
+      expect({ shown, afterCollapse: screen.queryByText("x"), expanded: root.getAttribute("aria-expanded") }).toEqual({
+        shown: ["x", "y", "z", "other"],
+        afterCollapse: null,
+        expanded: "false",
+      });
+    });
+
     it("leaves the selected node's own default expansion alone", () => {
       render(
         <Tree<Node>
@@ -365,6 +396,15 @@ describe("Tree", () => {
       expect(screen.getByText("sibling")).toBeInTheDocument();
       fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
       expect(screen.queryByText("sibling")).toBeNull();
+    });
+
+    it("reveals a selection again when navigation returns to it after a bulk collapse", () => {
+      const { rerender } = render(<Tree<Node> {...props} roots={makeDeepTree()} selected={leaf} />);
+      fireEvent.click(screen.getByRole("button", { name: "Collapse all" }));
+      rerender(<Tree<Node> {...props} roots={makeDeepTree()} selected={{ id: "sibling", label: "sibling" }} />);
+      rerender(<Tree<Node> {...props} roots={makeDeepTree()} selected={leaf} />);
+
+      expect(screen.getByText("z").closest("[role=treeitem]")).toHaveAttribute("aria-selected", "true");
     });
 
     it("honors a controlled bulk collapse after the selected path is shown", () => {

@@ -27,6 +27,19 @@ function renderTree(props: Partial<Parameters<typeof TreeNode<Node>>[0]> = {}) {
 }
 
 describe("TreeNode", () => {
+  it("refreshes lazy children on reopening and host invalidation without remounting the row", async () => {
+    const loadChildren = vi.fn().mockResolvedValueOnce([{ id: "first", label: "First" }]).mockResolvedValueOnce([{ id: "second", label: "Second" }]).mockResolvedValueOnce([{ id: "third", label: "Third" }]);
+    const props = { node: { id: "folder", label: "Folder", lazy: true }, getKey: (node: Node) => node.id, getChildren: (node: Node) => node.children, hasMoreChildren: (node: Node) => Boolean(node.lazy), loadChildren, reloadOnOpen: true, renderRow: ({ node }: { node: Node }) => <span>{node.label}</span> };
+    const { rerender } = render(<TreeNode {...props} getChildrenVersion={() => 0} />);
+    await screen.findByText("First");
+    const row = screen.getByText("Folder");
+    fireEvent.click(row); fireEvent.click(row);
+    await screen.findByText("Second");
+    rerender(<TreeNode {...props} getChildrenVersion={() => 1} />);
+    await screen.findByText("Third");
+    expect(screen.getByText("Folder")).toBe(row);
+    expect(loadChildren).toHaveBeenCalledTimes(3);
+  });
   it("shares controlled expansion between two trees, including nested nodes", () => {
     function ControlledTrees() {
       const [expanded, setExpanded] = useState(new Set(["root"]));
@@ -214,6 +227,46 @@ describe("TreeNode", () => {
     expect(rootRow.style.paddingLeft).toBe("8px");
     expect(aRow.style.paddingLeft).toBe("24px");
     expect(a1Row.style.paddingLeft).toBe("40px");
+  });
+});
+
+describe("TreeNode host updates after a lazy load", () => {
+  type Row = { id: string; label: string; active?: boolean; children?: Row[]; lazy?: boolean };
+  const loaded: Row[] = [{ id: "a", label: "a", active: true }, { id: "b", label: "b" }];
+
+  function renderFolder(children: Row[]) {
+    const props = {
+      getKey: (n: Row) => n.id,
+      getChildren: (n: Row) => n.children,
+      hasMoreChildren: (n: Row) => n.lazy === true,
+      loadChildren: () => Promise.resolve(loaded),
+      defaultOpen: () => true,
+      renderRow: ({ node }: { node: Row }) => <span data-testid={`row-${node.id}`} data-active={String(Boolean(node.active))}>{node.label}</span>,
+    };
+    const folder = (kids: Row[]): Row => ({ id: "folder", label: "folder", lazy: true, children: kids });
+    const view = render(<TreeNode<Row> node={folder(children)} {...props} />);
+    return { ...view, update: (kids: Row[]) => view.rerender(<TreeNode<Row> node={folder(kids)} {...props} />) };
+  }
+
+  it("highlights exactly the host's new active child after a lazy group has loaded", async () => {
+    const { update } = renderFolder([{ id: "a", label: "a", active: true }, { id: "b", label: "b" }]);
+    await waitFor(() => expect(screen.getByTestId("row-a")).toHaveAttribute("data-active", "true"));
+    update([{ id: "a", label: "a" }, { id: "b", label: "b", active: true }]);
+    expect(screen.getByTestId("row-a")).toHaveAttribute("data-active", "false");
+    expect(screen.getByTestId("row-b")).toHaveAttribute("data-active", "true");
+  });
+
+  it("reveals children the host adds after the lazy load resolved, keeping loaded ones", async () => {
+    const { update } = renderFolder([{ id: "a", label: "a", active: true }, { id: "b", label: "b" }]);
+    await waitFor(() => expect(screen.getByTestId("row-b")).toBeInTheDocument());
+    update([{ id: "a", label: "a" }, { id: "b", label: "b" }, { id: "c", label: "c" }]);
+    expect(screen.getAllByTestId(/^row-/).map((el) => el.textContent)).toEqual(["folder", "a", "b", "c"]);
+  });
+
+  it("keeps loaded children when the host supplies no synchronous children", async () => {
+    renderFolder([]);
+    await waitFor(() => expect(screen.getByTestId("row-a")).toBeInTheDocument());
+    expect(screen.getByTestId("row-b")).toBeInTheDocument();
   });
 });
 

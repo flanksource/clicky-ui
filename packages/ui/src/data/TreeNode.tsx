@@ -71,6 +71,10 @@ export type TreeNodeProps<T> = {
    * and reopened. Required for any node `hasMoreChildren` returns true for.
    */
   loadChildren?: (node: T) => Promise<T[]>;
+  /** Refresh lazy children on each manual reopen, retaining the row and its children while loading. */
+  reloadOnOpen?: boolean;
+  /** Host-controlled invalidation; open nodes refresh when their version changes. */
+  getChildrenVersion?: (node: T) => string | number;
   /**
    * Marks a node as a **secondary child** of its parent. Secondary
    * children keep the full tree structure (they render, they can be
@@ -89,6 +93,13 @@ export type TreeNodeProps<T> = {
    */
   isSecondary?: (node: T) => boolean;
 };
+
+function mergeChildrenByKey<T>(loaded: T[], sync: T[] | undefined, getKey: (node: T) => TreeKey): T[] {
+  if (!sync?.length) return loaded;
+  const current = new Map(sync.map((child) => [getKey(child), child]));
+  const loadedKeys = new Set(loaded.map(getKey));
+  return [...loaded.map((child) => current.get(getKey(child)) ?? child), ...sync.filter((child) => !loadedKeys.has(getKey(child)))];
+}
 
 export function TreeNode<T>({
   node,
@@ -115,21 +126,25 @@ export function TreeNode<T>({
   isSecondary,
   hasMoreChildren,
   loadChildren,
+  reloadOnOpen = false,
+  getChildrenVersion,
 }: TreeNodeProps<T>) {
   if (getExpanded && !onExpandedChange) throw new Error("Controlled tree expansion requires onExpandedChange");
-  // Lazily-fetched children take precedence over the synchronous ones once a
-  // load has resolved; until then `loadedChildren` is null and we fall back to
-  // getChildren. A node can be "lazy" (hasMoreChildren) with no sync children.
+  // Lazily-fetched children are the base set once a load has resolved; until
+  // then `loadedChildren` is null and we use getChildren. A node can be "lazy"
+  // (hasMoreChildren) with no sync children. The loaded copy is a snapshot, so
+  // the host's current sync children win by key (fresh `active`, `to`, ...) and
+  // sync-only children are appended rather than hidden behind the stale snapshot.
   const [loadedChildren, setLoadedChildren] = useState<T[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const syncChildren = getChildren(node);
-  const children = loadedChildren ?? syncChildren;
+  const children = loadedChildren === null ? syncChildren : mergeChildrenByKey(loadedChildren, syncChildren, getKey);
   const hasChildren = (children?.length ?? 0) > 0;
   const lazyUnloaded = (hasMoreChildren?.(node) ?? false) && loadedChildren === null;
   // The chevron shows when there is something to reveal: either real children
   // are present, or the node is lazy and has not been loaded yet.
-  const expandable = hasChildren || lazyUnloaded;
+  const expandable = hasChildren || lazyUnloaded || Boolean(reloadOnOpen && hasMoreChildren?.(node));
   // A node opts out of bulk expand-all in two distinct cases:
   //
   //  1. The node itself is secondary (its edge from the parent is
@@ -171,8 +186,10 @@ export function TreeNode<T>({
   const revealNextKey = revealPath?.get(key) ?? null;
   const isOnRevealPath = revealNextKey !== null;
   const revealOverride = revealOverrides?.get(key);
-  const pathOnly = isOnRevealPath && revealOverride === undefined;
   const ownOpen = getExpanded ? getExpanded(node) : open;
+  // An ancestor that is already open keeps all its children; only a closed one
+  // opens to just the next path node.
+  const pathOnly = isOnRevealPath && revealOverride === undefined && !ownOpen;
   const isOpen = isForcedOpen || pathOnly || (revealOverride ?? ownOpen);
 
   useEffect(() => {
@@ -188,21 +205,25 @@ export function TreeNode<T>({
   const loadRequested = useRef(false);
   const nodeKey = getKey(node);
   const loadKeyRef = useRef(nodeKey);
+  const loadGeneration = useRef(0);
+  const childrenVersion = getChildrenVersion?.(node);
+  const previousChildrenVersion = useRef(childrenVersion);
 
   function loadLazyChildren() {
     if (!loadChildren || loadRequested.current) return;
     loadRequested.current = true;
+    const generation = ++loadGeneration.current;
     loadKeyRef.current = nodeKey;
     setLoading(true);
     setError(null);
     loadChildren(node)
       .then((kids) => {
-        if (loadKeyRef.current !== nodeKey) return;
+        if (loadKeyRef.current !== nodeKey || generation !== loadGeneration.current) return;
         setLoadedChildren(kids);
         setLoading(false);
       })
       .catch((err) => {
-        if (loadKeyRef.current !== nodeKey) return;
+        if (loadKeyRef.current !== nodeKey || generation !== loadGeneration.current) return;
         // Surfaced to renderRow via ctx.error; allow a retry on re-toggle.
         loadRequested.current = false;
         setError(err);
@@ -223,17 +244,29 @@ export function TreeNode<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, lazyUnloaded, error]);
 
+  useEffect(() => {
+    if (!getChildrenVersion || previousChildrenVersion.current === childrenVersion) return;
+    previousChildrenVersion.current = childrenVersion;
+    loadRequested.current = false;
+    if (isOpen && hasMoreChildren?.(node)) loadLazyChildren();
+    // The host version, rather than callback identity, invalidates this node.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [childrenVersion]);
+
+  useEffect(() => () => { loadGeneration.current++; loadRequested.current = false; }, []);
+
   function toggle() {
     if (!expandable) return;
     if (isOnRevealPath) {
       if (!onRevealToggle) throw new Error("A revealed tree path requires onRevealToggle");
-      const next = pathOnly || !revealOverride;
+      const next = pathOnly || !(revealOverride ?? ownOpen);
       if (next && lazyUnloaded) loadLazyChildren();
       onRevealToggle(key, next);
       return;
     }
     const next = !ownOpen;
-    if (next && lazyUnloaded) loadLazyChildren();
+    if (next && reloadOnOpen && hasMoreChildren?.(node)) loadRequested.current = false;
+    if (next && (lazyUnloaded || reloadOnOpen)) loadLazyChildren();
     if (getExpanded) onExpandedChange!(node, next);
     else setOpen(next);
   }
@@ -327,6 +360,8 @@ export function TreeNode<T>({
               {...(isSecondary ? { isSecondary } : {})}
               {...(hasMoreChildren ? { hasMoreChildren } : {})}
               {...(loadChildren ? { loadChildren } : {})}
+              reloadOnOpen={reloadOnOpen}
+              {...(getChildrenVersion ? { getChildrenVersion } : {})}
             />
           ))}
         </div>
