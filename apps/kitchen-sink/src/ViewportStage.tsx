@@ -71,7 +71,7 @@ function PresetFrame({ demoId, preset, scale }: { demoId: string; preset: Viewpo
         <iframe
           title={`${demoId} at ${preset.label}`}
           src={frameUrl(demoId)}
-          sandbox="allow-scripts allow-same-origin"
+          sandbox="allow-scripts allow-same-origin allow-popups"
           width={preset.width}
           height={preset.height}
           className="origin-top-left border-0"
