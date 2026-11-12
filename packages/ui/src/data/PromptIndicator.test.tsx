@@ -95,6 +95,26 @@ describe("PromptIndicator", () => {
     expect(screen.queryByRole("dialog", { name: pendingRegion.title })).toBeNull();
   });
 
+  it("with autoOpen, opens none of the previous API's prompts after basePath changes", async () => {
+    class OldApiOnly {
+      constructor(private url: string) {}
+      addEventListener(_type: string, callback: (event: MessageEvent) => void) {
+        if (this.url.startsWith("/api/todos/"))
+          setTimeout(() => callback(new MessageEvent("prompts", { data: JSON.stringify([pendingRegion, pendingTarget]) })));
+      }
+      close() {}
+    }
+    vi.stubGlobal("EventSource", OldApiOnly);
+    const { rerender } = render(<PromptIndicator basePath="/api/todos" autoOpen />);
+    expect(await screen.findByRole("dialog", { name: pendingRegion.title })).toBeInTheDocument();
+
+    rerender(<PromptIndicator basePath="/api/runs/r2" autoOpen />);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(indicator()).toHaveAccessibleName("Prompts");
+  });
+
   it("keeps the next prompt's dialog open when an earlier, already closed prompt's answer lands", async () => {
     let finish: (value: { ok: boolean; text: () => Promise<string> }) => void = () => {};
     vi.stubGlobal("fetch", vi.fn(() => new Promise((resolve) => { finish = resolve; })));
