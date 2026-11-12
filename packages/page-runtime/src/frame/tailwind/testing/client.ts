@@ -2,13 +2,13 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { prepareTailwind, type TailwindOptions } from "../runtime.ts";
 import { waitForReadiness } from "../../readiness.ts";
-import { insertBaseLinks, insertCss } from "../stylesheets.ts";
+import { insertBaseStyles, insertCss } from "../stylesheets.ts";
 import { createTailwindStore } from "../store.ts";
 import { openRuntimeDb, result, tailwindCacheName } from "../../../storage/db.ts";
 import type { Snapshot } from "./compare.ts";
 
 const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-type Options = Pick<TailwindOptions, "libraries" | "loaders" | "candidates"> & { base: string[]; pages: Record<string, () => Promise<{ default: React.ComponentType<{ data: unknown }> }>>; data: unknown };
+type Options = Pick<TailwindOptions, "libraries" | "loaders" | "candidates"> & { base: Array<{ url: string; layer: string }>; pages: Record<string, () => Promise<{ default: React.ComponentType<{ data: unknown }> }>>; data: unknown };
 
 async function snapshot(root: HTMLElement): Promise<Snapshot> {
   await frame(); await document.fonts.ready;
@@ -51,7 +51,7 @@ async function storageState(storage: Awaited<ReturnType<typeof freshStorage>>) {
 async function probes(options: Options & { root: HTMLElement }) {
   const runtimeVersion = "probe";
   const storage = await freshStorage(runtimeVersion);
-  await insertBaseLinks({ document, urls: options.base, timeoutMs: 15000 }).ready;
+  await insertBaseStyles({ document, stylesheets: options.base, timeoutMs: 15000 }).ready;
   const errors: string[] = [];
   const prepare = () => prepareTailwind({ ...options, candidates: ["w-[137px]"], runtimeVersion, store: storage.store, timeoutMs: 5000, onError: (error) => errors.push(String(error)) });
   let runtime = await prepare();
@@ -92,11 +92,11 @@ async function probes(options: Options & { root: HTMLElement }) {
 
 // A page that never opts in: the base links alone style it and no runtime style element exists.
 async function plainProbe(options: Options & { root: HTMLElement }) {
-  await insertBaseLinks({ document, urls: options.base, timeoutMs: 15000 }).ready;
+  await insertBaseStyles({ document, stylesheets: options.base, timeoutMs: 15000 }).ready;
   const safelisted = document.createElement("div"); safelisted.className = "bg-red-500"; options.root.append(safelisted);
   await frame();
   const color = getComputedStyle(safelisted).backgroundColor;
-  return { runtimeStyle: document.getElementById("runtime-tailwind") !== null, baseLinks: document.querySelectorAll("link[data-page-runtime-base]").length, color, styled: color !== "rgba(0, 0, 0, 0)" && color !== "" };
+  return { runtimeStyle: document.getElementById("runtime-tailwind") !== null, baseLinks: document.querySelectorAll("[data-page-runtime-base]").length, color, styled: color !== "rgba(0, 0, 0, 0)" && color !== "" };
 }
 
 export async function run(options: Options): Promise<unknown> {
@@ -108,7 +108,7 @@ export async function run(options: Options): Promise<unknown> {
   const load = options.pages[name]; if (!load) throw new Error(`unknown page ${name}`);
   const module = await load();
   let runtime: Awaited<ReturnType<typeof prepareTailwind>> | undefined;
-  await insertBaseLinks({ document, urls: options.base, timeoutMs: 15000 }).ready;
+  await insertBaseStyles({ document, stylesheets: options.base, timeoutMs: 15000 }).ready;
   if (params.get("mode") === "reference") {
     const response = await fetch(`/reference/${name}`);
     if (!response.ok) throw new Error(await response.text());

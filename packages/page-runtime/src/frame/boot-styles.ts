@@ -1,8 +1,8 @@
 import type { FrameConfig } from "../schema.ts";
-import { baseStylesheetUrls, loadLibraries } from "./tailwind/load.ts";
+import { baseStylesheets, loadLibraries } from "./tailwind/load.ts";
 import { loadTailwind, prepareTailwind } from "./tailwind/runtime.ts";
 import { createTailwindStore } from "./tailwind/store.ts";
-import { insertBaseLinks } from "./tailwind/stylesheets.ts";
+import { insertBaseStyles } from "./tailwind/stylesheets.ts";
 import { lazyRuntimeDb, tailwindCacheName } from "../storage/db.ts";
 import type { TailwindActivity } from "../activity-schema.ts";
 
@@ -23,7 +23,7 @@ export function pageTailwind(options: { module: { meta?: unknown }; page: string
 export async function loadPageStyles(config: FrameConfig) {
   const styles = await loadLibraries({ config });
   performance.mark("page-runtime:recipes");
-  const base = insertBaseLinks({ document, urls: baseStylesheetUrls({ libraries: styles.libraries, config }), timeoutMs: config.profile.readinessTimeoutMs });
+  const base = insertBaseStyles({ document, stylesheets: baseStylesheets({ libraries: styles.libraries, config }), timeoutMs: config.profile.readinessTimeoutMs });
   await base.ready;
   performance.mark("page-runtime:base-styles");
   return { ...styles, links: base.links };

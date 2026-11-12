@@ -13,7 +13,7 @@ vi.mock("./bridge.ts", () => ({
   createFrameBridge: (options: { receive: (value: BridgeEnvelope) => void }) => { fixture.receive = options.receive; return { send: fixture.send, dispose: fixture.disposeBridge }; },
   workerRequest: vi.fn(async () => undefined),
 }));
-vi.mock("./boot-styles.ts", () => ({ loadPageStyles: vi.fn(), preparePageStyles: fixture.prepare }));
+vi.mock("./boot-styles.ts", async (original) => ({ ...await original<typeof import("./boot-styles.ts")>(), loadPageStyles: vi.fn(), preparePageStyles: fixture.prepare }));
 vi.mock("/__runtime/page-agent.js", () => ({ startPageAgent: fixture.start, PageAgentProvider: ({ children }: { children: unknown }) => children }));
 vi.mock("./readiness.ts", () => ({ waitForReadiness: fixture.ready }));
 vi.mock("../sw/profile.ts", () => ({ validateProfile: (profile: unknown) => profile }));
@@ -92,10 +92,36 @@ it("passes the lock's page roots into the page agent", async () => {
   expect(fixture.start).toHaveBeenCalledWith(expect.objectContaining({ pageSources }));
 });
 
+it("mounts the host layout around the native page entry and includes its style metadata", async () => {
+  const element = document.getElementById("page-runtime-config")!;
+  const config = JSON.parse(element.textContent!);
+  element.textContent = JSON.stringify({ ...config, layout: pathToFileURL(resolve("src/frame/testing/boot-layout.ts")).href });
+  const boot = bootFrame(); command({ type: "data", data: null }); await boot;
+  expect(document.querySelector('[data-layout="true"]')?.textContent).toBe("Report");
+  expect(fixture.prepare).toHaveBeenCalledWith(expect.objectContaining({ module: expect.objectContaining({ meta: { tailwind: "dynamic" } }) }));
+});
+
+it("acknowledges a data update after readiness without registering another worker or restarting the agent", async () => {
+  const boot = bootFrame(); command({ type: "data", data: null }); await boot;
+  fixture.send.mockClear();
+  fixture.receive!({ bridge: "page-runtime-v1", session: "test", id: "data-update", message: { type: "data", data: { title: "Updated" } } });
+  await vi.waitFor(() => expect(fixture.send).toHaveBeenCalledWith({ type: "status", state: "ready" }, { re: "data-update" }));
+  expect([fixture.ready.mock.calls.length, fixture.start.mock.calls.length, vi.mocked(navigator.serviceWorker.register).mock.calls.length]).toEqual([2, 1, 1]);
+});
+
 it("reports an agent command before startup instead of dropping it", async () => {
   const boot = bootFrame(); command({ type: "pick" }); command({ type: "data", data: null });
   await boot;
   expect(fixture.send.mock.calls).toContainEqual([expect.objectContaining({ type: "error", error: expect.objectContaining({ message: expect.stringContaining("page agent is not ready") }) }), undefined]);
+});
+
+it("acknowledges source replacement in the existing document without restarting its worker or agent", async () => {
+  const boot = bootFrame(); command({ type: "data", data: null }); await boot;
+  const root = document.getElementById("root");
+  fixture.send.mockClear();
+  fixture.receive!({ bridge: "page-runtime-v1", session: "test", id: "source-update", message: { type: "sources", files: { "report.tsx": "export default function Page() { return 'Updated'; }" } } });
+  await vi.waitFor(() => expect(fixture.send).toHaveBeenCalledWith({ type: "status", state: "ready" }, { re: "source-update" }));
+  expect({ sameRoot: document.getElementById("root") === root, workerStarts: vi.mocked(navigator.serviceWorker.register).mock.calls.length, agentStarts: fixture.start.mock.calls.length }).toEqual({ sameRoot: true, workerStarts: 1, agentStarts: 1 });
 });
 
 it("retains worker diagnostics until after the first paint instead of delivering them on the render path", async () => {

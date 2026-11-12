@@ -28,8 +28,10 @@ export function stylesheetModule(css: string, url: string): string {
   return [
     `const link = document.createElement("link");`,
     `link.rel = "stylesheet"; link.href = ${JSON.stringify(url)};`,
+    'link.dataset.pageRuntimeStylesheet = new URL(link.href).pathname;',
+    'const previous = [...document.querySelectorAll("link[data-page-runtime-stylesheet]")].filter(item => item.dataset.pageRuntimeStylesheet === link.dataset.pageRuntimeStylesheet);',
     `link.dataset.pageRuntime = "loading";`,
-    `const ready = new Promise((resolve, reject) => { link.onload = () => { link.dataset.pageRuntime = "loaded"; resolve(link.sheet); }; link.onerror = () => { link.dataset.pageRuntime = "error"; reject(new Error("stylesheet failed: " + link.href)); }; });`,
+    `const ready = new Promise((resolve, reject) => { link.onload = () => { for (const item of previous) item.remove(); link.dataset.pageRuntime = "loaded"; resolve(link.sheet); }; link.onerror = () => { link.dataset.pageRuntime = "error"; reject(new Error("stylesheet failed: " + link.href)); }; });`,
     "document.head.append(link);",
     `export const source = ${JSON.stringify(css)};`,
     "export default ready;",

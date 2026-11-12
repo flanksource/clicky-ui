@@ -102,8 +102,8 @@ export type Theme = { theme: "light" | "dark"; density: "compact" | "comfortable
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 export type HostMessage =
   | AgentHostMessage
-  | { type: "open"; page: string; manifest: FolderManifest; lock?: PageLock; files: Record<string, string>; policy?: RuntimePolicy }
-  | { type: "sources"; files: Record<string, string | null> }
+  | { type: "open"; page: string; layout?: string; manifest: FolderManifest; lock?: PageLock; files: Record<string, string>; policy?: RuntimePolicy }
+  | { type: "sources"; files: Record<string, string | null>; data?: JsonValue }
   | { type: "reload" }
   | ({ type: "theme" } & Theme)
   | { type: "data"; data: JsonValue }
@@ -117,7 +117,7 @@ export type FrameMessage =
   | { type: "snapshot"; html: string };
 export type BridgeEnvelope<M = HostMessage | FrameMessage> = { bridge: "page-runtime-v1"; session: string; id?: string; re?: string; message: M };
 
-export type FrameConfig = { page: string; entry: string; lock: PageLock; profile: RuntimeProfile; runtimeVersion: string };
+export type FrameConfig = { page: string; entry: string; layout?: string; lock: PageLock; profile: RuntimeProfile; runtimeVersion: string };
 
 export type AgentRect = { left: number; top: number; width: number; height: number };
 export type AgentLocator = import("@flanksource/clicky-ui/comments").CommentLocator;

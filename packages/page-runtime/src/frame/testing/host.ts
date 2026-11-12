@@ -15,6 +15,7 @@ const activityEvents: FrameMessage[] = [];
 const activityOutput = document.createElement("pre"); activityOutput.id = "activity"; activityOutput.hidden = true; document.body.append(activityOutput);
 const reload = document.createElement("button"); reload.id = "reload"; reload.textContent = "Reload page"; reload.onclick = () => bridge.send({ type: "reload" }); document.body.append(reload);
 let opened = false;
+let updating = false;
 const bridge = createBridge({ target: frame.contentWindow!, origin: config.origin, session, direction: "host", onMessage: (envelope) => { void receive(envelope.message as FrameMessage); }, onError: (error) => { result.textContent = JSON.stringify({ failure: error.message }); document.title = "CASE-DONE"; } });
 const review = createRemoteReview({ send: (message) => bridge.send(message), onState: () => undefined, onAction: () => undefined });
 async function receive(message: FrameMessage) {
@@ -28,6 +29,23 @@ async function receive(message: FrameMessage) {
     if (message.state === "connecting" || (message.state === "booting" && !opened)) { opened = true; bridge.send(config.open); return; }
     if (message.state === "booting") { bridge.send({ type: "theme", theme: "dark", density: "compact" }); bridge.send({ type: "data", data: "Report" }); }
     if (message.state === "ready") {
+      if (config.name === "updates") {
+        if (updating) return;
+        updating = true;
+        try {
+          const snapshot = async () => (await bridge.request({ type: "export", format: "html" })).message;
+          const before = await snapshot();
+          await bridge.request({ type: "data", data: "Data update" });
+          const data = await snapshot();
+          await bridge.request({ type: "sources", files: { "custom.css": 'main { outline-color: rgb(12, 34, 56); }' } });
+          const css = await snapshot();
+          await bridge.request({ type: "sources", files: { "helper.ts": 'export const text = "Updated helper";' }, data: "Source data" });
+          const helper = await snapshot();
+          await bridge.request({ type: "sources", files: { "report.tsx": config.open.files["report.tsx"]!.replace("{text}:{data}", "{text}:{data}:Edited page") } });
+          result.textContent = JSON.stringify({ states, errors, before, data, css, helper, snapshot: await snapshot() });
+        } catch (error) { result.textContent = JSON.stringify({ states, errors, failure: String(error) }); }
+        document.title = "CASE-DONE"; return;
+      }
       // A rejected export is the case result; otherwise the host would wait for CASE-DONE until the test times out.
       try {
         const snapshot = await bridge.request({ type: "export", format: "html" });

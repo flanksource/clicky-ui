@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FrameConfig } from "../../schema.ts";
-import { baseStylesheetUrls, loadLibraries, resolveStyleImport } from "./load.ts";
+import { baseStylesheets, loadLibraries, resolveStyleImport } from "./load.ts";
 import { libraryKey } from "./cache.ts";
 
 const origin = "https://runtime.example";
@@ -50,9 +50,9 @@ describe("runtime tailwind recipe loading", () => {
   it("lists every library's base stylesheet in library order through the package route, once each", async () => {
     setLocation();
     const { libraries } = await loadLibraries({ config: configFor({ managed: ["third", "second", "first"] }), importModule: importer });
-    expect(baseStylesheetUrls({ libraries, config })).toEqual([
-      `${origin}/npm/first@1.0.0/dist/styles.css?page=report.tsx`,
-      `${origin}/npm/second@2.0.0/dist/styles.css?page=report.tsx`,
+    expect(baseStylesheets({ libraries, config })).toEqual([
+      { url: `${origin}/npm/first@1.0.0/dist/styles.css?page=report.tsx`, layer: "components" },
+      { url: `${origin}/npm/second@2.0.0/dist/styles.css?page=report.tsx`, layer: "components" },
     ]);
   });
 
@@ -63,7 +63,7 @@ describe("runtime tailwind recipe loading", () => {
     await expect(loadLibraries({ config, importModule: async () => ({ default: { name: "first", layer: "components", stylesheets: {} } }) })).rejects.toThrow("first/page-styles: invalid recipe");
     const { libraries } = await loadLibraries({ config, importModule: importer });
     libraries[0]!.recipe = { ...libraries[0]!.recipe, base: ["https://other.example/styles.css"] };
-    expect(() => baseStylesheetUrls({ libraries, config })).toThrow("runtime package route");
+    expect(() => baseStylesheets({ libraries, config })).toThrow("runtime package route");
   });
 
   it("fails for unmapped dependencies and external package routes", () => {

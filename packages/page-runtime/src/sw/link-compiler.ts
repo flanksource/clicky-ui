@@ -11,7 +11,7 @@ import { pageSourceModule, pageSourcePath, validatePageSourceLinks, type PageSou
 import type { LinkActivity } from "./link-activity.ts";
 import { RUNTIME_MODULES } from "./runtime-module.ts";
 
-type Context = { path: string; lock: PageSourceLock; links: StoredLink[]; sources: string[] };
+type Context = { path: string; lock: PageSourceLock; links: StoredLink[]; sources: string[]; revision?: string };
 const SOURCE_SUFFIXES = ["", ".tsx", ".ts", ".jsx", ".js", ".mdx", ".md", "/index.tsx", "/index.ts", "/index.js"];
 
 function resolveLinked(specifier: string, options: Context): string {
@@ -38,7 +38,9 @@ function resolveLinked(specifier: string, options: Context): string {
   if (query.has("raw")) target += "?raw";
   else if (query.has("url")) target += "?url";
   else if (/\.(css|json)$/.test(found)) target += "?module";
-  return moduleUrl(target);
+  const revised = new URL(target, "https://runtime.invalid");
+  if (options.revision && revised.pathname.startsWith("/src/")) revised.searchParams.set("revision", options.revision);
+  return moduleUrl(revised.href);
 }
 
 export async function rewriteLinkImports(options: Context & { code: string }): Promise<string> {
@@ -75,7 +77,8 @@ type LinkCompileOptions = Context & { code: string; query: URLSearchParams; plug
 
 export async function compileLinkModule(options: LinkCompileOptions): Promise<string> {
   const compiled = await compileLinkSource(options);
-  return compiled.imports ? await rewriteLinkModule({ ...options, code: compiled.code }) : compiled.code;
+  const revision = options.query.get("revision");
+  return compiled.imports ? await rewriteLinkModule({ ...options, ...(revision ? { revision } : {}), code: compiled.code }) : compiled.code;
 }
 
 export async function rewriteLinkModule(options: Context & { code: string; metrics?: LinkActivity }): Promise<string> {
@@ -96,7 +99,12 @@ export async function compileLinkSource(options: LinkCompileOptions): Promise<{ 
   if (options.query.has("raw")) return { code: `export default ${JSON.stringify(options.code)};`, imports: false };
   if (options.query.has("url")) return { code: `export default ${JSON.stringify(moduleUrl(options.path))};`, imports: false };
   if (extension === ".json") return { code: `export default ${JSON.stringify(JSON.parse(options.code))};`, imports: false };
-  if (extension === ".css") return { code: stylesheetModule(options.code, moduleUrl(options.path)), imports: false };
+  if (extension === ".css") {
+    const stylesheet = new URL(options.path, "https://runtime.invalid");
+    const revision = options.query.get("revision");
+    if (revision) stylesheet.searchParams.set("revision", revision);
+    return { code: stylesheetModule(options.code, moduleUrl(stylesheet.href)), imports: false };
+  }
   const owner = options.links.find((link) => options.path.startsWith(`/link/${link.id}/`));
   const commonjs = owner?.build.commonjs?.[decodeURIComponent(options.path.slice(`/link/${owner.id}/`.length))];
   let code = options.code;

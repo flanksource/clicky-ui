@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FrameConfig } from "../schema.ts";
 
 const fixture = vi.hoisted(() => ({
-  loadLibraries: vi.fn(), baseStylesheetUrls: vi.fn(), loadTailwind: vi.fn(), prepareTailwind: vi.fn(), createTailwindStore: vi.fn(), lazyRuntimeDb: vi.fn(),
+  loadLibraries: vi.fn(), baseStylesheets: vi.fn(), loadTailwind: vi.fn(), prepareTailwind: vi.fn(), createTailwindStore: vi.fn(), lazyRuntimeDb: vi.fn(),
 }));
-vi.mock("./tailwind/load.ts", () => ({ loadLibraries: fixture.loadLibraries, baseStylesheetUrls: fixture.baseStylesheetUrls }));
+vi.mock("./tailwind/load.ts", () => ({ loadLibraries: fixture.loadLibraries, baseStylesheets: fixture.baseStylesheets }));
 vi.mock("./tailwind/runtime.ts", () => ({ loadTailwind: fixture.loadTailwind, prepareTailwind: fixture.prepareTailwind }));
 vi.mock("./tailwind/store.ts", () => ({ createTailwindStore: fixture.createTailwindStore }));
 vi.mock("../storage/db.ts", () => ({ lazyRuntimeDb: fixture.lazyRuntimeDb, tailwindCacheName: (version: string) => `tailwind-${version}` }));
@@ -14,13 +14,13 @@ import { loadPageStyles, pageTailwind, preparePageStyles } from "./boot-styles.t
 const config = { page: "report.tsx", runtimeVersion: "v1", profile: { readinessTimeoutMs: 500 } } as FrameConfig;
 const libraries = [{ name: "clicky" }, { name: "facet" }];
 const urls = ["https://runtime.example/npm/clicky@1/styles.css?page=report.tsx", "https://runtime.example/npm/facet@1/styles.css?page=report.tsx"];
-const links = () => [...document.head.querySelectorAll<HTMLLinkElement>("link[rel=stylesheet]")];
+const links = () => [...document.head.querySelectorAll<HTMLStyleElement>("style[data-page-runtime-base]")];
 const settle = (event: "load" | "error") => links().forEach((link) => link.dispatchEvent(new Event(event)));
 
 beforeEach(() => {
   document.head.innerHTML = ""; document.body.innerHTML = '<div id="root"></div>';
   fixture.loadLibraries.mockResolvedValue({ libraries, loaders: { loadStylesheet: vi.fn(), loadModule: vi.fn() } });
-  fixture.baseStylesheetUrls.mockReturnValue(urls);
+  fixture.baseStylesheets.mockReturnValue(urls.map(url => ({ url, layer: "facet" })));
   fixture.loadTailwind.mockResolvedValue({});
   fixture.prepareTailwind.mockResolvedValue({ warm: false, candidates: new Set(), ready: async () => {}, stop: vi.fn() });
   fixture.lazyRuntimeDb.mockReturnValue(() => Promise.resolve({}));
@@ -34,7 +34,8 @@ describe("base stylesheets", () => {
   it("links every library's base stylesheet in library order and resolves once they have all loaded", async () => {
     const loading = loadPageStyles(config);
     await vi.waitFor(() => expect(links()).toHaveLength(2));
-    expect(links().map((link) => link.href)).toEqual(urls);
+    expect(links().map((link) => link.dataset.pageRuntimeBase)).toEqual(urls);
+    expect(links()[0]!.textContent).toContain('layer(facet)');
     let done = false; void loading.then(() => { done = true; });
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(done).toBe(false);

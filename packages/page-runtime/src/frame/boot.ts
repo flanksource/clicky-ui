@@ -1,4 +1,3 @@
-import type { ComponentType, ReactNode } from "react";
 import type { BridgeEnvelope, FrameConfig, JsonValue, RuntimeError, RuntimePhase, RuntimeProfile } from "../schema.ts";
 import { createFrameBridge, workerRequest } from "./bridge.ts";
 import { waitForReadiness } from "./readiness.ts";
@@ -7,15 +6,13 @@ import { withExportRender } from "./export-page.ts";
 import { runtimeError } from "../sw/errors.ts";
 import { validateProfile } from "../sw/profile.ts";
 import { validateFrameMessage } from "../host/validation.ts";
-import { loadPageStyles, preparePageStyles } from "./boot-styles.ts";
+import { loadPageStyles, pageTailwind, preparePageStyles } from "./boot-styles.ts";
 import type { PageAgent } from "./agent/index.ts";
 import { PAGE_AGENT_URL } from "../sw/runtime-module.ts";
 import { createFrameActivity } from "./activity.ts";
+import { mountPage, type PageModule, type PageLayout, type ReactRuntime } from "./mount-page.ts";
 
-/** `meta.tailwind` is `"dynamic"` for a page that builds Tailwind at runtime; it is validated when the page's styles are prepared. */
-export type PageModule = { default: ComponentType<{ data: JsonValue }>; ready?: (() => Promise<void>) | Promise<void>; meta?: unknown };
 export type PageStyles = Awaited<ReturnType<typeof preparePageStyles>>;
-type ReactRuntime = [typeof import("react"), typeof import("react-dom/client"), typeof import("react-dom")];
 
 function detail(error: unknown, phase: RuntimePhase, file: string): RuntimeError {
   if (error && typeof error === "object" && "pageRuntime" in error) return error.pageRuntime as RuntimeError;
@@ -49,7 +46,8 @@ export async function bootFrame(): Promise<void> {
   let agent: PageAgent | undefined;
   let styles: PageStyles | undefined;
   let unmount: (() => void) | undefined;
-  let updateData: ((value: JsonValue) => void) | undefined;
+  let updateData: ((value: JsonValue) => Promise<void>) | undefined;
+  let updateSources: ((files: Record<string, string | null>) => Promise<void>) | undefined;
   let latestData: JsonValue = null;
   let exportMount: ((module: PageModule, root: HTMLElement) => { mounted: Promise<void>; unmount: () => void }) | undefined;
   let receiveData!: (data: JsonValue) => void;
@@ -73,10 +71,27 @@ export async function bootFrame(): Promise<void> {
       if (url.searchParams.has("runtime-opened")) location.reload();
       else { url.searchParams.set("runtime-opened", "1"); location.replace(url); }
     }
-    else if (m.type === "sources") { performance.mark("page-runtime:sources"); await workerRequest({ page: config?.page, message: m }, 15000); performance.mark("page-runtime:invalidated"); location.reload(); }
+    else if (m.type === "sources") {
+      if (!config || !updateSources) throw new Error("page is not mounted for source updates");
+      ready = false; phase = "compile";
+      performance.mark("page-runtime:sources");
+      await workerRequest({ page: config.page, message: m }, 15000);
+      if ("data" in m) latestData = m.data!;
+      await updateSources(m.files);
+      ready = true;
+      bridge.send({ type: "status", state: "ready" }, envelope.id ? { re: envelope.id } : undefined);
+    }
     else if (m.type === "reload") location.reload();
     else if (m.type === "theme") { document.documentElement.dataset.theme = m.theme; document.documentElement.dataset.density = m.density; }
-    else if (m.type === "data") { latestData = m.data; receiveData(m.data); updateData?.(m.data); }
+    else if (m.type === "data") {
+      latestData = m.data; receiveData(m.data);
+      if (updateData) {
+        ready = false; phase = "render";
+        await updateData(m.data);
+        ready = true;
+        bridge.send({ type: "status", state: "ready" }, envelope.id ? { re: envelope.id } : undefined);
+      }
+    }
     else if (m.type === "mode" || m.type === "pick" || m.type === "page" || m.type === "pins" || m.type === "highlight" || m.type === "scroll" || m.type === "design-override" || m.type === "design-write" || m.type === "design-write-result" || m.type === "review-remove" || m.type === "review-list" || m.type === "review-select" || m.type === "review-visibility" || m.type === "review-action") {
       if (!agent) throw new Error("page agent is not ready");
       agent.receive(m);
@@ -144,11 +159,15 @@ export async function bootFrame(): Promise<void> {
       Promise.all([import("react"), import("react-dom/client"), import("react-dom")]),
     ]), moduleFailure]); }
     finally { navigator.serviceWorker.removeEventListener("message", workerError); }
+    let layout = config.layout ? await import(config.layout) as PageLayout : undefined;
+    for (const module of [pageModule, layout]) if (module?.meta !== undefined && (module.meta === null || typeof module.meta !== "object" || Array.isArray(module.meta))) throw new Error(`${config.page}: meta must be an object`);
     performance.mark("page-runtime:module");
     performance.mark("page-runtime:libraries");
     activity.resolve(config, { react: reactRuntime[0].version, "react-dom": reactRuntime[2].version });
     if (typeof pageModule.default !== "function" && typeof pageModule.default !== "object") throw new Error(`${config.page}: missing default React component`);
-    const pageStyles = await preparePageStyles({ config, styles: libraryStyles, module: pageModule, onError: (error) => { ready = false; report(error); }, onActivity: activity.tailwind });
+    const styledModule = layout?.meta === undefined ? pageModule : { ...pageModule, meta: { ...layout.meta as object, ...pageModule.meta as object } };
+    let pageStyles = await preparePageStyles({ config, styles: libraryStyles, module: styledModule, onError: (error) => { ready = false; report(error); }, onActivity: activity.tailwind });
+    let dynamicStyles = pageTailwind({ module: styledModule, page: config.page });
     styles = pageStyles;
     performance.mark("page-runtime:styles");
     const pageRoot = document.getElementById("root");
@@ -157,13 +176,54 @@ export async function bootFrame(): Promise<void> {
     const { startPageAgent, PageAgentProvider } = agentModule;
     agent = startPageAgent({ root: pageRoot, page: config.page, ...(config.lock.pageSources ? { pageSources: config.lock.pageSources } : {}), send: (message) => bridge.send(message), error: report });
     phase = "render";
-    const mountedPage = mountPage({ module: pageModule, runtime: reactRuntime, agent, provider: PageAgentProvider, data: pageData, file: config.page, root: pageRoot, subscribe: (update) => { updateData = update; } });
+    const pageAgent = agent; const runtime = reactRuntime;
+    const wrap = (children: import("react").ReactNode) => runtime[0].createElement(PageAgentProvider, { agent: pageAgent, children });
+    const mountedPage = mountPage({ module: pageModule, ...(layout ? { layout } : {}), runtime, data: pageData, file: config.page, root: pageRoot, wrap });
+    updateSources = async (files) => {
+      const revision = crypto.randomUUID();
+      const revised = (path: string) => { const url = new URL(path, location.href); url.searchParams.set("revision", revision); return url.href; };
+      const paths = Object.keys(files);
+      if (paths.length && paths.every(path => path.endsWith(".css"))) {
+        for (const path of paths) {
+          const url = new URL(`/src/${path.split("/").map(encodeURIComponent).join("/")}`, location.href);
+          const links = [...document.querySelectorAll<HTMLLinkElement>("link[data-page-runtime-stylesheet]")].filter(link => link.dataset.pageRuntimeStylesheet === url.pathname);
+          if (files[path] === null) { for (const link of links) link.remove(); }
+          else if (links.length) { url.searchParams.set("module", ""); const module = await import(revised(url.href)) as { default: Promise<CSSStyleSheet> }; await module.default; }
+        }
+        if (!updateData) throw new Error("page is not mounted for CSS updates");
+        await updateData(latestData); return;
+      }
+      const entry = revised(config!.entry);
+      const nextModule = await import(entry) as PageModule;
+      const nextLayout = config!.layout && Object.keys(files).some(path => path !== config!.page) ? await import(revised(config!.layout)) as PageLayout : layout;
+      for (const module of [nextModule, nextLayout]) if (module?.meta !== undefined && (module.meta === null || typeof module.meta !== "object" || Array.isArray(module.meta))) throw new Error(`${config!.page}: meta must be an object`);
+      if (typeof nextModule.default !== "function" && typeof nextModule.default !== "object") throw new Error(`${config!.page}: missing default React component`);
+      const nextStyled = { meta: { ...nextLayout?.meta as object, ...nextModule.meta as object } };
+      const nextDynamic = pageTailwind({ module: nextStyled, page: config!.page });
+      if (nextDynamic !== dynamicStyles) {
+        const nextStyles = await preparePageStyles({ config: config!, styles: await loadPageStyles(config!), module: nextStyled, onError: report, onActivity: activity.tailwind });
+        pageStyles.stop(); pageStyles = nextStyles; styles = nextStyles; dynamicStyles = nextDynamic;
+      }
+      phase = "render";
+      await mountedPage.replace({ module: nextModule, ...(nextLayout ? { layout: nextLayout } : {}), data: latestData });
+      pageModule = nextModule; layout = nextLayout; config!.entry = entry;
+      if (config!.layout && nextLayout) config!.layout = revised(config!.layout);
+      phase = "readiness";
+      await waitForReadiness({ root: pageRoot, mounted: pageStyles.ready(), ...(pageModule.ready ? { hook: pageModule.ready } : {}), timeoutMs: config!.profile.readinessTimeoutMs, status: () => undefined });
+      await pageStyles.ready(); activity.schedule();
+    };
+    updateData = async (value) => {
+      await mountedPage.update(value);
+      phase = "readiness";
+      await waitForReadiness({ root: pageRoot, mounted: pageStyles.ready(), ...(pageModule.ready ? { hook: pageModule.ready } : {}), timeoutMs: config!.profile.readinessTimeoutMs, status: () => undefined });
+      await pageStyles.ready();
+    };
     unmount = mountedPage.unmount;
     latestData = pageData;
-    const page = config.page; const pageAgent = agent; const runtime = reactRuntime;
+    const page = config.page;
     exportMount = (module, root) => {
       if (typeof module.default !== "function" && typeof module.default !== "object") throw new Error(`${page}: export compile has no default React component`);
-      return mountPage({ module, runtime, agent: pageAgent, provider: PageAgentProvider, data: latestData, file: page, root, subscribe: () => undefined });
+      return mountPage({ module, ...(layout ? { layout } : {}), runtime, data: latestData, file: page, root, wrap });
     };
     performance.mark("page-runtime:render");
     requestAnimationFrame(() => requestAnimationFrame(() => { performance.mark("page-runtime:visible"); subscribeActivity(); activity.schedule(); }));
@@ -176,26 +236,6 @@ export async function bootFrame(): Promise<void> {
     bridge.send({ type: "status", state: "ready" });
     activity.schedule();
   } catch (error) { if (controlled) subscribeActivity(); dispose(); announceLock(); report(error); }
-}
-
-function mountPage(options: { module: PageModule; runtime: ReactRuntime; agent: PageAgent; provider: typeof import("./page-agent.js")["PageAgentProvider"]; data: JsonValue; file: string; root: HTMLElement; subscribe: (update: (value: JsonValue) => void) => void }): { mounted: Promise<void>; unmount: () => void } {
-  const [React, { createRoot }, { flushSync }] = options.runtime;
-  let resolve!: () => void; let reject!: (error: unknown) => void;
-  const mounted = new Promise<void>((yes, no) => { resolve = yes; reject = no; });
-  class Boundary extends React.Component<{ children: ReactNode }, { failed: boolean }> {
-    override state = { failed: false };
-    static getDerivedStateFromError() { return { failed: true }; }
-    override componentDidCatch(error: Error) { reject(Object.assign(error, { pageRuntime: detail(error, "render", options.file) })); }
-    override render() { return this.state.failed ? null : this.props.children; }
-  }
-  function Mounted() {
-    const [data, setData] = React.useState(options.data);
-    React.useLayoutEffect(() => { options.subscribe(setData); resolve(); }, []);
-    return React.createElement(options.module.default, { data });
-  }
-  const renderer = createRoot(options.root);
-  flushSync(() => renderer.render(React.createElement(Boundary, null, React.createElement(options.provider, { agent: options.agent, children: React.createElement(Mounted) }))));
-  return { mounted, unmount: () => renderer.unmount() };
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {

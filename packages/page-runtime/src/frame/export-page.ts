@@ -37,20 +37,21 @@ export async function exportPageModule<T extends ExportModule>(options: { config
 }
 
 /**
- * Runs `run` against the export render: for a page with export plugins, the live root is hidden while the export
- * compile renders in its place, so the snapshot and print see only the export; the live render is restored after.
+ * Prepares export-only markup offscreen while the live page stays visible, then exposes it for snapshot/print.
  */
 export async function withExportRender<T, M extends ExportModule>(options: { config: FrameConfig; root: HTMLElement; request: (message: unknown) => Promise<void>; mount: (module: M, root: HTMLElement) => Mounted; run: () => Promise<T> }): Promise<T> {
   const module = await exportPageModule<M>(options);
   if (!module) return options.run();
   const container = document.createElement("div");
   container.dataset.pageRuntimeExport = "";
+  container.style.cssText = `position:fixed;left:-100000px;top:0;width:${options.root.getBoundingClientRect().width}px;pointer-events:none`;
   options.root.after(container);
-  options.root.hidden = true; options.root.dataset.pageRuntimeLive = "";
   let mounted: Mounted | undefined;
   try {
     mounted = options.mount(module, container);
     await waitForReadiness({ root: container, mounted: mounted.mounted, ...(module.ready ? { hook: module.ready } : {}), timeoutMs: options.config.profile.readinessTimeoutMs, status: () => undefined });
+    options.root.hidden = true; options.root.dataset.pageRuntimeLive = "";
+    container.removeAttribute("style");
     return await options.run();
   } finally {
     mounted?.unmount(); container.remove();

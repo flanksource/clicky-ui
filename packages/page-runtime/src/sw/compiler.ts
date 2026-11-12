@@ -61,7 +61,10 @@ export async function rewriteImports(options: { code: string; path: string; lock
       if (item.specifier === undefined) throw new RuntimeFailure({ phase: "link", file: options.path, line: code.slice(0, item.start).split("\n").length, message: `${options.path}: dynamic imports must name a literal module` });
       const target = canonical(item.specifier, { ...options, line: code.slice(0, item.start).split("\n").length });
       const quoted = /^['"`]/.test(code.slice(item.start, item.end));
-      const text = moduleUrl(target);
+      const revision = new URL(options.path, "https://runtime.invalid").searchParams.get("revision");
+      const revised = new URL(target, "https://runtime.invalid");
+      if (revision && revised.pathname.startsWith("/src/")) revised.searchParams.set("revision", revision);
+      const text = moduleUrl(revised.href);
       code = `${code.slice(0, item.start)}${quoted ? JSON.stringify(text) : text}${code.slice(item.end)}`;
     }
     return defineNodeEnv(code).code;
@@ -75,12 +78,12 @@ export async function compilePage(options: CompilerOptions): Promise<{ code: str
   if (url.searchParams.has("raw")) code = `export default ${JSON.stringify(options.code)};`;
   else if (url.searchParams.has("url")) code = `export default ${JSON.stringify(moduleUrl(url.pathname))};`;
   else if (extension === ".json") code = `export default ${JSON.stringify(JSON.parse(options.code))};`;
-  else if (extension === ".css") code = stylesheetModule(options.code, moduleUrl(url.pathname));
+  else if (extension === ".css") { const stylesheet = new URL(url); stylesheet.searchParams.delete("module"); code = stylesheetModule(options.code, moduleUrl(stylesheet.href)); }
   else if ([".ts", ".tsx", ".jsx", ".mdx", ".md"].includes(extension)) {
     const started = performance.now();
     try { code = await compileSource({ path: url.pathname.slice("/src/".length), extension, code: options.code }, { compile, plugins: options.plugins }); }
     finally { if (options.activity) options.activity.compileMs += performance.now() - started; }
   } else if ([".js", ".mjs"].includes(extension)) code = options.code;
   else throw new Error(`${options.path}: unsupported source extension ${extension}`);
-  return { code: await rewriteImports({ code, path: url.pathname, lock: options.lock, sources: options.sources, ...(options.activity ? { activity: options.activity } : {}) }), candidates: sourceCandidates({ path: url.pathname, code: options.code }) };
+  return { code: await rewriteImports({ code, path: options.path, lock: options.lock, sources: options.sources, ...(options.activity ? { activity: options.activity } : {}) }), candidates: sourceCandidates({ path: url.pathname, code: options.code }) };
 }

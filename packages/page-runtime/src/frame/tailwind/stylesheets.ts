@@ -1,14 +1,18 @@
-/** Links the libraries' published stylesheets in the given order; `ready` rejects naming the stylesheet that failed or timed out. */
-export function insertBaseLinks(options: { document: Document; urls: string[]; timeoutMs: number }): { links: HTMLLinkElement[]; ready: Promise<void> } {
-  const links = options.urls.map((url) => {
-    const link = options.document.createElement("link");
-    link.rel = "stylesheet"; link.href = url; link.dataset["pageRuntimeBase"] = url;
+import { layerOrder } from "./recipe.ts";
+
+/** Imports base stylesheets in their declared cascade layers and waits for every import to load. */
+export function insertBaseStyles(options: { document: Document; stylesheets: Array<{ url: string; layer: string }>; timeoutMs: number }): { links: HTMLStyleElement[]; ready: Promise<void> } {
+  const links = options.stylesheets.map(({ url, layer }) => {
+    const link = options.document.createElement("style");
+    link.textContent = `${layerOrder}\n@import url(${JSON.stringify(url)}) layer(${layer});`;
+    link.dataset["pageRuntimeBase"] = url;
     return link;
   });
   const ready = Promise.all(links.map((link) => new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${link.href}: base stylesheet timeout after ${options.timeoutMs}ms`)), options.timeoutMs);
+    const url = link.dataset["pageRuntimeBase"];
+    const timer = setTimeout(() => reject(new Error(`${url}: base stylesheet timeout after ${options.timeoutMs}ms`)), options.timeoutMs);
     link.addEventListener("load", () => { clearTimeout(timer); resolve(); }, { once: true });
-    link.addEventListener("error", () => { clearTimeout(timer); reject(new Error(`${link.href}: base stylesheet failed to load`)); }, { once: true });
+    link.addEventListener("error", () => { clearTimeout(timer); reject(new Error(`${url}: base stylesheet failed to load`)); }, { once: true });
   }))).then(() => undefined);
   options.document.head.append(...links);
   return { links, ready };

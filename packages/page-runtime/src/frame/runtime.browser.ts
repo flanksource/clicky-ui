@@ -15,12 +15,29 @@ async function run(name: string) {
   await browser("open", `${server.hostOrigin}/?case=${name}`);
   launched = true;
   await browser("wait", "--fn", 'document.title === "CASE-DONE"');
-  return JSON.parse(await browser("get", "text", "#result")) as { states: string[]; errors: Array<{ phase: string; message: string; file: string }>; elapsed?: number; snapshot?: { html: string }; failure?: string };
+  return JSON.parse(await browser("get", "text", "#result")) as { states: string[]; errors: Array<{ phase: string; message: string; file: string }>; elapsed?: number; snapshot?: { html: string }; before?: { html: string }; data?: { html: string }; css?: { html: string }; helper?: { html: string }; failure?: string };
 }
 beforeAll(async () => { server = await startRuntimeTestServer(); });
 afterAll(async () => { try { if (launched) await browser("close"); } finally { await server?.close(); } });
 
 describe("worker + frame + boot in real Chromium", () => {
+  it("loads library base styles in their recipe layer so custom CSS overrides library utility classes", async () => {
+    const result = await run("cascade");
+    expect({ failure: result.failure, errors: result.errors }).toEqual({ failure: undefined, errors: [] });
+    expect(result.snapshot?.html).toContain('data-color="rgb(91, 33, 182)"');
+    expect(result.snapshot?.html).toContain('@layer components');
+  });
+  it("reconciles data and changed source graphs in one document while retaining unchanged layout DOM", async () => {
+    const result = await run("updates");
+    expect({ failure: result.failure, errors: result.errors, boots: result.states.filter(state => state === "booting").length }).toEqual({ failure: undefined, errors: [], boots: 1 });
+    const attribute = (html: string | undefined, name: string) => html?.match(new RegExp(`${name}="([^"]+)"`))?.[1];
+    expect(attribute(result.data?.html, "data-instance")).toBe(attribute(result.before?.html, "data-instance"));
+    expect(attribute(result.css?.html, "data-instance")).toBe(attribute(result.data?.html, "data-instance"));
+    expect(result.css?.html).toContain("outline-color: rgb(12, 34, 56)");
+    expect(attribute(result.snapshot?.html, "data-document")).toBe(attribute(result.before?.html, "data-document"));
+    expect(attribute(result.snapshot?.html, "data-layout")).toBe(attribute(result.helper?.html, "data-layout"));
+    expect(result.snapshot?.html).toContain("Updated helper:Source data:Edited page");
+  });
   it("uses one React, installs the hook first, and waits for every readiness state", async () => {
     const result = await run("ready");
     expect(result.failure).toBeUndefined();
@@ -41,6 +58,8 @@ describe("worker + frame + boot in real Chromium", () => {
     const result = await run("markdown-export");
     expect({ failure: result.failure, errors: result.errors, ready: result.states.at(-1) }).toEqual({ failure: undefined, errors: [], ready: "ready" });
     expect({ kept: result.snapshot?.html.includes("Public summary."), removed: result.snapshot?.html.includes("Internal margin figures."), liveRootHidden: result.snapshot?.html.includes("data-page-runtime-live") }).toEqual({ kept: true, removed: false, liveRootHidden: false });
+    expect(result.snapshot?.html).toContain('data-report-layout');
+    expect(result.snapshot?.html).toContain('Report frame');
   });
   it.each(["resolve", "fetch", "compile", "link", "render", "readiness"])("reports the %s error phase with a source location", async (phase) => {
     const result = await run(phase);

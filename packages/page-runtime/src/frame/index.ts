@@ -1,4 +1,5 @@
-export { bootFrame, ensureController, type PageModule, type PageStyles } from "./boot.ts";
+export { bootFrame, ensureController, type PageStyles } from "./boot.ts";
+export type { PageModule } from "./mount-page.ts";
 export { waitForReadiness, type ReadinessOptions } from "./readiness.ts";
 export { createFrameBridge, workerRequest } from "./bridge.ts";
 export { validateHostMessage } from "../host/validation.ts";

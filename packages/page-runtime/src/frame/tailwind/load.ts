@@ -35,8 +35,15 @@ function lockedIntegrity(url: string, config: FrameConfig): string | undefined {
 }
 
 /** Every library's published base stylesheets, in library order, resolved through the integrity-checked package route. */
-export function baseStylesheetUrls(options: { libraries: LibraryStyles[]; config: FrameConfig }): string[] {
-  return [...new Set(options.libraries.flatMap((library) => library.recipe.base.map((id) => resolveStyleImport({ id, base: library.base, config: options.config }))))];
+export function baseStylesheets(options: { libraries: LibraryStyles[]; config: FrameConfig }): Array<{ url: string; layer: string }> {
+  const sheets = new Map<string, { url: string; layer: string }>();
+  for (const library of options.libraries) for (const id of library.recipe.base) {
+    const url = resolveStyleImport({ id, base: library.base, config: options.config });
+    const previous = sheets.get(url);
+    if (previous && previous.layer !== library.recipe.layer) throw new Error(`${url}: base stylesheet declared in conflicting layers ${previous.layer} and ${library.recipe.layer}`);
+    sheets.set(url, { url, layer: library.recipe.layer });
+  }
+  return [...sheets.values()];
 }
 
 export async function loadLibraries(options: { config: FrameConfig; importModule?: ImportModule }): Promise<{ libraries: LibraryStyles[]; loaders: CompilerLoaders }> {

@@ -11,7 +11,7 @@ import type { CommonJsSource } from "../link/types.ts";
 
 /** Where page modules import the development JSX runtime from: a shim that marks host elements. */
 export const DEV_SHIM_URL = "/__runtime/jsx-dev-runtime.js";
-export const COMPILER_REVISION = "editable-boundaries-v1";
+export const COMPILER_REVISION = "editable-boundaries-live-v2";
 
 /**
  * Adds `data-source` to host elements from jsxDEV's source argument. MDX's development output passes a full

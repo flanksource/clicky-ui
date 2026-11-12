@@ -12,6 +12,15 @@ const profile: RuntimeProfile = { runtimeDomain: "runtime.example", embedders: [
 const origin = "https://runtime.example";
 
 describe("link route compilation and invalidation", () => {
+  it("revises host source imports without reloading linked dependency singletons", async () => {
+    const link = exampleLink();
+    const lock = composeLinkOverrides({ lock: exampleLock(), links: [link], profile, developerOverrides: true });
+    const code = await compileLinkModule({ path: "/src/page.tsx", code: 'import Helper from "./helper"; import React from "react"; export { Helper, React };', lock, links: [link], sources: ["helper.tsx"], query: new URLSearchParams({ revision: "next" }), plugins: BASE_PLUGINS });
+    expect(code).toContain('"/src/helper.tsx?revision=next"');
+    expect(code).toContain('"/link/checkout/dist/runtime/react.js"');
+    const css = await compileLinkModule({ path: "/src/page.css", code: "p { color: blue; }", lock, links: [link], sources: [], query: new URLSearchParams({ revision: "next", module: "" }), plugins: BASE_PLUGINS });
+    expect(css).toContain('link.href = "/src/page.css?revision=next"');
+  });
   it("resolves a published ESM wrapper's CommonJS remap into the checkout runtime", async () => {
     const link = exampleLink();
     link.build.fragment.integrity["@flanksource/clicky-ui@2.0.0/dist/runtime/postcss.js"] = "sha384-postcss";

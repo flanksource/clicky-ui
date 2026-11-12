@@ -7,11 +7,13 @@ export type PageFrameProps = Omit<IframeHTMLAttributes<HTMLIFrameElement>, "src"
   runtimeOrigin: string; open: Omit<Extract<HostMessage, { type: "open" }>, "type">; theme: Theme; data: JsonValue;
   onMessage?: (message: FrameMessage) => void; onError: (error: Error) => void;
   onBridge?: (bridge: PageBridge | null) => void;
+  /** False when the host sends data updates through the bridge; bootstrap still receives the latest data. */
+  dataUpdates?: boolean;
   /** Local development only: embed on the host origin while P7 isolation is deferred. */
   origin?: FrameOrigin;
 };
 
-export function PageFrame({ runtimeOrigin, origin = "cross-origin", open, theme, data, onMessage, onError, onBridge, ...props }: PageFrameProps) {
+export function PageFrame({ runtimeOrigin, origin = "cross-origin", open, theme, data, dataUpdates = true, onMessage, onError, onBridge, ...props }: PageFrameProps) {
   const frame = useRef<HTMLIFrameElement>(null);
   const latest = useRef({ open, theme, data, onMessage, onError, onBridge });
   latest.current = { open, theme, data, onMessage, onError, onBridge };
@@ -36,6 +38,6 @@ export function PageFrame({ runtimeOrigin, origin = "cross-origin", open, theme,
     return () => { bridge.current?.dispose(); bridge.current = null; latest.current.onBridge?.(null); };
   }, [runtimeOrigin, origin, open.page]);
   useLayoutEffect(() => { bridge.current?.send({ type: "theme", ...theme }); }, [theme]);
-  useLayoutEffect(() => { bridge.current?.send({ type: "data", data }); }, [data]);
+  useLayoutEffect(() => { if (dataUpdates) bridge.current?.send({ type: "data", data }); }, [data, dataUpdates]);
   return <iframe {...props} ref={frame} title={props.title ?? open.page} sandbox="allow-scripts allow-same-origin allow-modals" />;
 }

@@ -45,16 +45,22 @@ export function validateHostMessage(value: unknown): HostMessage {
     case "design-override": case "design-write": case "design-write-result":
     case "mode": case "pick": case "page": case "capture-vocabulary": case "pins": case "highlight": case "scroll": return validateAgentHostMessage(m);
     case "open": {
-      keys(m, ["type", "page", "manifest", "lock", "files", "policy"], "message"); text(m.page, "open.page");
+      keys(m, ["type", "page", "layout", "manifest", "lock", "files", "policy"], "message"); text(m.page, "open.page");
       if (m.policy !== undefined) validatePolicy(m.policy, "open.policy");
       const manifest = record(m.manifest, "manifest");
       for (const [name, range] of Object.entries(record(manifest.dependencies, "manifest.dependencies"))) text(range, `dependencies.${name}`);
       if (m.lock !== undefined) validateLock(m.lock);
-      for (const [path, source] of Object.entries(record(m.files, "files"))) { validateSourcePath(path); text(source, path, true); }
+      const files = record(m.files, "files");
+      for (const [path, source] of Object.entries(files)) { validateSourcePath(path); text(source, path, true); }
+      if (m.layout !== undefined) {
+        text(m.layout, "open.layout"); validateSourcePath(m.layout);
+        if (!Object.hasOwn(files, m.layout) || !/\.[cm]?[jt]sx?$/.test(m.layout)) throw new Error("open.layout: expected a JavaScript/TypeScript source in files");
+      }
       break;
     }
     case "sources":
-      keys(m, ["type", "files"], "message");
+      keys(m, ["type", "files", "data"], "message");
+      if ("data" in m) validateJson(m.data);
       for (const [path, source] of Object.entries(record(m.files, "files"))) { validateSourcePath(path); if (source !== null) text(source, path, true); }
       break;
     case "reload": keys(m, ["type"], "message"); break;

@@ -7,6 +7,12 @@ const LOCK: PageLock = { lock: 2, packageOrigin: "https://packages.example", pag
 const plugins = BASE_PLUGINS;
 
 describe("compiled source modules", () => {
+  it("propagates source revisions through local imports while retaining shared library module identities", async () => {
+    const result = await compilePage({ path: "/src/report.tsx?revision=next", code: 'import Component from "./component"; import text from "./note.txt?raw"; import UI from "@acme/ui"; export { Component, text, UI };', lock: LOCK, sources: ["component.tsx", "note.txt"], plugins });
+    expect(result.code).toContain('"/src/component.tsx?revision=next"');
+    expect(result.code).toContain('"/src/note.txt?raw=&revision=next"');
+    expect(result.code).toContain('"/npm/@acme/ui@1.0.0/index.js"');
+  });
   it("compiles Markdown pages and resolves extensionless Markdown source imports", async () => {
     const lock = { ...LOCK, page: "report.md" };
     const result = await compilePage({ path: "/src/report.md", code: "# Revenue", lock, sources: ["report.md"], plugins });

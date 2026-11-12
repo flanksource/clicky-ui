@@ -14,6 +14,19 @@ vi.mock("./resolver.ts", async (importOriginal) => {
 const origin = "https://runtime.example";
 const profile: RuntimeProfile = { runtimeDomain: "runtime.example", embedders: ["https://host.example"], packageOrigin: "https://packages.example", registry: "https://registry.example", managed: {}, policy: { dependencies: "strict" }, minReleaseAgeDays: 0, network: { allow: [] }, csp: { add: {} }, links: "deny", sources: ["host"], readinessTimeoutMs: 1000 };
 
+it("persists a validated layout source in the frame configuration while preserving a Markdown entry", async () => {
+  const caches = memoryCaches();
+  const router = createRouter({ origin, version: "test", profile, caches, plugins: BASE_PLUGINS });
+  const lock = { ...exampleLock(), page: "report.mdx" };
+  await router.message({ type: "open", page: lock.page, layout: "layout.tsx", lock, manifest: { dependencies: {} }, files: { "report.mdx": "# Report", "layout.tsx": "export default ({ children }) => children;" } });
+  const response = await router.route(new Request(`${origin}/frame/report.mdx`));
+  const html = await response.text();
+  expect(html).toContain('"layout":"/src/layout.tsx"');
+  expect(html).toContain('"entry":"/src/report.mdx"');
+  await expect(router.message({ type: "open", page: lock.page, layout: "../outside.tsx", lock, manifest: { dependencies: {} }, files: {} })).rejects.toThrow();
+  await expect(router.message({ type: "open", page: lock.page, layout: "missing.tsx", lock, manifest: { dependencies: {} }, files: {} })).rejects.toThrow(/layout/);
+});
+
 it("loads and validates a persisted page once for concurrent module requests and keeps edits current", async () => {
   const caches = memoryCaches();
   const store = await caches.open("page-runtime-test-pages");

@@ -47,7 +47,7 @@ export default function Page({data}: {data: string}) {
   return <main data-facet-diagram data-facet-ready="false" data-one-react={React === one && one === two} data-hook={Boolean(window.__REACT_DEVTOOLS_GLOBAL_HOOK__)}><h1>{data}</h1><img src="/image.svg" /><svg data-facet-arrow data-facet-arrow-ready="false" /></main>;
 }`;
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" /></svg>';
-type Case = "ready" | "agent" | "review" | "resolve" | "fetch" | "compile" | "link" | "render" | "readiness" | "markdown-export";
+type Case = "ready" | "cascade" | "updates" | "agent" | "review" | "resolve" | "fetch" | "compile" | "link" | "render" | "readiness" | "markdown-export";
 async function listen(server: Server): Promise<string> {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address(); if (!address || typeof address === "string") throw new Error("server has no port");
@@ -63,19 +63,23 @@ export async function startRuntimeTestServer(options: { local?: boolean } = {}) 
   const files = await runtimeFiles();
   files.set("@acme/library-one@1.0.0/index.js", 'import React from "react"; export const shared = React; export function StatCard() { return React.createElement("h2", {id:"library-heading",style:{padding:"32px",margin:"32px"}}, "Revenue"); }');
   files.set("@acme/library-two@1.0.0/index.js", 'import React from "react"; export const shared = React;');
+  files.set("@acme/library-one@1.0.0/styles.css", '.library-heading { color: red; }');
+  files.set("@acme/library-one@1.0.0/page-styles.js", 'export default { name: "@acme/library-one", layer: "components", base: ["@acme/library-one/styles.css"], entry: "", theme: "", runtimeDependencies: [] };');
   // A library export plugin: drops paragraphs starting with `options.prefix`, the way facet-redact removes classified regions.
   files.set("@acme/redact@1.0.0/remark.mjs", "export default function drop(options) { return (tree) => { tree.children = tree.children.filter((node) => !(node.type === \"paragraph\" && node.children?.[0]?.value?.startsWith(options.prefix))); }; }");
   const integrity = Object.fromEntries(await Promise.all([...files].map(async ([path, code]) => [path, await digest(new TextEncoder().encode(code))])));
   const lock: PageLock = { lock: 2, packageOrigin: "http://127.0.0.1", page: "report.tsx", versions: { react: "18.3.1", "@acme/library-one": "1.0.0", "@acme/library-two": "1.0.0" }, map: { imports: { react: `/npm/${runtime}react.js`, "react-dom/client": `/npm/${runtime}react-dom-client.js`, "react/jsx-runtime": `/npm/${runtime}jsx-runtime.js`, "react/jsx-dev-runtime": `/npm/${runtime}jsx-dev-runtime.js`, "@acme/library-one": "/npm/@acme/library-one@1.0.0/index.js", "@acme/library-two": "/npm/@acme/library-two@1.0.0/index.js" }, scopes: {} }, integrity, remaps: {}, barrels: { modules: [], barrels: {} } };
   lock.map.imports["@flanksource/clicky-ui/comments"] = `/npm/${runtime}comments.js`;
   lock.map.imports["react-dom"] = `/npm/${runtime}react-dom.js`;
+  lock.map.imports["@acme/library-one/styles.css"] = "/npm/@acme/library-one@1.0.0/styles.css";
+  lock.map.imports["@acme/library-one/page-styles"] = "/npm/@acme/library-one@1.0.0/page-styles.js";
   let hostOrigin = ""; let runtimeOrigin = ""; let packageRequests = 0; let registryRequests = 0;
   const server = createServer((req, res) => { void (async () => {
     const url = new URL(req.url!, runtimeOrigin);
     if (options.local && ["/", "/host.js", "/case.json"].includes(url.pathname)) { handleHost(req, res); return; }
     if (url.pathname === "/__playground/probe" || url.pathname.startsWith("/src/host-")) { res.end("host-route"); return; }
     if (url.pathname === "/profile.json") {
-      const profile: RuntimeProfile = { runtimeDomain: "127.0.0.1", embedders: [hostOrigin], packageOrigin: `${runtimeOrigin}/packages`, registry: `${runtimeOrigin}/registry`, managed: {}, policy: { dependencies: "strict" }, minReleaseAgeDays: 0, network: { allow: [] }, csp: { add: {} }, links: "deny", sources: ["host"], readinessTimeoutMs: 1500 };
+      const profile: RuntimeProfile = { runtimeDomain: "127.0.0.1", embedders: [hostOrigin], packageOrigin: `${runtimeOrigin}/packages`, registry: `${runtimeOrigin}/registry`, managed: { "@acme/library-one": "*" }, policy: { dependencies: "strict" }, minReleaseAgeDays: 0, network: { allow: [] }, csp: { add: {} }, links: "deny", sources: ["host"], readinessTimeoutMs: 1500 };
       res.setHeader("content-type", "application/json"); res.end(JSON.stringify(profile)); return;
     }
     if (url.pathname.startsWith("/packages/")) { packageRequests++; const file = files.get(decodeURIComponent(url.pathname.slice(10))); if (file === undefined) { res.statusCode = 404; res.end("missing package"); } else res.end(file); return; }
@@ -96,6 +100,7 @@ export async function startRuntimeTestServer(options: { local?: boolean } = {}) 
       let source = PAGE;
       if (name === "agent") source = 'import { StatCard } from "@acme/library-one";\nexport default function Page() {\n  return <StatCard />;\n}';
       if (name === "review") source = 'export default function Page() { return <article data-review-id="summary"><h1 data-review-content>Review summary</h1></article>; }';
+      if (name === "cascade") source = 'import {useLayoutEffect} from "react"; import "./custom.css"; export default function Page() { useLayoutEffect(() => { const heading = document.getElementById("layer-heading"); heading.setAttribute("data-color", getComputedStyle(heading).color); }, []); return <h3 id="layer-heading" className="library-heading">Custom heading</h3>; }';
       if (options.local) source = 'export default function Page() { return <svg width="240" height="120"><rect id="target" width={160} height={80} fill="red" /></svg>; }';
       if (name === "resolve") ownLock.page = "other.tsx";
       if (name === "fetch") ownLock.integrity["@acme/library-one@1.0.0/index.js"] = "sha384-invalid";
@@ -104,11 +109,21 @@ export async function startRuntimeTestServer(options: { local?: boolean } = {}) 
       if (name === "render") source = 'export default function Page() { throw new Error("render failure"); }';
       if (name === "readiness") source = 'export const ready = new Promise(() => {}); export default function Page() { return <main>waiting</main>; }';
       let open: Extract<HostMessage, { type: "open" }> = { type: "open", page: "report.tsx", lock: ownLock, manifest: { dependencies: {} }, files: { "report.tsx": source, "page.css": '@import url("/delayed.css"); main { display: block; }' } };
+      if (name === "cascade") open.files["custom.css"] = 'h3 { color: rgb(91, 33, 182); }';
+      if (name === "updates") {
+        open.layout = "layout.tsx";
+        open.files = {
+          "report.tsx": 'import {useState} from "react"; import {text} from "./helper"; window.documentId ??= crypto.randomUUID(); export default function Page({data}) { const [id] = useState(() => crypto.randomUUID()); return <main data-document={window.documentId} data-instance={id}>{text}:{data}</main>; }',
+          "helper.ts": 'export const text = "Original";',
+          "layout.tsx": 'import {useState} from "react"; import "./custom.css"; export default function Layout({children}) { const [id] = useState(() => crypto.randomUUID()); return <section><header data-layout={id}>Stable header</header>{children}</section>; }',
+          "custom.css": 'main { outline-color: red; }',
+        };
+      }
       if (name === "markdown-export") {
         ownLock.page = "report.md";
         ownLock.map.imports["@acme/redact/remark"] = "/npm/@acme/redact@1.0.0/remark.mjs";
         ownLock.compiler = { "@acme/redact": { remark: [{ module: "@acme/redact/remark", options: { prefix: "Internal" } }] } };
-        open = { type: "open", page: "report.md", lock: ownLock, manifest: { dependencies: {} }, files: { "report.md": "# Report\n\nPublic summary.\n\nInternal margin figures.\n" } };
+        open = { type: "open", page: "report.md", layout: "layout.tsx", lock: ownLock, manifest: { dependencies: {} }, files: { "report.md": "# Report\n\nPublic summary.\n\nInternal margin figures.\n", "layout.tsx": 'export default function Layout({children}) { return <section data-report-layout><header>Report frame</header>{children}</section>; }' } };
       }
       res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ origin: runtimeOrigin, open, name })); return;
     }

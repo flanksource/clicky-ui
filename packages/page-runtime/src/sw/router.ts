@@ -18,7 +18,7 @@ import { candidatesForPage, lazyRuntimeDb, putCandidates, tailwindCacheName } fr
 export { digest, verifyIntegrity } from "./integrity.ts";
 
 export type RouterOptions = { origin: string; version: string; profile: RuntimeProfile; plugins: MdxPlugins; caches: CacheStorage; indexedDB?: IDBFactory; fetch?: typeof fetch; onActivity?: (event: { request: Request; record: WorkerActivity }) => void };
-type StoredPage = { lock: PageLock; files: Record<string, string>; manifest: Extract<HostMessage, { type: "open" }>["manifest"]; policy?: RuntimePolicy };
+type StoredPage = { lock: PageLock; files: Record<string, string>; layout?: string; manifest: Extract<HostMessage, { type: "open" }>["manifest"]; policy?: RuntimePolicy };
 const JS = { "content-type": "text/javascript; charset=utf-8" };
 const serial = (value: unknown) => JSON.stringify(value).replaceAll("<", "\\u003c");
 const frameMetadata = new WeakMap<FrameConfig, { map: string; config: string }>();
@@ -93,7 +93,7 @@ export function createRouter(options: RouterOptions) {
     const policy = m.policy ?? profile.policy;
     const existing = m.lock ?? (saved?.lock.lock === 2 && serial(saved.manifest) === serial(m.manifest) && saved.policy && serial(saved.policy) === serial(policy) ? saved.lock : undefined);
     const lock = await resolvePage({ page: m.page, profile: { ...profile, policy }, manifest: m.manifest, ...(existing ? { lock: existing } : {}), fetch: fetcher });
-    const savedPage: StoredPage = { lock, files: m.files, manifest: m.manifest, policy };
+    const savedPage: StoredPage = { lock, files: m.files, ...(m.layout ? { layout: m.layout } : {}), manifest: m.manifest, policy };
     await (await store).put(key(m.page), Response.json(savedPage));
     pages.set(m.page, Promise.resolve(savedPage));
   }
@@ -120,7 +120,7 @@ export function createRouter(options: RouterOptions) {
     const code = exportModules.get(saved.lock.page)?.get(path);
     if (code === undefined) throw new RuntimeFailure({ phase: "fetch", file: path, message: `no export compile is registered for ${path}; export the page again` });
     activity.source = "compiled"; activity.generated = "export module"; activity.decodedBytes = byteLength(code);
-    const linked = await rewriteImports({ code, path: url.pathname, lock: saved.lock, sources: Object.keys(saved.files), activity });
+    const linked = await rewriteImports({ code, path: `${url.pathname}${url.search}`, lock: saved.lock, sources: Object.keys(saved.files), activity });
     activity.outputBytes = byteLength(linked);
     return new Response(linked, { headers: JS });
   }
@@ -223,7 +223,7 @@ export function createRouter(options: RouterOptions) {
         const exists = await (await store).match(key(page!));
         const saved = exists ? await load(page!) : undefined;
         let config = saved ? frameConfigs.get(saved.lock) : undefined;
-        if (saved && !config) { config = { page: page!, entry: moduleUrl(`/src/${page}`), lock: saved.lock, profile: { ...profile, packageOrigin: saved.lock.packageOrigin }, runtimeVersion: options.version }; frameConfigs.set(saved.lock, config); }
+        if (saved && !config) { config = { page: page!, entry: moduleUrl(`/src/${page}`), ...(saved.layout ? { layout: moduleUrl(`/src/${saved.layout}`) } : {}), lock: saved.lock, profile: { ...profile, packageOrigin: saved.lock.packageOrigin }, runtimeVersion: options.version }; frameConfigs.set(saved.lock, config); }
         const document = frameDocument({ ...(config ? { config } : {}), ...(saved ? { preload: moduleGraph.get(saved.lock) ?? [] } : {}) });
         activity.generated = "frame + import map"; activity.outputBytes = byteLength(document.html); activity.decodedBytes = activity.outputBytes;
         return new Response(document.html, { headers: { "content-type": "text/html; charset=utf-8", "content-security-policy": contentSecurityPolicy(config?.profile ?? profile, document.nonce) } });
