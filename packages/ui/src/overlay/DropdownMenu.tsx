@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Slot } from "@radix-ui/react-slot";
 import {
   autoUpdate,
@@ -137,17 +137,19 @@ function DropdownMenuRoot({
   const nodeId = useFloatingNodeId();
   const elementsRef = useRef<Array<HTMLElement | null>>([]);
 
-  const onOpenChangeRef = useRef(onOpenChange);
-  onOpenChangeRef.current = onOpenChange;
-  useEffect(() => {
-    onOpenChangeRef.current?.(open);
-  }, [open]);
+  // Every open/close goes through here, so the host hears each change from the
+  // event that caused it rather than from an effect after the render.
+  const changeOpen = (next: boolean) => {
+    if (next === open) return;
+    setOpen(next);
+    onOpenChange?.(next);
+  };
 
   const { refs, floatingStyles, context } = useFloating<HTMLDivElement>({
     // nodeId is always defined inside the FloatingTree; guard for the type only.
     ...(nodeId ? { nodeId } : {}),
     open,
-    onOpenChange: setOpen,
+    onOpenChange: changeOpen,
     // bottom-end / bottom-start reproduce the previous right/left alignment.
     placement: align === "right" ? "bottom-end" : "bottom-start",
     whileElementsMounted: autoUpdate,
@@ -183,7 +185,7 @@ function DropdownMenuRoot({
   );
 
   const closeMenu = () => {
-    setOpen(false);
+    changeOpen(false);
     if (refs.domReference.current instanceof HTMLElement)
       refs.domReference.current.focus();
   };
@@ -191,8 +193,12 @@ function DropdownMenuRoot({
 
   // Selecting any leaf (at any depth) emits a tree-wide "click"; the root closes
   // and restores focus to the trigger.
+  // The listener subscribes once per tree; it reads the latest closeMenu,
+  // which is published after each commit rather than during render.
   const closeMenuRef = useRef(closeMenu);
-  closeMenuRef.current = closeMenu;
+  useLayoutEffect(() => {
+    closeMenuRef.current = closeMenu;
+  });
   useEffect(() => {
     if (!tree) return;
     const onTreeClick = () => closeMenuRef.current();
