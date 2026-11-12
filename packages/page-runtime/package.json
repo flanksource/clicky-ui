@@ -4,7 +4,7 @@
   "description": "Browser-mode page runtime for facet and clicky-ui pages: library runtime sets, the module service worker and the page frame.",
   "license": "Apache-2.0",
   "type": "module",
-  "files": ["src", "dist/build", "dist/static", "scripts/run-package-build.ts", "!**/*.test.*", "!**/*.browser.*"],
+  "files": ["src", "dist/build", "dist/static", "scripts/run-package-build.ts", "!**/*.test.*", "!**/*.browser.*", "!**/testing/**", "!**/testing-*.ts", "!**/vitest.*"],
   "repository": {
     "type": "git",
     "url": "https://github.com/flanksource/clicky-ui.git",

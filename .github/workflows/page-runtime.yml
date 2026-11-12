@@ -22,7 +22,10 @@ jobs:
       - run: pnpm --filter @flanksource/page-runtime check
       - run: pnpm --filter @flanksource/page-runtime exec vitest run
       - run: pnpm --dir packages/page-runtime/dist/build --config.ignoreScripts=true pack --out "$GITHUB_WORKSPACE/page-runtime-build.tgz"
+      - run: pnpm --dir packages/page-runtime --config.ignoreScripts=true pack --out "$GITHUB_WORKSPACE/page-runtime.tgz"
       - uses: actions/upload-artifact@v4
         with:
           name: page-runtime-build
-          path: page-runtime-build.tgz
+          path: |
+            page-runtime-build.tgz
+            page-runtime.tgz
