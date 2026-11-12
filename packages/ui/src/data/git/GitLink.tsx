@@ -4,7 +4,7 @@ import type { GitTarget, GitWebRepository } from "./types";
 
 export type GitLinkProps = Omit<
   AnchorHTMLAttributes<HTMLAnchorElement>,
-  "href"
+  "href" | "target"
 > & {
   repository: GitWebRepository;
   target: GitTarget;
