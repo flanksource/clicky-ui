@@ -41,6 +41,8 @@ export type NativeComment = {
   author: Actor;
   target: Target;
   status: string;
+  /** Who holds the thread; a delivery assigns the agent it hands the thread to. */
+  assignee?: Actor | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -98,10 +100,20 @@ function authorFor(actor: Actor): StoredAuthor {
     kind: actor.kind === "agent" ? "agent" : "user",
   };
 }
-function agentRunFor(run: NativeAgentRun): StoredAgentRun {
+/** The first reply an agent wrote in the thread at or after the hand-off was requested. */
+function firstAgentReply(messages: NativeMessage[], requestedAt: string): string | undefined {
+  const since = Date.parse(requestedAt);
+  const times = messages
+    .filter((m) => m.author.kind === "agent" && Date.parse(m.createdAt) >= since)
+    .map((m) => Date.parse(m.createdAt));
+  return times.length > 0 ? new Date(Math.min(...times)).toISOString() : undefined;
+}
+function agentRunFor(run: NativeAgentRun, messages: NativeMessage[]): StoredAgentRun {
   if (!AGENT_RUN_STATES.includes(run.state as StoredAgentRun["state"]))
     throw new Error(`Unknown agent run state ${JSON.stringify(run.state)}; expected ${AGENT_RUN_STATES.join(", ")}`);
+  const repliedAt = firstAgentReply(messages, run.requestedAt);
   return {
+    ...(repliedAt ? { repliedAt } : {}),
     ...(run.sessionId ? { sessionId: run.sessionId } : {}),
     requestedAt: run.requestedAt,
     state: run.state as StoredAgentRun["state"],
@@ -117,7 +129,8 @@ export function project(
 ): StoredComment[] {
   if (!c.content?.playground?.page)
     throw new Error(`Comment ${c.id} is missing playground metadata`);
-  const { page: _page, ...fields } = c.content.playground;
+  // Gavel owns the assignee; a copy left in the playground fields is never the current one.
+  const { page: _page, assignee: _assignee, ...fields } = c.content.playground;
   const capture = c.attachments?.find((a) => a.name === "screenshot.png");
   const root: StoredComment = {
     ...fields,
@@ -125,6 +138,7 @@ export function project(
     version: c.version,
     body: fields.body === "" ? "" : c.bodyMarkdown,
     author: fields.author ?? authorFor(c.author),
+    ...(c.assignee ? { assignee: authorFor(c.assignee) } : {}),
     status: c.status,
     createdAt: new Date(c.createdAt).toISOString(),
     ...(c.updatedAt !== c.createdAt
@@ -148,7 +162,7 @@ export function project(
           },
         }
       : {}),
-    ...(c.content.agentRun ? { agentRun: agentRunFor(c.content.agentRun) } : {}),
+    ...(c.content.agentRun ? { agentRun: agentRunFor(c.content.agentRun, c.messages ?? []) } : {}),
   };
   return [
     root,

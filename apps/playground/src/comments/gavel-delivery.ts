@@ -53,4 +53,6 @@ export type GavelAgentSession = {
   cwd?: string;
   status?: string;
   inCmux: boolean;
+  /** How much of the model's context window the session fills; absent when gavel has no reading. */
+  context?: { usedTokens: number; windowTokens: number };
 };

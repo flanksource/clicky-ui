@@ -13,11 +13,8 @@ import type { DeliverTarget, GavelClient, PageRef } from "./gavel-client";
 
 export const GAVEL_COMMENT_CONFIG: CommentConfig = {
   statuses: DEFAULT_COMMENT_STATUSES,
-  assignees: [
-    { id: "you", name: localUser.name, kind: "user" },
-    { id: "claude", name: "Claude", kind: "agent" },
-    { id: "codex", name: "Codex", kind: "agent" },
-  ],
+  // Agents are not listed: assigning a thread to one delivers it, which the panel's own Assign… entries do.
+  assignees: [{ id: "you", name: localUser.name, kind: "user" }],
 };
 
 const REFRESH_DEBOUNCE_MS = 200;

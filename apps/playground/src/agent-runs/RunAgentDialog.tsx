@@ -22,7 +22,7 @@ function describeError(cause: unknown): string {
 }
 
 /** `run` starts a session for a thread; `configure` only saves the runtime new sessions use. */
-export type RunAgentDialogMode = "run" | "configure" | "create";
+export type RunAgentDialogMode = "run" | "configure" | "create" | "assign";
 
 const COPY: Record<
   RunAgentDialogMode,
@@ -43,6 +43,11 @@ const COPY: Record<
     submit: "Save runtime",
     busy: "Saving…",
   },
+  assign: {
+    title: "Assign to a new agent",
+    submit: "Start session and send",
+    busy: "Sending…",
+  },
 };
 
 function intro(
@@ -54,6 +59,8 @@ function intro(
   if (mode === "configure") {
     return "Every new agent session starts with this runtime. Sessions already running keep theirs.";
   }
+  if (mode === "assign")
+    return "Starts a new agent session with this runtime and sends it this thread. The page's agent settings stay as they are.";
   return grouping === "page"
     ? "No agent session is running for this page. This starts the page's session; later comments on the page are sent into it."
     : "No agent session is running. This starts the playground's one shared session; later comments are sent into it.";
@@ -117,6 +124,11 @@ function RuntimeChooser({
   );
 }
 
+async function loadPlaygroundCatalog(): Promise<RuntimeCatalog> {
+  const [runtimes, models] = await Promise.all([fetchRuntimeCatalog(), fetchModelCatalog()]);
+  return { families: agentRuntimeFamilies(runtimes), models };
+}
+
 /**
  * Chooses the runtime new agent sessions start with, through clicky-ui's
  * runtime bar fed by captain's agent-mode runtimes and model catalog.
@@ -132,6 +144,7 @@ export function RunAgentDialog({
   onClose,
   fields,
   canSubmit = true,
+  loadCatalog = loadPlaygroundCatalog,
 }: {
   open: boolean;
   mode: RunAgentDialogMode;
@@ -144,6 +157,8 @@ export function RunAgentDialog({
   onClose: () => void;
   fields?: ReactNode;
   canSubmit?: boolean;
+  /** Where the runtimes and models come from; the playground's captain by default, gavel's for the extension. */
+  loadCatalog?: () => Promise<RuntimeCatalog>;
 }) {
   const [catalog, setCatalog] = useState<RuntimeCatalog | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -152,12 +167,8 @@ export function RunAgentDialog({
     if (!open) return;
     setCatalog(null);
     setLoadError(null);
-    Promise.all([fetchRuntimeCatalog(), fetchModelCatalog()]).then(
-      ([runtimes, models]) =>
-        setCatalog({ families: agentRuntimeFamilies(runtimes), models }),
-      (cause: unknown) => setLoadError(describeError(cause)),
-    );
-  }, [open]);
+    loadCatalog().then(setCatalog, (cause: unknown) => setLoadError(describeError(cause)));
+  }, [open, loadCatalog]);
 
   return (
     <Modal open={open} onClose={onClose} title={COPY[mode].title} size="lg">

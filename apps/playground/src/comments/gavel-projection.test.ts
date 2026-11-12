@@ -42,6 +42,30 @@ it("projects the agent hand-off gavel records beside the playground fields", () 
   expect(() => project({ ...native, content: { ...native.content, agentRun: { sessionId: "s-9", requestedAt: "2026-11-01T11:00:00Z", state: "bogus", target: { label: "x" } } } }, { attachmentUrl })).toThrow(/agent run state/);
 });
 
+it.each([
+  { name: "an agent reply after the hand-off", messages: [{ kind: "agent", at: "2026-11-01T11:05:00Z" }], repliedAt: "2026-11-01T11:05:00.000Z" },
+  { name: "the first of several agent replies", messages: [{ kind: "user", at: "2026-11-01T11:02:00Z" }, { kind: "agent", at: "2026-11-01T11:03:00Z" }, { kind: "agent", at: "2026-11-01T11:09:00Z" }], repliedAt: "2026-11-01T11:03:00.000Z" },
+  { name: "only human replies", messages: [{ kind: "user", at: "2026-11-01T11:05:00Z" }], repliedAt: undefined },
+  { name: "an agent reply written before the hand-off", messages: [{ kind: "agent", at: "2026-11-01T10:59:00Z" }], repliedAt: undefined },
+])("dates the agent's first reply on the hand-off from $name", ({ messages, repliedAt }) => {
+  const [root] = project({
+    ...native,
+    content: { ...native.content, agentRun: { sessionId: "s-9", requestedAt: "2026-11-01T11:00:00Z", state: "sent" } },
+    messages: messages.map(({ kind, at }, index) => ({ id: `m-${index}`, bodyMarkdown: "reply", author: { kind, id: `${kind}:${index}` }, createdAt: at })),
+  }, { attachmentUrl });
+  expect(root?.agentRun?.repliedAt).toBe(repliedAt);
+});
+
+it.each([
+  { name: "the agent a delivery assigned", assignee: { kind: "agent", id: "claude:s-1", label: "claude-opus-5-5" }, expected: { id: "claude:s-1", name: "claude-opus-5-5", kind: "agent" } },
+  { name: "a person", assignee: { kind: "user", id: "ada" }, expected: { id: "ada", name: "ada", kind: "user" } },
+  { name: "nobody, even when the playground copy still names an old assignee", assignee: null, expected: undefined },
+])("takes the thread's assignee from gavel: $name", ({ assignee, expected }) => {
+  const stale = { id: "codex", name: "Codex", kind: "agent" as const };
+  const [root] = project({ ...native, assignee, content: { ...native.content, playground: { ...native.content.playground, assignee: stale } } }, { attachmentUrl });
+  expect(root?.assignee).toEqual(expected);
+});
+
 it("keeps an empty body empty and names rating-only comments", () => {
   expect(bodyFor({ id: "x", body: "", createdAt: "", author: null, rating: "positive" })).toBe("Positive feedback");
   expect(bodyFor({ id: "x", body: "", createdAt: "", author: null })).toBe("Negative feedback");
