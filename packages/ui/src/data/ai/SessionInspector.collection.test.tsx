@@ -90,7 +90,7 @@ describe("SessionInspector session collections", () => {
     expect(tabs).not.toHaveClass("overflow-x-auto");
     expect(
       within(toolbar).getByLabelText("Context 63% used"),
-    ).toHaveTextContent("gpt-5.5");
+    ).toHaveTextContent("GPT-5.5");
     expect(within(toolbar).getByTitle("Mode: api")).toBeInTheDocument();
     expect(within(toolbar).getByTitle("High effort")).toBeInTheDocument();
     expect(

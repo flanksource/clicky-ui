@@ -44,6 +44,10 @@ export function normalizeErrorDiagnostics(
   }
   const record = objectRecord(value);
   if (!record) return null;
+  // An Error that carries structured diagnostics reports those; a response body's
+  // `diagnostics` may be a provider payload instead and is only a fallback below.
+  const carried = value instanceof Error ? objectRecord(record.diagnostics) : null;
+  if (carried && typeof carried.message === "string") return normalizeErrorDiagnostics(carried, fallback);
   const nestedError = objectRecord(record.error);
   if (nestedError && nestedError !== record) {
     return normalizeErrorDiagnostics(nestedError, fallback);
@@ -61,6 +65,9 @@ export function normalizeErrorDiagnostics(
     ...contextEntries(record.context),
   ];
   const details = detailBlocks(record.details);
+  if (value instanceof Error && value.cause !== undefined) {
+    details.push({ label: "Cause", value: value.cause instanceof Error ? value.cause.stack ?? value.cause.message : stringifyValue(value.cause) });
+  }
   if (!message && !trace && !stacktrace && !time && context.length === 0) {
     const nestedDiagnostics = objectRecord(record.diagnostics);
     if (nestedDiagnostics && nestedDiagnostics !== record) {
@@ -223,6 +230,13 @@ function firstString(record: Record<string, unknown>, keys: string[]): string | 
 }
 
 function contextEntries(value: unknown): Array<[string, string]> {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry: unknown) =>
+      Array.isArray(entry) && entry.length === 2 && typeof entry[0] === "string"
+        ? [[entry[0], stringifyValue(entry[1])] as [string, string]]
+        : [],
+    );
+  }
   const record = objectRecord(value);
   if (!record) return [];
   return Object.entries(record)

@@ -35,6 +35,9 @@ export {
   type ProviderGlyph,
 } from "./provider-icons";
 export { defaultChatModelId } from "./models";
+export { AgentIdentity, AgentIdentityProvider } from "./AgentIdentity";
+export type { AgentIdentityMetadata } from "./agent-identity-context";
+export { shortContextModelName, modelProvider } from "./ContextMeter.model";
 export {
   ContextMeter,
   type ContextMeterProps,
