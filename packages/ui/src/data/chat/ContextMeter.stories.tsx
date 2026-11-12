@@ -72,7 +72,7 @@ export const Bar: Story = {
     );
     await expect(
       canvas.getByTitle("anthropic/claude-opus-4-8"),
-    ).toHaveTextContent("opus-4.8");
+    ).toHaveTextContent("Opus 4.8");
     await expect(
       card.getByText("anthropic/claude-opus-4-8"),
     ).toBeInTheDocument();
