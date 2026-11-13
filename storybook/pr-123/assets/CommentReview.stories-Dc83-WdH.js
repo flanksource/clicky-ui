@@ -1,0 +1,19 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{t}from"./react-pByjoP3I.js";import{t as n}from"./jsx-runtime-BG4KOiPz.js";import{n as r,t as i}from"./button-vt3_phWI.js";import{C as a,x as o}from"./ActionError-WOWFGWDw.js";import{a as s,i as c,n as l,t as u}from"./CommentProvider-C4WBHaND.js";import{n as d,t as f}from"./CommentRail-DvT_Mw1c.js";import{d as p,u as m}from"./CommentCard-CA9xD9yA.js";import{n as h,t as g}from"./CommentSidePanel-CzjtAspN.js";import{n as _,t as v}from"./CommentDraftPopover-CzvW4exv.js";function y(){let[e,t]=(0,x.useState)(w);return(0,S.jsx)(u,{comments:e,config:C,initialRailMode:`all`,onReply:e=>{t(t=>[...t,{...e,id:`reply-${t.length}`,createdAt:new Date().toISOString(),author:{name:`Ada`}}])},children:(0,S.jsx)(b,{})})}function b(){let e=s(),[t,n]=(0,x.useState)(null),[r,a]=(0,x.useState)(!1),o=e.registerAnchor,c=(0,x.useCallback)(e=>{o(`example-target`,e),n(e)},[o]);return(0,S.jsxs)(`div`,{className:`flex h-[720px] min-h-0 max-w-full flex-col md:flex-row`,children:[(0,S.jsxs)(`div`,{ref:e.contentRef,"data-example-scroll":``,className:`min-h-0 min-w-0 flex-1 overflow-auto p-6`,children:[(0,S.jsx)(`h2`,{className:`text-lg font-semibold`,children:`Document review`}),(0,S.jsx)(`p`,{className:`mt-3 text-sm text-muted-foreground`,children:`Scroll before and after opening a comment. Resize the rail to reflow the preview.`}),(0,S.jsx)(`div`,{className:`h-80`}),(0,S.jsxs)(`section`,{id:`example-target`,ref:c,className:`rounded-md border border-border p-4`,children:[(0,S.jsx)(`h3`,{className:`font-semibold`,children:`Navigation selection`}),(0,S.jsx)(i,{onClick:()=>a(!0),children:`Comment on selection`})]}),(0,S.jsx)(`div`,{className:`h-[1000px]`})]}),(0,S.jsx)(f,{open:e.railMode!==`closed`,onOpenChange:t=>t?e.openCommentList():e.closeRail(),children:(0,S.jsx)(`div`,{className:`p-3`,children:(0,S.jsx)(g,{className:`w-full`,compact:!0,previewLines:3,focusedAlignment:`flow`,detailTabs:[{id:`capture`,label:`Capture`,render:()=>(0,S.jsx)(`p`,{children:`Captured navigation selection and source context.`})},{id:`agents`,label:`Agents`,render:()=>(0,S.jsx)(m,{model:`claude-opus-5-5`,effort:`high`})}],threadToMarkdown:e=>e.map(e=>e.body).join(`
+
+`)})})}),r&&t&&(0,S.jsx)(v,{reference:t,label:`Navigation selection`,anchor:`example-target`,config:C,onDiscard:()=>a(!1),onCreate:()=>a(!1)})]})}var x,S,C,w,T,E,D;function O(){return(O=e((()=>{x=t(),l(),c(),h(),d(),_(),a(),p(),r(),S=n(),C={statuses:o},w=[{id:`example-root`,anchor:`example-target`,createdAt:`2026-11-04`,status:`open`,author:{kind:`agent`,name:`claude-opus-5-5`},body:`Review the navigation and retain the selected document.
+
+This second paragraph describes the selection. The comment preview should remain compact while the complete thread is available in its detail dialog.
+
+[Open reference](#example-target)`}],T={title:`Comments/Review details`,component:y,parameters:{layout:`fullscreen`}},E={},D=[`CommentReviewExample`,`ResizableDetails`],y.parameters={...y.parameters,docs:{...y.parameters?.docs,source:{originalSource:`function CommentReviewExample() {
+  const [comments, setComments] = useState(initial);
+  return <CommentProvider comments={comments} config={config} initialRailMode="all" onReply={input => {
+    setComments(current => [...current, {
+      ...input,
+      id: \`reply-\${current.length}\`,
+      createdAt: new Date().toISOString(),
+      author: {
+        name: "Ada"
+      }
+    }]);
+  }}><ReviewSurface /></CommentProvider>;
+}`,...y.parameters?.docs?.source}}},E.parameters={...E.parameters,docs:{...E.parameters?.docs,source:{originalSource:`{}`,...E.parameters?.docs?.source}}}})))()}O();export{y as CommentReviewExample,E as ResizableDetails,D as __namedExportsOrder,T as default};
