@@ -34,6 +34,7 @@ const GROUP_LABELS: Record<string, string> = {
   language: "Languages",
   jpa: "JPA",
   kubernetes: "Kubernetes",
+  "cloud-resources": "Cloud resources",
   programming: "Programming",
   "files-code": "Files & code",
   "git-source-control": "Git & source control",
@@ -268,7 +269,11 @@ function IconCard({
     <div className="flex min-w-0 items-center gap-2 rounded border border-border bg-background px-2 py-1.5">
       <Component
         size={size}
-        className="shrink-0 text-foreground"
+        className={
+          icon.group === "cloud-resources"
+            ? "shrink-0"
+            : "shrink-0 text-foreground"
+        }
         title={icon.name}
       />
       <div className="min-w-0 leading-tight">
