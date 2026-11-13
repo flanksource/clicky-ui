@@ -1,1 +1,0 @@
-import{n as e}from"./rolldown-runtime-sJBDdmOt.js";function t(){return{status:new Map,framework:new Map}}function n(e,t){if(t.size===0)return!0;let n=new Set,r=new Set;for(let[e,i]of t.entries())i===`include`&&n.add(e),i===`exclude`&&r.add(e);return e&&r.has(e)?!1:n.size===0||!!e&&n.has(e)}function r(){return(r=e((()=>{})))()}export{r as n,n as r,t};
