@@ -44,15 +44,15 @@ export type ManagedAgentTarget = {
 };
 export type SessionAgentTarget = CaptainAgentTarget | ManagedAgentTarget;
 
-/** Where a page's threads go; `playground` is a gavel-managed session started with the playground's runtime. */
+/** Where a page's threads are sent; `playground` is a gavel-managed session started with the playground's runtime. */
 export type AgentTarget = { kind: "playground" } | SessionAgentTarget;
 
 /**
- * A page's agent delivery as gavel holds it, in the route whose prefix is the
- * page's comment target: where its threads go, and whether gavel delivers new
- * human comments there as they are created.
+ * A page's auto-run as gavel's settings hold it: the page's comment-agent
+ * entry, or the default it inherits, is enabled. Which live session a page's
+ * threads are sent to is the browser's choice (localStorage), never stored here.
  */
-export type PageAgentRoute = { target: AgentTarget; autoRun: boolean };
+export type PageAgentState = { autoRun: boolean };
 
 export type AgentSessionSettings = {
   grouping: AgentSessionGrouping;
@@ -85,9 +85,9 @@ export type AgentSessionsFile = {
   sessions: AgentSession[];
 };
 
-/** What `GET /__playground/agent-sessions` answers: the file, plus each page's gavel route. */
+/** What `GET /__playground/agent-sessions` answers: the file, plus the auto-run state of the requested `page`. */
 export type AgentSessionsView = AgentSessionsFile & {
-  pages: Record<string, PageAgentRoute>;
+  pages: Record<string, PageAgentState>;
 };
 
 export const DEFAULT_AGENT_SESSION_SETTINGS: AgentSessionSettings = {
@@ -182,7 +182,7 @@ function assertAgentSessionsFile(
     : [];
   if (moved.length > 0) {
     throw new Error(
-      `${file} has settings.${moved.join(" and settings.")}, which moved to gavel comment routes (one per page); remove ${moved.length > 1 ? "them" : "it"} from the file and set the page's target and auto-run again in the playground`,
+      `${file} has settings.${moved.join(" and settings.")}, which moved out of this file (auto-run is a page entry in gavel's comment agent settings; a page's session target lives in the browser); remove ${moved.length > 1 ? "them" : "it"} from the file and set the page's target and auto-run again in the playground`,
     );
   }
   if (

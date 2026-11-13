@@ -18,14 +18,14 @@ import { registerRepositoryDocumentsMiddleware } from "./repository-documents-se
 import { registerBookmarkletMiddleware } from "./bookmarklet-middleware";
 import { registerPageActivityMiddleware } from "./page-activity";
 import { registerVocabulariesMiddleware } from "./vocabularies-server";
-import { fixedGavel, onDemandGavel } from "./gavel-launch-server";
+import { fixedGavel } from "./gavel-launch-server";
 
 export function registerProductionApi(options: { root: string; middlewares: MiddlewareApp; env: Record<string, string>; sourceRoots: SourceRoot[]; vocabularyRoots: string[]; script: string; events: SourceEvents }) {
   const { root, env, middlewares } = options;
   const workspaceRoot = resolve(root, "../..");
   const dir = resolve(root, ".playground");
   const pagesDir = resolve(root, "src/pages");
-  const endpoint = env.PLAYGROUND_GAVEL_URL ? fixedGavel(env.PLAYGROUND_GAVEL_URL) : onDemandGavel({ workspace: workspaceRoot, command: [env.PLAYGROUND_GAVEL_BINARY ?? "gavel"], localRoots: [workspaceRoot, ...(env.PLAYGROUND_LOCAL_ROOTS ?? "").split(",").filter(Boolean)] });
+  const endpoint = fixedGavel(env.PLAYGROUND_GAVEL_URL);
   configureComments({ dir, endpoint, workspace: workspaceRoot });
   const logger = { error: (message: string) => process.stderr.write(message + "\n") };
   const captainURL = env.PLAYGROUND_CAPTAIN_URL ?? "http://localhost:9020";
@@ -48,5 +48,5 @@ export function registerProductionApi(options: { root: string; middlewares: Midd
   registerRuntimeProfilesMiddleware({ ...app, modelsURL: `${captainURL}/api/chat/models`, permissionsURL: `${captainURL}/api/captain/ai/permissions/catalog`, runtimesURL: `${captainURL}/api/chat/runtimes`, resolveURL: `${captainURL}/api/chat/runtime-profiles/resolve`, presetsResolveURL: `${captainURL}/api/chat/runtime-presets/resolve` });
   registerWorkspaceFilesMiddleware({ ...app, cwd: workspaceRoot });
   registerPageActivityMiddleware(app);
-  return { changed: () => navigation.clearMeta(), async close() { closeVocabularies(); prompts.close(); await endpoint.close(); } };
+  return { changed: () => navigation.clearMeta(), close() { closeVocabularies(); } };
 }

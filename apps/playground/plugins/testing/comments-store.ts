@@ -44,12 +44,7 @@ export function configureTestComments(dir: string) {
   return configureComments({
     dir,
     workspace: dir,
-    endpoint: {
-      url: async () => url,
-      unreachable: () => false,
-      generation: 0,
-      close: async () => undefined,
-    },
+    endpoint: { url: async () => url },
   });
 }
 const client = configureTestComments;

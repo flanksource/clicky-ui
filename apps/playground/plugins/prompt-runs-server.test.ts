@@ -395,7 +395,7 @@ describe("playground prompt runs", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ runtime: { spec: { model: "m-1" } } }),
     });
-    await fetch(`${baseUrl}/__playground/agent-sessions/targets`, {
+    await fetch(`${baseUrl}/__playground/agent-sessions/auto-run`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ page: PAGE, autoRun: true }),

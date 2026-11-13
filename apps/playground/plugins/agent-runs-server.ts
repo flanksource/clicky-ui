@@ -10,8 +10,12 @@ import type { Plugin } from "vite";
 import { buildPlaygroundInstructions } from "../src/agent-instructions-text";
 import {
   DEFAULT_RUN_PROMPT,
+  type CommentAgent,
+  type CommentAgentSettings,
   type DeliverTarget,
-  type Route,
+  type GavelAgentSession,
+  type RunOptions,
+  type SettingsRef,
 } from "../src/comments/gavel-delivery";
 import {
   AGENT_SESSION_GROUPINGS,
@@ -24,8 +28,8 @@ import {
   type AgentSessionSettings,
   type AgentSessionsFile,
   type AgentSessionsView,
-  type AgentTarget,
-  type PageAgentRoute,
+  type PageAgentState,
+  type SessionAgentTarget,
 } from "./agent-session-store";
 import {
   CaptainClient,
@@ -33,11 +37,11 @@ import {
   CaptainUnreachableError,
   type CaptainLiveSession,
 } from "./captain-client";
-import { commentsClient, type CommentsClient } from "./comments-client";
+import { commentsClient } from "./comments-client";
 import { CommentHttpError } from "./comments-lifecycle";
 import { readJsonBody, sendJson } from "./comments-server";
 import { isUnresolvedStatus } from "./comments-statuses";
-import { findComment, type StoredAuthor } from "./comments-store";
+import { findComment, readPage, type StoredAuthor } from "./comments-store";
 import { LaunchHttpError } from "./launch-client";
 
 export const AGENT_RUNS_ROUTE = "/__playground";
@@ -58,6 +62,7 @@ export type AgentRunsOptions = {
 };
 
 const AGENT_COMMENT_ROUTE = /^\/comments\/([^/]+)\/agent-run$/;
+const AGENT_BATCH_ROUTE = "/comments/agent-run/batch";
 const SESSION_ENTRY_ROUTE = /^\/agent-sessions\/sessions\/([^/]+)$/;
 const PROXY_ROUTE = /^\/agent-runs\/(runs|sessions)\/(.+)$/;
 const STOP_PATH = /^[^/]+\/stop$/;
@@ -142,11 +147,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-type RunRequest = { human: StoredAuthor; runtime?: AgentSessionRuntime; fresh: boolean };
+type RunRequest = {
+  human: StoredAuthor;
+  runtime?: AgentSessionRuntime;
+  fresh: boolean;
+  /** The live session the browser chose for the comment's page; absent when the thread goes to the playground's own agent. */
+  target?: SessionAgentTarget;
+};
+
+function parseSessionTarget(target: unknown): SessionAgentTarget {
+  if (!isSessionTarget(target) || Object.keys(target).length !== 3) {
+    throw new RequestError(
+      '"target" must be {kind:"captain"|"managed", sessionId, label}',
+      400,
+    );
+  }
+  return target;
+}
 
 function parseRunRequest(body: Record<string, unknown>): RunRequest {
   const unexpected = Object.keys(body).find(
-    (key) => key !== "author" && key !== "runtime" && key !== "fresh",
+    (key) => !["author", "runtime", "fresh", "target"].includes(key),
   );
   if (unexpected) {
     throw new RequestError(
@@ -167,8 +188,22 @@ function parseRunRequest(body: Record<string, unknown>): RunRequest {
   const human: StoredAuthor = { name: author["name"], kind: "user" };
   const fresh = body["fresh"] ?? false;
   if (typeof fresh !== "boolean") throw new RequestError('"fresh" must be a boolean', 400);
-  const runtime = body["runtime"];
-  return runtime === undefined ? { human, fresh } : { human, fresh, runtime: parseRuntime(runtime) };
+  const { runtime, target } = body;
+  return {
+    human,
+    fresh,
+    ...(runtime === undefined ? {} : { runtime: parseRuntime(runtime) }),
+    ...(target === undefined ? {} : { target: parseSessionTarget(target) }),
+  };
+}
+
+/** A run request for every open thread of `page`; its other fields are a single thread's. */
+function parseBatchRequest(body: Record<string, unknown>): RunRequest & { page: string } {
+  const { page, ...rest } = body;
+  if (typeof page !== "string" || page === "") {
+    throw new RequestError('"page" is required: a page slug or external:<uuid> key', 400);
+  }
+  return { page, ...parseRunRequest(rest) };
 }
 
 function parseRuntime(runtime: unknown): AgentSessionRuntime {
@@ -200,7 +235,7 @@ function parseSettingsPatch(body: Record<string, unknown>): SettingsPatch {
   );
   if (unexpected === "autoRun") {
     throw new RequestError(
-      'auto-run is a per-page gavel route now; PUT /agent-sessions/targets {page, autoRun} sets it',
+      "auto-run is a per-page comment agent in gavel's settings; PUT /agent-sessions/auto-run {page, autoRun} sets it",
       400,
     );
   }
@@ -242,7 +277,29 @@ export type CaptainSessionOption = {
   model?: string;
   /** The agent runs in a cmux pane, so delivery can fall back to typing into it. */
   inCmux: boolean;
+  /** Gavel launched this session for a thread in the playground's scope. */
+  managed?: boolean;
+  /** The session has ended and delivering to it resumes it. */
+  resumable?: boolean;
 };
+
+/** A session gavel manages, as the picker lists it; captain knows nothing of it once it has ended. */
+function gavelManagedOption(session: GavelAgentSession): CaptainSessionOption {
+  return {
+    id: session.id,
+    ...(session.status ? { status: session.status } : {}),
+    source: session.source,
+    title: session.title,
+    ...(session.cwd ? { cwd: session.cwd } : {}),
+    ...(session.model ? { model: session.model } : {}),
+    inCmux: session.inCmux,
+    managed: true,
+    ...(session.resumable ? { resumable: true } : {}),
+  };
+}
+
+/** Whether delivering to a gavel-managed session works: it is still running, or gavel can resume it. */
+const deliverableManaged = (session: GavelAgentSession): boolean => session.managed === true && (session.resumable === true || session.status !== "ended");
 
 export function captainSessionOption(record: CaptainLiveSession): CaptainSessionOption {
   const prompt = record.initialPrompt?.trim().split("\n")[0];
@@ -259,65 +316,51 @@ export function captainSessionOption(record: CaptainLiveSession): CaptainSession
   };
 }
 
-type TargetRequest = { page: string; target?: AgentTarget; autoRun?: boolean };
+type AutoRunRequest = { page: string; autoRun: boolean };
 
-function parseTargetRequest(body: Record<string, unknown>): TargetRequest {
-  const unexpected = Object.keys(body).find(
-    (key) => key !== "page" && key !== "target" && key !== "autoRun",
-  );
+function parseAutoRunRequest(body: Record<string, unknown>): AutoRunRequest {
+  const unexpected = Object.keys(body).find((key) => key !== "page" && key !== "autoRun");
   if (unexpected) {
     throw new RequestError(
-      `target request has no field ${JSON.stringify(unexpected)}; use page, target and autoRun`,
+      `auto-run request has no field ${JSON.stringify(unexpected)}; use page and autoRun`,
       400,
     );
   }
-  const { page, target, autoRun } = body;
+  const { page, autoRun } = body;
   if (typeof page !== "string" || page === "") {
     throw new RequestError(
       '"page" is required: a page slug or external:<uuid> key',
       400,
     );
   }
-  if (target === undefined && autoRun === undefined) {
-    throw new RequestError('send "target", "autoRun" or both', 400);
-  }
-  if (autoRun !== undefined && typeof autoRun !== "boolean") {
-    throw new RequestError('"autoRun" must be a boolean', 400);
-  }
-  const auto = autoRun === undefined ? {} : { autoRun };
-  if (target === undefined) return { page, ...auto };
-  if (
-    isRecord(target) &&
-    target["kind"] === "playground" &&
-    Object.keys(target).length === 1
-  ) {
-    return { page, target: { kind: "playground" }, ...auto };
-  }
-  if (!isSessionTarget(target) || Object.keys(target).length !== 3) {
-    throw new RequestError(
-      '"target" must be {kind:"playground"} or {kind:"captain", sessionId, label}',
-      400,
-    );
-  }
-  return { page, target, ...auto };
+  if (typeof autoRun !== "boolean") throw new RequestError('"autoRun" must be a boolean', 400);
+  return { page, autoRun };
 }
 
-/** The page a gavel route's prefix is the comment target of, or undefined for a route the playground did not make. */
-function routePage(client: CommentsClient, route: Route): string | undefined {
-  const prefix = client.target("").uri;
-  if (route.workflowId !== "human-review" || !route.targetPrefix.startsWith(prefix)) return undefined;
-  const page = decodeURIComponent(route.targetPrefix.slice(prefix.length));
-  return page === "" ? undefined : page;
-}
+/** Where a page's auto-run lives in gavel's settings: its entry in the project layer's `comments.agents.pages`. */
+const PROJECT_LAYER: SettingsRef = { kind: "project" };
 
-/** The scope's page routes, by page. */
-async function pageRoutes(client: CommentsClient): Promise<Map<string, Route>> {
-  const routes = new Map<string, Route>();
-  for (const route of await client.routes()) {
-    const page = routePage(client, route);
-    if (page !== undefined) routes.set(page, route);
-  }
-  return routes;
+/**
+ * Gavel resolves every layer for any page of the scope, so reading the layers
+ * without a particular page asks about this one.
+ */
+const SETTINGS_PROBE_PAGE = "playground-settings";
+
+const PAGE_ENTRY_PREFIX = "page/";
+
+const autoRunOf = (settings: CommentAgentSettings): PageAgentState => ({ autoRun: settings.agent.agent.enabled === true });
+
+/**
+ * The pages whose comment-agent entry in a project layer is enabled. An entry's
+ * key is its target URI below the scope (`page/<encoded page>`); any other key
+ * is not a playground page, so it is left alone.
+ */
+function enabledProjectPages(settings: CommentAgentSettings): string[] {
+  return settings.settings.layers
+    .filter((layer) => layer.kind === "project")
+    .flatMap((layer) => Object.entries(layer.config.comments?.agents?.pages ?? {}))
+    .filter(([key, agent]) => key.startsWith(PAGE_ENTRY_PREFIX) && agent.enabled === true)
+    .map(([key]) => decodeURIComponent(key.slice(PAGE_ENTRY_PREFIX.length)));
 }
 
 function requestOrigin(req: IncomingMessage): string {
@@ -482,18 +525,33 @@ export function createAgentRuns(options: AgentRunsOptions) {
     };
   }
 
-  /** Every live captain session, projected for the target picker. */
-  async function captainSessions(page?: string): Promise<CaptainSessionOption[]> {
+  /**
+   * Every session a thread can be delivered into, projected for the target
+   * picker: the live captain sessions, and the scope's gavel-managed ones (ended
+   * ones marked resumable), each once. With a `page`, only the captain sessions
+   * working in its directory, plus the `linked` ones the browser chose for it
+   * (which may work elsewhere). Managed sessions run in gavel's workspace, so no
+   * page directory filters them.
+   */
+  async function captainSessions(page?: string, chosen: string[] = []): Promise<CaptainSessionOption[]> {
     const directory = page ? sessionScopeDirectory({ page, dir, cwd }) : undefined;
     const stored = readAgentSessions(dir);
-    const routed = page ? [...(await pageRoutes(commentsClient(dir))).entries()] : [];
     const linked = new Set(page ? [
-      ...routed.flatMap(([key, route]) => route.target.kind === "session" && pageInSessionScope(key, page) ? [route.target.sessionId] : []),
+      ...chosen,
       ...stored.sessions.filter(session => session.page && pageInSessionScope(session.page, page)).map(session => session.sessionId),
     ] : []);
-    return (await captain.listLiveSessions())
+    const live = (await captain.listLiveSessions())
       .filter(session => !directory || linked.has(session.id) || (session.key && linked.has(session.key)) || (session.cwd && cwdInSessionScope(session.cwd, directory)))
       .map(captainSessionOption);
+    const managed = (await commentsClient(dir).agentSessions()).filter(session => session.managed);
+    const gavelOf = (option: CaptainSessionOption) => managed.find(session => session.id === option.id || session.id === option.captainId);
+    return [
+      ...live.map(option => {
+        const session = gavelOf(option);
+        return session ? { ...option, managed: true, ...(session.resumable ? { resumable: true } : {}) } : option;
+      }),
+      ...managed.filter(session => !live.some(option => gavelOf(option) === session)).map(gavelManagedOption),
+    ];
   }
 
   async function projects() {
@@ -550,28 +608,16 @@ export function createAgentRuns(options: AgentRunsOptions) {
         cwd: project,
         label: `${page} · ${runtime.spec.model}`,
       };
-      try {
-        update((data) => ({ ...data, sessions: [...data.sessions, managed] }));
-        const route = await savePageRoute({
-          page,
-          target: { kind: "managed", sessionId: session.sessionId, label: managed.label! },
-          origin,
-        });
-        return { session: managed, route };
-      } catch (error) {
-        update((data) => ({ ...data, sessions: data.sessions.filter((entry) => entry.runId !== session.runId) }));
-        const stopped = await captain.fetch(`${UPSTREAM_PREFIX.runs}${encodeURIComponent(session.runId)}/stop`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-        if (!stopped.ok && stopped.status !== 404 && stopped.status !== 409) throw new Error(`${describeError(error)}; cleanup of run ${session.runId} failed: ${stopped.status}`);
-        throw error;
-      }
+      update((data) => ({ ...data, sessions: [...data.sessions, managed] }));
+      return { session: managed };
     });
   }
 
   /**
-   * What gavel runs for a page's threads when the page has no live session: a
-   * new managed session from the playground's runtime, shared per `groupKey`.
+   * What gavel runs for a page's threads: a managed session from the
+   * playground's runtime, shared per `group` (one for every page, or one per page).
    */
-  function runTarget(options: { page: string; origin: string; noRuntime: string; fresh?: boolean }): DeliverTarget {
+  function runSetup(options: { page: string; origin: string; noRuntime: string }): { group: string; runOptions: RunOptions } {
     const { settings } = readAgentSessions(dir);
     const { runtime } = settings;
     if (!runtime) throw new RequestError(options.noRuntime, 409);
@@ -583,10 +629,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
     }
     const shared = settings.grouping === "page" ? options.page : null;
     return {
-      kind: "run",
-      prompt: DEFAULT_RUN_PROMPT,
-      groupKey: shared === null ? "playground:shared" : `playground:page:${shared}`,
-      ...(options.fresh ? { fresh: true } : {}),
+      group: shared === null ? "playground:shared" : `playground:page:${shared}`,
       runOptions: {
         spec: runtime.spec,
         ...(runtime.presets ? { presets: runtime.presets } : {}),
@@ -595,82 +638,111 @@ export function createAgentRuns(options: AgentRunsOptions) {
     };
   }
 
-  /** The picker's view of a gavel delivery target. */
-  async function agentTarget(target: DeliverTarget, live: () => Promise<CaptainLiveSession[]>): Promise<AgentTarget> {
-    if (target.kind === "run") return { kind: "playground" };
-    const managed = readAgentSessions(dir).sessions.find((entry) => entry.purpose === "target" && entry.sessionId === target.sessionId);
-    if (managed) return { kind: "managed", sessionId: target.sessionId, label: managed.label! };
-    const record = (await live()).find((entry) => entry.id === target.sessionId);
-    const option = record ? captainSessionOption(record) : undefined;
-    return { kind: "captain", sessionId: target.sessionId, label: option ? `${option.title} · ${option.source}` : target.sessionId };
+  function runTarget(options: { page: string; origin: string; noRuntime: string; fresh?: boolean }): DeliverTarget {
+    const { group, runOptions } = runSetup(options);
+    return { kind: "run", prompt: DEFAULT_RUN_PROMPT, groupKey: group, ...(options.fresh ? { fresh: true } : {}), runOptions };
   }
 
-  const liveSessions = () => {
-    let listed: Promise<CaptainLiveSession[]> | undefined;
-    return () => (listed ??= captain.listLiveSessions());
-  };
-
-  async function routeView(route: Route): Promise<PageAgentRoute> {
-    return { target: await agentTarget(route.target, liveSessions()), autoRun: route.enabled };
+  /** The comment agent a page's auto-run saves: the same run as `runTarget`, enabled. */
+  function pageAgent(options: { page: string; origin: string; noRuntime: string }): CommentAgent {
+    const { group, runOptions } = runSetup(options);
+    return { enabled: true, prompt: DEFAULT_RUN_PROMPT, group, ...runOptions };
   }
 
   /**
-   * Writes a page's gavel route: the route's prefix is the page's comment
-   * target, its target where threads go, and `enabled` whether gavel delivers
-   * new human comments there as they are created. A page left on the
-   * playground's own agent without auto-run needs no route.
+   * Switches a page's auto-run: on saves the page's comment-agent entry in the
+   * project layer; off removes it, and when an inherited default still enables
+   * the agent, saves `{enabled: false}` there instead.
    */
-  async function savePageRoute(request: TargetRequest & { origin: string }): Promise<PageAgentRoute> {
+  async function setAutoRun(request: AutoRunRequest, origin: string): Promise<PageAgentState> {
+    const { page, autoRun } = request;
     const gavel = commentsClient(dir);
-    const existing = (await pageRoutes(gavel)).get(request.page);
-    const sessionId =
-      request.target === undefined
-        ? existing?.target.kind === "session" ? existing.target.sessionId : undefined
-        : request.target.kind === "playground" ? undefined : request.target.sessionId;
-    const autoRun = request.autoRun ?? existing?.enabled ?? false;
-    if (sessionId === undefined && !autoRun) {
-      if (existing) await gavel.deleteRoute(existing.id);
-      return { target: { kind: "playground" }, autoRun: false };
+    const save = (agent: CommentAgent | null) => gavel.saveAgent({ page, layer: PROJECT_LAYER, entry: true, agent });
+    if (autoRun) {
+      return autoRunOf(await save(pageAgent({ page, origin, noRuntime: "auto-run needs a runtime; send runtime ({spec:{model}}) with the settings first" })));
     }
-    const saved = await gavel.saveRoute({
-      ...(existing ? { id: existing.id } : {}),
-      scopeUri: gavel.scope,
-      targetPrefix: gavel.target(request.page).uri,
-      workflowId: "human-review",
-      target: sessionId === undefined
-        ? runTarget({ page: request.page, origin: request.origin, noRuntime: "auto-run needs a runtime; send runtime ({spec:{model}}) with the settings first" })
-        : { kind: "session", sessionId },
-      enabled: autoRun,
-    });
-    return routeView(saved);
+    let saved = await save(null);
+    if (saved.agent.agent.enabled) saved = await save({ enabled: false });
+    if (saved.agent.agent.enabled) {
+      throw new Error(`auto-run of page ${page} is still enabled by layer ${saved.agent.provenance["enabled"]?.layer ?? "unknown"}`);
+    }
+    return autoRunOf(saved);
   }
 
-  /** Rebuilds every page route that starts a managed session, after the runtime or grouping it embeds changed. */
-  async function refreshRunRoutes(origin: string): Promise<void> {
+  /** Rewrites every enabled page entry of the project layer, after the runtime or grouping it embeds changed. */
+  async function refreshPageAgents(origin: string): Promise<void> {
     const gavel = commentsClient(dir);
-    for (const [page, route] of await pageRoutes(gavel)) {
-      if (route.target.kind !== "run") continue;
-      await gavel.saveRoute({ ...route, target: runTarget({ page, origin, noRuntime: "the playground has no runtime to refresh its auto-run routes with" }) });
+    for (const page of enabledProjectPages(await gavel.agent(SETTINGS_PROBE_PAGE))) {
+      await gavel.saveAgent({
+        page,
+        layer: PROJECT_LAYER,
+        entry: true,
+        agent: pageAgent({ page, origin, noRuntime: "the playground has no runtime to refresh its auto-run agents with" }),
+      });
     }
   }
 
-  /** Points a page's threads at a live session, or back at a gavel-managed one; and sets whether new comments are delivered automatically. */
-  function setTarget(body: Record<string, unknown>, origin: string): Promise<PageAgentRoute> {
-    const request = parseTargetRequest(body);
-    return serialized(async () => {
-      const { target } = request;
-      if (target?.kind === "managed") {
-        const session = readAgentSessions(dir).sessions.find(
-          (entry) => entry.sessionId === target.sessionId && entry.purpose === "target",
+  /** Sets whether gavel delivers new human comments on a page to the playground's agent automatically. */
+  function setPageAutoRun(body: Record<string, unknown>, origin: string): Promise<PageAgentState> {
+    const request = parseAutoRunRequest(body);
+    return serialized(() => setAutoRun(request, origin));
+  }
+
+  /**
+   * A chosen target is delivered into only while its session is still there: a
+   * stored playground session that runs, a live captain session, or a session
+   * gavel manages that runs or can resume.
+   */
+  async function assertTargetAvailable(target: SessionAgentTarget): Promise<void> {
+    if (target.kind === "managed") {
+      const session = readAgentSessions(dir).sessions.find(
+        (entry) => entry.sessionId === target.sessionId && entry.purpose === "target",
+      );
+      if (session && (await verify(session)).state === "running") return;
+    } else {
+      const live = await captain.listLiveSessions();
+      if (live.some((entry) => entry.id === target.sessionId || entry.key === target.sessionId)) return;
+    }
+    const known = await commentsClient(dir).agentSessions();
+    if (known.some((entry) => entry.id === target.sessionId && deliverableManaged(entry))) return;
+    throw new RequestError(
+      target.kind === "managed" ? "Managed session is no longer available" : `Captain session ${target.label} is no longer live; choose another target`,
+      409,
+    );
+  }
+
+  /**
+   * What gavel delivers a page's threads to: the live or resumable session the
+   * browser chose, or, when it chose none, a managed run from the playground's runtime.
+   */
+  async function resolveDeliverTarget(request: RunRequest, options: { page: string; origin: string }): Promise<DeliverTarget> {
+    const { page, origin } = options;
+    if (request.target) {
+      if (request.fresh) {
+        throw new RequestError(
+          `page ${page} sends its threads to session ${request.target.sessionId}; "fresh" only applies to playground-managed runs`,
+          400,
         );
-        if (!session || (await verify(session)).state !== "running")
-          throw new RequestError("Managed session is no longer available", 409);
       }
-      return savePageRoute({ ...request, origin });
-    });
+      if (request.runtime) {
+        throw new RequestError(
+          `page ${page} sends its threads to session ${request.target.sessionId}, which needs no runtime`,
+          409,
+        );
+      }
+      await assertTargetAvailable(request.target);
+      return { kind: "session", sessionId: request.target.sessionId };
+    }
+    // A named runtime becomes the one every new gavel-managed session starts with.
+    if (request.runtime) {
+      const runtime = request.runtime;
+      update((data) => ({ ...data, settings: { ...data.settings, runtime } }));
+      await refreshPageAgents(origin);
+    }
+    return runTarget({ page, origin, fresh: request.fresh, noRuntime: "no live agent session; supply a runtime ({spec:{model}}) to start one" });
   }
 
-  /** Hands one thread root to gavel for delivery: into the page's live session, or a managed run when it has none. */
+  /** Hands one thread root to gavel for delivery: into the live session the browser chose for its page, or a managed run when it chose none. */
   function runOnComment(id: string, body: Record<string, unknown>, origin: string) {
     const request = parseRunRequest(body);
     return serialized(async () => {
@@ -686,36 +758,38 @@ export function createAgentRuns(options: AgentRunsOptions) {
         );
       }
       if (!found.comment.version) throw new Error(`comment ${id} has no gavel version`);
-      const route = (await pageRoutes(commentsClient(dir))).get(found.page);
-      let target: DeliverTarget;
-      if (route?.target.kind === "session") {
-        if (request.fresh) {
-          throw new RequestError(
-            `page ${found.page} sends its threads to session ${route.target.sessionId}; "fresh" only applies to playground-managed runs`,
-            400,
-          );
-        }
-        if (request.runtime) {
-          throw new RequestError(
-            `page ${found.page} sends its threads to session ${route.target.sessionId}, which needs no runtime`,
-            409,
-          );
-        }
-        target = route.target;
-      } else {
-        // A named runtime becomes the one every new gavel-managed session starts with.
-        if (request.runtime) {
-          const runtime = request.runtime;
-          update((data) => ({ ...data, settings: { ...data.settings, runtime } }));
-          await refreshRunRoutes(origin);
-        }
-        target = runTarget({ page: found.page, origin, fresh: request.fresh, noRuntime: "no live agent session; supply a runtime ({spec:{model}}) to start one" });
-      }
+      const target = await resolveDeliverTarget(request, { page: found.page, origin });
       const comment = await commentsClient(dir).deliver(
         { id, version: found.comment.version, requestId: `playground:${randomUUID()}`, target },
         request.human,
       );
       return { comment };
+    });
+  }
+
+  /**
+   * Hands every open thread root of a page to one target in a single gavel
+   * delivery. A thread already delivered to the chosen session is left out
+   * unless that delivery failed. Gavel fails the whole batch when any thread
+   * went stale, so nothing is partially delivered.
+   */
+  function runOnPage(body: Record<string, unknown>, origin: string) {
+    const { page, ...request } = parseBatchRequest(body);
+    return serialized(async () => {
+      const noOpenThread = new CommentHttpError(`page ${page} has no open thread to send to an agent`, 409);
+      const roots = (await readPage(dir, page)).filter((comment) => !comment.parentId && isUnresolvedStatus(comment.status));
+      if (roots.length === 0) throw noOpenThread;
+      const target = await resolveDeliverTarget(request, { page, origin });
+      const open = roots.filter(
+        (comment) => !(target.kind === "session" && comment.agentRun?.sessionId === target.sessionId && comment.agentRun.state !== "error"),
+      );
+      if (open.length === 0) throw noOpenThread;
+      const threads = open.map((comment) => {
+        if (!comment.version) throw new Error(`comment ${comment.id} has no gavel version`);
+        return { id: comment.id, expectedVersion: comment.version };
+      });
+      const comments = await commentsClient(dir).deliverBatch({ requestId: `playground:${randomUUID()}`, target, threads }, request.human);
+      return { comments };
     });
   }
 
@@ -725,19 +799,15 @@ export function createAgentRuns(options: AgentRunsOptions) {
       const data = readAgentSessions(dir);
       const settings = { ...data.settings, ...patch };
       writeAgentSessions(dir, { ...data, settings });
-      await refreshRunRoutes(origin);
+      await refreshPageAgents(origin);
       return settings;
     });
   }
 
-  async function sessionsView(): Promise<AgentSessionsView> {
+  /** The stored file, and the auto-run state of `page` when one is asked about. */
+  async function sessionsView(page?: string): Promise<AgentSessionsView> {
     const { settings, sessions } = await verifiedSessions();
-    const live = liveSessions();
-    const pages: Record<string, PageAgentRoute> = {};
-    for (const [page, route] of await pageRoutes(commentsClient(dir))) {
-      pages[page] = { target: await agentTarget(route.target, live), autoRun: route.enabled };
-    }
-    return { settings, sessions, pages };
+    return { settings, sessions, pages: page ? { [page]: autoRunOf(await commentsClient(dir).agent(page)) } : {} };
   }
 
   async function proxy(
@@ -849,12 +919,13 @@ export function createAgentRuns(options: AgentRunsOptions) {
     projects,
     createSession,
     runOnComment,
+    runOnPage,
     updateSettings,
-    setTarget,
+    setPageAutoRun,
     captainSessions,
     proxy,
     forgetSession,
-    sessions: () => serialized(sessionsView),
+    sessions: (page?: string) => serialized(() => sessionsView(page)),
   };
 }
 
@@ -881,10 +952,12 @@ function sendError(logger: ErrorLogger, res: ServerResponse, error: unknown): vo
 
 /**
  * Hands playground comments to agents through gavel's shared delivery: into a
- * live session the page is pointed at, or a gavel-managed session started from
- * the playground's runtime, one shared or one per page (`settings.grouping`).
- * A page's target and auto-run are one gavel route under its comment target, so
- * gavel delivers new human comments itself; nothing here watches for them.
+ * live session the browser chose for the page and sends with the request, or a
+ * gavel-managed session started from the playground's runtime, one shared or
+ * one per page (`settings.grouping`). A page's auto-run is its comment-agent
+ * entry in gavel's settings (`comments.agents.pages` of the project layer), so
+ * gavel delivers new human comments itself; nothing here watches for them. Which
+ * live session a page's threads go to is never stored here.
  * Captain's own session listing, stop and follow endpoints are proxied as is.
  * Register this plugin before `playgroundComments`: that middleware answers
  * every other `/__playground/comments/*` path with a 405.
@@ -894,22 +967,24 @@ export function registerAgentRunsMiddleware({ middlewares, logger, runs }: { mid
     const url = new URL(req.url ?? "/", "http://playground.local");
     const method = req.method ?? "";
     const comment = AGENT_COMMENT_ROUTE.exec(url.pathname);
+    const isBatch = url.pathname === AGENT_BATCH_ROUTE;
     const proxied = PROXY_ROUTE.exec(url.pathname);
     const entry = SESSION_ENTRY_ROUTE.exec(url.pathname);
     const isSessions = url.pathname === "/agent-sessions";
     const isSettings = url.pathname === "/agent-sessions/settings";
-    const isTargets = url.pathname === "/agent-sessions/targets";
+    const isAutoRun = url.pathname === "/agent-sessions/auto-run";
     const isCaptain = url.pathname === "/agent-sessions/captain";
     const isProjects = url.pathname === "/agent-sessions/projects";
     const isCreate = url.pathname === "/agent-sessions/sessions";
     if (
       !(
         comment ||
+        isBatch ||
         proxied ||
         entry ||
         isSessions ||
         isSettings ||
-        isTargets ||
+        isAutoRun ||
         isCaptain ||
         isProjects ||
         isCreate
@@ -935,6 +1010,11 @@ export function registerAgentRunsMiddleware({ middlewares, logger, runs }: { mid
               requestOrigin(req),
             ),
           );
+        } else if (isBatch) {
+          if (method !== "POST") {
+            throw new RequestError("POST is required to run an agent on a page's open threads", 405);
+          }
+          sendJson(res, 202, await runs.runOnPage(await readJsonBody(req), requestOrigin(req)));
         } else if (comment) {
           if (method !== "POST") {
             throw new RequestError("POST is required to run an agent", 405);
@@ -949,7 +1029,7 @@ export function registerAgentRunsMiddleware({ middlewares, logger, runs }: { mid
           if (method !== "GET") {
             throw new RequestError("GET reads the agent sessions and settings", 405);
           }
-          sendJson(res, 200, await runs.sessions());
+          sendJson(res, 200, await runs.sessions(url.searchParams.get("page") ?? undefined));
         } else if (isSettings) {
           if (method !== "PUT") {
             throw new RequestError("PUT updates the agent session settings", 405);
@@ -957,18 +1037,16 @@ export function registerAgentRunsMiddleware({ middlewares, logger, runs }: { mid
           sendJson(res, 200, {
             settings: await runs.updateSettings(await readJsonBody(req), requestOrigin(req)),
           });
-        } else if (isTargets) {
+        } else if (isAutoRun) {
           if (method !== "PUT") {
-            throw new RequestError("PUT sets a page's agent target and auto-run", 405);
+            throw new RequestError("PUT sets whether a page's new comments are delivered automatically", 405);
           }
-          sendJson(res, 200, {
-            route: await runs.setTarget(await readJsonBody(req), requestOrigin(req)),
-          });
+          sendJson(res, 200, await runs.setPageAutoRun(await readJsonBody(req), requestOrigin(req)));
         } else if (isCaptain) {
           if (method !== "GET") {
             throw new RequestError("GET lists the live captain sessions", 405);
           }
-          sendJson(res, 200, { sessions: await runs.captainSessions(url.searchParams.get("page") ?? undefined) });
+          sendJson(res, 200, { sessions: await runs.captainSessions(url.searchParams.get("page") ?? undefined, url.searchParams.getAll("linked")) });
         } else if (entry) {
           if (method !== "DELETE") {
             throw new RequestError("DELETE ends and forgets an agent session", 405);

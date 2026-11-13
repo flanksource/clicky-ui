@@ -26,11 +26,11 @@ describe("agent session file", () => {
     ["autoRun", { autoRun: true, grouping: "shared" }],
     ["targets", { grouping: "shared", targets: { welcome: { kind: "captain", sessionId: "s", label: "S" } } }],
     ["autoRun and settings.targets", { autoRun: false, grouping: "shared", targets: {} }],
-  ])("fails loudly when settings still hold %s, which moved to gavel routes", (moved, settings) => {
+  ])("fails loudly when settings still hold %s, which moved out of the file", (moved, settings) => {
     write(settings);
 
     expect(() => readAgentSessions(dir)).toThrow(
-      new RegExp(`has settings\\.${moved}, which moved to gavel comment routes`),
+      new RegExp(`has settings\\.${moved}, which moved out of this file \\(auto-run is a page entry in gavel's comment agent settings; a page's session target lives in the browser\\)`),
     );
   });
 });

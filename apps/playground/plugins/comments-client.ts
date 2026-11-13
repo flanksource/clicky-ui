@@ -4,7 +4,7 @@ import type { GavelEndpoint } from "./gavel-launch-server";
 import { vocabularyReferences } from "../../../packages/ui/src/comments/comment-vocabulary";
 import { commentVocabularyItems } from "./vocabulary-registry";
 import { LaunchHttpError } from "./launch-client";
-import type { DeliverTarget, GavelAgentSession, Route, RouteInput } from "../src/comments/gavel-delivery";
+import type { CommentAgent, CommentAgentSettings, DeliverBatchRequest, DeliverTarget, GavelAgentSession, SaveCommentAgentRequest, SettingsRef } from "../src/comments/gavel-delivery";
 import type {
   CommentsFile,
   StoredAuthor,
@@ -108,8 +108,6 @@ export class CommentsClient {
       );
     }
     const text = await response.text();
-    // Gavel answers a delete (DELETE /routes/{id}) 204 with no body.
-    if (response.status === 204) return undefined as T;
     let body: unknown;
     try {
       body = JSON.parse(text);
@@ -337,23 +335,35 @@ export class CommentsClient {
     );
     return project(c)[0]!;
   }
-  /** The live agent sessions gavel can deliver to. */
+  /**
+   * Hands several open thread roots to one target in a single message; a stale
+   * or closed thread fails the whole batch (409). Answers the updated roots in the order sent.
+   */
+  async deliverBatch(options: DeliverBatchRequest, author = localUser): Promise<StoredComment[]> {
+    const rows = await this.request<NativeComment[]>("/deliver", { method: "POST", body: JSON.stringify(options) }, author);
+    if (!Array.isArray(rows)) throw new Error("Gavel comments returned an invalid batch delivery response");
+    return rows.map((row) => project(row)[0]!);
+  }
+  /** The agent sessions gavel can deliver to: live ones, and the scope's managed ones, ended ones resumable. */
   async agentSessions(): Promise<GavelAgentSession[]> {
     const sessions = await this.request<GavelAgentSession[]>(`/agent-sessions?${new URLSearchParams({ scope: this.scope })}`);
     if (!Array.isArray(sessions)) throw new Error("Gavel comments returned an invalid agent session list");
     return sessions;
   }
-  async routes(): Promise<Route[]> {
-    const routes = await this.request<Route[]>(`/routes?${new URLSearchParams({ scope: this.scope })}`);
-    if (!Array.isArray(routes)) throw new Error("Gavel comments returned an invalid route list");
-    return routes;
+  /** The comment agent that applies to `page`, and the settings layers it resolves from, each field traced to its layer. */
+  agent(page: string): Promise<CommentAgentSettings> {
+    return this.request<CommentAgentSettings>(`/agent?${new URLSearchParams({ scope: this.scope, uri: this.target(page).uri })}`);
   }
-  /** Creates (no `id`) or replaces a route; gavel delivers new human comments under its `targetPrefix` to its target while it is enabled. */
-  saveRoute(route: RouteInput): Promise<Route> {
-    return this.request<Route>("/routes", { method: "PUT", body: JSON.stringify(route) });
-  }
-  async deleteRoute(id: string): Promise<void> {
-    await this.request<undefined>(`/routes/${encodeURIComponent(id)}`, { method: "DELETE" });
+  /**
+   * Saves `agent` at `layer`: its default, or with `page` its entry for the page's target; `null` removes
+   * the entry. Gavel answers 403 to a non-human actor and 501 when the host has no agent settings.
+   */
+  saveAgent(options: { page: string; layer: SettingsRef; entry: boolean; agent: CommentAgent | null }): Promise<CommentAgentSettings> {
+    const { page, layer, entry, agent } = options;
+    return this.request<CommentAgentSettings>("/agent", {
+      method: "PUT",
+      body: JSON.stringify({ target: { scopeUri: this.scope, uri: this.target(page).uri }, layer, page: entry, agent } satisfies SaveCommentAgentRequest),
+    });
   }
 }
 async function findComment(client: CommentsClient, id: string) {

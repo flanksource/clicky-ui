@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { commentsClient } from "./comments-client";
-import { checkGavelDeliveryRoutes } from "./gavel-compatibility";
+import type { CommentAgentSettings } from "../src/comments/gavel-delivery";
 import { LaunchHttpError } from "./launch-client";
 import { readAll, writeAll, type StoredComment } from "./testing/comments-store";
 
@@ -37,10 +37,6 @@ describe("CommentsClient agent delivery", () => {
     if (!found?.version) throw new Error("fixture thread has no version");
     return found.version;
   }
-
-  it("is recognised by the playground's gavel compatibility check", async () => {
-    await expect(checkGavelDeliveryRoutes(await commentsClient(dir).endpoint.url())).resolves.toBeUndefined();
-  });
 
   it("lists the live agent sessions gavel can deliver to", async () => {
     const sessions = await commentsClient(dir).agentSessions();
@@ -85,37 +81,101 @@ describe("CommentsClient agent delivery", () => {
     await expect(attempt).rejects.toMatchObject({ status: 409 });
   });
 
-  it("creates, replaces and deletes a route under the client's scope", async () => {
-    const client = commentsClient(dir);
-    const targetPrefix = client.target(PAGE).uri;
-    const created = await client.saveRoute({
-      scopeUri: client.scope,
-      targetPrefix,
-      workflowId: "human-review",
-      target: { kind: "session", sessionId: LIVE_SESSION },
-      enabled: false,
+  describe("batch delivery", () => {
+    const OTHER = "thread-2";
+
+    beforeEach(async () => {
+      await writeAll(dir, { [PAGE]: [root, { ...root, id: OTHER, body: "Tighten the footer" }] });
     });
-    expect(await client.routes()).toEqual([created]);
-    expect(created).toMatchObject({ targetPrefix, enabled: false, target: { kind: "session", sessionId: LIVE_SESSION } });
 
-    const replaced = await client.saveRoute({ ...created, enabled: true });
-    expect(replaced).toEqual({ ...created, enabled: true });
-    expect(await client.routes()).toEqual([replaced]);
+    async function threads() {
+      const roots = (await readAll(dir))[PAGE] ?? [];
+      return roots.map((comment) => {
+        if (!comment.version) throw new Error(`fixture thread ${comment.id} has no version`);
+        return { id: comment.id, expectedVersion: comment.version };
+      });
+    }
 
-    await client.deleteRoute(created.id);
-    expect(await client.routes()).toEqual([]);
+    it("delivers several threads into a live session in one request and returns each with gavel's agentRun", async () => {
+      const delivered = await commentsClient(dir).deliverBatch(
+        { requestId: "batch-1", target: { kind: "session", sessionId: LIVE_SESSION }, threads: await threads() },
+        human,
+      );
+
+      expect(delivered.map((comment) => ({ id: comment.id, run: comment.agentRun?.sessionId, state: comment.agentRun?.state }))).toEqual([
+        { id: THREAD, run: LIVE_SESSION, state: "sent" },
+        { id: OTHER, run: LIVE_SESSION, state: "sent" },
+      ]);
+    });
+
+    it("fails the whole batch on a stale thread and delivers none", async () => {
+      const [first, second] = await threads();
+      const attempt = commentsClient(dir).deliverBatch(
+        { requestId: "batch-stale", target: { kind: "session", sessionId: LIVE_SESSION }, threads: [first!, { ...second!, expectedVersion: 99 }] },
+        human,
+      );
+
+      await expect(attempt).rejects.toBeInstanceOf(LaunchHttpError);
+      await expect(attempt).rejects.toMatchObject({ status: 409 });
+      expect((await readAll(dir))[PAGE]?.map((comment) => comment.agentRun)).toEqual([undefined, undefined]);
+    });
   });
 
-  it("rejects a route whose prefix is outside the scope", async () => {
-    const client = commentsClient(dir);
-    const attempt = client.saveRoute({
-      scopeUri: client.scope,
-      targetPrefix: "gavel://workspace/elsewhere/page/welcome",
-      workflowId: "human-review",
-      target: { kind: "session", sessionId: LIVE_SESSION },
-      enabled: true,
+  it("lists a session gavel started for a thread as managed once the run was delivered", async () => {
+    await commentsClient(dir).deliver({
+      id: THREAD,
+      version: await version(),
+      requestId: "deliver-run",
+      target: { kind: "run", prompt: "editor-comments", groupKey: "test:group", runOptions: { spec: { model: "test-model-1" } } },
+    }, human);
+
+    const sessions = await commentsClient(dir).agentSessions();
+
+    expect(sessions).toContainEqual(expect.objectContaining({ id: expect.stringMatching(/^managed-\d+$/), managed: true }));
+  });
+
+  describe("comment agent settings", () => {
+    const layer = { kind: "project" } as const;
+    const agent = { enabled: true, prompt: "editor-comments", group: "playground:shared", spec: { model: "test-model-1" } };
+    const entryKey = `page/${encodeURIComponent(PAGE)}`;
+    const projectPages = (settings: CommentAgentSettings) =>
+      Object.assign({}, ...settings.settings.layers.filter((entry) => entry.kind === "project").map((entry) => entry.config.comments?.agents?.pages ?? {}));
+
+    it("saves a page entry in the project layer, resolves it for the page, and removes it again", async () => {
+      const client = commentsClient(dir);
+      expect((await client.agent(PAGE)).agent.agent.enabled).toBeFalsy();
+
+      const saved = await client.saveAgent({ page: PAGE, layer, entry: true, agent });
+      expect(saved.agent.agent).toMatchObject(agent);
+      expect(projectPages(saved)).toEqual({ [entryKey]: expect.objectContaining(agent) });
+      expect((await client.agent(PAGE)).agent.agent).toMatchObject(agent);
+      expect((await client.agent("pricing")).agent.agent.enabled).toBeFalsy();
+
+      const removed = await client.saveAgent({ page: PAGE, layer, entry: true, agent: null });
+      expect(projectPages(removed)).toEqual({});
+      expect(removed.agent.agent.enabled).toBeFalsy();
     });
 
-    await expect(attempt).rejects.toMatchObject({ status: 400 });
+    it("saves {enabled: false} over an agent the page inherits from the default", async () => {
+      const client = commentsClient(dir);
+      await client.saveAgent({ page: PAGE, layer, entry: false, agent });
+      expect((await client.agent(PAGE)).agent.agent.enabled).toBe(true);
+
+      const off = await client.saveAgent({ page: PAGE, layer, entry: true, agent: { enabled: false } });
+
+      expect(off.agent.agent.enabled).toBe(false);
+      expect(projectPages(off)).toEqual({ [entryKey]: { enabled: false } });
+      expect((await client.agent("pricing")).agent.agent.enabled).toBe(true);
+    });
+
+    it("rejects a target outside the client's scope", async () => {
+      const client = commentsClient(dir);
+      const attempt = client.request("/agent", {
+        method: "PUT",
+        body: JSON.stringify({ target: { scopeUri: client.scope, uri: "gavel://workspace/elsewhere/page/welcome" }, layer, page: true, agent }),
+      });
+
+      await expect(attempt).rejects.toMatchObject({ status: 400 });
+    });
   });
 });

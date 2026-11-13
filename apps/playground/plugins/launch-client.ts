@@ -36,15 +36,7 @@ export class LaunchClient {
     readonly endpoint: GavelEndpoint,
     readonly workspace: string,
   ) {}
-  /** Bumped each time the endpoint starts a new server; its preparations are gone with the old one. */
-  get generation() {
-    return this.endpoint.generation;
-  }
-  private async json<T>(
-    path: string,
-    init?: RequestInit,
-    retried = false,
-  ): Promise<T> {
+  private async json<T>(path: string, init?: RequestInit): Promise<T> {
     let baseURL: string;
     try {
       baseURL = await this.endpoint.url();
@@ -55,11 +47,6 @@ export class LaunchClient {
     try {
       response = await fetch(new URL(path, baseURL), init);
     } catch (cause) {
-      // An on-demand server that has gone away is started again; every
-      // request is a read, a prepare or an idempotency-keyed start, so one
-      // retry is safe.
-      if (!retried && this.endpoint.unreachable())
-        return this.json(path, init, true);
       throw new LaunchHttpError(
         502,
         `Cannot reach Gavel at ${baseURL}: ${describe(cause)}`,

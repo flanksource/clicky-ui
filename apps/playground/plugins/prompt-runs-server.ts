@@ -19,7 +19,7 @@ import { persistPromptResult } from "./prompt-run-results";
 import { prepareRepositoryFolder } from "./repository-folder";
 import { documentProblems, type DocumentLintSnapshot } from "./document-problems";
 import { LaunchClient, LaunchHttpError } from "./launch-client";
-import { fixedGavel, onDemandGavel, type GavelEndpoint } from "./gavel-launch-server";
+import { fixedGavel, type GavelEndpoint } from "./gavel-launch-server";
 import { RepositoryDocuments } from "./repository-documents";
 import { repositoryPromptDirectory } from "./repository-prompt-directory";
 import {
@@ -177,9 +177,7 @@ function requestOrigin(req: IncomingMessage): string {
 
 export function createPromptRuns(options: PromptRunsOptions) {
   const { dir, onCreated } = options;
-  const endpoint = options.endpoint ?? (options.gavelURL
-    ? fixedGavel(options.gavelURL)
-    : onDemandGavel({ workspace: options.workspace }));
+  const endpoint = options.endpoint ?? fixedGavel(options.gavelURL);
   const gavel = new LaunchClient(endpoint, options.workspace);
   const associations = new PromptAssociations(dir);
   const processing = new Set<string>();
@@ -361,8 +359,6 @@ export function createPromptRuns(options: PromptRunsOptions) {
   }
 
   return {
-    /** Stops the launch server the playground started, if any. */
-    close: () => endpoint.close(),
     resume: (logger: ErrorLogger) => {
       for (const entry of associations.all())
         if (entry.state === "running") void follow(entry, logger);
@@ -485,11 +481,9 @@ export function playgroundPromptRuns(runs: PromptRuns): Plugin {
     name: "playground-prompt-runs",
     configureServer(server) {
       registerPromptRunsMiddleware({ middlewares: server.middlewares, logger: server.config.logger, runs });
-      server.httpServer?.once("close", () => void runs.close());
     },
     configurePreviewServer(server) {
       registerPromptRunsMiddleware({ middlewares: server.middlewares, logger: server.config.logger, runs });
-      server.httpServer?.once("close", () => void runs.close());
     },
   };
 }
