@@ -22,12 +22,10 @@ function importConditions(css: string, suffix: string): string {
 async function assetUrl(url: string): Promise<string> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`HTML export asset ${url}: HTTP ${response.status}`);
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error);
-    reader.onload = () => resolve(String(reader.result));
-    void response.blob().then((blob) => reader.readAsDataURL(blob), reject);
-  });
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  return `data:${response.headers.get("content-type") ?? "application/octet-stream"};base64,${btoa(binary)}`;
 }
 
 async function inlineCss(options: { css: string; url: string; parents: string[] }): Promise<string> {
