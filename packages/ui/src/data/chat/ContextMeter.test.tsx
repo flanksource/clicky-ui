@@ -13,11 +13,14 @@ import { providerIcon, providerIconColor } from "./provider-icons";
 
 describe("ContextMeter", () => {
   it.each([
-    ["anthropic/claude-opus-4-8", "opus-4.8"],
-    ["Claude Opus 4.8", "opus-4.8"],
-    ["claude-agent-sonnet-5", "sonnet-5"],
-    ["claude-code-haiku-4-5", "haiku-4.5"],
-    ["gpt-5.5", "gpt-5.5"],
+    ["anthropic/claude-opus-4-8", "Opus 4.8"],
+    ["Claude Opus 4.8", "Opus 4.8"],
+    ["Claude  Opus   4.8   fast  mode", "Opus 4.8 fast-mode"],
+    ["opus 4.8x", "Opus 4.8x"],
+    ["claude-agent-sonnet-5", "Sonnet 5"],
+    ["claude-code-haiku-4-5", "Haiku 4.5"],
+    ["claude-opus-5-5", "Opus 5.5"],
+    ["gpt-5.5", "GPT-5.5"],
     ["acme/model-next", "model-next"],
   ])("shortens the model label %s to %s", (model, expected) => {
     expect(shortContextModelName(model)).toBe(expected);
@@ -107,7 +110,7 @@ describe("ContextMeter", () => {
     );
 
     const trigger = screen.getByLabelText("Context 63% used");
-    expect(trigger).toHaveTextContent("opus-4.8");
+    expect(trigger).toHaveTextContent("Opus 4.8");
     expect(trigger).not.toHaveTextContent("anthropic/claude-opus-4-8");
     expect(trigger).not.toHaveTextContent("ctx");
     expect(trigger.querySelector("[data-context-provider] svg")).toHaveClass(
@@ -132,7 +135,7 @@ describe("ContextMeter", () => {
       "percentage",
     ]);
     expect(screen.getByTitle("anthropic/claude-opus-4-8")).toHaveTextContent(
-      "opus-4.8",
+      "Opus 4.8",
     );
   });
 

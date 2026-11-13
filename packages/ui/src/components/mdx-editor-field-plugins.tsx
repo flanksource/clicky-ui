@@ -82,8 +82,10 @@ function codeBlockEditorDescriptors(
 
 /**
  * The registered JSX blocks: the built-in callout when `callouts` is on, plus
- * whatever the consumer registers. They share one `jsxPlugin` because MDXEditor
- * keeps a single descriptor list — a second call would replace the first.
+ * whatever the consumer registers, plus a `*` catch-all under `mdxSyntax`.
+ * They share one `jsxPlugin` because MDXEditor keeps a single descriptor list —
+ * a second call would replace the first. MDXEditor matches by name before
+ * falling back to `*`, so the catch-all never shadows a registered block.
  */
 function jsxComponentDescriptors(mdx: MdxEditorModule, options: MdxEditorPluginOptions) {
   const descriptors: MdxEditorJsxComponentDescriptor[] = [];
@@ -91,6 +93,15 @@ function jsxComponentDescriptors(mdx: MdxEditorModule, options: MdxEditorPluginO
     descriptors.push(calloutJsxDescriptor(mdx, optionObject(options.callouts) ?? {}));
   }
   if (options.jsxComponents?.length) descriptors.push(...options.jsxComponents);
+  if (options.mdxSyntax) {
+    descriptors.push({
+      name: "*",
+      kind: "flow",
+      props: [],
+      hasChildren: true,
+      Editor: mdx.GenericJsxEditor as MdxEditorJsxComponentDescriptor["Editor"],
+    });
+  }
   return descriptors;
 }
 

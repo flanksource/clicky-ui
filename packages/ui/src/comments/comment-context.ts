@@ -36,7 +36,7 @@ export type CommentContextValue = {
   focusAnchor: (anchor: CommentAnchor) => void;
   openCommentList: () => void;
   closeRail: () => void;
-  registerAnchor: (anchor: CommentAnchor, el: HTMLElement | null) => void;
+  registerAnchor: (anchor: CommentAnchor, el: Element | null) => void;
   getAnchorTop: (anchor: CommentAnchor) => number | null;
   scrollToAnchor: (anchor: CommentAnchor, options?: CommentScrollOptions) => boolean;
   contentRef: RefObject<HTMLDivElement | null>;

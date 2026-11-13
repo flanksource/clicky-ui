@@ -267,6 +267,7 @@ export {
   type MarkdownDocumentStats,
 } from "./data/examples/markdown-preview-mock";
 export { MethodBadge, type MethodBadgeProps } from "./data/MethodBadge";
+export { ImagePreview, type ImagePreviewProps } from "./data/ImagePreview";
 export { ProgressBar, type ProgressBarProps, type ProgressSegment } from "./data/ProgressBar";
 export { SignedDeltaBar, type SignedDeltaBarProps } from "./data/SignedDeltaBar";
 export { MultiGaugeBar, type MultiGaugeBarProps, type GaugeMarker } from './data/MultiGaugeBar';
@@ -615,6 +616,7 @@ export {
   CopyBadge,
   type ErrorDetailsProps,
 } from "./data/diagnostics/ErrorDetails";
+export { ActionError } from "./data/diagnostics/ActionError";
 export {
   normalizeErrorDiagnostics,
   parseDiagnosticsStackTrace,

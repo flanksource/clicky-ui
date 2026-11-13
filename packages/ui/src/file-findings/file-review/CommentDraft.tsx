@@ -1,9 +1,8 @@
-import { useEffect } from "react";
 import { Icon } from "../../data/Icon";
 import { cn } from "../../lib/utils";
-import { CommentComposer } from "../../comments/CommentComposer";
-import type { CommentCallbacks, CommentConfig } from "../../comments/comment-types";
-import { UiClose, UiComment } from "../../icons";
+import { CommentDraftCard } from "../../comments/CommentDraftCard";
+import type { CommentCallbacks, CommentConfig, CommentCreateAction } from "../../comments/comment-types";
+import { UiComment } from "../../icons";
 
 const PILL = { width: 104, height: 28 };
 const CARD_WIDTH = 320;
@@ -34,6 +33,7 @@ export function CommentDraft({
   onCreate,
   onExpand,
   onClose,
+  createActions,
 }: {
   anchor: string;
   label: string;
@@ -44,13 +44,9 @@ export function CommentDraft({
   onCreate: NonNullable<CommentCallbacks["onCreate"]>;
   onExpand: () => void;
   onClose: () => void;
+  /** Post variants beside the default Post; the picked id reaches `onCreate`. */
+  createActions?: readonly CommentCreateAction[] | undefined;
 }) {
-  useEffect(() => {
-    if (!expanded) return;
-    const close = (event: KeyboardEvent) => event.key === "Escape" && onClose();
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [expanded, onClose]);
 
   const pillTop = position.top - PILL.height - 8;
   const up = position.top >= CARD_ROOM;
@@ -73,23 +69,14 @@ export function CommentDraft({
       style={style}
     >
       {expanded ? (
-        <>
-          <div className="flex items-center gap-1 border-b border-border px-2 py-1 text-[11px] text-muted-foreground">
-            <Icon icon={UiComment} className="text-xs" />
-            <span className="min-w-0 flex-1 truncate">{label}</span>
-            <button
-              type="button"
-              aria-label="Discard comment"
-              onClick={onClose}
-              className="rounded p-0.5 hover:bg-muted hover:text-foreground [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11"
-            >
-              <Icon icon={UiClose} className="text-xs" />
-            </button>
-          </div>
-          <div className="p-2">
-            <CommentComposer config={config} anchor={anchor} collapsible={false} autoFocus placeholder="Add a comment…" onCreate={onCreate} />
-          </div>
-        </>
+        <CommentDraftCard
+          label={label}
+          config={config}
+          anchor={anchor}
+          onCreate={onCreate}
+          onDiscard={onClose}
+          {...(createActions ? { createActions } : {})}
+        />
       ) : (
         <button
           type="button"

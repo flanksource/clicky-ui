@@ -35,10 +35,10 @@ describe("@flanksource/clicky-ui/file-findings entry", () => {
         findings={[
           { file: file.file, workDir: file.workDir, line: 3, severity: "warning", message: "Line too long", source: "mdl", kind: "lint" },
         ]}
-        selectedFile={file}
-        onSelectFile={() => undefined}
+        selected={{ kind: "file", ref: file }}
+        onSelect={() => undefined}
         onLineChange={() => undefined}
-        view="rendered"
+        view="preview"
         onViewChange={() => undefined}
         problemFilters={{ severity: new Map(), type: new Map() }}
         onProblemFiltersChange={() => undefined}

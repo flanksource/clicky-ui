@@ -1,4 +1,4 @@
-import type { FilterState } from "../../data/test-runner/filterState";
+import { matchesFilterState, type FilterState } from "../../data/test-runner/filterState";
 import type { FileFinding, LintSeverity } from "../types";
 
 /** Controlled include/exclude/neutral filters, persisted by the host. */
@@ -11,4 +11,8 @@ export function emptyProblemFilters(): ProblemFilters {
 }
 export function problemType(finding: FileFinding): string {
   return finding.rule || finding.source;
+}
+/** Whether a finding passes the Problems severity and issue-type filters. */
+export function matchesProblemFilters(finding: FileFinding, filters: ProblemFilters): boolean {
+  return matchesFilterState(finding.severity, filters.severity) && matchesFilterState(problemType(finding), filters.type);
 }

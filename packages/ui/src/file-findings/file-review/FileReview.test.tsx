@@ -82,29 +82,30 @@ describe("FileReview", () => {
     expect(onViewChange).toHaveBeenCalledWith("preview");
   });
 
-  it("filters Problems by severity and issue type, each pill cycling include, exclude, clear", () => {
+  it("filters Problems by severity and issue type from filter bar dropdowns that include, exclude and clear", () => {
     const findings: FileFinding[] = [...FINDINGS, { ...FINDINGS[0]!, line: 1, rule: "MD041", message: "First line should be a heading" }];
     renderReview({ findings, view: "problems" });
-    const pill = (name: RegExp) => within(screen.getByRole("menu", { name: "Problem view options" })).getByText(name);
+    const pick = (facet: string, value: string, region: "include" | "exclude" | "neutral") => {
+      fireEvent.focus(screen.getByRole("combobox", { name: facet }));
+      fireEvent.click(document.querySelector(`[data-filter-option="${value}"] [data-tristate-region="${region}"]`)!);
+    };
     const all = problemLines();
-    fireEvent.click(screen.getByRole("button", { name: /^View Options/ }));
+    const optionsMenu = screen.queryByRole("button", { name: /^View Options/ });
 
-    fireEvent.click(pill(/^Warnings/));
+    pick("Severity", "warning", "include");
     const onlyWarnings = problemLines();
-    fireEvent.click(pill(/^Warnings/));
+    pick("Severity", "warning", "exclude");
     const noWarnings = problemLines();
-    fireEvent.click(pill(/^Warnings/));
-    fireEvent.click(pill(/^MD013/));
-    fireEvent.click(pill(/^MD013/));
+    pick("Severity", "warning", "neutral");
+    pick("Issue Type", "MD013", "exclude");
     const noMD013 = problemLines();
-    fireEvent.click(pill(/^vale\.Units/));
-    fireEvent.click(pill(/^vale\.Units/));
-    fireEvent.click(pill(/^MD041/));
-    fireEvent.click(pill(/^MD041/));
+    pick("Issue Type", "vale.Units", "exclude");
+    pick("Issue Type", "MD041", "exclude");
     const noneLeft = { lines: problemLines(), empty: screen.queryByText("No problems match the current filters.") !== null };
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
 
-    expect({ all, onlyWarnings, noWarnings, noMD013, noneLeft, cleared: problemLines() }).toEqual({
+    expect({ optionsMenu, all, onlyWarnings, noWarnings, noMD013, noneLeft, cleared: problemLines() }).toEqual({
+      optionsMenu: null,
       all: ["5", "1", "3"],
       onlyWarnings: ["1", "3"],
       noWarnings: ["5"],
@@ -175,6 +176,68 @@ describe("FileReview on a code file", () => {
     expect(onViewChange).toHaveBeenCalledWith("source");
   });
 
+  it("appends host tabs after the built-ins and renders the picked one with the file's path, source and findings", () => {
+    const renderTab = vi.fn(({ path, findings }: { path: string; findings: readonly FileFinding[] }) => (
+      <p>
+        Coverage of {path}: {findings.length} finding
+      </p>
+    ));
+    const { onViewChange } = renderCode({ findings: [GO_FINDING], view: "coverage", tabs: [{ id: "coverage", label: "Coverage", render: renderTab }] });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Source" }));
+
+    expect({
+      tabs: tabNames(),
+      body: screen.getByText(/Coverage of/).textContent,
+      ctx: renderTab.mock.calls[0]![0],
+      switched: onViewChange.mock.calls,
+    }).toEqual({
+      tabs: ["Source", "Problems", "Coverage"],
+      body: `Coverage of ${GO_PATH}: 1 finding`,
+      ctx: { path: GO_PATH, source: GO, findings: [GO_FINDING] },
+      switched: [["source"]],
+    });
+  });
+
+  it("rejects a view that is neither built in nor a host tab, and a host tab named like a built-in", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const tab = (id: string) => ({ id, label: id, render: () => null });
+    expect(() => renderCode({ view: "coverage", tabs: [tab("blame")] })).toThrow(/view "coverage" is neither a built-in tab nor one of `tabs` \(blame\)/);
+    expect(() => renderCode({ tabs: [tab("source")] })).toThrow(/host tab id "source" collides with a built-in tab/);
+  });
+
+  it("assigns a problem by posting it as a thread on its text, handed to the picked assignee", async () => {
+    const onCreate = vi.fn(async () => {});
+    const getFindingActions = vi.fn(() => [{ label: "Ignore rule", onSelect: vi.fn() }]);
+    renderCode({
+      findings: [GO_FINDING],
+      view: "problems",
+      getFindingActions,
+      comments: {
+        items: [],
+        callbacks: { onCreate },
+        config: { statuses: [{ value: "open", label: "Open", stage: "active", unresolved: true }], assignees: [{ id: "claude", name: "Claude", kind: "agent" }] },
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Problem actions" }));
+    const menu = screen.getAllByRole("menuitem").map((item) => item.textContent);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Assign…" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Claude" }));
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalled());
+    expect({ menu, created: onCreate.mock.calls[0] }).toEqual({
+      menu: ["Open in source", "Copy description", "Assign…", "Ignore rule"],
+      created: [
+        {
+          body: "Wrap the error\n\n`errcheck`",
+          anchor: sourceAnchor({ line: 4, prefix: "c Retry(n int) error {\n\t", quote: "return call(n)", suffix: "\n}" }),
+          assignee: { id: "claude", name: "Claude", kind: "agent" },
+        },
+      ],
+    });
+  });
+
   it("hides findings under the lines behind the Findings toggle and lists a line's when its mark is picked", () => {
     const { container } = renderCode({ findings: [GO_FINDING] });
     const listed = () => container.querySelectorAll(`[data-source-finding="${GO_FINDING.line}"]`).length;
@@ -212,5 +275,35 @@ describe("FileReview on a code file", () => {
     fireEvent.click(screen.getByRole("button", { name: "Blame" }));
     const shas = [...container.querySelectorAll<HTMLElement>("[data-blame-sha]")].map((cell) => [cell.closest("li")?.dataset.sourceLine, cell.textContent?.slice(0, 7)]);
     expect({ editor: screen.queryByTestId("editor"), shas }).toEqual({ editor: null, shas: [["1", "a1b2c3d"], ["3", "f6e5d4c"]] });
+  });
+});
+
+describe("FileReview on an image file", () => {
+  const PNG_PATH = "docs/img/a.png";
+  const SVG_PATH = "docs/logo.svg";
+  const IMAGE_URL = "/api/file?path=docs%2Fimg%2Fa.png";
+  const SVG = '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
+
+  it("previews the image from imageUrl and offers no Source tab when there is no source", () => {
+    renderReview({ path: PNG_PATH, source: undefined, imageUrl: IMAGE_URL, view: "preview" });
+    expect({ tabs: tabNames(), src: screen.getByRole("img").getAttribute("src") }).toEqual({ tabs: ["Preview"], src: IMAGE_URL });
+  });
+
+  it("rejects the source view when there is no source", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => renderReview({ path: PNG_PATH, source: undefined, imageUrl: IMAGE_URL, view: "source" })).toThrow(/view "source" needs `source`/);
+  });
+
+  it("rejects a missing source without an imageUrl", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => renderReview({ path: "pkg/a.go", source: undefined, view: "source" })).toThrow(/needs `source` unless `imageUrl` is set/);
+  });
+
+  it("offers Preview and Source for an svg with both imageUrl and source", () => {
+    renderReview({ path: SVG_PATH, source: SVG, imageUrl: "/api/file?path=docs%2Flogo.svg", view: "preview" });
+    expect({ tabs: tabNames(), src: screen.getByRole("img").getAttribute("src") }).toEqual({
+      tabs: ["Preview", "Source"],
+      src: "/api/file?path=docs%2Flogo.svg",
+    });
   });
 });

@@ -1,10 +1,13 @@
-import { useRef, useState } from "react";
+import { ActionError } from "../data/diagnostics/ActionError";
+import { useEffect, useRef, useState } from "react";
+import { useCommentState } from "./comment-persistence";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { DropdownMenu } from "../overlay/DropdownMenu";
-import { UiArrowUp, UiClose, UiThumbsDown, UiThumbsUp } from "../icons";
+import { SplitButton } from "../components/SplitButton";
+import { UiPaperPlaneRightFilled, UiClose, UiThumbsDown, UiThumbsUp } from "../icons";
 import type { BadgeTone } from "../data/Badge";
-import { MentionTextarea } from "./MentionTextarea";
+import { CommentEditor } from "./CommentEditor";
 import { toneToBadgeTone } from "./comment-utils";
 import type {
   CommentAnchor,
@@ -39,6 +42,7 @@ export type CommentComposerProps = {
   createActions?: readonly CommentCreateAction[];
   /** Fired once per mention referenced by a posted comment. */
   onMention?: (mention: CommentMention, context: { body: string }) => void;
+  onCancel?: () => void;
 };
 
 function FacetPicker({
@@ -126,21 +130,27 @@ export function CommentComposer({
   onCreate,
   createActions,
   onMention,
+  onCancel,
 }: CommentComposerProps) {
-  const [open, setOpen] = useState(!collapsible || autoFocus);
-  const [body, setBody] = useState("");
-  const [facets, setFacets] = useState<Record<string, string>>({});
-  const [rating, setRating] = useState<CommentRating | undefined>();
+  const draftKey = `draft:create:${anchor ?? "general"}`;
+  const [open, setOpen] = useCommentState(`${draftKey}:open`, !collapsible || autoFocus);
+  const [body, setBody] = useCommentState(`${draftKey}:body`, "");
+  const [facets, setFacets] = useCommentState<Record<string, string>>(`${draftKey}:facets`, {});
+  const [rating, setRating] = useCommentState<CommentRating | undefined>(`${draftKey}:rating`, undefined);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<unknown>(null);
   const submittingRef = useRef(false);
-  const mentionsRef = useRef<Map<string, CommentMention>>(new Map());
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const [savedMentions, setSavedMentions] = useCommentState<CommentMention[]>(`${draftKey}:mentions`, []);
+  const mentionsRef = useRef<Map<string, CommentMention>>(new Map(savedMentions.map((mention) => [mention.id, mention])));
 
   function reset() {
     setBody("");
     setFacets({});
     setRating(undefined);
     mentionsRef.current.clear();
+    setSavedMentions([]);
   }
 
   function setFacet(key: string, value: string | undefined) {
@@ -158,9 +168,12 @@ export function CommentComposer({
     if ((!text && !rating) || submittingRef.current) return;
     submittingRef.current = true;
     setSubmitting(true);
+    setError(null);
     const mentions = [...mentionsRef.current.values()].filter((m) =>
       body.toLowerCase().includes(`@${m.name.toLowerCase()}`),
     );
+    const snapshot = { body, facets, rating, mentions: [...mentionsRef.current.values()] };
+    reset();
     try {
       const input: CommentCreateInput = {
         body: text,
@@ -172,15 +185,23 @@ export function CommentComposer({
       if (actionId === undefined) await onCreate?.(input);
       else await onCreate?.(input, actionId);
       for (const mention of mentions) onMention?.(mention, { body: text });
-      reset();
       if (collapsible) setOpen(false);
+    } catch (cause) {
+      if (!mounted.current) return;
+      setBody(snapshot.body);
+      setFacets(snapshot.facets);
+      setRating(snapshot.rating);
+      mentionsRef.current = new Map(snapshot.mentions.map(mention => [mention.id, mention]));
+      setSavedMentions(snapshot.mentions);
+      setOpen(true);
+      setError(cause);
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
     }
   }
 
-  if (!open && body.trim().length === 0) {
+  if (collapsible && !open && body.trim().length === 0) {
     return (
       <button
         type="button"
@@ -198,16 +219,19 @@ export function CommentComposer({
       aria-busy={submitting}
       className="relative rounded-2xl border border-border bg-muted/25 px-3 pt-3 pb-10 shadow-sm transition-[border-color,box-shadow] focus-within:border-primary/40 focus-within:shadow-md [@media(pointer:coarse)]:pb-2"
     >
-      <MentionTextarea
-        ref={inputRef}
+      <CommentEditor
+        disabled={submitting}
+        {...(config.vocabulary ? { vocabulary: config.vocabulary } : {})}
         value={body}
         onChange={setBody}
         mentionables={config.mentionables ?? []}
-        onMentionSelect={(m) => mentionsRef.current.set(m.id, m)}
-        onSubmit={() => void submit()}
+        onMentionSelect={(m) => { mentionsRef.current.set(m.id, m); setSavedMentions([...mentionsRef.current.values()]); }}
+        onSubmit={() => void submit(createActions?.[0]?.id)}
         onCancel={() => {
+          if (submittingRef.current) return;
           reset();
           if (collapsible) setOpen(false);
+          onCancel?.();
         }}
         placeholder={placeholder}
         // An always-open composer is page chrome: focusing it on mount would
@@ -216,6 +240,7 @@ export function CommentComposer({
         data-testid="comment-compose-input"
         className="min-h-[48px] pr-10 [@media(pointer:coarse)]:pr-12"
       />
+      {error !== null && <ActionError error={error} context={[["Operation", "Post comment"], ["Anchor", anchor ?? "Whole page"]]} />}
       {collapsible && (
         <button
           type="button"
@@ -265,32 +290,20 @@ export function CommentComposer({
             onChange={(value) => setFacet(facet.key, value)}
           />
         ))}
-        {createActions?.length ? (
-          <div className="ml-auto flex gap-1 [@media(pointer:coarse)]:flex-wrap [@media(pointer:coarse)]:justify-end [@media(pointer:coarse)]:gap-2">
-            {createActions.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                onClick={() => void submit(action.id)}
-                disabled={submitting || (!body.trim() && !rating)}
-                className="whitespace-nowrap rounded-md bg-primary px-1.5 py-1 text-[10px] font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:px-3 [@media(pointer:coarse)]:text-sm"
-              >
-                {action.label}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <button
-            type="button"
-            data-testid="comment-compose-send"
-            aria-label="Post comment"
-            onClick={() => void submit()}
-            disabled={submitting || (!body.trim() && !rating)}
-            className="ml-auto inline-flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground [@media(pointer:coarse)]:size-11"
-          >
-            <Icon icon={UiArrowUp} className="text-xs" />
-          </button>
-        )}
+        <SplitButton
+          className="ml-auto [@media(pointer:coarse)]:min-h-11"
+          size="sm"
+          label={<span className="sr-only">{createActions?.[0]?.label ?? "Post comment"}</span>}
+          icon={UiPaperPlaneRightFilled}
+          loading={submitting}
+          title="Send options"
+          disabled={submitting || (!body.trim() && !rating)}
+          onClick={() => void submit(createActions?.[0]?.id)}
+          items={(createActions?.slice(1) ?? []).map(action => ({
+            label: action.label,
+            onSelect: () => { void submit(action.id); },
+          }))}
+        />
       </div>
     </div>
   );

@@ -173,6 +173,13 @@ export interface MdxEditorPluginOptions {
    * consuming application. Combined with `callouts` into one `jsxPlugin`.
    */
   jsxComponents?: readonly MdxEditorJsxComponentDescriptor[];
+  /**
+   * Parse the value as MDX: a JSX block with no registered descriptor loads in
+   * the generic JSX editor, keeping its attributes and children, instead of
+   * failing the import. Off by default, since MDX rejects HTML comments and
+   * stray tags that plain markdown allows.
+   */
+  mdxSyntax?: boolean;
   images?: boolean | MdxEditorImageOptions;
   markdownShortcuts?: boolean;
   diffMode?: boolean | MdxEditorViewMode | MdxEditorDiffModeOptions;

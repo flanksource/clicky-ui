@@ -58,3 +58,20 @@ describe("MdxEditorField parsing errors", () => {
     expect(source).toBeDisabled();
   });
 });
+
+describe("MdxEditorField mdxSyntax", () => {
+  const unregisteredJsx = "<SlideSplit wide>\n<div>\n\n| Area | Control |\n| --- | --- |\n| Encryption | TLS 1.2+ |\n\n</div>\n</SlideSplit>\n";
+
+  it("loads JSX blocks that have no registered descriptor", async () => {
+    render(<MdxEditorField mdxSyntax value={unregisteredJsx} />);
+
+    expect(await screen.findByText("TLS 1.2+", {}, { timeout: 10_000 })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  }, 15_000);
+
+  it("still rejects JSX blocks in plain markdown", async () => {
+    render(<MdxEditorField value={unregisteredJsx} />);
+
+    expect(await screen.findByRole("alert", {}, { timeout: 10_000 })).toHaveTextContent(/mdxJsxFlowElement/);
+  }, 15_000);
+});

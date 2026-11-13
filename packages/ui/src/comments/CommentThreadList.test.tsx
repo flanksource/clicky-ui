@@ -1,3 +1,4 @@
+import { setCommentDraft } from "../test/comment-editor";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import * as clipboard from "../components/clipboard";
@@ -9,6 +10,10 @@ import {
 } from "./comment-types";
 
 const config: CommentConfig = { statuses: DEFAULT_COMMENT_STATUSES };
+
+// jsdom has no layout for selection ranges used by the focused Lexical editor.
+Object.defineProperty(Range.prototype, "getBoundingClientRect", { configurable: true, value: () => new DOMRect() });
+Object.defineProperty(Range.prototype, "getClientRects", { configurable: true, value: () => [] });
 
 const comments: Comment[] = [
   {
@@ -95,13 +100,14 @@ describe("CommentThreadList", () => {
     expect(copy).toHaveBeenCalledWith("# Whole thread\n\nroot and reply");
   });
 
-  it("previews the exact copied Markdown in a tab of the maximized thread", async () => {
-    const markdown = "# Whole thread\n\nroot and reply";
+  it("renders a consumer detail tab over the maximized thread and adds no built-in Markdown tab", () => {
+    const threadToMarkdown = (thread: readonly Comment[]) => thread.map((comment) => comment.body).join(" / ");
     render(
       <CommentThreadList
         comments={comments}
         config={config}
-        threadToMarkdown={() => markdown}
+        threadToMarkdown={threadToMarkdown}
+        detailTabs={[{ id: "preview", label: "Preview", render: (thread) => <pre>{threadToMarkdown(thread)}</pre> }]}
       />,
     );
 
@@ -109,10 +115,10 @@ describe("CommentThreadList", () => {
       screen.getAllByRole("button", { name: "Comment actions" })[0]!,
     );
     fireEvent.click(screen.getByText("Maximise"));
-    fireEvent.click(screen.getByRole("tab", { name: "Markdown" }));
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Thread", "Preview"]);
+    fireEvent.click(screen.getByRole("tab", { name: "Preview" }));
 
-    expect(await screen.findByText("Whole thread")).toBeInTheDocument();
-    expect(screen.getByText("root and reply")).toBeInTheDocument();
+    expect(screen.getByText("root comment / a reply")).toBeInTheDocument();
   });
 
   it.each([
@@ -142,8 +148,8 @@ describe("CommentThreadList", () => {
       expect(replyButtons).toHaveLength(2);
       fireEvent.click(replyButtons[index]);
 
-      const input = screen.getByPlaceholderText("Write a reply…");
-      fireEvent.change(input, { target: { value: "answering inline" } });
+      const input = screen.getByRole("textbox", { name: "Write a reply…" });
+      setCommentDraft(input, "answering inline");
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: "Send" }));
       });
@@ -176,7 +182,7 @@ describe("CommentThreadList", () => {
     fireEvent.click(screen.getAllByTestId("comment-card")[0]!);
     fireEvent.click(screen.getByRole("button", { name: "Reply" }));
     const input = screen.getByTestId("comment-reply-input");
-    fireEvent.change(input, { target: { value: "thanks" } });
+    setCommentDraft(input, "thanks");
     await act(async () => {
       fireEvent.keyDown(input, { key: "Enter" });
     });
@@ -199,9 +205,7 @@ describe("CommentThreadList", () => {
 
     fireEvent.click(screen.getAllByTestId("comment-card")[0]!);
     fireEvent.click(screen.getByRole("button", { name: "Reply" }));
-    fireEvent.change(screen.getByTestId("comment-reply-input"), {
-      target: { value: "Posted once" },
-    });
+    setCommentDraft(screen.getByTestId("comment-reply-input"), "Posted once");
     const send = screen.getByRole("button", { name: "Send" });
     fireEvent.click(send);
     fireEvent.click(send);

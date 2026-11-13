@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { setCommentDraft } from "../test/comment-editor";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { CommentProvider, type CommentProviderProps } from "./CommentProvider";
@@ -78,6 +79,17 @@ function TestSurface({
 }
 
 describe("CommentSidePanel anchor navigation", () => {
+  it("realigns a focused comment when a nested document scrolls", () => {
+    render(<CommentProvider comments={comments} config={config} resolveAnchor={strictAnchorResolver}><TestSurface scrollTo={vi.fn()} /></CommentProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Open comments" }));
+    fireEvent.click(screen.getByTestId("comment-card"));
+    const focused = screen.getByTestId("comment-focused-rail");
+    focused.getBoundingClientRect = () => ({ top: Number.parseFloat(focused.style.top) || 0 }) as DOMRect;
+    const nested = screen.getByTestId("comment-content").firstElementChild as HTMLElement;
+    nested.getBoundingClientRect = () => ({ top: 150, height: 30 }) as DOMRect;
+    fireEvent.scroll(nested);
+    expect(focused).toHaveStyle({ top: "150px" });
+  });
   it("keeps the comment list open while expanding capture context", () => {
     const scrollTo = vi.fn();
     render(
@@ -251,9 +263,7 @@ describe("CommentSidePanel anchor navigation", () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Reply" }));
-    fireEvent.change(screen.getByPlaceholderText("Write a reply…"), {
-      target: { value: "Compare the render cost." },
-    });
+    setCommentDraft(screen.getByRole("textbox", { name: "Write a reply…" }), "Compare the render cost.");
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() => {

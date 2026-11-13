@@ -42,11 +42,19 @@ export type FileTreeNode = {
   name: string;
   kind: "folder" | "file";
   children?: FileTreeNode[] | undefined;
-  /** Set on `file` nodes. */
-  ref?: FileRef | undefined;
+  /** The file, or the folder's path under its work dir (`""` for a work dir's root). */
+  ref: FileRef;
   /** Findings in this file, or beneath this folder. */
   findings: FileFinding[];
 };
+
+/** The tree node open in the viewer: a file, or a folder shown as the findings beneath it. */
+export type FileTreeSelection = { kind: FileTreeNode["kind"]; ref: FileRef };
+
+export function sameSelection(a: FileTreeSelection | null, b: FileTreeSelection | null): boolean {
+  if (!a || !b) return a === b;
+  return a.kind === b.kind && sameFileRef(a.ref, b.ref);
+}
 
 export function fileRefKey(ref: FileRef): string {
   return `${ref.workDir ?? ""}\u0000${ref.file}`;

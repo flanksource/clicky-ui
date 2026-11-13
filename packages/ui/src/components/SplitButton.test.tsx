@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { SplitButton } from "./SplitButton";
+import { UiCheck } from "../icons";
 
 function renderSplitButton(overrides: Partial<Parameters<typeof SplitButton>[0]> = {}) {
   const onClick = vi.fn();
@@ -48,6 +49,13 @@ describe("SplitButton", () => {
   it("disables the primary half while loading", () => {
     renderSplitButton({ loading: true });
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  it.each([true, false])("replaces the action icon with its loader with menu=%s", withMenu => {
+    renderSplitButton({ icon: UiCheck, loading: true, ...(withMenu ? {} : { items: [] }) });
+    const primary = screen.getByRole("button", { name: "Save" });
+    expect(primary).toHaveAttribute("aria-busy", "true");
+    expect(primary.querySelectorAll("svg")).toHaveLength(1);
   });
 
   it("disables both halves when disabled", () => {

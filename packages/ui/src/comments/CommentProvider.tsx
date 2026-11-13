@@ -7,6 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { CommentPersistenceBoundary } from "./CommentPersistenceBoundary";
+import { useCommentState } from "./comment-persistence";
 import { deriveAnchorCounts, deriveAnchorMeta } from "./comment-utils";
 import {
   CommentContext,
@@ -48,6 +50,8 @@ export type CommentProviderProps = CommentCallbacks & {
    * visible, so the reader is not asked to open it a second time.
    */
   initialRailMode?: CommentRailMode;
+  /** Recover comment UI and drafts in this tab under a document-specific key. */
+  persistenceKey?: string;
 };
 
 /**
@@ -56,7 +60,11 @@ export type CommentProviderProps = CommentCallbacks & {
  * `registerAnchor` so the side panel can scroll-align to them). Owns no
  * fetching — `comments` and the callbacks are controlled by the consumer.
  */
-export function CommentProvider({
+export function CommentProvider(props: CommentProviderProps) {
+  return <CommentPersistenceBoundary {...(props.persistenceKey ? { scope: props.persistenceKey } : {})}><CommentProviderInner {...props} /></CommentPersistenceBoundary>;
+}
+
+function CommentProviderInner({
   children,
   comments,
   config,
@@ -75,21 +83,25 @@ export function CommentProvider({
   onChecklistToggle,
   onMention,
   initialRailMode = "closed",
+  persistenceKey,
 }: CommentProviderProps) {
-  const [railMode, setRailMode] = useState<CommentRailMode>(initialRailMode);
-  const [focusedAnchor, setFocusedAnchor] = useState<CommentAnchor | null>(
-    null
-  );
-  const [highlightAnchor, setHighlightAnchor] = useState<CommentAnchor | null>(
-    null
-  );
-  const railModeRef = useRef<CommentRailMode>(initialRailMode);
+  const [railMode, setRailMode] = useCommentState<CommentRailMode>("rail", initialRailMode);
+  const [focusedAnchor, setFocusedAnchor] = useCommentState<CommentAnchor | null>("focused-anchor", null);
+  const [highlightAnchor, setHighlightAnchor] = useState<CommentAnchor | null>(null);
+  // A new persistence scope keeps the subtree mounted: scoped state comes from the new store, the transient highlight resets.
+  const [highlightScope, setHighlightScope] = useState(persistenceKey);
+  if (highlightScope !== persistenceKey) {
+    setHighlightScope(persistenceKey);
+    setHighlightAnchor(null);
+  }
+  // The stable actions below must write to the current scope's store, not the one they were created with.
+  const scopedSetters = useRef({ setRailMode, setFocusedAnchor });
+  const railModeRef = useRef<CommentRailMode>(railMode);
   const onRailModeChangeRef = useRef(onRailModeChange);
   const onScrollToAnchorRef = useRef(onScrollToAnchor);
   const externalAnchorTopRef = useRef(externalAnchorTop);
-  externalAnchorTopRef.current = externalAnchorTop;
   const resolveAnchorRef = useRef(resolveAnchor);
-  const anchorEls = useRef<Record<string, HTMLElement>>({});
+  const anchorEls = useRef<Record<string, Element>>({});
   const contentRef = useRef<HTMLDivElement | null>(null);
 
   const commentCounts = useMemo(() => deriveAnchorCounts(comments), [comments]);
@@ -97,33 +109,36 @@ export function CommentProvider({
   const [anchorStore] = useState(createCommentAnchorStore);
 
   useLayoutEffect(() => {
+    scopedSetters.current = { setRailMode, setFocusedAnchor };
+    railModeRef.current = railMode;
     onRailModeChangeRef.current = onRailModeChange;
     onScrollToAnchorRef.current = onScrollToAnchor;
+    externalAnchorTopRef.current = externalAnchorTop;
     resolveAnchorRef.current = resolveAnchor;
-  }, [onRailModeChange, onScrollToAnchor, externalAnchorTop, resolveAnchor]);
+  }, [setRailMode, setFocusedAnchor, railMode, onRailModeChange, onScrollToAnchor, externalAnchorTop, resolveAnchor]);
 
   const focusAnchor = useCallback((anchor: CommentAnchor) => {
-    setFocusedAnchor(anchor);
+    scopedSetters.current.setFocusedAnchor(anchor);
     railModeRef.current = "focused";
-    setRailMode("focused");
+    scopedSetters.current.setRailMode("focused");
     onRailModeChangeRef.current?.("focused");
   }, []);
 
   const openCommentList = useCallback(() => {
     const next = railModeRef.current === "all" ? "closed" : "all";
     railModeRef.current = next;
-    setRailMode(next);
+    scopedSetters.current.setRailMode(next);
     onRailModeChangeRef.current?.(next);
   }, []);
 
   const closeRail = useCallback(() => {
     railModeRef.current = "closed";
-    setRailMode("closed");
+    scopedSetters.current.setRailMode("closed");
     onRailModeChangeRef.current?.("closed");
   }, []);
 
   const registerAnchor = useCallback(
-    (anchor: CommentAnchor, el: HTMLElement | null) => {
+    (anchor: CommentAnchor, el: Element | null) => {
       if (!el) {
         delete anchorEls.current[anchor];
         return;
