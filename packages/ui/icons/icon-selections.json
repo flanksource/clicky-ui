@@ -1577,6 +1577,14 @@
       "note": ""
     },
     {
+      "consumerName": "skip-circle",
+      "group": "runtime-process",
+      "status": "NEW",
+      "outline": "octicon:skip-16",
+      "filled": "octicon:skip-fill-16",
+      "note": "GitHub-style skipped execution: a circle with a diagonal slash."
+    },
+    {
       "consumerName": "history",
       "group": "runtime-process",
       "status": "NEW",
@@ -3017,6 +3025,14 @@
       "note": "Bank account, bank feed, mapping rule"
     },
     {
+      "consumerName": "vault",
+      "group": "data-analytics",
+      "status": "NEW",
+      "outline": "ph:vault-light",
+      "filled": "ph:vault-fill",
+      "note": "Held funds: suspense, escrow, money awaiting allocation"
+    },
+    {
       "consumerName": "ledger",
       "group": "data-analytics",
       "status": "NEW",
@@ -3151,6 +3167,350 @@
       "outline": "ph:steps-light",
       "filled": "ph:steps-fill",
       "note": "An ordered stage within a pipeline that must run in sequence."
+    },
+    {
+      "consumerName": "batch-job",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "iconmind:batch-job-outline-thin",
+      "filled": "skip",
+      "note": "A batch job: a scheduled run that sweeps a queue of pending work."
+    },
+    {
+      "consumerName": "classic-batch",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "carbon:classic-batch",
+      "filled": "skip",
+      "note": "A classic batch run over stacked records."
+    },
+    {
+      "consumerName": "task-batch",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "iconoven:task-batch",
+      "filled": "skip",
+      "note": "A batch of tasks processed together."
+    },
+    {
+      "consumerName": "batch-check",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "lsicon:batch-check-outline",
+      "filled": "lsicon:batch-check-filled",
+      "note": "A batch of items processed and checked off together."
+    },
+    {
+      "consumerName": "merge-queue",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "iconmind:merge-queue-outline-thin",
+      "filled": "skip",
+      "note": "Pending items converging into one processing queue."
+    },
+    {
+      "consumerName": "list-numbers",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "ph:list-numbers-light",
+      "filled": "ph:list-numbers-fill",
+      "note": "An ordered, numbered sequence of steps (1, 2, 3)."
+    },
+    {
+      "consumerName": "pipeline-stage",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "iconmind:pipeline-stage-outline-thin",
+      "filled": "skip",
+      "note": "One stage in a sequential pipeline flow."
+    },
+    {
+      "consumerName": "form-step",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "iconmind:form-step-outline-thin",
+      "filled": "skip",
+      "note": "A numbered step in a multi-step flow."
+    },
+    {
+      "consumerName": "batch-request",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "iconmind:batch-request-outline-thin",
+      "filled": "skip",
+      "note": "Many requests grouped and processed as one batch."
+    },
+    {
+      "consumerName": "api",
+      "group": "actions-tools",
+      "status": "NEW",
+      "outline": "iconmind:api-outline-thin",
+      "filled": "skip",
+      "note": "An API endpoint."
+    },
+    {
+      "consumerName": "api-request",
+      "group": "actions-tools",
+      "status": "NEW",
+      "outline": "iconmind:request-outline-thin",
+      "filled": "skip",
+      "note": "An incoming API request received by an endpoint."
+    },
+    {
+      "consumerName": "api-bridge",
+      "group": "actions-tools",
+      "status": "NEW",
+      "outline": "iconmind:api-bridge-outline-thin",
+      "filled": "skip",
+      "note": "A service endpoint bridging external callers into a system."
+    },
+    {
+      "consumerName": "webhook",
+      "group": "actions-tools",
+      "status": "NEW",
+      "outline": "material-symbols-light:webhook",
+      "filled": "skip",
+      "note": "An inbound webhook / callback endpoint."
+    },
+    {
+      "consumerName": "arrow-square-in",
+      "group": "actions-tools",
+      "status": "NEW",
+      "outline": "ph:arrow-square-in-light",
+      "filled": "ph:arrow-square-in-fill",
+      "note": "Something arriving from outside: an inbound request or import."
+    },
+    {
+      "consumerName": "api-gateway",
+      "group": "actions-tools",
+      "status": "NEW",
+      "outline": "hugeicons:api-gateway",
+      "filled": "skip",
+      "note": "An API gateway: the entry point inbound requests are routed through."
+    },
+    {
+      "consumerName": "gateway-api",
+      "group": "actions-tools",
+      "status": "NEW",
+      "outline": "carbon:gateway-api",
+      "filled": "skip",
+      "note": "A gateway exposing an API to outside callers."
+    },
+    {
+      "consumerName": "web-service-definition",
+      "group": "actions-tools",
+      "status": "NEW",
+      "outline": "carbon:web-services-definition",
+      "filled": "skip",
+      "note": "The definition of a web service: the configured contract behind an endpoint."
+    },
+    {
+      "consumerName": "webhook-line",
+      "group": "actions-tools",
+      "status": "NEW",
+      "outline": "mingcute:webhook-line",
+      "filled": "mingcute:webhook-fill",
+      "note": "A webhook endpoint that receives calls from outside."
+    },
+    {
+      "consumerName": "import-arrow",
+      "group": "actions-tools",
+      "status": "NEW",
+      "outline": "icons8:import",
+      "filled": "skip",
+      "note": "Icons8: data arriving into the system."
+    },
+    {
+      "consumerName": "services",
+      "group": "actions-tools",
+      "status": "NEW",
+      "outline": "icons8:services",
+      "filled": "skip",
+      "note": "Icons8: a configured service."
+    },
+    {
+      "consumerName": "code-file",
+      "group": "actions-tools",
+      "status": "NEW",
+      "outline": "icons8:code-file",
+      "filled": "skip",
+      "note": "Icons8: a file of configuration or code."
+    },
+    {
+      "consumerName": "condition",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "iconmind:condition-outline-thin",
+      "filled": "skip",
+      "note": "A conditional branch: if this, then that."
+    },
+    {
+      "consumerName": "branch-flow",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "iconmind:branch-flow-outline-thin",
+      "filled": "skip",
+      "note": "A flow that splits into conditional branches."
+    },
+    {
+      "consumerName": "conditions",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "material-symbols-light:conditions",
+      "filled": "skip",
+      "note": "A set of conditions evaluated in order."
+    },
+    {
+      "consumerName": "flow-arrow",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "ph:flow-arrow-light",
+      "filled": "ph:flow-arrow-fill",
+      "note": "A flow between nodes."
+    },
+    {
+      "consumerName": "arrow-decision",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "mdi:arrow-decision-outline",
+      "filled": "mdi:arrow-decision",
+      "note": "A decision point where a flow takes one of several paths."
+    },
+    {
+      "consumerName": "bpmn-conditional",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "carbon:bpmn-conditional-outline",
+      "filled": "skip",
+      "note": "A BPMN conditional flow."
+    },
+    {
+      "consumerName": "dynamic-form",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "material-symbols-light:dynamic-form-outline",
+      "filled": "material-symbols-light:dynamic-form",
+      "note": "A form whose fields are defined by configuration."
+    },
+    {
+      "consumerName": "input-field",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "iconoir:input-field",
+      "filled": "skip",
+      "note": "A single input field on a screen."
+    },
+    {
+      "consumerName": "report-forms",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "mingcute:report-forms-line",
+      "filled": "mingcute:report-forms-fill",
+      "note": "A form document with labelled rows of fields."
+    },
+    {
+      "consumerName": "form-fields",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "hugeicons:form",
+      "filled": "skip",
+      "note": "A form: stacked labelled input fields."
+    },
+    {
+      "consumerName": "layout-template",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "hugeicons:layout-template",
+      "filled": "skip",
+      "note": "A page layout template."
+    },
+    {
+      "consumerName": "screen-template",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "carbon:template",
+      "filled": "skip",
+      "note": "A template a screen is built from."
+    },
+    {
+      "consumerName": "layout-window",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "streamline:layout-window-1",
+      "filled": "streamline:layout-window-1-solid",
+      "note": "A window with a laid-out screen."
+    },
+    {
+      "consumerName": "insert-table",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "icons8:insert-table",
+      "filled": "skip",
+      "note": "Icons8: a grid of cells being defined."
+    },
+    {
+      "consumerName": "columns-layout",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "icons8:columns",
+      "filled": "skip",
+      "note": "Icons8: a column layout."
+    },
+    {
+      "consumerName": "todo-list",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "icons8:todo-list",
+      "filled": "skip",
+      "note": "Icons8: a checklist of rows."
+    },
+    {
+      "consumerName": "list-end",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "lucide:list-end",
+      "filled": "skip",
+      "note": "Send an item to the end of a queue."
+    },
+    {
+      "consumerName": "list-end-line",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "mingcute:list-end-line",
+      "filled": "mingcute:list-end-fill",
+      "note": "Send an item to the end of a list or queue."
+    },
+    {
+      "consumerName": "delay-queue",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "iconmind:delay-queue-outline-thin",
+      "filled": "skip",
+      "note": "A queue holding items back until later: parked work."
+    },
+    {
+      "consumerName": "low-priority",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "material-symbols-light:low-priority",
+      "filled": "skip",
+      "note": "Move an item down to the back of the queue."
+    },
+    {
+      "consumerName": "playlist-remove",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "material-symbols-light:playlist-remove",
+      "filled": "skip",
+      "note": "Take items out of the active queue."
+    },
+    {
+      "consumerName": "tray-arrow-down",
+      "group": "playbooks-workflows",
+      "status": "NEW",
+      "outline": "ph:tray-arrow-down-light",
+      "filled": "ph:tray-arrow-down-fill",
+      "note": "Set work aside into a holding tray."
     },
     {
       "consumerName": "cache",

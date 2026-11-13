@@ -82,6 +82,24 @@ function ControlledHarness({ initialTab = "detail" }: { initialTab?: string }) {
 const tree = () => screen.getByRole("tree");
 
 describe("TestRunner", () => {
+  it("hides adapter-selected children without changing result counts or details", () => {
+    const child: Test = { name: "captured observation", failed: true };
+    const parent: Test = { name: "issue policy", children: [child], detail: { policy: "POL-001" } };
+    render(<Harness tests={[parent]} adapters={createTestRunnerRegistry([{
+      id: "leaf-navigation", match: () => true, treeChildren: () => [],
+    }])} />);
+    const row = within(tree()).getByText("issue policy").closest('[role="treeitem"]')!;
+    expect(within(tree()).queryByText(child.name)).not.toBeInTheDocument();
+    expect(row).not.toHaveAttribute("aria-expanded");
+    expect(screen.getByText("1 test")).toBeInTheDocument();
+    expect(document.querySelector('[data-summary-outcome="failed"]')).toHaveAttribute("aria-label", "1 failed");
+    fireEvent.click(screen.getByRole("button", { name: "Expand all" }));
+    expect(within(tree()).queryByText(child.name)).not.toBeInTheDocument();
+    fireEvent.click(within(tree()).getByText("issue policy"));
+    expect(screen.getByText("POL-001")).toBeInTheDocument();
+    expect(parent.children).toEqual([child]);
+  });
+
   it("renders the test forest and the empty detail state", () => {
     render(<Harness />);
     expect(within(tree()).getByText(/acme \/ api \/ auth/)).toBeInTheDocument();

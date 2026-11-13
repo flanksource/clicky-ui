@@ -207,7 +207,24 @@ const fixtureStepCopyAdapter: TestNodeAdapter = {
 export type VerificationAdapterOptions = {
   /** Override the wait section while retaining the fixture's other detail sections. */
   renderWait?: (wait: WaitDetail) => ReactNode;
+  /**
+   * The answerable form of a step waiting on a person (`node.waiting`), shown in
+   * its own section at the top of the step's detail. The host resolves which
+   * pending prompt belongs to the node and answers it (e.g. with PromptForm).
+   */
+  renderPendingPrompt?: (node: Test) => ReactNode;
 };
+
+// The attempt a step is waiting in: it carries the step's name and task id (the
+// host finds the step's prompt by them) and `waiting`, and, when its result has
+// nothing marking it a fixture step, the step reference, so the fixture detail
+// (and its pending form) still renders it.
+function liveAttemptNode(step: Test, attempt: Test, ref: { id: string; kind: string }): Test {
+  const live: Test = { ...attempt, name: step.name, ...(step.task_id !== undefined ? { task_id: step.task_id } : {}), waiting: true };
+  if (isFixtureNode(live)) return live;
+  // readStepDetail has already checked that an attempt result's detail is an object.
+  return { ...live, detail: { ...(attempt.detail as Record<string, unknown> | undefined), step: ref } };
+}
 
 export function verificationAdapters(options: VerificationAdapterOptions = {}): TestNodeAdapterRegistry {
   const fixtureAdapter: TestNodeAdapter = {
@@ -217,14 +234,20 @@ export function verificationAdapters(options: VerificationAdapterOptions = {}): 
     detailAttempts: ({ node }) => {
       const detail = readStepDetail(node.detail);
       if (detail.kind !== "step") return [];
-      return detail.step.attempts.map((attempt) => ({
-        id: attempt.attempt, status: attempt.status,
-        ...(attempt.durationMs !== undefined ? { durationMs: attempt.durationMs } : {}),
-        node: attempt.result ? verifyNodeTest(attempt.result) : {
+      const live = detail.step.attempts.length - 1;
+      return detail.step.attempts.map((attempt, index) => {
+        const attemptNode: Test = attempt.result ? verifyNodeTest(attempt.result) : {
           name: node.name, message: `Attempt ${attempt.attempt}: execution evidence was not stored in this report.`,
           detail: { step: detail.step.step },
-        },
-      }));
+        };
+        // The step waits in its last attempt; that one keeps the step's identity so the host finds its prompt.
+        const waiting = node.waiting === true && index === live;
+        return {
+          id: attempt.attempt, status: attempt.status,
+          ...(attempt.durationMs !== undefined ? { durationMs: attempt.durationMs } : {}),
+          node: waiting ? liveAttemptNode(node, attemptNode, detail.step.step) : attemptNode,
+        };
+      });
     },
     detailTabs: ({ node }) => {
       const detail = readStepDetail(node.detail);

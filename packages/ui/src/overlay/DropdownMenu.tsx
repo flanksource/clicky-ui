@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Slot } from "@radix-ui/react-slot";
 import {
   autoUpdate,
@@ -63,6 +63,7 @@ export type DropdownMenuItem = {
 };
 
 export type DropdownMenuProps = {
+  role?: "menu" | "dialog";
   /** Trigger label. Ignored when `trigger` is provided. */
   label?: ReactNode;
   /** Icon shown before the trigger label. Ignored when `trigger` is provided. */
@@ -111,6 +112,7 @@ export function DropdownMenu(props: DropdownMenuProps) {
 }
 
 function DropdownMenuRoot({
+  role: popupRole = "menu",
   label,
   icon,
   hideChevron = false,
@@ -135,17 +137,19 @@ function DropdownMenuRoot({
   const nodeId = useFloatingNodeId();
   const elementsRef = useRef<Array<HTMLElement | null>>([]);
 
-  const onOpenChangeRef = useRef(onOpenChange);
-  onOpenChangeRef.current = onOpenChange;
-  useEffect(() => {
-    onOpenChangeRef.current?.(open);
-  }, [open]);
+  // Every open/close goes through here, so the host hears each change from the
+  // event that caused it rather than from an effect after the render.
+  const changeOpen = (next: boolean) => {
+    if (next === open) return;
+    setOpen(next);
+    onOpenChange?.(next);
+  };
 
   const { refs, floatingStyles, context } = useFloating<HTMLDivElement>({
     // nodeId is always defined inside the FloatingTree; guard for the type only.
     ...(nodeId ? { nodeId } : {}),
     open,
-    onOpenChange: setOpen,
+    onOpenChange: changeOpen,
     // bottom-end / bottom-start reproduce the previous right/left alignment.
     placement: align === "right" ? "bottom-end" : "bottom-start",
     whileElementsMounted: autoUpdate,
@@ -168,7 +172,7 @@ function DropdownMenuRoot({
   // menu correctly does dismiss the menu, which is harmless since closing the
   // menu does not unmount a Modal it doesn't own.
   const dismiss = useDismiss(context, { escapeKey: false });
-  const role = useRole(context, { role: "menu" });
+  const role = useRole(context, { role: popupRole });
   const listNav = useListNavigation(context, {
     listRef: elementsRef,
     activeIndex,
@@ -177,11 +181,11 @@ function DropdownMenuRoot({
   });
 
   const { getReferenceProps, getFloatingProps, getItemProps } = useInteractions(
-    [click, dismiss, role, listNav],
+    [click, dismiss, role, ...(popupRole === "menu" ? [listNav] : [])],
   );
 
   const closeMenu = () => {
-    setOpen(false);
+    changeOpen(false);
     if (refs.domReference.current instanceof HTMLElement)
       refs.domReference.current.focus();
   };
@@ -189,8 +193,12 @@ function DropdownMenuRoot({
 
   // Selecting any leaf (at any depth) emits a tree-wide "click"; the root closes
   // and restores focus to the trigger.
+  // The listener subscribes once per tree; it reads the latest closeMenu,
+  // which is published after each commit rather than during render.
   const closeMenuRef = useRef(closeMenu);
-  closeMenuRef.current = closeMenu;
+  useLayoutEffect(() => {
+    closeMenuRef.current = closeMenu;
+  });
   useEffect(() => {
     if (!tree) return;
     const onTreeClick = () => closeMenuRef.current();
@@ -205,7 +213,7 @@ function DropdownMenuRoot({
           <Slot
             ref={refs.setReference}
             className="inline-flex"
-            aria-haspopup="menu"
+            aria-haspopup={popupRole}
             aria-expanded={open}
             {...getReferenceProps()}
           >
@@ -219,7 +227,7 @@ function DropdownMenuRoot({
             variant={variant}
             size={size}
             title={title}
-            aria-haspopup="menu"
+            aria-haspopup={popupRole}
             aria-expanded={open}
             {...getReferenceProps()}
           >
@@ -242,7 +250,8 @@ function DropdownMenuRoot({
               <div
                 ref={refs.setFloating}
                 {...getFloatingProps()}
-                role="menu"
+                role={popupRole}
+                aria-modal={popupRole === "dialog" ? false : undefined}
                 aria-label={menuLabel}
                 {...(menuLabel ? { "aria-labelledby": undefined } : {})}
                 style={{ ...floatingStyles, zIndex: floatingZ }}

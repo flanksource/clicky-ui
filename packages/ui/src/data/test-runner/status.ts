@@ -214,7 +214,7 @@ const OUTCOME_TONE: Record<TestOutcome, BadgeTone> = {
   errored: "danger",
   timedout: "warning",
   warned: "warning",
-  aborted: "danger",
+  aborted: "neutral",
   skipped: "neutral",
   running: "info",
   pending: "neutral",

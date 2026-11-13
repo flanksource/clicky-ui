@@ -38,9 +38,12 @@ export function MatrixMark({ mark, label, className, static: isStatic = false }:
   );
 }
 
+/** What a mix or heatmap counts, as its labels name them. */
+export type MatrixUnit = "steps" | "plans" | "cases";
+
 export type MatrixMixProps = {
   counts: MatrixCounts;
-  unit: "steps" | "plans";
+  unit: MatrixUnit;
   /** Outcomes drawn even at zero; every other zero count is dropped. */
   always?: readonly MatrixMarkKey[];
   static?: boolean;
@@ -90,7 +93,7 @@ export type MatrixTick = { label: string; mark: MatrixMarkKey };
 export type MatrixHeatmapProps = {
   /** In run order: where a run is and where it broke read left to right. */
   ticks: readonly MatrixTick[];
-  unit: "steps" | "plans";
+  unit: MatrixUnit;
   static?: boolean;
 };
 
@@ -113,7 +116,7 @@ export function MatrixHeatmap({ ticks, unit, static: isStatic = false }: MatrixH
 }
 
 export type EmptyMatrixCellProps = {
-  /** The cell outcome: "queued", "absent", or "error" with detail "never started". Anything else throws. */
+  /** The cell outcome: "queued", "absent", "na", or "error" with detail "never started". Anything else throws. */
   outcome: string;
   /** Why a cell has no run: "never started". */
   detail?: string;
@@ -125,12 +128,13 @@ export type EmptyMatrixCellProps = {
 
 /**
  * A plan with no run in an environment: pending while queued, error when it
- * never started, hollow when not part of that run.
+ * never started, hollow when not part of that run, N/A when its country does
+ * not apply there.
  */
 export function EmptyMatrixCell({ outcome, detail, title, bare = false }: EmptyMatrixCellProps) {
   const neverStarted = detail === "never started";
-  if (!neverStarted && outcome !== "queued" && outcome !== "absent") throw new Error(`unexpected empty matrix cell ${outcome}: ${title}`);
-  const mark: MatrixMarkKey = neverStarted ? "error" : outcome === "queued" ? "pending" : "absent";
+  if (!neverStarted && outcome !== "queued" && outcome !== "absent" && outcome !== "na") throw new Error(`unexpected empty matrix cell ${outcome}: ${title}`);
+  const mark: MatrixMarkKey = neverStarted ? "error" : outcome === "queued" ? "pending" : outcome === "na" ? "na" : "absent";
   const label = neverStarted ? "never started" : MATRIX_MARKS[mark].label;
   return (
     <span title={title} className="flex h-5 min-w-0 items-center gap-1.5 text-xs" data-empty-cell={mark}>

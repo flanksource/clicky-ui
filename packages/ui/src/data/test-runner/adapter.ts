@@ -33,6 +33,12 @@ export type TestNodeAdapter = {
   /** Claim the node. The first registered adapter to return true wins per surface. */
   match: (node: Test, runner: TestRunnerContext) => boolean;
   /**
+   * Children shown in the navigation tree; results and status rollups stay intact.
+   * Return [] to render a node as a leaf. Without a matching hook, uses node.children.
+   * @example { id: "setup-leaf", match: node => node.name === "setup", treeChildren: () => [] }
+   */
+  treeChildren?: (c: AdapterContext) => Test[] | undefined;
+  /**
    * Replace the framework icon for the node — return any node, or null to fall
    * back to the built-in tool mark (`TEST_TOOLS`). For a tool the catalog
    * lacks, prefer adding it to `TEST_TOOLS` so every surface shows it.
@@ -100,6 +106,11 @@ export class TestNodeAdapterRegistry {
 
   resolveActions(node: Test, runner: TestRunnerContext): TestNodeAdapter | null {
     return this.firstWith(node, runner, (a) => !!a.nodeActions);
+  }
+
+  resolveTreeChildren(node: Test, runner: TestRunnerContext): Test[] | undefined {
+    const adapter = this.firstWith(node, runner, (a) => !!a.treeChildren);
+    return adapter?.treeChildren ? adapter.treeChildren({ node, runner }) : node.children;
   }
 
   /**

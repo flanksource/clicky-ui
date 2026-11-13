@@ -341,6 +341,31 @@ describe("Clicky", () => {
     expect(onTableRowClick.mock.calls[0][0].cells._id.plain).toBe("widget-1");
   });
 
+  it("lists host menuActions in a table result's overflow menu and runs them", () => {
+    const onSelect = vi.fn();
+    const clickyDocument: ClickyDocument = {
+      version: 1,
+      node: {
+        kind: "table",
+        columns: [{ name: "name", label: "Name" }],
+        rows: [{ cells: { name: { kind: "text", text: "First widget", plain: "First widget" } } }],
+      },
+    };
+
+    render(
+      <Clicky
+        data={clickyDocument}
+        menuActions={[{ id: "open-profile", label: "Open profile", section: "", onSelect }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /open column menu/i }));
+    const tableMenu = screen.getByRole("menu", { name: /column menu/i });
+    fireEvent.click(within(tableMenu).getByRole("menuitem", { name: "Open profile" }));
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
   it("does not expand an inline row-detail panel on row click", () => {
     const onTableRowClick = vi.fn();
     const clickyDocument: ClickyDocument = {

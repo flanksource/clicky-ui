@@ -39,6 +39,8 @@ export interface Test {
    * and pending with a static hollow icon.
    */
   running?: boolean;
+  /** A running node blocked on a person answering a form (gavel's fixture `form` step). */
+  waiting?: boolean;
   timed_out?: boolean;
   task_id?: string;
   can_stop?: boolean;

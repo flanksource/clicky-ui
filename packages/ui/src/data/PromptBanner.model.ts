@@ -149,6 +149,14 @@ export function summarizePrompts(prompts: PromptSnapshot[]): PromptSummary {
   );
 }
 
+const STATE_RANK: Record<string, number> = { pending: 0, answered: 1 };
+
+/** Pending prompts first, then answered, then closed (cancelled, expired); each group keeps its order. */
+export function orderPrompts(prompts: readonly PromptSnapshot[]): PromptSnapshot[] {
+  const rank = (prompt: PromptSnapshot) => STATE_RANK[prompt.state] ?? 2;
+  return [...prompts].sort((a, b) => rank(a) - rank(b));
+}
+
 export function summarizePromptAnswer(prompt: PromptSnapshot): string {
   if (prompt.cancelled || prompt.state === "cancelled") return "Cancelled";
   if (prompt.state === "expired") return "Expired";

@@ -35,8 +35,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Gavel tests
-        uses: flanksource/gavel@fb4916508ea984a8d1cdcc52190765a0ed6ec57a # v0.0.61
+        uses: flanksource/gavel@4c5015446610371c852fd866bfbe0efa77f24c9d # v0.0.80
         with:
+          version: v0.0.80
           args: test --framework vitest --concurrency 1 --test-timeout 10m --timeout 15m
           comment-header: gavel-test
           artifact-name: gavel-test-results
@@ -66,9 +67,10 @@ jobs:
       - name: Build library
         run: pnpm --filter @flanksource/clicky-ui run build
       - name: Gavel lint
-        uses: flanksource/gavel@fb4916508ea984a8d1cdcc52190765a0ed6ec57a # v0.0.61
+        uses: flanksource/gavel@4c5015446610371c852fd866bfbe0efa77f24c9d # v0.0.80
         with:
-          args: lint
+          version: v0.0.80
+          args: ${{ github.event_name == 'pull_request' && 'lint --changed' || 'lint' }}
           comment-header: gavel-lint
           artifact-name: gavel-lint-results
 
@@ -140,8 +142,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Gavel e2e tests
-        uses: flanksource/gavel@fb4916508ea984a8d1cdcc52190765a0ed6ec57a # v0.0.61
+        uses: flanksource/gavel@4c5015446610371c852fd866bfbe0efa77f24c9d # v0.0.80
         with:
+          version: v0.0.80
           args: test --framework playwright --test-timeout 10m --timeout 15m
           comment-header: gavel-e2e
           artifact-name: gavel-e2e-results

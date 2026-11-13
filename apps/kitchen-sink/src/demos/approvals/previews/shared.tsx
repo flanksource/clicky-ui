@@ -146,6 +146,22 @@ export const TH_NUM_CLASS = `${TH_CLASS} text-right`;
 export const TD_CLASS = "align-top text-mv-md text-mv-ink-2";
 export const TD_NUM_CLASS = `${TD_CLASS} text-right`;
 
+/** A preview table's header row: text columns first, then right-aligned numeric ones. */
+export function PreviewHead({ text, numeric }: { text: string[]; numeric: string[] }) {
+  return (
+    <thead>
+      <tr>
+        {text.map((label) => (
+          <th key={label} className={TH_CLASS}>{label}</th>
+        ))}
+        {numeric.map((label) => (
+          <th key={label} className={TH_NUM_CLASS}>{label}</th>
+        ))}
+      </tr>
+    </thead>
+  );
+}
+
 export function PreviewTable({
   minWidth,
   children,

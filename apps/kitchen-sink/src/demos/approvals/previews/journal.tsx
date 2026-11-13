@@ -11,8 +11,7 @@ import {
   PreviewTable,
   TD_CLASS,
   TD_NUM_CLASS,
-  TH_CLASS,
-  TH_NUM_CLASS,
+  PreviewHead,
 } from "./shared";
 
 /** Merivio's `.apr-node`: one side of the credit → debit flow. */
@@ -29,6 +28,23 @@ function FlowNode({ line }: { line: JournalLine }) {
         {money(Math.abs(line.gross))}
       </div>
     </div>
+  );
+}
+
+/** Net / tax / gross cells of a journal row; the totals row also bolds net. */
+function AmountCells({ net, tax, gross, netStrong }: { net: number; tax: number; gross: number; netStrong: boolean }) {
+  return (
+    <>
+      <td className={TD_NUM_CLASS}>
+        <Amount value={net} strong={netStrong} />
+      </td>
+      <td className={TD_NUM_CLASS}>
+        <Amount value={tax} dim />
+      </td>
+      <td className={TD_NUM_CLASS}>
+        <Amount value={gross} strong />
+      </td>
+    </>
   );
 }
 
@@ -74,16 +90,7 @@ export function JournalPreview({
       </div>
 
       <PreviewTable minWidth={720}>
-        <thead>
-          <tr>
-            <th className={TH_CLASS}>Account</th>
-            <th className={TH_CLASS}>Description</th>
-            <th className={TH_CLASS}>Direction</th>
-            <th className={TH_NUM_CLASS}>Net</th>
-            <th className={TH_NUM_CLASS}>Tax</th>
-            <th className={TH_NUM_CLASS}>Gross</th>
-          </tr>
-        </thead>
+        <PreviewHead text={["Account", "Description", "Direction"]} numeric={["Net", "Tax", "Gross"]} />
         <tbody>
           {change.lines.map((line) => (
             <tr key={line.code} className="border-b border-mv-hair last:border-0">
@@ -97,15 +104,7 @@ export function JournalPreview({
                   {line.dir === "debit" ? "Debit" : "Credit"}
                 </span>
               </td>
-              <td className={TD_NUM_CLASS}>
-                <Amount value={line.net} />
-              </td>
-              <td className={TD_NUM_CLASS}>
-                <Amount value={line.tax} dim />
-              </td>
-              <td className={TD_NUM_CLASS}>
-                <Amount value={line.gross} strong />
-              </td>
+              <AmountCells net={line.net} tax={line.tax} gross={line.gross} netStrong={false} />
             </tr>
           ))}
           <tr className="border-t border-mv-border bg-mv-surface-2">
@@ -113,15 +112,7 @@ export function JournalPreview({
               Totals · debit {money(change.debit)} = credit{" "}
               {money(change.credit)}
             </td>
-            <td className={TD_NUM_CLASS}>
-              <Amount value={0} strong />
-            </td>
-            <td className={TD_NUM_CLASS}>
-              <Amount value={0} dim />
-            </td>
-            <td className={TD_NUM_CLASS}>
-              <Amount value={0} strong />
-            </td>
+            <AmountCells net={0} tax={0} gross={0} netStrong />
           </tr>
         </tbody>
       </PreviewTable>

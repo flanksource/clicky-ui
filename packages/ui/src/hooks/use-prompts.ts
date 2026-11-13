@@ -50,6 +50,7 @@ export interface UsePromptsResult {
 
 const DEFAULT_BASE = "/api/todos";
 const DEFAULT_POLL_MS = 2_000;
+const NO_PROMPTS: PromptSnapshot[] = [];
 
 function hasEventSource(): boolean {
   return typeof globalThis !== "undefined" && typeof globalThis.EventSource !== "undefined";
@@ -94,17 +95,21 @@ export function usePrompts(options: UsePromptsOptions = {}): UsePromptsResult {
     forcePoll = false,
   } = options;
 
-  const [prompts, setPrompts] = useState<PromptSnapshot[]>([]);
+  // The listing is tagged with the API and filter it came from, so a changed
+  // basePath or filter shows nothing rather than the previous scope's prompts
+  // until its own subscription delivers.
+  const query = filterQuery({ owner, kind, state: stateFilter, labels });
+  const scope = `${basePath}/prompts?${query}`;
+  const [listing, setListing] = useState<{ scope: string; prompts: PromptSnapshot[] }>({ scope, prompts: NO_PROMPTS });
   const [status, setStatus] = useState("idle");
 
   const eventSourceFactory = useEventSourceFactory();
   const eventSourceFactoryRef = useRef(eventSourceFactory);
   eventSourceFactoryRef.current = eventSourceFactory;
 
-  const labelsKey = JSON.stringify(labels ?? {});
   useEffect(() => {
     if (!enabled) return;
-    const query = filterQuery({ owner, kind, state: stateFilter, labels });
+    const setPrompts = (prompts: PromptSnapshot[]) => setListing({ scope, prompts });
 
     if (forcePoll || !hasEventSource()) {
       let stopped = false;
@@ -141,8 +146,9 @@ export function usePrompts(options: UsePromptsOptions = {}): UsePromptsResult {
     });
     es.onerror = () => setStatus("connection lost — retrying");
     return () => es.close();
-  }, [owner, kind, stateFilter, labelsKey, basePath, enabled, pollMs, forcePoll]);
+  }, [scope, query, basePath, enabled, pollMs, forcePoll]);
 
+  const prompts = listing.scope === scope ? listing.prompts : NO_PROMPTS;
   const pending = prompts.filter((p) => p.state === "pending");
   return { prompts, pending, status };
 }
