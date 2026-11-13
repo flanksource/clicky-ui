@@ -28,6 +28,7 @@ export {
   type FileReviewProps,
   type FileReviewTab,
   type FileReviewTabContext,
+  type FileReviewPreviewContext,
 } from "./file-findings/file-review/FileReview";
 export {
   BUILTIN_FILE_REVIEW_VIEWS,

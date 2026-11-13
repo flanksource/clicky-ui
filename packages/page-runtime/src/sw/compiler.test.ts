@@ -7,6 +7,9 @@ const LOCK: PageLock = { lock: 2, packageOrigin: "https://packages.example", pag
 const plugins = BASE_PLUGINS;
 
 describe("compiled source modules", () => {
+  it("resolves JSX directory imports to index.jsx", async () => {
+    expect(await rewriteImports({ code: 'export { default } from "./components";', path: "/src/report.jsx", lock: LOCK, sources: ["components/index.jsx"] })).toBe('export { default } from "/src/components/index.jsx";');
+  });
   it("propagates source revisions through local imports while retaining shared library module identities", async () => {
     const result = await compilePage({ path: "/src/report.tsx?revision=next", code: 'import Component from "./component"; import text from "./note.txt?raw"; import UI from "@acme/ui"; export { Component, text, UI };', lock: LOCK, sources: ["component.tsx", "note.txt"], plugins });
     expect(result.code).toContain('"/src/component.tsx?revision=next"');

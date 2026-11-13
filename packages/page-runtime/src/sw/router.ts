@@ -1,6 +1,7 @@
 import type { FrameConfig, HostMessage, PageLock, RuntimeError, RuntimePolicy, RuntimeProfile } from "../schema.ts";
 import { validateHostMessage, validateSourcePath, validateLock } from "../host/validation.ts";
 import { compilePage, moduleUrl, requestModuleUrl, rewriteImports } from "./compiler.ts";
+import { fetchSource } from "./source-provider.ts";
 import type { MdxPlugins } from "./compile.ts";
 import { COMPILER_REVISION, DEV_SHIM, DEV_SHIM_URL } from "./compile.ts";
 import { CONTENT_TYPES, extensionOf } from "./content-types.ts";
@@ -18,7 +19,11 @@ import { candidatesForPage, lazyRuntimeDb, putCandidates, tailwindCacheName } fr
 export { digest, verifyIntegrity } from "./integrity.ts";
 
 export type RouterOptions = { origin: string; version: string; profile: RuntimeProfile; plugins: MdxPlugins; caches: CacheStorage; indexedDB?: IDBFactory; fetch?: typeof fetch; onActivity?: (event: { request: Request; record: WorkerActivity }) => void };
-type StoredPage = { lock: PageLock; files: Record<string, string>; layout?: string; manifest: Extract<HostMessage, { type: "open" }>["manifest"]; policy?: RuntimePolicy };
+type StoredPage = { lock: PageLock; files: Record<string, string>; sourceProvider?: import("../schema.ts").SourceProvider; layout?: string; manifest: Extract<HostMessage, { type: "open" }>["manifest"]; policy?: RuntimePolicy };
+const sourcePaths = (saved: StoredPage) => {
+  const prefix = saved.lock.page.slice(0, saved.lock.page.indexOf("/") + 1);
+  return [...new Set([...Object.keys(saved.files), ...(saved.sourceProvider?.paths ?? []).map(path => prefix + path)])];
+};
 const JS = { "content-type": "text/javascript; charset=utf-8" };
 const serial = (value: unknown) => JSON.stringify(value).replaceAll("<", "\\u003c");
 const frameMetadata = new WeakMap<FrameConfig, { map: string; config: string }>();
@@ -93,7 +98,8 @@ export function createRouter(options: RouterOptions) {
     const policy = m.policy ?? profile.policy;
     const existing = m.lock ?? (saved?.lock.lock === 2 && serial(saved.manifest) === serial(m.manifest) && saved.policy && serial(saved.policy) === serial(policy) ? saved.lock : undefined);
     const lock = await resolvePage({ page: m.page, profile: { ...profile, policy }, manifest: m.manifest, ...(existing ? { lock: existing } : {}), fetch: fetcher });
-    const savedPage: StoredPage = { lock, files: m.files, ...(m.layout ? { layout: m.layout } : {}), manifest: m.manifest, policy };
+    if (m.sourceProvider && new URL(m.sourceProvider.url).origin !== options.origin) throw new Error("source provider must use the runtime origin");
+    const savedPage: StoredPage = { lock, files: m.files, ...(m.sourceProvider ? { sourceProvider: m.sourceProvider } : {}), ...(m.layout ? { layout: m.layout } : {}), manifest: m.manifest, policy };
     await (await store).put(key(m.page), Response.json(savedPage));
     pages.set(m.page, Promise.resolve(savedPage));
   }
@@ -120,23 +126,30 @@ export function createRouter(options: RouterOptions) {
     const code = exportModules.get(saved.lock.page)?.get(path);
     if (code === undefined) throw new RuntimeFailure({ phase: "fetch", file: path, message: `no export compile is registered for ${path}; export the page again` });
     activity.source = "compiled"; activity.generated = "export module"; activity.decodedBytes = byteLength(code);
-    const linked = await rewriteImports({ code, path: `${url.pathname}${url.search}`, lock: saved.lock, sources: Object.keys(saved.files), activity });
+    const linked = await rewriteImports({ code, path: `${url.pathname}${url.search}`, lock: saved.lock, sources: sourcePaths(saved), activity });
     activity.outputBytes = byteLength(linked);
     return new Response(linked, { headers: JS });
   }
   async function compiled(url: URL, saved: StoredPage, activity: WorkerActivity): Promise<Response> {
     const path = decodeURIComponent(url.pathname.slice("/src/".length)); validateSourcePath(path);
-    const code = saved.files[path];
+    let code = saved.files[path];
+    if (code === undefined && saved.sourceProvider) {
+      const prefix = saved.lock.page.slice(0, saved.lock.page.indexOf("/") + 1);
+      const response = await fetchSource({ provider: saved.sourceProvider, path: path.startsWith(prefix) ? path.slice(prefix.length) : path, fetch: fetcher });
+      if (!url.searchParams.has("module") && !url.searchParams.has("raw") && !url.searchParams.has("url") && !/\.(tsx?|jsx?|mdx?|mjs|css|json)$/.test(path)) return response;
+      code = await response.text();
+    }
     if (code === undefined) throw new RuntimeFailure({ phase: "fetch", file: path, message: `source ${path} does not exist` });
     activity.decodedBytes = byteLength(code); activity.source = "compiled";
     const asModule = url.searchParams.has("module") || /\.(tsx?|jsx?|mdx?|mjs)$/.test(path) || url.searchParams.has("raw") || url.searchParams.has("url");
     if (!asModule) { activity.outputBytes = activity.decodedBytes; return new Response(code, { headers: { "content-type": CONTENT_TYPES[extensionOf(path)] ?? "application/octet-stream" } }); }
-    const hash = await digest(new TextEncoder().encode(serial({ compiler: COMPILER_REVISION, code, lock: saved.lock, query: [...url.searchParams], paths: Object.keys(saved.files) })));
+    const paths = sourcePaths(saved);
+    const hash = await digest(new TextEncoder().encode(serial({ compiler: COMPILER_REVISION, code, lock: saved.lock, query: [...url.searchParams], paths })));
     const cacheKey = `${options.origin}/__runtime/compiled/${encodeURIComponent(hash)}`;
     const hit = await (await output).match(cacheKey);
     if (hit) { activity.source = "cache"; activity.cache = "storage"; activity.outputBytes = hit.headers.has("content-length") ? Number(hit.headers.get("content-length")) : (await hit.clone().arrayBuffer()).byteLength; return hit; }
     let result;
-    try { result = await compilePage({ path: `${url.pathname}${url.search}`, code, lock: saved.lock, sources: Object.keys(saved.files), plugins: options.plugins, activity }); }
+    try { result = await compilePage({ path: `${url.pathname}${url.search}`, code, lock: saved.lock, sources: paths, plugins: options.plugins, activity }); }
     catch (error) { throw error instanceof RuntimeFailure ? error : new RuntimeFailure(runtimeError({ error, phase: "compile", file: path })); }
     activity.outputBytes = byteLength(result.code);
     if (/\.(css|json)$/.test(path) || url.searchParams.has("raw") || url.searchParams.has("url")) { activity.source = "generated"; activity.generated = extensionOf(path) + " module"; }
@@ -186,7 +199,7 @@ export function createRouter(options: RouterOptions) {
     if (url.searchParams.has("url")) return respond(`export default ${JSON.stringify(moduleUrl(url.pathname))};`, "URL module");
     if ([".js", ".mjs"].includes(ext)) {
       const code = conversion ? await rewriteConvertedImports({ code: text, ...conversion }) : text;
-      return respond(await rewriteImports({ code, path: url.pathname, lock: saved.lock, sources: Object.keys(saved.files), activity }));
+      return respond(await rewriteImports({ code, path: url.pathname, lock: saved.lock, sources: sourcePaths(saved), activity }));
     }
     if (url.searchParams.has("module") || request.destination === "script") {
       if (ext === ".json") return respond(`export default ${JSON.stringify(JSON.parse(text))};`, "JSON module");

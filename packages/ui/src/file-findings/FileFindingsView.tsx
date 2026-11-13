@@ -89,6 +89,7 @@ export type FileFindingsViewProps = {
   fileToolbar?: ((file: FileRef) => ReactNode) | undefined;
   /** Host tabs after the open file's Preview, Source and Problems. */
   fileTabs?: ((file: FileRef) => FileReviewTab[]) | undefined;
+  filePreview?: ((file: FileRef) => FileReviewProps["preview"]) | undefined;
   /** Host tabs after the open folder's Problems. */
   folderTabs?: ((folder: FileRef) => FolderTab[]) | undefined;
   /**
@@ -254,6 +255,7 @@ type FileViewerProps = Pick<
   tabs: FileReviewTab[];
   actions: DropdownMenuItem[];
   toolbar: ReactNode;
+  preview: FileReviewProps["preview"];
   comments: FileReviewComments | undefined;
   /** Serves the file as an image. */
   imageUrl: string | undefined;
@@ -264,7 +266,7 @@ type FileViewerProps = Pick<
   onSourceChange: ((source: string) => void) | undefined;
 };
 
-function FileViewer({ file, showPath, findings, state, view, tabs, actions, toolbar, comments, imageUrl, raster, resolveUrl, onSourceChange, selectToComment, authorFilter, layout, onLayoutChange, ...review }: FileViewerProps) {
+function FileViewer({ file, showPath, findings, state, view, tabs, actions, toolbar, preview, comments, imageUrl, raster, resolveUrl, onSourceChange, selectToComment, authorFilter, layout, onLayoutChange, ...review }: FileViewerProps) {
   const ready = state?.status === "ready" ? state : null;
   let body: ReactNode;
   if (!raster && !ready) {
@@ -289,6 +291,7 @@ function FileViewer({ file, showPath, findings, state, view, tabs, actions, tool
         findings={findings}
         tabs={tabs}
         toolbar={toolbar}
+        preview={preview}
         {...(ready ? { source: ready.text } : {})}
         {...(imageUrl ? { imageUrl } : {})}
         {...(resolveUrl ? { resolveUrl } : {})}
@@ -345,6 +348,7 @@ export function FileFindingsView({
   getFolderActions,
   fileToolbar,
   fileTabs,
+  filePreview,
   folderTabs,
   comments,
   treeNode,
@@ -420,6 +424,7 @@ export function FileFindingsView({
   } else {
     const file = selectedNode.ref;
     const tabs = fileTabs?.(file) ?? [];
+    const preview = filePreview?.(file);
     const markdown = isMarkdownPath(file.file);
     const image = Boolean(fileUrl) && isImagePath(file.file);
     const raster = Boolean(fileUrl) && isRasterImagePath(file.file);
@@ -430,7 +435,8 @@ export function FileFindingsView({
         showPath={showPath}
         findings={selectedNode.findings}
         state={state}
-        view={fileView(view, { markdown, image, raster }, tabs)}
+        view={fileView(view, { markdown: markdown || Boolean(preview), image, raster }, tabs)}
+        preview={preview}
         onViewChange={onViewChange}
         tabs={tabs}
         actions={nodeActions(selectedNode)}

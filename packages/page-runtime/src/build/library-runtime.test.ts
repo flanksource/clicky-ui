@@ -23,6 +23,14 @@ async function fixture(files: Record<string, string>, options: { name?: string; 
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
 
 describe("buildLibraryRuntime", () => {
+  it("excludes host-only exports from rendering packages", async () => {
+    const options = await fixture({ "dist/index.js": "export const value = 1;", "dist/host/preview.js": 'import "node:fs";' }, {
+      exports: { ".": "./dist/index.js", "./preview": "./dist/host/preview.js" },
+    });
+    const { fragment } = await buildLibraryRuntime({ ...options, exclude: ["example-library/preview"] });
+    expect(fragment.imports).not.toHaveProperty("example-library/preview");
+    expect(Object.keys(fragment.integrity)).not.toContain("example-library@1.2.3/dist/host/preview.js");
+  });
   it("traces installed versions, relative files and assets with independent integrity and barrel locations", async () => {
     const source = "export const value = 7;";
     const options = await fixture({

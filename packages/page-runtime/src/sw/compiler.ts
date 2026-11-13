@@ -39,7 +39,7 @@ function canonical(specifier: string, options: { path: string; lock: PageLock; s
   if (!parsed.pathname.startsWith(prefix)) throw new Error(`${options.path}: unsupported module URL ${target}`);
   const relative = parsed.pathname.slice(prefix.length);
   const listing = source ? options.sources : Object.keys(options.lock.integrity);
-  const candidates = source ? ["", ".tsx", ".ts", ".jsx", ".js", ".mdx", ".md", "/index.tsx", "/index.ts", "/index.js"] : CANONICAL_CANDIDATES;
+  const candidates = source ? ["", ".tsx", ".ts", ".jsx", ".js", ".mdx", ".md", "/index.tsx", "/index.ts", "/index.jsx", "/index.js"] : CANONICAL_CANDIDATES;
   const found = candidates.map((suffix) => `${relative}${suffix}`).find((file) => listing.includes(converted ? `esm/${file}` : file) || (!source && !converted && options.lock.remaps[file] !== undefined));
   if (!found) throw new RuntimeFailure({ phase: "link", file: options.path, line: options.line, message: `${options.path}:${options.line}: cannot resolve ${specifier} to a canonical file` });
   target = `${prefix}${source || converted ? found : options.lock.remaps[found] ?? found}`;

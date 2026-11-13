@@ -65,6 +65,16 @@ const problemLines = () => Array.from(document.querySelectorAll("[data-problem-l
 const tabNames = () => screen.getAllByRole("tab").map((tab) => tab.textContent?.replace(/\d+$/, "").trim());
 
 describe("FileReview", () => {
+  it("keeps a custom JSX preview mounted across tabs and supplies the current draft", () => {
+    const preview = ({ source }: { source: string }) => <iframe title="Custom preview" data-source={source} />;
+    const props = { path: "page.jsx", source: "initial", view: "preview", onViewChange: vi.fn(), preview };
+    const result = render(<FileReview {...props} />);
+    const frame = screen.getByTitle("Custom preview");
+    result.rerender(<FileReview {...props} source="draft" view="source" />);
+    expect(screen.getByTitle("Custom preview")).toBe(frame);
+    expect(frame.getAttribute("data-source")).toBe("draft");
+    expect(frame.parentElement?.className).toContain("hidden");
+  });
   it("offers only Preview and Source, and no thread counts, without findings or comments", () => {
     renderReview();
     expect({ tabs: tabNames(), counts: screen.queryByText(/open ·/) }).toEqual({ tabs: ["Preview", "Source"], counts: null });

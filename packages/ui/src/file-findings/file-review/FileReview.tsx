@@ -1,5 +1,5 @@
 import { useCommentState, useDiscardCommentDraft } from "../../comments/comment-persistence";
-import { ELEMENT_PREFIX, captureLocators, elementAnchor } from "../../comments/anchoring/dom-anchor";
+import { ELEMENT_PREFIX, captureLocators, elementAnchor, parseElementAnchor } from "../../comments/anchoring/dom-anchor";
 import { PATCH_PREFIX, isPatchAnchor } from "../../comments/anchoring/patch-anchor";
 import type { ScreenshotTarget } from "../../comments/annotation-screenshot";
 import { elementLabel, useElementPicker } from "../../comments/element-picker";
@@ -155,6 +155,13 @@ export type FileReviewTabContext = {
   onSourceChange?: (source: string) => void;
 };
 
+export type FileReviewPreviewContext = FileReviewTabContext & {
+  comments: readonly Comment[];
+  focusedAnchor: string | null;
+  onSelectElement: (selection: { anchor: string; label: string; position: CommentDraftPosition }) => void;
+  onFocus: (anchor: string) => void;
+};
+
 /** A host-defined tab after the built-in ones; its body fills the review pane. */
 export type FileReviewTab = Omit<TabItem, "disabled" | "countColor"> & {
   render: (ctx: FileReviewTabContext) => ReactNode;
@@ -216,6 +223,7 @@ function threadOptions(comments: FileReviewComments | undefined, people: boolean
 }
 
 export type FileReviewProps = {
+  preview?: ((context: FileReviewPreviewContext) => ReactNode) | undefined;
   sidebarWidth?: number;
   onSidebarWidthChange?: (width: number) => void;
   /** Host-owned resolution for relative Markdown links and images. */
@@ -329,6 +337,7 @@ export function FileReview({
   getFindingActions,
   tabs = NO_TABS,
   toolbar,
+  preview,
   className,
 }: FileReviewProps) {
   const lint = findingsProp !== undefined;
@@ -349,7 +358,7 @@ export function FileReview({
   if (view === "problems" && !lint) throw new Error("FileReview: view \"problems\" needs `findings`");
   if (view === "problems" && (!problemFilters || !onProblemFiltersChange))
     throw new Error("FileReview: view \"problems\" needs `problemFilters` and `onProblemFiltersChange`");
-  if (view === "preview" && !prose && !imageUrl) throw new Error(`FileReview: view "preview" needs a markdown file, got ${path}`);
+  if (view === "preview" && !prose && !imageUrl && !preview) throw new Error(`FileReview: view "preview" needs a markdown file, got ${path}`);
   const [showBlame, setShowBlame] = useState(false);
   const [showFindings, setShowFindings] = useState(true);
   const [editMode, setEditMode] = useState(true);
@@ -1031,7 +1040,7 @@ export function FileReview({
             setDraft(null);
           }}
           tabs={[
-            ...(prose || imageUrl ? [{ id: "preview", label: "Preview", icon: UiEye }] : []),
+            ...(prose || imageUrl || preview ? [{ id: "preview", label: "Preview", icon: UiEye }] : []),
             ...(hasSource ? [{ id: "source", label: "Source", icon: UiFileCode }] : []),
             ...(lint && hasSource ? [{ id: "problems", label: "Problems", icon: UiListChecks, count: findings.length }] : []),
             ...tabs.map(({ render: _render, ...tab }) => tab),
@@ -1255,7 +1264,19 @@ export function FileReview({
         )}
         {/* Hidden rather than unmounted, so anchor boxes stay measured and a picked finding scrolls straight to its line. */}
         {imageUrl && view === "preview" && <ImagePreview src={imageUrl} alt={path} className="h-full" />}
-        {prose && (
+        {preview && <div ref={origin} className={cn("relative h-full", view !== "preview" && "hidden")} data-file-review-preview="custom">
+          {preview({ path, source: raw, findings, comments: open, focusedAnchor: focused,
+            onSelectElement: selection => {
+              parseElementAnchor(selection.anchor);
+              setDraft({ ...selection, expanded: true, surface: "preview" });
+            }, onFocus: setFocused, ...(onSourceChange ? { onSourceChange } : {}) })}
+          {draft?.surface === "preview" && renderDraft(draft, origin.current?.clientWidth ?? width)}
+          {focused && <div className="absolute right-2 top-12 z-30 max-h-[80%] w-80 overflow-auto rounded border bg-card p-2 shadow">
+            <button type="button" onClick={() => setFocused(null)}>Close comments</button>
+            <CommentThread comments={selectAnchorThreads(open, focused)} config={config} anchor={focused} {...callbacks} {...peopleThreads} />
+          </div>}
+        </div>}
+        {prose && !preview && (
         <div className={cn("flex", narrow ? "flex-col gap-4 p-4" : "h-full", view !== "preview" && "hidden")}>
           {/* Wide layouts give the document and the sidebar their own scroll panes. */}
           <div ref={bodyPane} onScroll={levelSidebar} className={cn("min-w-0 flex-1", !narrow && "overflow-y-auto p-4")}>

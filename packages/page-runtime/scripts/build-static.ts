@@ -5,6 +5,7 @@ import { build, type Plugin } from "rolldown";
 import { frameDocument } from "../src/sw/router.ts";
 import { EXPORT_COMPILER_URL } from "../src/sw/runtime-module.ts";
 import { findLocalWorkspaces, localWorkspacesPlugin } from "./local-workspaces.ts";
+import { reactExternals } from "./react-externals.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workspaceRoot = resolve(root, "../..");
@@ -39,8 +40,8 @@ export async function buildStatic(options: BuildStaticOptions = {}): Promise<voi
   await build({
     ...failOnUnresolved,
     input: resolve(root, "src/frame/entry.ts"),
-    plugins,
-    external: ["./page-agent.js", EXPORT_COMPILER_URL, "react", "react-dom", "react-dom/client"],
+    plugins: [...plugins, reactExternals()],
+    external: ["./page-agent.js", EXPORT_COMPILER_URL],
     platform: "browser",
     transform: { define: { "process.env.NODE_ENV": JSON.stringify("development") } },
     output: { file: resolve(outDir, "boot.js"), format: "es", sourcemap: true, codeSplitting: false },
@@ -48,8 +49,8 @@ export async function buildStatic(options: BuildStaticOptions = {}): Promise<voi
   await build({
     ...failOnUnresolved,
     input: resolve(root, "src/frame/page-agent.ts"),
-    plugins,
-    external: ["/__runtime/editing.js", "react", "react-dom/client", "react/jsx-runtime", "react/jsx-dev-runtime", "@flanksource/clicky-ui/comments"],
+    plugins: [...plugins, reactExternals()],
+    external: ["/__runtime/editing.js", "@flanksource/clicky-ui/comments"],
     platform: "browser",
     transform: { jsx: { runtime: "automatic", development: true }, define: { "process.env.NODE_ENV": JSON.stringify("development") } },
     output: { file: resolve(outDir, "page-agent.js"), format: "es", sourcemap: true, codeSplitting: false },

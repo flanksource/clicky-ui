@@ -3,6 +3,7 @@ import { keys, record, validatePolicy } from "../sw/profile.ts";
 import { validateAgentFrameMessage, validateAgentHostMessage } from "./agent-validation.ts";
 import { validateJson } from "./message-values.ts";
 import { validateActivity } from "../activity-schema.ts";
+import { validateSourceProvider } from "../sw/source-provider.ts";
 import { validatePageSources } from "../link/page-sources.ts";
 import { validateCompilerPlugins } from "../sw/compiler-plugins.ts";
 import { validateReviewFrameMessage, validateReviewHostMessage } from "./review/validation.ts";
@@ -45,7 +46,8 @@ export function validateHostMessage(value: unknown): HostMessage {
     case "design-override": case "design-write": case "design-write-result":
     case "mode": case "pick": case "page": case "capture-vocabulary": case "pins": case "highlight": case "scroll": return validateAgentHostMessage(m);
     case "open": {
-      keys(m, ["type", "page", "layout", "manifest", "lock", "files", "policy"], "message"); text(m.page, "open.page");
+      keys(m, ["type", "page", "layout", "manifest", "lock", "files", "sourceProvider", "policy"], "message"); text(m.page, "open.page");
+      if (m.sourceProvider !== undefined) validateSourceProvider(m.sourceProvider as import("../schema.ts").SourceProvider);
       if (m.policy !== undefined) validatePolicy(m.policy, "open.policy");
       const manifest = record(m.manifest, "manifest");
       for (const [name, range] of Object.entries(record(manifest.dependencies, "manifest.dependencies"))) text(range, `dependencies.${name}`);

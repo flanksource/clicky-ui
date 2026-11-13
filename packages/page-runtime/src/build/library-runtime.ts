@@ -12,16 +12,16 @@ import { ClosureTracer, createResolver, EMPTY_MODULE, exportEntries, IMPORT_COND
 
 import { BASE_PACKAGES, BASE_ENTRIES } from "./base.ts";
 export { BASE_PACKAGES, BASE_ENTRIES } from "./base.ts";
-export type LibraryRuntimeOptions = { libraryDir: string; outDir: string; base?: Fragment; aliases?: Record<string, string> };
+export type LibraryRuntimeOptions = { libraryDir: string; outDir: string; base?: Fragment; aliases?: Record<string, string>; exclude?: string[] };
 export type BuiltLibraryRuntime = { fragment: Fragment; barrels: BarrelIndex };
 
-export function librarySpec(options: { libraryDir: string; base?: Fragment }): FragmentSpec {
+export function librarySpec(options: { libraryDir: string; base?: Fragment; exclude?: string[] }): FragmentSpec {
   const dir = realpathSync(options.libraryDir);
   const manifest = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { name?: string; version?: string; pageRuntime?: { compiler?: unknown } };
   if (!manifest.name || !manifest.version) throw new Error(`${dir}/package.json must declare name and version`);
   const exported = exportEntries(dir);
   const compiler = manifest.pageRuntime?.compiler === undefined ? undefined : validateCompilerPlugins(manifest.pageRuntime.compiler, { library: manifest.name, path: `${manifest.name} package.json pageRuntime.compiler` });
-  const entries = exported.filter(({ path }) => path.startsWith(`${join(dir, "dist")}${sep}`) && !path.startsWith(`${join(dir, "dist/runtime")}${sep}`));
+  const entries = exported.filter(({ path, specifier }) => !options.exclude?.includes(specifier) && path.startsWith(`${join(dir, "dist")}${sep}`) && !path.startsWith(`${join(dir, "dist/runtime")}${sep}`));
   if (!entries.length) throw new Error(`${manifest.name}: no browser exports in dist; build the library first`);
   for (const plugin of compiler?.remark ?? []) {
     const entry = exported.find(({ specifier }) => specifier === plugin.module);
@@ -31,9 +31,12 @@ export function librarySpec(options: { libraryDir: string; base?: Fragment }): F
   // Sweep only directories the package exports into: computed dynamic imports load chunks next to exported modules,
   // while other dist artifacts (a CLI's inlined classic-script bundle) are never served as modules.
   const exportedDirs = [...new Set(entries.filter(({ path }) => /\.m?js$/.test(path)).map(({ path }) => dirname(path)))];
+  const excluded = exported.filter(({ specifier }) => options.exclude?.includes(specifier));
+  const excludedDirs = excluded.map(({ path }) => dirname(path)).filter(dir => !entries.some(entry => entry.path.startsWith(`${dir}${sep}`)));
   const files = readdirSync(join(dir, "dist"), { recursive: true, encoding: "utf8" })
     .filter((path) => !path.startsWith(`runtime${sep}`) && /\.(m?js)$/.test(path))
     .map((path) => join(dir, "dist", path))
+    .filter(path => !excluded.some(entry => entry.path === path) && !excludedDirs.some(dir => path.startsWith(`${dir}${sep}`)))
     .filter((path) => exportedDirs.some((exported) => path.startsWith(`${exported}${sep}`)));
   const providesBase = !options.base && manifest.name === "@flanksource/clicky-ui";
   if (providesBase) {

@@ -14,6 +14,29 @@ vi.mock("./resolver.ts", async (importOriginal) => {
 const origin = "https://runtime.example";
 const profile: RuntimeProfile = { runtimeDomain: "runtime.example", embedders: ["https://host.example"], packageOrigin: "https://packages.example", registry: "https://registry.example", managed: {}, policy: { dependencies: "strict" }, minReleaseAgeDays: 0, network: { allow: [] }, csp: { add: {} }, links: "deny", sources: ["host"], readinessTimeoutMs: 1000 };
 
+it("links MDX exports against lazy CSS and component sources", async () => {
+  const page = "editor/page.mdx";
+  const router = createRouter({ origin, version: "test", profile, caches: memoryCaches(), plugins: BASE_PLUGINS });
+  await router.message({ type: "open", page, lock: { ...exampleLock(), page }, manifest: { dependencies: {} }, files: { [page]: "# Report" }, sourceProvider: { url: `${origin}/sources/token`, paths: ["page.css", "title.jsx"] } });
+  await router.exportModule(page, { type: "export-module", path: page, code: 'import "./page.css"; import Title from "./title.jsx"; export default Title;' });
+  const result = await router.route(new Request(`${origin}/src/${page}?export=revision&page=${page}`));
+  expect(result.headers.get("x-page-runtime-error")).toBeNull();
+  expect(await result.text()).toContain("/src/editor/page.css?module");
+});
+
+it("resolves lazy JSX imports against the source index and lets draft overlays override HTTP sources", async () => {
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response('export default "disk";'));
+  const page = "editor/page.jsx";
+  const router = createRouter({ origin, version: "test", profile, caches: memoryCaches(), plugins: BASE_PLUGINS, fetch: fetcher });
+  await router.message({ type: "open", page, lock: { ...exampleLock(), page }, manifest: { dependencies: {} }, files: { [page]: 'import title from "./title.jsx"; export default title;' }, sourceProvider: { url: `${origin}/sources/token`, paths: ["page.jsx", "title.jsx"] } });
+  const request = (path: string) => router.route(new Request(`${origin}/src/editor/${path}?page=${page}`));
+  expect(await (await request("page.jsx")).text()).toContain("/src/editor/title.jsx");
+  expect(await (await request("title.jsx")).text()).toContain('"disk"');
+  await router.update(page, { type: "sources", files: { "editor/title.jsx": 'export default "draft";' } });
+  expect(await (await request("title.jsx")).text()).toContain('"draft"');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});
+
 it("persists a validated layout source in the frame configuration while preserving a Markdown entry", async () => {
   const caches = memoryCaches();
   const router = createRouter({ origin, version: "test", profile, caches, plugins: BASE_PLUGINS });

@@ -100,9 +100,10 @@ export type RuntimePhase = "resolve" | "fetch" | "compile" | "link" | "render" |
 export type RuntimeError = { phase: RuntimePhase; message: string; file: string; line?: number; column?: number };
 export type Theme = { theme: "light" | "dark"; density: "compact" | "comfortable" | "spacious" };
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
+export type SourceProvider = { url: string; paths: string[] };
 export type HostMessage =
   | AgentHostMessage
-  | { type: "open"; page: string; layout?: string; manifest: FolderManifest; lock?: PageLock; files: Record<string, string>; policy?: RuntimePolicy }
+  | { type: "open"; page: string; layout?: string; manifest: FolderManifest; lock?: PageLock; files: Record<string, string>; sourceProvider?: SourceProvider; policy?: RuntimePolicy }
   | { type: "sources"; files: Record<string, string | null>; data?: JsonValue }
   | { type: "reload" }
   | ({ type: "theme" } & Theme)
