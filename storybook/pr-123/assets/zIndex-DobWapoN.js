@@ -1,1 +1,0 @@
-import{n as e}from"./rolldown-runtime-sJBDdmOt.js";var t;function n(){return(n=e((()=>{t={raised:30,chatFab:60,chatWindow:61,popover:9e3,modal:1e4,modalStep:10,popoverOverModalOffset:5,tour:5e4,tourCardOffset:10,toast:1e5}})))()}export{t as n,n as t};
