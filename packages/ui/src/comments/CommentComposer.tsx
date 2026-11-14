@@ -5,7 +5,7 @@ import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
 import { DropdownMenu } from "../overlay/DropdownMenu";
 import { SplitButton } from "../components/SplitButton";
-import { UiPaperPlaneRightFilled, UiClose, UiThumbsDown, UiThumbsUp } from "../icons";
+import { UiPaperPlaneRightFilled, UiClose } from "../icons";
 import type { BadgeTone } from "../data/Badge";
 import { CommentEditor } from "./CommentEditor";
 import { toneToBadgeTone } from "./comment-utils";
@@ -14,9 +14,10 @@ import type {
   CommentConfig,
   CommentCreateAction,
   CommentCreateInput,
+  CommentDefaultDelivery,
   CommentFacet,
   CommentMention,
-  CommentRating,
+  CommentMentionable,
 } from "./comment-types";
 
 // Static literals so Tailwind's source scanner emits these utilities.
@@ -116,8 +117,85 @@ function FacetPicker({
   );
 }
 
+/** The first target named as a standalone `@name` in `body`. */
+function targetNamedIn(body: string, targets: readonly CommentMentionable[]): CommentMentionable | undefined {
+  return targets.find((target) =>
+    new RegExp(`(?:^|\\s)@${target.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w./-])`, "i").test(body),
+  );
+}
+
+/** The empty picker's chip: what happens to a comment sent without a target. */
+function untargetedChip(defaultDelivery: CommentDefaultDelivery | null | undefined) {
+  if (defaultDelivery === undefined) {
+    return { text: "Send to…", label: "Send to…", title: "Send this comment to an agent, or type @ and its name" };
+  }
+  if (defaultDelivery === null) {
+    return {
+      text: "Not delivered",
+      label: "Send to… (not delivered by default)",
+      title: "No agent rule covers this page, so the comment is only posted. Pick a target, or type @ and its name, to deliver it",
+    };
+  }
+  return {
+    text: `Auto: ${defaultDelivery.label}`,
+    label: `Send to… (default: ${defaultDelivery.label})`,
+    title: defaultDelivery.description ?? `New comments here are delivered to ${defaultDelivery.label}. Pick a target to send this one elsewhere`,
+  };
+}
+
+function TargetPicker({
+  targets,
+  target,
+  defaultDelivery,
+  onPick,
+  onClear,
+}: {
+  targets: readonly CommentMentionable[];
+  target: CommentMentionable | undefined;
+  defaultDelivery: CommentDefaultDelivery | null | undefined;
+  onPick: (target: CommentMentionable) => void;
+  onClear: () => void;
+}) {
+  const empty = untargetedChip(defaultDelivery);
+  return (
+    <span className="inline-flex items-center">
+      <DropdownMenu
+        align="left"
+        menuClassName="min-w-[150px]"
+        menuLabel="Comment targets"
+        items={targets.map((option) => ({ label: `@${option.name}`, onSelect: () => onPick(option) }))}
+        trigger={
+          <button
+            type="button"
+            aria-label={target ? `Send to @${target.name}` : empty.label}
+            title={target ? `This comment is sent to @${target.name}` : empty.title}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors [@media(pointer:coarse)]:min-h-11",
+              target ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/60",
+              !target && defaultDelivery && "bg-muted/60 text-foreground",
+            )}
+          >
+            {target ? `@${target.name}` : empty.text}
+          </button>
+        }
+      />
+      {target && (
+        <button
+          type="button"
+          aria-label="Clear target"
+          onClick={onClear}
+          className="inline-flex items-center justify-center rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground [@media(pointer:coarse)]:size-11"
+        >
+          <Icon icon={UiClose} className="text-[10px]" />
+        </button>
+      )}
+    </span>
+  );
+}
+
 /**
- * The new-comment composer: a mention-aware textarea, one picker per configured
+ * The new-comment composer: a mention-aware textarea, a target picker for
+ * `config.targets` (also chosen by typing `@name`), one picker per configured
  * facet, and a send button. Starts as a pill when `collapsible`. Owns only its
  * own draft state; posting is delegated to `onCreate`.
  */
@@ -136,7 +214,9 @@ export function CommentComposer({
   const [open, setOpen] = useCommentState(`${draftKey}:open`, !collapsible || autoFocus);
   const [body, setBody] = useCommentState(`${draftKey}:body`, "");
   const [facets, setFacets] = useCommentState<Record<string, string>>(`${draftKey}:facets`, {});
-  const [rating, setRating] = useCommentState<CommentRating | undefined>(`${draftKey}:rating`, undefined);
+  const [pickedTargetId, setPickedTargetId] = useCommentState<string | undefined>(`${draftKey}:target`, undefined);
+  const targets = config.targets ?? [];
+  const target = targets.find((option) => option.id === pickedTargetId) ?? targetNamedIn(body, targets);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const submittingRef = useRef(false);
@@ -148,7 +228,7 @@ export function CommentComposer({
   function reset() {
     setBody("");
     setFacets({});
-    setRating(undefined);
+    setPickedTargetId(undefined);
     mentionsRef.current.clear();
     setSavedMentions([]);
   }
@@ -165,22 +245,22 @@ export function CommentComposer({
 
   async function submit(actionId?: string) {
     const text = body.trim();
-    if ((!text && !rating) || submittingRef.current) return;
+    if (!text || submittingRef.current) return;
     submittingRef.current = true;
     setSubmitting(true);
     setError(null);
     const mentions = [...mentionsRef.current.values()].filter((m) =>
-      body.toLowerCase().includes(`@${m.name.toLowerCase()}`),
+      m.id !== target?.id && body.toLowerCase().includes(`@${m.name.toLowerCase()}`),
     );
-    const snapshot = { body, facets, rating, mentions: [...mentionsRef.current.values()] };
+    const snapshot = { body, facets, pickedTargetId, mentions: [...mentionsRef.current.values()] };
     reset();
     try {
       const input: CommentCreateInput = {
         body: text,
         anchor: anchor ?? null,
-        ...(rating ? { rating } : {}),
         ...(Object.keys(facets).length > 0 ? { facets } : {}),
         ...(mentions.length > 0 ? { mentions } : {}),
+        ...(target ? { target: { id: target.id, name: target.name, kind: target.kind } } : {}),
       };
       if (actionId === undefined) await onCreate?.(input);
       else await onCreate?.(input, actionId);
@@ -190,7 +270,7 @@ export function CommentComposer({
       if (!mounted.current) return;
       setBody(snapshot.body);
       setFacets(snapshot.facets);
-      setRating(snapshot.rating);
+      setPickedTargetId(snapshot.pickedTargetId);
       mentionsRef.current = new Map(snapshot.mentions.map(mention => [mention.id, mention]));
       setSavedMentions(snapshot.mentions);
       setOpen(true);
@@ -224,7 +304,8 @@ export function CommentComposer({
         {...(config.vocabulary ? { vocabulary: config.vocabulary } : {})}
         value={body}
         onChange={setBody}
-        mentionables={config.mentionables ?? []}
+        // One completion per @-name: a target named like a mentionable completes to the same text.
+        mentionables={[...(config.mentionables ?? []), ...targets.filter((option) => !config.mentionables?.some((m) => m.name.toLowerCase() === option.name.toLowerCase()))]}
         onMentionSelect={(m) => { mentionsRef.current.set(m.id, m); setSavedMentions([...mentionsRef.current.values()]); }}
         onSubmit={() => void submit(createActions?.[0]?.id)}
         onCancel={() => {
@@ -257,31 +338,15 @@ export function CommentComposer({
       {/* Touch-sized controls cannot share one absolute row with the textarea,
           so on a coarse pointer the row joins the flow and wraps. */}
       <div className="absolute inset-x-3 bottom-2.5 flex items-center gap-1.5 [@media(pointer:coarse)]:static [@media(pointer:coarse)]:mt-2 [@media(pointer:coarse)]:flex-wrap [@media(pointer:coarse)]:gap-2">
-        {(
-          [
-            ["positive", "Positive rating", UiThumbsUp],
-            ["negative", "Negative rating", UiThumbsDown],
-          ] as const
-        ).map(([value, label, icon]) => (
-          <button
-            key={value}
-            type="button"
-            aria-label={label}
-            aria-pressed={rating === value}
-            onClick={() =>
-              setRating((current) => (current === value ? undefined : value))
-            }
-            className={cn(
-              "inline-flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [@media(pointer:coarse)]:size-11",
-              rating === value &&
-                (value === "positive"
-                  ? "bg-green-100 text-green-700 [[data-theme=dark]_&]:bg-green-500/20 [[data-theme=dark]_&]:text-green-300"
-                  : "bg-red-100 text-red-700 [[data-theme=dark]_&]:bg-red-500/20 [[data-theme=dark]_&]:text-red-300"),
-            )}
-          >
-            <Icon icon={icon} className="text-sm" />
-          </button>
-        ))}
+        {targets.length > 0 && (
+          <TargetPicker
+            targets={targets}
+            target={target}
+            defaultDelivery={config.defaultDelivery}
+            onPick={(option) => setPickedTargetId(option.id)}
+            onClear={() => setPickedTargetId(undefined)}
+          />
+        )}
         {(config.facets ?? []).map((facet) => (
           <FacetPicker
             key={facet.key}
@@ -297,7 +362,7 @@ export function CommentComposer({
           icon={UiPaperPlaneRightFilled}
           loading={submitting}
           title="Send options"
-          disabled={submitting || (!body.trim() && !rating)}
+          disabled={submitting || !body.trim()}
           onClick={() => void submit(createActions?.[0]?.id)}
           items={(createActions?.slice(1) ?? []).map(action => ({
             label: action.label,

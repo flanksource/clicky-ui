@@ -79,7 +79,8 @@ function LocationMeta({ label }: { label: string }) {
   return (
     <span
       data-testid="comment-location-meta"
-      className="inline-flex items-center rounded-full bg-muted px-2 py-1 text-[10px] font-medium text-muted-foreground"
+      title={label}
+      className="inline-block max-w-full truncate rounded-full bg-muted px-2 py-1 align-middle text-[10px] font-medium text-muted-foreground"
     >
       {label}
     </span>

@@ -1,6 +1,6 @@
 import { normalizeErrorDiagnostics } from "../data/diagnostics/error-diagnostics";
 import { ActionError } from "../data/diagnostics/ActionError";
-import { useState, type ReactNode } from "react";
+import { useContext, useState, type ReactNode } from "react";
 import { useCommentState } from "./comment-persistence";
 import { cn } from "../lib/utils";
 import { Icon } from "../data/Icon";
@@ -29,6 +29,8 @@ import {
 } from "./CommentCardParts";
 import { CommentMarkdown } from "./CommentMarkdown";
 import { CommentPreview } from "./CommentPreview";
+import { ProposalCard } from "./ProposalCard";
+import { CommentProposalContext } from "./proposal-context";
 import {
   assignmentMenuItems,
   type CommentActionRunner,
@@ -351,8 +353,18 @@ function SavedCommentCard(props: CommentCardProps) {
   const { comment, config, compact, defaultExpanded } = props;
   const [expanded, setExpanded] = useCommentState(`expanded:${comment.id}`, defaultExpanded ?? false);
   const [collapsedActionError, setCollapsedActionError] = useState<unknown>(null);
+  const proposalCallbacks = useContext(CommentProposalContext);
   const isReply = Boolean(comment.parentId);
   const body = <CommentBody {...props} />;
+  const collapsed = !expanded && !props.fullBody && props.previewLines === undefined;
+  const proposal = comment.proposal ? (
+    <ProposalCard
+      commentId={comment.id}
+      proposal={comment.proposal}
+      callbacks={proposalCallbacks}
+      {...(isReply && collapsed ? { className: "ml-4" } : {})}
+    />
+  ) : null;
 
   async function runCollapsedAction(action: "resolve" | "close" | "reopen") {
     setCollapsedActionError(null);
@@ -380,7 +392,7 @@ function SavedCommentCard(props: CommentCardProps) {
     }
   }
 
-  if (!expanded && !props.fullBody && props.previewLines === undefined) {
+  if (collapsed) {
     return (
       <>
         <div
@@ -499,6 +511,7 @@ function SavedCommentCard(props: CommentCardProps) {
           </span>
         </div>
         {collapsedActionError !== null && <ActionError error={collapsedActionError} context={[["Comment", comment.id], ["Anchor", comment.anchor ?? "Whole page"]]} />}
+        {proposal}
       </>
     );
   }
@@ -518,6 +531,7 @@ function SavedCommentCard(props: CommentCardProps) {
         )}
       >
         {body}
+        {proposal && <div className="mt-2.5">{proposal}</div>}
       </div>
     </>
   );

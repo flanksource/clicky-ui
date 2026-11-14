@@ -5,6 +5,7 @@ import { CommentComposer } from "./CommentComposer";
 import { CommentThreadList } from "./CommentThreadList";
 import type { CommentDetailOptions } from "./comment-detail";
 import { buildThreadListHandlers } from "./comment-utils";
+import { CommentProposalContext, useProposalCallbacks } from "./proposal-context";
 import type {
   Comment,
   CommentAnchor,
@@ -70,7 +71,17 @@ export function CommentThread({
   onDelete,
   onChecklistToggle,
   onMention,
+  onApplyProposal,
+  onRejectProposal,
+  onRequestRevision,
+  loadProposalDiff,
 }: CommentThreadProps) {
+  const proposalCallbacks = useProposalCallbacks({
+    ...(onApplyProposal ? { onApplyProposal } : {}),
+    ...(onRejectProposal ? { onRejectProposal } : {}),
+    ...(onRequestRevision ? { onRequestRevision } : {}),
+    ...(loadProposalDiff ? { loadProposalDiff } : {}),
+  });
   const listHandlers = buildThreadListHandlers(comments, config, {
     ...(onUpdateStatus ? { onUpdateStatus } : {}),
     ...(onClose ? { onClose } : {}),
@@ -82,7 +93,7 @@ export function CommentThread({
     ...(onMention ? { onMention } : {}),
   });
 
-  return (
+  const thread = (
     <div className={cn(compact && "p-2")}>
       <CommentThreadList
         comments={comments}
@@ -115,5 +126,13 @@ export function CommentThread({
         </div>
       )}
     </div>
+  );
+  // With none of its own, a thread inherits an enclosing provider's callbacks.
+  return proposalCallbacks ? (
+    <CommentProposalContext.Provider value={proposalCallbacks}>
+      {thread}
+    </CommentProposalContext.Provider>
+  ) : (
+    thread
   );
 }

@@ -3,6 +3,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { $createParagraphNode, $createTextNode, $getRoot, getNearestEditorFromDOMNode } from "lexical";
 import { CommentThread } from "./CommentThread";
 import {
+  proposalComments,
   sampleComments,
   sampleConfig,
   useDemoCommentStore,
@@ -34,6 +35,29 @@ function Demo({ autoFocusComposer = false }: { autoFocusComposer?: boolean }) {
 
 export const Default: Story = {
   render: () => <Demo />,
+};
+
+function ProposalDemo() {
+  const { comments, callbacks } = useDemoCommentStore(proposalComments);
+  return (
+    <div className="max-w-xl">
+      <CommentThread
+        comments={comments}
+        config={sampleConfig}
+        defaultExpanded
+        {...callbacks}
+      />
+    </div>
+  );
+}
+
+export const WithProposedPatch: Story = {
+  render: () => <ProposalDemo />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Apply" }));
+    await expect(await canvas.findByText("Applied")).toBeInTheDocument();
+  },
 };
 
 export const WithMentionAutocomplete: Story = {

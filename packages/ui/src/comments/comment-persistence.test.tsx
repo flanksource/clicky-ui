@@ -59,13 +59,13 @@ it("restores drafts after remount and isolates pages", () => {
   expect(screen.getByLabelText("Draft")).toHaveValue("Keep this comment");
 });
 
-it("restores a composer's body and rating and clears them only after successful submission", async () => {
+it("restores a composer's body and picked target and clears them only after successful submission", async () => {
   const onCreate = vi.fn();
   const composer = (
     <CommentPersistenceBoundary scope="composer">
       <CommentComposer
         anchor="summary"
-        config={{ statuses: DEFAULT_COMMENT_STATUSES }}
+        config={{ statuses: DEFAULT_COMMENT_STATUSES, targets: [{ id: "runtime:codex", name: "codex", kind: "agent" }] }}
         collapsible={false}
         onCreate={onCreate}
       />
@@ -74,26 +74,29 @@ it("restores a composer's body and rating and clears them only after successful 
   const first = render(composer);
   setCommentDraft(
     screen.getByTestId("comment-compose-input"),
-    "Keep my rating and text",
+    "Keep my target and text",
   );
   expect(screen.getByText("Saved drafts (1)")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Positive rating" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send to…" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "@codex" }));
   first.unmount();
   const restored = render(composer);
   expect(screen.getByTestId("comment-compose-input")).toHaveTextContent(
-    "Keep my rating and text",
+    "Keep my target and text",
   );
-  fireEvent.click(screen.getByTestId("comment-compose-send"));
+  expect(screen.getByRole("button", { name: "Send to @codex" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
   await screen.findByTestId("comment-compose-input");
   expect(onCreate).toHaveBeenCalledWith(
     expect.objectContaining({
-      body: "Keep my rating and text",
-      rating: "positive",
+      body: "Keep my target and text",
+      target: { id: "runtime:codex", name: "codex", kind: "agent" },
     }),
   );
   restored.unmount();
   render(composer);
   expect(screen.getByTestId("comment-compose-input")).not.toHaveTextContent(
-    "Keep my rating and text",
+    "Keep my target and text",
   );
+  expect(screen.getByRole("button", { name: "Send to…" })).toBeVisible();
 });

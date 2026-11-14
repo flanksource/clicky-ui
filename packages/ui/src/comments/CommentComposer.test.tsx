@@ -56,52 +56,102 @@ describe("CommentComposer", () => {
     expect(screen.getByTestId("comment-compose-input")).toHaveFocus();
   });
 
-  it.each([
-    ["Positive", "positive"],
-    ["Negative", "negative"],
-  ] as const)("submits a %s rating with the comment", async (label, rating) => {
-    const onCreate = vi.fn();
-    render(
-      <CommentComposer
-        config={{ statuses: DEFAULT_COMMENT_STATUSES }}
-        collapsible={false}
-        onCreate={onCreate}
-      />,
-    );
+  describe("comment target", () => {
+    const targets = [
+      { id: "session", name: "session", kind: "agent" as const },
+      { id: "runtime:claude", name: "claude", kind: "agent" as const },
+      { id: "runtime:codex", name: "codex", kind: "agent" as const },
+    ];
+    const config = { statuses: DEFAULT_COMMENT_STATUSES, targets };
+    const renderComposer = (onCreate = vi.fn()) => {
+      render(<CommentComposer config={config} collapsible={false} onCreate={onCreate} />);
+      return onCreate;
+    };
 
-    fireEvent.click(screen.getByRole("button", { name: `${label} rating` }));
-    setCommentDraft(screen.getByTestId("comment-compose-input"), "This comparison is clear");
-    fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
+    it("offers no rating buttons", () => {
+      renderComposer();
+      expect([screen.queryByRole("button", { name: /rating/i })]).toEqual([null]);
+    });
 
-    expect(onCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ body: "This comparison is clear", rating }),
-    );
-    await waitFor(() =>
-      expect(screen.getByTestId("comment-compose-input")).toHaveTextContent(/^$/),
-    );
-  });
+    it("posts the target chosen from the empty target picker", async () => {
+      const onCreate = renderComposer();
+      fireEvent.click(screen.getByRole("button", { name: "Send to…" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "@claude" }));
+      setCommentDraft(screen.getByTestId("comment-compose-input"), "Tighten this layout");
+      fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
 
-  it("allows a rating without forcing placeholder comment text", async () => {
-    const onCreate = vi.fn();
-    render(
-      <CommentComposer
-        config={{ statuses: DEFAULT_COMMENT_STATUSES }}
-        collapsible={false}
-        onCreate={onCreate}
-      />,
-    );
+      expect(onCreate).toHaveBeenCalledWith({
+        body: "Tighten this layout",
+        anchor: null,
+        target: { id: "runtime:claude", name: "claude", kind: "agent" },
+      });
+      await waitFor(() => expect(screen.getByRole("button", { name: "Send to…" })).toBeVisible());
+    });
 
-    fireEvent.click(screen.getByRole("button", { name: "Positive rating" }));
-    fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
+    it("targets an @-named agent typed into the comment and shows it in the target chip", () => {
+      const onCreate = renderComposer();
+      setCommentDraft(screen.getByTestId("comment-compose-input"), "@codex fix the overflow");
+      expect(screen.getByRole("button", { name: "Send to @codex" })).toBeVisible();
+      fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
 
-    expect(onCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ body: "", rating: "positive" }),
-    );
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Positive rating" }),
-      ).toHaveAttribute("aria-pressed", "false"),
-    );
+      expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
+        body: "@codex fix the overflow",
+        target: { id: "runtime:codex", name: "codex", kind: "agent" },
+      }));
+    });
+
+    it("prefers the picked target over an @-name in the text and posts no target once it is cleared", () => {
+      const onCreate = renderComposer();
+      setCommentDraft(screen.getByTestId("comment-compose-input"), "ask @session about this");
+      fireEvent.click(screen.getByRole("button", { name: "Send to @session" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "@codex" }));
+      expect(screen.getByRole("button", { name: "Send to @codex" })).toBeVisible();
+
+      setCommentDraft(screen.getByTestId("comment-compose-input"), "no agent here");
+      fireEvent.click(screen.getByRole("button", { name: "Clear target" }));
+      fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
+
+      expect(onCreate).toHaveBeenCalledWith({ body: "no agent here", anchor: null });
+    });
+
+    it("completes each @-name once when a target shares its name with a mentionable", async () => {
+      render(
+        <CommentComposer
+          config={{ ...config, mentionables: [{ id: "agent-claude", name: "claude", kind: "agent" }] }}
+          collapsible={false}
+        />,
+      );
+      setCommentDraft(screen.getByTestId("comment-compose-input"), "@cla");
+
+      await waitFor(() => expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["@claude"]));
+    });
+
+    it("previews the page's default delivery until a target replaces it", () => {
+      const defaultDelivery = { label: "claude", description: "The project rule sends new threads here to claude" };
+      render(<CommentComposer config={{ ...config, defaultDelivery }} collapsible={false} />);
+      const chip = screen.getByRole("button", { name: "Send to… (default: claude)" });
+      expect([chip.textContent, chip.title]).toEqual(["Auto: claude", defaultDelivery.description]);
+
+      setCommentDraft(screen.getByTestId("comment-compose-input"), "@codex take this one");
+      expect([
+        screen.getByRole("button", { name: "Send to @codex" }).textContent,
+        screen.queryByRole("button", { name: /default: claude/ }),
+      ]).toEqual(["@codex", null]);
+    });
+
+    it("says a comment is not delivered when the page has no default delivery", () => {
+      render(<CommentComposer config={{ ...config, defaultDelivery: null }} collapsible={false} />);
+      const chip = screen.getByRole("button", { name: "Send to… (not delivered by default)" });
+      expect(chip.textContent).toBe("Not delivered");
+    });
+
+    it("does not treat an @-name inside a longer word as a target", () => {
+      const onCreate = renderComposer();
+      setCommentDraft(screen.getByTestId("comment-compose-input"), "mail me@codexample.com");
+      fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
+
+      expect(onCreate).toHaveBeenCalledWith({ body: "mail me@codexample.com", anchor: null });
+    });
   });
 
   it("submits a comment only once while the create request is pending", async () => {

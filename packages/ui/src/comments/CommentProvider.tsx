@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { CommentPersistenceBoundary } from "./CommentPersistenceBoundary";
+import { CommentProposalContext, useProposalCallbacks } from "./proposal-context";
 import { useCommentState } from "./comment-persistence";
 import { deriveAnchorCounts, deriveAnchorMeta } from "./comment-utils";
 import {
@@ -27,9 +28,12 @@ import {
   type CommentAnchor,
   type CommentCallbacks,
   type CommentConfig,
+  type CommentProposalCallbacks,
 } from "./comment-types";
 
-export type CommentProviderProps = CommentCallbacks & {
+const NO_PROPOSAL_CALLBACKS: CommentProposalCallbacks = {};
+
+export type CommentProviderProps =CommentCallbacks & {
   children: ReactNode;
   /** All comments for the document; counts and metadata are derived from these. */
   comments: Comment[];
@@ -82,6 +86,10 @@ function CommentProviderInner({
   onDelete,
   onChecklistToggle,
   onMention,
+  onApplyProposal,
+  onRejectProposal,
+  onRequestRevision,
+  loadProposalDiff,
   initialRailMode = "closed",
   persistenceKey,
 }: CommentProviderProps) {
@@ -220,6 +228,10 @@ function CommentProviderInner({
       ...(onDelete ? { onDelete } : {}),
       ...(onChecklistToggle ? { onChecklistToggle } : {}),
       ...(onMention ? { onMention } : {}),
+      ...(onApplyProposal ? { onApplyProposal } : {}),
+      ...(onRejectProposal ? { onRejectProposal } : {}),
+      ...(onRequestRevision ? { onRequestRevision } : {}),
+      ...(loadProposalDiff ? { loadProposalDiff } : {}),
     }),
     [
       onCreate,
@@ -232,8 +244,13 @@ function CommentProviderInner({
       onDelete,
       onChecklistToggle,
       onMention,
+      onApplyProposal,
+      onRejectProposal,
+      onRequestRevision,
+      loadProposalDiff,
     ]
   );
+  const proposalCallbacks = useProposalCallbacks(callbacks) ?? NO_PROPOSAL_CALLBACKS;
 
   useLayoutEffect(() => {
     anchorStore.update(commentMeta, railMode, focusedAnchor, highlightAnchor);
@@ -287,7 +304,9 @@ function CommentProviderInner({
     <CommentAnchorStoreContext.Provider value={anchorStore}>
       <CommentAnchorActionsContext.Provider value={anchorActions}>
         <CommentContext.Provider value={value}>
-          {children}
+          <CommentProposalContext.Provider value={proposalCallbacks}>
+            {children}
+          </CommentProposalContext.Provider>
         </CommentContext.Provider>
       </CommentAnchorActionsContext.Provider>
     </CommentAnchorStoreContext.Provider>

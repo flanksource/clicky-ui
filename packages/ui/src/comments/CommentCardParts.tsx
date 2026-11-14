@@ -1,4 +1,6 @@
+import { useContext } from "react";
 import { Badge } from "../data/Badge";
+import { AgentIdentityContext } from "../data/chat/agent-identity-context";
 import { Icon, type StaticIconComponent } from "../data/Icon";
 import { cn } from "../lib/utils";
 import { UiCheck, UiChecks, UiClock, UiRobotAi, UiThumbsDown, UiThumbsUp, UiWarningTriangle } from "../icons";
@@ -79,10 +81,12 @@ function deliveryTitle(stage: AgentDeliveryStage, run: CommentAgentRun, label: s
 
 /** An agent's hold on a thread: its provider's glyph, where the thread went, and a chat-style delivery tick. */
 function AgentDeliveryChip({ assignee, run }: { assignee: CommentAuthor; run: CommentAgentRun }) {
+  const identities = useContext(AgentIdentityContext);
+  const session = run.sessionId ? identities[run.sessionId] : undefined;
   const stage = agentDeliveryStage(run);
-  const glyph = agentGlyph(assignee.model ?? assignee.name);
+  const glyph = agentGlyph(session?.model ?? assignee.model ?? assignee.name);
   const tick = DELIVERY_TICK[stage];
-  const label = run.target?.label ?? assignee.name;
+  const label = run.sessionId ? `@${(session?.sessionName ?? run.sessionId).replace(/^@/, "")}` : run.target?.label ?? assignee.name;
   return (
     <Badge
       variant="soft"
