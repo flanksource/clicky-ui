@@ -11,9 +11,10 @@
  * identically regardless of the host page's root font-size.
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 const BROWSER_DEFAULT_FONT_SIZE_PX = 16;
-const CSS_OUTPUT_PATH = "./dist/styles.css";
+const CSS_OUTPUT_PATH = fileURLToPath(new URL("../dist/styles.css", import.meta.url));
 
 const cssContent = readFileSync(CSS_OUTPUT_PATH, "utf8");
 const transformedCss = cssContent.replace(

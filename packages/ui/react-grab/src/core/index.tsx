@@ -4360,4 +4360,5 @@ export type {
 } from "../types.js";
 
 export { generateSnippet } from "../utils/generate-snippet.js";
+export { getGrabContext, formatGrabContext, type GrabContext, type GrabContextEntry } from "../utils/injected-context.js";
 export { copyContent } from "../utils/copy-content.js";

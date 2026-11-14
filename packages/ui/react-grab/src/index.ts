@@ -11,6 +11,7 @@ export { openPlugin } from "./core/plugins/open.js";
 export { FreezeError } from "./errors.js";
 export { OpenFileError } from "./errors.js";
 export { generateSnippet } from "./utils/generate-snippet.js";
+export { getGrabContext, formatGrabContext, type GrabContext, type GrabContextEntry } from "./utils/injected-context.js";
 export { PluginSetupError, ReactGrabError } from "./errors.js";
 export type {
   Options,

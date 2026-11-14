@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { verifyForkFiles } from "./fork-integrity.js";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const checkout = resolve(packageRoot, "../../.tmp/react-grab-upstream/src");
+const checkout = resolve(packageRoot, "../../../.tmp/react-grab-upstream/src");
 const read = (path: string) => readFileSync(resolve(packageRoot, path), "utf8");
 const metadata = new Map(read("UPSTREAM").trim().split("\n").map((line) => {
   const match = /^(repository|tag|commit): (.+)$/.exec(line);

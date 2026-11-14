@@ -31,6 +31,7 @@ import {
 } from "../utils/is-useful-component-name.js";
 import type { SourceLocation } from "../types.js";
 import { getReactFiberForElement } from "./element-adapter.js";
+import { getGrabContext, formatGrabContext } from "../utils/injected-context.js";
 
 const isSourceComponentName = (name: string): boolean => {
   if (name.length <= 1) return false;
@@ -571,8 +572,9 @@ export const getStackContext = async (
   element: Element,
   options: StackContextOptions = {},
 ): Promise<string> => {
+  const injected = formatGrabContext(getGrabContext(element));
   const traceContext = await getTraceContext(element, options);
-  return traceContext.text;
+  return [traceContext.text, injected].filter(Boolean).join("\n\n");
 };
 
 const composeElementContext = (element: Element, traceContext: TraceContextResult): string => {
@@ -588,16 +590,18 @@ export const getElementReferenceContext = async (
   element: Element,
   options: StackContextOptions = {},
 ): Promise<string> => {
+  const injected = formatGrabContext(getGrabContext(element));
   const traceContext = await getTraceContext(element, options);
-  return `${getInlineHTMLPreview(element)}${composeElementContext(element, traceContext).replace(/\n\s+/g, " ")}`;
+  return [`${getInlineHTMLPreview(element)}${composeElementContext(element, traceContext).replace(/\n\s+/g, " ")}`, injected].filter(Boolean).join("\n\n");
 };
 
 export const formatElementInfo = async (
   element: Element,
   options: StackContextOptions = {},
 ): Promise<string> => {
+  const injected = formatGrabContext(getGrabContext(element));
   const nearestFiberElement = findNearestFiberElement(element);
   const htmlPreview = getHTMLPreview(nearestFiberElement);
   const traceContext = await getTraceContext(nearestFiberElement, options);
-  return `${htmlPreview}${composeElementContext(nearestFiberElement, traceContext)}`;
+  return [`${htmlPreview}${composeElementContext(nearestFiberElement, traceContext)}`, injected].filter(Boolean).join("\n\n");
 };

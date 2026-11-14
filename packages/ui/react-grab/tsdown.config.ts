@@ -1,14 +1,20 @@
 // Derived from react-grab (MIT, Copyright (c) 2025 Aiden Bai): packages/react-grab/vite.config.ts
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "tsdown";
 import { cssTextPlugin, solidBabelPlugin, solidWebBrowserPlugin } from "./solid-babel-plugin.js";
 import { solidSourceLocationBabelPlugin } from "./solid-source-location-babel-plugin.js";
 
 const sourceLocations = process.env.REACT_GRAB_SOURCE_LOCATIONS === "true";
-const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as { version: string };
+const root = dirname(fileURLToPath(import.meta.url));
+const version = /^tag: react-grab@(.+)$/m.exec(readFileSync(resolve(root, "UPSTREAM"), "utf8"))?.[1];
+if (!version) throw new Error("UPSTREAM must pin the React Grab version");
 
 export default defineConfig({
-  entry: { index: "./src/index.ts", "core/index": "./src/core/index.tsx", primitives: "./src/primitives.ts" },
+  entry: { index: resolve(root, "src/index.ts"), "core/index": resolve(root, "src/core/index.tsx"), primitives: resolve(root, "src/primitives.ts") },
+  outDir: resolve(root, "../dist/react-grab"),
+  tsconfig: resolve(root, "tsconfig.json"),
   format: ["esm"],
   dts: true,
   clean: false,
