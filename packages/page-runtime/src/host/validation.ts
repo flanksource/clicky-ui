@@ -25,6 +25,15 @@ export function validateFrameMessage(value: unknown): FrameMessage {
       if (!["connecting", "booting", "mounted", "fonts", "images", "stylesheets", "diagrams", "hook", "quiescence", "ready"].includes(String(m.state))) throw new Error("message.state: invalid status");
       break;
     case "snapshot": keys(m, ["type", "html"], "message"); text(m.html, "snapshot.html", true); break;
+    case "emit":
+      keys(m, ["type", "event", "payload"], "message"); text(m.event, "emit.event");
+      if (!("payload" in m)) throw new Error("emit.payload: required");
+      validateJson(m.payload);
+      break;
+    case "size":
+      keys(m, ["type", "height"], "message");
+      if (typeof m.height !== "number" || !Number.isFinite(m.height) || m.height < 0) throw new Error("size.height: expected a non-negative number");
+      break;
     case "error": {
       keys(m, ["type", "error"], "message");
       const error = record(m.error, "error");

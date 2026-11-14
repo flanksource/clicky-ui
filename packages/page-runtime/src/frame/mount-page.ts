@@ -1,13 +1,15 @@
 import type { ComponentType, ReactNode } from "react";
-import type { JsonValue } from "../schema.ts";
+import type { FrameMessage, JsonValue, PageHost } from "../schema.ts";
 import { RuntimeFailure, runtimeError } from "../sw/errors.ts";
+import { validateFrameMessage } from "../host/validation.ts";
 
-export type PageModule = { default: ComponentType<{ data: JsonValue }>; ready?: (() => Promise<void>) | Promise<void>; meta?: unknown };
+export type PageModule = { default: ComponentType<{ data: JsonValue; host: PageHost }>; ready?: (() => Promise<void>) | Promise<void>; meta?: unknown };
 export type PageLayout = { default: ComponentType<{ data: JsonValue; children: ReactNode }>; meta?: unknown };
 export type ReactRuntime = [typeof import("react"), typeof import("react-dom/client"), typeof import("react-dom")];
 
-export function mountPage(options: { module: PageModule; layout?: PageLayout; runtime: ReactRuntime; data: JsonValue; file: string; root: HTMLElement; wrap: (children: ReactNode) => ReactNode }) {
+export function mountPage(options: { module: PageModule; layout?: PageLayout; runtime: ReactRuntime; data: JsonValue; file: string; root: HTMLElement; wrap: (children: ReactNode) => ReactNode; send: (message: FrameMessage) => void }) {
   const [React, { createRoot }, { flushSync }] = options.runtime;
+  const host: PageHost = { emit: (event, payload) => options.send(validateFrameMessage({ type: "emit", event, payload })) };
   const renderer = createRoot(options.root);
   let revision = 0;
   const failures: unknown[] = [];
@@ -20,7 +22,7 @@ export function mountPage(options: { module: PageModule; layout?: PageLayout; ru
   }
   async function update(data: JsonValue) {
     failures.length = 0;
-    const page = React.createElement(options.module.default, { data });
+    const page = React.createElement(options.module.default, { data, host });
     const content = options.layout ? React.createElement(options.layout.default, { data, children: page }) : page;
     flushSync(() => renderer.render(options.wrap(React.createElement(Boundary, { revision: ++revision, children: content }))));
     if (failures.length) throw new RuntimeFailure(runtimeError({ error: failures[0], phase: "render", file: options.file }));

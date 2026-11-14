@@ -1,6 +1,6 @@
 # Local package publications
 
-Local package origins serve completed package snapshots. Run the normal build in Clicky UI, React Grab, or Facet; it holds a package build lock, builds all artifacts, validates the package, then publishes it. A failed or interrupted build leaves the last successful publication active. Concurrent builds of the same package wait for the owner to finish.
+Local package origins serve completed package snapshots. Run the normal build in Clicky UI or Facet; it holds a package build lock, builds all artifacts, validates the package, then publishes it. The React picker is included in Clicky UI as `@flanksource/clicky-ui/react-grab`. A failed or interrupted build leaves the last successful publication active. Concurrent builds of the same package wait for the owner to finish.
 
 Publication uses `pnpm --config.ignoreScripts=true pack --json` to preserve the package manager's file selection, workspace dependency rewriting, and inherited license files without rerunning lifecycle scripts. Exported files, runtime fragments, barrel indexes, and local integrity entries must be valid before activation. This requires pnpm and tar on the build machine.
 
@@ -10,13 +10,12 @@ For an existing, already-complete build, initialize its publication explicitly:
 
 ```sh
 pnpm --dir packages/ui exec tsx ../page-runtime/scripts/run-package-build.ts --publish-only
-pnpm --dir packages/react-grab exec tsx ../page-runtime/scripts/run-package-build.ts --publish-only
 ```
 
 Start a standalone package origin with persistent catalog storage:
 
 ```sh
-pnpm --filter @flanksource/page-runtime run serve-packages --package ../ui --package ../react-grab --package ../../../facet --state-dir .tmp/package-origin --port 5812
+pnpm --filter @flanksource/page-runtime run serve-packages --package ../ui --package ../../../facet --state-dir .tmp/package-origin --port 5812
 ```
 
 `--package` selects an already published package directory and can repeat. `--state-dir` retains catalogs across restarts; do not delete it while old pages remain open. `--upstream-registry` supplies metadata for packages outside the local set, and `--upstream-origin` supplies their versioned files. Missing local versions or files fail without contacting upstream.

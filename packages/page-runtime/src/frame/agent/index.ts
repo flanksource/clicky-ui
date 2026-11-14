@@ -1,5 +1,5 @@
-import { init } from "@flanksource/react-grab/core";
-import type { ReactGrabAPI } from "@flanksource/react-grab";
+import { init } from "@flanksource/clicky-ui/react-grab/core";
+import type { ReactGrabAPI } from "@flanksource/clicky-ui/react-grab";
 import { getFiberFromHostInstance } from "bippy";
 import {
   captureLocators, commentAnchor, describeElement, COMMENT_ELEMENT_HTML_LIMIT, COMMENT_ELEMENT_HTML_TRUNCATION,

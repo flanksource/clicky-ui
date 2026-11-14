@@ -1,4 +1,4 @@
-import type { BridgeEnvelope, FrameConfig, JsonValue, RuntimeError, RuntimePhase, RuntimeProfile } from "../schema.ts";
+import type { BridgeEnvelope, FrameConfig, FrameMessage, JsonValue, RuntimeError, RuntimePhase, RuntimeProfile } from "../schema.ts";
 import { createFrameBridge, workerRequest } from "./bridge.ts";
 import { waitForReadiness } from "./readiness.ts";
 import { exportHtml } from "./export.ts";
@@ -61,7 +61,8 @@ export async function bootFrame(): Promise<void> {
     activitySubscribed = true;
     void workerRequest({ message: "subscribe-activity", load: activity.load, navigationStart: activity.navigationStart }, 15000).catch(report);
   };
-  const dispose = () => { ready = false; unmount?.(); unmount = undefined; exportMount = undefined; agent?.dispose(); agent = undefined; styles?.stop(); styles = undefined; };
+  let sizeObserver: ResizeObserver | undefined;
+  const dispose = () => { ready = false; sizeObserver?.disconnect(); sizeObserver = undefined; unmount?.(); unmount = undefined; exportMount = undefined; agent?.dispose(); agent = undefined; styles?.stop(); styles = undefined; };
   window.addEventListener("pagehide", () => { activity.stop(); dispose(); bridge.dispose(); }, { once: true });
   async function receive(envelope: BridgeEnvelope) {
     const m = envelope.message;
@@ -178,7 +179,14 @@ export async function bootFrame(): Promise<void> {
     phase = "render";
     const pageAgent = agent; const runtime = reactRuntime;
     const wrap = (children: import("react").ReactNode) => runtime[0].createElement(PageAgentProvider, { agent: pageAgent, children });
-    const mountedPage = mountPage({ module: pageModule, ...(layout ? { layout } : {}), runtime, data: pageData, file: config.page, root: pageRoot, wrap });
+    let reportedHeight: number | undefined;
+    sizeObserver = new ResizeObserver(() => {
+      const height = Math.ceil(pageRoot.getBoundingClientRect().height);
+      if (height !== reportedHeight) { reportedHeight = height; bridge.send({ type: "size", height }); }
+    });
+    sizeObserver.observe(pageRoot);
+    const send = (message: FrameMessage) => bridge.send(message);
+    const mountedPage = mountPage({ module: pageModule, ...(layout ? { layout } : {}), runtime, data: pageData, file: config.page, root: pageRoot, wrap, send });
     updateSources = async (files) => {
       const revision = crypto.randomUUID();
       const revised = (path: string) => { const url = new URL(path, location.href); url.searchParams.set("revision", revision); return url.href; };
@@ -223,7 +231,7 @@ export async function bootFrame(): Promise<void> {
     const page = config.page;
     exportMount = (module, root) => {
       if (typeof module.default !== "function" && typeof module.default !== "object") throw new Error(`${page}: export compile has no default React component`);
-      return mountPage({ module, ...(layout ? { layout } : {}), runtime, data: latestData, file: page, root, wrap });
+      return mountPage({ module, ...(layout ? { layout } : {}), runtime, data: latestData, file: page, root, wrap, send });
     };
     performance.mark("page-runtime:render");
     requestAnimationFrame(() => requestAnimationFrame(() => { performance.mark("page-runtime:visible"); subscribeActivity(); activity.schedule(); }));

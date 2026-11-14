@@ -52,7 +52,7 @@ A browser-only runtime for facet and clicky-ui pages. Pages written as `.mdx` or
    /<name>@<ver>/<file>     metadata for resolution
 ```
 
-The host never loads page code. It sends `open` (page path, folder manifest, source files, optional lock), `theme` and `data` over the bridge. The frame asks the worker for the page entry; the worker resolves bare specifiers through the composed import map, fetches package files from the package origin, verifies integrity, compiles source, rewrites imports to canonical URLs and serves the result. The frame mounts the page's default export with `{ data }`, waits for readiness signals and reports status back.
+The host never loads page code. It sends `open` (page path, folder manifest, source files, optional lock), `theme` and `data` over the bridge. The frame asks the worker for the page entry; the worker resolves bare specifiers through the composed import map, fetches package files from the package origin, verifies integrity, compiles source, rewrites imports to canonical URLs and serves the result. The frame mounts the page's default export with `{ data, host }`, waits for readiness signals and reports status back.
 
 Static assets produced by `pnpm --filter @flanksource/page-runtime build` in `dist/static/`:
 
@@ -166,9 +166,49 @@ function Report({ source, lock, saveLock }: { source: string; lock?: PageLock; s
 
 `RuntimeActivity`, `BuildLog` and `clearPageRuntimeCache` from the same entry give hosts a live compile/fetch log and a cache reset.
 
+#### Page-to-host messages
+
+Besides `lock`, `status`, `error`, `snapshot`, `activity` and the agent messages, a frame sends two data messages. Both are validated by the host bridge, and the payload of `emit` must be JSON.
+
+| Frame message | Sent when | Host receives |
+|---|---|---|
+| `{ type: "emit", event, payload }` | the page calls `host.emit(event, payload)`; `host` is the second prop of the page's default export, next to `data` | the message, through `PageFrame`'s `onMessage` |
+| `{ type: "size", height }` | the page root's rendered height changes (a `ResizeObserver` on `#root`, rounded up to whole pixels; the first value is sent when the page mounts) | the message, through `onMessage`; set the iframe's `height` from it to make a frame follow its content |
+
+Host messages are unchanged; `emit` and `size` are rejected if they arrive from the host direction.
+
+### Forms with runtime extensions
+
+`PageForm` renders a clicky-ui `JsonSchemaForm` inside a frame and lets the form be extended by `FormExtension` modules (formats, lookups, layouts, slots, pre/post hooks) that are compiled in the browser. The whole form, including its extensions, runs inside the frame, so extensions are ordinary functions in the same React as the form; the sandbox, lock and integrity model are unchanged.
+
+```tsx
+import { PageForm } from "@flanksource/page-runtime/host";
+
+<PageForm
+  runtimeOrigin="https://pages.example.com"
+  theme={{ theme: "light", density: "comfortable" }}
+  manifest={{ dependencies: { "@flanksource/clicky-ui": "^0.3.57" } }}
+  schema={schema}
+  value={value}
+  onChange={setValue}
+  formProps={{ layout: { mode: "cards" } }}
+  extensions={[{ tsx: inlineSource, name: "notes" }]}   // host-supplied; the schema may declare its own too
+  files={{ "extensions/service.tsx": serviceSource }}    // serves the schema's `{ ref: "extensions/service.tsx" }`
+  onError={(error) => console.error(error)}
+/>
+```
+
+- **Extension sources.** `{ tsx }` is inline source, placed at `__form/ext-<i>.tsx`. `{ ref }` is a path relative to the project root, served by `files` or, through the approved path index, by `sourceProvider`; a ref neither can serve throws when `PageForm` renders. Each module's default export must be a `FormExtension` (`defineFormExtension` from `@flanksource/clicky-ui/components`). The generated `__form/entry.tsx` checks every default export when it loads, so a bad export fails the page with a named error instead of being ignored.
+- **Schema-declared sources.** A schema's root can declare its own extensions, `"x-clicky-extensions": [{ "ref": "extensions/service.tsx" }, { "tsx": "…", "name": "…" }]`, so one `schema.json` describes a whole form. `PageForm` reads the keyword and appends those sources after the host's `extensions`; a source's index in the combined list fixes its file name (`__form/ext-<i>.tsx`), and they are validated like host sources (a ref must be served by `files` or `sourceProvider`, an inline source must not be empty, a malformed keyword throws). The generated entry hands host sources to the form's `extensions` prop and schema-declared ones only to its `extensionLoader`, by declared index, so nothing is registered twice and duplicate or reserved names still throw. The framed form always has a loader, so a schema-declared form just works in `PageForm`; a plain `JsonSchemaForm` loads them only when the host passes its own `extensionLoader`.
+- **Data.** Only serializable `JsonSchemaForm` props cross the bridge (`formProps`, typed `FormDataProps`: the props minus `onChange`, `pre`, `post`, `extensions`, `lookupFetcher` and `expressionEvaluator`). A host-side `lookupFetcher` cannot reach a framed form, so lookups must be extension handlers; they run in the frame under the profile's `network.allow` and CSP.
+- **Value.** The frame keeps the value in local state for typing latency and reports every edit as `emit` event `change`, which `PageForm` maps to `onChange`. Feeding the value back through `value` is safe: the frame reseeds from `value` only when it is not one of the values it emitted and has not yet seen echoed back.
+- **Height.** `size` messages set the iframe's height, so the frame grows and shrinks with the form.
+- **Live edits.** Changing the extension sources, or the sources the schema declares, sends a `sources` message with only the changed files once the frame is ready, without remounting the iframe. Changing the manifest, `sourceProvider` or `policy` re-sends `open` instead, because a worker session cannot swap those.
+- **Without React.** `formPageOpen` from `@flanksource/page-runtime/form` is the pure generator behind `PageForm` (pass `schema` to include its declared sources); it returns the `open` message (`{ page, manifest, files, sourceProvider?, policy? }`) for use with `PageFrame` directly, and `formSourceUpdate` computes the `sources`/`open` message between two such messages.
+
 ### 4. Write a page
 
-A page is an `.mdx` or `.tsx` module whose default export receives `{ data }`. It imports managed libraries and allowed dependencies by their normal npm specifiers:
+A page is an `.mdx` or `.tsx` module whose default export receives `{ data, host }` (`host.emit(event, payload)` sends a JSON payload to the embedding host, see [Page-to-host messages](#page-to-host-messages)). It imports managed libraries and allowed dependencies by their normal npm specifiers:
 
 ```mdx
 import { Gauge } from "@flanksource/clicky-ui/data";
@@ -217,7 +257,8 @@ The checker re-traces `dist` and fails on missing mappings, Node built-ins, unco
 
 | Export | Contents |
 |---|---|
-| `./host` | `PageFrame`, bridge, validation, activity/build log, cache clearing, remote review |
+| `./host` | `PageFrame`, `PageForm`, bridge, validation, activity/build log, cache clearing, remote review |
+| `./form` | `formPageOpen`, `formSourceUpdate`: the pure generator for pages that render a `JsonSchemaForm` with runtime extensions |
 | `./host/link` | Host side of developer checkout links |
 | `./frame`, `./frame/agent` | Frame bootstrap and in-frame agent (bundled into `dist/static`) |
 | `./sw` | Service worker (bundled into `dist/static/sw.js`) |

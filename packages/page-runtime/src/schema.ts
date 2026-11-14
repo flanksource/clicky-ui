@@ -109,13 +109,21 @@ export type HostMessage =
   | ({ type: "theme" } & Theme)
   | { type: "data"; data: JsonValue }
   | { type: "export"; format: "html" | "print" };
+/** The `open` host message without its `type`: what `PageFrame` takes as `open` and what `formPageOpen` builds. */
+export type OpenMessage = Omit<Extract<HostMessage, { type: "open" }>, "type">;
 export type FrameMessage =
   | import("./activity-schema.ts").ActivityMessage
   | AgentFrameMessage
   | { type: "lock"; lock: PageLock }
   | { type: "status"; state: "connecting" | "booting" | "mounted" | "fonts" | "images" | "stylesheets" | "diagrams" | "hook" | "quiescence" | "ready" }
   | { type: "error"; error: RuntimeError }
-  | { type: "snapshot"; html: string };
+  | { type: "snapshot"; html: string }
+  /** A page-defined event with a JSON payload, sent through `host.emit` (see `PageHost`). */
+  | { type: "emit"; event: string; payload: JsonValue }
+  /** The rendered height of the page root in CSS pixels, sent whenever it changes. */
+  | { type: "size"; height: number };
+/** What the runtime gives a page component next to its data: the page-to-host half of the bridge. */
+export type PageHost = { emit(event: string, payload: JsonValue): void };
 export type BridgeEnvelope<M = HostMessage | FrameMessage> = { bridge: "page-runtime-v1"; session: string; id?: string; re?: string; message: M };
 
 export type FrameConfig = { page: string; entry: string; layout?: string; lock: PageLock; profile: RuntimeProfile; runtimeVersion: string };

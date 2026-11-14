@@ -79,16 +79,45 @@ test("honors explicit browser:false mappings while rejecting undeclared builtins
   expect((await import(pathToFileURL(join(process.cwd(), root, "compiled", runtime.imports["example-lib"]!)).href)).disabled).toBe(true);
 });
 
-test("compiles requested barrel bindings without pulling in unused optional peers", async () => {
+test.each([
+  { published: true, target: "node" as const },
+  { published: false, target: "node" as const },
+  { published: true, target: "browser" as const },
+  { published: false, target: "browser" as const },
+])("compiles requested barrel bindings without unused optional peers ($target, published index: $published)", async ({ published, target }) => {
   const root = await fixture();
   const library = join(root, "node_modules/example-lib");
   await writeFile(join(library, "package.json"), JSON.stringify({ name: "example-lib", version: "1.0.0", type: "module", sideEffects: false, main: "./browser.js" }));
-  await mkdir(join(library, "dist/runtime"), { recursive: true });
-  await writeFile(join(library, "dist/runtime/barrels.json"), JSON.stringify({ modules: ["example-lib@1.0.0/leaf.js"], barrels: { "example-lib@1.0.0/browser.js": { value: 0 } } }));
+  if (published) {
+    await mkdir(join(library, "dist/runtime"), { recursive: true });
+    await writeFile(join(library, "dist/runtime/barrels.json"), JSON.stringify({ modules: ["example-lib@1.0.0/leaf.js"], barrels: { "example-lib@1.0.0/browser.js": { value: 0 } } }));
+  }
   await writeFile(join(library, "leaf.js"), 'export const value = "selected export";');
   await writeFile(join(library, "browser.js"), 'export { value } from "./leaf.js"; export { missing } from "missing-optional-peer";');
-  const runtime = await buildDependencyRuntime({ root, outDir: join(root, "compiled"), entries: ["example-lib"], target: "browser", exports: { "example-lib": ["value"] } });
+  const runtime = await buildDependencyRuntime({ root, outDir: join(root, "compiled"), entries: ["example-lib"], target, exports: { "example-lib": ["value"] } });
   expect((await import(pathToFileURL(join(process.cwd(), root, "compiled", runtime.imports["example-lib"]!)).href)).value).toBe("selected export");
+});
+
+test("keeps side effects when deriving an unpublished barrel index", async () => {
+  const root = await fixture();
+  const library = join(root, "node_modules/example-lib");
+  await writeFile(join(library, "package.json"), JSON.stringify({ name: "example-lib", version: "1.0.0", type: "module", sideEffects: ["./browser.js"], main: "./browser.js" }));
+  await writeFile(join(library, "leaf.js"), 'export const state = { initialized: false };');
+  await writeFile(join(library, "browser.js"), 'import { state } from "./leaf.js"; state.initialized = true; export { state };');
+  const runtime = await buildDependencyRuntime({ root, outDir: join(root, "compiled"), entries: ["example-lib"], target: "browser", exports: { "example-lib": ["state"] } });
+  expect((await import(pathToFileURL(join(process.cwd(), root, "compiled", runtime.imports["example-lib"]!)).href)).state).toEqual({ initialized: true });
+});
+
+test.each(["node", "browser"] as const)("preserves missing optional dynamic imports as runtime failures (%s)", async target => {
+  const root = await fixture();
+  const library = join(root, "node_modules/example-lib");
+  await writeFile(join(library, "package.json"), JSON.stringify({ name: "example-lib", version: "1.0.0", type: "module", main: "./browser.js", peerDependencies: { "optional-highlighter": "*" }, peerDependenciesMeta: { "optional-highlighter": { optional: true } } }));
+  await writeFile(join(library, "browser.js"), 'export const load = () => import("optional-highlighter/theme");');
+  const runtime = await buildDependencyRuntime({ root, outDir: join(root, "compiled"), entries: ["example-lib"], target });
+  const module = await import(pathToFileURL(join(process.cwd(), root, "compiled", runtime.imports["example-lib"]!)).href);
+  await expect(module.load()).rejects.toThrow(/optional-highlighter/);
+  await writeFile(join(library, "browser.js"), 'export { theme } from "optional-highlighter/theme";');
+  await expect(buildDependencyRuntime({ root, outDir: join(root, "static"), entries: ["example-lib"], target })).rejects.toThrow(/optional-highlighter/);
 });
 
 test.each(["node", "browser"] as const)("shares base-module identity across new ESM and CommonJS dependency entries (%s)", async target => {

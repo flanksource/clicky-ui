@@ -7,6 +7,7 @@ import { rolldown, type Plugin } from "rolldown";
 import { ClosureTracer, createResolver, IMPORT_CONDITIONS, moduleFormat, resolveBrowser } from "./trace.ts";
 import { dependencyBarrels } from "./dependency-barrels.ts";
 import { commonJsExportNames, type CommonJsExports } from "./commonjs-exports.ts";
+import { optionalDependency } from "./dependency-optional.ts";
 
 export interface DependencyRuntimeOptions {
   root: string;
@@ -65,6 +66,9 @@ export async function buildDependencyRuntime(options: DependencyRuntimeOptions):
         return { id: source, external: true };
       }
       if (source.startsWith("\0entry:")) return source;
+      if (extra.kind === "dynamic-import" && importer && optionalDependency({ source, importer })) {
+        return await this.resolve(source, importer, { ...extra, skipSelf: true }) ?? { id: source, external: true };
+      }
       if (importer?.startsWith("\0entry:")) return this.resolve(source, join(root, "package.json"), { ...extra, skipSelf: true });
       if (/^(react|react-dom|scheduler)(\/|$)/.test(source)) return this.resolve(source, join(root, "package.json"), { ...extra, skipSelf: true });
       return null;

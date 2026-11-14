@@ -1,4 +1,5 @@
 export { PageFrame, type PageFrameProps } from "./PageFrame.tsx";
+export { PageForm, type PageFormProps } from "./PageForm.tsx";
 export { createBridge, type BridgeOptions, type PageBridge } from "./bridge.ts";
 export { validateEnvelope, validateFrameMessage, validateHostMessage } from "./validation.ts";
 export { RuntimeActivity } from "./RuntimeActivity.tsx";

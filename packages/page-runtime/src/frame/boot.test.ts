@@ -27,6 +27,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   performance.clearMarks();
   vi.stubGlobal("requestAnimationFrame", vi.fn());
+  vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   history.replaceState(null, "", `${location.pathname}?runtime-opened=1`);
   location.hash = new URLSearchParams({ host: "https://host.example" }).toString();
   const worker = { state: "activated" };
@@ -122,6 +123,28 @@ it("acknowledges source replacement in the existing document without restarting 
   fixture.receive!({ bridge: "page-runtime-v1", session: "test", id: "source-update", message: { type: "sources", files: { "report.tsx": "export default function Page() { return 'Updated'; }" } } });
   await vi.waitFor(() => expect(fixture.send).toHaveBeenCalledWith({ type: "status", state: "ready" }, { re: "source-update" }));
   expect({ sameRoot: document.getElementById("root") === root, workerStarts: vi.mocked(navigator.serviceWorker.register).mock.calls.length, agentStarts: fixture.start.mock.calls.length }).toEqual({ sameRoot: true, workerStarts: 1, agentStarts: 1 });
+});
+
+it("sends the page root's rounded-up height to the host when it changes and stops observing on pagehide", async () => {
+  const observers: Array<{ callback: () => void; observed: Element[]; disconnected: boolean }> = [];
+  vi.stubGlobal("ResizeObserver", class {
+    state = { callback: () => {}, observed: [] as Element[], disconnected: false };
+    constructor(callback: () => void) { this.state.callback = callback; observers.push(this.state); }
+    observe(target: Element) { this.state.observed.push(target); }
+    disconnect() { this.state.disconnected = true; }
+  });
+  const boot = bootFrame(); command({ type: "data", data: null }); await boot;
+  const root = document.getElementById("root")!;
+  let height = 120.4;
+  root.getBoundingClientRect = () => ({ height }) as DOMRect;
+  const sizes = () => fixture.send.mock.calls.map(([message]) => message).filter(message => message.type === "size");
+  observers[0]!.callback();
+  observers[0]!.callback();
+  height = 300;
+  observers[0]!.callback();
+  expect({ observed: observers[0]!.observed, sizes: sizes() }).toEqual({ observed: [root], sizes: [{ type: "size", height: 121 }, { type: "size", height: 300 }] });
+  window.dispatchEvent(new Event("pagehide"));
+  expect(observers[0]!.disconnected).toBe(true);
 });
 
 it("retains worker diagnostics until after the first paint instead of delivering them on the render path", async () => {

@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, type IframeHTMLAttributes } from "react";
 import type { FrameMessage, HostMessage, JsonValue, Theme } from "../schema.ts";
 import { createBridge, type PageBridge } from "./bridge.ts";
 import { validateFrameOrigin, type FrameOrigin } from "./origin.ts";
+import { registerPageRuntimeDebug } from "./debug-runtime.tsx";
 
 export type PageFrameProps = Omit<IframeHTMLAttributes<HTMLIFrameElement>, "src" | "sandbox" | "onError"> & {
   runtimeOrigin: string; open: Omit<Extract<HostMessage, { type: "open" }>, "type">; theme: Theme; data: JsonValue;
@@ -23,9 +24,11 @@ export function PageFrame({ runtimeOrigin, origin = "cross-origin", open, theme,
     if (!target || !frame.current) throw new Error("PageFrame has no contentWindow");
     validateFrameOrigin({ runtimeOrigin, hostOrigin: location.origin, origin });
     const session = crypto.randomUUID();
+    const debug = registerPageRuntimeDebug({ session, page: open.page, origin: runtimeOrigin });
     let opened = false;
-    bridge.current = createBridge({ target, origin: runtimeOrigin, session, direction: "host", onError: (error) => latest.current.onError(error), onMessage: (envelope) => {
+    bridge.current = createBridge({ target, origin: runtimeOrigin, session, direction: "host", onError: (error) => { debug.fail(error); latest.current.onError(error); }, onMessage: (envelope) => {
       const message = envelope.message as FrameMessage;
+      debug.receive(message);
       if (message.type === "lock" && JSON.stringify(message.lock) === JSON.stringify(latest.current.open.lock)) return;
       if (message.type === "status" && (message.state === "connecting" || (message.state === "booting" && !opened))) { opened = true; bridge.current!.send({ type: "open", ...latest.current.open }); return; }
       if (message.type === "status" && message.state === "booting") { bridge.current!.send({ type: "theme", ...latest.current.theme }); bridge.current!.send({ type: "data", data: latest.current.data }); }
@@ -35,7 +38,7 @@ export function PageFrame({ runtimeOrigin, origin = "cross-origin", open, theme,
     const params = new URLSearchParams({ session, host: location.origin });
     if (origin === "same-origin-local") params.set("origin", origin);
     frame.current.src = `${runtimeOrigin}/frame/${open.page.split("/").map(encodeURIComponent).join("/")}#${params}`;
-    return () => { bridge.current?.dispose(); bridge.current = null; latest.current.onBridge?.(null); };
+    return () => { debug.dispose(); bridge.current?.dispose(); bridge.current = null; latest.current.onBridge?.(null); };
   }, [runtimeOrigin, origin, open.page]);
   useLayoutEffect(() => { bridge.current?.send({ type: "theme", ...theme }); }, [theme]);
   useLayoutEffect(() => { if (dataUpdates) bridge.current?.send({ type: "data", data }); }, [data, dataUpdates]);

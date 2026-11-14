@@ -9,10 +9,12 @@ import { guardedBarrels } from "../sw/barrels.ts";
 import { mergeBarrels } from "../sw/composition.ts";
 import { transformModule } from "../sw/module-transform.ts";
 import { packageOf } from "./trace.ts";
+import { dependencyBarrelIndex } from "./dependency-barrel-index.ts";
 
 export function dependencyBarrels({ target, root }: { target: "node" | "browser"; root: string }): Plugin {
   const resolver = new ResolverFactory({ conditionNames: [target, "import", "default"], mainFields: target === "browser" ? ["browser", "module", "main"] : ["module", "main"], extensions: [".mjs", ".js", ".cjs", ".json"], symlinks: true });
   const loaded = new Set<string>();
+  const indexed = new Set<string>();
   const directories = new Map<string, string>();
   let index: BarrelIndex = { modules: [], barrels: {} };
   const canonical = (path: string) => {
@@ -48,7 +50,16 @@ export function dependencyBarrels({ target, root }: { target: "node" | "browser"
       const url = entry ? "/runtime-entry.js" : canonical(id);
       for (const item of parsed.module.staticImports) {
         const path = resolver.sync(from, item.moduleRequest.value).path;
-        if (path) canonical(path);
+        if (path) {
+          canonical(path);
+          if (!indexed.has(path)) {
+            indexed.add(path);
+            const pkg = packageOf(path);
+            if (!existsSync(join(pkg.dir, "dist/runtime/barrels.json"))) {
+              index = mergeBarrels([index, dependencyBarrelIndex({ path, canonical, resolve: (from, source) => resolver.sync(from, source).path })]);
+            }
+          }
+        }
       }
       return transformModule(code, { url, barrels: index, known: () => false, resolveBare(source) {
         const path = resolver.sync(from, source).path;

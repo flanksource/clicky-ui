@@ -12,6 +12,7 @@
     "./sw": "./src/sw/index.ts",
     "./frame": "./src/frame/index.ts",
     "./frame/agent": "./src/frame/agent.ts",
+    "./form": "./src/form/index.ts",
     "./host": "./src/host/index.ts",
     "./host/link": "./src/host/link/index.ts",
     "./dev": "./src/dev/index.ts",
@@ -36,7 +37,6 @@
     "check": "tsc -p tsconfig.json --noEmit && pnpm run lint"
   },
   "dependencies": {
-    "@flanksource/react-grab": "workspace:*",
     "@mdx-js/mdx": "catalog:",
     "autoprefixer": "catalog:",
     "bippy": "catalog:",
@@ -67,7 +67,6 @@
     "fake-indexeddb": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "react-grab": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
