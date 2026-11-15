@@ -260,6 +260,22 @@ describe("FileReview on a code file", () => {
     expect({ shown, hidden, picked: listed() }).toEqual({ shown: 1, hidden: 0, picked: 1 });
   });
 
+  it("drops a schema finding's path under its line but keeps it in the Problems list", () => {
+    const schema: FileFinding = {
+      file: GO_PATH, line: 4, severity: "error", rule: "schema", source: "json", kind: "lint",
+      path: "/conditions/dueDate", message: "/conditions/dueDate: missing property 'fieldRef'",
+    };
+    const { container, unmount } = renderCode({ findings: [schema] });
+    const underLine = container.querySelector(`[data-source-finding="4"] button`)?.textContent;
+    unmount();
+    renderCode({ findings: [schema], view: "problems" });
+
+    expect({ underLine, listed: screen.queryByText(schema.message) !== null }).toEqual({
+      underLine: "missing property 'fieldRef'json schema",
+      listed: true,
+    });
+  });
+
   it("highlights a source-anchored comment on its characters", async () => {
     const comment: Comment = { ...COMMENT, body: "Retry forever?", anchor: sourceAnchor({ line: 4, prefix: "\treturn ", quote: "call(n)", suffix: "\n}" }) };
     const { container } = renderCode({ comments: { items: [comment], callbacks: {} } });

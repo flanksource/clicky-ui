@@ -47,6 +47,7 @@ export function lintFindings(results: readonly LinterResult[]): FileFinding[] {
           endLine: violation.end_line,
           endColumn: violation.end_column,
           message,
+          path: violation.path,
         },
       ];
     }),

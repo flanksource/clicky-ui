@@ -1,5 +1,32 @@
-import { describe, expect, it } from "vitest";
-import { isBlockHtml, sanitizeHtml } from "./html-utils";
+import DOMPurify from "dompurify";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { isBlockHtml, SANITIZE_CACHE_ENTRIES, sanitizeHtml } from "./html-utils";
+
+describe("sanitizeHtml cache", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("sanitizes a repeated input once and returns the same output", () => {
+    const input = `<span class="k">SELECT</span><script>x()</script> ${Math.random()}`;
+    const spy = vi.spyOn(DOMPurify, "sanitize");
+    const first = sanitizeHtml(input);
+    const second = sanitizeHtml(input);
+    expect({ calls: spy.mock.calls.length, same: first === second, script: /<script/i.test(second) }).toEqual({
+      calls: 1,
+      same: true,
+      script: false,
+    });
+  });
+
+  it("re-sanitizes the least recently used input once the cache is full", () => {
+    const prefix = `lru-${Math.random()}-`;
+    const oldest = `<b>${prefix}oldest</b>`;
+    sanitizeHtml(oldest);
+    for (let i = 0; i < SANITIZE_CACHE_ENTRIES; i++) sanitizeHtml(`<i>${prefix}${i}</i>`);
+    const spy = vi.spyOn(DOMPurify, "sanitize");
+    sanitizeHtml(oldest);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("sanitizeHtml", () => {
   it("returns empty string for empty input", () => {

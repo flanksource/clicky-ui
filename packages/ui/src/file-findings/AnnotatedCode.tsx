@@ -2,12 +2,12 @@ import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { ProblemActions } from "../data/diagnostics/ProblemActions";
 import type { editor as MonacoEditorApi, IDisposable } from "monaco-editor";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CommentProvider } from "../comments/CommentProvider";
 import { CommentSidePanel } from "../comments/CommentSidePanel";
 import { useCommentContext } from "../comments/comment-context";
 import type { CommentScrollOptions } from "../comments/comment-context";
 import type { CommentAnchor } from "../comments/comment-types";
-import { severityRank } from "../data/lint/stats";
 import { cn } from "../lib/utils";
 import type { Monaco } from "../monaco";
 import { MonacoEditor } from "../monaco/MonacoEditor";
@@ -19,6 +19,8 @@ import {
   lineOfAnchor,
   lineRangeAnchorResolver,
 } from "./findings-comments";
+import { FindingRow } from "./file-review/FindingRow";
+import { bySeverityThenLine } from "./file-review/marks";
 import { registerFindingsLanguages } from "./findings-languages";
 import { findingsLanguageForPath } from "./monaco-language";
 import type { FileFinding, LintSeverity } from "./types";
@@ -37,8 +39,8 @@ export type AnnotatedCodeProps = {
   getFindingActions?: ((finding: FileFinding) => DropdownMenuItem[]) | undefined;
   /** Makes the editor editable and receives every edit; without it the editor is read-only. */
   onChange?: ((source: string) => void) | undefined;
-  /** Shows each line's worst finding as `rule · message` after the line's text. */
-  inlineChips?: boolean | undefined;
+  /** Lists each line's findings under it, worst first, as the review source view does. */
+  inlineFindings?: boolean | undefined;
   /**
    * People's threads on line ranges: a gutter marker on each range, and a
    * Comment action on the selection (plus a click on an empty gutter line)
@@ -70,12 +72,8 @@ const GLYPH: Record<LintSeverity, string> = {
   info: `${GLYPH_BASE} bg-sky-500`,
 };
 const THREAD_GLYPH = `${GLYPH_BASE} bg-primary`;
-const CHIP_BASE = "ml-6 italic";
-const CHIP: Record<LintSeverity, string> = {
-  error: `${CHIP_BASE} text-red-500`,
-  warning: `${CHIP_BASE} text-amber-500`,
-  info: `${CHIP_BASE} text-sky-500`,
-};
+/** Height of one FindingRow (`h-5`) in an inline-findings view zone. */
+const FINDING_ROW_PX = 20;
 
 function markerSeverity(monaco: Monaco, severity: LintSeverity): number {
   const { MarkerSeverity } = monaco;
@@ -108,32 +106,25 @@ function toMarkers(
   });
 }
 
-/**
- * One chip per line that has findings: the worst finding's `rule · message`,
- * with `+N` for the line's other findings, injected after the line's text.
- */
-function inlineChipDecorations(
-  findings: readonly FileFinding[],
-  model: Pick<MonacoEditorApi.ITextModel, "getLineMaxColumn">,
-): MonacoEditorApi.IModelDeltaDecoration[] {
-  const byLine = new Map<number, FileFinding[]>();
-  for (const finding of findings) byLine.set(finding.line, [...(byLine.get(finding.line) ?? []), finding]);
-  return [...byLine].map(([line, onLine]) => {
-    const worst = onLine.reduce((a, b) => (severityRank(b.severity) > severityRank(a.severity) ? b : a));
-    const label = worst.rule ? `${worst.rule} · ${worst.message}` : worst.message;
-    const column = model.getLineMaxColumn(line);
-    return {
-      range: { startLineNumber: line, startColumn: column, endLineNumber: line, endColumn: column },
-      options: {
-        // Monaco drops injected text on an empty range unless told to keep it.
-        showIfCollapsed: true,
-        after: {
-          content: onLine.length > 1 ? `${label} +${onLine.length - 1}` : label,
-          inlineClassName: CHIP[worst.severity],
-        },
-      },
-    };
-  });
+type FindingZone = { line: number; findings: FileFinding[]; node: HTMLDivElement };
+
+/** One view zone under each line that has findings, holding the line's findings worst first. */
+function useFindingZones(mounted: MountedEditor | null, findings: readonly FileFinding[], enabled: boolean): FindingZone[] {
+  const [zones, setZones] = useState<FindingZone[]>([]);
+  useEffect(() => {
+    if (!mounted || !enabled) return setZones([]);
+    const byLine = new Map<number, FileFinding[]>();
+    for (const finding of findings) byLine.set(finding.line, [...(byLine.get(finding.line) ?? []), finding]);
+    const next = [...byLine].map(([line, onLine]) => ({ line, findings: onLine.sort(bySeverityThenLine), node: document.createElement("div") }));
+    const ids: string[] = [];
+    mounted.editor.changeViewZones((accessor) => {
+      for (const zone of next)
+        ids.push(accessor.addZone({ afterLineNumber: zone.line, heightInPx: zone.findings.length * FINDING_ROW_PX, domNode: zone.node, suppressMouseDown: true }));
+    });
+    setZones(next);
+    return () => mounted.editor.changeViewZones((accessor) => ids.forEach((id) => accessor.removeZone(id)));
+  }, [mounted, findings, enabled]);
+  return zones;
 }
 
 /** The first finding whose line range covers `line`. */
@@ -153,7 +144,7 @@ function CodeBody({
   onLineChange,
   getFindingActions,
   onChange,
-  inlineChips,
+  inlineFindings,
   sourceComments,
   className,
 }: AnnotatedCodeProps & {
@@ -162,7 +153,7 @@ function CodeBody({
   contentElement: { current: HTMLDivElement | null };
 }) {
   const ctx = useCommentContext();
-  const { focusAnchor, commentMeta } = ctx;
+  const { focusAnchor, focusedAnchor, commentMeta } = ctx;
 
   const findingsById = useMemo(() => {
     const comments = findingsToComments(findings);
@@ -177,8 +168,8 @@ function CodeBody({
     if (!model) return;
     editor.updateOptions({ glyphMargin: true });
     monaco.editor.setModelMarkers(model, MARKER_OWNER, toMarkers(findings, model, monaco));
-    const decorations = editor.createDecorationsCollection([
-      ...findings.map((finding) => ({
+    const decorations = editor.createDecorationsCollection(
+      findings.map((finding) => ({
         range: {
           startLineNumber: finding.line,
           startColumn: 1,
@@ -192,13 +183,20 @@ function CodeBody({
           glyphMarginHoverMessage: { value: finding.message },
         },
       })),
-      ...(inlineChips ? inlineChipDecorations(findings, model) : []),
-    ]);
+    );
     return () => {
       decorations.clear();
       monaco.editor.setModelMarkers(model, MARKER_OWNER, []);
     };
-  }, [mounted, findings, inlineChips]);
+  }, [mounted, findings]);
+  const zones = useFindingZones(mounted, findings, inlineFindings === true);
+  const selectFinding = useCallback(
+    (finding: FileFinding) => {
+      focusAnchor(lineAnchor(finding.line));
+      onLineChange?.(finding.line);
+    },
+    [focusAnchor, onLineChange],
+  );
 
   const threads = useRef(sourceComments);
   threads.current = sourceComments;
@@ -230,12 +228,10 @@ function CodeBody({
     const subscription = editor.onMouseDown((event) => {
       const clicked = event.target.position?.lineNumber;
       const finding = clicked === undefined ? undefined : findingCovering(findings, clicked);
-      if (!finding) return;
-      focusAnchor(lineAnchor(finding.line));
-      onLineChange?.(finding.line);
+      if (finding) selectFinding(finding);
     });
     return () => subscription.dispose();
-  }, [mounted, findings, focusAnchor, onLineChange]);
+  }, [mounted, findings, selectFinding]);
 
   // The rail aligns to the editor's scroll position by listening for `scroll`
   // on the content element, which an editor's internal scrolling never fires.
@@ -273,6 +269,24 @@ function CodeBody({
           beforeMount={(monaco) => registerFindingsLanguages(monaco.languages)}
           onMount={(editor, monaco) => onMount({ editor, monaco })}
         />
+        {zones.map((zone) =>
+          createPortal(
+            <div className="leading-5">
+              {zone.findings.map((finding) => (
+                <FindingRow
+                  key={`${finding.rule}:${finding.message}`}
+                  finding={finding}
+                  selected={focusedAnchor === lineAnchor(finding.line)}
+                  onSelect={selectFinding}
+                  getFindingActions={getFindingActions}
+                  truncate
+                />
+              ))}
+            </div>,
+            zone.node,
+            zone.line,
+          ),
+        )}
       </div>
       {findings.length > 0 && (
         <div className="shrink-0 overflow-y-auto border-l border-border px-density-3">

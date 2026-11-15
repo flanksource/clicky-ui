@@ -27,6 +27,13 @@ describe("ObjectGraph", () => {
     expect(screen.getByText("Proxy@1a2b")).toBeTruthy();
   });
 
+  it("shows a truncated value's kind and explanation alongside its captured scalar", () => {
+    render(<ObjectGraph roots={[{ id: "notes", label: "notes", kind: "truncated", value: "Delivery…", raw: "Character limit reached" }]} />);
+    expect(screen.getByText("truncated")).toBeTruthy();
+    expect(screen.getByText("Delivery…")).toBeTruthy();
+    expect(screen.getByText("Character limit reached")).toBeTruthy();
+  });
+
   it("uses a custom renderLabel when provided", () => {
     render(
       <ObjectGraph

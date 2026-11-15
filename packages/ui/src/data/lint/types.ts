@@ -20,6 +20,8 @@ export type Violation = {
   /** Column just past the flagged range on `end_line`, when reported. */
   end_column?: number;
   message?: string;
+  /** JSON Pointer of the document value a schema violation is about; `message` begins with `<path>: `. */
+  path?: string;
   source?: string;
   rule?: {
     method?: string;

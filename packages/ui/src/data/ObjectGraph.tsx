@@ -267,6 +267,7 @@ function DefaultObjectLabel<T extends ObjectGraphNode>({
   return (
     <>
       {label}
+      {node.kind && ["opaque", "identity", "truncated", "error"].includes(node.kind) && <span className={cn("rounded border border-border px-1 text-[10px]", node.kind === "error" ? "text-destructive" : "text-muted-foreground")}>{node.kind}</span>}
       {node.type &&
         (renderType ? (
           renderType(node)
@@ -277,9 +278,8 @@ function DefaultObjectLabel<T extends ObjectGraphNode>({
         custom
       ) : node.value != null ? (
         <span className="break-all text-foreground">{String(node.value)}</span>
-      ) : node.raw && !node.children ? (
-        <span className="break-all italic text-muted-foreground/70">{node.raw}</span>
       ) : null}
+      {custom == null && node.raw && !node.children?.length && node.raw !== String(node.value) && <span className="break-all italic text-muted-foreground">{node.raw}</span>}
     </>
   );
 }

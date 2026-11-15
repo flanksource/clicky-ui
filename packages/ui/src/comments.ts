@@ -59,6 +59,8 @@ export {
   type MentionTextareaProps,
 } from "./comments/MentionTextarea";
 export { CommentCard, type CommentCardProps } from "./comments/CommentCard";
+export { ProposalCard, type ProposalCardProps } from "./comments/ProposalCard";
+export { CommentCapture, type CommentCaptureContext } from "./comments/CommentCapture";
 export {
   CommentComposer,
   type CommentComposerProps,

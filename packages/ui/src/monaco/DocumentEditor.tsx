@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import type { editor } from "monaco-editor";
 import { Button } from "../components/button";
 import { ErrorWrapper } from "../components/ErrorWrapper";
@@ -7,6 +7,7 @@ import type {
   JsonSchemaObject,
   JsonSchemaFormProps,
 } from "../components/json-schema-form-types";
+import type { FormDataProps } from "../components/json-schema-form-runtime-types";
 import { rehydrateRefs } from "../components/json-schema-form-refs";
 import { MonacoEditor } from "./MonacoEditor";
 import { sourceCommentActions, type SourceComments } from "./source-comments";
@@ -48,6 +49,8 @@ export type DocumentEditorProps = {
    * markdown keeps the authored path.
    */
   resolveImageUrl?: (src: string) => string;
+  /** Renders the Form view and the frontmatter form; see `DocumentFormProps.Form`. */
+  Form?: DocumentFormProps["Form"];
 };
 
 /** Controlled file editor; the host owns persistence and schema loading. */
@@ -63,6 +66,7 @@ export function DocumentEditor({
   onModeChange,
   sourceComments,
   resolveImageUrl,
+  Form,
 }: DocumentEditorProps) {
   const [localMode, setLocalMode] = useState<"source" | "rich" | "form">(
     "source",
@@ -182,15 +186,23 @@ export function DocumentEditor({
             frontmatterSchema={schema ?? null}
             {...(formOptions ? { formOptions } : {})}
             {...(resolveImageUrl ? { resolveImageUrl } : {})}
+            {...(Form ? { Form } : {})}
           />
         )}
         {mode === "form" && schema && (
-          <DocumentForm path={path} value={value} onChange={onChange} schema={schema} {...(formOptions ? { formOptions } : {})} />
+          <DocumentForm path={path} value={value} onChange={onChange} schema={schema} {...(formOptions ? { formOptions } : {})} {...(Form ? { Form } : {})} />
         )}
       </div>
     </div>
   );
 }
+
+/** What `DocumentForm` hands the form that renders the parsed document: the resolved schema, the value and the serializable form props. */
+export type DocumentSchemaFormProps = FormDataProps & {
+  schema: JsonSchemaObject;
+  value: Record<string, unknown>;
+  onChange: (value: Record<string, unknown>) => void;
+};
 
 export type DocumentFormProps = {
   path: string;
@@ -198,6 +210,11 @@ export type DocumentFormProps = {
   onChange: (source: string) => void;
   schema: JsonSchemaObject;
   formOptions?: DocumentEditorProps["formOptions"];
+  /**
+   * Renders the form in place of `JsonSchemaForm`, for example a page-runtime
+   * `PageForm` for a schema that declares `x-clicky-extensions`.
+   */
+  Form?: ComponentType<DocumentSchemaFormProps>;
 };
 
 /**
@@ -206,7 +223,7 @@ export type DocumentFormProps = {
  * a document that cannot be parsed (or an edit that cannot be written) is
  * shown as an alert and nothing is reported.
  */
-export function DocumentForm({ path, value, onChange, schema, formOptions }: DocumentFormProps) {
+export function DocumentForm({ path, value, onChange, schema, formOptions, Form = JsonSchemaForm }: DocumentFormProps) {
   const [error, setError] = useState("");
   let form: ReturnType<typeof structuredDocument> | undefined;
   let parsingError = "";
@@ -241,7 +258,7 @@ export function DocumentForm({ path, value, onChange, schema, formOptions }: Doc
             <FormFailure message={failure.message} value={value} reset={reset} />
           )}
         >
-        <JsonSchemaForm
+        <Form
           size="sm"
           inline
           requiredFirst
@@ -300,6 +317,7 @@ export type DocumentRichEditorProps = {
    */
   frontmatterSchema?: JsonSchemaObject | null | undefined;
   formOptions?: DocumentEditorProps["formOptions"];
+  Form?: DocumentFormProps["Form"];
 };
 
 /**
@@ -316,7 +334,7 @@ export function DocumentRichEditor(props: DocumentRichEditorProps) {
   );
 }
 
-function RichBody({ frontmatterSchema, formOptions, ...props }: DocumentRichEditorProps) {
+function RichBody({ frontmatterSchema, formOptions, Form, ...props }: DocumentRichEditorProps) {
   if (!frontmatterSchema) return <RichMarkdown {...props} />;
   return (
     <div className="flex flex-col gap-2">
@@ -329,6 +347,7 @@ function RichBody({ frontmatterSchema, formOptions, ...props }: DocumentRichEdit
             onChange={props.onChange}
             schema={frontmatterSchema}
             {...(formOptions ? { formOptions } : {})}
+            {...(Form ? { Form } : {})}
           />
         </div>
       </details>

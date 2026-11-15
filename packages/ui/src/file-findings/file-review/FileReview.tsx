@@ -1171,7 +1171,7 @@ export function FileReview({
                 line={editorLine}
                 onLineChange={setEditorLine}
                 onChange={onSourceChange}
-                inlineChips
+                inlineFindings
                 sourceComments={sourceComments}
               />
             </div>

@@ -8,6 +8,7 @@ import type { StackFrameActions } from "./StackFrameRow";
 import { goroutineStateDot, threadStateDot } from "./state-styles";
 import { countStackByState, goroutinesFromRecords, parseStackDump, type ParsedStack } from "./stacktrace";
 import { ThreadCard } from "./ThreadCard";
+import { ThreadStateFilterChips } from "./ThreadStateFilterChips";
 
 const STACK_MIN_LINES = 10;
 const STACK_LINE_HEIGHT_REM = 1;
@@ -225,37 +226,19 @@ export function StackDumpView({
                   </button>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-1">
-                {Array.from(stateCounts.entries())
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([state, count]) => {
-                    const active = selectedStates.has(state);
-                    return (
-                      <button
-                        type="button"
-                        key={state}
-                        aria-pressed={active}
-                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors ${
-                          active
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border bg-muted/50 text-muted-foreground hover:bg-background"
-                        }`}
-                        onClick={() => {
-                          setSelectedStates((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(state)) next.delete(state);
-                            else next.add(state);
-                            return next;
-                          });
-                        }}
-                      >
-                        <span className={`h-2 w-2 rounded-full ${stackStateDot(parsed, state)}`} />
-                        {state}
-                        <span className="text-[10px] opacity-70">{count}</span>
-                      </button>
-                    );
-                  })}
-              </div>
+              <ThreadStateFilterChips
+                counts={stateCounts}
+                selected={selectedStates}
+                dot={(state) => stackStateDot(parsed, state)}
+                onToggle={(state) => {
+                  setSelectedStates((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(state)) next.delete(state);
+                    else next.add(state);
+                    return next;
+                  });
+                }}
+              />
             </>
           )}
         </div>

@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import { clearDebugRuntimes, debugRuntimes, subscribeToDebugRuntimes } from "../data/debugRuntime";
 import { IconButton } from "../components/IconButton";
 import { UiClose, UiTrash } from "../icons";
 import { Tabs, type TabItem } from "../layout/Tabs";
@@ -8,6 +9,7 @@ import { ConsoleTab } from "./tabs/ConsoleTab";
 import { InspectionTab } from "./tabs/InspectionTab";
 import { NetworkTab } from "./tabs/NetworkTab";
 import { QueriesTab } from "./tabs/QueriesTab";
+import { RuntimesTab } from "./tabs/RuntimesTab";
 import {
   LEVEL_HELP,
   SELECTABLE_LEVELS,
@@ -20,7 +22,7 @@ export type { DebugTab };
 
 /**
  * The console itself: a header that says what is being captured and at what
- * cost, and one of four tabs below it.
+ * cost, and its capture and runtime tabs below it.
  *
  * Three tabs are scoped to a selected capture and one is not. Queries is the
  * list; Network and Inspection explain the row you picked from it; Console is
@@ -54,6 +56,7 @@ export function DebugConsole({
 
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const selected = useSelectedRecord(state.records, selectedId);
+  const runtimes = useSyncExternalStore(subscribeToDebugRuntimes, debugRuntimes, debugRuntimes);
 
   const tabs: TabItem[] = useMemo(
     () => [
@@ -65,8 +68,9 @@ export function DebugConsole({
         label: "Inspection",
         count: (selected?.counts.inspections ?? 0) + (selected?.counts.probes ?? 0),
       },
+      { id: "runtimes", label: "Runtimes", count: runtimes.length },
     ],
-    [state.records.length, state.logs.length, selected],
+    [state.records.length, state.logs.length, selected, runtimes.length],
   );
 
   return (
@@ -84,6 +88,7 @@ export function DebugConsole({
           iconClassName="size-4"
           onClick={() => {
             store.clear();
+            clearDebugRuntimes();
             void (client ?? new DebugClient()).clear().catch(() => {
               // The server's buffer outliving the client's view is a cosmetic
               // mismatch, not a reason to fail the click the user just made.
@@ -110,6 +115,7 @@ export function DebugConsole({
         ) : null}
         {tab === "network" ? <NetworkTab record={selected} client={client} /> : null}
         {tab === "console" ? <ConsoleTab lines={state.logs} /> : null}
+        {tab === "runtimes" ? <RuntimesTab /> : null}
         {tab === "inspection" ? (
           <InspectionTab
             record={selected}

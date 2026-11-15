@@ -34,6 +34,11 @@ describe("dock state in the URL", () => {
     });
   });
 
+  it("retains the runtimes tab in a shared console link", () => {
+    writeDockState({ open: true, tab: "runtimes", level: "debug" });
+    expect(readDockState().tab).toBe("runtimes");
+  });
+
   // The ordinary case must not make every link the user copies carry debug
   // parameters they did not ask for.
   it("leaves no trace when the console is closed", () => {

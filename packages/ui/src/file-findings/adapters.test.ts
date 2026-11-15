@@ -46,6 +46,15 @@ describe("lintFindings", () => {
     ]);
   });
 
+  it("keeps a schema violation's JSON Pointer alongside its self-contained message", () => {
+    const message = "/conditions/dueDate: missing property 'fieldRef'";
+    const [finding] = lintFindings([
+      lintResult({ linter: "json", violations: [{ file: "p.yaml", line: 7, path: "/conditions/dueDate", message }] }),
+    ]);
+
+    expect([finding?.path, finding?.message]).toEqual(["/conditions/dueDate", message]);
+  });
+
   it("treats a violation without a severity as an error, as on the wire", () => {
     const [finding] = lintFindings([lintResult({ violations: [{ file: "a.go", line: 3, message: "m" }] })]);
 

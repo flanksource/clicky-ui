@@ -5,6 +5,7 @@ import { Tree } from "../data/Tree";
 import { UiFileCode, UiFolder, UiImage, UiLoader } from "../icons";
 import { SplitPane } from "../layout/SplitPane";
 import { cn } from "../lib/utils";
+import { ContextMenu } from "../overlay/ContextMenu";
 import { groupFindingsByFile } from "./adapters";
 import {
   FileReview,
@@ -163,8 +164,17 @@ function FileTreeRow({
     const render = slots?.[part];
     return render ? render({ node, selected, default: fallback }) : fallback;
   };
+  // Right-click anywhere on the tree's row (this content's parent) opens the same actions as the kebab.
+  const [row, setRow] = useState<HTMLElement | null>(null);
+  const label = node.kind === "folder" ? "Folder actions" : "File actions";
   return (
     <>
+      {actions.length > 0 && (
+        // The menu is portaled, but its React events still bubble to the row, which would select it.
+        <span hidden ref={(anchor) => setRow(anchor?.parentElement ?? null)} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+          <ContextMenu contextTarget={row} menuLabel={label} menuItems={actions} />
+        </span>
+      )}
       {slot("icon", <Icon icon={node.kind === "folder" ? UiFolder : isImagePath(node.ref.file) ? UiImage : UiFileCode} className="shrink-0 text-muted-foreground" />)}
       {slot(
         "name",
@@ -174,7 +184,7 @@ function FileTreeRow({
       )}
       <span className="flex-1" />
       {slot("badges", <SeverityCounts findings={node.findings} />)}
-      <NodeActions variant="row" items={actions} label={node.kind === "folder" ? "Folder actions" : "File actions"} />
+      <NodeActions variant="row" items={actions} label={label} />
     </>
   );
 }

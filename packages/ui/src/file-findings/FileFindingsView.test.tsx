@@ -282,6 +282,36 @@ describe("FileFindingsView", () => {
       });
     });
 
+    it("opens a row's file or folder actions on right-click without selecting the row", async () => {
+      const onSelect = vi.fn();
+      const archive = vi.fn();
+      render(
+        <Harness
+          loadFile={readFile}
+          findings={WITH_FOLDER}
+          initialFile={{ workDir: WORK_DIR, file: GO_FILE }}
+          onSelect={onSelect}
+          getFileActions={(file) => [{ label: `Archive ${file.file}`, onSelect: () => archive(file) }]}
+          getFolderActions={(folder) => [{ label: `New file in ${folder.file}`, onSelect: vi.fn() }]}
+        />,
+      );
+      const rowOf = (name: string) => screen.getByText(name, { selector: '[role="tree"] *' }).closest('[role="treeitem"]')!.firstElementChild!;
+      await screen.findByText("handler.go");
+
+      fireEvent.contextMenu(rowOf("pkg/server"));
+      const folderMenu = screen.getByRole("menu", { name: "Folder actions" });
+      const folderItems = within(folderMenu).getAllByRole("menuitem").map((item) => item.textContent);
+      fireEvent.keyDown(folderMenu, { key: "Escape" });
+      fireEvent.contextMenu(rowOf("handler.go"));
+      fireEvent.click(screen.getByRole("menuitem", { name: `Archive ${GO_FILE}` }));
+
+      expect({ folderItems, archived: archive.mock.calls, selections: onSelect.mock.calls }).toEqual({
+        folderItems: ["New file in pkg/server"],
+        archived: [[{ workDir: WORK_DIR, file: GO_FILE }]],
+        selections: [],
+      });
+    });
+
     it("reveals a file opened from outside the tree even after every folder was collapsed", async () => {
       const loadFile = (file: FileRef) => Promise.resolve(file.file === ROUTES_FILE ? "package server\n\nvar routes = 1\n" : FILES[file.file]!);
       render(<Harness loadFile={loadFile} findings={WITH_FOLDER} initialSelection={FOLDER} />);

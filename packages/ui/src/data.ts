@@ -474,6 +474,7 @@ export {
   type DebugConsoleRequest,
 } from "./data/debugConsoleSignal";
 export { useDebugAction } from "./data/useDebugAction";
+export { registerDebugRuntime, debugRuntimes, subscribeToDebugRuntimes, clearDebugRuntimes, type DebugRuntime } from "./data/debugRuntime";
 export * from "./data/clicky-export";
 export {
   type LogEntry,
@@ -577,6 +578,7 @@ export {
   type DiagnosticsDetailPanelProps,
 } from "./data/diagnostics/DiagnosticsDetailPanel";
 export { StackDumpView, type StackDumpViewProps } from "./data/diagnostics/StackDumpView";
+export { ThreadStateFilterChips, type ThreadStateFilterChipsProps } from "./data/diagnostics/ThreadStateFilterChips";
 export { MetricTile, type MetricTileProps } from "./data/diagnostics/MetricTile";
 export { cpuTone, memoryTone } from "./data/diagnostics/metric-tone";
 export type { ProcessNode, StackCapture, RunMeta } from "./data/diagnostics/types";
