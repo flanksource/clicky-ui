@@ -1,6 +1,6 @@
 import { cleanup, render } from "@testing-library/react";
 import { useRef } from "react";
-import type { ContextMenuActionContext, Plugin, ReactGrabAPI } from "@flanksource/react-grab";
+import type { ContextMenuActionContext, Plugin, ReactGrabAPI } from "@flanksource/clicky-ui/react-grab";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useReactGrabStyle } from "./useReactGrabStyle";
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
-import { commentPlugin, type ContextMenuActionContext } from "@flanksource/react-grab";
+import { commentPlugin, type ContextMenuActionContext } from "@flanksource/clicky-ui/react-grab";
 
 import type { CommentScreenshotCapture } from "../../plugins/comments-model";
 import { commentAnchor, commentTarget } from "./dom-anchor";

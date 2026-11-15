@@ -68,7 +68,7 @@ async function fixture({ problems = () => ({}), betaAge = 3 * HOUR }: { problems
     comment("c3", documentId("docs/deep/setup.md"), "resolved", 6 * HOUR),
     comment("c4", EXTERNAL_ID, "open", HOUR / 4),
   ];
-  configureComments({ dir, endpoint: fixedGavel("http://gavel.local"), workspace: "/workspace" });
+  configureComments({ dir, endpoint: fixedGavel("http://gavel.local"), workspace: "/workspace", project: "playground" });
   writeFileSync(
     join(dir, "external-pages.json"),
     JSON.stringify([{ id: EXTERNAL_ID, title: "Setup dashboard", base: "https://example.com/dash", urls: ["https://example.com/dash"] }]),

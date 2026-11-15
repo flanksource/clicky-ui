@@ -254,7 +254,7 @@ export async function createRootComment(
     if (!pagesDir) throw new Error("style edit comments require the pages directory");
     selector = styleEditSelector(assertStyleEdit(fields.styleEdit), {
       pagesDir,
-      workspace: commentsClient(dir).workspace,
+      workspace: (await commentsClient(dir)).workspace,
     });
   }
   const element = persistElementContext(rawElement);
@@ -327,7 +327,7 @@ async function handle(
         pages: commentActivity(await listComments(dir)),
       });
     case "attachment": {
-      const client = commentsClient(dir);
+      const client = await commentsClient(dir);
       const target = new URL(
         "/api/v1/comments" + url.pathname,
         await client.endpoint.url(),

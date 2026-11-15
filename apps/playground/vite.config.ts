@@ -36,7 +36,7 @@ import { playgroundGavelLint } from "./plugins/gavel-lint-server";
 import { playgroundBlame } from "./plugins/blame-server";
 import { playgroundProduction } from "./plugins/production-server";
 import { playgroundReactDevtoolsHook } from "./plugins/react-devtools-hook";
-import { fixedGavel, onDemandGavel } from "./plugins/gavel-launch-server";
+import { fixedGavel } from "./plugins/gavel-launch-server";
 import { playgroundRepositoryDocuments } from "./plugins/repository-documents-server";
 import { playgroundNavigation } from "./plugins/navigation-server";
 import { playgroundVocabularies } from "./plugins/vocabularies-server";
@@ -101,7 +101,7 @@ const externalAliases: Alias[] = envList("PLAYGROUND_EXTERNAL_ALIASES").map(
   },
 );
 
-const gavelEndpoint = localEnv.PLAYGROUND_GAVEL_URL ? fixedGavel(localEnv.PLAYGROUND_GAVEL_URL) : onDemandGavel({ workspace: workspaceRoot, command: [localEnv.PLAYGROUND_GAVEL_BINARY ?? "gavel"], localRoots: [workspaceRoot, ...envList("PLAYGROUND_LOCAL_ROOTS").map((path) => existingPath("PLAYGROUND_LOCAL_ROOTS", path))] });
+const gavelEndpoint = fixedGavel(localEnv.PLAYGROUND_GAVEL_URL);
 configureComments({ dir: playgroundDataDir, endpoint: gavelEndpoint, workspace: workspaceRoot });
 const captainURL = "http://localhost:9020";
 const gavelEditURL = localEnv.PLAYGROUND_GAVEL_EDIT_URL ?? "http://127.0.0.1:9094";
@@ -113,7 +113,6 @@ const agentRuns = createAgentRuns({
 });
 const promptRuns = createPromptRuns({
   dir: playgroundDataDir,
-  gavelURL: localEnv.PLAYGROUND_GAVEL_URL,
   endpoint: gavelEndpoint,
   workspace: workspaceRoot,
 });
@@ -179,7 +178,7 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     // External source (see PLAYGROUND_EXTERNAL_ALIASES) cannot see this app's
     // node_modules, so these resolve from the playground's own install.
-    dedupe: ["react", "react-dom", "@iconify/react"],
+    dedupe: ["react", "react-dom", "@iconify/react", "@tanstack/react-query", "monaco-editor", "@monaco-editor/react"],
     alias: [
       ...externalAliases,
       {
@@ -213,6 +212,10 @@ export default defineConfig(({ mode }) => ({
       {
         find: /^@flanksource\/clicky-ui\/connections$/,
         replacement: resolve(uiSrc, "connections.ts"),
+      },
+      {
+        find: /^@flanksource\/clicky-ui\/jvm$/,
+        replacement: resolve(uiSrc, "jvm.ts"),
       },
       {
         find: /^@flanksource\/clicky-ui\/chat$/,

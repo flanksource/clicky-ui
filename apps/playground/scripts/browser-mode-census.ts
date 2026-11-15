@@ -10,7 +10,7 @@ import { catalog, renderMarkdown, summarize, summaryLine, type Census, type Issu
 import { readPageDependencies } from "../src/browser-mode/dependencies";
 
 export type CensusOptions = { root: string; externalRoots?: string[]; aliases?: Record<string, string>; libraryImports?: string[] };
-const DEFAULT_IMPORTS = ["react", "react-dom", "react-dom/client", "react/jsx-runtime", "react/jsx-dev-runtime", "@flanksource/clicky-ui", "@flanksource/facet", "@flanksource/react-grab"];
+const DEFAULT_IMPORTS = ["react", "react-dom", "react-dom/client", "react/jsx-runtime", "react/jsx-dev-runtime", "@flanksource/clicky-ui", "@flanksource/facet", "@flanksource/clicky-ui/react-grab"];
 const BUILTINS = new Set(builtinModules.map((name) => name.replace(/^node:/, "")));
 const suffixes = ["", ".tsx", ".ts", ".jsx", ".js", ".mjs", ".mdx", ".json", "/index.tsx", "/index.ts", "/index.js"];
 const posix = (path: string): string => path.split(sep).join("/");
@@ -193,7 +193,7 @@ export function loadConfiguration(root: string): CensusOptions {
     return [entry.slice(0, separator), entry.slice(separator + 1)];
   }));
   const libraryImports = new Set(BASE_ENTRIES);
-  const manifests = { "@flanksource/clicky-ui": "../../packages/ui/package.json", "@flanksource/react-grab": "../../packages/react-grab/package.json", "@flanksource/facet": "node_modules/@flanksource/facet/package.json" };
+  const manifests = { "@flanksource/clicky-ui": "../../packages/ui/package.json", "@flanksource/facet": "node_modules/@flanksource/facet/package.json" };
   for (const [name, path] of Object.entries(manifests)) {
     const manifest = JSON.parse(readFileSync(resolve(root, path), "utf8")) as { exports: Record<string, unknown> };
     if (!manifest.exports || typeof manifest.exports !== "object") throw new Error(`${name} must declare browser exports`);

@@ -10,6 +10,7 @@ import { productionAssets } from "./production-assets";
 import { productionBrowserRoutes } from "./production-browser-routes";
 import { productionChanges } from "./production-changes";
 import { productionProxy } from "./production-proxy";
+import { oipaConditionsFiles } from "./oipa-conditions-files";
 import { readDependencyDefaults, registerDependencyDefaults } from "./runtime-dependencies-defaults";
 
 export async function startProductionServer(options: { root: string; port: number; host: string; outDir?: string }) {
@@ -17,7 +18,7 @@ export async function startProductionServer(options: { root: string; port: numbe
   const outDir = options.outDir ?? resolve(root, "dist/browser");
   const config = await productionConfig(root);
   const runtime = dirname(fileURLToPath(import.meta.resolve("@flanksource/page-runtime/static/bootstrap.html")));
-  const packages = [resolve(root, "../../packages/ui"), resolve(root, "../../packages/react-grab"), await realpath(resolve(root, "../../../facet"))];
+  const packages = [resolve(root, "../../packages/ui"), await realpath(resolve(root, "../../../facet"))];
   const packageHandler = await createPackageHandler({ packages, stateDir: resolve(root, ".tmp/package-origin"), upstreamRegistry: "https://registry.npmjs.org", upstreamOrigin: "https://unpkg.com" });
   const app = productionMiddleware();
   let invalidateMetadata = () => {};
@@ -26,6 +27,7 @@ export async function startProductionServer(options: { root: string; port: numbe
   app.middlewares.use(changes.middleware);
   registerDependencyDefaults({ middlewares: app.middlewares, root });
   app.middlewares.use(productionBrowserRoutes({ root, sourceRoots: config.sourceRoots }));
+  app.middlewares.use(oipaConditionsFiles({ dir: config.env.PLAYGROUND_OIPA_PRODUCTS_DIR }));
   app.middlewares.use(productionProxy({ prefix: "/oipa-api", target: config.env.PLAYGROUND_OIPA_URL ?? "http://localhost:8020" }));
   const api = registerProductionApi({ ...app, ...config, root, script: await readFile(resolve(outDir, "bookmarklet.js"), "utf8"), events: { created: changes.changed, changed: changes.changed, deleted: changes.changed, folderCreated: changes.changed, folderDeleted: changes.changed } });
   invalidateMetadata = api.changed;

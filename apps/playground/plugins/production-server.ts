@@ -10,7 +10,7 @@ export function playgroundProduction(options: { root: string }): Plugin {
     enforce: "pre",
     async transform(code, id) {
       if (id === resolve(root, "src/registry.ts")) return { code: liveRegistry(code), map: null };
-      if (id === resolve(root, "src/main.tsx")) return { code: code.replace('import("./App")', 'import("./browser-mode/BrowserApp")').replace('if (!bookmarklet) void import("@flanksource/react-grab");', ''), map: null };
+      if (id === resolve(root, "src/main.tsx")) return { code: code.replace('import("./App")', 'import("./browser-mode/BrowserApp")').replace('if (!bookmarklet) void import("@flanksource/clicky-ui/react-grab");', ''), map: null };
       if (id === resolve(root, "src/App.tsx")) return { code: code.replace('from "./comments/useComments"', 'from "./browser-mode/comments"'), map: null };
       return;
     },

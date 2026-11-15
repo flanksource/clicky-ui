@@ -346,13 +346,13 @@ const PROJECT_LAYER: SettingsRef = { kind: "project" };
  */
 const SETTINGS_PROBE_PAGE = "playground-settings";
 
-const PAGE_ENTRY_PREFIX = "page/";
+const PAGE_ENTRY_PREFIX = "pages/";
 
 const autoRunOf = (settings: CommentAgentSettings): PageAgentState => ({ autoRun: settings.agent.agent.enabled === true });
 
 /**
  * The pages whose comment-agent entry in a project layer is enabled. An entry's
- * key is its target URI below the scope (`page/<encoded page>`); any other key
+ * key is its target URI below the scope (`pages/<encoded page>`); any other key
  * is not a playground page, so it is left alone.
  */
 function enabledProjectPages(settings: CommentAgentSettings): string[] {
@@ -543,7 +543,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
     const live = (await captain.listLiveSessions())
       .filter(session => !directory || linked.has(session.id) || (session.key && linked.has(session.key)) || (session.cwd && cwdInSessionScope(session.cwd, directory)))
       .map(captainSessionOption);
-    const managed = (await commentsClient(dir).agentSessions()).filter(session => session.managed);
+    const managed = (await (await commentsClient(dir)).agentSessions()).filter(session => session.managed);
     const gavelOf = (option: CaptainSessionOption) => managed.find(session => session.id === option.id || session.id === option.captainId);
     return [
       ...live.map(option => {
@@ -656,7 +656,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
    */
   async function setAutoRun(request: AutoRunRequest, origin: string): Promise<PageAgentState> {
     const { page, autoRun } = request;
-    const gavel = commentsClient(dir);
+    const gavel = await commentsClient(dir);
     const save = (agent: CommentAgent | null) => gavel.saveAgent({ page, layer: PROJECT_LAYER, entry: true, agent });
     if (autoRun) {
       return autoRunOf(await save(pageAgent({ page, origin, noRuntime: "auto-run needs a runtime; send runtime ({spec:{model}}) with the settings first" })));
@@ -671,7 +671,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
 
   /** Rewrites every enabled page entry of the project layer, after the runtime or grouping it embeds changed. */
   async function refreshPageAgents(origin: string): Promise<void> {
-    const gavel = commentsClient(dir);
+    const gavel = await commentsClient(dir);
     for (const page of enabledProjectPages(await gavel.agent(SETTINGS_PROBE_PAGE))) {
       await gavel.saveAgent({
         page,
@@ -703,7 +703,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
       const live = await captain.listLiveSessions();
       if (live.some((entry) => entry.id === target.sessionId || entry.key === target.sessionId)) return;
     }
-    const known = await commentsClient(dir).agentSessions();
+    const known = await (await commentsClient(dir)).agentSessions();
     if (known.some((entry) => entry.id === target.sessionId && deliverableManaged(entry))) return;
     throw new RequestError(
       target.kind === "managed" ? "Managed session is no longer available" : `Captain session ${target.label} is no longer live; choose another target`,
@@ -759,7 +759,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
       }
       if (!found.comment.version) throw new Error(`comment ${id} has no gavel version`);
       const target = await resolveDeliverTarget(request, { page: found.page, origin });
-      const comment = await commentsClient(dir).deliver(
+      const comment = await (await commentsClient(dir)).deliver(
         { id, version: found.comment.version, requestId: `playground:${randomUUID()}`, target },
         request.human,
       );
@@ -788,7 +788,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
         if (!comment.version) throw new Error(`comment ${comment.id} has no gavel version`);
         return { id: comment.id, expectedVersion: comment.version };
       });
-      const comments = await commentsClient(dir).deliverBatch({ requestId: `playground:${randomUUID()}`, target, threads }, request.human);
+      const comments = await (await commentsClient(dir)).deliverBatch({ requestId: `playground:${randomUUID()}`, target, threads }, request.human);
       return { comments };
     });
   }
@@ -807,7 +807,7 @@ export function createAgentRuns(options: AgentRunsOptions) {
   /** The stored file, and the auto-run state of `page` when one is asked about. */
   async function sessionsView(page?: string): Promise<AgentSessionsView> {
     const { settings, sessions } = await verifiedSessions();
-    return { settings, sessions, pages: page ? { [page]: autoRunOf(await commentsClient(dir).agent(page)) } : {} };
+    return { settings, sessions, pages: page ? { [page]: autoRunOf(await (await commentsClient(dir)).agent(page)) } : {} };
   }
 
   async function proxy(

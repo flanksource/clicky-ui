@@ -39,7 +39,7 @@ describe("CommentsClient agent delivery", () => {
   }
 
   it("lists the live agent sessions gavel can deliver to", async () => {
-    const sessions = await commentsClient(dir).agentSessions();
+    const sessions = await (await commentsClient(dir)).agentSessions();
 
     expect(sessions).toEqual([
       expect.objectContaining({ id: LIVE_SESSION, source: "claude", model: "claude-test", inCmux: false }),
@@ -47,7 +47,7 @@ describe("CommentsClient agent delivery", () => {
   });
 
   it("delivers a thread into a live session and returns it with gavel's agentRun", async () => {
-    const delivered = await commentsClient(dir).deliver({
+    const delivered = await (await commentsClient(dir)).deliver({
       id: THREAD,
       version: await version(),
       requestId: "deliver-1",
@@ -58,7 +58,7 @@ describe("CommentsClient agent delivery", () => {
   });
 
   it("surfaces a delivery to a session that is not live as gavel's 502, recorded on the thread", async () => {
-    const attempt = commentsClient(dir).deliver({
+    const attempt = (await commentsClient(dir)).deliver({
       id: THREAD,
       version: await version(),
       requestId: "deliver-gone",
@@ -70,7 +70,7 @@ describe("CommentsClient agent delivery", () => {
   });
 
   it("answers a stale version with gavel's 409", async () => {
-    const attempt = commentsClient(dir).deliver({
+    const attempt = (await commentsClient(dir)).deliver({
       id: THREAD,
       version: 99,
       requestId: "deliver-stale",
@@ -97,7 +97,7 @@ describe("CommentsClient agent delivery", () => {
     }
 
     it("delivers several threads into a live session in one request and returns each with gavel's agentRun", async () => {
-      const delivered = await commentsClient(dir).deliverBatch(
+      const delivered = await (await commentsClient(dir)).deliverBatch(
         { requestId: "batch-1", target: { kind: "session", sessionId: LIVE_SESSION }, threads: await threads() },
         human,
       );
@@ -110,7 +110,7 @@ describe("CommentsClient agent delivery", () => {
 
     it("fails the whole batch on a stale thread and delivers none", async () => {
       const [first, second] = await threads();
-      const attempt = commentsClient(dir).deliverBatch(
+      const attempt = (await commentsClient(dir)).deliverBatch(
         { requestId: "batch-stale", target: { kind: "session", sessionId: LIVE_SESSION }, threads: [first!, { ...second!, expectedVersion: 99 }] },
         human,
       );
@@ -122,14 +122,14 @@ describe("CommentsClient agent delivery", () => {
   });
 
   it("lists a session gavel started for a thread as managed once the run was delivered", async () => {
-    await commentsClient(dir).deliver({
+    await (await commentsClient(dir)).deliver({
       id: THREAD,
       version: await version(),
       requestId: "deliver-run",
       target: { kind: "run", prompt: "editor-comments", groupKey: "test:group", runOptions: { spec: { model: "test-model-1" } } },
     }, human);
 
-    const sessions = await commentsClient(dir).agentSessions();
+    const sessions = await (await commentsClient(dir)).agentSessions();
 
     expect(sessions).toContainEqual(expect.objectContaining({ id: expect.stringMatching(/^managed-\d+$/), managed: true }));
   });
@@ -137,12 +137,12 @@ describe("CommentsClient agent delivery", () => {
   describe("comment agent settings", () => {
     const layer = { kind: "project" } as const;
     const agent = { enabled: true, prompt: "editor-comments", group: "playground:shared", spec: { model: "test-model-1" } };
-    const entryKey = `page/${encodeURIComponent(PAGE)}`;
+    const entryKey = `pages/${encodeURIComponent(PAGE)}`;
     const projectPages = (settings: CommentAgentSettings) =>
       Object.assign({}, ...settings.settings.layers.filter((entry) => entry.kind === "project").map((entry) => entry.config.comments?.agents?.pages ?? {}));
 
     it("saves a page entry in the project layer, resolves it for the page, and removes it again", async () => {
-      const client = commentsClient(dir);
+      const client = await commentsClient(dir);
       expect((await client.agent(PAGE)).agent.agent.enabled).toBeFalsy();
 
       const saved = await client.saveAgent({ page: PAGE, layer, entry: true, agent });
@@ -157,7 +157,7 @@ describe("CommentsClient agent delivery", () => {
     });
 
     it("saves {enabled: false} over an agent the page inherits from the default", async () => {
-      const client = commentsClient(dir);
+      const client = await commentsClient(dir);
       await client.saveAgent({ page: PAGE, layer, entry: false, agent });
       expect((await client.agent(PAGE)).agent.agent.enabled).toBe(true);
 
@@ -169,10 +169,10 @@ describe("CommentsClient agent delivery", () => {
     });
 
     it("rejects a target outside the client's scope", async () => {
-      const client = commentsClient(dir);
+      const client = await commentsClient(dir);
       const attempt = client.request("/agent", {
         method: "PUT",
-        body: JSON.stringify({ target: { scopeUri: client.scope, uri: "gavel://workspace/elsewhere/page/welcome" }, layer, page: true, agent }),
+        body: JSON.stringify({ target: { scopeUri: client.scope, uri: "gavel://project/elsewhere/pages/welcome" }, layer, page: true, agent }),
       });
 
       await expect(attempt).rejects.toMatchObject({ status: 400 });

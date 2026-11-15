@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
-import type { Plugin } from "@flanksource/react-grab";
+import type { Plugin } from "@flanksource/clicky-ui/react-grab";
 import { editableTargetOf, type EditableRoot } from "./editable-dom";
 
 const STYLE_ACTION = {

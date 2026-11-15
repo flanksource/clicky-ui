@@ -182,17 +182,17 @@ describe("playground agent delivery through gavel", () => {
   }
 
   /** A page's entry key in a settings layer: its comment target below the scope. */
-  const entryKey = (page: string) => `page/${encodeURIComponent(page)}`;
+  const entryKey = (page: string) => `pages/${encodeURIComponent(page)}`;
 
   /** The comment-agent page entries of every project layer, by entry key. */
   async function projectPages(): Promise<Record<string, CommentAgent>> {
-    const { settings } = await commentsClient(dir).agent("welcome");
+    const { settings } = await (await commentsClient(dir)).agent("welcome");
     return Object.assign({}, ...settings.layers.filter((layer) => layer.kind === "project").map((layer) => layer.config.comments?.agents?.pages ?? {}));
   }
 
   /** The comment agent gavel resolves for a page, when it delivers new comments automatically. */
   async function enabledAgent(page: string): Promise<CommentAgent | undefined> {
-    const { agent } = (await commentsClient(dir).agent(page)).agent;
+    const { agent } = (await (await commentsClient(dir)).agent(page)).agent;
     return agent.enabled ? agent : undefined;
   }
 
@@ -722,7 +722,7 @@ describe("playground agent delivery through gavel", () => {
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ autoRun: true });
-      const { agent } = await commentsClient(dir).agent("welcome");
+      const { agent } = await (await commentsClient(dir)).agent("welcome");
       expect(agent.agent.instructions).toContain("clicky-ui-playground");
       expect(agent.agent).toEqual({
         enabled: true,
@@ -741,7 +741,7 @@ describe("playground agent delivery through gavel", () => {
 
       await putAutoRun({ page: "welcome", autoRun: true });
 
-      expect((await commentsClient(dir).agent("welcome")).agent.agent).toMatchObject({
+      expect((await (await commentsClient(dir)).agent("welcome")).agent.agent).toMatchObject({
         group: "playground:page:welcome",
         presets: ["review"],
       });
@@ -767,7 +767,7 @@ describe("playground agent delivery through gavel", () => {
     });
 
     it("saves {enabled: false} over an agent the page inherits from a default", async () => {
-      await commentsClient(dir).saveAgent({ page: "welcome", layer: { kind: "project" }, entry: false, agent: { enabled: true, prompt: "editor-comments" } });
+      await (await commentsClient(dir)).saveAgent({ page: "welcome", layer: { kind: "project" }, entry: false, agent: { enabled: true, prompt: "editor-comments" } });
       expect((await view("welcome")).pages).toEqual({ welcome: { autoRun: true } });
 
       const response = await putAutoRun({ page: "welcome", autoRun: false });
@@ -782,7 +782,7 @@ describe("playground agent delivery through gavel", () => {
 
       await putAutoRun({ page: "team/summary", autoRun: true });
 
-      expect(Object.keys(await projectPages())).toEqual(["page/team%2Fsummary"]);
+      expect(Object.keys(await projectPages())).toEqual(["pages/team%2Fsummary"]);
       expect((await view("welcome")).pages).toEqual({ welcome: { autoRun: false } });
     });
 

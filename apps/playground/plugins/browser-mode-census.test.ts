@@ -205,7 +205,6 @@ describe("browser mode compatibility census", () => {
 
   it("loads the library declarations without depending on generated dist files", () => {
     file("packages/ui/package.json", JSON.stringify({ exports: { ".": { import: "./dist/index.js" }, "./icons": { import: "./dist/icons.js" }, "./runtime/*": "./dist/runtime/*" } }));
-    file("packages/react-grab/package.json", JSON.stringify({ exports: { ".": "./dist/index.js" } }));
     file("apps/playground/node_modules/@flanksource/facet/package.json", JSON.stringify({ exports: { ".": { import: "./dist/index.js" }, "./styles.css": "./dist/styles.css", "./types": { types: "./dist/types.d.ts" } } }));
     const options = loadConfiguration(resolve(root, "apps/playground"));
     expect(options.libraryImports).toEqual(expect.arrayContaining(["react", "@tanstack/react-query", "@flanksource/clicky-ui/icons", "@flanksource/facet/styles.css"]));

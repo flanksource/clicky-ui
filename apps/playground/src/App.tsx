@@ -15,6 +15,8 @@ import { PLAYGROUND_COMMENT_CONFIG, useComments } from "./comments/useComments";
 import { PlaygroundShell } from "./PlaygroundShell";
 import { ArtifactSearch } from "./navigation/ArtifactSearch";
 import { VocabularyReference } from "./vocabularies/VocabularyReference";
+import { FormExtensionsDemo } from "./form-extensions/FormExtensionsDemo";
+import { OipaConditionsPage } from "./oipa-conditions/OipaConditionsPage";
 import { useVocabulary } from "./vocabularies/context";
 import { ExternalWorkspace } from "./bookmarklet/ExternalWorkspace";
 import { allowDocumentNavigation } from "./documents/navigation-guard";
@@ -94,7 +96,7 @@ export function App() {
 
   return (
     <ThemeProvider>
-      {new URLSearchParams(window.location.search).has("vocabulary") ? <VocabularyReference id={new URLSearchParams(window.location.search).get("vocabulary")!} /> : <>
+      {new URLSearchParams(window.location.search).has("vocabulary") ? <VocabularyReference id={new URLSearchParams(window.location.search).get("vocabulary")!} /> : new URLSearchParams(window.location.search).has("form-extensions") ? <FormExtensionsDemo /> : new URLSearchParams(window.location.search).has("oipa-conditions") ? <OipaConditionsPage /> : <>
       <DensityProvider>
         <RouterProvider adapter={router}>
           <ArtifactSearch onNavigate={slug => navigateRoute(standardRoute(slug, "preview"))} />

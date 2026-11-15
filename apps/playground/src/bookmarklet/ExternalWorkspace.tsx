@@ -16,7 +16,7 @@ import { AgentSessionButton } from "../agent-runs/AgentSessionButton";
 import { PlaygroundPreferences } from "../PlaygroundPreferences";
 import { useExternalCatalog } from "./external-catalog";
 import { ExternalPreview } from "./ExternalPreview";
-import { CommentCapture } from "../comments/CommentCapture";
+import { CommentCapture } from "@flanksource/clicky-ui/comments";
 import { PlaygroundCommentReview } from "../comments/PlaygroundCommentReview";
 import { useFeedbackCopy } from "../comments/useFeedbackCopy";
 import { resolvedReviewQueue } from "../comments/PlaygroundCommentReview";
@@ -203,7 +203,7 @@ export function ExternalWorkspace({
                     className="rounded-md border border-border p-3"
                   >
                     <p className="mb-2 text-sm font-medium">{comment.body}</p>
-                    <CommentCapture comment={comment} />
+                    <CommentCapture capture={comment.element} />
                   </div>
                 ))}
             </div>
@@ -247,7 +247,7 @@ export function ExternalWorkspace({
               extraAssignItems={agentRuns.extraAssignItems}
               renderRootDetails={(comment) => (
                 <>
-                  <CommentCapture comment={comment} />
+                  <CommentCapture capture={comment.element} />
                   {agentRuns.renderRunDetails(comment)}
                 </>
               )}

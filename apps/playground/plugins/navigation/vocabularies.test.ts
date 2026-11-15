@@ -29,7 +29,7 @@ it("lists vocabulary root pages in Vocabularies with titles or aliases and keeps
     expect.objectContaining({ alias: "symbols", slug: "vocabularies/symbols", file: "example-kit/examples/vocabularies/symbols.tsx" }),
     expect.objectContaining({ alias: "guide", slug: "guide", file: "src/pages/guide.tsx" }),
   ]));
-  configureComments({ dir: root, workspace: root, endpoint: fixedGavel("http://gavel.local") });
+  configureComments({ dir: root, workspace: root, endpoint: fixedGavel("http://gavel.local"), project: "playground" });
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ data: [], page: { total: 0, limit: 200, offset: 0 } })));
   const navigation = createNavigation({ dir: root, pagesDir, endpoint: fixedGavel("http://gavel.local"), problems: async () => ({}) });
   const tree = await navigation.children(parseNavigationQuery(new URLSearchParams({ age: "all", active: "vocabularies/shapes" })));

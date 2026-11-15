@@ -606,5 +606,5 @@ export async function addComment(
     ? { ...fields, vocabularyRefs }
     : fields;
   assertComment(validated);
-  return commentsClient(dir).add(page, validated, selector);
+  return (await commentsClient(dir)).add(page, validated, selector);
 }

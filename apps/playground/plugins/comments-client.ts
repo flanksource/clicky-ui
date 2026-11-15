@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { isAbsolute, relative, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import type { GavelEndpoint } from "./gavel-launch-server";
 import { vocabularyReferences } from "../../../packages/ui/src/comments/comment-vocabulary";
@@ -22,29 +22,85 @@ import {
   type NativeComment,
   type Action,
 } from "./comments-projection";
-const clients = new Map<string, CommentsClient>();
+type ConfiguredComments = {
+  endpoint: GavelEndpoint;
+  workspace: string;
+  project?: string;
+  client?: Promise<CommentsClient>;
+};
+const clients = new Map<string, ConfiguredComments>();
 
+/**
+ * Threads live under the `gavel://project/<name>` scope of the gavel project
+ * holding `workspace`, looked up on first use unless `project` names it.
+ */
 export function configureComments({
   dir,
   endpoint,
   workspace,
+  project,
 }: {
   dir: string;
   endpoint: GavelEndpoint;
   workspace: string;
+  project?: string;
 }) {
-  const client = new CommentsClient(
-    endpoint,
-    `gavel://workspace/${createHash("sha256").update(workspace).digest("hex")}`,
-    workspace,
-  );
-  clients.set(dir, client);
-  return client;
+  clients.set(dir, { endpoint, workspace, ...(project === undefined ? {} : { project }) });
 }
-export function commentsClient(dir: string): CommentsClient {
-  const client = clients.get(dir);
-  if (!client) throw new Error(`Gavel comments are not configured for ${dir}`);
-  return client;
+export function commentsClient(dir: string): Promise<CommentsClient> {
+  const configured = clients.get(dir);
+  if (!configured) throw new Error(`Gavel comments are not configured for ${dir}`);
+  const { endpoint, workspace, project } = configured;
+  if (!configured.client) {
+    const client = (project === undefined ? gavelProject(endpoint, workspace) : Promise.resolve(project)).then(
+      (name) => new CommentsClient(endpoint, projectScope(name), workspace),
+    );
+    // A lookup that failed (gavel down, project not registered yet) is retried by the next request.
+    client.catch(() => {
+      if (configured.client === client) delete configured.client;
+    });
+    configured.client = client;
+  }
+  return configured.client;
+}
+
+/** Go's `url.PathEscape`, which gavel compares the scope against: it keeps `$&+=:@` and escapes `!'()*`. */
+function goPathEscape(name: string): string {
+  return encodeURIComponent(name)
+    .replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/%(24|26|2B|3D|3A|40)/g, (_match, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+}
+export function projectScope(name: string): string {
+  return `gavel://project/${goPathEscape(name)}`;
+}
+
+/** The registered gavel project whose directory most specifically holds `workspace`. */
+export async function gavelProject(endpoint: GavelEndpoint, workspace: string): Promise<string> {
+  const base = await endpoint.url();
+  const url = new URL("/api/projects", base);
+  let response: Response;
+  try {
+    response = await fetch(url);
+  } catch (cause) {
+    throw new LaunchHttpError(502, `Cannot reach Gavel projects at ${url.href}: ${String(cause)}`);
+  }
+  if (!response.ok) {
+    throw new LaunchHttpError(502, `Gavel projects at ${url.href} returned HTTP ${response.status}: ${await response.text()}`);
+  }
+  const projects = (await response.json()) as { name: string; dir?: string }[];
+  const root = resolve(workspace);
+  const holding = projects
+    .filter((p): p is { name: string; dir: string } => !!p.dir)
+    .map((p) => ({ name: p.name, dir: resolve(p.dir) }))
+    .filter(({ dir }) => !relative(dir, root).startsWith("..") && !isAbsolute(relative(dir, root)))
+    .sort((a, b) => b.dir.length - a.dir.length);
+  if (!holding[0]) {
+    throw new LaunchHttpError(
+      422,
+      `No gavel project at ${url.origin} holds the playground workspace ${root}; register it as a gavel project to keep comments`,
+    );
+  }
+  return holding[0].name;
 }
 /** Gavel's `code-range` selector (gavel/comments/selectors.go): a line range of a file at a source revision. */
 export type CodeRangeSelector = {
@@ -66,7 +122,7 @@ export class CommentsClient {
   ) {}
   target(page: string, selector?: CodeRangeSelector): Target & { selector?: CodeRangeSelector } {
     return {
-      uri: `${this.scope}/page/${encodeURIComponent(page)}`,
+      uri: `${this.scope}/pages/${encodeURIComponent(page)}`,
       scopeUri: this.scope,
       kind: "playground-page",
       label: page,
@@ -374,21 +430,21 @@ async function findComment(client: CommentsClient, id: string) {
   throw new LaunchHttpError(404, `comment "${id}" not found`);
 }
 export async function readAll(dir: string) {
-  return commentsClient(dir).all();
+  return (await commentsClient(dir)).all();
 }
 export async function readPage(dir: string, page: string) {
-  return (await commentsClient(dir).all(page))[page] ?? [];
+  return (await (await commentsClient(dir)).all(page))[page] ?? [];
 }
 export async function writeAll(
   dir: string,
   next: CommentsFile,
   previous: CommentsFile,
 ) {
-  await commentsClient(dir).replace(next, previous);
+  await (await commentsClient(dir)).replace(next, previous);
 }
 export async function lookupComment(dir: string, id: string) {
   try {
-    return await findComment(commentsClient(dir), id);
+    return await findComment(await commentsClient(dir), id);
   } catch (cause) {
     if (cause instanceof LaunchHttpError && cause.status === 404)
       return undefined;
@@ -400,7 +456,7 @@ export async function addReply(
   id: string,
   reply: StoredComment,
 ): Promise<StoredComment> {
-  const client = commentsClient(dir);
+  const client = await commentsClient(dir);
   const { page, comment } = await findComment(client, id);
   const root = comment.rootId ?? comment.id;
   reply = {
@@ -434,7 +490,7 @@ export async function patchComment(
     reply?: StoredComment;
   } = {},
 ): Promise<StoredComment> {
-  const client = commentsClient(dir);
+  const client = await commentsClient(dir);
   const { page, comment } = await findComment(client, id);
   const updated = { ...comment, ...patch } as StoredComment;
   if (patch.body !== undefined) {
@@ -513,7 +569,7 @@ export async function patchComment(
   return project(rows.at(-1)!).find((c) => c.id === id)!;
 }
 export async function removeComment(dir: string, id: string): Promise<number> {
-  const client = commentsClient(dir);
+  const client = await commentsClient(dir);
   const { page, comment } = await findComment(client, id);
   const list = await readPage(dir, page);
   await client.batch([

@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { resolve } from "node:path";
 import { beforeAll, afterAll } from "vitest";
-import { configureComments } from "../comments-client";
+import { commentsClient, configureComments } from "../comments-client";
 import { commentActor } from "../comments-projection";
 import * as store from "../comments-store";
 export * from "../comments-store";
@@ -41,15 +41,18 @@ afterAll(() => {
 
 export function configureTestComments(dir: string) {
   if (!url) throw new Error("Comments test host is not ready");
-  return configureComments({
+  // The test host makes each scope its own web project; a project per directory keeps tests apart.
+  configureComments({
     dir,
     workspace: dir,
     endpoint: { url: async () => url },
+    project: dir,
   });
+  return commentsClient(dir);
 }
 const client = configureTestComments;
 export async function writeAll(dir: string, data: store.CommentsFile) {
-  const c = client(dir);
+  const c = await client(dir);
   const rows = Object.entries(data).flatMap(([page, list]) =>
     list
       .filter((comment) => !comment.parentId)
@@ -108,11 +111,11 @@ export async function writeAll(dir: string, data: store.CommentsFile) {
   if (!response.ok) throw new Error(await response.text());
 }
 export async function readAll(dir: string) {
-  client(dir);
+  await client(dir);
   return store.readAll(dir);
 }
 export async function readPage(dir: string, page: string) {
-  client(dir);
+  await client(dir);
   return store.readPage(dir, page);
 }
 export async function addComment(
@@ -120,7 +123,7 @@ export async function addComment(
   page: string,
   comment: store.StoredComment,
 ) {
-  client(dir);
+  await client(dir);
   const created = await store.addComment(dir, page, comment);
   const all = await store.readAll(dir);
   const fixture = {

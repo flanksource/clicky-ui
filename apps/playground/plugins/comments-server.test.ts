@@ -137,7 +137,7 @@ describe("playground comment lifecycle API", () => {
         }),
       });
     const gavelTarget = async (id: string) =>
-      (await configureTestComments(dir).request<{ target: Record<string, unknown> }>(`/${id}`)).target;
+      (await (await configureTestComments(dir)).request<{ target: Record<string, unknown> }>(`/${id}`)).target;
 
     it("stores the styleEdit and sends a code-range selector derived from its marker to Gavel", async () => {
       const response = await create({ styleEdit });
@@ -146,7 +146,7 @@ describe("playground comment lifecycle API", () => {
       const root = (await response.json()) as StoredComment;
       expect(root.styleEdit).toEqual(styleEdit);
       expect(await gavelTarget(root.id)).toMatchObject({
-        uri: expect.stringMatching(/\/page\/sample$/),
+        uri: expect.stringMatching(/\/pages\/sample$/),
         kind: "playground-page",
         selector: {
           kind: "code-range",

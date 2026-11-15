@@ -429,7 +429,7 @@ export function AgentRunsProvider({
                 }),
             ],
       renderRunDetails: (comment) =>
-        comment.agentRun ? (
+        comment.agentRun?.state === "error" ? (
           <div className="px-1">
             <AgentRunChip comment={comment} managedSessions={data?.sessions ?? []} onOpen={openPanel} onRetry={next => retry(comment, next)} {...(canRetryFresh ? { onRetryFresh: () => retryFresh(comment) } : {})} />
           </div>
@@ -465,7 +465,7 @@ export function AgentRunsProvider({
 
   const identities = useMemo(() => Object.fromEntries((data?.sessions ?? []).map(session => {
     const { model, provider, effort } = session.runtime.spec;
-    const metadata: AgentIdentityMetadata = { model, ...(typeof provider === "string" ? { provider } : {}), ...(typeof effort === "string" ? { effort } : {}) };
+    const metadata: AgentIdentityMetadata = { sessionName: session.label ?? session.sessionId, model, ...(typeof provider === "string" ? { provider } : {}), ...(typeof effort === "string" ? { effort } : {}) };
     return [session.sessionId, metadata];
   })), [data]);
   return (
