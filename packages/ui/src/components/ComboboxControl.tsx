@@ -14,7 +14,7 @@ import {
 import type { ComboboxOption, ComboboxTriStateMode } from "./combobox-types";
 import { comboboxLabelPadding } from "../lib/combobox-values";
 import { ComboboxActions } from "./ComboboxActions";
-import { ComboboxTags } from "./ComboboxTags";
+import { ComboboxMoreTags, ComboboxTags, useSingleRowTagCount } from "./ComboboxTags";
 
 export function ComboboxControl({
   anchorRef,
@@ -96,6 +96,9 @@ export function ComboboxControl({
 }) {
   const actionPadding = ["pr-2", "pr-8", "pr-14", "pr-[5.5rem]"][Number(showToggle) + Number(showClear) + Number(Boolean(suffix))];
   const suffixPosition = ["right-0", "right-7", "right-[3.75rem]"][Number(showToggle) + Number(showClear)];
+  const shownCount = useSingleRowTagCount(anchorRef, tags ? tagValues : []);
+  const shownTags = tagValues.slice(0, shownCount);
+  const hiddenTags = tagValues.slice(shownCount);
   return (
     <div
       ref={anchorRef}
@@ -136,7 +139,17 @@ export function ComboboxControl({
           onRemove={onRemoveTag}
           onSetMode={onSetTagMode}
           options={options}
-          values={tagValues}
+          values={shownTags}
+        />
+      )}
+      {tags && hiddenTags.length > 0 && (
+        <ComboboxMoreTags
+          disabled={disabled}
+          modes={tagModes}
+          onRemove={onRemoveTag}
+          onSetMode={onSetTagMode}
+          options={options}
+          values={hiddenTags}
         />
       )}
       <input

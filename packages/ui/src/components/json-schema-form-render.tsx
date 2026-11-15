@@ -25,6 +25,8 @@ import {
 import { ArrayControl } from "./json-schema-form-array";
 import { ObjectControl, StringMapControl } from "./json-schema-form-object";
 import { FieldErrorMessages, FieldErrorText } from "./json-schema-form-error-display";
+import { CustomControl } from "./json-schema-form-custom-control";
+import { rowLayoutEngine, type BuiltFieldRow, type LayoutEngine } from "./json-schema-form-extension-api";
 import { appendInstancePath, errorsAtInstancePath } from "./json-schema-form-errors";
 import type { JsonSchemaFormError } from "./json-schema-form-error-types";
 import { applyPostExtensions } from "./json-schema-form-extensions";
@@ -35,7 +37,6 @@ import { hoistNestedFields, isHoisted } from "./json-schema-form-hoist";
 import type {
   FieldArgs,
   FieldControl,
-  HelpDisplay,
   JsonSchemaObject,
   JsonSchemaProperty,
   RenderApi,
@@ -46,6 +47,7 @@ import {
   fieldInputId,
   hasObjectItemProperties,
   rendersAsSection,
+  nullableGroupClearable,
   isEmptyValue,
   normalizeColSpan,
   normalizeColumns,
@@ -66,6 +68,7 @@ import { UnionControl } from "./json-schema-form-union";
 import { JsonControl } from "./json-schema-form-json";
 import { NullableControl } from "./json-schema-form-nullable";
 import { FormObjectSection } from "./json-schema-form-section";
+import { FieldClearButton } from "./field-clear-button";
 import { UiText, UiCalendar, UiToggleOff, UiListNumbers, UiArray, UiCode2, UiListDashes } from "../icons";
 import { FormHelp } from "./json-schema-form-help-links";
 import { hasFormHelp } from "./json-schema-form-help-model";
@@ -78,13 +81,17 @@ import { hasFormHelp } from "./json-schema-form-help-model";
 // renderValueControl produces just the value node for a field, dispatching on
 // its resolved kind. The RenderContext carries readOnly + the pre/post stacks so
 // container controls (array/object/map) can recurse with full context.
-export function renderValueControl(field: FieldControl, ctx: RenderContext): ReactNode {
+export function renderValueControl(
+  field: FieldControl,
+  ctx: RenderContext,
+  opts?: { clearInHeader?: boolean },
+): ReactNode {
   // ctx.instancePath is the field's own path here: buildField descends into the
   // child context before rendering the value.
   const fieldId = fieldInputId(ctx.instancePath, ctx.idPrefix);
   if (field.nullable && !ctx.presentation) {
     const nonNull = { ...field, onChange: (next: unknown) => field.onChange(field.kind === "date" && next === "" ? null : next) };
-    return <NullableControl field={field} fieldId={fieldId} ctx={ctx}>{renderNonNullableControl(nonNull, ctx)}</NullableControl>;
+    return <NullableControl field={field} fieldId={fieldId} ctx={ctx} clearInHeader={opts?.clearInHeader === true}>{renderNonNullableControl(nonNull, ctx)}</NullableControl>;
   }
   return renderNonNullableControl(field, ctx);
 }
@@ -144,6 +151,8 @@ function renderNonNullableControl(field: FieldControl, ctx: RenderContext): Reac
       return <ObjectControl field={field} ctx={ctx} />;
     case "string-map":
       return <StringMapControl field={field} ctx={ctx} />;
+    case "custom":
+      return <CustomControl field={field} fieldId={fieldId} readOnly={readOnly} ctx={ctx} />;
     default:
       return <StringControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
   }
@@ -151,8 +160,8 @@ function renderNonNullableControl(field: FieldControl, ctx: RenderContext): Reac
 
 // ownsReadOnlyRendering reports whether a control renders its own non-editable
 // form, so the renderer must not pre-empt it with the plain ReadOnlyValue text:
-// containers recurse structurally, and textarea/display/link have bespoke
-// read-only output.
+// containers recurse structurally, textarea/display/link have bespoke read-only
+// output, and a custom control is handed `readOnly` to present itself.
 function ownsReadOnlyRendering(kind: FieldControl["kind"]): boolean {
   return (
     kind === "array" ||
@@ -161,24 +170,21 @@ function ownsReadOnlyRendering(kind: FieldControl["kind"]): boolean {
     kind === "textarea" ||
     kind === "markdown" ||
     kind === "display" ||
-    kind === "link"
+    kind === "link" ||
+    kind === "custom"
   );
 }
 
 // buildField resolves a control, applies the pre-extensions (any returning
 // null drops the field), renders the value node, then applies the
 // post-extensions to the {label, value} node pair.
+// `row` is set by renderFieldRow: a section row's header can then carry a
+// nullable value's clear action (headerClear) in place of a bordered wrapper.
 function buildField(
   args: FieldArgs,
   ctx: RenderContext,
-): {
-  field: FieldControl;
-  fieldId: string;
-  label: ReactNode;
-  value: ReactNode;
-  messages: JsonSchemaFormError[];
-  help: HelpDisplay;
-} | null {
+  row?: { labelOverride?: string | undefined },
+): (BuiltFieldRow & { engine: LayoutEngine | undefined }) | null {
   // `x-hidden` is a property of the schema, not of the resolved control, so no
   // extension can set or clear it — checked before anything is resolved. A
   // matching `allOf` branch that re-declares the property without the flag is
@@ -196,7 +202,7 @@ function buildField(
   // A const already holding its value is a fixed discriminator (the union
   // selector chose it); there is nothing to edit, so it is not shown.
   if (args.prop.const !== undefined && args.prop["x-hidden"] !== false && args.value === args.prop.const && hide("hidden: const discriminator")) return null;
-  const base = resolveControl(args);
+  const base = resolveControl({ ...args, extensions: ctx.extensions });
   if (ctx.showTypeIcons && base.labelIcon == null) {
     const icons = { string: UiText, textarea: UiText, markdown: UiText, date: UiCalendar, boolean: UiToggleOff, number: UiListNumbers, array: UiArray, object: UiCode2, "string-map": UiCode2, enum: UiListDashes };
     if (base.kind in icons) {
@@ -254,8 +260,17 @@ function buildField(
   const help = field.helpDisplay ?? ctx.layout.help ?? "inline";
   // A section's label is its header row (none for an empty title), so post
   // extensions decorate it too.
+  const Heading = ctx.extensions.slots.SectionHeading ?? SectionHeading;
+  // Throws for an x-layout / layout.mode no extension registered, before any
+  // control renders against it.
+  const engine = rowLayoutEngine({
+    fieldKey: args.key,
+    fieldLayout: field.layout,
+    formMode: ctx.layout.mode,
+    layouts: ctx.extensions.layouts,
+  });
   let label: ReactNode = rendersAsSection(field, ctx.layout.mode) ? (
-    field.label === "" ? null : <SectionHeading field={field} size={ctx.size} helpDisplay={help} />
+    field.label === "" ? null : <Heading field={field} size={ctx.size} helpDisplay={help} />
   ) : (
     <FieldLabel field={field} fieldId={fieldId} size={ctx.layout.mode === "properties" ? propertyControlSize[ctx.size] : ctx.size} helpDisplay={help} />
   );
@@ -277,7 +292,17 @@ function buildField(
     ...(ctx.layout.mode === "properties" && field.kind === "array"
       ? { layout: { ...ctx.layout, mode: overrideMode ?? "stacked" } } : {}),
   };
-  let value: ReactNode = renderValueControl(field, valueCtx);
+  const clearInHeader =
+    row !== undefined &&
+    field.nullable === true &&
+    !ctx.presentation &&
+    rendersAsSection(field, ctx.layout.mode) &&
+    (row.labelOverride ?? field.label) !== "";
+  const nullField = field;
+  const headerClear = clearInHeader && nullableGroupClearable(field, valueCtx.readOnly || field.readOnly === true) ? (
+    <FieldClearButton clearLabel={`Clear ${field.label} to null`} onClear={() => nullField.onChange(null)} />
+  ) : null;
+  let value: ReactNode = renderValueControl(field, valueCtx, { clearInHeader });
   const postCtx = {
     fieldId,
     ...(ctx.rootValue ? { rootValue: ctx.rootValue } : {}),
@@ -306,9 +331,10 @@ function buildField(
       ).value} />;
   }
   if (ctx.debug && field.kind !== "display") {
-    ({ label, value } = withFieldDebug({ label, value }, { fieldKey: args.key, instancePath, field, prop: args.prop, hiddenReason }));
+    const source = field.kind === "custom" ? ctx.extensions.formats.get(field.format ?? "")?.extension : undefined;
+    ({ label, value } = withFieldDebug({ label, value }, { fieldKey: args.key, instancePath, field, prop: args.prop, hiddenReason, ...(source ? { source } : {}) }));
   }
-  return { field, fieldId, label, value, messages, help };
+  return { field, fieldId, label, value, headerClear, messages, help, engine };
 }
 
 // renderFieldNodes runs the full pipeline and returns the raw {label, value}
@@ -320,13 +346,14 @@ export function renderFieldNodes(
 ): { label: ReactNode; value: ReactNode } | null {
   const built = buildField(args, ctx);
   if (!built) return null;
+  const FieldError = ctx.extensions.slots.FieldError ?? FieldErrorText;
   return {
     label: built.label,
     value:
       built.messages.length > 0 ? (
         <div className="flex min-w-0 flex-col gap-0.5">
           {built.value}
-          <FieldErrorText id={fieldErrorId(built.fieldId)} errors={built.messages} />
+          <FieldError id={fieldErrorId(built.fieldId)} errors={built.messages} />
         </div>
       ) : (
         built.value
@@ -342,17 +369,23 @@ export function renderFieldRow(
   ctx: RenderContext,
   opts?: { labelOverride?: string },
 ): ReactNode | null {
-  const built = buildField(args, ctx);
-  if (!built) return null;
+  const buildResult = buildField(args, ctx, { labelOverride: opts?.labelOverride });
+  if (!buildResult) return null;
+  const { engine, ...built } = buildResult;
   const { field } = built;
+  const FieldError = ctx.extensions.slots.FieldError ?? FieldErrorText;
+  const Heading = ctx.extensions.slots.SectionHeading ?? SectionHeading;
+  if (engine) {
+    return engine.Row(opts?.labelOverride === undefined ? built : { ...built, label: opts.labelOverride }, ctx);
+  }
   if (ctx.layout.mode === "properties" && field.kind !== "display") {
     return <PropertiesFieldRow {...built} label={opts?.labelOverride ?? built.label} ctx={ctx} />;
   }
   if (field.kind === "object" && field.label !== "" && (field.schema["x-object-display"] ?? ctx.objectDisplay) === "accordion") {
     const path = args.instancePath ?? appendInstancePath(ctx.instancePath, field.key);
     const hasErrors = built.messages.length > 0 || ctx.errors.some(error => error.instancePath.startsWith(`${path}/`));
-    return <FormObjectSection title={built.label} hasErrors={hasErrors}>
-      <FieldErrorText id={fieldErrorId(built.fieldId)} errors={built.messages} />{built.value}
+    return <FormObjectSection title={built.label} actions={built.headerClear} hasErrors={hasErrors}>
+      {built.messages.length > 0 && <FieldError id={fieldErrorId(built.fieldId)} errors={built.messages} />}{built.value}
     </FormObjectSection>;
   }
   // Object fields — and table-laid-out arrays/string-maps — render as a flat
@@ -370,18 +403,21 @@ export function renderFieldRow(
       <ObjectSection
         heading={
           opts?.labelOverride === undefined ? built.label : opts.labelOverride === "" ? null : (
-            <SectionHeading field={field} label={opts.labelOverride} size={ctx.size} helpDisplay={built.help} />
+            <Heading field={field} label={opts.labelOverride} size={ctx.size} helpDisplay={built.help} />
           )
         }
+        actions={built.headerClear}
         size={ctx.size}
         helpDisplay={built.help}
         {...(hasFormHelp(field) ? { helper: <FormHelp field={field} /> } : {})}
       >
-        <FieldErrorText
-          id={fieldErrorId(built.fieldId)}
-          errors={built.messages}
-          className="min-w-0 break-words"
-        />
+        {built.messages.length > 0 && (
+          <FieldError
+            id={fieldErrorId(built.fieldId)}
+            errors={built.messages}
+            className="min-w-0 break-words"
+          />
+        )}
         {built.value}
       </ObjectSection>
     );
@@ -413,8 +449,10 @@ export function renderFieldRow(
   );
   // One rendering path for both sources, so the soft hint lands in the same
   // fieldErrorId element the control's aria-describedby already points at.
+  const hasMessages = built.messages.length > 0;
+  const customError = ctx.extensions.slots.FieldError;
   const err =
-    built.messages.length > 0 ? (
+    hasMessages && !customError ? (
       <FieldErrorMessages id={fieldErrorId(built.fieldId)} errors={built.messages} />
     ) : undefined;
   return (
@@ -426,6 +464,7 @@ export function renderFieldRow(
       {...(field.colSpan === "full" ? { maxWidth: "none" } : {})}
       {...(hasFormHelp(field) && built.help !== "hover" ? { helper: <FormHelp field={field} /> } : {})}
       {...(err ? { error: err } : {})}
+      {...(hasMessages && customError ? { errorElement: <FieldError id={fieldErrorId(built.fieldId)} errors={built.messages} /> } : {})}
     />
   );
 }

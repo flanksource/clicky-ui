@@ -1,8 +1,10 @@
 import { isPlainObject } from "../lib/collections";
 import {
+  declaredBranches,
   effectiveProperties,
   evaluatePredicate,
   matchesIf,
+  selectedBranches,
   type EffectiveProperties,
 } from "./json-schema-form-conditionals";
 import { cloneSchemaDefault } from "./json-schema-form-defaults";
@@ -128,6 +130,9 @@ function hiddenBy(leaf: JsonSchemaProperty, keyword: string, flag: boolean, labe
 // effectiveProperties selects the branch it merges.
 function loadListenersOf(schema: JsonSchemaObject, value: Record<string, unknown>): BoundListener[] {
   const bound = loadListenersAt(schema["x-on-load"], "#/x-on-load");
+  for (const { branch, pointer } of selectedBranches(schema, value)) {
+    bound.push(...loadListenersAt(branch["x-on-load"], `#${pointer}/x-on-load`));
+  }
   for (const [index, clause] of (schema.allOf ?? []).entries()) {
     if (clause.if === undefined && clause.then === undefined) {
       bound.push(...loadListenersAt(clause["x-on-load"], `#/allOf/${index}/x-on-load`));
@@ -350,6 +355,9 @@ function list(actions: ChangeActions, name: ListName): string[] {
 // field that only exists while some `allOf` branch is live.
 function declaredKeys(schema: JsonSchemaObject): Set<string> {
   const keys = new Set(Object.keys(schema.properties ?? {}));
+  for (const branch of declaredBranches(schema)) {
+    for (const key of Object.keys(branch.properties ?? {})) keys.add(key);
+  }
   for (const clause of schema.allOf ?? []) {
     for (const branch of [clause, clause.then, clause.else]) {
       for (const key of Object.keys(branch?.properties ?? {})) keys.add(key);

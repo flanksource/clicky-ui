@@ -1,14 +1,25 @@
 import { createContext, useContext } from "react";
 import type { LookupDescriptor, LookupFetcher } from "./json-schema-form-types";
 
-// FormLookupContext carries the host-provided LookupFetcher down to the
-// LookupControl rendered deep inside the form, so the form stays decoupled from
-// any specific RPC client. FormLookupProvider provides it when JsonSchemaForm is
-// given a lookupFetcher.
-export const FormLookupContext = createContext<LookupFetcher | undefined>(undefined);
+// FormLookups is what the form provides to its lookup controls: the host's
+// LookupFetcher plus the per-url handlers form extensions registered
+// (FormExtension.lookups).
+export interface FormLookups {
+  fetcher?: LookupFetcher;
+  handlers: ReadonlyMap<string, LookupFetcher>;
+}
 
-export function useLookupFetcher(): LookupFetcher | undefined {
-  return useContext(FormLookupContext);
+// FormLookupContext carries them down to the LookupControl rendered deep inside
+// the form, so the form stays decoupled from any specific RPC client.
+// FormLookupProvider provides it.
+export const FormLookupContext = createContext<FormLookups>({ handlers: new Map() });
+
+// useLookupFetcher resolves the fetcher for one lookup: the extension handler
+// registered for the descriptor's `url`, else the host's lookupFetcher. Called
+// without a descriptor it returns the host's lookupFetcher.
+export function useLookupFetcher(descriptor?: LookupDescriptor): LookupFetcher | undefined {
+  const { fetcher, handlers } = useContext(FormLookupContext);
+  return (descriptor && handlers.get(descriptor.url)) || fetcher;
 }
 
 // readPath resolves a dotted path (e.g. "provider.type") against the form's root

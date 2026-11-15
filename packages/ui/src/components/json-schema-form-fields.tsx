@@ -371,21 +371,48 @@ export function EnumControl({
 // (debounced) typed query drives server-side search. Single-select keeps
 // allowCustomValue on so a value outside the option set still commits (e.g. an
 // inline DSN). When no fetcher is wired it degrades to a free-text combobox.
-export function LookupControl({
-  field,
-  fieldId,
-  readOnly,
-  size,
-  rootValue,
-}: {
+export function LookupControl(props: {
   field: FieldControl;
   fieldId: string;
   readOnly: boolean;
   size: FormSize;
   rootValue?: Record<string, unknown>;
 }) {
-  const fetcher = useLookupFetcher();
+  // A failed lookup is shown under the control until the next one succeeds; the
+  // options already loaded stay as they were.
+  const [error, setError] = useState<string>();
+  const errorId = `${props.fieldId}-lookup-error`;
+  return (
+    <>
+      <LookupInput {...props} onError={setError} {...(error ? { errorId } : {})} />
+      {error && (
+        <p id={errorId} role="alert" data-jsf-lookup-error className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
+
+function LookupInput({
+  field,
+  fieldId,
+  readOnly,
+  size,
+  rootValue,
+  onError,
+  errorId,
+}: {
+  field: FieldControl;
+  fieldId: string;
+  readOnly: boolean;
+  size: FormSize;
+  rootValue?: Record<string, unknown>;
+  onError: (message: string | undefined) => void;
+  errorId?: string;
+}) {
   const descriptor = field.lookup;
+  const fetcher = useLookupFetcher(descriptor);
   const value = toText(field.value);
   const [options, setOptions] = useState<FieldOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -402,11 +429,14 @@ export function LookupControl({
       setLoading(true);
       const root = rootRef.current;
       fetcher({ descriptor, query, ...(root ? { rootValue: root } : {}) })
-        .then((next) => setOptions(next))
-        .catch(() => setOptions([]))
+        .then((next) => {
+          setOptions(next);
+          onError(undefined);
+        })
+        .catch((cause: unknown) => onError(cause instanceof Error ? cause.message : String(cause)))
         .finally(() => setLoading(false));
     },
-    [descriptor, fetcher],
+    [descriptor, fetcher, onError],
   );
 
   // Re-fetch the head set when the scope (a sibling field, e.g. provider type)
@@ -499,6 +529,7 @@ export function LookupControl({
       onSearch={onSearch}
       onChange={(v) => field.onChange(v)}
       {...comboboxAriaProps(field, fieldId)}
+      {...(errorId ? { invalid: true as const, describedBy: errorId } : {})}
       {...(defaultPlaceholder(field.schema) ? { placeholder: defaultPlaceholder(field.schema) } : {})}
     />
   );

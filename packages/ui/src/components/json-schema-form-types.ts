@@ -4,6 +4,7 @@ import type { FieldTone } from "./json-schema-form-tone";
 import type { MdxEditorPluginOptions } from "./mdx-editor-options";
 import type { LookupDescriptor } from "./json-schema-form-runtime-types";
 import type { ChangeListener } from "./json-schema-form-listener-types";
+import type { FormExtensionSource } from "./json-schema-form-extension-api";
 
 export type { FieldTone };
 export type * from "./json-schema-form-runtime-types";
@@ -190,7 +191,7 @@ export interface JsonSchemaProperty {
   "x-icon"?: string;
   // Per-field layout override, winning over `x-label-position` and the form
   // layout. "table" renders an array of objects (or a map) as compact rows.
-  "x-layout"?: "inline" | "stack" | "table";
+  "x-layout"?: FieldLayout;
   // Array-level: the most visible columns an object array with no display hint
   // opens as a grid; wider arrays open as the inline item form. Default 4.
   "x-table-max-columns"?: number;
@@ -246,6 +247,10 @@ export interface JsonSchemaObject extends JsonSchemaProperty {
   // the matched branch's fields (the picker collapses to a compact header with a
   // "change" affordance). Drives the two-phase connection form.
   "x-discriminator"?: string;
+  // Code modules for this form: inline TSX or `ref` paths a host loads through
+  // JsonSchemaForm's `extensionLoader`. Read on the root object only, and
+  // stripped before the renderer walks the schema.
+  "x-clicky-extensions"?: FormExtensionSource[];
 }
 
 export type FieldControlKind =
@@ -272,7 +277,14 @@ export type FieldControlKind =
   // schema fields that label/structure a form rather than collect a value.
   | "display"
   // A read-only external hyperlink.
-  | "link";
+  | "link"
+  // A field whose schema `format` a form extension registered a renderer for
+  // (FormExtension.formats); `FieldControl.format` names which.
+  | "custom";
+
+// A per-field `x-layout`: a built-in override, or the name of a layout engine a
+// form extension registered (FormExtension.layouts).
+export type FieldLayout = "inline" | "stack" | "table" | (string & Record<never, never>);
 
 // How a display control renders (FieldControl.displayVariant): a bold section
 // "heading", a muted block of "text", a horizontal "divider", or an empty
@@ -504,7 +516,11 @@ export interface FieldControl {
   // "inline"/"stack" force the field's subtree into that FormLayout mode;
   // "table" renders an array (or string-map) as compact rows with column
   // headers. Takes precedence over the form-level layout.
-  layout?: "inline" | "stack" | "table";
+  layout?: FieldLayout;
+
+  // custom — the schema `format` a form extension renders. Set only on a
+  // resolved "custom" control, where it selects the renderer.
+  format?: string;
 
   // array — the schema each item is rendered against (recursively).
   itemSchema?: JsonSchemaProperty;

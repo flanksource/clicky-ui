@@ -1,54 +1,67 @@
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "../lib/utils";
-import { Icon } from "../data/Icon";
-import { UiCheck, UiEllipsisBold } from "../icons";
+import { Loading } from "./loading";
 import { FormFieldFilter } from "./json-schema-form-filter-input";
-import { DropdownMenu } from "../overlay/DropdownMenu";
+import { useSchemaExtensions, withoutExtensionSources } from "./json-schema-form-schema-extensions";
 import { FieldsGrid } from "./json-schema-form-layout";
 import { FormErrorSummary } from "./json-schema-form-error-display";
 import { unmatchedFormErrors } from "./json-schema-form-errors";
 import { FormLookupProvider } from "./FormLookupProvider";
 import { FormConnectionContext } from "./form-connection-context";
+import { FormLayoutEnginesContext } from "./form-layout-context";
 import { DiscriminatedForm } from "./json-schema-form-discriminator";
 import { rehydrateRefs } from "./json-schema-form-refs";
 import { renderApi, renderObjectFields } from "./json-schema-form-render";
 import { applySchemaDefaults } from "./json-schema-form-defaults";
 import {
+  assertFormLayoutRegistered,
+  isBuiltInFormLayout,
+  mergeFormExtensions,
+  type FormExtension,
+  type LayoutEngine,
+} from "./json-schema-form-extension-api";
+import { FormNoMatches, FormPreferencesMenu, FormTitle } from "./json-schema-form-chrome";
+import {
   cssLength,
   DEFAULT_COLUMN_MIN_WIDTH,
   normalizeColumns,
 } from "./json-schema-form-utils";
-import { DEFAULT_FORM_SIZE, fieldInnerGapClass, labelSizeClass, type FormSize } from "./json-schema-form-size";
+import { DEFAULT_FORM_SIZE, fieldInnerGapClass } from "./json-schema-form-size";
 import {
+  BUILT_IN_LAYOUT_OPTIONS,
   DEFAULT_PREFERENCES_STORAGE_KEY,
   readPreferences,
   writePreferences,
   type FormPreferences,
   type LayoutMode,
-  type SortMode,
 } from "./json-schema-form-preferences";
 import type { FormLayout, JsonSchemaFormProps, RenderContext } from "./json-schema-form-types";
 
 const DEFAULT_LABEL_MAX_WIDTH = "40ch";
 const DEFAULT_VALUE_MAX_WIDTH = "600px";
+const NO_EXTENSIONS: FormExtension[] = [];
 
 // resolveFormLayout maps the `layout`/`inline` props plus an optional menu-driven
 // `modeOverride` to a single resolved FormLayout. An explicit `layout` sets the
 // base; `inline` is the shorthand for it; `modeOverride` (from the preferences
 // menu) wins over both but only flips the mode — width caps from `layout` are
 // preserved. Both modes fill valueMaxWidth (inline value column / stacked
-// label+value stack); the label cap only applies inline.
+// label+value stack); the label cap only applies inline. A mode that is not
+// built in must be a layout engine a form extension registered, else it throws.
 function resolveFormLayout(
   layout: FormLayout | undefined,
   inline: boolean,
   modeOverride: LayoutMode | undefined,
+  engines: ReadonlyMap<string, LayoutEngine>,
 ): FormLayout {
   const baseMode = layout?.mode ?? (inline ? "inline" : "stacked");
   const mode = modeOverride ?? baseMode;
+  assertFormLayoutRegistered(mode, engines);
   const valueMaxWidth = layout?.valueMaxWidth ?? DEFAULT_VALUE_MAX_WIDTH;
   // `help` is orthogonal to mode, so it survives a menu-driven mode flip.
   const help = layout?.help ? { help: layout.help } : {};
   if (mode === "properties") return { ...layout, mode, ...help };
+  if (!isBuiltInFormLayout(mode)) return { ...layout, mode, valueMaxWidth, ...help };
   if (mode !== "inline") return { mode: "stacked", valueMaxWidth, ...help };
   return {
     mode: "inline",
@@ -61,9 +74,24 @@ function resolveFormLayout(
 // JsonSchemaForm renders an object subschema as a form: one control per
 // (effective) property. It resolves if/then conditionals internally and recurses
 // through array items and object/map values; every other behaviour is layered on
-// by the pre/post extension functions the consumer supplies. The component holds
-// no domain knowledge.
-export function JsonSchemaForm({
+// by the pre/post extension functions and form extensions the consumer supplies.
+// The component holds no domain knowledge.
+//
+// This wrapper loads the extensions the schema declares (`x-clicky-extensions`)
+// through `extensionLoader` and renders the form once they are ready, with the
+// keyword stripped from the schema the form walks.
+export function JsonSchemaForm({ extensionLoader, extensions, schema, ...props }: JsonSchemaFormProps) {
+  const loaded = useSchemaExtensions(schema["x-clicky-extensions"], extensionLoader);
+  const bodySchema = useMemo(() => withoutExtensionSources(schema), [schema]);
+  const merged = useMemo(
+    () => (loaded === undefined || loaded.length === 0 ? extensions : [...(extensions ?? []), ...loaded]),
+    [extensions, loaded],
+  );
+  if (loaded === undefined) return <Loading label="Loading form extensions" />;
+  return <JsonSchemaFormBody schema={bodySchema} {...props} {...(merged ? { extensions: merged } : {})} />;
+}
+
+function JsonSchemaFormBody({
   showTypeIcons = false,
   objectDisplay = "flat",
   schema,
@@ -86,6 +114,7 @@ export function JsonSchemaForm({
   title,
   pre,
   post,
+  extensions: formExtensions = NO_EXTENSIONS,
   showPreferencesMenu = true,
   showFilter,
   persistPreferences = true,
@@ -94,18 +123,35 @@ export function JsonSchemaForm({
   connectionApiBase,
   expressionEvaluator,
   applyDefaults = true,
-}: JsonSchemaFormProps) {
+}: Omit<JsonSchemaFormProps, "extensionLoader">) {
+  const extensions = useMemo(() => mergeFormExtensions(formExtensions), [formExtensions]);
+  const { slots } = extensions;
+  const Title = slots.Title ?? FormTitle;
+  const PreferencesMenu = slots.PreferencesMenu ?? FormPreferencesMenu;
+  const FieldFilter = slots.FieldFilter ?? FormFieldFilter;
+  const ErrorSummary = slots.ErrorSummary ?? FormErrorSummary;
+  const NoMatches = slots.NoMatches ?? FormNoMatches;
+  const layoutOptions = useMemo(
+    () => [
+      ...BUILT_IN_LAYOUT_OPTIONS,
+      ...[...extensions.layouts.keys()].map((name) => ({ value: name, label: name })),
+    ],
+    [extensions],
+  );
+
   // When the menu is hidden, never touch localStorage and start from an empty
   // override so behaviour is identical to before this feature existed.
   const [prefs, setPrefs] = useState<FormPreferences>(() =>
-    showPreferencesMenu && persistPreferences ? readPreferences(preferencesStorageKey) : {},
+    showPreferencesMenu && persistPreferences
+      ? readPreferences(preferencesStorageKey, [...extensions.layouts.keys()])
+      : {},
   );
   // The field filter is transient view state (a "find" over the fields), never
   // persisted — reopening the form should never start with fields hidden.
   const [fieldFilter, setFieldFilter] = useState("");
 
   const effectiveSize = prefs.size ?? size;
-  const resolvedLayout = resolveFormLayout(layout, inline, prefs.layoutMode);
+  const resolvedLayout = resolveFormLayout(layout, inline, prefs.layoutMode, extensions.layouts);
   const filterVisible = showFilter ?? (showPreferencesMenu && resolvedLayout.mode === "properties");
   // The `requiredFirst` prop sets the base sort; a menu selection overrides it.
   const effectiveSortMode = prefs.sortMode ?? (requiredFirst ? "required-first" : "schema");
@@ -126,7 +172,10 @@ export function JsonSchemaForm({
     () => (applyDefaults ? applySchemaDefaults(resolvedSchema, value) : value),
     [applyDefaults, resolvedSchema, value],
   );
-  const preExtensions = pre ?? [];
+  // The hook stacks: the props first, then each form extension's, so they run in
+  // one order at every depth (and unmatchedFormErrors sees the same pre-hooks).
+  const preExtensions = useMemo(() => [...(pre ?? []), ...extensions.pre], [pre, extensions]);
+  const postExtensions = useMemo(() => [...(post ?? []), ...extensions.post], [post, extensions]);
   const unmatchedErrors = useMemo(
     () =>
       unmatchedFormErrors({
@@ -137,13 +186,14 @@ export function JsonSchemaForm({
         hideReadOnlyFields,
         hideEmpty,
         pre: preExtensions,
+        extensions,
         rootValue: rootValue ?? effectiveValue,
         instancePath,
         ...(hiddenKeys ? { hiddenKeys } : {}),
         ...(fieldFilter.trim() ? { fieldFilter: fieldFilter.trim() } : {}),
         ...(expressionEvaluator ? { expressionEvaluator } : {}),
       }),
-    [effectiveValue, errors, expressionEvaluator, fieldFilter, hiddenKeys, hideEmpty, hideReadOnlyFields, instancePath, preExtensions, readOnly, resolvedSchema, rootValue],
+    [effectiveValue, errors, expressionEvaluator, extensions, fieldFilter, hiddenKeys, hideEmpty, hideReadOnlyFields, instancePath, preExtensions, readOnly, resolvedSchema, rootValue],
   );
   // Defaults are part of the submitted form value, not only presentation. This
   // is especially important for required discriminator fields whose default
@@ -164,7 +214,8 @@ export function JsonSchemaForm({
     size: effectiveSize,
     sortMode: effectiveSortMode,
     pre: preExtensions,
-    post: post ?? [],
+    post: postExtensions,
+    extensions,
     rootValue: rootValue ?? effectiveValue,
     onRootChange: onRootChange ?? onChange,
     instancePath,
@@ -187,13 +238,15 @@ export function JsonSchemaForm({
   const noMatches = objectRows != null && objectRows.length === 0 && fieldFilter.trim() !== "";
 
   return (
-    <FormLookupProvider {...(lookupFetcher ? { fetcher: lookupFetcher } : {})}>
+    <FormLookupProvider handlers={extensions.lookups} {...(lookupFetcher ? { fetcher: lookupFetcher } : {})}>
       <FormConnectionContext.Provider value={connectionApiBase}>
+      <FormLayoutEnginesContext.Provider value={extensions.layouts}>
       <div data-json-schema-form className={cn("relative flex flex-col", fieldInnerGapClass[effectiveSize])}>
         {showPreferencesMenu && !inPickerPhase && (
           <PreferencesMenu
             size={effectiveSize}
             layoutMode={resolvedLayout.mode}
+            layoutOptions={layoutOptions}
             sortMode={effectiveSortMode}
             fieldFilter={fieldFilter}
             filterInMenu={!filterVisible}
@@ -205,13 +258,13 @@ export function JsonSchemaForm({
             onToggleDebug={() => applyPrefs({ ...prefs, debug: !prefs.debug })}
           />
         )}
-        {title && <h3 className={cn("font-semibold", labelSizeClass[effectiveSize])}>{title}</h3>}
+        {title && <Title title={title} size={effectiveSize} />}
         {filterVisible && !inPickerPhase && (
           <div className="max-w-md pr-9">
-            <FormFieldFilter value={fieldFilter} onChange={setFieldFilter} />
+            <FieldFilter value={fieldFilter} onChange={setFieldFilter} />
           </div>
         )}
-        <FormErrorSummary errors={unmatchedErrors} />
+        {unmatchedErrors.length > 0 && <ErrorSummary errors={unmatchedErrors} />}
         <FieldsGrid
           layout={resolvedLayout}
           size={effectiveSize}
@@ -235,174 +288,10 @@ export function JsonSchemaForm({
             objectRows
           )}
         </FieldsGrid>
-        {noMatches && (
-          <p className={cn("text-muted-foreground", labelSizeClass[effectiveSize])}>
-            No fields match “{fieldFilter.trim()}”.
-          </p>
-        )}
+        {noMatches && <NoMatches filter={fieldFilter.trim()} size={effectiveSize} />}
       </div>
+      </FormLayoutEnginesContext.Provider>
       </FormConnectionContext.Provider>
     </FormLookupProvider>
-  );
-}
-
-const SIZE_OPTIONS: { value: FormSize; label: string }[] = [
-  { value: "xs", label: "Extra small" },
-  { value: "sm", label: "Small" },
-  { value: "md", label: "Medium" },
-  { value: "lg", label: "Large" },
-  { value: "xl", label: "Extra large" },
-];
-
-const LAYOUT_OPTIONS: { value: LayoutMode; label: string }[] = [
-  { value: "stacked", label: "Stacked" },
-  { value: "inline", label: "Inline" },
-  { value: "properties", label: "Properties" },
-];
-
-const SORT_OPTIONS: { value: SortMode; label: string }[] = [
-  { value: "schema", label: "Schema order" },
-  { value: "required-first", label: "Required first" },
-  { value: "priority", label: "Required & filled first" },
-];
-
-// PreferencesMenu is the compact top-right ellipsis menu controlling this form's
-// size, layout, sort, and a live field filter. Selecting an option fires the
-// matching callback and closes the menu; typing in the filter updates fields
-// live without closing. The parent decides whether to persist.
-function PreferencesMenu({
-  size,
-  layoutMode,
-  sortMode,
-  fieldFilter,
-  filterInMenu,
-  onFilterChange,
-  onSelectSize,
-  onSelectLayout,
-  onSelectSort,
-  debug,
-  onToggleDebug,
-}: {
-  size: FormSize;
-  layoutMode: LayoutMode;
-  sortMode: SortMode;
-  fieldFilter: string;
-  filterInMenu: boolean;
-  onFilterChange: (value: string) => void;
-  onSelectSize: (size: FormSize) => void;
-  onSelectLayout: (mode: LayoutMode) => void;
-  onSelectSort: (mode: SortMode) => void;
-  debug: boolean;
-  onToggleDebug: () => void;
-}) {
-  const filterActive = fieldFilter.trim() !== "" || debug;
-  return (
-    <DropdownMenu
-      align="right"
-      menuLabel="Form display options"
-      className="absolute right-0 top-0 z-10"
-      trigger={
-        <button
-          type="button"
-          aria-label="Form display options"
-          aria-haspopup="menu"
-          className={cn(
-            "inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            filterActive ? "text-primary" : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <Icon icon={UiEllipsisBold} className="text-lg" />
-        </button>
-      }
-    >
-      {(closeMenu) => (
-        <>
-          {filterInMenu && <div className="px-2 pb-1.5 pt-1">
-            <FormFieldFilter value={fieldFilter} onChange={onFilterChange} />
-          </div>}
-          <PreferenceSection title="Size" />
-          {SIZE_OPTIONS.map((opt) => (
-            <PreferenceItem
-              key={opt.value}
-              label={opt.label}
-              selected={opt.value === size}
-              onSelect={() => {
-                onSelectSize(opt.value);
-                closeMenu();
-              }}
-            />
-          ))}
-          <PreferenceSection title="Layout" />
-          {LAYOUT_OPTIONS.map((opt) => (
-            <PreferenceItem
-              key={opt.value}
-              label={opt.label}
-              selected={opt.value === layoutMode}
-              onSelect={() => {
-                onSelectLayout(opt.value);
-                closeMenu();
-              }}
-            />
-          ))}
-          <PreferenceSection title="Sort" />
-          {SORT_OPTIONS.map((opt) => (
-            <PreferenceItem
-              key={opt.value}
-              label={opt.label}
-              selected={opt.value === sortMode}
-              onSelect={() => {
-                onSelectSort(opt.value);
-                closeMenu();
-              }}
-            />
-          ))}
-          <PreferenceSection title="Debug" />
-          <PreferenceItem
-            role="menuitemcheckbox"
-            label="Show hidden fields & sources"
-            selected={debug}
-            onSelect={() => {
-              onToggleDebug();
-              closeMenu();
-            }}
-          />
-        </>
-      )}
-    </DropdownMenu>
-  );
-}
-
-function PreferenceSection({ title }: { title: string }) {
-  return (
-    <div className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-      {title}
-    </div>
-  );
-}
-
-function PreferenceItem({
-  label,
-  selected,
-  onSelect,
-  role = "menuitemradio",
-}: {
-  label: string;
-  selected: boolean;
-  onSelect: () => void;
-  role?: "menuitemradio" | "menuitemcheckbox";
-}) {
-  return (
-    <button
-      type="button"
-      role={role}
-      aria-checked={selected}
-      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-popover-foreground hover:bg-accent hover:text-accent-foreground"
-      onClick={onSelect}
-    >
-      <span className="flex w-3.5 shrink-0 justify-center">
-        {selected && <Icon icon={UiCheck} className="text-xs" />}
-      </span>
-      {label}
-    </button>
   );
 }

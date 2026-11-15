@@ -91,6 +91,7 @@ export const KIND_GLYPH: Record<FieldControlKind, DebugGlyphPair> = {
   object: pair(UiObject),
   display: pair(UiText),
   link: pair(UiLink),
+  custom: pair(UiExtension, UiExtensionDark),
 };
 
 // The JSON Schema `type` names, read by the `type` keyword row.

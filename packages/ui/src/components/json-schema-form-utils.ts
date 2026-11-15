@@ -124,6 +124,22 @@ export function rendersAsSection(field: FieldControl, mode: FormLayout["mode"]):
   );
 }
 
+// nullableGroupClearable reports whether a nullable container value carries a
+// clear-to-null action. A section-rendered container shows it in its header row;
+// any other container gets the bordered ClearableFieldGroup around its body.
+export function nullableGroupClearable(field: FieldControl, readOnly: boolean): boolean {
+  if (readOnly || field.value === null || field.value === undefined) return false;
+  const tags =
+    field.kind === "array" &&
+    field.arrayDisplay === undefined &&
+    (Boolean(field.itemSchema?.enum) ||
+      ["string", "integer", "number"].includes(String(field.itemSchema?.type)));
+  return (
+    (["object", "array", "string-map"].includes(field.kind) && !tags) ||
+    (field.kind === "lookup" && Boolean(field.lookup?.multi && field.lookup?.hierarchy))
+  );
+}
+
 // hasObjectItemProperties reports whether an array's items are objects with a
 // fixed set of properties — the precondition for both the column-per-property
 // table and the summary-row accordion, which need to know the item's shape.

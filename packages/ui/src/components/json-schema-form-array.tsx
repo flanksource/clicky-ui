@@ -59,7 +59,11 @@ export function ArrayControl({
   const perItem =
     field.arrayDisplay === "stacked" || field.arrayDisplay === "list";
   if (field.arrayDisplay === "list") {
-    if (scalarType !== "string") {
+    // Items that are strings include a string enum: the list keeps one combobox per item.
+    const stringEnumItems =
+      field.itemSchema?.enum !== undefined &&
+      field.itemSchema.enum.every((choice) => typeof choice === "string");
+    if (scalarType !== "string" && !stringEnumItems) {
       throw new Error(
         `${field.key} uses x-array-display list without string items`,
       );

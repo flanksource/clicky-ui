@@ -45,6 +45,7 @@ export const FORM_KEYWORD_GROUPS: Record<string, Exclude<KeywordGroup, "consumer
   "x-classes": "presentation",
   "x-icon": "presentation",
   "x-table-max-columns": "presentation",
+  "x-clicky-extensions": "opt-in",
   "x-clicky-component": "opt-in",
   "x-clicky-default-source": "opt-in",
   "x-clicky-unit": "opt-in",

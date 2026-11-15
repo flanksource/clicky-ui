@@ -3,10 +3,12 @@ import { Section } from "../layout/Section";
 
 export function FormObjectSection({
   title,
+  actions,
   hasErrors,
   children,
 }: {
   title: ReactNode;
+  actions?: ReactNode;
   hasErrors: boolean;
   children: ReactNode;
 }) {
@@ -16,7 +18,7 @@ export function FormObjectSection({
   }, [hasErrors]);
   return (
     <div className="col-span-full min-w-0">
-      <Section title={title} open={open} onToggle={setOpen}>
+      <Section title={title} summary={actions} open={open} onToggle={setOpen}>
         {children}
       </Section>
     </div>

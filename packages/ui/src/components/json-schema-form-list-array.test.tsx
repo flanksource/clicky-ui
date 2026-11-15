@@ -92,6 +92,45 @@ describe("JsonSchemaForm compact scalar lists", () => {
     });
   });
 
+  it("renders a list of string enum items as numbered rows, one combobox per item", () => {
+    render(
+      <JsonSchemaForm
+        schema={{
+          type: "object",
+          properties: {
+            states: {
+              type: "array",
+              title: "States",
+              "x-array-display": "list",
+              items: { type: "string", enum: ["policy:active", "policy:lapsed"] },
+            },
+          },
+        }}
+        value={{ states: ["policy:active"] }}
+        onChange={vi.fn()}
+        showPreferencesMenu={false}
+      />,
+    );
+    const list = screen.getByRole("group", { name: "States" });
+    expect(within(list).getByRole("combobox", { name: "Item 1" })).toHaveValue("policy:active");
+    expect(within(list).getByRole("button", { name: "Add item" })).toBeInTheDocument();
+  });
+
+  it("still refuses a list whose items are not strings", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() =>
+      render(
+        <JsonSchemaForm
+          schema={{ type: "object", properties: { counts: { type: "array", "x-array-display": "list", items: { type: "integer", enum: [1, 2] } } } }}
+          value={{ counts: [1] }}
+          onChange={vi.fn()}
+          showPreferencesMenu={false}
+        />,
+      ),
+    ).toThrow(/counts uses x-array-display list without string items/);
+    spy.mockRestore();
+  });
+
   it("hides edit actions for read-only lists", () => {
     render(
       <JsonSchemaForm

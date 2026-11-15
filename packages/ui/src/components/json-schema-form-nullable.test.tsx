@@ -96,6 +96,57 @@ describe("nullable fields", () => {
     expect(screen.getByRole("status")).toHaveTextContent('{"field":null}');
     expect(screen.queryByText("Required")).not.toBeInTheDocument();
   });
+  it.each<"flat" | "accordion">(["flat", "accordion"])(
+    "puts a nullable object section's clear in its header instead of a bordered wrapper (%s)",
+    (objectDisplay) => {
+      function SectionHarness() {
+        const [value, setValue] = useState<Record<string, unknown>>({
+          overpayment: { parameters: { months: 2 } },
+        });
+        return (
+          <>
+            <JsonSchemaForm
+              schema={{
+                properties: {
+                  overpayment: {
+                    title: "Overpayment",
+                    anyOf: [
+                      { type: "null" },
+                      {
+                        type: "object",
+                        properties: {
+                          parameters: {
+                            title: "Parameters",
+                            type: "object",
+                            properties: { months: { title: "Months", type: "integer" } },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              }}
+              value={value}
+              onChange={setValue}
+              objectDisplay={objectDisplay}
+              applyDefaults={false}
+              persistPreferences={false}
+            />
+            <output>{JSON.stringify(value)}</output>
+          </>
+        );
+      }
+      const { container } = render(<SectionHarness />);
+      const clear = screen.getByRole("button", { name: "Clear Overpayment to null" });
+      let header: HTMLElement | null = clear;
+      while (header && !header.textContent?.includes("Overpayment")) header = header.parentElement;
+      expect(header).not.toBeNull();
+      expect(header).not.toHaveTextContent("Months");
+      expect(container.querySelector(".pt-9")).toBeNull();
+      fireEvent.click(clear);
+      expect(screen.getByRole("status")).toHaveTextContent('{"overpayment":null}');
+    },
+  );
   it("preserves a nullable date picker", () => {
     const { container } = render(
       <Harness

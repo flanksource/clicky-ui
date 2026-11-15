@@ -4,26 +4,26 @@ import { Button } from "./button";
 import { ClearableFieldGroup } from "./clearable-field-group";
 import { inputSizeClass } from "./json-schema-form-size";
 import { seedUnionBranch } from "./json-schema-form-union-model";
+import { nullableGroupClearable } from "./json-schema-form-utils";
 import type { FieldControl, RenderContext } from "./json-schema-form-types";
 
+// clearInHeader is set when the field's section header row already carries the
+// clear-to-null action, so the body is not wrapped in a second bordered box.
 export function NullableControl({
   field,
   fieldId,
   ctx,
+  clearInHeader = false,
   children,
 }: {
   field: FieldControl;
   fieldId: string;
   ctx: RenderContext;
+  clearInHeader?: boolean;
   children: ReactNode;
 }) {
-  const readOnly = ctx.readOnly || field.readOnly;
+  const readOnly = ctx.readOnly || field.readOnly === true;
   const empty = field.value === null || field.value === undefined;
-  const tags =
-    field.kind === "array" &&
-    field.arrayDisplay === undefined &&
-    (Boolean(field.itemSchema?.enum) ||
-      ["string", "integer", "number"].includes(String(field.itemSchema?.type)));
   let control = children;
   if (field.kind === "boolean") {
     control = (
@@ -63,13 +63,7 @@ export function NullableControl({
   }
   return (
     <ClearableFieldGroup
-      clearable={
-        !readOnly &&
-        !empty &&
-        ((["object", "array", "string-map"].includes(field.kind) && !tags) ||
-          (field.kind === "lookup" &&
-            Boolean(field.lookup?.multi && field.lookup?.hierarchy)))
-      }
+      clearable={!clearInHeader && nullableGroupClearable(field, readOnly)}
       clearLabel={`Clear ${field.label} to null`}
       onClear={() => field.onChange(null)}
     >

@@ -12,7 +12,17 @@ export interface FormPreferences {
   debug?: boolean;
 }
 
-export type LayoutMode = "stacked" | "inline" | "properties";
+export type BuiltInLayoutMode = "stacked" | "inline" | "properties";
+
+// A built-in mode, or the name of a layout engine a form extension registered.
+export type LayoutMode = BuiltInLayoutMode | (string & Record<never, never>);
+
+// The display-options menu's built-in layouts, which any registered engines follow.
+export const BUILT_IN_LAYOUT_OPTIONS: { value: LayoutMode; label: string }[] = [
+  { value: "stacked", label: "Stacked" },
+  { value: "inline", label: "Inline" },
+  { value: "properties", label: "Properties" },
+];
 
 // SortMode controls the order fields render in at every object level:
 // - "schema": schema/x-order order (the default).
@@ -29,8 +39,13 @@ function isFormSize(value: unknown): value is FormSize {
   return typeof value === "string" && VALID_SIZES.includes(value);
 }
 
-function isLayoutMode(value: unknown): value is LayoutMode {
-  return value === "stacked" || value === "inline" || value === "properties";
+function isLayoutMode(value: unknown, extensionLayouts: readonly string[]): value is LayoutMode {
+  return (
+    value === "stacked" ||
+    value === "inline" ||
+    value === "properties" ||
+    (typeof value === "string" && extensionLayouts.includes(value))
+  );
 }
 
 function isSortMode(value: unknown): value is SortMode {
@@ -43,7 +58,9 @@ function isSortMode(value: unknown): value is SortMode {
 // validated independently so one bad value doesn't discard the whole record.
 // Display preferences are best-effort, so a read failure yields {} rather than
 // an error — the form falls back to its props.
-export function readPreferences(storageKey: string): FormPreferences {
+// `extensionLayouts` are the layout-engine names the form's extensions
+// register; a stored layout naming any other engine is out of range and dropped.
+export function readPreferences(storageKey: string, extensionLayouts: readonly string[] = []): FormPreferences {
   let raw: string | null;
   try {
     raw = localStorage.getItem(storageKey);
@@ -63,7 +80,7 @@ export function readPreferences(storageKey: string): FormPreferences {
   const record = parsed as Record<string, unknown>;
   const prefs: FormPreferences = {};
   if (isFormSize(record.size)) prefs.size = record.size;
-  if (isLayoutMode(record.layoutMode)) prefs.layoutMode = record.layoutMode;
+  if (isLayoutMode(record.layoutMode, extensionLayouts)) prefs.layoutMode = record.layoutMode;
   if (isSortMode(record.sortMode)) prefs.sortMode = record.sortMode;
   if (typeof record.debug === "boolean") prefs.debug = record.debug;
   return prefs;

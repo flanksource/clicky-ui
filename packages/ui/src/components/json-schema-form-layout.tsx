@@ -11,6 +11,8 @@ import type {
   HelpDisplay,
 } from "./json-schema-form-types";
 import { DEFAULT_COLUMN_MIN_WIDTH } from "./json-schema-form-utils";
+import { FormLayoutEnginesContext } from "./form-layout-context";
+import { assertFormLayoutRegistered, isBuiltInFormLayout } from "./json-schema-form-extension-api";
 import { FormHelp } from "./json-schema-form-help-links";
 import { hasFormHelp } from "./json-schema-form-help-model";
 import {
@@ -33,15 +35,7 @@ import {
 // whole declaration and collapses every row to a stacked-looking column. The
 // template is an inline style because Tailwind can't interpolate runtime widths.)
 // Stacked mode is a plain single-column grid.
-export function FieldsGrid({
-  layout,
-  size,
-  columns,
-  columnMinWidth,
-  columnsMaxWidth,
-  className,
-  children,
-}: {
+export interface FieldsGridProps {
   layout: FormLayout;
   size: FormSize;
   // Object-level `x-columns`: split a stacked object into N equal columns, or
@@ -60,8 +54,18 @@ export function FieldsGrid({
   // defaults via tailwind-merge.
   className?: string;
   children: ReactNode;
-}) {
+}
+
+export function FieldsGrid(props: FieldsGridProps) {
+  const { layout, size, columns, columnMinWidth, columnsMaxWidth, className, children } = props;
   const propertiesParent = useContext(PropertiesContext);
+  const engines = useContext(FormLayoutEnginesContext);
+  // A layout mode that is not built in is a registered engine; it owns the grid.
+  if (!isBuiltInFormLayout(layout.mode)) {
+    assertFormLayoutRegistered(layout.mode, engines);
+    const { Grid } = engines.get(layout.mode)!;
+    return <Grid {...props} />;
+  }
   if (layout.mode === "properties") {
     return (
       <div
@@ -130,6 +134,7 @@ export function FieldWrapper({
   value,
   helper,
   error,
+  errorElement,
   layout,
   size,
   maxWidth,
@@ -138,6 +143,9 @@ export function FieldWrapper({
   value: ReactNode;
   helper?: ReactNode;
   error?: ReactNode;
+  // A complete error element (a FieldError slot replacement), rendered as-is
+  // instead of `error`'s <p>-wrapped text.
+  errorElement?: ReactNode;
   layout: FormLayout;
   size: FormSize;
   // Overrides the stacked value-width cap. A field spanning the full row of a
@@ -163,6 +171,7 @@ export function FieldWrapper({
         {error && (
           <p className="col-start-2 text-xs text-destructive">{error}</p>
         )}
+        {errorElement && <div className="col-start-2">{errorElement}</div>}
       </div>
     );
   }
@@ -175,6 +184,7 @@ export function FieldWrapper({
       {value}
       {helper && <p className="text-xs text-muted-foreground">{helper}</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
+      {errorElement}
     </div>
   );
 }
@@ -299,12 +309,15 @@ export function SectionHeading({
 // section's header too.
 export function ObjectSection({
   heading,
+  actions,
   size,
   helper,
   helpDisplay,
   children,
 }: {
   heading: ReactNode;
+  /** Right-aligned header-row actions, e.g. a nullable section's clear. */
+  actions?: ReactNode;
   size: FormSize;
   helper?: ReactNode;
   helpDisplay?: HelpDisplay;
@@ -329,6 +342,7 @@ export function ObjectSection({
           )}
         >
           {heading}
+          {actions != null && <span className="ml-auto shrink-0 font-normal">{actions}</span>}
         </div>
       )}
       {helper && !hoverHelp && (
