@@ -161,23 +161,31 @@ function workDirRootNames(workDirs: readonly (string | undefined)[]): Map<string
  * into one row (`pkg/sub/a.go`). A listed file with no findings is a node with
  * none. When the files span several work dirs, each gets its own root folder.
  */
-export function groupFindingsByFile(findings: readonly FileFinding[], files: readonly FileRef[] = []): FileTreeNode[] {
-  const byWorkDir = new Map<string | undefined, { findings: FileFinding[]; files: string[] }>();
+export function groupFindingsByFile(findings: readonly FileFinding[], files: readonly FileRef[] = [], folders: readonly FileRef[] = []): FileTreeNode[] {
+  const byWorkDir = new Map<string | undefined, { findings: FileFinding[]; files: string[]; folders: string[] }>();
   const groupOf = (workDir: string | undefined) => {
     const existing = byWorkDir.get(workDir);
     if (existing) return existing;
-    const created = { findings: [], files: [] };
+    const created = { findings: [], files: [], folders: [] };
     byWorkDir.set(workDir, created);
     return created;
   };
   for (const finding of findings) groupOf(finding.workDir).findings.push(finding);
   for (const ref of files) groupOf(ref.workDir).files.push(ref.file);
+  for (const ref of folders) groupOf(ref.workDir).folders.push(ref.file);
   const multiRoot = byWorkDir.size > 1;
   const rootNames = workDirRootNames(Array.from(byWorkDir.keys()));
 
   const roots = Array.from(byWorkDir.entries())
-    .map(([workDir, { findings: group, files: groupFiles }]): FileTreeNode[] => {
+    .map(([workDir, { findings: group, files: groupFiles, folders: groupFolders }]): FileTreeNode[] => {
       const trie = newTrie("", "");
+      for (const folder of groupFolders) {
+        let current = trie;
+        for (const segment of collapsedPathSegments(folder)) {
+          const child = current.folders.get(segment) ?? newTrie(segment, current.path ? `${current.path}/${segment}` : segment);
+          current.folders.set(segment, child); current = child;
+        }
+      }
       for (const file of groupFiles) addToTrie(trie, file);
       for (const finding of group) addToTrie(trie, finding.file, finding);
       const nodes = trieNodes(trie, workDir);

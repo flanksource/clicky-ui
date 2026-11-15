@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { WorkspaceAccessDialog, workspaceAccessClient } from "@flanksource/clicky-ui/components";
 import { ActionError, Button, InputField, Modal } from "@flanksource/clicky-ui";
 import {
   addRepository,
@@ -10,8 +11,11 @@ import {
 } from "./api";
 import { refreshRepositories } from "./catalog";
 import type { DirectoryEntry, DocumentRepository } from "./types";
+const accessClient = workspaceAccessClient("/__playground/gavel/api/workspace/access");
 
 export function RepositoryPicker({ onClose }: { onClose: () => void }) {
+  const [access, setAccess] = useState(false);
+  const [accessRevision, setAccessRevision] = useState(0);
   const [path, setPath] = useState("");
   const [entries, setEntries] = useState<DirectoryEntry[]>([]);
   const [selectable, setSelectable] = useState(false);
@@ -44,7 +48,7 @@ export function RepositoryPicker({ onClose }: { onClose: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [path]);
+  }, [path, accessRevision]);
   return (
     <Modal
       open
@@ -73,6 +77,8 @@ export function RepositoryPicker({ onClose }: { onClose: () => void }) {
       <p className="mb-3 text-sm text-muted-foreground">
         Choose a Git working-tree root inside an enabled directory.
       </p>
+      <Button size="sm" variant="outline" onClick={() => setAccess(true)}>Update workspace access</Button>
+      {access && <WorkspaceAccessDialog client={accessClient} initialPath={path} onClose={() => { setAccess(false); setAccessRevision(current => current + 1); }} onChanged={() => setAccessRevision(current => current + 1)} />}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Button size="sm" variant="outline" onClick={() => setPath("")}>
           Enabled directories

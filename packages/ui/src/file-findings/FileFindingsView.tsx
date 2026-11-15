@@ -47,6 +47,7 @@ export type FileFindingsViewProps = {
    * findings shows a zero count and opens like any other.
    */
   files?: readonly FileRef[] | undefined;
+  folders?: readonly FileRef[] | undefined;
   /** The open file or folder, or null for none. Controlled so the host can keep it in its URL. */
   selected: FileTreeSelection | null;
   onSelect: (selection: FileTreeSelection) => void;
@@ -337,6 +338,7 @@ function FileViewer({ file, showPath, findings, state, view, tabs, actions, tool
 export function FileFindingsView({
   findings,
   files,
+  folders,
   selected,
   onSelect,
   view,
@@ -358,7 +360,7 @@ export function FileFindingsView({
   className,
   ...review
 }: FileFindingsViewProps) {
-  const tree = useMemo(() => groupFindingsByFile(findings, files), [findings, files]);
+  const tree = useMemo(() => groupFindingsByFile(findings, files, folders), [findings, files, folders]);
   const selectedNode = useMemo(() => findNode(tree, selected), [tree, selected]);
   const openFile = selectedNode?.kind === "file" ? selectedNode.ref : null;
   const openKey = openFile ? fileRefKey(openFile) : null;

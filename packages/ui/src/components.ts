@@ -516,3 +516,7 @@ export {
   type ToastOptions,
   type ToastTone,
 } from "./overlay/toast-context";
+export { WorkspaceAccessDialog } from "./components/WorkspaceAccessDialog";
+export type { WorkspaceAccessDialogProps } from "./components/WorkspaceAccessDialog";
+export { workspaceAccessClient } from "./components/workspace-access-client";
+export type { WorkspaceAccessClient, WorkspaceAccessRoot } from "./components/workspace-access-client";

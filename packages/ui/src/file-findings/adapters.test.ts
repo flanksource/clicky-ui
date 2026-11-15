@@ -219,6 +219,9 @@ function outline(nodes: FileTreeNode[], depth = 0): string[] {
 }
 
 describe("groupFindingsByFile", () => {
+  it("retains an explicitly opened empty folder", () => {
+    expect(groupFindingsByFile([], [], [{ file: "empty" }])).toEqual([{ key: "folder\u0000\u0000empty", name: "empty", kind: "folder", ref: { workDir: undefined, file: "empty" }, children: [], findings: [] }]);
+  });
   it("builds a path tree with folders before files, collapsing single-child folders", () => {
     const tree = groupFindingsByFile([
       finding("pkg/server/handler.go", WORK_DIR, 41),

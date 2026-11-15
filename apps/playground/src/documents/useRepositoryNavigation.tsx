@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { WorkspaceAccessDialog, workspaceAccessClient } from "@flanksource/clicky-ui/components";
 import { Button, ActionError, DOCUMENT_ANCHOR } from "@flanksource/clicky-ui";
 import { usePromptRuns } from "../prompt-runs/PromptRunsProvider";
 import { DOCUMENTS_REFRESH_EVENT } from "../navigation/refresh";
@@ -13,6 +14,7 @@ import type { DocumentRepository } from "./types";
 import { OpenRepositoryDocument } from "./OpenRepositoryDocument";
 
 const requestDocumentsRefresh = () => window.dispatchEvent(new Event(DOCUMENTS_REFRESH_EVENT));
+const workspaceAccess = workspaceAccessClient("/__playground/gavel/api/workspace/access");
 
 /**
  * The repository side of the sidebar that is not the tree: the add/refresh controls, the dialogs
@@ -30,6 +32,14 @@ export function useRepositoryNavigation({
   const { openPrompt } = usePromptRuns();
   const problems = useDocumentProblems();
   const [picker, setPicker] = useState(false);
+  const [access, setAccess] = useState(false);
+  const [accessError, setAccessError] = useState("");
+  useEffect(() => workspaceAccess.subscribe(() => {
+    setAccessError("");
+    requestDocumentsRefresh();
+    void catalog.refresh();
+    void refreshDocumentProblems();
+  }, cause => setAccessError(cause.message)), []);
   const [openDocument, setOpenDocument] = useState<DocumentRepository>();
   const [settings, setSettings] = useState<{
     repository: DocumentRepository;
@@ -68,17 +78,19 @@ export function useRepositoryNavigation({
           <Button size="sm" variant="outline" onClick={() => setPicker(true)}>
             Add repository
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setAccess(true)}>Workspace access…</Button>
           <Button size="sm" variant="ghost" onClick={() => { requestDocumentsRefresh(); void catalog.refresh(); void refreshDocumentProblems(); }}>
             Refresh
           </Button>
         </div>
-        {(catalog.error || problems.error) && (
-          <ActionError title="Repository review unavailable" error={catalog.error ?? problems.error} context={[["Operation", "Load repository review"]]} className="mx-2 rounded-md bg-background text-xs text-foreground" />
+        {(catalog.error || problems.error || accessError) && (
+          <ActionError title="Repository review unavailable" error={catalog.error ?? problems.error ?? accessError} context={[["Operation", "Load repository review"]]} className="mx-2 rounded-md bg-background text-xs text-foreground" />
         )}
       </div>
     ),
     dialogs: (
       <>
+        {access && <WorkspaceAccessDialog client={workspaceAccess} initialPath={catalog.repositories[0]?.root ?? ""} onClose={() => setAccess(false)} onChanged={() => { requestDocumentsRefresh(); void catalog.refresh(); void refreshDocumentProblems(); }} />}
         {picker && <RepositoryPicker onClose={() => setPicker(false)} />}
         {settings && (
           <RepositoryFolderSettings

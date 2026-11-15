@@ -1,4 +1,5 @@
 import type { MiddlewareApp } from "./middleware";
+import { isIP } from "node:net";
 import type { Plugin } from "vite";
 import { readJsonBody, sendJson } from "./comments-server";
 import type { GavelEndpoint } from "./gavel-launch-server";
@@ -97,10 +98,17 @@ export function registerRepositoryDocumentsMiddleware({ middlewares, dir, endpoi
     res.once("close", () => abort.abort());
     void (async () => {
       const path = req.url ?? "/";
+      if (/^\/api\/workspace\/access(?:[/?]|$)/.test(path)) {
+        const peer = req.socket.remoteAddress;
+        const localPeer = peer === "127.0.0.1" || peer === "::1" || peer === "::ffff:127.0.0.1";
+        const host = new URL(`http://${req.headers.host}`).hostname;
+        if (!localPeer || !(host === "localhost" || host === "[::1]" || isIP(host) && host === "127.0.0.1") || req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) return sendJson(res, 403, { error: "Workspace access management requires a local same-origin browser" });
+      }
       if (!/^\/api\/(workspace\/|runs(?:[/?]|$)|launch(?:[/?]|$))/.test(path))
         return sendJson(res, 404, { error: "Unknown Gavel operation" });
       const method = req.method ?? "GET";
       const headers: Record<string, string> = {};
+      if (/^\/api\/workspace\/access(?:[/?]|$)/.test(path) && req.headers.origin) headers.Origin = new URL(await endpoint.url()).origin;
       if (typeof req.headers["idempotency-key"] === "string")
         headers["Idempotency-Key"] = req.headers["idempotency-key"];
       const body = ["POST", "PUT"].includes(method)
