@@ -46,6 +46,7 @@ const entry = {
   "expressions/playground": resolve(__dirname, "src/expressions/playground.ts"),
   profiles: resolve(__dirname, "src/profiles.ts"),
   connections: resolve(__dirname, "src/connections.ts"),
+  jvm: resolve(__dirname, "src/jvm.ts"),
   chat: resolve(__dirname, "src/chat.ts"),
   ai: resolve(__dirname, "src/ai.ts"),
   "runtime-profile": resolve(__dirname, "src/runtime-profile.ts"),
@@ -67,6 +68,12 @@ export default defineConfig(({ mode }) => {
             {
               find: /^monaco-editor$/,
               replacement: "monaco-editor/esm/vs/editor/editor.api",
+            },
+            // Fixtures authored as a downstream module (examples/form-extensions
+            // imports the public entry) resolve to this checkout's source.
+            {
+              find: /^@flanksource\/clicky-ui\/components$/,
+              replacement: resolve(__dirname, "src/components.ts"),
             },
           ]
         : [],
@@ -133,6 +140,7 @@ export default defineConfig(({ mode }) => {
       // VM context stay on forks. `include` is per project: extending
       // concatenates arrays, so a shared one would run every file on both.
       projects: [
+        "./react-grab/vitest.config.ts",
         {
           extends: true,
           test: {

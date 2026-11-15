@@ -4,6 +4,8 @@ import type { AddressInfo } from "node:net";
 import { extname, resolve, sep } from "node:path";
 import { createCatalogStore, type LocalPackage } from "./catalog.ts";
 
+export { serveRuntime, type RuntimeOriginOptions } from "./runtime-origin.ts";
+
 export type PackageOriginOptions = { packages: string[]; upstreamRegistry: string; upstreamOrigin: string; stateDir: string };
 export type PackageHandler = (request: IncomingMessage, response: ServerResponse) => Promise<void>;
 export const LOCAL_RELEASE_TIME = "2000-01-01T00:00:00.000Z";

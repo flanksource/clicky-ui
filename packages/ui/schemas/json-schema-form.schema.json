@@ -167,8 +167,9 @@
       "examples": ["lock"]
     },
     "x-layout": {
-      "description": "Per-field layout override, taking precedence over the form-level layout. `inline` and `stack` force the field's subtree into label-beside-value or label-above-value mode; `table` renders an array of objects (or a map) as compact rows under column headers. On a map's value schema, `stack` renders each key above its value as one full-width unit.",
-      "enum": ["inline", "stack", "table"]
+      "description": "Per-field layout override, taking precedence over the form-level layout. `inline` and `stack` force the field's subtree into label-beside-value or label-above-value mode; `table` renders an array of objects (or a map) as compact rows under column headers. On a map's value schema, `stack` renders each key above its value as one full-width unit. Any other value names a layout engine a form extension registered (`FormExtension.layouts`) and lays out just this field's row; a name nothing registered fails when the form renders.",
+      "type": "string",
+      "examples": ["inline", "stack", "table"]
     },
     "x-table-max-columns": {
       "description": "Array-level, for arrays of objects with no `x-layout: table` or `x-array-display: accordion` hint. The most visible columns (the union across rows under each row's listener state) the array opens as a grid with; a wider array opens as the inline item form. The array's view menu switches between grid, stack form and inline form either way.",
@@ -261,6 +262,27 @@
     "x-clicky-lookup": {
       "description": "Turns the field into an async entity-reference picker: options are fetched lazily from another entity's list endpoint via the form's `lookupFetcher`. Single-select also accepts free-form entry; set `multi` for an array field.",
       "$ref": "#/$defs/LookupDescriptor"
+    },
+    "x-clicky-extensions": {
+      "description": "Root-level, opt-in: code modules for this form, each `{ \"tsx\": \"…\", \"name\": \"…\" }` (inline TSX) or `{ \"ref\": \"path/to/extension.tsx\" }` (a path relative to the project root that the host serves). Honoured only when the host gives `JsonSchemaForm` an `extensionLoader` (`PageForm` always does); a schema that declares sources with no loader throws. Each module default-exports a `FormExtension` registering custom `format` renderers, `x-clicky-lookup.url` handlers, layout engines, slots and hooks.",
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["tsx"],
+            "properties": { "tsx": { "type": "string", "minLength": 1 }, "name": { "type": "string", "minLength": 1 } }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["ref"],
+            "properties": { "ref": { "type": "string", "minLength": 1 } }
+          }
+        ]
+      },
+      "examples": [[{ "ref": "extension.tsx" }]]
     },
     "x-clicky-unit": {
       "description": "Opt-in: honoured only when the consumer passes `createUnitFormExtensions()` to the form. Renders a positive integer as a unit-scaled input with step controls — `count` (K/M/B/T) or `bytes` (KiB/MiB/GiB/TiB).",

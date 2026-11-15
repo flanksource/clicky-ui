@@ -50,3 +50,23 @@ The **Presentation / All Field Types** story includes scalar fields, dates, mark
 `format:json` provides a JSON textarea. Invalid text remains editable and displays an error while the last valid committed value stays intact. External controlled-value updates replace stale drafts. Use typed schemas for known structures; reserve this format for arbitrary JSON.
 
 `x-help.links` accepts `{label,href}` entries with absolute HTTP(S) URLs. Links appear with inline help or in the field's focusable hover card according to `layout.help` / `x-help-display`. Links open a new tab with `noopener noreferrer`; unsafe protocols fail explicitly. Help links and branch editing also appear in the **JsonSchemaForm / Resource editing** Storybook example.
+
+## Form extensions
+
+`JsonSchemaForm` takes `extensions: FormExtension[]` — bundles authored with `defineFormExtension` from `@flanksource/clicky-ui/components`. One bundle can contribute every extension point, and each is opted into through something the form already reads, so a schema gains no new keywords:
+
+| Extension point | Registered under | Selected by |
+|---|---|---|
+| `formats` (custom field type) | schema `format` | the property's standard `format` |
+| `lookups` | `x-clicky-lookup.url` | the descriptor's `url`; any other `url` still goes to `lookupFetcher` |
+| `layouts` (layout engine) | a layout name | form `layout.mode`, or a property's `x-layout` (that one row only) |
+| `slots` | `Title`, `PreferencesMenu`, `FieldFilter`, `ErrorSummary`, `NoMatches`, `SectionHeading`, `FieldError` | replaces the default component, whose props it receives; the defaults are exported so a replacement can wrap them |
+| `pre` / `post` | — | run after the `pre`/`post` props, in extension order, at every depth |
+
+A format renderer receives `{ field, value, onChange, fieldId, readOnly, ctx }` and reads its own configuration from `field.schema` (standard keywords plus any `x-*` it documents). A format no extension registers renders as it always did, so `email` or `uri` stay plain text inputs. A layout engine is `{ Grid, Row }`: `Grid` replaces the container every group of rows renders into and `Row` receives each built field row (`BuiltFieldRow`).
+
+Nothing is overridden silently: registering a built-in format (`json`, `date`, `date-time`, `textarea`, `md`, `percent`, `connection`) or layout (`stacked`, `inline`, `properties`, `stack`, `table`), registering a name twice across extensions, or using a layout name nothing registered, throws. ### Schema-declared extensions
+
+A schema can carry its own extensions in a root-level `x-clicky-extensions` array, so one file fully describes a form. Each entry is `{ "tsx": "…", "name"?: "…" }` (inline module source) or `{ "ref": "path/to/extension.tsx" }` (a path relative to the project root that the host serves); `FormExtensionSource` is the type. Loading them is opt-in: pass `extensionLoader={(source, index) => Promise<FormExtension>}` to `JsonSchemaForm`. The form loads every declared source once per distinct list of sources, shows `Loading` meanwhile, and merges the results after the `extensions` prop through the same merge, so duplicate and reserved names still throw. A rejected load is rethrown during render, so an error boundary sees it. A schema that declares sources with no `extensionLoader` throws (`schema declares x-clicky-extensions but no extensionLoader was provided; render it with PageForm or pass extensionLoader`) instead of rendering fields whose `format` or layout has no handler. The keyword is stripped before the renderer walks the schema. `@flanksource/page-runtime`'s `PageForm` always provides a loader, so a schema-declared form just works there; a plain host supplies its own, for example a bundler `import()` for refs.
+
+The serializable subset of the form's props is exported as `FormDataProps`, for a host that renders the form somewhere it cannot pass functions. See **Extensions / FormExtension** for a runnable example (`components/examples/form-extensions`) that exercises every extension point.

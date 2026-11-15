@@ -41,6 +41,36 @@ const handler = await createPackageHandler(options);
 
 `PackageOriginOptions` requires all three configuration properties. `createPackageHandler(options)` asynchronously validates packages and returns `(IncomingMessage, ServerResponse) => Promise<void>`, which owns the complete response, including error handling. Route package requests to it from a containing server; unrelated API/static routes stay with that server. If mounting below a prefix, strip that prefix from `request.url` before calling it and use the prefix in the profile URLs. `servePackages({ ...options, port })` wraps the handler in a loopback HTTP server and returns `{ origin, close }`; `close()` closes active connections and resolves after shutdown. Register application shutdown handlers in the caller. No signal handlers are installed by the programmatic API.
 
+## Isolated local page runtime
+
+`serveRuntime` serves the built browser runtime, profile and local package publications together on an ephemeral, separate loopback origin. Storybook uses it for **Extensions / FormExtension / Page Form**, which compiles the shared extension TSX in `PageForm`. Build both packages before starting Storybook:
+
+```bash
+make build
+pnpm --filter @flanksource/page-runtime build
+pnpm --filter storybook dev
+```
+
+The runtime requires a built Facet publication as well as Clicky UI. Storybook uses the sibling `../facet` checkout, or the checkout selected by its existing `STORYBOOK_FACET_SRC` setting. Build Facet there before opening the example.
+
+Open [Page Form](http://localhost:5270/?path=/story/extensions-formextension--page-form). Its three-dot menu shows the live runtime badge, opens the console's Runtimes tab, and reloads the runtime while retaining the host value. The original native Example remains alongside it. The story starts with browser capture open; server capture tabs are offline because Storybook has no application API.
+
+```ts
+import { serveRuntime } from "@flanksource/page-runtime/dev";
+
+const runtime = await serveRuntime({
+  hostOrigin: "http://localhost:5270",
+  packages: ["/workspace/clicky-ui/packages/ui", "/workspace/facet"],
+  stateDir: "/workspace/clicky-ui/.tmp/storybook/runtime-packages",
+  upstreamRegistry: "https://registry.npmjs.org",
+  upstreamOrigin: "https://unpkg.com",
+});
+// Use runtime.origin for PageForm.runtimeOrigin and runtime.dependencies in its manifest.
+await runtime.close();
+```
+
+`hostOrigin` must be an exact loopback HTTP(S) origin; it is the profile's only allowed embedder. `packages`, `stateDir`, `upstreamRegistry` and `upstreamOrigin` have the same meaning as in `createPackageHandler`. `assetsDir` optionally selects a built runtime asset directory; the default is this package's `dist/static`. Missing assets or publications fail startup. Rebuilds appear in new profiles as immutable package generations. `close()` releases package watchers and closes active connections.
+
 ## Focused tests
 
 ```bash

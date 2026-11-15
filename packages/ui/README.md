@@ -1,5 +1,37 @@
 # @flanksource/clicky-ui
 
+`CommentCapture` from `@flanksource/clicky-ui/comments` shows a captured element's page URL, component, source, HTML and optional screenshot. Pass these fields through `capture`; omit it to show the empty state. Its sidebar summary stays on one line and expands on click. Pass `expanded` for a dedicated Capture tab, and use `renderRootDetails` on `CommentThreadList` or `CommentSidePanel` to retain context in both the sidebar and maximized thread.
+
+To name delivery badges, wrap comments in `AgentIdentityProvider` from `@flanksource/clicky-ui/chat` and set `identities[sessionId].sessionName` to the session title. The badge shows `@session-name` with the delivery receipt; an unavailable name is shown as `@session-id`.
+
+## React Grab element picker
+
+The react-grab fork in `react-grab/` ships as `@flanksource/clicky-ui/react-grab`. Like upstream, it renders with Solid, which is bundled into the picker, and embeds Tailwind v4 CSS in a shadow root. It needs no React of its own and never registers a renderer with the page's React DevTools hook, so it inspects and freezes only the page's React. Import the main entry to initialize automatically, or initialize explicitly through the core entry:
+
+```tsx
+import { init } from "@flanksource/clicky-ui/react-grab/core";
+
+const picker = init();
+// Dispose when the owning page or extension unloads.
+picker.dispose();
+```
+
+Pages can attach literal context with any `data-grab-*` attribute. Attributes on `html` and `body` supply page context; attributes on the selected element and its ancestors supply element context, ordered from outermost to innermost. Sibling attributes are excluded. Attribute values retain multiline text and are never executed or parsed as JSON.
+
+```html
+<html data-grab-project="acme" data-grab-context="Order management">
+  <body data-grab-route="/orders">
+    <section data-grab-context="Pending orders">
+      <button data-grab-order-id="order-7" data-grab-context="Approve this order">Approve</button>
+    </section>
+  </body>
+</html>
+```
+
+Context is included in copied element information, element references and `getStackContext()` results, including extension TODO captures. `getGrabContext(element)` returns structured page and element entries; `formatGrabContext(context)` formats them as text. Both are exported from the main and core entries. Open shadow-root ancestors are included; iframe context comes from the selected element's document.
+
+Build with `pnpm --filter @flanksource/clicky-ui build:react-grab`. Run `check:react-grab`, `test:react-grab` and `check:react-grab-fork` through the same filter. The normal Clicky UI build includes these picker artifacts and upstream license notices.
+
 Flanksource's React component library built on [shadcn/ui](https://ui.shadcn.com/) with light/dark theming and density presets.
 
 ## Install

@@ -21,6 +21,7 @@
   ],
   "type": "module",
   "sideEffects": [
+    "./dist/react-grab/index.js",
     "**/*.css",
     "./src/styles.ts",
     "./src/styles/**"
@@ -29,6 +30,10 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./react-grab": { "types": "./dist/react-grab/index.d.ts", "import": "./dist/react-grab/index.js" },
+    "./react-grab/core": { "types": "./dist/react-grab/core/index.d.ts", "import": "./dist/react-grab/core/index.js" },
+    "./react-grab/primitives": { "types": "./dist/react-grab/primitives.d.ts", "import": "./dist/react-grab/primitives.js" },
+    "./react-grab/styles.css": "./dist/react-grab/styles.css",
     "./runtime/*": "./dist/runtime/*",
     ".": {
       "types": "./dist/index.d.ts",
@@ -130,6 +135,11 @@
       "import": "./dist/connections.js",
       "require": "./dist/connections.cjs"
     },
+    "./jvm": {
+      "types": "./dist/jvm.d.ts",
+      "import": "./dist/jvm.js",
+      "require": "./dist/jvm.cjs"
+    },
     "./chat": {
       "types": "./dist/chat.d.ts",
       "import": "./dist/chat.js",
@@ -172,7 +182,11 @@
   "scripts": {
     "dev": "vite dev",
     "build": "tsx ../page-runtime/scripts/run-package-build.ts",
-    "build:artifacts": "pnpm run build:icons && pnpm run check:public-exports && vite build && node scripts/rewrite-declaration-imports.mjs && pnpm run check:declarations && vite build --mode cjs && node scripts/build-styles.mjs && tsx scripts/build-runtime.ts",
+    "build:artifacts": "pnpm run build:icons && pnpm run check:public-exports && vite build && node scripts/rewrite-declaration-imports.mjs && vite build --mode cjs && node scripts/build-styles.mjs && pnpm run build:react-grab && pnpm run check:declarations && tsx scripts/build-runtime.ts",
+    "build:react-grab": "tsx react-grab/scripts/build.ts",
+    "check:react-grab": "tsc -p react-grab/tsconfig.json --noEmit",
+    "test:react-grab": "vitest run --config react-grab/vitest.config.ts",
+    "check:react-grab-fork": "tsx react-grab/scripts/fork-check.ts",
     "test:runtime-set": "gavel test --work-dir ../page-runtime --framework vitest --recursive=false -- --config ../../packages/ui/scripts/test-runtime-set.config.ts",
     "build:icons": "tsx scripts/build-icons.ts",
     "build:icons:force": "tsx scripts/build-icons.ts --force",
@@ -189,6 +203,7 @@
     "check": "pnpm run build:icons && tsc -b --noEmit && pnpm run check:public-exports && pnpm run lint"
   },
   "dependencies": {
+    "bippy": "catalog:",
     "@codemirror/autocomplete": "catalog:",
     "@codemirror/commands": "catalog:",
     "@codemirror/lang-json": "catalog:",
@@ -220,6 +235,13 @@
     "yaml": "catalog:"
   },
   "devDependencies": {
+    "@babel/core": "catalog:",
+    "@babel/preset-typescript": "catalog:",
+    "@types/babel__core": "catalog:",
+    "@types/node": "catalog:",
+    "babel-preset-solid": "catalog:",
+    "solid-js": "catalog:",
+    "tsdown": "catalog:",
     "@ai-sdk/react": "catalog:",
     "@iconify/types": "catalog:",
     "@iconify/utils": "catalog:",

@@ -9,6 +9,7 @@ export function registerPageRuntimeDebug(options: { session: string; page: strin
   const dispose = registerDebugRuntime({
     id: options.session,
     label: options.page,
+    state: source,
     clear: source.clear,
     content: <Suspense fallback={<p className="p-density-3 text-sm text-muted-foreground">Loading runtime diagnostics…</p>}><RuntimeDebugPanel source={source} page={options.page} origin={options.origin} /></Suspense>,
   });
