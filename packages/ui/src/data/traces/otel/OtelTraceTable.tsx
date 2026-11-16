@@ -4,7 +4,7 @@ import type { DataTableProps } from "../../DataTable";
 import { OtelTraceDetail } from "./OtelTraceDetail";
 import { ResultTable } from "./TraceResults";
 import type { Span, Summary } from "./api";
-import { spanTraces } from "./span-traces";
+import { spanTraces, traceRoot } from "./span-traces";
 import { DataTable, type DataTableColumn } from "../../DataTable";
 import { ServerTimingBadge } from "../../ServerTimingBadge";
 import type { ServerTimingMetric } from "../../server-timing";
@@ -53,36 +53,37 @@ export function OtelTraceTable({
   serverTiming,
   ...tableProps
 }: OtelTraceTableProps) {
+  const listingRows = listing?.rows;
   const result = useMemo(() => {
     try {
-      return { traces: spanTraces(spans) };
+      const traces = spanTraces(spans);
+      // One row per trace, at its root span's position in the loaded rows: those
+      // arrive in the server's sort, which the listing must keep. The detail
+      // view does not use them, so they are only mapped while listing.
+      const rows =
+        listingRows && !selectedTraceId
+          ? traces
+              .map((trace) => {
+                const root = traceRoot(trace.spans);
+                const position = listingRows.findIndex((row) => {
+                  const span = row._trace as Span | undefined;
+                  return span?.traceId === root.traceId && span.spanId === root.spanId;
+                });
+                if (position < 0)
+                  throw new Error(`Trace ${root.traceId} is missing its mapped root row`);
+                return { position, row: { ...listingRows[position]!, _traceId: trace.summary.traceId } };
+              })
+              .sort((a, b) => a.position - b.position)
+              .map(({ row }) => row)
+          : undefined;
+      return { traces, rows };
     } catch (error) {
       return { error: error instanceof Error ? error.message : String(error) };
     }
-  }, [spans]);
+  }, [spans, listingRows, selectedTraceId]);
   const selected = result.traces?.find(
     (trace) => trace.summary.traceId === selectedTraceId,
   );
-  // One row per trace, at its root span's position in the loaded rows: those
-  // arrive in the server's sort, which the listing must keep.
-  const listingRows =
-    listing &&
-    result.traces
-      ?.map((trace) => {
-        const ids = new Set(trace.spans.map((span) => span.spanId));
-        const root = trace.spans.find(
-          (span) => !span.parentId || !ids.has(span.parentId),
-        )!;
-        const position = listing.rows.findIndex((row) => {
-          const span = row._trace as Span | undefined;
-          return span?.traceId === root.traceId && span.spanId === root.spanId;
-        });
-        if (position < 0)
-          throw new Error(`Trace ${root.traceId} is missing its mapped root row`);
-        return { position, row: { ...listing.rows[position]!, _traceId: trace.summary.traceId } };
-      })
-      .sort((a, b) => a.position - b.position)
-      .map(({ row }) => row);
   return (
     // A flex column so the listing's DataTable fills a bounded parent: its body
     // scrolls and the pagination footer stays on screen.
@@ -119,7 +120,7 @@ export function OtelTraceTable({
           {...(serverTiming?.length
             ? { filterBarProps: { trailing: <ServerTimingBadge metrics={serverTiming} /> } }
             : {})}
-          data={listingRows!}
+          data={result.rows!}
           columns={listing.columns}
           autoFilter={false}
           getRowId={(row) => String(row._traceId)}

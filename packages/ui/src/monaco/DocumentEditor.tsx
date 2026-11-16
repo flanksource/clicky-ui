@@ -37,8 +37,6 @@ export type DocumentEditorProps = {
     | "inline"
     | "layout"
     | "requiredFirst"
-    | "showTypeIcons"
-    | "objectDisplay"
     | "persistPreferences"
     | "preferencesStorageKey"
   >;
@@ -77,7 +75,9 @@ export function DocumentEditor({
     onModeChange?.(next);
   };
   const commentsRef = useRef(sourceComments);
-  commentsRef.current = sourceComments;
+  useEffect(() => {
+    commentsRef.current = sourceComments;
+  });
   const [mounted, setMounted] = useState<editor.IStandaloneCodeEditor | null>(
     null,
   );
@@ -262,8 +262,6 @@ export function DocumentForm({ path, value, onChange, schema, formOptions, Form 
           size="sm"
           inline
           requiredFirst
-          showTypeIcons
-          objectDisplay="accordion"
           {...formOptions}
           applyDefaults={false}
           schema={

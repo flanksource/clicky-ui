@@ -58,22 +58,10 @@ import { calloutVariantStyles, type CalloutVariant } from "./callout-tones";
 import { Tree } from "./Tree";
 import { ObjectGraph, type ObjectGraphNode } from "./ObjectGraph";
 import { ExecutionTree, type ExecutionNode } from "./ExecutionTree";
-import { Icon, type StaticIconComponent } from "./Icon";
+import { Icon } from "./Icon";
 import { getFallbackIconProvider } from "./icon-fallback";
 import { CLICKY_ICONIFY_GLYPHS } from "./clicky-icon-glyphs";
-import {
-  UiCheck,
-  UiCloudDownload,
-  UiComment,
-  UiEllipsis,
-  UiEye,
-  UiFileCode,
-  UiFileSpreadsheet,
-  UiFileText,
-  UiJson,
-  UiMarkdown,
-  UiTable,
-} from "../icons";
+import { UiCheck, UiCloudDownload, UiEllipsis } from "../icons";
 import { CodeBlock } from "./CodeBlock";
 import { JsonView } from "./JsonView";
 import { isBlockHtml, sanitizeHtml } from "./html-utils";

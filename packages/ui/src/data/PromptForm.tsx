@@ -33,6 +33,14 @@ export function PromptForm({ prompt, basePath, onResolved, lookupFetcher, connec
   const [value, setValue] = useState<Record<string, unknown>>(() => ({ ...prompt.value }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Handed another prompt, start over from its value; a refetched snapshot of the same prompt keeps the edits.
+  const [answering, setAnswering] = useState(prompt.id);
+  if (answering !== prompt.id) {
+    setAnswering(prompt.id);
+    setValue({ ...prompt.value });
+    setBusy(false);
+    setError(null);
+  }
 
   const resolve = async (answer: { values?: Record<string, unknown>; cancelled?: boolean }) => {
     setBusy(true);

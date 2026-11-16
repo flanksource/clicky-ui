@@ -7,7 +7,7 @@ const PAGE_HOST_URL = process.env.PAGE_HOST_URL ?? "http://localhost:5810";
 export default defineConfig({
   testDir: "./tests",
   ...(PAGE_HOST ? { outputDir: "../.tmp/T-host-e2e/playwright" } : {}),
-  testIgnore: ["**/responsive.spec.ts", ...(PAGE_HOST ? [] : ["**/page-host/**"])],
+  ...(PAGE_HOST ? {} : { testIgnore: ["**/page-host/**"] }),
   timeout: 60_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
@@ -26,7 +26,10 @@ export default defineConfig({
     name: "page-host", testMatch: "**/page-host/**/*.spec.ts",
     use: { ...devices["Desktop Chrome"], channel: "chrome", baseURL: PAGE_HOST_URL, viewport: { width: 1920, height: 1080 } },
   }] : [
-    { name: "chromium", use: { ...devices["Desktop Chrome"], channel: "chrome" } },
+    {
+      name: "chromium",
+      use: { ...devices["Desktop Chrome"], channel: "chrome" },
+    },
     ...(process.env.E2E_ALL_BROWSERS
       ? [
           { name: "firefox", use: { ...devices["Desktop Firefox"] } },
@@ -39,7 +42,7 @@ export default defineConfig({
     { command: "pnpm --filter page-host dev:runtime", url: "http://localhost:5811/profile.json", reuseExistingServer: !process.env.CI, timeout: 30_000 },
   ] : {
     command: process.env.CI
-      ? "pnpm --filter kitchen-sink exec vite preview --port 5801 --strictPort"
+      ? "make -C .. e2e-preview"
       : "pnpm --filter kitchen-sink dev",
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,

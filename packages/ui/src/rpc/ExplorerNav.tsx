@@ -1,19 +1,9 @@
-import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { useContext, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "../data/Icon";
 import { UiChevronRight } from "../icons";
 import { useRouter } from "./router";
-
-export type ExplorerNavSlot = {
-  container: HTMLElement | null;
-  title: string;
-  /** Host controls kept beside the surface crumb, as beside the default title. */
-  titleActions?: ReactNode;
-  /** Hides the surface's default title while a portal is mounted; returns the release. */
-  claim: () => () => void;
-};
-
-export const ExplorerNavContext = createContext<ExplorerNavSlot | null>(null);
+import { ExplorerNavContext } from "./explorer-nav-context";
 
 export type ExplorerNavPortalProps = {
   /** Where the surface breadcrumb leads — the surface listing with the host's filters kept. */

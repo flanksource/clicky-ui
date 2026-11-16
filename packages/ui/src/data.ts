@@ -180,8 +180,6 @@ export {
   SchemaViewerRow,
   SchemaFieldMetaPanel,
   type SchemaViewerProps,
-  type SchemaViewerSection,
-  type SchemaViewerView,
   type SchemaViewerProps as SchemaBrowserProps,
   type SchemaFieldMetaPanelProps,
 } from "./data/SchemaViewer";
@@ -652,7 +650,6 @@ export {
   type ErrorDetailsProps,
 } from "./data/diagnostics/ErrorDetails";
 export { ActionError } from "./data/diagnostics/ActionError";
-export { ProblemRow, type ProblemRowProps } from "./data/diagnostics/ProblemRow";
 export {
   normalizeErrorDiagnostics,
   parseDiagnosticsStackTrace,

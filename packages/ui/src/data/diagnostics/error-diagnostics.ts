@@ -44,8 +44,10 @@ export function normalizeErrorDiagnostics(
   }
   const record = objectRecord(value);
   if (!record) return null;
-  const carried = objectRecord(record.diagnostics);
-  if (carried && carried !== record) return normalizeErrorDiagnostics(carried, fallback);
+  // An Error that carries structured diagnostics reports those; a response body's
+  // `diagnostics` may be a provider payload instead and is only a fallback below.
+  const carried = value instanceof Error ? objectRecord(record.diagnostics) : null;
+  if (carried && typeof carried.message === "string") return normalizeErrorDiagnostics(carried, fallback);
   const nestedError = objectRecord(record.error);
   if (nestedError && nestedError !== record) {
     return normalizeErrorDiagnostics(nestedError, fallback);

@@ -57,12 +57,13 @@ describe("DocumentForm", () => {
   });
 
   it("reports a value its schema cannot show in place of the form, and retries once the source changes", () => {
-    const schema = { type: "object", properties: { env: { type: "object", additionalProperties: { type: "string" } } } } as const;
-    const { rerender } = render(<DocumentForm path="checks.md" value={"---\nenv: [bad]\n---\n"} onChange={vi.fn()} schema={schema} />);
+    // A compact string list throws on a non-string item, so a list of numbers cannot be shown.
+    const schema = { type: "object", properties: { tags: { type: "array", items: { type: "string" }, "x-array-display": "list" } } } as const;
+    const { rerender } = render(<DocumentForm path="checks.md" value={"---\ntags: [1]\n---\n"} onChange={vi.fn()} schema={schema} />);
 
     expect(screen.getByRole("alert")).toHaveTextContent("Use Source to fix it");
 
-    rerender(<DocumentForm path="checks.md" value={"---\nenv: {A: b}\n---\n"} onChange={vi.fn()} schema={schema} />);
+    rerender(<DocumentForm path="checks.md" value={"---\ntags: [one]\n---\n"} onChange={vi.fn()} schema={schema} />);
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });

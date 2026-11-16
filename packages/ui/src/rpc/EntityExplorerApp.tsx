@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { ExplorerNavContext, type ExplorerNavSlot } from "./ExplorerNav";
+import { ExplorerNavContext, type ExplorerNavSlot } from "./explorer-nav-context";
 import { ThemeSwitcher } from "../components/theme-switcher";
 import type { PreExtension, PostExtension } from "../components/json-schema-form-types";
 import type { ClickyCommandRuntime } from "../data/Clicky";

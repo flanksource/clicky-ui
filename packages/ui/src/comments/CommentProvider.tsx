@@ -108,9 +108,7 @@ function CommentProviderInner({
   }
   // The stable actions below must write to the current scope's store, not the one they were created with.
   const scopedSetters = useRef({ setRailMode, setFocusedAnchor });
-  scopedSetters.current = { setRailMode, setFocusedAnchor };
   const railModeRef = useRef<CommentRailMode>(railMode);
-  railModeRef.current = railMode;
   const onRailModeChangeRef = useRef(onRailModeChange);
   const onScrollToAnchorRef = useRef(onScrollToAnchor);
   const externalAnchorTopRef = useRef(externalAnchorTop);

@@ -66,6 +66,27 @@ it("sorts the listing through the server's sort keys and keeps the server's row 
   expect(onServerSort).toHaveBeenCalledWith({ key: "op_sort", dir: "desc" });
 });
 
+const operationTable = (rows: { operation: string }[]): ClickyNode => ({
+  kind: "table",
+  columns: [{ name: "operation", label: "Operation" }],
+  rows: rows.map(row => ({ cells: { operation: { kind: "text", text: row.operation, plain: row.operation } } })),
+});
+
+it("lists a trace at its parentless root even when an orphan span starts earlier", () => {
+  const traceId = "c".repeat(32);
+  const orphan = { ...traceExample.spans[0]!, traceId, spanId: "orphan", parentId: "missing", operation: "orphan first", startedAt: "2026-11-02T10:00:00Z" };
+  const root = { ...traceExample.spans[0]!, traceId, spanId: "root-c", parentId: undefined, operation: "parentless root", startedAt: "2026-11-02T10:00:01Z" };
+  const rows = [orphan, root].map(span => ({ _trace: span, operation: span.operation }));
+  render(<OtelTraceTable {...props} spans={[orphan, root]} listing={profileTraceListing(rows, operationTable(rows))} />);
+  expect(screen.getAllByRole("row").slice(1).map(row => row.textContent)).toEqual([root.operation]);
+});
+
+it("reports a trace whose root row is absent from the listing instead of throwing while rendering", () => {
+  const rows = [{ _trace: { ...traceExample.spans[0]!, spanId: "unrelated" }, operation: "unrelated" }];
+  render(<OtelTraceTable {...props} listing={profileTraceListing(rows, operationTable(rows))} />);
+  expect(screen.getByRole("alert")).toHaveTextContent("is missing its mapped root row");
+});
+
 it("lets the listing fill a bounded parent so the table body scrolls under a pinned footer", () => {
   // jsdom has no layout; this pins the CSS contract that keeps the footer on screen.
   const rows = traceExample.spans.map(span => ({ _trace: span, operation: span.operation }));

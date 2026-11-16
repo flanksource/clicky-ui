@@ -23,7 +23,6 @@
   "sideEffects": [
     "./dist/react-grab/index.js",
     "**/*.css",
-    "./src/styles.ts",
     "./src/styles/**"
   ],
   "main": "./dist/index.cjs",
@@ -221,11 +220,11 @@
     "@flanksource/icons": "catalog:",
     "@floating-ui/react": "catalog:",
     "@lexical/react": "catalog:",
+    "@medv/finder": "catalog:",
     "@monaco-editor/react": "catalog:",
     "@radix-ui/react-compose-refs": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.1",
     "@tanstack/react-virtual": "^3.13.12",
-    "ajv": "catalog:",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "country-flag-icons": "catalog:",
@@ -261,6 +260,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "ai": "catalog:",
+    "ajv": "catalog:",
     "jsdom": "^26.0.0",
     "monaco-editor": "catalog:",
     "react": "^18.3.1",

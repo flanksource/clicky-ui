@@ -45,6 +45,12 @@ export function PromptIndicator({
 }: PromptIndicatorProps) {
   const { prompts, pending } = usePrompts({ ...filter, basePath, ...(enabled !== undefined ? { enabled } : {}) });
   const [active, setActive] = useState<PromptSnapshot | null>(null);
+  // An open prompt belongs to the API it came from; answering it on another would post its id there.
+  const [activeBase, setActiveBase] = useState(basePath);
+  if (activeBase !== basePath) {
+    setActiveBase(basePath);
+    setActive(null);
+  }
   const ordered = useMemo(() => orderPrompts(prompts), [prompts]);
   const count = useMemo(() => summarizePrompts(prompts).pending, [prompts]);
 
@@ -54,7 +60,10 @@ export function PromptIndicator({
     if (!unopened || active) return;
     autoOpened.current.add(unopened.id);
     setActive(unopened);
-  }, [unopened?.id, active]);
+  }, [unopened, active]);
+
+  // A dialog's answer can land after it was closed and another opened: clear only the prompt it was for.
+  const closePrompt = (id: string) => setActive((current) => (current?.id === id ? null : current));
 
   const label = count > 0 ? `${count} pending` : "Prompts";
   return (
@@ -104,8 +113,7 @@ export function PromptIndicator({
           prompt={active}
           basePath={basePath}
           open={true}
-          onClose={() => setActive(null)}
-          onResolved={() => setActive(null)}
+          onClose={() => closePrompt(active.id)}
           lookupFetcher={lookupFetcher}
           connectionApiBase={connectionApiBase}
         />
