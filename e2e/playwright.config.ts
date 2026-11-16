@@ -7,7 +7,9 @@ const PAGE_HOST_URL = process.env.PAGE_HOST_URL ?? "http://localhost:5810";
 export default defineConfig({
   testDir: "./tests",
   ...(PAGE_HOST ? { outputDir: "../.tmp/T-host-e2e/playwright" } : {}),
-  ...(PAGE_HOST ? {} : { testIgnore: ["**/page-host/**"] }),
+  // playground-frames specs need the built playground shell plus sibling gavel/facet checkouts; they run through
+  // playground-frames.config.ts (`pnpm --filter e2e test:playground-frames`), never this config.
+  ...(PAGE_HOST ? {} : { testIgnore: ["**/page-host/**", "**/playground-frames/**"] }),
   timeout: 60_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
