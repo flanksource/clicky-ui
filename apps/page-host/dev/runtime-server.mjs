@@ -13,15 +13,14 @@ if (!["default", "developer"].includes(hostProfile)) throw new Error(`Unknown pa
 const converterOrigin = process.env.PAGE_ESM_SH_ORIGIN;
 if (converterOrigin !== undefined) {
   if (hostProfile !== "developer") throw new Error("PAGE_ESM_SH_ORIGIN requires PAGE_HOST_PROFILE=developer");
+  if (!URL.canParse(converterOrigin)) throw new Error(`PAGE_ESM_SH_ORIGIN is not a URL: ${JSON.stringify(converterOrigin)}`);
   const converter = new URL(converterOrigin);
   if (!["http:", "https:"].includes(converter.protocol) || converter.username || converter.password || converter.origin !== converterOrigin) throw new Error("PAGE_ESM_SH_ORIGIN must be an http(s) origin without credentials, path, query or fragment");
 }
 if (Boolean(process.env.PAGE_PACKAGE_ORIGIN) !== Boolean(process.env.PAGE_REGISTRY)) throw new Error("Set both PAGE_PACKAGE_ORIGIN and PAGE_REGISTRY, or neither to serve workspace packages");
 const packages = [new URL("../../../packages/ui/", import.meta.url), new URL("../../../../facet/", import.meta.url)].map((url) => fileURLToPath(url));
 if (!process.env.PAGE_PACKAGE_ORIGIN) {
-  for (const directory of packages) {
-    for (const artifact of ["dist/runtime/importmap.json", "dist/runtime/barrels.json"]) await readFile(resolve(directory, artifact));
-  }
+  await Promise.all(packages.flatMap((directory) => ["dist/runtime/importmap.json", "dist/runtime/barrels.json"].map((artifact) => readFile(resolve(directory, artifact)))));
 }
 const local = process.env.PAGE_PACKAGE_ORIGIN ? null : await servePackages({
   packages, port: Number(process.env.PAGE_PACKAGE_PORT ?? 5812),
