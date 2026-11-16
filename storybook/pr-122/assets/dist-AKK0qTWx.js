@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-BCiCTKAo.js";import{g as t,k as n,u as r}from"./chunk-BO2N2NFS-B0FCh1Ed.js";function i(){return(i=e((()=>{t()})))()}i();export{r as Streamdown,n as defaultRehypePlugins};
