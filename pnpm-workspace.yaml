@@ -14,7 +14,7 @@ allowBuilds:
 
 catalog:
   "@ai-sdk/react": ^3.0.201
-  # @flanksource/react-grab (the react-grab source fork) builds with these, on upstream react-grab@0.1.50's ranges.
+  # Clicky UI's react-grab fork (packages/ui/react-grab) builds its Solid UI with these, on upstream react-grab@0.1.50's ranges.
   "@babel/core": ^7.29.0
   "@babel/preset-typescript": ^7.28.5
   "@chromatic-com/storybook": ^5.6.0
@@ -104,7 +104,6 @@ catalog:
   prettier: ^3.8.3
   react: ^18.3.1
   react-dom: ^18.3.1
-  react-grab: ^0.1.50
   rehype-raw: ^7.0.0
   remark-frontmatter: ^5.0.0
   remark-gfm: ^4.0.0

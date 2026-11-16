@@ -30,7 +30,6 @@ await writeFile(resolve(root, "src/vocabularies/shapes/catalog.ts"), 'export def
 await writeFile(resolve(root, "src/vocabularies/shapes/Preview.tsx"), 'export default () => <div>Fixture shapes</div>;');
 await mkdir(resolve(workspace, "packages"), { recursive: true });
 await symlink(resolve(repository, "packages/ui"), resolve(workspace, "packages/ui"));
-await symlink(resolve(repository, "packages/react-grab"), resolve(workspace, "packages/react-grab"));
 await symlink(resolve(repository, "../facet"), resolve(fixture, "facet"));
 await symlink(resolve(repository, "apps/playground/node_modules"), resolve(root, "node_modules"));
 await symlink(resolve(repository, "apps/playground/src/browser-mode"), resolve(root, "src/browser-mode"));
