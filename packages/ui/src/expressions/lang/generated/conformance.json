@@ -959,33 +959,6 @@
   },
   {
     "language": "cel",
-    "source": "A small helper command is available at `cmd/ceval` to evaluate CEL expressions against an input YAML or JSON file.",
-    "boundaries": [
-      0,
-      2,
-      8,
-      15,
-      23,
-      26,
-      36,
-      39,
-      51,
-      54,
-      63,
-      67,
-      79,
-      87,
-      90,
-      96,
-      101,
-      104,
-      109,
-      113
-    ],
-    "origin": "README.md"
-  },
-  {
-    "language": "cel",
     "source": "B'bytes'",
     "boundaries": [
       0
@@ -1034,17 +1007,6 @@
   },
   {
     "language": "cel",
-    "source": "Example input file:",
-    "boundaries": [
-      0,
-      8,
-      14,
-      18
-    ],
-    "origin": "README.md"
-  },
-  {
-    "language": "cel",
     "source": "Go,25",
     "boundaries": [
       0,
@@ -1064,15 +1026,6 @@
   },
   {
     "language": "cel",
-    "source": "Output:",
-    "boundaries": [
-      0,
-      6
-    ],
-    "origin": "README.md"
-  },
-  {
-    "language": "cel",
     "source": "R'raw\\dstring'",
     "boundaries": [
       0
@@ -1081,14 +1034,16 @@
   },
   {
     "language": "cel",
-    "source": "Run it with:",
+    "source": "ValuesProvider: redacting{},",
     "boundaries": [
       0,
-      4,
-      7,
-      11
+      14,
+      16,
+      25,
+      26,
+      27
     ],
-    "origin": "README.md"
+    "origin": "GO_TEMPLATE.md"
   },
   {
     "language": "cel",
@@ -1778,6 +1733,20 @@
   },
   {
     "language": "cel",
+    "source": "a/b/c: d",
+    "boundaries": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      7
+    ],
+    "origin": "README.md"
+  },
+  {
+    "language": "cel",
     "source": "aws.arnToMap(\"arn:aws:sns:eu-west-1:123:MMS-Topic\")",
     "boundaries": [
       0,
@@ -2122,6 +2091,60 @@
   },
   {
     "language": "cel",
+    "source": "func (p redacting) Field(receiver reflect.Value, name string) (reflect.Value, bool, error) {",
+    "boundaries": [
+      0,
+      5,
+      6,
+      8,
+      17,
+      19,
+      24,
+      25,
+      34,
+      41,
+      42,
+      47,
+      49,
+      54,
+      60,
+      62,
+      63,
+      70,
+      71,
+      76,
+      78,
+      82,
+      84,
+      89,
+      91
+    ],
+    "origin": "GO_TEMPLATE.md"
+  },
+  {
+    "language": "cel",
+    "source": "go run ./cmd/ceval -f env.yaml -e \"labels['a/b/c']\"",
+    "boundaries": [
+      0,
+      3,
+      7,
+      8,
+      9,
+      12,
+      13,
+      19,
+      20,
+      22,
+      25,
+      26,
+      31,
+      32,
+      34
+    ],
+    "origin": "README.md"
+  },
+  {
+    "language": "cel",
     "source": "gomplate.Template{Expression: \"person.display_name\"},",
     "boundaries": [
       0,
@@ -2151,7 +2174,19 @@
   },
   {
     "language": "cel",
-    "source": "import \"github.com/flanksource/gomplate/v3\"",
+    "source": "if name == \"password\" {",
+    "boundaries": [
+      0,
+      3,
+      8,
+      11,
+      22
+    ],
+    "origin": "GO_TEMPLATE.md"
+  },
+  {
+    "language": "cel",
+    "source": "import \"github.com/flanksource/gomplate/v4\"",
     "boundaries": [
       0,
       7
@@ -2731,6 +2766,15 @@
       47
     ],
     "origin": "CEL.md"
+  },
+  {
+    "language": "cel",
+    "source": "labels:",
+    "boundaries": [
+      0,
+      6
+    ],
+    "origin": "README.md"
   },
   {
     "language": "cel",
@@ -3980,6 +4024,42 @@
   },
   {
     "language": "cel",
+    "source": "return p.DefaultValuesProvider.Field(receiver, name)",
+    "boundaries": [
+      0,
+      7,
+      8,
+      9,
+      30,
+      31,
+      36,
+      37,
+      45,
+      47,
+      51
+    ],
+    "origin": "GO_TEMPLATE.md"
+  },
+  {
+    "language": "cel",
+    "source": "return reflect.ValueOf(\"****\"), true, nil",
+    "boundaries": [
+      0,
+      7,
+      14,
+      15,
+      22,
+      23,
+      29,
+      30,
+      32,
+      36,
+      38
+    ],
+    "origin": "GO_TEMPLATE.md"
+  },
+  {
+    "language": "cel",
     "source": "script: \u003e",
     "boundaries": [
       0,
@@ -4494,6 +4574,21 @@
       19
     ],
     "origin": "CEL.md"
+  },
+  {
+    "language": "cel",
+    "source": "type redacting struct{ gomplate.DefaultValuesProvider }",
+    "boundaries": [
+      0,
+      5,
+      15,
+      21,
+      23,
+      31,
+      32,
+      54
+    ],
+    "origin": "GO_TEMPLATE.md"
   },
   {
     "language": "cel",
