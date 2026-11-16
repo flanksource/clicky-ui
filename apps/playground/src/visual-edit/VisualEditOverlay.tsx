@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { cn, DropdownMenu, useFloatingZIndex } from "@flanksource/clicky-ui";
-import { UiCheck } from "@flanksource/clicky-ui/icons";
+import { cn, useFloatingZIndex } from "@flanksource/clicky-ui";
 import {
   describeEditable,
   editableTargetOf,
   findEditableRoots,
   isEditableVisible,
   instancesOf,
-  styleOptions,
   type EditableRoot,
   type FacetEditableRoot,
   type EditableTextPart,
@@ -59,7 +57,6 @@ export function VisualEditOverlay({ root, page, onOpenSource, onPendingChange, s
   const [hovered, setHovered] = useState<Element | null>(null);
   const [editing, setEditing] = useState<{ node: FacetEditableRoot; part: EditableTextPart } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [styleSaved, setStyleSaved] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const busy = editing !== null || edits.pending;
 
@@ -67,10 +64,6 @@ export function VisualEditOverlay({ root, page, onOpenSource, onPendingChange, s
     onPendingChange(busy);
   }, [busy, onPendingChange]);
   useEffect(() => () => onPendingChange(false), [onPendingChange]);
-
-  useEffect(() => {
-    if (edits.lastSaved?.edit.kind === "style") setStyleSaved(true);
-  }, [edits.lastSaved]);
 
   useEffect(() => {
     setHovered(null);
@@ -189,18 +182,6 @@ export function VisualEditOverlay({ root, page, onOpenSource, onPendingChange, s
     // tick refreshes values and rects after DOM mutations, scrolling and resizing
   }, [root, hovered, selected, tick]);
 
-  const pickStyle = useCallback((node: FacetEditableRoot, value: string) => {
-    if (!root || !node.markerValue || busy || pending || value === node.value) return;
-    onSelect(node);
-    const nodes = instancesOf(root, node.markerValue).filter((other) => other.kind !== "svg" && other.value === node.value);
-    void edits.commit({
-      markerValue: node.markerValue,
-      nodes: nodes.map((other) => other.element),
-      edit: { kind: "style", prop: node.styleProp, value },
-      previous: node.value,
-    });
-  }, [root, busy, pending, onSelect, edits.commit]);
-
   const commitText = useCallback((node: FacetEditableRoot, part: EditableTextPart, to: string) => {
     setEditing(null);
     if (!root || !node.markerValue) return;
@@ -244,31 +225,6 @@ export function VisualEditOverlay({ root, page, onOpenSource, onPendingChange, s
                 className={cn("pointer-events-none fixed rounded-sm ring-primary", isSelected ? "ring-2" : "ring-1")}
                 style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
               />
-              {/* Flush above the node's corner: keeps its title visible and clickable, and the pointer can cross straight into it. */}
-              {node.kind !== "svg" && <div className="pointer-events-auto fixed -translate-y-full" style={{ left: rect.left, top: rect.top }}>
-                <DropdownMenu
-                  align="left"
-                  menuLabel={`${node.styleProp} options for ${focus.label}`}
-                  {...(focus.instances > 1
-                    ? { header: <div className="px-2 py-1 text-xs text-muted-foreground">Applies to {focus.instances} nodes</div> }
-                    : {})}
-                  items={styleOptions(node.kind, node.styleProp).map((option) => ({
-                    label: option,
-                    ...(option === node.value ? { icon: UiCheck } : {}),
-                    onSelect: () => pickStyle(node, option),
-                  }))}
-                  trigger={
-                    <button
-                      type="button"
-                      disabled={busy || pending}
-                      aria-label={`Change ${node.styleProp} of “${focus.label}” (${node.value})`}
-                      className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium leading-none text-primary-foreground shadow-sm"
-                    >
-                      {node.styleProp}: {node.value}
-                    </button>
-                  }
-                />
-              </div>}
             </div>
           );
         })}
@@ -280,7 +236,6 @@ export function VisualEditOverlay({ root, page, onOpenSource, onPendingChange, s
         saving={edits.saving}
         live={live}
         lastSaved={edits.lastSaved}
-        styleSaved={styleSaved}
         nodeCount={scan.count}
         showAll={showAll}
         onToggleShowAll={() => setShowAll((shown) => !shown)}

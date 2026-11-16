@@ -44,7 +44,13 @@ vi.mock("./OpenRepositoryDocument", () => ({
 
 import { useRepositoryNavigation } from "./useRepositoryNavigation";
 
+class WorkspaceAccessStream extends EventTarget {
+  onerror: (() => void) | null = null;
+  close() {}
+}
+
 beforeEach(() => {
+  vi.stubGlobal("EventSource", WorkspaceAccessStream);
   mocks.catalog.repositories = [repository];
   mocks.catalog.error = null;
   mocks.refreshDocumentProblems.mockResolvedValue(undefined);

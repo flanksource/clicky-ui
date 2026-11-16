@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { parseEditableSource } from "../../plugins/editable-source-marker";
+import { parseEditableSource } from "@flanksource/page-runtime/markers";
 import type { VisualEdit, VisualEditCandidate, VisualEditResponse } from "../../plugins/visual-edits-contract";
 import { overrideCallSite } from "./react-override";
 import { postVisualEdit } from "./visual-edits-api";

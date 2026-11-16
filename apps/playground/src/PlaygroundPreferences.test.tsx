@@ -46,7 +46,7 @@ it("keeps preferences under the avatar and saves page reloads across menu openin
 
 it("listens for source updates while the preferences menu is closed", async () => {
   const close = vi.fn();
-  class Stream {
+  class Stream extends EventTarget {
     onmessage: ((event: { data: string }) => void) | null = null;
     onopen = null;
     onerror = null;

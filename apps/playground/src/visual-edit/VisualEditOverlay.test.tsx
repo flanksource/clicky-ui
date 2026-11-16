@@ -25,11 +25,11 @@ const posted = () => fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body
 function mountDiagram() {
   document.body.innerHTML = `
     <div id="root" data-facet-diagram>
-      <div id="zone" data-editable-container="variant" data-container-style="zone" data-editable-source="${ZONE}">
-        <div id="api" data-editable-box="variant" data-box-style="outlined" data-editable-source="${SHARED}">
+      <div id="zone" data-editable-container="variant" data-container-style="zone" data-source="${ZONE}">
+        <div id="api" data-editable-box="variant" data-box-style="outlined" data-source="${SHARED}">
           <div id="api-title" data-editable-text="title">Run API</div>
         </div>
-        <div id="ui" data-editable-box="variant" data-box-style="outlined" data-editable-source="${SHARED}">
+        <div id="ui" data-editable-box="variant" data-box-style="outlined" data-source="${SHARED}">
           <div data-editable-text="title">Run UI</div>
         </div>
         <div id="plain" data-editable-box="variant" data-box-style="ghost">Plain</div>
@@ -54,12 +54,6 @@ function mountOverlay(root: HTMLElement) {
   return { onOpenSource, onPendingChange, onSelect };
 }
 
-async function pickVariant(box: HTMLElement, label: string, option: string) {
-  fireEvent.pointerMove(box);
-  fireEvent.click(await screen.findByRole("button", { name: label }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: option }));
-}
-
 beforeEach(() => {
   vi.spyOn(Element.prototype, "getClientRects").mockReturnValue([new DOMRect(0, 0, 10, 10)] as unknown as DOMRectList);
   fetchMock.mockReset();
@@ -69,9 +63,9 @@ beforeEach(() => {
 
 it("counts and selects rendered SVG shapes without showing Facet-only controls", async () => {
   document.body.innerHTML = `<div id="root"><svg>
-    <defs><marker><path data-editable-source="${ZONE}" /></marker></defs>
-    <g data-editable-source="${ZONE}"><rect id="shape" data-editable-source="${SHARED}" /></g>
-    <text data-editable-source="${SHARED}"><tspan id="label">Cache</tspan></text>
+    <defs><marker><path data-source="${ZONE}" /></marker></defs>
+    <g data-source="${ZONE}"><rect id="shape" data-source="${SHARED}" /></g>
+    <text data-source="${SHARED}"><tspan id="label">Cache</tspan></text>
   </svg></div>`;
   const { onSelect } = mountOverlay(document.getElementById("root")!);
   fireEvent.click(await screen.findByRole("button", { name: "Show editable (3)" }));
@@ -101,31 +95,13 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-it("posts the picked variant for the whole call site and previews it on every instance", async () => {
-  const { root, api, ui } = mountDiagram();
-  const { onPendingChange } = mountOverlay(root);
-  fetchMock.mockResolvedValue(jsonResponse(200, { status: "applied", file: "x.tsx", path: "src/pages/x.tsx", line: 12, hash: "bbbbbbbbbbbb" }));
-
-  fireEvent.pointerMove(api);
-  fireEvent.click(await screen.findByRole("button", { name: "Change variant of “Run API” (outlined)" }));
-  expect(await screen.findByText("Applies to 2 nodes")).toBeTruthy();
-  fireEvent.click(await screen.findByRole("menuitem", { name: "card" }));
-
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-  expect(posted()).toEqual([{ page: PAGE, source: SHARED, edit: { kind: "style", prop: "variant", value: "card" } }]);
-  expect(overrides.mock.calls).toEqual([[[api, ui], SHARED, { variant: "card" }]]);
-  await waitFor(() => expect(onPendingChange).toHaveBeenLastCalledWith(false));
-  expect(onPendingChange).toHaveBeenCalledWith(true);
-  expect(await screen.findByText("Arrows re-measure on reload")).toBeTruthy();
-});
-
 it("shows a refused edit with an Open source action and restores the previous preview", async () => {
-  const { root, api, ui } = mountDiagram();
+  const { root, api, title } = mountDiagram();
   const { onOpenSource } = mountOverlay(root);
   fetchMock.mockResolvedValue(
     jsonResponse(422, {
       status: "refused",
-      error: "variant is computed",
+      error: "title is computed",
       reason: "computed-value",
       file: "flanksource/_facet-diagrams/cells.tsx",
       line: 12,
@@ -133,13 +109,16 @@ it("shows a refused edit with an Open source action and restores the previous pr
     }),
   );
 
-  await pickVariant(api, "Change variant of “Run API” (outlined)", "card");
+  fireEvent.click(title);
+  const input = await screen.findByRole("textbox", { name: "Edit title of Run API" });
+  fireEvent.change(input, { target: { value: "Run Gateway" } });
+  fireEvent.keyDown(input, { key: "Enter" });
 
   const alert = await screen.findByRole("alert");
-  expect(alert.textContent).toMatch(/Edit refused.*variant is computed \(computed-value\)/);
+  expect(alert.textContent).toMatch(/Edit refused.*title is computed \(computed-value\)/);
   expect(overrides.mock.calls).toEqual([
-    [[api, ui], SHARED, { variant: "card" }],
-    [[api, ui], SHARED, { variant: "outlined" }],
+    [[api], SHARED, { title: "Run Gateway" }],
+    [[api], SHARED, { title: "Run API" }],
   ]);
   fireEvent.click(within(alert).getByRole("button", { name: /Open source/ }));
   expect(onOpenSource).toHaveBeenCalledWith({ file: "flanksource/_facet-diagrams/cells.tsx", line: 12 });
@@ -214,7 +193,7 @@ it("cancels an inline edit on Escape without posting", async () => {
 it("opens the editor from a wrapper holding only that text, as between a wrapped title's lines", async () => {
   document.body.innerHTML = `
     <div id="root" data-facet-diagram>
-      <div data-editable-box="variant" data-box-style="header" data-editable-source="${SHARED}">
+      <div data-editable-box="variant" data-box-style="header" data-source="${SHARED}">
         <div id="title-wrapper"><span data-editable-text="title">Cloud estate</span></div>
         <div id="body">Hosted in <span data-editable-text="description">three regions</span></div>
       </div>
@@ -232,7 +211,7 @@ it("outlines every visible editable node on demand, skipping hidden ones and nod
   const hidden = Object.assign(document.createElement("div"), { id: "hidden" });
   hidden.setAttribute("data-editable-box", "variant");
   hidden.setAttribute("data-box-style", "outlined");
-  hidden.setAttribute("data-editable-source", SHARED);
+  hidden.setAttribute("data-source", SHARED);
   root.append(hidden);
   const rendered = [new DOMRect(0, 0, 10, 10)] as unknown as DOMRectList;
   vi.spyOn(Element.prototype, "getClientRects").mockImplementation(function (this: Element) {
@@ -256,7 +235,7 @@ it("explains why a node without a call-site marker is not editable and reports a
   const { root, plain } = mountDiagram();
   mountOverlay(root);
   fireEvent.click(plain);
-  expect((await screen.findByText(/has no data-editable-source/)).textContent).toMatch(/not rendered from a page module/);
+  expect((await screen.findByText(/has no data-source/)).textContent).toMatch(/not rendered from a page module/);
 
   cleanup();
   document.body.innerHTML = `<div id="bare" data-facet-diagram></div>`;

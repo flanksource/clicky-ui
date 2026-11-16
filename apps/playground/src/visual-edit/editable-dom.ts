@@ -1,9 +1,8 @@
-import { BOX_STYLES, CONTAINER_STYLES, DIAGRAM_ROLES } from "@flanksource/facet";
 import {
   EDITABLE_SOURCE_ATTRIBUTE,
   parseEditableSource,
   type EditableSourceMarker,
-} from "../../plugins/editable-source-marker";
+} from "@flanksource/page-runtime/markers";
 import type { VisualEditStyleProp } from "../../plugins/visual-edits-contract";
 import { SVG_EDITABLE_TAGS, isSvgEditableTag, type SvgEditableTag } from "./svg-schemas";
 
@@ -30,7 +29,8 @@ export type SvgEditableRoot = EditableSource & { kind: "svg"; tag: SvgEditableTa
 export type EditableRoot = FacetEditableRoot | SvgEditableRoot;
 
 const FACET_SELECTOR = "[data-editable-box],[data-editable-container]";
-export const EDITABLE_ROOT_SELECTOR = `${FACET_SELECTOR},${SVG_EDITABLE_TAGS.map(tag => `svg ${tag}[${EDITABLE_SOURCE_ATTRIBUTE}]`).join(",")}`;
+// Positional `<file>:<line>:<column>` markers share the attribute; only editable call sites carry `#<ordinal>@<hash>`.
+export const EDITABLE_ROOT_SELECTOR = `${FACET_SELECTOR},${SVG_EDITABLE_TAGS.map(tag => `svg ${tag}[${EDITABLE_SOURCE_ATTRIBUTE}*="#"]`).join(",")}`;
 const SVG_RESOURCES = "defs,marker,clipPath,mask,pattern,linearGradient,radialGradient,filter,symbol";
 const TEXT_SELECTOR = "[data-editable-text]";
 
@@ -100,10 +100,4 @@ export function isEditableVisible(element: Element): boolean {
 /** All roots rendered from the same call site, e.g. the items of a `.map`. */
 export function instancesOf(root: ParentNode, markerValue: string): EditableRoot[] {
   return findEditableRoots(root).filter((node) => node.markerValue === markerValue);
-}
-
-export function styleOptions(kind: EditableKind, prop: VisualEditStyleProp): readonly string[] {
-  if (prop === "role") return DIAGRAM_ROLES;
-  if (prop === "variant") return kind === "box" ? BOX_STYLES : CONTAINER_STYLES;
-  throw new Error(`no style options for ${kind} prop ${JSON.stringify(prop)}`);
 }

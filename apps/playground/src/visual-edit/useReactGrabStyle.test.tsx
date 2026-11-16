@@ -26,12 +26,12 @@ function mount() {
     return (
       <div ref={contentRef}>
         <button id="html">Plain</button>
-        <div id="facet" data-editable-box="variant" data-box-style="card" data-editable-source={MARKER}>Facet</div>
+        <div id="facet" data-editable-box="variant" data-box-style="card" data-source={MARKER}>Facet</div>
         <svg>
-          <rect id="marked" data-editable-source={MARKER} />
+          <rect id="marked" data-source={MARKER} />
           <rect id="unmarked" />
-          <text id="text" data-editable-source={MARKER}><tspan id="tspan">Hello</tspan></text>
-          <foreignObject id="box" data-editable-source={MARKER} />
+          <text id="text" data-source={MARKER}><tspan id="tspan">Hello</tspan></text>
+          <foreignObject id="box" data-source={MARKER} />
         </svg>
       </div>
     );

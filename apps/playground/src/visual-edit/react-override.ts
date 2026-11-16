@@ -1,4 +1,4 @@
-import { EDITABLE_SOURCE_ATTRIBUTE } from "../../plugins/editable-source-marker";
+import { EDITABLE_SOURCE_ATTRIBUTE } from "@flanksource/page-runtime/markers";
 
 type Fiber = {
   tag: number;

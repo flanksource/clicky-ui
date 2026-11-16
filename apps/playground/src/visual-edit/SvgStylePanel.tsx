@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { ActionError, Button, JsonSchemaForm, useFloatingZIndex, type JsonSchemaObject } from "@flanksource/clicky-ui";
 import { UiClose, UiLinkExternal } from "@flanksource/clicky-ui/icons";
 import type { StoredStyleEdit } from "../../plugins/comments-store";
-import { EDITABLE_SOURCE_ATTRIBUTE, parseEditableSource } from "../../plugins/editable-source-marker";
+import { EDITABLE_SOURCE_ATTRIBUTE, parseEditableSource } from "@flanksource/page-runtime/markers";
 import { liveOverrideSupport, readCallSiteProps } from "./react-override";
 import { diffSvgAttributes, readSvgAttributes, type SvgFormValues } from "./svg-attributes";
 import { svgSchemaFor } from "./svg-schemas";
@@ -21,7 +21,7 @@ import { SvgDeleteButton } from "./SvgDeleteButton";
 export type StyleChangeRequest = { agent?: string; onFocusThread: () => void };
 
 export type SvgStylePanelProps = {
-  /** The SVG element being styled; it carries a `data-editable-source` marker. */
+  /** The SVG element being styled; it carries a `data-source` marker. */
   element: Element;
   /** The page content; every instance of the element's call site below it previews together. */
   root: HTMLElement;

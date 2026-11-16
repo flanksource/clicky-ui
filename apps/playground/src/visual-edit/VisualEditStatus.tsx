@@ -13,7 +13,6 @@ export type VisualEditStatusProps = {
   saving: boolean;
   live: LiveOverrideSupport;
   lastSaved: SavedVisualEdit | null;
-  styleSaved: boolean;
   nodeCount: number;
   /** Every editable node is outlined, not just the hovered and selected ones. */
   showAll: boolean;
@@ -63,7 +62,6 @@ export function VisualEditStatus(props: VisualEditStatusProps) {
             <span role="status">Saved — reload to see it</span>
           ) : null}
           {props.saving ? <span role="status">Saving…</span> : null}
-          {props.styleSaved ? <span className="text-muted-foreground">Arrows re-measure on reload</span> : null}
           {props.nodeCount === 0 ? (
             <span role="status">{`No editable nodes on ${props.diagram ? "this diagram" : "this page"}`}</span>
           ) : (

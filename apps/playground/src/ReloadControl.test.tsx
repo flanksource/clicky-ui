@@ -7,10 +7,12 @@ beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
   vi.stubGlobal("__PLAYGROUND_REVISION__", "initial");
-  vi.stubGlobal("EventSource", class {
+  vi.stubGlobal("EventSource", class extends EventTarget {
+    onopen: (() => void) | null = null;
+    onerror: (() => void) | null = null;
     onmessage: ((event: MessageEvent) => void) | null = null;
     close = vi.fn();
-    constructor() { changes = this as unknown as EventSource; }
+    constructor() { super(); changes = this as unknown as EventSource; }
   });
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });

@@ -11,33 +11,41 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
+/** Renders the editable-node markers a diagram box carries: its style, its title text part and its call-site marker. */
+function Box(props: { id: string; variant: string; title: string; "data-source"?: string }) {
+  return (
+    <div id={props.id} data-editable-box="variant" data-box-style={props.variant} data-source={props["data-source"]}>
+      <div data-editable-text="title">{props.title}</div>
+    </div>
+  );
+}
+
 /** react-dom registers with the DevTools hook while it evaluates, so the hook must exist before its first import. */
-async function renderWithHook(build: (facet: typeof import("@flanksource/facet")) => ReactElement) {
+async function renderWithHook(build: () => ReactElement) {
   await import("bippy/install-hook-only");
   const { createRoot } = await import("react-dom/client");
-  const facet = await import("@flanksource/facet");
   hooked.IS_REACT_ACT_ENVIRONMENT = true;
   const container = document.body.appendChild(document.createElement("div"));
-  await act(async () => createRoot(container).render(build(facet)));
+  await act(async () => createRoot(container).render(build()));
   return container;
 }
 
 it("overrides the call-site component's props and re-renders every instance", async () => {
   const { overrideCallSite, liveOverrideSupport } = await import("./react-override");
-  const container = await renderWithHook(({ BoxNode }) => {
-    const Callout = (props: { tone: "outlined" | "card"; title: string; "data-editable-source": string }) => (
-      <BoxNode id={props.title} variant={props.tone} title={props.title} data-editable-source={props["data-editable-source"]} />
+  const container = await renderWithHook(() => {
+    const Callout = (props: { tone: "outlined" | "card"; title: string; "data-source": string }) => (
+      <Box id={props.title} variant={props.tone} title={props.title} data-source={props["data-source"]} />
     );
     return (
       <>
-        <Callout tone="outlined" title="Run API" data-editable-source={MARKER} />
-        <Callout tone="outlined" title="Run UI" data-editable-source={MARKER} />
-        <Callout tone="outlined" title="Other" data-editable-source={OTHER_MARKER} />
+        <Callout tone="outlined" title="Run API" data-source={MARKER} />
+        <Callout tone="outlined" title="Run UI" data-source={MARKER} />
+        <Callout tone="outlined" title="Other" data-source={OTHER_MARKER} />
       </>
     );
   });
   expect(liveOverrideSupport()).toEqual({ supported: true });
-  const nodes = Array.from(container.querySelectorAll(`[data-editable-source="${MARKER}"]`));
+  const nodes = Array.from(container.querySelectorAll(`[data-source="${MARKER}"]`));
 
   await act(async () => overrideCallSite(nodes, MARKER, { tone: "card" }));
   await act(async () => overrideCallSite(nodes, MARKER, { title: "Run Gateway" }));
@@ -59,23 +67,23 @@ it("keeps a reverted prop reverted when a different prop is overridden next", as
   let tick: () => void = () => {
     throw new Error("Ticker is not mounted");
   };
-  const container = await renderWithHook(({ BoxNode }) => {
+  const container = await renderWithHook(() => {
     const Ticker = () => {
       const [count, setCount] = useState(0);
       tick = () => setCount((value) => value + 1);
       return <span>{count}</span>;
     };
-    const Callout = (props: { tone: "outlined" | "card"; title: string; "data-editable-source": string }) => (
-      <BoxNode id="callout" variant={props.tone} title={props.title} data-editable-source={props["data-editable-source"]} />
+    const Callout = (props: { tone: "outlined" | "card"; title: string; "data-source": string }) => (
+      <Box id="callout" variant={props.tone} title={props.title} data-source={props["data-source"]} />
     );
     return (
       <>
         <Ticker />
-        <section><div><Callout tone="outlined" title="Run API" data-editable-source={MARKER} /></div></section>
+        <section><div><Callout tone="outlined" title="Run API" data-source={MARKER} /></div></section>
       </>
     );
   });
-  const nodes = Array.from(container.querySelectorAll(`[data-editable-source="${MARKER}"]`));
+  const nodes = Array.from(container.querySelectorAll(`[data-source="${MARKER}"]`));
   // A refused style edit is reverted, then a text edit follows. Commits elsewhere in the tree (the
   // shell's polling) flip the root buffers while the diagram's .return pointers stay stale.
   const steps: Array<[string, string]> = [
@@ -96,8 +104,8 @@ it("overrides a host element's attribute props and reverts them, including one t
   const { overrideCallSite } = await import("./react-override");
   const container = await renderWithHook(() => (
     <svg>
-      <rect data-editable-source={MARKER} x={10} width={80} fill="#eeeeee" />
-      <rect data-editable-source={OTHER_MARKER} x={10} width={80} fill="#eeeeee" />
+      <rect data-source={MARKER} x={10} width={80} fill="#eeeeee" />
+      <rect data-source={OTHER_MARKER} x={10} width={80} fill="#eeeeee" />
     </svg>
   ));
   const [target, untouched] = Array.from(container.querySelectorAll("rect")) as [SVGRectElement, SVGRectElement];
@@ -120,9 +128,9 @@ it("overrides a host element's attribute props and reverts them, including one t
 
 it("throws with context when the node has no component carrying the marker", async () => {
   const { overrideCallSite } = await import("./react-override");
-  const container = await renderWithHook(({ BoxNode }) => <BoxNode id="a" title="A" variant="card" />);
+  const container = await renderWithHook(() => <Box id="a" title="A" variant="card" />);
   expect(() => overrideCallSite([container.firstElementChild!], MARKER, { variant: "ghost" })).toThrow(
-    /no component or element with data-editable-source/,
+    /no component or element with data-source/,
   );
 });
 

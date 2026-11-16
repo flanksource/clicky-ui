@@ -23,8 +23,8 @@ function mountPanel() {
   document.body.innerHTML = `
     <div id="root">
       <svg>
-        <rect id="rect" data-editable-source="${MARKER}" x="10" y="10" width="80" height="40" fill="#eeeeee" stroke="#333333" stroke-width="2"/>
-        <text id="label" data-editable-source="flanksource/_facet-diagrams/call-path.tsx:50:9#4@aaaaaaaaaaaa" x="20" y="35">Hello</text>
+        <rect id="rect" data-source="${MARKER}" x="10" y="10" width="80" height="40" fill="#eeeeee" stroke="#333333" stroke-width="2"/>
+        <text id="label" data-source="flanksource/_facet-diagrams/call-path.tsx:50:9#4@aaaaaaaaaaaa" x="20" y="35">Hello</text>
       </svg>
     </div>`;
   const root = document.getElementById("root")!;

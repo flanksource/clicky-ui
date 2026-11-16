@@ -6,7 +6,7 @@ import { useEditableSelection } from "./useEditableSelection";
 const MARKER = "flanksource/_facet-diagrams/cells.tsx:12:7#0@aaaaaaaaaaaa";
 function targets() {
   const root = document.createElement("div");
-  root.innerHTML = `<svg><rect data-editable-source="${MARKER}" /></svg><div data-editable-box="variant" data-box-style="card" data-editable-source="${MARKER}"></div>`;
+  root.innerHTML = `<svg><rect data-source="${MARKER}" /></svg><div data-editable-box="variant" data-box-style="card" data-source="${MARKER}"></div>`;
   return { svg: describeEditable(root.querySelector("rect")!), facet: describeEditable(root.lastElementChild!) };
 }
 

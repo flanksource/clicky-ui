@@ -9,7 +9,7 @@ import {
   sortReplies,
 } from "../../../../packages/ui/src/comments/comment-utils";
 
-import { parseEditableSource } from "../../plugins/editable-source-marker";
+import { parseEditableSource } from "@flanksource/page-runtime/markers";
 import { tallyAnchors } from "./anchor-tally";
 import {
   describeMarkdown,
