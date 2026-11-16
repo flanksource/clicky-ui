@@ -1,4 +1,3 @@
-import { useSyncExternalStore } from "react";
 import { validateDependencies } from "@flanksource/page-runtime/sw";
 import type { DependencyPolicy } from "@flanksource/page-runtime/schema";
 
@@ -15,7 +14,8 @@ export const BROWSER_PROFILE_KEY = "playground.runtime.profile";
 export const BROWSER_WORKSPACE_KEY = "playground.runtime.dependencies";
 export const browserPageKey = (slug: string) => `playground.runtime.dependencies.page:${slug}`;
 export const APPROVALS_KEY = "playground.runtime.approvals";
-const changed = "playground-dependency-defaults";
+/** Window event dispatched after any browser runtime layer or approval is saved. */
+export const BROWSER_RUNTIME_CHANGED = "playground-dependency-defaults";
 const POLICIES: DependencyPolicy[] = ["any", "ask", "strict"];
 
 function object(value: unknown, path: string): Record<string, unknown> {
@@ -92,30 +92,21 @@ export function readBrowserRuntime(slug: string): BrowserRuntime {
 export function saveBrowserDocument(options: { key: string; source: string; expected: string }) {
   if (readStored(options.key) !== options.expected) throw new Error("Browser runtime defaults changed since preview; preview again");
   JSON.parse(options.source);
-  localStorage.setItem(options.key, options.source); window.dispatchEvent(new Event(changed));
+  localStorage.setItem(options.key, options.source); window.dispatchEvent(new Event(BROWSER_RUNTIME_CHANGED));
 }
 
 export function approveDependencies(options: { names: string[]; scope: "workspace" | "page"; slug: string }) {
   const approvals = readApprovals();
   if (options.scope === "workspace") approvals.workspace = [...new Set([...approvals.workspace, ...options.names])].sort();
   else approvals.pages[options.slug] = [...new Set([...(approvals.pages[options.slug] ?? []), ...options.names])].sort();
-  localStorage.setItem(APPROVALS_KEY, JSON.stringify(approvals)); window.dispatchEvent(new Event(changed));
+  localStorage.setItem(APPROVALS_KEY, JSON.stringify(approvals)); window.dispatchEvent(new Event(BROWSER_RUNTIME_CHANGED));
 }
 
 export function revokeApproval(options: { name: string; scope: "workspace" | "page"; slug: string }) {
   const approvals = readApprovals();
   if (options.scope === "workspace") approvals.workspace = approvals.workspace.filter(name => name !== options.name);
   else approvals.pages[options.slug] = (approvals.pages[options.slug] ?? []).filter(name => name !== options.name);
-  localStorage.setItem(APPROVALS_KEY, JSON.stringify(approvals)); window.dispatchEvent(new Event(changed));
-}
-
-function subscribe(listener: () => void) {
-  window.addEventListener(changed, listener); window.addEventListener("storage", listener);
-  return () => { window.removeEventListener(changed, listener); window.removeEventListener("storage", listener); };
-}
-/** A snapshot key that changes whenever any browser layer for `slug` changes; use it as an effect dependency. */
-export function useBrowserRuntimeVersion(slug: string): string {
-  return useSyncExternalStore(subscribe, () => [BROWSER_PROFILE_KEY, BROWSER_WORKSPACE_KEY, browserPageKey(slug), APPROVALS_KEY].map(key => localStorage.getItem(key) ?? "").join("\u0000"), () => "");
+  localStorage.setItem(APPROVALS_KEY, JSON.stringify(approvals)); window.dispatchEvent(new Event(BROWSER_RUNTIME_CHANGED));
 }
 
 export async function dependencyDocument(scope: "workspace" | "profile", update?: { source: string; expectedHash: string }): Promise<DependencyDocument> {

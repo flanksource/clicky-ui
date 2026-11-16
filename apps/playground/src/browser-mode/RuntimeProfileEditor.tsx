@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { ActionError, Button, CodeDiff, Field, Properties, Select } from "@flanksource/clicky-ui";
 import type { DependencyPolicy } from "@flanksource/page-runtime/schema";
-import { BROWSER_PROFILE_KEY, dependencyDocument, parseProfileLayer, readBrowserRuntime, readStored, revokeApproval, saveBrowserDocument, updatePolicyDocument, useBrowserRuntimeVersion, type ProfileScope } from "./dependency-defaults";
+import { BROWSER_PROFILE_KEY, dependencyDocument, parseProfileLayer, readBrowserRuntime, readStored, revokeApproval, saveBrowserDocument, updatePolicyDocument, type ProfileScope } from "./dependency-defaults";
+import { useBrowserRuntimeVersion } from "./useBrowserRuntimeVersion";
 import type { EffectivePolicy } from "./runtime-profile";
 
 const LAYERS: Array<{ scope: ProfileScope; label: string }> = [{ scope: "workspace", label: "package.json (pageRuntime.policy)" }, { scope: "profile", label: ".playground/runtime-profile.json" }, { scope: "browser-default", label: "Browser runtime default" }];
