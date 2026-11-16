@@ -1,0 +1,1 @@
+import{a as e,c as t}from"./dist-2YC0bp_c.js";e();export{t as markdown};

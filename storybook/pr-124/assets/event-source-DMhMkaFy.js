@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{t}from"./react-pByjoP3I.js";function n(){return(0,r.useContext)(a)}var r,i,a;function o(){return(o=e((()=>{r=t(),i=e=>new EventSource(e),a=(0,r.createContext)(i)})))()}export{o as n,n as r,a as t};

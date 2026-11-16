@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";function t(e,t){if(!e||e.length===0)return null;let n=1/0,r=-1/0,i=0,a=0;for(let o of e){let e=t?t(o.value):o.value;e<n&&(n=e),e>r&&(r=e),i+=e,a=e}return{current:a,min:n,max:r,avg:i/e.length,count:e.length}}function n(){return(n=e((()=>{})))()}export{t as n,n as t};
