@@ -60,7 +60,9 @@ export const RestoreAll: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "Restore all (2)" }));
-    await expect(canvas.getByText("0 classes patched")).toBeInTheDocument();
+    // Rule42 sits in the virtual `~janino` loader, which cannot be restored from the register, so it survives "Restore all".
+    await expect(canvas.getByText("1 class patched")).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "Restore all (0)" })).toBeDisabled();
   },
 };
 

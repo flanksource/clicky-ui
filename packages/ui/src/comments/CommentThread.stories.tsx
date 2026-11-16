@@ -110,15 +110,20 @@ function DefaultDeliveryDemo() {
   );
 }
 
-/** Both the root composer and a reply box state where a comment without an `@target` goes, and which settings layer says so. */
+/**
+ * The new-thread composer states where a comment without an `@target` goes, and which settings layer says so.
+ * A reply box does not: the comment agent rule applies to new threads only, so it says replies need an `@target`.
+ */
 export const WithDefaultDeliveryLine: Story = {
   render: () => <DefaultDeliveryDemo />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Add a comment…" }));
     const line = await canvas.findByTestId("default-delivery");
     await expect(line).toHaveTextContent("Comments without an @target go to claude-opus-5-5 (rule from project)");
     await userEvent.click((await canvas.findAllByRole("button", { name: "Reply" }))[0]!);
-    await expect(await canvas.findAllByTestId("default-delivery")).toHaveLength(2);
+    await expect(await canvas.findByTestId("reply-delivery")).toHaveTextContent("Replies are delivered only when they name an @target");
+    await expect(canvas.getAllByTestId("default-delivery")).toHaveLength(1);
   },
 };
 

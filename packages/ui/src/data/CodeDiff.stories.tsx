@@ -313,19 +313,21 @@ export const LineSelection: Story = {
   render: () => <SelectionDiff view="unified" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    // The direct userEvent APIs each start a fresh session, so a held Shift would not reach the next click; one setup() session keeps it.
+    const user = userEvent.setup();
     await waitFor(() => expect(canvas.getAllByRole("checkbox").length).toBe(8));
     const hunk = canvas.getByRole("checkbox", { name: "Select hunk 1" });
     expect(hunk).toHaveAttribute("aria-checked", "false");
 
-    await userEvent.click(canvas.getByRole("checkbox", { name: "Select old line 2" }));
+    await user.click(canvas.getByRole("checkbox", { name: "Select old line 2" }));
     expect(canvas.getByRole("checkbox", { name: "Select hunk 1" })).toHaveAttribute("aria-checked", "mixed");
 
-    await userEvent.keyboard("{Shift>}");
-    await userEvent.click(canvas.getByRole("checkbox", { name: "Select new line 3" }));
-    await userEvent.keyboard("{/Shift}");
+    await user.keyboard("{Shift>}");
+    await user.click(canvas.getByRole("checkbox", { name: "Select new line 3" }));
+    await user.keyboard("{/Shift}");
     expect(canvas.getByRole("checkbox", { name: "Unselect hunk 1" })).toHaveAttribute("aria-checked", "true");
 
-    await userEvent.click(canvas.getByRole("checkbox", { name: "Unselect hunk 1" }));
+    await user.click(canvas.getByRole("checkbox", { name: "Unselect hunk 1" }));
     expect(canvas.getByRole("checkbox", { name: "Select hunk 1" })).toHaveAttribute("aria-checked", "false");
   },
 };

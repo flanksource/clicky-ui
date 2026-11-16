@@ -226,7 +226,7 @@ describe("SpecRuntimeEditor sandbox section", () => {
     render(<Harness />);
     chooseMode("Native");
     expect(
-      screen.getByRole("checkbox", { name: "Require native sandbox" }),
+      screen.getByRole("switch", { name: "Require native sandbox" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("radiogroup", { name: "Filesystem access" }),
@@ -241,7 +241,7 @@ describe("SpecRuntimeEditor sandbox section", () => {
     render(<Harness initial={{ mode: "agent" }} />);
     chooseMode("Native");
     expect(
-      screen.queryByRole("checkbox", { name: "Require native sandbox" }),
+      screen.queryByRole("switch", { name: "Require native sandbox" }),
     ).toBeNull();
     expect(
       within(

@@ -502,7 +502,7 @@ export function Combobox(props: ComboboxProps) {
           listId={listId}
           ariaLabel={ariaLabel}
           title={props.title}
-          clearable={showClear}
+          clearable={props.clearable === true && showClear}
           onClear={clear}
           clearLabel={props.clearLabel ?? "Clear"}
           onToggle={() => (open ? commitAndClose() : openMenu())}

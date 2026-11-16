@@ -32,6 +32,8 @@ export const Transparent: Story = {
 
 export const LoadError: Story = {
   args: { src: "/missing/diagram.png", alt: "diagram.png" },
+  // jsdom never loads images, so the img `error` event only fires in a real browser. ImagePreview.test.tsx covers the jsdom path.
+  tags: ["browser"],
   play: async ({ canvasElement }) => {
     await expect(await within(canvasElement).findByRole("alert")).toHaveTextContent("Could not load diagram.png");
   },

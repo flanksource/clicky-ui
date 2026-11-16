@@ -253,7 +253,8 @@ export const WithLimits: Story = {
     const listbox = await body.findByRole("listbox", { name: "Model" });
     await expect(body.getByLabelText("Search Model")).toBeInTheDocument();
     await userEvent.click(
-      within(listbox).getByRole("option", { name: /^Claude Sonnet/ }),
+      // Options show the display name (shortContextModelName drops the "Claude " prefix).
+      within(listbox).getByRole("option", { name: /^Sonnet 4\.6/ }),
     );
     await expect(canvas.getByTitle("Runtime mode — CLI")).toBeInTheDocument();
     await expect(

@@ -122,7 +122,9 @@ describe("properties presentation", () => {
       );
       expect(preview.querySelector("[data-jsf-readonly]")).toHaveClass(height);
       fireEvent.keyDown(preview, { key: "Enter" });
-      expect(screen.getByLabelText("Name")).toHaveClass(height);
+      expect(
+        screen.getByLabelText("Name").closest("[data-jsf-control]"),
+      ).toHaveClass(height);
       fireEvent.change(screen.getByLabelText("Name"), {
         target: { value: "Changed" },
       });

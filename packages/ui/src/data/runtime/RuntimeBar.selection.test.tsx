@@ -83,12 +83,13 @@ describe("RuntimeBar mode-first selection", () => {
 
     fireEvent.click(modelPicker);
     const menu = within(screen.getByRole("listbox", { name: "Model" }));
+    // Human model names are normalized by shortContextModelName ("Sonnet CLI" -> "Sonnet cli").
     expect(
-      menu.getByRole("option", { name: /Sonnet CLI/ }),
+      menu.getByRole("option", { name: /Sonnet cli/i }),
     ).toBeInTheDocument();
     expect(menu.getByRole("option", { name: /Codex CLI/ })).toBeInTheDocument();
     expect(
-      menu.queryByRole("option", { name: /Sonnet API|Unavailable model/ }),
+      menu.queryByRole("option", { name: /Sonnet API|Unavailable model/i }),
     ).not.toBeInTheDocument();
     expect(menu.queryByText("Custom API")).not.toBeInTheDocument();
   });

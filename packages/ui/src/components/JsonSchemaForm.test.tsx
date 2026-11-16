@@ -1504,9 +1504,12 @@ describe("JsonSchemaForm preferences menu", () => {
     fireEvent.click(screen.getByRole("button", { name: "Form display options" }));
   }
 
+  // The control height is carried by the InputField chrome wrapping the input.
   function firstInput(container: HTMLElement): HTMLElement {
-    const el = container.querySelector<HTMLElement>("input[data-jsf-input]");
-    if (!el) throw new Error("no [data-jsf-input] input rendered");
+    const el = container
+      .querySelector<HTMLElement>("input[data-jsf-input]")
+      ?.closest<HTMLElement>("[data-jsf-control]");
+    if (!el) throw new Error("no [data-jsf-input] input inside a [data-jsf-control] rendered");
     return el;
   }
 
@@ -1921,7 +1924,7 @@ describe("JsonSchemaForm presentation extensions", () => {
     expect(onChange).toHaveBeenCalledWith({ mode: "manual" });
   });
 
-  it("renders x-input-suffix-icon in the input adornment wrapper and reserves padding", () => {
+  it("renders x-input-suffix-icon in the input adornment wrapper, after the input and in flow", () => {
     const schema: JsonSchemaObject = {
       type: "object",
       properties: {
@@ -1936,10 +1939,16 @@ describe("JsonSchemaForm presentation extensions", () => {
         showPreferencesMenu={false}
       />,
     );
-    expect(container.querySelector("[data-jsf-control]")).not.toBeNull();
-    expect(container.querySelector("input[data-jsf-input]")).toHaveClass("pr-8");
-    // The adornment icon is sized to size-4 to match the library's InputField icon.
-    expect(container.querySelector("[data-jsf-control] .size-4")).not.toBeNull();
+    const input = container.querySelector("input[data-jsf-input]");
+    const control = input?.closest("[data-jsf-control]");
+    expect(control).not.toBeNull();
+    // The adornment sits after the input inside the same InputField chrome, in
+    // normal flow, so no `pr-*` padding is needed to keep text clear of it.
+    const icon = control?.querySelector(".size-4");
+    expect(icon).not.toBeNull();
+    const adornment = [...(control?.children ?? [])].find((child) => child.contains(icon!));
+    expect(adornment?.previousElementSibling).toBe(input);
+    expect(input).not.toHaveClass("pr-8");
   });
 
   it("applies object-level x-classes to the fields grid container", () => {

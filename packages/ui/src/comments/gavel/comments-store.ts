@@ -77,7 +77,7 @@ export type StoredStyleChange = {
 /**
  * A visual edit Design mode could not write back (its value is computed in
  * code, spread, ...), asked of an agent instead. `marker` is the element's
- * `data-editable-source`; the refusal is the visual-edits server's 422.
+ * `data-source`; the refusal is the visual-edits server's 422.
  */
 export type StoredStyleEdit = {
   marker: string;

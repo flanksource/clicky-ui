@@ -123,11 +123,22 @@ export const EditCompileAndApply: Story = {
     const edit = await canvas.findByRole("button", { name: "Edit" });
     await waitFor(() => expect(edit).toBeEnabled());
     await userEvent.click(edit);
-    await waitFor(() => expect(canvasElement.querySelector("textarea.inputarea")).not.toBeNull(), { timeout: 10_000 });
-    const input = canvasElement.querySelector<HTMLTextAreaElement>("textarea.inputarea")!;
-    input.focus();
+    // Focus the editor's input only once its lines have rendered: a textarea that appears earlier belongs to an editor still mounting, and the typing is lost.
+    await waitFor(
+      () => {
+        if (!canvasElement.querySelector(".view-lines")) throw new Error("the editor has not rendered its lines yet");
+        const input = canvasElement.querySelector<HTMLTextAreaElement>("textarea.inputarea");
+        if (!input) throw new Error("the editor has no input area");
+        input.focus();
+        expect(document.activeElement).toBe(input);
+      },
+      { timeout: 10_000 },
+    );
     await userEvent.keyboard("// patched{Enter}");
-    await userEvent.click(canvas.getByRole("button", { name: "Compile preview" }));
+    // Compile stays disabled until the draft differs from the decompiled source.
+    const compile = canvas.getByRole("button", { name: "Compile preview" });
+    await waitFor(() => expect(compile).toBeEnabled());
+    await userEvent.click(compile);
     await expect(await canvas.findByText(/Compiles with 1 warning|Compiles cleanly/)).toBeInTheDocument();
     await userEvent.click(await canvas.findByRole("checkbox", { name: "Allow replacing class bytecode" }));
     await userEvent.click(canvas.getByRole("button", { name: "Apply patch" }));

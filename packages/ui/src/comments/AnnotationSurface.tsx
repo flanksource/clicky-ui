@@ -123,8 +123,8 @@ export function AnnotationSurface({
       const anchor = commentAnchor(element, root.current);
       if (!anchor) throw new Error("Selected element cannot be anchored");
       const source = element
-        .closest("[data-editable-source]")
-        ?.getAttribute("data-editable-source");
+        .closest("[data-source]")
+        ?.getAttribute("data-source");
       void prepare(
         {
           kind: "dom",

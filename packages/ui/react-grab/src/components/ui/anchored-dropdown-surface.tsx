@@ -51,7 +51,7 @@ export const AnchoredDropdownSurface: Component<AnchoredDropdownSurfaceProps> = 
   return (
     <Show when={dropdown.shouldMount()}>
       <div
-        ref={containerRef}
+        ref={(element) => (containerRef = element)}
         data-react-grab-ignore-events
         {...{ [props.dataAttribute]: "" }}
         class={cn(

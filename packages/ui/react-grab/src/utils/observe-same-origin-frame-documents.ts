@@ -29,11 +29,11 @@ export const observeSameOriginFrameDocuments = (callback: FrameDocumentCallback)
       collectCleanupError(() => rootObserver.disconnect(), cleanupErrors);
     }
 
-    for (const root of [...rootObservers.keys()]) {
+    for (const root of rootObservers.keys()) {
       if ("host" in root && root.ownerDocument === targetDocument) cleanupRoot(root, cleanupErrors);
     }
 
-    for (const iframeElement of [...observedIframes.keys()]) {
+    for (const iframeElement of observedIframes.keys()) {
       if (iframeElement.ownerDocument === targetDocument)
         cleanupIframe(iframeElement, cleanupErrors);
     }
@@ -194,7 +194,7 @@ export const observeSameOriginFrameDocuments = (callback: FrameDocumentCallback)
 
   return () => {
     const cleanupErrors: unknown[] = [];
-    for (const iframeElement of [...observedIframes.keys()]) {
+    for (const iframeElement of observedIframes.keys()) {
       cleanupIframe(iframeElement, cleanupErrors);
     }
     for (const [root, rootObserver] of rootObservers) {

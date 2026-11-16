@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { JsonSchemaForm } from "./JsonSchemaForm";
 import type { JsonSchemaObject } from "./json-schema-form-types";
 
@@ -14,33 +14,38 @@ function firstInput(container: HTMLElement): HTMLElement {
   return el;
 }
 
+// The control height lives on the InputField chrome (`[data-jsf-control]`) that
+// wraps the native input; the text size lives on the input itself.
+function firstControl(container: HTMLElement): HTMLElement {
+  const el = firstInput(container).closest<HTMLElement>("[data-jsf-control]");
+  if (!el) throw new Error("input[data-jsf-input] is not inside a [data-jsf-control] wrapper");
+  return el;
+}
+
 describe("JsonSchemaForm size", () => {
   it("defaults to the md baseline (h-9 text-sm) when size is unset", () => {
     const { container } = render(
       <JsonSchemaForm schema={stringSchema} value={{ Name: "" }} onChange={vi.fn()} />,
     );
-    const input = firstInput(container);
-    expect(input.className).toContain("h-9");
-    expect(input.className).toContain("text-sm");
+    expect(firstControl(container).className).toContain("h-9");
+    expect(firstInput(container).className).toContain("text-sm");
   });
 
   it("renders xs inputs at h-7 text-xs", () => {
     const { container } = render(
       <JsonSchemaForm schema={stringSchema} value={{ Name: "" }} onChange={vi.fn()} size="xs" />,
     );
-    const input = firstInput(container);
-    expect(input.className).toContain("h-7");
-    expect(input.className).toContain("text-xs");
-    expect(input.className).not.toContain("h-9");
+    expect(firstControl(container).className).toContain("h-7");
+    expect(firstControl(container).className).not.toContain("h-9");
+    expect(firstInput(container).className).toContain("text-xs");
   });
 
   it("renders xl inputs at h-11 text-lg", () => {
     const { container } = render(
       <JsonSchemaForm schema={stringSchema} value={{ Name: "" }} onChange={vi.fn()} size="xl" />,
     );
-    const input = firstInput(container);
-    expect(input.className).toContain("h-11");
-    expect(input.className).toContain("text-lg");
+    expect(firstControl(container).className).toContain("h-11");
+    expect(firstInput(container).className).toContain("text-lg");
   });
 
   it("scales the label text size", () => {
@@ -66,9 +71,8 @@ describe("JsonSchemaForm size", () => {
     const { container } = render(
       <JsonSchemaForm schema={nested} value={{ addr: { city: "" } }} onChange={vi.fn()} size="lg" />,
     );
-    const input = firstInput(container);
-    expect(input.className).toContain("h-10");
-    expect(input.className).toContain("text-base");
+    expect(firstControl(container).className).toContain("h-10");
+    expect(firstInput(container).className).toContain("text-base");
   });
 
   it("matches the inline label cell min-height to the size", () => {
@@ -139,6 +143,8 @@ describe("JsonSchemaForm size", () => {
       />,
     );
 
+    // Property rows only expose Remove while the key is being edited.
+    fireEvent.click(screen.getByRole("button", { name: "Edit env key" }));
     expect(screen.getByRole("button", { name: "Remove env" }).className).toContain("h-7");
     expect(screen.getByRole("button", { name: "Add field" }).className).toContain("h-7");
   });

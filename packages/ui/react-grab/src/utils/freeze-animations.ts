@@ -397,7 +397,7 @@ export const unfreezeGlobalAnimations = (): void => {
   if (!hasGlobalAnimationFreeze()) return;
 
   const cleanupErrors: unknown[] = [];
-  for (const targetDocument of [...globalAnimationFreezes.keys()]) {
+  for (const targetDocument of globalAnimationFreezes.keys()) {
     cleanupErrors.push(...unfreezeDocumentAnimations(targetDocument));
   }
   try {

@@ -129,6 +129,7 @@ export const InlineFindings: Story = {
       ["3", "Line length exceeds 80 charactersmarkdownlint MD013"],
       ["4", "Headings should be surrounded by blank linesmarkdownlint MD022"],
     ]);
-    await expect(rows().map((row) => row.getBoundingClientRect().height)).toEqual([20, 20, 20]);
+    // The rows render into view-zone nodes that Monaco attaches to the document on a later frame, and a detached node measures 0.
+    await waitFor(() => expect(rows().map((row) => row.getBoundingClientRect().height)).toEqual([20, 20, 20]));
   },
 };
