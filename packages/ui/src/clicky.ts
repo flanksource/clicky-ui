@@ -2,7 +2,6 @@ export {
   Clicky,
   ClickyNodeView,
   ClickyTable,
-  useClickyTableMenu,
   type ClickyCommandRequest,
   type ClickyCommandRuntime,
   type ClickyLinkTarget,

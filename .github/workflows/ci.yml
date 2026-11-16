@@ -26,6 +26,9 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      # The builder's declarations import @flanksource/clicky-ui types from its dist.
+      - name: Build library
+        run: pnpm --filter @flanksource/clicky-ui run build
       - name: Build runtime builder
         run: pnpm --filter @flanksource/page-runtime run build:builder
       - name: Verify runtime builder

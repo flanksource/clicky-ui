@@ -37,6 +37,8 @@ export type DocumentEditorProps = {
     | "inline"
     | "layout"
     | "requiredFirst"
+    | "showTypeIcons"
+    | "objectDisplay"
     | "persistPreferences"
     | "preferencesStorageKey"
   >;
@@ -262,6 +264,8 @@ export function DocumentForm({ path, value, onChange, schema, formOptions, Form 
           size="sm"
           inline
           requiredFirst
+          showTypeIcons
+          objectDisplay="accordion"
           {...formOptions}
           applyDefaults={false}
           schema={
