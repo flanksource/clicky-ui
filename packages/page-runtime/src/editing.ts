@@ -19,7 +19,7 @@ function EditableBoundary({ identities, children }: { identities: string[]; chil
 
 export function editableElement(element: ReactElement<Record<string, unknown>>): ReactElement {
   const review = element.props["data-review-id"];
-  const source = element.props["data-editable-source"] ?? element.props["data-source"];
+  const source = element.props["data-source"];
   const identities = [...(typeof review === "string" ? [`review:${review}`] : []), ...(typeof source === "string" && source.includes("#") ? [`source:${source}`] : [])];
   return identities.length ? createElement(EditableBoundary, { identities, key: element.key, children: element }) : element;
 }

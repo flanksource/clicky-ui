@@ -51,7 +51,7 @@ pnpm --filter @flanksource/page-runtime build
 pnpm --filter storybook dev
 ```
 
-The runtime requires a built Facet publication as well as Clicky UI. Storybook uses the sibling `../facet` checkout, or the checkout selected by its existing `STORYBOOK_FACET_SRC` setting. Build Facet there before opening the example.
+The runtime requires a built Facet publication as well as Clicky UI. Storybook uses the sibling `../facet` checkout. Build Facet there before opening the example.
 
 Open [Page Form](http://localhost:5270/?path=/story/extensions-formextension--page-form). Its three-dot menu shows the live runtime badge, opens the console's Runtimes tab, and reloads the runtime while retaining the host value. The original native Example remains alongside it. The story starts with browser capture open; server capture tabs are offline because Storybook has no application API.
 

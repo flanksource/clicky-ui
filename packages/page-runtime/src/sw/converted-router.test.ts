@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PageLock, RuntimeProfile } from "../schema.ts";
 import { memoryCaches } from "../link/testing-cache.ts";
-import { conversionFixture, CONVERTER, PROFILE } from "../../spikes/esm-sh/fixtures.ts";
+import { conversionFixture, CONVERTER, PROFILE } from "./esm-sh-fixtures/fixtures.ts";
 import { createRouter, contentSecurityPolicy } from "./router.ts";
 import { BASE_PLUGINS } from "./compiler.ts";
 import { resolvePage } from "./resolver.ts";

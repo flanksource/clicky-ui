@@ -26,7 +26,7 @@ export function dependencyBarrels({ target, root }: { target: "node" | "browser"
       const file = join(pkg.dir, "dist/runtime/barrels.json");
       if (existsSync(file)) {
         const manifest = JSON.parse(readFileSync(join(pkg.dir, "package.json"), "utf8")) as { sideEffects?: boolean | string[] };
-        index = mergeBarrels([index, guardedBarrels({ index: JSON.parse(readFileSync(file, "utf8")) as BarrelIndex, name: pkg.name, version: pkg.version, sideEffects: manifest.sideEffects })]);
+        index = mergeBarrels([index, guardedBarrels({ index: JSON.parse(readFileSync(file, "utf8")) as BarrelIndex, name: pkg.name, version: pkg.version, ...(manifest.sideEffects === undefined ? {} : { sideEffects: manifest.sideEffects }) })]);
       }
     }
     return `/npm/${key}/${relative(pkg.dir, path).split(sep).join("/")}`;

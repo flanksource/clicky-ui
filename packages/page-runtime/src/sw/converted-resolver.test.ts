@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
-import { conversionFixture, CONVERTER, MANIFESTS, PROFILE, registryResponse } from "../../spikes/esm-sh/fixtures.ts";
+import { conversionFixture, CONVERTER, MANIFESTS, PROFILE, registryResponse } from "./esm-sh-fixtures/fixtures.ts";
 import { resolvePage } from "./resolver.ts";
 import { validateProfile } from "./profile.ts";
 import { validateLock } from "../host/validation.ts";

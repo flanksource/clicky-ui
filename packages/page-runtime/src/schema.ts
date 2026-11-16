@@ -1,7 +1,6 @@
 // Contracts shared across @flanksource/page-runtime: what a library build publishes (src/build) and what the service
 // worker, frame and host read (src/sw, src/frame, src/host). Each slice extends this file only through the owner named
-// in the plan's Execution section; the types below come from the P0 spikes (spikes/lib/fragment.ts,
-// spikes/lib/module-transform.ts) and are the starting contract.
+// in the plan's Execution section.
 
 export type PageStylesRecipe = {
   name: string;

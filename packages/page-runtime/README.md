@@ -493,4 +493,3 @@ The browser suites need built `packages/ui/dist` (and facet's `dist` for the Tai
 - [PACKAGE_PUBLICATIONS.md](PACKAGE_PUBLICATIONS.md) — atomic local package publications and generations
 - [src/frame/agent/README.md](src/frame/agent/README.md) — in-frame agent, picking and design edits
 - [src/host/review/README.md](src/host/review/README.md) — remote review
-- [spikes/README.md](spikes/README.md) — measurements behind the design

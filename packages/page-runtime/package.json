@@ -30,10 +30,9 @@
     "build:builder": "tsx scripts/build-builder.ts",
     "serve-packages": "tsx scripts/serve-packages.ts",
     "check-fragment": "tsx scripts/check-fragment.ts",
-    "spike": "tsx spikes/run.ts",
     "test": "vitest run",
     "test:browser": "vitest run --config vitest.browser.config.ts",
-    "lint": "oxlint src spikes scripts --deny-warnings",
+    "lint": "oxlint src scripts --deny-warnings",
     "check": "tsc -p tsconfig.json --noEmit && pnpm run lint"
   },
   "dependencies": {

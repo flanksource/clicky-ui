@@ -15,7 +15,7 @@ function source(value: unknown): void {
   if (!isPageSource(value)) throw new Error("design: expected editable page source");
 }
 function prop(name: string): void {
-  if (!/^[a-zA-Z][\w-]*$/.test(name) || /^(?:on[A-Z]|data-source$|data-editable-source$|__|ref$|key$|dangerouslySetInnerHTML$)/.test(name)) throw new Error(`design: invalid prop ${name}`);
+  if (!/^[a-zA-Z][\w-]*$/.test(name) || /^(?:on[A-Z]|data-source$|__|ref$|key$|dangerouslySetInnerHTML$)/.test(name)) throw new Error(`design: invalid prop ${name}`);
 }
 function props(value: unknown): void {
   for (const [name, item] of Object.entries(record(value, "design.props"))) { prop(name); validateJson(item); }

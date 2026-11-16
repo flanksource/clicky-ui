@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { startConvertedBrowserServer } from "../../spikes/esm-sh/browser-server.ts";
+import { startConvertedBrowserServer } from "./esm-sh-fixtures/browser-server.ts";
 
 const exec = promisify(execFile);
 const session = `esm-sh-${process.pid}`;

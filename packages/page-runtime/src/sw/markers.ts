@@ -71,7 +71,7 @@ export function insertSourceMarkers(code: string, path: string, typescript: bool
     const tag = code.slice(name.start, tokens[end - 1]!.end);
     if (editable.has(tag)) {
       const at = openingEnd(tokens, index);
-      if (tokens.slice(end, tokens.findIndex((item) => item.start === at)).some((item) => code.slice(item.start, item.end) === "data-source" || code.slice(item.start, item.end) === "data-editable-source")) throw new Error(`${path}:${line}:${column}: source markers are compiler-owned`);
+      if (tokens.slice(end, tokens.findIndex((item) => item.start === at)).some((item) => code.slice(item.start, item.end) === "data-source")) throw new Error(`${path}:${line}:${column}: source markers are compiler-owned`);
       const previous = insertions.findIndex((item) => item.at === afterTypeArguments(tokens, end - 1));
       if (previous >= 0) insertions.splice(previous, 1);
       insertions.push({ at, text: ` data-source=${JSON.stringify(formatEditableSource({ file: path, line, column, ordinal: ordinal++, hash }))} ` });
