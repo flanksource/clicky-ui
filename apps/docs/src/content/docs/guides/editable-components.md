@@ -61,7 +61,7 @@ The source marker belongs to that inner `BoxNode` call site. This does not regis
 
 Accept `data-*` props and forward them to the existing root element that represents the component. Preserve its ID and geometry so arrows remain attached. Avoid an extra wrapper solely for editing.
 
-`data-editable-source` is injected by the playground compiler. Its file, line, column, ordinal, and hash identify the JSX call site. Never hand-author the attribute or construct a marker string. The injector and save handler must use the same element discovery and ordinal sequence.
+`data-source` is injected by the playground compiler. Its file, line, column, ordinal, and hash identify the JSX call site. Never hand-author the attribute or construct a marker string. The injector and save handler must use the same element discovery and ordinal sequence.
 
 The current Facet root markers are:
 

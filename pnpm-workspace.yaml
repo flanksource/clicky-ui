@@ -63,7 +63,7 @@ catalog:
   "@medv/finder": ^4.0.2
   "@tailwindcss/cli": ^4.3.3
   "@tailwindcss/forms": ^0.5.9
-  # Same version @tailwindcss/vite depends on; page-runtime's spikes compile with them directly.
+  # Same version @tailwindcss/vite depends on; page-runtime's Tailwind test server and playground's SVG preview compile with them directly.
   "@tailwindcss/node": ^4.3.3
   "@tailwindcss/oxide": ^4.3.3
   "@tailwindcss/vite": ^4.3.3

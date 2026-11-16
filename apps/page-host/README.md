@@ -82,7 +82,7 @@ export default function Page() {
 }
 ```
 
-Recorded esm.sh responses and spike findings live in [the esm.sh spike](../../packages/page-runtime/spikes/esm-sh/README.md). The Chromium regression serves those recordings from a local fixture converter; CI makes no requests to esm.sh. Run it separately when verification is permitted:
+Recorded esm.sh responses live in [`packages/page-runtime/src/sw/esm-sh-fixtures`](../../packages/page-runtime/src/sw/esm-sh-fixtures/fixtures.ts). The Chromium regression serves those recordings from a local fixture converter; CI makes no requests to esm.sh. Run it separately when verification is permitted:
 
 ```bash
 gavel test --work-dir ./packages/page-runtime --framework vitest --recursive=false -- --config vitest.browser.config.ts src/sw/converted.browser.ts
