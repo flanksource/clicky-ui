@@ -32,7 +32,7 @@ The declaration is read statically without running the page. Put imported item d
 
 Vocabulary declarations are discovered in normal `src/pages/**` pages and in configured vocabulary roots. The built-in root is `src/vocabularies`; `PLAYGROUND_VOCABULARY_DIRS` adds comma-separated absolute directories. Root pages are `*.tsx` or `*/index.tsx`; helpers prefixed `_` or `.`, tests, stories, `node_modules` and `dist` are excluded. Root vocabulary pages appear under **Vocabularies** as `vocabularies/<alias>`; declarations in `src/pages` keep their normal slug.
 
-Facet, Git and the local gitignored Brand page live here. The runnable Shapes example lives in `examples/vocabularies/shapes/index.tsx`. To include it, from `apps/playground`:
+The Git vocabulary lives here (the Facet vocabulary returns with the Facet release that ships its editable markers), alongside any local gitignored page such as Brand. The runnable Shapes example lives in `examples/vocabularies/shapes/index.tsx`. To include it, from `apps/playground`:
 
 ```bash
 PLAYGROUND_VOCABULARY_DIRS="$PWD/examples/vocabularies" pnpm run dev
