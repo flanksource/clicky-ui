@@ -125,7 +125,7 @@ export default defineConfig(({ mode }) => ({
     svgPreview({ root, workspaceRoot }),
     // Design mode's live preview needs react-dom registered with a DevTools hook.
     playgroundReactDevtoolsHook({ root }),
-    // Pre-transform: stamps facet node call sites with data-editable-source for Design mode.
+    // Pre-transform: stamps facet node call sites with data-source for Design mode.
     playgroundEditableSource({ pagesDir: resolve(root, "src/pages") }),
     playgroundMarkdown({ sourceRoot: resolve(root, "src") }),
     playgroundPageMeta({ sourceRoot: resolve(root, "src") }),

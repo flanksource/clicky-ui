@@ -302,9 +302,19 @@ describe("playground prompt runs", () => {
     captain.nextRunFailure = { status: 422, body: { error: refusal } };
     const response = await startRun();
     expect(response.status).toBe(422);
-    expect(await response.json()).toEqual({
+    const body = await response.json();
+    expect(body).toEqual({
       error: refusal,
+      context: {
+        Endpoint: expect.stringMatching(/\/api\/launch\/lint$/),
+        Method: "POST",
+        Status: "422",
+        "Content type": "application/json",
+      },
+      details: [{ label: "Response", value: JSON.stringify({ error: refusal }) }],
+      stacktrace: expect.stringContaining(`Error: ${refusal}`),
     });
+    expect(JSON.stringify(body)).not.toMatch(/Captain command|clicky prompt run|docs\/arch\.svg/);
   });
 
   it("answers an invalid request with what to fix", async () => {

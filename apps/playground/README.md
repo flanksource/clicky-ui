@@ -106,7 +106,7 @@ React Grab's **Style element** toolbar and context-menu action use the same sele
 How a change reaches the source:
 
 - Facet nodes carry stable markers: `data-editable-box` / `data-editable-container` (naming the style prop) and `data-editable-text` (naming the text prop), documented in facet's README under "Editable markers". Any component can emit them.
-- `plugins/editable-source-plugin.ts` stamps each facet node call site in `src/pages/**/*.tsx` with `data-editable-source="<file>:<line>:<col>#<ordinal>@<hash>"` at compile time, in dev and `playground:prod`.
+- `plugins/editable-source-plugin.ts` stamps each facet node call site in `src/pages/**/*.tsx` with `data-source="<file>:<line>:<col>#<ordinal>@<hash>"` at compile time, in dev and `playground:prod`.
 - `POST /__playground/visual-edits` with `{page, source, edit: {kind:"style", prop, value} | {kind:"text", prop, from, to}, choose?}` rewrites the source:
   - **Style edits** set a literal attribute at the call site.
   - **Text edits** change the literal attribute on the call site, or else the unique matching string literal or JSX text in the page's module graph. This covers text mapped from arrays and text passed as children of a wrapper.

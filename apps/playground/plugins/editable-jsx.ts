@@ -1,14 +1,14 @@
 import ts from "typescript";
 
 import { isSvgEditableTag, type SvgEditableTag } from "../src/visual-edit/svg-schemas";
-import { EDITABLE_SOURCE_ATTRIBUTE } from "./editable-source-marker";
+import { EDITABLE_SOURCE_ATTRIBUTE } from "@flanksource/page-runtime/markers";
 
 export {
   EDITABLE_SOURCE_ATTRIBUTE,
   formatEditableSource,
   parseEditableSource,
   type EditableSourceMarker,
-} from "./editable-source-marker";
+} from "@flanksource/page-runtime/markers";
 
 export const EDITABLE_COMPONENTS = ["BoxNode", "ContainerNode", "BrandBox", "BrandContainer", "Tile", "Zone"] as const;
 export type EditableComponent = (typeof EDITABLE_COMPONENTS)[number];

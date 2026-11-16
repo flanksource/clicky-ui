@@ -37,6 +37,20 @@ it("reads each layer's policy and the package-manager names that strict allows",
   expect(readDependencyDefaults({ root: resolve(root, "apps/playground"), workspaceRoot: root })).toEqual({ profile: { zod: "^3" }, workspace: { yaml: "^2" }, policies: { profile: "any", workspace: "ask" }, packageNames: ["keep", "react"] });
 });
 
+it.each(["workspace:*", "workspace:^", "catalog:", "link:../local", "file:../local"])("lists package.json names installed through the package-manager protocol %s", async spec => {
+  const { root } = await fixture();
+  writeFileSync(resolve(root, "package.json"), JSON.stringify({ dependencies: { "@acme/local": spec, keep: "^1" } }));
+  expect(readDependencyDefaults({ root, workspaceRoot: root }).packageNames).toEqual(["@acme/local", "keep"]);
+});
+
+it("still rejects an invalid package.json range and an invalid package name", async () => {
+  const { root } = await fixture();
+  writeFileSync(resolve(root, "package.json"), JSON.stringify({ dependencies: { keep: "not a range" } }));
+  expect(() => readDependencyDefaults({ root, workspaceRoot: root })).toThrow(/invalid semantic range/);
+  writeFileSync(resolve(root, "package.json"), JSON.stringify({ dependencies: { "Bad Name": "workspace:*" } }));
+  expect(() => readDependencyDefaults({ root, workspaceRoot: root })).toThrow(/expected package name and version range/);
+});
+
 it("rejects unknown scopes, malformed defaults, and symlink destinations", async () => {
   const { root, url } = await fixture();
   expect((await fetch(`${url}?scope=other`)).status).toBe(400);

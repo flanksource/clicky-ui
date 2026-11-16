@@ -108,18 +108,23 @@ it("mounts every API without a Vite server and preserves routing and validation"
 
 it("reads vocabulary metadata through plain middleware and declares runtime source URLs", async () => {
   const options = await fixture();
-  const vocabulary = join(options.dir, "shapes");
-  mkdirSync(vocabulary);
-  writeFileSync(join(vocabulary, "Preview.tsx"), "throw new Error('preview executed'); export default () => <div />;");
-  const item = { catalog: "shapes", type: "shape", id: "circle", label: "Circle", description: "Round node", references: ["shapes.md"] };
-  writeFileSync(join(vocabulary, "catalog.ts"), `export default [${JSON.stringify(item)}];`);
-  cleanups.push(registerVocabulariesMiddleware({ ...options, roots: [vocabulary], sourceRoots: [{ directory: options.dir, url: "/runtime/sources/" }] }));
+  const vocabularies = join(options.dir, "vocabs");
+  const vocabulary = join(vocabularies, "shapes");
+  mkdirSync(vocabulary, { recursive: true });
+  const item = { type: "shape", id: "circle", label: "Circle", description: "Round node", references: ["shapes.md"] };
+  const declare = (items: string) => writeFileSync(join(vocabulary, "index.tsx"), `throw new Error('page executed'); export const vocabulary = {alias:'shapes', instructions:'Read shapes as geometry.', items:${items}}; export default () => <div />;`);
+  declare(JSON.stringify([item]));
+  cleanups.push(registerVocabulariesMiddleware({ ...options, roots: [vocabularies], sourceRoots: [{ directory: options.dir, url: "/runtime/sources/" }] }));
   const response = await fetch(`${options.origin}/__playground/vocabularies`);
   const snapshot = await response.json();
-  expect({ status: response.status, items: snapshot.items, catalogs: snapshot.catalogs }).toEqual({ status: 200, items: [item], catalogs: [{ id: "shapes", preview: `/runtime/sources/shapes/Preview.tsx?vocabVersion=${snapshot.revision}` }] });
+  expect({ status: response.status, items: snapshot.items, catalogs: snapshot.catalogs }).toEqual({
+    status: 200,
+    items: [{ ...item, catalog: "shapes" }],
+    catalogs: [{ alias: "shapes", slug: "vocabularies/shapes", file: "vocabs/shapes/index.tsx", instructions: "Read shapes as geometry.", page: expect.stringMatching(/^\/runtime\/sources\/vocabs\/shapes\/index\.tsx\?vocabVersion=[a-f0-9]{20}$/), previewRevision: expect.stringMatching(/^[a-f0-9]{20}$/) }],
+  });
   expect((await fetch(`${options.origin}/__playground/vocabularies`, { method: "POST" })).status).toBe(405);
   expect((await fetch(`${options.origin}/unclaimed`)).status).toBe(404);
-  writeFileSync(join(vocabulary, "catalog.ts"), "export default fetch('/untrusted');");
+  declare("fetch('/untrusted')");
   const invalid = await fetch(`${options.origin}/__playground/comments/schema`);
   expect({ status: invalid.status, error: (await invalid.json()).error }).toEqual({ status: 500, error: expect.stringContaining("metadata") });
 });

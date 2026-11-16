@@ -51,7 +51,7 @@ import {
 import { readExternalPages } from "./external-pages-store";
 import { externalUrl } from "../src/bookmarklet/model";
 import { commentsClient, type CodeRangeSelector } from "./comments-client";
-import { parseEditableSource } from "./editable-source-marker";
+import { parseEditableSource } from "@flanksource/page-runtime/markers";
 import { LaunchHttpError } from "./launch-client";
 import { PageStoreError } from "./pages-store";
 import { RepositoryDocuments } from "./repository-documents";

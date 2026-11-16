@@ -5,14 +5,14 @@ import type { Plugin } from "vite";
 
 import { SVG_EDITABLE_TAGS } from "../src/visual-edit/svg-schemas";
 import { editableOpeningNodes, parseTsx } from "./editable-jsx";
-import { EDITABLE_SOURCE_ATTRIBUTE, formatEditableSource } from "./editable-source-marker";
+import { EDITABLE_SOURCE_ATTRIBUTE, formatEditableSource } from "@flanksource/page-runtime/markers";
 import { sourceHash } from "./source-hash";
 
 /** Cheap pre-check ahead of the parse: an intrinsic SVG shape opening anywhere in the file. */
 const INTRINSIC_SVG_OPENING = new RegExp(`<(?:${SVG_EDITABLE_TAGS.join("|")})(?=[\\s/>])`);
 
 /**
- * Appends `data-editable-source` to every facet box/container opening and every
+ * Appends `data-source` to every facet box/container opening and every
  * intrinsic SVG shape opening in `src/pages/**.tsx`, so rendered DOM can be
  * traced back to the call site that wrote it. Runs ahead of the JSX transform
  * and appends after all attributes so the marker wins over spreads.

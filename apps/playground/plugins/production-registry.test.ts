@@ -5,15 +5,17 @@ import { liveRegistry, pageFiles } from "./production-registry";
 
 describe("production playground registry", () => {
   it("keeps all four loader kinds live without bundling scratch pages", async () => {
-    const result = liveRegistry(
-      await readFile(resolve("src/registry.ts"), "utf8"),
-    );
+    const source = await readFile(resolve("src/registry.ts"), "utf8");
+    const result = liveRegistry(source);
+    const dynamicImports = (code: string) => code.split("import(/* @vite-ignore */").length - 1;
     expect(result).not.toMatch(/import\.meta\.glob\s*\(/);
     for (const kind of ["component", "guidance", "markdown", "meta"]) {
       expect(result).toContain(`__liveModules("${kind}")`);
     }
     expect(result).toContain("/__playground/browser-page?");
-    expect(result).not.toContain("import(/* @vite-ignore */");
+    // The registry's own runtime-loaded vocabulary pages keep their dynamic imports; the live loaders add none.
+    expect(dynamicImports(source)).toBeGreaterThan(0);
+    expect(dynamicImports(result)).toBe(dynamicImports(source));
   });
 
   it("rejects registry changes that would accidentally bundle pages", () => {

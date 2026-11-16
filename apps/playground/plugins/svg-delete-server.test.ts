@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { editableOpenings } from "./editable-jsx";
-import { formatEditableSource } from "./editable-source-marker";
+import { formatEditableSource } from "@flanksource/page-runtime/markers";
 import { sourceHash } from "./source-hash";
 import { applyVisualEdit, createVisualEditLineage } from "./visual-edits-server";
 
@@ -30,14 +30,16 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
-it("deletes the selected SVG call site and rejects old markers after ordinals shift", () => {
+it("deletes the selected SVG call site, remaps surviving markers through the shifted ordinals and rejects the deleted one", () => {
   const rect = marker(0);
   const circle = marker(1);
   expect(apply(rect, { kind: "attributes", values: { width: 24 } }).statusCode).toBe(200);
   expect(apply(rect, { kind: "delete" })).toMatchObject({ statusCode: 200, body: { status: "applied" } });
   expect(disk()).toBe('export default () => <svg><circle r={4}/><text>Keep</text></svg>;');
-  expect(apply(circle, { kind: "delete" })).toMatchObject({ statusCode: 409, body: { status: "stale" } });
-  expect(apply(circle, { kind: "attributes", values: { r: 12 } }).statusCode).toBe(409);
+  expect(apply(rect, { kind: "delete" })).toMatchObject({ statusCode: 409, body: { status: "stale" } });
+  expect(apply(rect, { kind: "attributes", values: { width: 30 } }).statusCode).toBe(409);
+  expect(apply(circle, { kind: "attributes", values: { r: 12 } }).statusCode).toBe(200);
+  expect(disk()).toBe('export default () => <svg><circle r={12}/><text>Keep</text></svg>;');
   expect(apply(marker(0), { kind: "delete" }).statusCode).toBe(200);
   expect(disk()).toBe('export default () => <svg><text>Keep</text></svg>;');
 });

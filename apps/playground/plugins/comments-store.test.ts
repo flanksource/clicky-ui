@@ -10,8 +10,10 @@ import {
   COMMENT_STATUSES,
   RESOLVED_STATUS,
   UNRESOLVED_STATUSES,
+  assertStyleEdit,
   patchComment,
   readAll,
+  withGavelAssignee,
   writeAll,
   type StoredComment,
 } from "./testing/comments-store";
@@ -75,6 +77,28 @@ describe("dashboard filter module", () => {
   });
 });
 
+describe("style edit validation", () => {
+  const styleEdit = {
+    marker: "flanksource/_d/call-path.tsx:42:7#3@0123456789ab",
+    tag: "rect",
+    changes: [{ attribute: "x", from: 1, to: 2 }],
+    refusal: { reason: "computed", file: "flanksource/_d/call-path.tsx", line: 44, column: 9, message: "x is computed there" },
+  };
+
+  // JSON has no encoding for these, so only an in-process caller can hand them over; the HTTP route sees `null`.
+  it.each([Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NaN])("rejects the non-finite value %s", (value) => {
+    expect(() => assertStyleEdit({ ...styleEdit, changes: [{ attribute: "x", from: 1, to: value }] })).toThrow(
+      /changes\[0\]\.to must be a finite number/,
+    );
+  });
+
+  it("accepts null as the target of a change that removes the attribute", () => {
+    const removal = { ...styleEdit, changes: [{ attribute: "x", from: 1, to: null }] };
+
+    expect(assertStyleEdit(removal)).toEqual(removal);
+  });
+});
+
 describe("assignment fields in the comment store", () => {
   let dir: string;
 
@@ -127,7 +151,7 @@ describe("assignment fields in the comment store", () => {
     await writeAll(dir, { sample: [held] });
 
     expect(await patchComment(dir, comment.id, { body: "Edited" })).toEqual({
-      ...held,
+      ...withGavelAssignee(held),
       body: "Edited",
       version: 3,
       updatedAt: expect.any(String),

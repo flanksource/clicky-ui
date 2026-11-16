@@ -130,17 +130,17 @@ export default () => (
     expect(source.slice(0, path!.insertAt).endsWith("<path")).toBe(true);
   });
 
-  it("throws when an SVG shape already authors data-editable-source", () => {
-    expect(() => editableOpenings('export default () => <rect data-editable-source="x" />;', FILE)).toThrow(
-      /page\.tsx:1:22 already authors data-editable-source/,
+  it("throws when an SVG shape already authors data-source", () => {
+    expect(() => editableOpenings('export default () => <rect data-source="x" />;', FILE)).toThrow(
+      /page\.tsx:1:22 already authors data-source/,
     );
   });
 
-  it("throws when an element already authors data-editable-source", () => {
+  it("throws when an element already authors data-source", () => {
     const source = `import { BoxNode } from "@flanksource/facet";
-const a = <BoxNode data-editable-source="hand" />;`;
+const a = <BoxNode data-source="hand" />;`;
 
-    expect(() => editableOpenings(source, FILE)).toThrow(/page\.tsx:2:11 already authors data-editable-source/);
+    expect(() => editableOpenings(source, FILE)).toThrow(/page\.tsx:2:11 already authors data-source/);
   });
 });
 
@@ -207,10 +207,10 @@ describe("playgroundEditableSource", () => {
     const out = transform(source, id)!;
 
     expect(out.code).toContain(
-      `<BoxNode title="A" data-editable-source="flanksource/_d/diagram.tsx:4:5#0@${hash}" />`,
+      `<BoxNode title="A" data-source="flanksource/_d/diagram.tsx:4:5#0@${hash}" />`,
     );
     expect(out.code).toContain(
-      `<Tile title="B" data-editable-source="flanksource/_d/diagram.tsx:5:5#1@${hash}">x</Tile>`,
+      `<Tile title="B" data-source="flanksource/_d/diagram.tsx:5:5#1@${hash}">x</Tile>`,
     );
   });
 
@@ -253,8 +253,8 @@ describe("playgroundEditableSource", () => {
       const hash = sourceHash(plain);
 
       expect(transform(plain, id)!.code).toBe(
-        'import { editableElement as __playgroundEditableElement } from "@flanksource/page-runtime/editing";export default () => <svg>{__playgroundEditableElement(<rect x={1} data-editable-source="flanksource/_d/diagram.tsx:1:27#0@' +
-          `${hash}" />)}{__playgroundEditableElement(<path d="M0 0" data-editable-source="flanksource/_d/diagram.tsx:1:41#1@${hash}"></path>)}</svg>;`,
+        'import { editableElement as __playgroundEditableElement } from "@flanksource/page-runtime/editing";export default () => <svg>{__playgroundEditableElement(<rect x={1} data-source="flanksource/_d/diagram.tsx:1:27#0@' +
+          `${hash}" />)}{__playgroundEditableElement(<path d="M0 0" data-source="flanksource/_d/diagram.tsx:1:41#1@${hash}"></path>)}</svg>;`,
       );
     });
 
@@ -262,10 +262,10 @@ describe("playgroundEditableSource", () => {
       const hash = sourceHash(svgSource);
       const out = transform(svgSource, id)!.code;
 
-      expect(out).toContain(`<rect x={1} data-editable-source="flanksource/_d/diagram.tsx:4:5#0@${hash}" />`);
-      expect(out).toContain(`<BoxNode title="A" data-editable-source="flanksource/_d/diagram.tsx:5:5#1@${hash}" />`);
-      expect(out).toContain(`<g data-editable-source="flanksource/_d/diagram.tsx:6:5#2@${hash}">`);
-      expect(out).toContain(`<text data-editable-source="flanksource/_d/diagram.tsx:6:8#3@${hash}">t</text>`);
+      expect(out).toContain(`<rect x={1} data-source="flanksource/_d/diagram.tsx:4:5#0@${hash}" />`);
+      expect(out).toContain(`<BoxNode title="A" data-source="flanksource/_d/diagram.tsx:5:5#1@${hash}" />`);
+      expect(out).toContain(`<g data-source="flanksource/_d/diagram.tsx:6:5#2@${hash}">`);
+      expect(out).toContain(`<text data-source="flanksource/_d/diagram.tsx:6:8#3@${hash}">t</text>`);
     });
 
     it("maps code after an injected SVG marker back to its original position", () => {
@@ -280,7 +280,7 @@ describe("playgroundEditableSource", () => {
     });
 
     it("still throws on a hand-written marker on an SVG shape", () => {
-      expect(() => transform('export default () => <rect data-editable-source="x" />;', id)).toThrow(/already authors data-editable-source/);
+      expect(() => transform('export default () => <rect data-source="x" />;', id)).toThrow(/already authors data-source/);
     });
   });
 });

@@ -5,6 +5,7 @@ import { afterEach, expect, it } from "vitest";
 import { readBrowserProject, readCompatibility } from "./production-project";
 import { productionConfig } from "./production-config";
 import { linkedSourceFile } from "./production-links";
+import { census as buildCensus, loadConfiguration, writeCatalog } from "../scripts/browser-mode-census";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
@@ -52,6 +53,7 @@ it("rechecks an incompatible page from its current source rather than stale cens
 it("maps every census-compatible workspace source without compiling pages on the server", async () => {
   const root = resolve(".");
   const config = await productionConfig(root);
+  writeCatalog({ root, result: await buildCensus(loadConfiguration(root)), check: false });
   const census = await readCompatibility(root);
   const compatible = census.pages.filter(page => page.compatible);
   expect(compatible.length).toBeGreaterThan(0);
@@ -64,19 +66,28 @@ it("maps every census-compatible workspace source without compiling pages on the
 });
 
 it("retains the icons ESM runtime paths alongside the aliased CommonJS conversion", async () => {
-  const root = resolve(".");
-  const config = await productionConfig(root);
-  const project = await readBrowserProject({ root, slug: "flanksource/workload-panel", sourceRoots: config.sourceRoots });
-  if (!project.compatible) throw new Error("Workload panel must remain census compatible");
-  const icons = project.links.find(link => link.build.library === "@flanksource/icons");
-  if (!icons) throw new Error("Icons alias was not linked");
-  expect(Object.keys(icons.build.modules)).toContain("mi/index.mjs");
-  const file = await linkedSourceFile({ root, sourceRoots: config.sourceRoots, id: icons.id, path: "mi/index.mjs" });
+  const workspace = resolve("../..");
+  await mkdir(resolve(workspace, ".tmp"), { recursive: true });
+  const root = await realpath(await mkdtemp(resolve(workspace, ".tmp/production-icons-")));
+  roots.push(root);
+  const icons = await realpath(resolve("node_modules/@flanksource/icons"));
+  const pages = resolve(root, "src/pages");
+  await mkdir(pages, { recursive: true }); await mkdir(resolve(root, "docs"));
+  await writeFile(resolve(root, "docs/browser-mode-compatibility.json"), JSON.stringify({ version: 1, configuration: { aliases: { "@flanksource/icons": icons }, libraryImports: [] }, pages: [] }));
+  await writeFile(resolve(pages, "workload.tsx"), 'import { Docker } from "@flanksource/icons/mi"; export default () => <Docker />;');
+  await writeFile(resolve(pages, "signoff.tsx"), 'import { AccessDenied } from "@flanksource/icons/icon"; export default () => <AccessDenied />;');
+  const sourceRoots = [{ directory: pages, url: "/source/pages/" }, { directory: icons, url: "/source/icons/" }];
+  const project = await readBrowserProject({ root, slug: "workload", sourceRoots });
+  if (!project.compatible) throw new Error(`Workload page must be compatible: ${JSON.stringify(project.issues)}`);
+  const link = project.links.find(link => link.build.library === "@flanksource/icons");
+  if (!link) throw new Error("Icons alias was not linked");
+  expect(Object.keys(link.build.modules)).toContain("mi/index.mjs");
+  const file = await linkedSourceFile({ root, sourceRoots, id: link.id, path: "mi/index.mjs" });
   expect(await readFile(file, "utf8")).toContain("export function Docker");
-  const trust = await readBrowserProject({ root, slug: "trust/access-review-signoff", sourceRoots: config.sourceRoots });
-  if (!trust.compatible) throw new Error("Trust signoff must remain census compatible");
-  const library = trust.links.find(link => link.build.library === "@flanksource/icons");
+  const signoff = await readBrowserProject({ root, slug: "signoff", sourceRoots });
+  if (!signoff.compatible) throw new Error(`Signoff page must be compatible: ${JSON.stringify(signoff.issues)}`);
+  const library = signoff.links.find(link => link.build.library === "@flanksource/icons");
   expect(library?.build.commonjs).toHaveProperty("source/icon/index.js");
   expect(library?.build.pageSources).toBeUndefined();
-  expect(trust.links.flatMap(link => link.build.pageSources ?? []).every(source => !source.root.includes("node_modules"))).toBe(true);
+  expect(signoff.links.flatMap(link => link.build.pageSources ?? []).every(source => !source.root.includes("node_modules"))).toBe(true);
 });

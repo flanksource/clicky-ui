@@ -5,7 +5,7 @@ import {
   type CommentVocabularyItem,
 } from "../../../packages/ui/src/comments/comment-vocabulary";
 import { externalUrl } from "../src/bookmarklet/model";
-import { parseEditableSource } from "./editable-source-marker";
+import { parseEditableSource } from "@flanksource/page-runtime/markers";
 
 import {
   COMMENT_ELEMENT_HTML_LIMIT,
@@ -106,7 +106,7 @@ export type StoredStyleChange = {
 /**
  * A visual edit Design mode could not write back (its value is computed in
  * code, spread, ...), asked of an agent instead. `marker` is the element's
- * `data-editable-source`; the refusal is the visual-edits server's 422.
+ * `data-source`; the refusal is the visual-edits server's 422.
  */
 export type StoredStyleEdit = {
   marker: string;
@@ -434,7 +434,7 @@ function assertPosition(value: unknown, what: string): number {
   return value as number;
 }
 
-/** Strict validation of a `styleEdit`; the marker must parse as a `data-editable-source`. */
+/** Strict validation of a `styleEdit`; the marker must parse as a `data-source`. */
 export function assertStyleEdit(input: unknown): StoredStyleEdit {
   const edit = assertExactKeys(input, ["marker", "tag", "changes", "refusal"], "styleEdit");
   const marker = assertStyleText(edit["marker"], "styleEdit.marker");

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { afterEach, expect, it } from "vitest";
 import { readStaticExports } from "./static-metadata";
@@ -36,12 +36,13 @@ it.each(["fetch('/secrets')", "missing", "(() => { while(true) {} })()"])("fails
   expect(() => readStaticExports(options)).toThrow(/metadata/);
 });
 
-it("reads the actual vocabulary catalogs and every page's metadata without Vite", () => {
-  const roots = [resolve("../.."), resolve("../../../gtm")];
-  for (const catalog of ["brand", "facet", "git"]) {
-    const values = readStaticExports({ file: resolve(`src/vocabularies/${catalog}/catalog.ts`), roots });
-    const arrays = Object.values(values).filter(Array.isArray);
-    expect({ catalog, arrays: arrays.length, populated: arrays.every(items => items.length > 0) }).toEqual({ catalog, arrays: 1, populated: true });
+it("reads the actual vocabulary declarations and every page's metadata without Vite", () => {
+  const roots = [resolve("../..")];
+  const vocabularies = readdirSync(resolve("src/vocabularies"), { withFileTypes: true }).filter(entry => entry.isDirectory() && !/^[_.]/.test(entry.name) && existsSync(resolve("src/vocabularies", entry.name, "index.tsx")));
+  expect(vocabularies.map(entry => entry.name)).toContain("git");
+  for (const { name } of vocabularies) {
+    const { vocabulary } = readStaticExports({ file: resolve("src/vocabularies", name, "index.tsx"), roots, names: ["vocabulary"] }) as { vocabulary: { alias: string; items: unknown[] } };
+    expect({ directory: name, alias: vocabulary.alias, populated: vocabulary.items.length > 0 }).toEqual({ directory: name, alias: name, populated: true });
   }
   for (const slug of Object.keys(pageUpdates(resolve("src/pages")))) {
     const file = pageFile(resolve("src/pages"), slug);

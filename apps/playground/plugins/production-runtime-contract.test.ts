@@ -5,7 +5,7 @@ import {
   validateHostMessage,
 } from "../../../packages/page-runtime/src/host/validation.ts";
 import { insertSourceMarkers } from "../../../packages/page-runtime/src/sw/markers.ts";
-import { parseEditableSource } from "./editable-source-marker";
+import { parseEditableSource } from "@flanksource/page-runtime/markers";
 
 describe("browser-only playground runtime contracts", () => {
   it("accepts Design mode through the validated page bridge", () => {

@@ -7,7 +7,7 @@ import type { Plugin } from "vite";
 import { isSvgEditableTag, validateSvgAttributes } from "../src/visual-edit/svg-schemas";
 import { editableOpenings, editableOpeningNodes, parseTsx } from "./editable-jsx";
 import ts from "typescript";
-import { parseEditableSource, type EditableSourceMarker } from "./editable-source-marker";
+import { parseEditableSource, type EditableSourceMarker } from "@flanksource/page-runtime/markers";
 import { diskModuleHost, pageModuleGraph } from "./page-module-graph";
 import { PAGE_SLUG_PATTERN, PageStoreError, pagePath, pagesFilePath, writePagesFile } from "./pages-store";
 import { sourceHash } from "./source-hash";

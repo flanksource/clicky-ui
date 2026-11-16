@@ -8,6 +8,7 @@ import { playgroundComments } from "./comments-server";
 import {
   configureTestComments,
   readAll,
+  withGavelAssignee,
   writeAll,
   type StoredAuthor,
   type StoredComment,
@@ -179,10 +180,10 @@ describe("playground comment lifecycle API", () => {
     it.each([
       ["a missing refusal", { ...styleEdit, refusal: undefined }, /styleEdit requires "refusal"/],
       ["an unexpected field", { ...styleEdit, extra: 1 }, /unexpected field "extra"/],
-      ["a malformed marker", { ...styleEdit, marker: "nope" }, /malformed data-editable-source/],
+      ["a malformed marker", { ...styleEdit, marker: "nope" }, /malformed data-source/],
       ["no changes", { ...styleEdit, changes: [] }, /changes must be a non-empty array/],
       ["a change without a target value", { ...styleEdit, changes: [{ attribute: "fill", from: "a" }] }, /changes\[0\] requires "to"/],
-      ["a non-finite value", { ...styleEdit, changes: [{ attribute: "x", from: 1, to: Number.POSITIVE_INFINITY }] }, /finite number|non-empty string/],
+      ["a boolean value", { ...styleEdit, changes: [{ attribute: "x", from: 1, to: true }] }, /changes\[0\]\.to must be a non-empty string/],
       ["an object value", { ...styleEdit, changes: [{ attribute: "x", from: { a: 1 }, to: 1 }] }, /changes\[0\]\.from must be a non-empty string/],
       ["an attribute that is not a name", { ...styleEdit, changes: [{ attribute: 'x" onload="', from: 1, to: 2 }] }, /is not an attribute name/],
       ["a fractional refusal line", { ...styleEdit, refusal: { ...styleEdit.refusal, line: 1.5 } }, /refusal\.line must be a positive integer/],
@@ -363,7 +364,7 @@ describe("playground comment lifecycle API", () => {
       const created = (await response.json()) as StoredComment;
       expect({ status: created.status, assignee: created.assignee, acknowledgedAt: created.acknowledgedAt }).toEqual({
         status: "in_progress",
-        assignee: agent,
+        assignee: { ...agent, id: "agent:Agent" },
         acknowledgedAt: undefined,
       });
       expect(await stored()).toEqual(created);
@@ -408,8 +409,8 @@ describe("playground comment lifecycle API", () => {
       const response = await act("acknowledge", { author: agent });
 
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual(heldBy(agent));
-      expect(await stored()).toEqual(heldBy(agent));
+      expect(await response.json()).toEqual(withGavelAssignee(heldBy(agent)));
+      expect(await stored()).toEqual(withGavelAssignee(heldBy(agent)));
     });
 
     it("records the acknowledgement when the assignee picks up an assigned root", async () => {
@@ -451,7 +452,7 @@ describe("playground comment lifecycle API", () => {
         const response = await act("acknowledge", { author: actor });
 
         expect(response.status).toBe(409);
-        expect(await stored()).toEqual(existing);
+        expect(await stored()).toEqual(withGavelAssignee(existing));
       },
     );
 

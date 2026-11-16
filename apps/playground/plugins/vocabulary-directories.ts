@@ -99,10 +99,11 @@ export async function vocabularyPages(options: Options): Promise<VocabularyPage[
   return pages;
 }
 
-function displayFile(page: VocabularyPage): string {
+/** Names a page by where it lives: under the app's `src` directory, an `examples` checkout, or its root directory. Never by scanning the absolute path for a `src` segment, which a checkout under GOPATH contains. */
+function displayFile(page: VocabularyPage, srcDirectory: string | undefined): string {
   const parts = page.root.split("/");
-  const src = parts.lastIndexOf("src");
-  const prefix = src >= 0 ? parts.slice(src).join("/") : parts.includes("examples") ? parts.slice(Math.max(0, parts.lastIndexOf("examples") - 1)).join("/") : basename(page.root);
+  const inSource = srcDirectory && basename(srcDirectory) === "src" && (page.root === srcDirectory || page.root.startsWith(srcDirectory + "/"));
+  const prefix = inSource ? relative(dirname(srcDirectory), page.root) : parts.includes("examples") ? parts.slice(Math.max(0, parts.lastIndexOf("examples") - 1)).join("/") : basename(page.root);
   return `${prefix}/${relative(page.root, page.file)}`;
 }
 
@@ -131,6 +132,7 @@ export function directoryVocabulary(options: Options) {
   let pending: Promise<VocabularySnapshot> | undefined;
   const load = async (): Promise<VocabularySnapshot> => {
     const pages = await vocabularyPages(options);
+    const srcDirectory = options.pagesDir ? dirname(await realpath(options.pagesDir)) : undefined;
     files = new Map(pages.map(page => [page.slug, page.file]));
     const versions = await installedVersions();
     const catalogs: VocabularySnapshot["catalogs"] = [];
@@ -140,7 +142,7 @@ export function directoryVocabulary(options: Options) {
       const hash = createHash("sha256").update(JSON.stringify(versions));
       for (const file of [...files].sort()) hash.update(file).update(await readFile(file));
       const previewRevision = hash.digest("hex").slice(0, 20);
-      catalogs.push({ alias: page.alias, slug: page.slug, file: displayFile(page), page: `${sourceUrl(page.file, options.sourceRoots)}?vocabVersion=${previewRevision}`, instructions: page.instructions, previewRevision });
+      catalogs.push({ alias: page.alias, slug: page.slug, file: displayFile(page, srcDirectory), page: `${sourceUrl(page.file, options.sourceRoots)}?vocabVersion=${previewRevision}`, instructions: page.instructions, previewRevision });
     }
     const items = pages.flatMap(page => page.items);
     const revision = createHash("sha256").update(JSON.stringify({ catalogs, items })).digest("hex").slice(0, 20);

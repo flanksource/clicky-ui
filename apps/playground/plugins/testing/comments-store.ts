@@ -50,6 +50,15 @@ export function configureTestComments(dir: string) {
   });
   return commentsClient(dir);
 }
+/**
+ * Gavel owns a thread's assignee and answers it as an actor with an id
+ * (`<kind>:<name>` for a playground author), which the projection keeps.
+ */
+export function withGavelAssignee<T extends store.StoredComment>(comment: T): T {
+  return comment.assignee
+    ? { ...comment, assignee: { ...comment.assignee, id: commentActor(comment.assignee).id } }
+    : comment;
+}
 const client = configureTestComments;
 export async function writeAll(dir: string, data: store.CommentsFile) {
   const c = await client(dir);

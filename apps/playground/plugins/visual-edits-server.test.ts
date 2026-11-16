@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { editableOpenings } from "./editable-jsx";
-import { formatEditableSource } from "./editable-source-marker";
+import { formatEditableSource } from "@flanksource/page-runtime/markers";
 import { applyVisualEdit, createVisualEditLineage } from "./visual-edits-server";
 import { sourceHash } from "./source-hash";
 

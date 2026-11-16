@@ -9,10 +9,20 @@ import { parseProfileLayer, type DependencyDocument } from "../src/browser-mode/
 type Options = { root: string; workspaceRoot?: string };
 type Scope = DependencyDocument["scope"];
 
+/** Package-manager specs that name a local or catalog package rather than a registry range; only the package name matters here. */
+const localSpec = /^(?:workspace|catalog|link|file):/;
+
 /** Names the workspace installs through its package manager; under `strict` and `ask` they are always allowed. */
 function packageNames(source: string): string[] {
   const document = JSON.parse(source || "{}") as Record<string, unknown>;
-  return [...new Set(["dependencies", "peerDependencies"].flatMap(field => document[field] === undefined ? [] : Object.keys(validateDependencies(document[field], `package.json.${field}`))))].sort();
+  const names = (field: string) => {
+    const value = document[field];
+    if (value === undefined) return [];
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`package.json.${field}: expected an object`);
+    const registry = Object.fromEntries(Object.entries(value).map(([name, spec]) => [name, typeof spec === "string" && localSpec.test(spec) ? "*" : spec]));
+    return Object.keys(validateDependencies(registry, `package.json.${field}`));
+  };
+  return [...new Set(["dependencies", "peerDependencies"].flatMap(names))].sort();
 }
 
 export function readDependencyDocument(options: Options & { scope: Scope }): DependencyDocument {

@@ -13,7 +13,7 @@ export type VisualEdit =
 export type VisualEditRequest = {
   /** Page slug of the page being viewed. */
   page: string;
-  /** The `data-editable-source` marker of the call site. */
+  /** The `data-source` marker of the call site. */
   source: string;
   edit: VisualEdit;
   /** A candidate id from a previous `ambiguous` response. */

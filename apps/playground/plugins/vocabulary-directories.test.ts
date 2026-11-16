@@ -65,6 +65,19 @@ it("keeps normal page slugs and uses aliases in vocabulary roots, excluding priv
   expect(snapshot.catalogs.map(({ alias, slug }) => ({ alias, slug }))).toEqual([{ alias: "symbols", slug: "vocabularies/symbols" }, { alias: "shapes", slug: "guide" }]);
 });
 
+it("names a vocabulary page by its own root even when the checkout path contains a src segment", async () => {
+  mkdirSync(".tmp", { recursive: true });
+  const base = realpathSync(mkdtempSync(resolve(".tmp/vocabulary-display-"))); directories.push(base);
+  const checkout = join(base, "src/checkout"); const vocabs = join(checkout, "vocabs"); const pages = join(checkout, "app/src/pages");
+  for (const dir of [vocabs, pages, join(checkout, "app/src/vocabularies")]) mkdirSync(dir, { recursive: true });
+  page(join(vocabs, "shapes.tsx"));
+  page(join(checkout, "app/src/vocabularies/symbols.tsx"), { alias: "symbols", instructions: "Read symbols", items: [item] });
+  const sourceRoot = [{ directory: checkout, url: "/checkout/" }];
+  const files = async (options: Parameters<typeof directoryVocabulary>[0]) => Object.fromEntries((await directoryVocabulary(options).refresh()).catalogs.map(({ alias, file }) => [alias, file]));
+  expect(await files({ roots: [vocabs], sourceRoots: sourceRoot })).toEqual({ shapes: "vocabs/shapes.tsx" });
+  expect(await files({ roots: [join(checkout, "app/src/vocabularies")], pagesDir: pages, sourceRoots: sourceRoot })).toEqual({ symbols: "src/vocabularies/symbols.tsx" });
+});
+
 it("versions only reachable imports, including raw assets and imported metadata glob matches", async () => {
   const options = fixture();
   const file = join(options.roots[0]!, "shapes/index.tsx");
