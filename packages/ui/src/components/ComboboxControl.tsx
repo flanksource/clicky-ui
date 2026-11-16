@@ -14,7 +14,8 @@ import {
 import type { ComboboxOption, ComboboxTriStateMode } from "./combobox-types";
 import { comboboxLabelPadding } from "../lib/combobox-values";
 import { ComboboxActions } from "./ComboboxActions";
-import { ComboboxMoreTags, ComboboxTags, useSingleRowTagCount } from "./ComboboxTags";
+import { ComboboxMoreTags, ComboboxTags } from "./ComboboxTags";
+import { useSingleRowTagCount } from "./useSingleRowTagCount";
 
 export function ComboboxControl({
   anchorRef,
