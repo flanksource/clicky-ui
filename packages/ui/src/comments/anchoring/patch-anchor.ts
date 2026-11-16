@@ -6,6 +6,11 @@
  * byte-for-byte compatible with them, so a client and the server place a
  * thread on the same lines. There is deliberately no fuzzy fallback: a hunk
  * that no longer matches exactly is "outdated", never silently moved.
+ *
+ * A patch made from rendered prose has a selection `quote` too, but it is
+ * stored beside the patch on the selector (and on the create input), never in
+ * the `r:` JSON: the patch is authoritative and the quote only sharpens the
+ * highlight while it still lies in the matched lines.
  */
 import type { PatchAnchor } from "../annotation-types";
 

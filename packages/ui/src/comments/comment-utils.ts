@@ -310,6 +310,17 @@ export type ThreadListHandlers = {
   ) => void | Promise<void>;
   onChecklistToggle?: (id: string, index: number) => void;
   onDelete?: (id: string) => void;
+  onEdit?: (id: string, body: string) => void | Promise<void>;
+  onEditReply?: (
+    rootId: string,
+    messageId: string,
+    body: string,
+  ) => void | Promise<void>;
+  onDeleteReply?: (
+    rootId: string,
+    messageId: string,
+  ) => void | Promise<void>;
+  onCreateTodo?: (thread: readonly Comment[]) => void | Promise<void>;
   onReply?: (parent: Comment, body: string) => void | Promise<void>;
 };
 
@@ -330,6 +341,10 @@ export function buildThreadListHandlers(
   if (cb.onAcknowledge) handlers.onAcknowledge = cb.onAcknowledge;
   if (cb.onAssign) handlers.onAssign = cb.onAssign;
   if (cb.onDelete) handlers.onDelete = cb.onDelete;
+  if (cb.onEdit) handlers.onEdit = cb.onEdit;
+  if (cb.onEditReply) handlers.onEditReply = cb.onEditReply;
+  if (cb.onDeleteReply) handlers.onDeleteReply = cb.onDeleteReply;
+  if (cb.onCreateTodo) handlers.onCreateTodo = cb.onCreateTodo;
   if (cb.onChecklistToggle) {
     const toggle = cb.onChecklistToggle;
     handlers.onChecklistToggle = (id, index) => {

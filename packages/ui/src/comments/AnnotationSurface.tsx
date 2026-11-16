@@ -17,8 +17,12 @@ import { elementLabel, useElementPicker } from "./element-picker";
 import {
   captureLocators,
   commentAnchor,
+  elementAnchor,
   resolveComment,
 } from "./anchoring/dom-anchor";
+import { driftNote, elementDrift, webTextDrift, type AnchorDrift } from "./anchoring/drift";
+import { captureWebText, resolveWebText } from "./anchoring/web-text-anchor";
+import type { PickedAnchor } from "./DriftList";
 import {
   captureScreenshot,
   releaseScreenshotCapture,
@@ -27,7 +31,13 @@ import {
 import type {
   AnnotationCapture,
   CommentScreenshotCapture,
+  TextQuote,
 } from "./annotation-types";
+
+const MAX_QUOTE_LABEL = 80;
+
+/** What the draft card calls a text selection: the words, quoted. */
+const quoteLabel = ({ exact }: TextQuote) => `“${exact.length > MAX_QUOTE_LABEL ? `${exact.slice(0, MAX_QUOTE_LABEL)}…` : exact}”`;
 
 const config = { statuses: DEFAULT_COMMENT_STATUSES };
 export type AnnotationSurfaceProps = Omit<CommentCallbacks, "onCreate"> & {
@@ -41,6 +51,12 @@ export type AnnotationSurfaceProps = Omit<CommentCallbacks, "onCreate"> & {
   onSelectionHandled?: () => void;
   onSelectCapture?: (id: string, capture: AnnotationCapture) => void;
   onPrepareCapture?: (capture: AnnotationCapture) => Promise<AnnotationCapture>;
+  /**
+   * Offers Re-anchor on an element or text thread whose element is gone or
+   * moved. It starts an element pick, then calls this with the thread's id and
+   * the new `e:` anchor (see `elementAnchor`); the host stores it (gavel `retarget`).
+   */
+  onRetarget?: (id: Comment["id"], anchor: string, quote?: TextQuote) => void | Promise<void>;
   onCreate: (
     input: CommentCreateInput,
     capture: AnnotationCapture,
@@ -59,6 +75,7 @@ export function AnnotationSurface({
   onSelectionHandled,
   onSelectCapture,
   onPrepareCapture,
+  onRetarget,
   onCreate,
   ...callbacks
 }: AnnotationSurfaceProps) {
@@ -89,10 +106,20 @@ export function AnnotationSurface({
       sessionStorage.setItem(storageKey, JSON.stringify(draft.capture));
     else sessionStorage.removeItem(storageKey);
   }, [draft, storageKey]);
+  /** A Re-anchor waiting for the next element pick. */
+  const retargeting = useRef<{ resolve: (picked: PickedAnchor | null) => void; reject: (error: Error) => void } | null>(null);
   const picker = useElementPicker({
     root,
     onPick: (element) => {
       if (!root.current) return;
+      const pending = retargeting.current;
+      if (pending) {
+        retargeting.current = null;
+        const locators = captureLocators(element, root.current);
+        if (locators.length === 0) pending.reject(new Error("the picked element cannot be told apart from the rest of the page"));
+        else pending.resolve({ anchor: elementAnchor(locators) });
+        return;
+      }
       const anchor = commentAnchor(element, root.current);
       if (!anchor) throw new Error("Selected element cannot be anchored");
       const source = element
@@ -113,7 +140,39 @@ export function AnnotationSurface({
       );
     },
   });
+  /** Words selected in the page, with no source to patch, become a `dom` capture: the containing element's locators plus a sibling quote. */
+  const captureSelection = () => {
+    const content = root.current;
+    const selection = window.getSelection();
+    if (!content || picker.picking || !selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+    const words = captureWebText(selection.getRangeAt(0), content);
+    if (!words) return;
+    selection.removeAllRanges();
+    void prepare({
+      kind: "dom",
+      version: 1,
+      view,
+      anchor: elementAnchor(words.locators),
+      locators: words.locators,
+      quote: words.quote,
+      label: quoteLabel(words.quote),
+    });
+    setOpen(true);
+  };
+  const pickAnchor = () =>
+    new Promise<PickedAnchor | null>((resolve, reject) => {
+      retargeting.current?.resolve(null);
+      retargeting.current = { resolve, reject };
+      picker.setPicking(true);
+    });
+  // The picker ends on its own Escape; the Re-anchor waiting on it ends with it.
+  useEffect(() => {
+    if (picker.picking) return;
+    retargeting.current?.resolve(null);
+    retargeting.current = null;
+  }, [picker.picking]);
   const [pins, setPins] = useState<{ id: string; element: Element }[]>([]);
+  const [drift, setDrift] = useState<Record<string, AnchorDrift>>({});
   useEffect(() => {
     if (selection) {
       void prepare(selection);
@@ -125,24 +184,42 @@ export function AnnotationSurface({
   useEffect(() => {
     const content = root.current;
     if (!content) return;
-    const update = () =>
+    const update = () => {
+      const next: Record<string, AnchorDrift> = {};
       setPins(
         comments.flatMap((comment) => {
           const capture = captures[comment.id];
+          if (capture?.kind === "code-range") {
+            // Where the patch sits now is the host's to say; this surface cannot pick a new source range.
+            const state = capture.location?.state;
+            if (state === "outdated" || state === "ambiguous") next[comment.id] = { state, note: driftNote(state, "lines"), reanchor: false };
+            return [];
+          }
           if (
             !capture?.anchor ||
             capture.view !== view ||
             capture.kind !== "dom"
           )
             return [];
+          if (capture.quote) {
+            // Words, not an element: the locators find the element, then the quote is looked for inside it only.
+            const words = resolveWebText(content, { quote: capture.quote, locators: capture.locators ?? [] });
+            const textState = webTextDrift(words);
+            if (textState) next[comment.id] = { state: textState, note: driftNote(textState, "text") };
+            return words.state === "orphaned" ? [] : [{ id: comment.id, element: words.element }];
+          }
           const match = resolveComment(
             content,
             capture.anchor,
             capture.locators ?? [],
           );
+          const state = elementDrift(match);
+          if (state) next[comment.id] = { state, note: driftNote(state, "element") };
           return match ? [{ id: comment.id, element: match.element }] : [];
         }),
       );
+      setDrift((current) => (JSON.stringify(current) === JSON.stringify(next) ? current : next));
+    };
     update();
     const observer = new MutationObserver(update);
     observer.observe(content, { childList: true, subtree: true });
@@ -253,6 +330,7 @@ export function AnnotationSurface({
             ref={root}
             className="relative min-w-0 flex-1"
             {...picker.rootProps}
+            onMouseUp={captureSelection}
           >
             {children}
             {picker.outline}
@@ -280,11 +358,13 @@ export function AnnotationSurface({
               {draft && !draft.element && (
                 <CommentDraftCard
                   label={
-                    draft.capture.kind === "code-range"
-                      ? "Source selection"
-                      : draft.capture.kind === "document"
-                        ? "File comment"
-                        : "Saved element selection"
+                    draft.capture.quote
+                      ? quoteLabel(draft.capture.quote)
+                      : draft.capture.kind === "code-range"
+                        ? "Source selection"
+                        : draft.capture.kind === "document"
+                          ? "File comment"
+                          : "Saved element selection"
                   }
                   anchor={draft.capture.anchor ?? "source-selection"}
                   config={config}
@@ -293,6 +373,8 @@ export function AnnotationSurface({
                 />
               )}
               <CommentSidePanel
+                drift={drift}
+                {...(onRetarget ? { onRetarget, pickAnchor } : {})}
                 formatAnchorLabel={(id) => {
                   const capture = captures[id];
                   return (

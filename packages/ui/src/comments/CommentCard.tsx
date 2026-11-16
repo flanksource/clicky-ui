@@ -14,11 +14,14 @@ import {
   UiCopy,
   UiDotsVertical,
   UiFullscreen,
+  UiListChecks,
   UiLock,
+  UiPencilSimpleLine,
   UiRestart,
   UiTrash,
 } from "../icons";
 import { CommentAuthorAvatar, CommentAuthorName } from "./CommentAuthor";
+import { CommentBodyEditor } from "./CommentBodyEditor";
 import {
   ChecklistChips,
   FacetBadges,
@@ -68,7 +71,11 @@ export type CommentCardProps = {
    */
   extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
   /** Delete this comment. */
-  onDelete?: () => void;
+  onDelete?: () => void | Promise<void>;
+  /** Replace this comment's body. Presence adds an Edit action that opens an in-place editor. */
+  onEdit?: (body: string) => void | Promise<void>;
+  /** Turn this root's thread into a todo. Presence adds a "Create todo" action to roots. */
+  onCreateTodo?: () => void | Promise<void>;
   /** Copy this comment's whole thread in the caller's canonical format. */
   onCopy?: () => void | Promise<void>;
   /** Begin a reply to this comment. */
@@ -86,17 +93,25 @@ export type CommentCardProps = {
 function actionMenuItems(
   isReply: boolean,
   opts: {
+    onEdit?: () => void;
     onDelete?: () => void;
     statusActions?: DropdownMenuItem[];
+    onCreateTodo?: () => void;
     onCopy?: () => void;
     onMaximize?: () => void;
   },
 ): DropdownMenuItem[] {
   const items: DropdownMenuItem[] = [];
+  if (opts.onEdit) {
+    items.push({ label: "Edit", icon: UiPencilSimpleLine, onSelect: opts.onEdit });
+  }
   if (opts.onDelete) {
     items.push({ label: "Delete", icon: UiTrash, onSelect: opts.onDelete });
   }
   if (!isReply) items.push(...(opts.statusActions ?? []));
+  if (!isReply && opts.onCreateTodo) {
+    items.push({ label: "Create todo", icon: UiListChecks, onSelect: opts.onCreateTodo });
+  }
   if (opts.onCopy) {
     items.push({ label: "Copy", icon: UiCopy, onSelect: opts.onCopy });
   }
@@ -145,14 +160,37 @@ function rootAssignmentItems(
   });
 }
 
-function CommentBody(props: CommentCardProps) {
+/** The card's own Edit, Delete and Create todo actions; a failure is reported through `run`. */
+function ownActionHandlers(
+  props: CommentCardProps,
+  run: CommentActionRunner,
+  startEditing: () => void,
+) {
+  const { onEdit, onDelete, onCreateTodo } = props;
+  return {
+    ...(onEdit ? { onEdit: startEditing } : {}),
+    ...(onDelete ? { onDelete: () => run("delete", onDelete) } : {}),
+    ...(onCreateTodo
+      ? { onCreateTodo: () => run("create todo from", onCreateTodo) }
+      : {}),
+  };
+}
+
+type CommentBodyProps = CommentCardProps & {
+  editing: boolean;
+  onEditingChange: (editing: boolean) => void;
+};
+
+function CommentBody(props: CommentBodyProps) {
   const {
     comment,
     config,
     renderBody,
     onUpdateStatus,
     onClose,
-    onDelete,
+    onEdit,
+    editing,
+    onEditingChange,
     onCopy,
     onReply,
     onChecklistToggle,
@@ -190,7 +228,9 @@ function CommentBody(props: CommentCardProps) {
     }
   };
   const menuItems = actionMenuItems(isReply, {
-    ...(onDelete ? { onDelete } : {}),
+    ...ownActionHandlers(props, reportingRunner(setActionError), () =>
+      onEditingChange(true),
+    ),
     statusActions: [
       ...rootAssignmentItems(props, reportingRunner(setActionError)),
       ...(stage === "active" && onUpdateStatus && resolved
@@ -299,7 +339,15 @@ function CommentBody(props: CommentCardProps) {
           )}
         </div>
       </div>
-      {comment.body.trim() && (
+      {editing && onEdit && (
+        <CommentBodyEditor
+          comment={comment}
+          config={config}
+          onSave={onEdit}
+          onDone={() => onEditingChange(false)}
+        />
+      )}
+      {!editing && comment.body.trim() && (
         <div className="text-[13px] leading-5 text-foreground">
           {props.previewLines !== undefined ? <CommentPreview id={comment.id} lines={props.previewLines}>
             {renderBody ? renderBody(comment.body) : <CommentMarkdown text={comment.body} {...(comment.vocabularyRefs ? { vocabularyRefs: comment.vocabularyRefs } : {})} {...(config.vocabulary ? { vocabulary: config.vocabulary } : {})} />}
@@ -353,10 +401,11 @@ function SavedCommentCard(props: CommentCardProps) {
   const { comment, config, compact, defaultExpanded } = props;
   const [expanded, setExpanded] = useCommentState(`expanded:${comment.id}`, defaultExpanded ?? false);
   const [collapsedActionError, setCollapsedActionError] = useState<unknown>(null);
+  const [editing, setEditing] = useState(false);
   const proposalCallbacks = useContext(CommentProposalContext);
   const isReply = Boolean(comment.parentId);
-  const body = <CommentBody {...props} />;
-  const collapsed = !expanded && !props.fullBody && props.previewLines === undefined;
+  const body = <CommentBody {...props} editing={editing} onEditingChange={setEditing} />;
+  const collapsed = !expanded && !props.fullBody && props.previewLines === undefined && !editing;
   const proposal = comment.proposal ? (
     <ProposalCard
       commentId={comment.id}
@@ -458,7 +507,11 @@ function SavedCommentCard(props: CommentCardProps) {
                 </span>
               }
               items={actionMenuItems(isReply, {
-                ...(props.onDelete ? { onDelete: props.onDelete } : {}),
+                ...ownActionHandlers(
+                  props,
+                  reportingRunner(setCollapsedActionError),
+                  () => setEditing(true),
+                ),
                 statusActions: [
                   ...rootAssignmentItems(
                     props,

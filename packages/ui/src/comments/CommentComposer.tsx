@@ -8,6 +8,7 @@ import { SplitButton } from "../components/SplitButton";
 import { UiPaperPlaneRightFilled, UiClose } from "../icons";
 import type { BadgeTone } from "../data/Badge";
 import { CommentEditor } from "./CommentEditor";
+import { DefaultDeliveryLine } from "./DefaultDeliveryLine";
 import { toneToBadgeTone } from "./comment-utils";
 import type {
   CommentAnchor,
@@ -117,13 +118,6 @@ function FacetPicker({
   );
 }
 
-/** The first target named as a standalone `@name` in `body`. */
-function targetNamedIn(body: string, targets: readonly CommentMentionable[]): CommentMentionable | undefined {
-  return targets.find((target) =>
-    new RegExp(`(?:^|\\s)@${target.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w./-])`, "i").test(body),
-  );
-}
-
 /** The empty picker's chip: what happens to a comment sent without a target. */
 function untargetedChip(defaultDelivery: CommentDefaultDelivery | null | undefined) {
   if (defaultDelivery === undefined) {
@@ -194,10 +188,13 @@ function TargetPicker({
 }
 
 /**
- * The new-comment composer: a mention-aware textarea, a target picker for
- * `config.targets` (also chosen by typing `@name`), one picker per configured
- * facet, and a send button. Starts as a pill when `collapsible`. Owns only its
- * own draft state; posting is delegated to `onCreate`.
+ * The new-comment composer: a mention-aware editor that completes
+ * `config.mentionables`, a target picker for `config.targets` (an explicit pick,
+ * sent as `CommentCreateInput.target`), the default-delivery line, one picker
+ * per configured facet, and a send button. An `@name` typed into the body is
+ * sent as plain text for the host to resolve. Starts as a pill when
+ * `collapsible`. Owns only its own draft state; posting is delegated to
+ * `onCreate`.
  */
 export function CommentComposer({
   config,
@@ -216,7 +213,7 @@ export function CommentComposer({
   const [facets, setFacets] = useCommentState<Record<string, string>>(`${draftKey}:facets`, {});
   const [pickedTargetId, setPickedTargetId] = useCommentState<string | undefined>(`${draftKey}:target`, undefined);
   const targets = config.targets ?? [];
-  const target = targets.find((option) => option.id === pickedTargetId) ?? targetNamedIn(body, targets);
+  const target = targets.find((option) => option.id === pickedTargetId);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const submittingRef = useRef(false);
@@ -322,6 +319,7 @@ export function CommentComposer({
         className="min-h-[48px] pr-10 [@media(pointer:coarse)]:pr-12"
       />
       {error !== null && <ActionError error={error} context={[["Operation", "Post comment"], ["Anchor", anchor ?? "Whole page"]]} />}
+      <DefaultDeliveryLine delivery={config.defaultDelivery} className="mt-1 text-[11px] leading-4 text-muted-foreground" />
       {collapsible && (
         <button
           type="button"

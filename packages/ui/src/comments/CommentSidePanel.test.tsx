@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { setCommentDraft } from "../test/comment-editor";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -471,6 +471,85 @@ describe("CommentSidePanel anchor navigation", () => {
         screen.getAllByRole("menuitem").map((item) => item.textContent),
       ).toEqual(["Acknowledge", "Assign…", "Maximise"]);
     });
+  });
+
+  describe("drift list", () => {
+    const thread = (id: string, anchor: string): Comment => ({ id, body: `Thread ${id}`, createdAt: "2026-01-01T00:00:00.000Z", anchor, author: { name: "Ada" } });
+    const drifted = [thread("p-old", "r:outdated"), thread("p-dup", "r:ambiguous"), thread("e-gone", "e:orphaned"), thread("e-moved", "e:moved"), thread("fine", "r:matched")];
+    const drift = {
+      "r:outdated": { state: "outdated" as const, note: "The lines this was written on have changed or been removed." },
+      "r:ambiguous": { state: "ambiguous" as const },
+      "e:orphaned": { state: "orphaned" as const },
+      "e:moved": { state: "moved" as const },
+    };
+    const anchorLabels = { "r:outdated": "Lines 7–8", "r:ambiguous": "Line 10", "e:orphaned": "Pay button", "e:moved": "Total row", "r:matched": "Line 1" };
+
+    function Opener() {
+      const ctx = useCommentContext();
+      return (
+        <button type="button" onClick={ctx.openCommentList}>
+          Open comments
+        </button>
+      );
+    }
+
+    function panel(props: Partial<React.ComponentProps<typeof CommentSidePanel>> = {}) {
+      render(
+        <CommentProvider comments={drifted} config={config} resolveAnchor={strictAnchorResolver}>
+          <Opener />
+          <CommentSidePanel anchorLabels={anchorLabels} {...props} />
+        </CommentProvider>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Open comments" }));
+    }
+
+    it("lists patch outdated and ambiguous threads with orphaned and moved element threads in one list, and keeps every thread in the feed", () => {
+      panel({ drift });
+      const list = within(screen.getByRole("region", { name: "Comments needing re-anchoring" }));
+      expect({
+        lists: document.querySelectorAll("[data-drift-list]").length,
+        rows: [...document.querySelectorAll<HTMLElement>("[data-drift-item]")].map((row) => [row.dataset.driftItem, within(row).getByText(/^(Outdated|Ambiguous|Orphaned|Moved)$/).textContent]),
+        labels: ["Lines 7–8", "Line 10", "Pay button", "Total row"].map((label) => list.getByText(label).textContent),
+        feed: screen.getAllByTestId("comment-feed-item").length,
+      }).toEqual({
+        lists: 1,
+        rows: [
+          ["r:outdated", "Outdated"],
+          ["r:ambiguous", "Ambiguous"],
+          ["e:orphaned", "Orphaned"],
+          ["e:moved", "Moved"],
+        ],
+        labels: ["Lines 7–8", "Line 10", "Pay button", "Total row"],
+        feed: 5,
+      });
+    });
+
+    it("shows no drift list when no anchor has drifted", () => {
+      panel();
+      expect(document.querySelector("[data-drift-list]")).toBeNull();
+    });
+
+    it("offers Re-anchor only when the host can retarget, and then picks before calling onRetarget(id, anchor)", async () => {
+      panel({ drift });
+      const without = screen.queryAllByRole("button", { name: "Re-anchor" }).length;
+      cleanup();
+      const pickAnchor = vi.fn(async () => ({ anchor: "e:new" }));
+      const onRetarget = vi.fn();
+      panel({ drift, pickAnchor, onRetarget });
+      const row = document.querySelector<HTMLElement>('[data-drift-item="e:orphaned"]')!;
+      fireEvent.click(within(row).getByRole("button", { name: "Re-anchor" }));
+      await waitFor(() => expect(onRetarget).toHaveBeenCalled());
+      expect({ without, picked: pickAnchor.mock.calls, retargeted: onRetarget.mock.calls }).toEqual({
+        without: 0,
+        picked: [["e:orphaned"]],
+        retargeted: [["e-gone", "e:new"]],
+      });
+    });
+
+    it("refuses onRetarget without a way to pick", () => {
+      expect(() => panel({ drift, onRetarget: vi.fn() })).toThrow(/pickAnchor/);
+    });
+
   });
 
   it("pins the rail header outside the anchor-offset box", () => {
