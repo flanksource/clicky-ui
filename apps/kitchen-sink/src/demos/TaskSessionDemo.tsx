@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { CLAUDE_SESSION_EXAMPLE } from "@flanksource/clicky-ui/ai";
 import { createTaskSessionFeed, TaskProgress, type TaskSnapshot } from "@flanksource/clicky-ui/data";
 import { DemoSection } from "./Section";
@@ -49,12 +49,11 @@ const snapshots = (actions: number, latest: string): TaskSnapshot[] => [
 ];
 
 // The demo has no captain server: serve the recorded transcript for the demo
-// href, as the HTTP read an expanded task makes once.
+// href, as the HTTP read an expanded task makes once. A layout effect installs
+// it before any child's passive effect can fetch.
 function useRecordedCaptainSession() {
-  const original = useRef<typeof globalThis.fetch | undefined>(undefined);
-  if (!original.current) {
+  useLayoutEffect(() => {
     const fallback = globalThis.fetch;
-    original.current = fallback;
     globalThis.fetch = (input, init) =>
       String(input).startsWith(SESSION_HREF)
         ? Promise.resolve(
@@ -64,13 +63,10 @@ function useRecordedCaptainSession() {
             }),
           )
         : fallback(input, init);
-  }
-  useEffect(
-    () => () => {
-      if (original.current) globalThis.fetch = original.current;
-    },
-    [],
-  );
+    return () => {
+      globalThis.fetch = fallback;
+    };
+  }, []);
 }
 
 export function TaskSessionDemo() {
