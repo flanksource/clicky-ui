@@ -160,6 +160,11 @@
       "import": "./dist/comment-anchoring.js",
       "require": "./dist/comment-anchoring.cjs"
     },
+    "./comments/gavel": {
+      "types": "./dist/comments-gavel.d.ts",
+      "import": "./dist/comments-gavel.js",
+      "require": "./dist/comments-gavel.cjs"
+    },
     "./oxlint-plugins": "./oxlint-plugins/clicky-ui.js",
     "./json-schema-form.schema.json": "./schemas/json-schema-form.schema.json",
     "./styles.css": "./dist/styles.css",

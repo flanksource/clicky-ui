@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  captureTextQuote,
   locateSelection,
   locateSourceSelection,
   markdownOutline,
   parseQuoteAnchor,
   quoteAnchor,
+  quoteLiesInLines,
   resolveQuote,
+  resolveQuoteInLines,
   sourceSpans,
 } from "./quote-anchor";
 
@@ -93,6 +96,56 @@ describe("quote anchors", () => {
   it("returns null once the quoted words are gone", () => {
     paragraph(9).textContent = "Check the latency.";
     expect(resolveQuote(root, { path: ["Runbook", "Rollback"], prefix: "Check the", quote: "error rate", suffix: "again." })).toBeNull();
+  });
+});
+
+describe("quotes held by a patch", () => {
+  const quote = { prefix: "Check the", exact: "error rate", suffix: "again." };
+
+  it("captures a selection as the words with the words around them", () => {
+    expect(captureTextQuote(root, rangeOver(paragraph(9), "error rate"))).toEqual(quote);
+  });
+
+  it("captures nothing for a selection spanning blocks", () => {
+    const range = rangeOver(paragraph(5), "rate, then");
+    range.setEnd(paragraph(9).firstChild!, 3);
+    expect(captureTextQuote(root, range)).toBeNull();
+  });
+
+  it("finds the quote again inside the lines the patch matches now, and only there", () => {
+    expect({
+      inside: resolveQuoteInLines(root, { start: 9, end: 9 }, quote)?.toString(),
+      // "again" is only on line 9: a patch that matches line 5 does not search line 9's block.
+      elsewhere: resolveQuoteInLines(root, { start: 5, end: 5 }, { prefix: "rate", exact: "again", suffix: "." }),
+    }).toEqual({ inside: "error rate", elsewhere: null });
+  });
+
+  it("returns null once the quoted words are gone from the patch lines, so the highlight falls back to the lines", () => {
+    paragraph(9).textContent = "Check the latency again.";
+    expect(resolveQuoteInLines(root, { start: 9, end: 9 }, quote)).toBeNull();
+  });
+
+  it("still finds it when the words around it were edited, as long as it occurs once in the lines", () => {
+    paragraph(9).textContent = "Please check the error rate once more.";
+    expect(resolveQuoteInLines(root, { start: 9, end: 9 }, quote)?.toString()).toBe("error rate");
+  });
+
+  it("requires the quote's exact text verbatim in the patch's source lines, so inline markdown formatting disqualifies it", () => {
+    // LINES[4] is "Check the **error** rate, then roll back.": rendered text "error rate" is not in the source.
+    expect({
+      verbatim: quoteLiesInLines({ prefix: "", exact: "rate, then roll back", suffix: "" }, [LINES[4]!]),
+      acrossFormatting: quoteLiesInLines({ prefix: "", exact: "error rate, then", suffix: "" }, [LINES[4]!]),
+      acrossLines: quoteLiesInLines({ prefix: "", exact: "roll back", suffix: "" }, [LINES[4]!, LINES[8]!]),
+      elsewhere: quoteLiesInLines({ prefix: "", exact: "latency", suffix: "" }, [LINES[4]!, LINES[8]!]),
+      empty: quoteLiesInLines({ prefix: "", exact: "", suffix: "" }, [LINES[4]!]),
+    }).toEqual({ verbatim: true, acrossFormatting: false, acrossLines: true, elsewhere: false, empty: false });
+  });
+
+  it("captures a selection across inline formatting as rendered text, which then fails the source check", () => {
+    const range = rangeOver(paragraph(5), "rate, then");
+    range.setStart(paragraph(5).firstChild!, "Check ".length);
+    const captured = captureTextQuote(root, range)!;
+    expect({ exact: captured.exact, inSource: quoteLiesInLines(captured, [LINES[4]!]) }).toEqual({ exact: "the error rate, then", inSource: false });
   });
 });
 

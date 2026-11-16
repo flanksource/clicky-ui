@@ -1,8 +1,12 @@
 import { useCommentState, useDiscardCommentDraft } from "../../comments/comment-persistence";
 import { ELEMENT_PREFIX, captureLocators, elementAnchor, parseElementAnchor } from "../../comments/anchoring/dom-anchor";
+import { driftNote, patchDrift, type DriftState } from "../../comments/anchoring/drift";
 import { PATCH_PREFIX, isPatchAnchor } from "../../comments/anchoring/patch-anchor";
 import type { ScreenshotTarget } from "../../comments/annotation-screenshot";
+import type { PickedAnchor, Retarget } from "../../comments/DriftList";
+import type { TextQuote } from "../../comments/annotation-types";
 import { elementLabel, useElementPicker } from "../../comments/element-picker";
+import { useEscapeLayer } from "../../overlay/modalStack";
 import type { SourceComments } from "../../monaco/source-comments";
 import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
 import { ProblemActions } from "../../data/diagnostics/ProblemActions";
@@ -37,12 +41,13 @@ import { AnnotatedCode } from "../LazyAnnotatedCode";
 import { blankMdxPreamble } from "../mdx-source";
 import type { FileFinding } from "../types";
 import { layoutCards, type AnchorMode, type Box } from "./geometry";
-import { useAnchorBoxes, useCardHeights, useFoundElements, useNarrow } from "./hooks";
+import { useAnchorBoxes, useCardHeights, useElementDrift, useNarrow } from "./hooks";
 import { SEVERITY_MARK, SEVERITY_RANK, severityOf, squiggle, type Severity } from "./marks";
 import { ProblemsList } from "./ProblemsList";
 import type { ProblemFilters } from "./problem-filters";
 import {
   QUOTE_PREFIX,
+  captureTextQuote,
   describeQuote,
   locateSelection,
   locateSourceSelection,
@@ -61,7 +66,7 @@ import { CommentDraft, type CommentDraftPosition } from "./CommentDraft";
 import { isBuiltinFileReviewView, type FileReviewView } from "./views";
 import { EditThreads, type EditThreadEntry } from "./EditThreads";
 import { FileDraftCard, FileThreadCard, FileThreads, type FileThreadEntry } from "./FileThreads";
-import { patchDraft, patchLabel, patchLineRanges, patchNote, patchSourceMarks, placePatches, type PatchPlacement } from "./patch-comments";
+import { patchDraft, patchLabel, patchLineRanges, patchSourceMarks, placePatches, type PatchPlacement } from "./patch-comments";
 import { composerActions, createComment } from "./post-actions";
 import { previewSelectionLines, sourceSelectionLines } from "./selection-lines";
 
@@ -87,7 +92,8 @@ const isFindingAnchor = (anchor: string) => anchor.startsWith(FINDING_ANCHOR_PRE
 
 type AuthorFilter = "all" | "user" | "agent";
 /** A selection offered for commenting: a Comment pill that morphs into a composer card once `expanded`. */
-type Draft = { anchor: string; label: string; position: CommentDraftPosition; expanded: boolean; surface: "preview" | "source" | "edit" };
+/** `quote` is the selected words of a patch (`r:`) draft; it is posted beside the anchor, never inside it. */
+type Draft = { anchor: string; label: string; quote?: TextQuote; position: CommentDraftPosition; expanded: boolean; surface: "preview" | "source" | "edit" };
 /** An edit-mode draft is composed in the thread rail beside the editor, so it has no floating position. */
 const NO_POSITION: CommentDraftPosition = { top: 0, bottom: 0, left: 0 };
 
@@ -123,6 +129,21 @@ function anchorLabel({ anchor, found, placements, raw }: { anchor: string; found
       ? describeSource(parseSourceAnchor(anchor))
       : anchor.replace("line:", "line ");
   return found ? label : `Text not found · ${label}`;
+}
+
+/** Whether a thread's anchor has drifted. An `e:` anchor not yet resolved against the rendered markdown counts as orphaned until it is. */
+function anchorDrift({
+  anchor,
+  placements,
+  elements,
+}: {
+  anchor: string;
+  placements: ReadonlyMap<string, PatchPlacement>;
+  elements: ReadonlyMap<string, DriftState | null>;
+}): DriftState | null {
+  if (isPatchAnchor(anchor)) return patchDrift(placements.get(anchor)?.match ?? { state: "outdated" });
+  if (anchor.startsWith(ELEMENT_PREFIX)) return elements.has(anchor) ? elements.get(anchor)! : "orphaned";
+  return null;
 }
 
 const WORD = /[\p{L}\p{N}'’-]/u;
@@ -193,6 +214,15 @@ export type FileReviewComments = CommentDetailOptions & {
    * ambiguous in the file-level comments.
    */
   anchoring?: "quote" | "patch" | undefined;
+  /**
+   * Offers Re-anchor on a thread in drift (outdated or ambiguous lines, an
+   * element that moved or is gone). It starts a pick — an element click for an
+   * `e:` thread, a text selection for any other — and then calls this with the
+   * thread's id and the new anchor, with the selected words as `quote` for a
+   * patch anchor made from rendered prose; the host stores it (gavel `retarget`),
+   * the quote beside the patch and never inside the anchor.
+   */
+  onRetarget?: ((id: Comment["id"], anchor: string, quote?: TextQuote) => void | Promise<void>) | undefined;
   targets?: FileReviewCommentTargets | undefined;
   callbacks: CommentCallbacks;
   /** Statuses and facets of the host's comments; lint statuses are added for findings. */
@@ -409,6 +439,9 @@ export function FileReview({
   const [fileDraft, setFileDraft] = useState(false);
   /** The element an `e:` draft was picked on, so a screenshot can capture it. */
   const draftElement = useRef<Element | null>(null);
+  /** A Re-anchor in progress: what it is waiting for the reader to pick, and who awaits the result. */
+  const retargeting = useRef<{ kind: "element" | "text"; resolve: (picked: PickedAnchor | null) => void } | null>(null);
+  const [retargetKind, setRetargetKind] = useState<"element" | "text" | null>(null);
   const discardCommentDraft = useDiscardCommentDraft();
   const [savedDraft, saveDraft] = useCommentState<Omit<Draft, "position"> | null>(`file:${path}:selection`, null);
   useEffect(() => { if (draft?.expanded && draft.surface !== "edit") { const { position: _position, ...selection } = draft; saveDraft(selection); } }, [draft, saveDraft]);
@@ -505,20 +538,23 @@ export function FileReview({
   const unposted = draftAnchor && !threadAnchors.includes(draftAnchor) ? draftAnchor : null;
   const allAnchors = useMemo(() => (unposted ? [...threadAnchors, unposted] : threadAnchors), [threadAnchors, unposted]);
   const patchPlacements = useMemo(() => placePatches(raw, allAnchors), [raw, allAnchors]);
-  const patchRanges = useMemo(() => patchLineRanges(patchPlacements), [patchPlacements]);
-  const foundElements = useFoundElements({ markdown, anchors: allAnchors });
-  // Threads with no place in the text are listed apart, never hidden: those on the whole file, and those whose lines (or element) can no longer be found.
+  const draftQuote = draft?.expanded ? draft.quote : savedDraft?.quote;
+  // The selected words each patch thread was written on, kept by the host beside the patch; they only sharpen the highlight.
+  const patchQuotes = useMemo(
+    () => new Map<string, TextQuote>([...getRoots(open).flatMap((c) => (c.anchor && c.quote ? [[c.anchor, c.quote] as const] : [])), ...(unposted && draftQuote ? [[unposted, draftQuote] as const] : [])]),
+    [open, unposted, draftQuote],
+  );
+  const patchRanges = useMemo(() => patchLineRanges(patchPlacements, patchQuotes), [patchPlacements, patchQuotes]);
+  const elementStates = useElementDrift({ markdown, anchors: allAnchors });
+  // One drift state per thread anchor: patch lines outdated or ambiguous, an element moved or gone.
+  const driftStates = useMemo(
+    () => new Map(threadAnchors.map((anchor) => [anchor, anchorDrift({ anchor, placements: patchPlacements, elements: elementStates })] as const)),
+    [threadAnchors, patchPlacements, elementStates],
+  );
+  // Threads with no place in the text are listed apart, never hidden: those on the whole file, and those in drift.
   const fileLevel = useMemo(
-    () =>
-      new Set(
-        threadAnchors.filter(
-          (anchor) =>
-            anchor === DOCUMENT_ANCHOR ||
-            (isPatchAnchor(anchor) && patchPlacements.get(anchor)?.match.state !== "matched") ||
-            (anchor.startsWith(ELEMENT_PREFIX) && !foundElements.has(anchor)),
-        ),
-      ),
-    [threadAnchors, patchPlacements, foundElements],
+    () => new Set(threadAnchors.filter((anchor) => anchor === DOCUMENT_ANCHOR || driftStates.get(anchor))),
+    [threadAnchors, driftStates],
   );
   const anchors = useMemo(() => allAnchors.filter((anchor) => !fileLevel.has(anchor)), [allAnchors, fileLevel]);
   const cardAnchors = useMemo(() => threadAnchors.filter((anchor) => !fileLevel.has(anchor)), [threadAnchors, fileLevel]);
@@ -527,15 +563,16 @@ export function FileReview({
       threadAnchors
         .filter((anchor) => fileLevel.has(anchor))
         .map((anchor) => {
-          const placement = patchPlacements.get(anchor);
+          const state = driftStates.get(anchor);
           return {
             anchor,
-            label: anchorLabel({ anchor, found: false, placements: patchPlacements, raw }),
-            note: placement ? patchNote(placement.match) : anchor.startsWith(ELEMENT_PREFIX) ? "The element this was written on is no longer in the rendered document." : null,
+            label: anchorLabel({ anchor, found: state !== "orphaned", placements: patchPlacements, raw }),
+            ...(state ? { drift: state } : {}),
+            note: state ? driftNote(state, isPatchAnchor(anchor) ? "lines" : "element") : null,
             thread: selectAnchorThreads(open, anchor),
           };
         }),
-    [threadAnchors, fileLevel, patchPlacements, open],
+    [threadAnchors, fileLevel, driftStates, patchPlacements, raw, open],
   );
   // A line with several findings shows its most severe one.
   const severity = useMemo(() => {
@@ -741,10 +778,12 @@ export function FileReview({
    * the rendered text so the thread shows in Preview too; in any other file it
    * anchors on the source characters.
    */
-  function locate(surface: Draft["surface"], range: Range): Pick<Draft, "anchor" | "label"> | null {
+  function locate(surface: Draft["surface"], range: Range): Pick<Draft, "anchor" | "label" | "quote"> | null {
     if (patchMode) {
-      const covered = surface === "preview" ? markdown.current && previewSelectionLines(range, markdown.current) : sourceSelectionLines(range);
-      return covered ? patchDraft(raw, covered) : null;
+      const rendered = surface === "preview" ? markdown.current : null;
+      const lines = surface === "preview" ? rendered && previewSelectionLines(range, rendered) : sourceSelectionLines(range);
+      // A selection in rendered prose also keeps its words, to highlight them precisely; the lines stay authoritative.
+      return lines ? patchDraft({ raw, lines, quote: rendered && captureTextQuote(rendered, range) }) : null;
     }
     if (!prose) {
       const covered = sourceRangeOf(range);
@@ -814,9 +853,18 @@ export function FileReview({
   }
 
   function offerComment(event: MouseEvent<HTMLDivElement>, surface: Draft["surface"]) {
-    if (!canComment || fromInlineThread(event) || (event.target as Element).closest("[data-comment-author]")) return;
+    const retargetingText = retargeting.current?.kind === "text";
+    if (!(canComment || retargetingText) || fromInlineThread(event) || (event.target as Element).closest("[data-comment-author]")) return;
     const selection = window.getSelection();
     const range = selection && !selection.isCollapsed && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    if (retargetingText) {
+      // The selection re-anchors the thread being retargeted instead of starting a comment.
+      const located = range && locate(surface, range);
+      if (!located) return;
+      selection?.removeAllRanges();
+      finishRetarget({ anchor: located.anchor, ...(located.quote ? { quote: located.quote } : {}) });
+      return;
+    }
     const locator = range ? locate(surface, range) : null;
     if (!range || !locator) {
       // An open composer may hold typed text: only Escape or its close button discards it.
@@ -916,7 +964,11 @@ export function FileReview({
       const root = markdown.current;
       if (!root || !origin.current) return;
       const locators = captureLocators(element, root);
-      if (locators.length === 0) return setAssignError("Could not comment on that element: it cannot be told apart from the rest of the page");
+      if (locators.length === 0) {
+        finishRetarget(null);
+        return setAssignError("Could not use that element: it cannot be told apart from the rest of the page");
+      }
+      if (retargeting.current) return finishRetarget({ anchor: elementAnchor(locators) });
       const base = origin.current.getBoundingClientRect();
       const rect = element.getBoundingClientRect();
       draftElement.current = element;
@@ -930,6 +982,38 @@ export function FileReview({
       });
     },
   });
+  /** Ends a Re-anchor: the awaited pick resolves with the new anchor, or null when cancelled. */
+  function finishRetarget(picked: PickedAnchor | null) {
+    const pending = retargeting.current;
+    if (!pending) return;
+    retargeting.current = null;
+    setRetargetKind(null);
+    picker.setPicking(false);
+    pending.resolve(picked);
+  }
+
+  /** Re-anchor: an element click for an `e:` thread, else a text selection in Preview or Source. */
+  function pickAnchor(current: string): Promise<PickedAnchor | null> {
+    retargeting.current?.resolve(null);
+    const kind = current.startsWith(ELEMENT_PREFIX) ? "element" : "text";
+    return new Promise((resolve) => {
+      retargeting.current = { kind, resolve };
+      setRetargetKind(kind);
+      setDraft(null);
+      setFileDraft(false);
+      if (kind === "element") {
+        onViewChange("preview");
+        picker.setPicking(true);
+      }
+    });
+  }
+  const retarget: Retarget | undefined = comments?.onRetarget ? { pickAnchor, onRetarget: comments.onRetarget } : undefined;
+  useEscapeLayer(retargetKind === "text", () => finishRetarget(null));
+  // The element picker ends on its own Escape; the Re-anchor waiting on it ends with it.
+  useEffect(() => {
+    if (retargetKind === "element" && !picker.picking) finishRetarget(null);
+  }, [retargetKind, picker.picking]);
+  useEffect(() => () => retargeting.current?.resolve(null), []);
   const targetMenuItems = [
     ...(targets?.element && prose
       ? [{ label: "Comment on element", onSelect: () => { onViewChange("preview"); picker.setPicking(true); } }]
@@ -963,7 +1047,7 @@ export function FileReview({
       ...(canComment
         ? {
             onCreate: (lines: { startLine: number; endLine: number }) =>
-              setDraft({ ...patchDraft(raw, lines), position: NO_POSITION, expanded: true, surface: "edit" }),
+              setDraft({ ...patchDraft({ raw, lines }), position: NO_POSITION, expanded: true, surface: "edit" }),
           }
         : {}),
     };
@@ -985,7 +1069,7 @@ export function FileReview({
         onClose={closeDraft}
         {...(draftActions ? { createActions: draftActions } : {})}
         onCreate={async (input, action) => {
-          await postDraft(anchor, input, action);
+          await postDraft(anchor, current.quote ? { ...input, quote: current.quote } : input, action);
           setDraft(null);
           saveDraft(null);
           setFocused(anchor);
@@ -1010,7 +1094,8 @@ export function FileReview({
         )}
         {comments && layout === "inline" && <span>· hover a highlight to view or reply</span>}
         {canComment && <span>· select or right-click text to comment</span>}
-        {picker.picking && <span role="status">· click an element to comment on it, Esc to cancel</span>}
+        {picker.picking && !retargetKind && <span role="status">· click an element to comment on it, Esc to cancel</span>}
+        {retargetKind && <span role="status">· {retargetKind === "element" ? "click an element" : "select text"} to re-anchor, Esc to cancel</span>}
         {authorFilter && (
           <div role="radiogroup" aria-label="Authors" className="ml-auto inline-flex rounded-md border border-border p-0.5">
             {(["all", "user", "agent"] as const).map((value) => (
@@ -1145,6 +1230,7 @@ export function FileReview({
           options={peopleThreads}
           renderRootDetails={renderRootDetails}
           composerActions={draftActions}
+          retarget={retarget}
           onCreate={postFileDraft}
           onDiscardDraft={() => setFileDraft(false)}
         />
@@ -1398,7 +1484,7 @@ export function FileReview({
                       style={placement}
                       className={cn("rounded-lg border bg-card", positioned, isFocused ? "z-10 -translate-x-2 border-primary/50 shadow-lg" : "border-border shadow-sm")}
                     >
-                      <FileThreadCard entry={fileEntry} config={config} callbacks={callbacks} options={peopleThreads} renderRootDetails={renderRootDetails} />
+                      <FileThreadCard entry={fileEntry} config={config} callbacks={callbacks} options={peopleThreads} renderRootDetails={renderRootDetails} retarget={retarget} />
                     </div>
                   );
                 }

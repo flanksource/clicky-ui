@@ -25,8 +25,12 @@ export interface MultiGaugeBarProps {
   variant?: "default" | "cell";
   /** `sm` draws a thin 8px track without the inline usage text; values stay in the summary. */
   size?: "md" | "sm";
+  /** Side of the track the pointer markers sit on; `bottom` flips them to point up at the track. */
+  markerSide?: "top" | "bottom";
   className?: string;
 }
+
+const pointerPath = { top: "M0 0H10L5 8Z", bottom: "M0 8H10L5 0Z" } as const;
 
 const markerTone: Record<GaugeTone, string> = {
   neutral: "text-muted-foreground",
@@ -47,8 +51,11 @@ export function MultiGaugeBar({
   unit,
   variant = "default",
   size = "md",
+  markerSide = "top",
   className,
 }: MultiGaugeBarProps) {
+  const below = markerSide === "bottom";
+  const trackHeight = size === "sm" ? 8 : 24;
   const values = [
     ...markers.map((marker) => marker.value),
     ...(average === undefined ? [] : [average]),
@@ -74,6 +81,8 @@ export function MultiGaugeBar({
     return { ...marker, position: x, lane };
   });
   const lanes = Math.max(0, ...placed.map((item) => item.lane));
+  const markerBand = 8 + lanes * 8;
+  const trackOffset = below ? 0 : markerBand;
   const usageLabel =
     average === undefined ? "Not collected" : formatValue(average);
   const summary = `${label}${unit ? ` (${unit})` : ""}. ${average === undefined ? "Average not collected" : `Average ${formatValue(average)}`}. ${markers.map((marker) => `${marker.label} ${formatValue(marker.value)}`).join(". ")}. Scale 0 to ${formatValue(ceiling)}`;
@@ -102,7 +111,11 @@ export function MultiGaugeBar({
       >
         <div
           className="relative mx-1 min-w-0 flex-1"
-          style={{ paddingTop: `${8 + lanes * 8}px` }}
+          style={
+            below
+              ? { paddingBottom: `${markerBand}px` }
+              : { paddingTop: `${markerBand}px` }
+          }
         >
           <div
             data-gauge-track=""
@@ -167,11 +180,11 @@ export function MultiGaugeBar({
                     ? {
                         left: "0%",
                         width: `${marker.position}%`,
-                        top: `${8 + lanes * 8}px`,
+                        top: `${trackOffset}px`,
                       }
                     : {
                         left: `${marker.position}%`,
-                        top: `${(lanes - marker.lane) * 8}px`,
+                        top: `${below ? trackHeight + marker.lane * 8 : (lanes - marker.lane) * 8}px`,
                         height: "8px",
                       }
                 }
@@ -182,13 +195,18 @@ export function MultiGaugeBar({
                     viewBox="0 0 10 8"
                     aria-hidden="true"
                   >
-                    <path d="M0 0H10L5 8Z" />
+                    <path d={pointerPath[markerSide]} />
                   </svg>
                 )}
               </span>
             ))}
           {variant === "default" && (
-            <div className="relative mt-3 h-5 text-xs text-muted-foreground">
+            <div
+              className={cn(
+                "relative h-5 text-xs text-muted-foreground",
+                below ? "mt-1" : "mt-3",
+              )}
+            >
               {(ceiling === 0 ? [0] : [0, 1, 2, 3]).map((tick) => (
                 <span
                   key={tick}
@@ -208,7 +226,7 @@ export function MultiGaugeBar({
             "shrink-0 text-xs text-muted-foreground",
             size === "sm" ? "leading-[8px]" : "leading-6",
           )}
-          style={{ paddingTop: `${8 + lanes * 8}px` }}
+          style={{ paddingTop: `${trackOffset}px` }}
         >
           {formatValue(ceiling)}
           {unit ? ` ${unit}` : ""}
@@ -240,7 +258,7 @@ export function MultiGaugeBar({
                 viewBox="0 0 10 8"
                 aria-hidden="true"
               >
-                <path d="M0 0H10L5 8Z" />
+                <path d={pointerPath[markerSide]} />
               </svg>
               <span>{marker.label}</span>{" "}
               <span className="font-medium text-foreground">

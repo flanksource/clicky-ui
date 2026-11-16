@@ -2,6 +2,7 @@
 // TextQuoteSelector: a quote is found again through the heading outline (the
 // section it sits in) plus a few words on each side, so the same words
 // elsewhere — or edits to other sections — never move it.
+import type { TextQuote } from "../../comments/annotation-types";
 
 /** A quote inside the section named by `path` (its heading trail), with the words around it. */
 export type QuoteLocator = { path: string[]; prefix: string; quote: string; suffix: string };
@@ -176,6 +177,46 @@ export function locateSelection(root: Element, range: Range): QuoteLocator | nul
     if (found.length === 1 && found[0]!.block === own.block && found[0]!.start === start) return locator;
     if (words >= before.length && words >= after.length) return null;
   }
+}
+
+/** A selection inside one rendered block as the words with the words around them; null when it spans blocks or is blank. */
+export function captureTextQuote(root: Element, range: Range): TextQuote | null {
+  const locator = locateSelection(root, range);
+  return locator && { prefix: locator.prefix, exact: locator.quote, suffix: locator.suffix };
+}
+
+/** Context from the strictest tier to none at all: inside a patch's few lines the words alone may be enough. */
+const QUOTE_TIERS = [...TIERS, { prefix: false, suffix: false }] as const;
+
+/**
+ * Finds a patch's quote again, searching only the rendered blocks that cover
+ * source lines `start`..`end` (where the patch matches now). The words with
+ * their context first, then with the context edited away; null once they are
+ * gone, or repeat so that nothing tells the occurrences apart, so the caller
+ * falls back to highlighting the lines.
+ */
+export function resolveQuoteInLines(root: Element, lines: { start: number; end: number }, quote: TextQuote): Range | null {
+  const covering = sections(root).filter(({ block }) => {
+    const { sourceStart, sourceEnd } = (block as HTMLElement).dataset;
+    return Number(sourceStart) <= lines.end && Number(sourceEnd) >= lines.start;
+  });
+  const locator = { path: [], prefix: quote.prefix, quote: quote.exact, suffix: quote.suffix };
+  for (const tier of QUOTE_TIERS) {
+    const found = matches(covering, locator, tier);
+    if (found.length === 1) return rangeIn(found[0]!.block, found[0]!.start, found[0]!.end);
+    if (found.length > 1) return null;
+  }
+  return null;
+}
+
+/**
+ * Whether the quote's exact text appears verbatim in the markdown source `lines`:
+ * the rule the server enforces on a selector's quote. Rendered text that
+ * differs from its source (`**bold**`, links, escapes) therefore does not lie
+ * in the lines, and the patch alone anchors the thread.
+ */
+export function quoteLiesInLines(quote: TextQuote, lines: readonly string[]): boolean {
+  return quote.exact !== "" && lines.join("\n").includes(quote.exact);
 }
 
 /** A run of characters on one source line (1-based line, 0-based columns). */

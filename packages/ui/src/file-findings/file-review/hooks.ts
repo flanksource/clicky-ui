@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { elementDrift, type DriftState } from "../../comments/anchoring/drift";
 import { ELEMENT_PREFIX, resolveElementAnchor } from "../../comments/anchoring/dom-anchor";
 import { measureAnchors, type AnchorMode, type Box } from "./geometry";
+import type { PatchLineRange } from "./patch-comments";
 
 const NARROW_WIDTH = 640;
 
@@ -54,7 +56,7 @@ export function useAnchorBoxes({
   anchors: readonly string[];
   mode: AnchorMode;
   /** Current source lines of the `r:` anchors that are placed, so they are boxed on the blocks covering them. */
-  patchRanges?: ReadonlyMap<string, { start: number; end: number }>;
+  patchRanges?: ReadonlyMap<string, PatchLineRange>;
   /** A hidden document measures as zero, so the last boxes are kept until it shows again. */
   visible: boolean;
 }) {
@@ -100,31 +102,33 @@ export function useNarrow(ref: RefObject<HTMLDivElement | null>) {
 }
 
 /**
- * The `e:` anchors whose element the rendered markdown still contains. Resolved
- * against the DOM whether or not it is visible, so a thread on an element that is
- * gone can be listed as orphaned from any tab.
+ * Where each `e:` anchor sits in the rendered markdown: null when its element
+ * is found and its locators agree, else why not (`orphaned` when gone, `moved`
+ * when only some locators find it). Resolved against the DOM whether or not it
+ * is visible, so a thread in drift can be listed from any tab. An anchor not
+ * yet resolved is absent from the map.
  */
-export function useFoundElements({
+export function useElementDrift({
   markdown,
   anchors,
 }: {
   markdown: RefObject<HTMLDivElement | null>;
   anchors: readonly string[];
-}): ReadonlySet<string> {
-  const [found, setFound] = useState<ReadonlySet<string>>(new Set());
+}): ReadonlyMap<string, DriftState | null> {
+  const [drift, setDrift] = useState<ReadonlyMap<string, DriftState | null>>(new Map());
   useLayoutEffect(() => {
     const root = markdown.current;
     const elements = anchors.filter((anchor) => anchor.startsWith(ELEMENT_PREFIX));
-    if (!root || elements.length === 0) return setFound((current) => (current.size === 0 ? current : new Set()));
+    if (!root || elements.length === 0) return setDrift((current) => (current.size === 0 ? current : new Map()));
     const sync = () =>
-      setFound((current) => {
-        const next = new Set(elements.filter((anchor) => resolveElementAnchor(root, anchor)));
-        return next.size === current.size && [...next].every((anchor) => current.has(anchor)) ? current : next;
+      setDrift((current) => {
+        const next = new Map(elements.map((anchor) => [anchor, elementDrift(resolveElementAnchor(root, anchor))] as const));
+        return next.size === current.size && [...next].every(([anchor, state]) => current.get(anchor) === state) ? current : next;
       });
     sync();
     const mutations = new MutationObserver(sync);
     mutations.observe(root, { childList: true, subtree: true, characterData: true });
     return () => mutations.disconnect();
   }, [markdown, anchors]);
-  return found;
+  return drift;
 }

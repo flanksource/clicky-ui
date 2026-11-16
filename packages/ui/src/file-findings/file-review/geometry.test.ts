@@ -72,6 +72,34 @@ describe("measureAnchors for line-range and element anchors", () => {
     expect([...boxes].map(([anchor, list]) => [anchor, list.map((box) => box.top)])).toEqual([["r:placed", [30, 60, 80]]]);
   });
 
+  describe("a placed r: range that also carries a quote", () => {
+    const QUOTE = { prefix: "Intro", exact: "key phrase", suffix: "inside." };
+    const quoted = new Map([["r:quoted", { start: 3, end: 4, quote: QUOTE }]]);
+    const measure = (mode: "text" | "block") => measureAnchors({ origin, markdown, anchors: ["r:quoted"], mode, patchRanges: quoted });
+    const PHRASE_RECT = { top: 7, left: 11, width: 30, height: 14 };
+
+    beforeEach(() => {
+      markdown.querySelector('[data-source-start="3"]')!.textContent = "Intro with the key phrase inside.";
+      // jsdom has no layout: only a range over the quoted words has a rect.
+      Range.prototype.getClientRects = function (this: Range) {
+        return (this.toString() === QUOTE.exact ? [PHRASE_RECT] : []) as unknown as DOMRectList;
+      };
+    });
+
+    it("highlights the quoted words while they still lie in the matched lines", () => {
+      expect([...measure("text")]).toEqual([["r:quoted", [PHRASE_RECT]]]);
+    });
+
+    it("falls back to the blocks covering the lines once the quote is gone", () => {
+      markdown.querySelector('[data-source-start="3"]')!.textContent = "Intro rewritten entirely.";
+      expect([...measure("text")]).toEqual([["r:quoted", [{ top: 30, left: 0, width: 100, height: 20 }]]]);
+    });
+
+    it("draws the covering blocks, not the words, when the whole block is the mode", () => {
+      expect([...measure("block")]).toEqual([["r:quoted", [{ top: 30, left: 0, width: 100, height: 20 }]]]);
+    });
+  });
+
   it("boxes the element an e: anchor's locators find, and leaves out one they cannot find", () => {
     const found = elementAnchor([{ kind: "css", selector: "p:nth-of-type(2)" }]);
     const gone = elementAnchor([{ kind: "css", selector: "#missing" }]);

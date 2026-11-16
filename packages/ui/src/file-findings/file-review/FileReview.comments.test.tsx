@@ -43,7 +43,7 @@ vi.mock("../../comments/annotation-screenshot", () => ({
 }));
 
 import { elementAnchor, parseElementAnchor } from "../../comments/anchoring/dom-anchor";
-import { capturePatch, patchAnchor } from "../../comments/anchoring/patch-anchor";
+import { capturePatch, parsePatchAnchor, patchAnchor } from "../../comments/anchoring/patch-anchor";
 import { DOCUMENT_ANCHOR, type Comment } from "../../comments/comment-types";
 import { setCommentDraft } from "../../test/comment-editor";
 import { FileReview, type FileReviewComments, type FileReviewProps } from "./FileReview";
@@ -112,9 +112,13 @@ async function openDraft() {
   fireEvent.click(pill);
 }
 
-async function post(body: string, button = "Post comment") {
+async function post(body: string, variant?: string) {
   setCommentDraft(await screen.findByTestId("comment-compose-input"), body);
-  fireEvent.click(screen.queryByRole("button", { name: button }) ?? screen.getByTestId("comment-compose-send"));
+  if (variant) {
+    fireEvent.click(screen.getByRole("button", { name: "Send options" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: variant }));
+  }
+  fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
 }
 
 beforeEach(() => {
@@ -196,7 +200,7 @@ describe("FileReview patch comments on a listed source", () => {
 describe("FileReview patch comments in Preview", () => {
   const paragraph = patchAnchor(capturePatch(MD, 3, 3));
 
-  it("anchors a selection on the lines of the blocks it touches", async () => {
+  it("anchors a selection on the lines of the blocks it touches, with the selected words as its quote", async () => {
     const onCreate = vi.fn(async () => {});
     const { container } = review({ path: MD_PATH, source: MD, view: "preview", comments: { callbacks: { onCreate } } });
     await waitFor(() => expect(container.querySelector('[data-source-start="3"]')).not.toBeNull());
@@ -209,7 +213,82 @@ describe("FileReview patch comments in Preview", () => {
     await openDraft();
     await post("Version of what?");
     await waitFor(() => expect(onCreate).toHaveBeenCalled());
-    expect(onCreate.mock.calls[0]![0].anchor).toBe(paragraph);
+    const input = onCreate.mock.calls[0]![0];
+    expect({ anchor: input.anchor, quote: input.quote }).toEqual({
+      anchor: patchAnchor(capturePatch(MD, 3, 3)),
+      quote: { prefix: "", exact: "Tag the commit with the next version and push the tag.", suffix: "" },
+    });
+  });
+
+  it("stores a patch plus a quote of the exact words selected, and the quote lies inside the patch lines", async () => {
+    const onCreate = vi.fn(async () => {});
+    const { container } = review({ path: MD_PATH, source: MD, view: "preview", comments: { callbacks: { onCreate } } });
+    await waitFor(() => expect(container.querySelector('[data-source-start="3"]')).not.toBeNull());
+    const block = container.querySelector('[data-source-start="3"]')!;
+    const text = block.firstChild as Text;
+    const range = document.createRange();
+    range.setStart(text, text.data.indexOf("next version"));
+    range.setEnd(text, text.data.indexOf("next version") + "next version".length);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    fireEvent.mouseUp(block);
+    await openDraft();
+    await post("Which version?");
+    await waitFor(() => expect(onCreate).toHaveBeenCalled());
+    const input = onCreate.mock.calls[0]![0];
+    const patch = parsePatchAnchor(input.anchor);
+    expect({
+      lines: [patch.startLine, patch.endLine],
+      quote: input.quote,
+      quoteInAnchor: input.anchor.includes("quote"),
+      insidePatchLines: patch.lines.join("\n").includes(input.quote!.exact),
+    }).toEqual({ lines: [3, 3], quote: { prefix: "with the", exact: "next version", suffix: "and push" }, quoteInAnchor: false, insidePatchLines: true });
+  });
+
+  describe("a selection across inline markdown formatting", () => {
+    const FORMATTED = ["# Release", "", "Tag the **commit** with the next version.", ""].join("\n");
+
+    async function select(from: (block: Element) => [Text, number], to: (block: Element) => [Text, number]) {
+      const onCreate = vi.fn(async () => {});
+      const { container } = review({ path: MD_PATH, source: FORMATTED, view: "preview", comments: { callbacks: { onCreate } } });
+      await waitFor(() => expect(container.querySelector('[data-source-start="3"]')?.childElementCount).toBe(1));
+      const block = container.querySelector('[data-source-start="3"]')!;
+      const range = document.createRange();
+      range.setStart(...from(block));
+      range.setEnd(...to(block));
+      window.getSelection()!.removeAllRanges();
+      window.getSelection()!.addRange(range);
+      fireEvent.mouseUp(block);
+      await openDraft();
+      await post("Formatting");
+      await waitFor(() => expect(onCreate).toHaveBeenCalled());
+      const input = onCreate.mock.calls[0]![0];
+      return { patch: parsePatchAnchor(input.anchor), quote: input.quote };
+    }
+    const lead = (block: Element) => block.firstChild as Text;
+    const tail = (block: Element) => block.lastChild as Text;
+
+    it("sends the patch alone when the rendered text differs from its source, never a quote the server would reject", async () => {
+      // Rendered "Tag the commit with" is "Tag the **commit** with" in the source.
+      const { patch, quote } = await select((block) => [lead(block), 0], (block) => [tail(block), " with".length]);
+      expect({ lines: [patch.startLine, patch.endLine], quote }).toEqual({ lines: [3, 3], quote: undefined });
+    });
+
+    it("keeps a quote that sits wholly in unformatted text, because it is verbatim in the source", async () => {
+      const { patch, quote } = await select((block) => [tail(block), tail(block).data.indexOf("next")], (block) => [tail(block), tail(block).data.indexOf(".")]);
+      expect(quote?.exact).toBe("next version");
+      expect(patch.lines.join("\n")).toContain(quote!.exact);
+    });
+  });
+
+  it("stores no quote for a Source selection, whose lines are the source itself", async () => {
+    const onCreate = vi.fn(async () => {});
+    review({ path: MD_PATH, source: MD, view: "source", comments: { callbacks: { onCreate } } });
+    selectSourceLines(3, 3);
+    await openDraft();
+    await post("Plain lines");
+    await waitFor(() => expect(onCreate).toHaveBeenCalled());
+    expect(onCreate.mock.calls[0]![0]).not.toHaveProperty("quote");
   });
 
   it("boxes a thread on the block covering its lines and labels its card with them", async () => {
@@ -238,6 +317,91 @@ describe("FileReview patch comments in Preview", () => {
     }).toEqual({ gone: 0, separateList: false, listed: "Element not found", body: "Where did it go?" });
   });
 
+  describe("drift list", () => {
+    const moved = elementAnchor([
+      { kind: "css", selector: '[data-source-start="3"]' },
+      { kind: "css", selector: '[data-source-start="5"]' },
+    ]);
+    const orphaned = elementAnchor([{ kind: "css", selector: "#removed" }]);
+    const outdated = patchAnchor(capturePatch("old a\nold b\nold c", 2, 2));
+    const items = [rootComment("m1", moved, "Moved one"), rootComment("o1", orphaned, "Orphaned one"), rootComment("p1", outdated, "Outdated one")];
+    const rail = (container: HTMLElement) => container.querySelector<HTMLElement>("[data-comment-sidebar]")!;
+    const entry = (container: HTMLElement, anchor: string) => within(withAttr(rail(container), "data-file-thread", anchor)[0] as HTMLElement);
+
+    it("lists moved and orphaned element threads with outdated patch threads, each with its state, and boxes none of them", async () => {
+      const { container } = review({ path: MD_PATH, source: MD, view: "preview", comments: { items } });
+      // An element thread reads as orphaned until the markdown has rendered and its locators have voted.
+      await waitFor(() => expect(entry(container, moved).getByText("Moved")).toBeTruthy());
+      expect({
+        states: [moved, orphaned, outdated].map((anchor) => entry(container, anchor).getByText(/^(Moved|Orphaned|Outdated)$/).textContent),
+        boxed: [moved, orphaned, outdated].map((anchor) => withAttr(container, "data-anchor-box", anchor).length),
+        reanchor: screen.queryAllByRole("button", { name: "Re-anchor" }).length,
+      }).toEqual({ states: ["Moved", "Orphaned", "Outdated"], boxed: [0, 0, 0], reanchor: 0 });
+    });
+
+    it("offers Re-anchor on each only when the host can retarget", async () => {
+      const { container } = review({ path: MD_PATH, source: MD, view: "preview", comments: { items, onRetarget: vi.fn() } });
+      await waitFor(() => expect(withAttr(rail(container), "data-file-thread", moved)).not.toHaveLength(0));
+      expect(screen.getAllByRole("button", { name: "Re-anchor" })).toHaveLength(3);
+    });
+
+    it("lists the same states in the file-level list of the Source view", async () => {
+      const { container } = review({ path: MD_PATH, source: MD, view: "source", comments: { items } });
+      await waitFor(() => {
+        const list = within(container.querySelector<HTMLElement>("[data-file-threads]")!);
+        expect(list.getAllByText(/^(Moved|Orphaned|Outdated)$/).map((el) => el.textContent).sort()).toEqual(["Moved", "Orphaned", "Outdated"]);
+      });
+    });
+
+    it("re-anchors an element thread on the element picked next, calling onRetarget(id, anchor) and nothing else", async () => {
+      const onRetarget = vi.fn();
+      const onCreate = vi.fn();
+      const { container } = review({ path: MD_PATH, source: MD, view: "preview", comments: { items, onRetarget, callbacks: { onCreate } } });
+      await waitFor(() => expect(withAttr(rail(container), "data-file-thread", orphaned)).not.toHaveLength(0));
+      fireEvent.click(entry(container, orphaned).getByRole("button", { name: "Re-anchor" }));
+      expect(screen.getByRole("status").textContent).toMatch(/click an element to re-anchor/);
+      fireEvent.click(container.querySelector('[data-source-start="3"]')!);
+      await waitFor(() => expect(onRetarget).toHaveBeenCalledTimes(1));
+      const [id, anchor] = onRetarget.mock.calls[0]!;
+      expect({ id, locators: parseElementAnchor(anchor), created: onCreate.mock.calls.length }).toEqual({
+        id: "o1",
+        locators: [expect.objectContaining({ kind: "markdown", tag: "p" })],
+        created: 0,
+      });
+    });
+
+    it("re-anchors a patch thread on the text selected next, keeping the selection's quote with its lines", async () => {
+      const onRetarget = vi.fn();
+      const { container } = review({ path: MD_PATH, source: MD, view: "preview", comments: { items, onRetarget } });
+      await waitFor(() => expect(withAttr(rail(container), "data-file-thread", outdated)).not.toHaveLength(0));
+      fireEvent.click(entry(container, outdated).getByRole("button", { name: "Re-anchor" }));
+      expect(screen.getByRole("status").textContent).toMatch(/select text to re-anchor/);
+      const block = container.querySelector('[data-source-start="5"]')!;
+      const range = document.createRange();
+      range.selectNodeContents(block);
+      window.getSelection()!.removeAllRanges();
+      window.getSelection()!.addRange(range);
+      fireEvent.mouseUp(block);
+      await waitFor(() => expect(onRetarget).toHaveBeenCalledTimes(1));
+      const [id, anchor, quote] = onRetarget.mock.calls[0]!;
+      expect({ id, patch: parsePatchAnchor(anchor), quote }).toEqual({
+        id: "p1",
+        patch: capturePatch(MD, 5, 5),
+        quote: { prefix: "", exact: "Watch the dashboard for an hour.", suffix: "" },
+      });
+    });
+
+    it("cancels a re-anchor on Escape without retargeting", async () => {
+      const onRetarget = vi.fn();
+      const { container } = review({ path: MD_PATH, source: MD, view: "preview", comments: { items, onRetarget } });
+      await waitFor(() => expect(withAttr(rail(container), "data-file-thread", outdated)).not.toHaveLength(0));
+      fireEvent.click(entry(container, outdated).getByRole("button", { name: "Re-anchor" }));
+      fireEvent.keyDown(document, { key: "Escape" });
+      await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+      expect(onRetarget).not.toHaveBeenCalled();
+    });
+  });
+
   it("puts file comments in the margin rail ahead of the placed cards, and the file draft there too", async () => {
     const onCreate = vi.fn(async () => {});
     const { container } = review({
@@ -252,7 +416,7 @@ describe("FileReview patch comments in Preview", () => {
     const listed = order();
     fireEvent.click(screen.getByRole("button", { name: "Comment" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Comment on file" }));
-    await post("Add a changelog entry", "Post comment");
+    await post("Add a changelog entry");
     await waitFor(() => expect(onCreate).toHaveBeenCalled());
     expect({
       listed,
@@ -298,7 +462,7 @@ describe("FileReview comment targets", () => {
     fireEvent.click(screen.getByRole("button", { name: "Comment" }));
     expect(screen.queryByRole("menuitem", { name: "Comment on element" })).toBeNull();
     fireEvent.click(screen.getByRole("menuitem", { name: "Comment on file" }));
-    await post("Add a changelog entry", "Post comment");
+    await post("Add a changelog entry");
     await waitFor(() => expect(onCreate).toHaveBeenCalled());
     expect(onCreate.mock.calls[0]![0]).toMatchObject({ body: "Add a changelog entry", anchor: DOCUMENT_ANCHOR });
   });
