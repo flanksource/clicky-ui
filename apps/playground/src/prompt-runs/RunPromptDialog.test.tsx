@@ -94,6 +94,13 @@ function renderPanel(api: PromptRunsApi, target: PromptTarget = TARGET) {
   return onStarted;
 }
 
+/** "Run prompt" stays disabled until the prompt detail and runtime catalog load; a click before that is a no-op. */
+async function clickRunPrompt() {
+  const button = await screen.findByRole("button", { name: "Run prompt" });
+  await vi.waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(button);
+}
+
 afterEach(cleanup);
 
 describe("RunPromptPanel", () => {
@@ -158,16 +165,7 @@ describe("RunPromptPanel", () => {
     });
     const onStarted = renderPanel(api, { ...TARGET, files: [markdownFile] });
     await screen.findByRole("group", { name: "Prompt runtime" });
-    await vi.waitFor(() =>
-      expect(
-        (
-          screen.getByRole("button", {
-            name: "Run prompt",
-          }) as HTMLButtonElement
-        ).disabled,
-      ).toBe(false),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Run prompt" }));
+    await clickRunPrompt();
     await vi.waitFor(() => expect(onStarted).toHaveBeenCalledWith(RUN));
     expect(api.startPromptRun).toHaveBeenCalledWith(
       expect.objectContaining({ variables: { files: markdownFile } }),
@@ -215,7 +213,7 @@ describe("RunPromptPanel", () => {
         new Error("runtime claude:sonnet is not installed"),
       );
     const onStarted = renderPanel(stubApi({ startPromptRun }));
-    fireEvent.click(await screen.findByRole("button", { name: "Run prompt" }));
+    await clickRunPrompt();
     expect(await screen.findByText("Couldn't start the run")).toBeTruthy();
     expect(
       screen.getByText("runtime claude:sonnet is not installed"),
@@ -243,7 +241,7 @@ describe("RunPromptPanel", () => {
         }),
       );
     renderPanel(stubApi({ startPromptRun }));
-    fireEvent.click(await screen.findByRole("button", { name: "Run prompt" }));
+    await clickRunPrompt();
     expect(await screen.findByText(refusal)).toBeTruthy();
     expect(screen.getByRole("note").textContent).toBe(hint);
     const context = [...document.querySelectorAll("details")]
