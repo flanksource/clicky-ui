@@ -239,7 +239,7 @@ describe("ThreadsSurface", () => {
       renderSurface(client, { initial: { thread: "22" } });
       fireEvent.click(await screen.findByRole("button", { name: /Download full dump/ }));
       expect(await screen.findByText("Thread dump unavailable")).toBeInTheDocument();
-      expect(screen.getAllByText(/Ledger\.post/).length).toBeGreaterThan(0);
+      expect((await screen.findAllByText(/Ledger\.post/)).length).toBeGreaterThan(0);
     });
   });
 
