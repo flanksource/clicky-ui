@@ -183,6 +183,32 @@ describe("effectiveProperties", () => {
     expect(required).toContain("FirstName");
   });
 
+  // A composed component that carries its own conditional as well as its own
+  // properties (a handling answer: outcome and requirements, plus "a manual
+  // outcome names the manual transaction") contributes both.
+  it("merges an allOf member's own properties beside the branch its own if selects", () => {
+    const composed: JsonSchemaObject = {
+      type: "object",
+      properties: { supported: { type: "string" } },
+      allOf: [
+        {
+          properties: { outcome: { type: "string" }, manual: { type: "string" } },
+          required: ["outcome"],
+          if: { required: ["outcome"], properties: { outcome: { const: "manual" } } },
+          [thenKeyword]: { required: ["manual"] },
+        },
+      ],
+    } as JsonSchemaObject;
+    const shape = (value: Record<string, unknown>) => {
+      const { properties, required } = effectiveProperties(composed, value);
+      return { keys: Object.keys(properties).sort(), required: [...required].sort() };
+    };
+    expect([shape({}), shape({ outcome: "manual" })]).toEqual([
+      { keys: ["manual", "outcome", "supported"], required: ["outcome"] },
+      { keys: ["manual", "outcome", "supported"], required: ["manual", "outcome"] },
+    ]);
+  });
+
   it("merges base properties, composition members, and matching conditionals together", () => {
     const mixed: JsonSchemaObject = {
       type: "object",

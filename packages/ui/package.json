@@ -232,7 +232,7 @@
     "@lexical/react": "catalog:",
     "@monaco-editor/react": "catalog:",
     "@radix-ui/react-compose-refs": "^1.1.2",
-    "@radix-ui/react-slot": "^1.1.1",
+    "@radix-ui/react-slot": "^1.3.0",
     "@tanstack/react-virtual": "^3.13.12",
     "ajv": "catalog:",
     "class-variance-authority": "^0.7.1",

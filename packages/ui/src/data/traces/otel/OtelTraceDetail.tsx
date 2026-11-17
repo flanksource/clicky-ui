@@ -64,9 +64,13 @@ export type OtelTraceDetailProps = {
   onSelectSpan: (id: string) => void;
   /** Places the trace title elsewhere, e.g. an app shell's top bar; rendered inline when unset. */
   renderTitle?: (title: ReactNode) => ReactNode;
+  /** Spans a source-side filter selected; the waterfall keeps them and their ancestors. Unset shows every span. */
+  visibleSpanIds?: ReadonlySet<string>;
+  /** Rendered above the span toolbar, e.g. the source's filter bar and load progress. */
+  header?: ReactNode;
 };
 
-export function OtelTraceDetail({ trace: TRACE, selectedSpanId, onSelectSpan, renderTitle }: OtelTraceDetailProps) {
+export function OtelTraceDetail({ trace: TRACE, selectedSpanId, onSelectSpan, renderTitle, visibleSpanIds, header }: OtelTraceDetailProps) {
   const index = useMemo(() => indexTrace(TRACE), [TRACE]);
   const suspects = useMemo(() => misparented(index), [index]);
   const selected = selectedSpanId ?? TRACE.spans[0]?.spanId ?? "";
@@ -80,13 +84,14 @@ export function OtelTraceDetail({ trace: TRACE, selectedSpanId, onSelectSpan, re
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q && categories.size === 0 && !onlySuspects) return undefined;
+    if (!q && categories.size === 0 && !onlySuspects && !visibleSpanIds) return undefined;
     const hits = TRACE.spans.filter(span =>
+      (!visibleSpanIds || visibleSpanIds.has(span.spanId)) &&
       (!q || [span.operation, span.service, ...Object.values(span.attributes ?? {}).map(String)].some(text => text.toLowerCase().includes(q))) &&
       (categories.size === 0 || categories.has(category(span))) &&
       (!onlySuspects || suspects.has(span.spanId)));
     return withAncestors(index, hits.map(span => span.spanId));
-  }, [index, query, categories, onlySuspects, suspects, TRACE]);
+  }, [index, query, categories, onlySuspects, suspects, TRACE, visibleSpanIds]);
 
   const rows = useMemo(() => buildRows(index, { collapsed, expanded, group, ...(visible ? { visible } : {}) }), [index, collapsed, expanded, group, visible]);
 
@@ -118,6 +123,7 @@ export function OtelTraceDetail({ trace: TRACE, selectedSpanId, onSelectSpan, re
             </p>
           </Callout>
         )}
+        {header}
         <Toolbar
           trace={TRACE}
           query={query}

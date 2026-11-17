@@ -250,6 +250,14 @@ export interface FormLayout {
    * wins over this.
    */
   help?: HelpDisplay;
+  /**
+   * "add-menu" hides every empty array of an object (the form and each nested
+   * section) and offers them from one "Add" menu at the top of that object;
+   * choosing one adds its first item, after which the array adds inline.
+   * Without it, only an object with more than three arrays collapses its empty
+   * ones, into an "Add item…" picker below its fields.
+   */
+  emptyArrays?: "add-menu";
 }
 export interface JsonSchemaFormProps extends FormErrorProps {
   /** Infer label icons from standard schema types and formats. Explicit icons win. */

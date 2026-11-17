@@ -17,7 +17,7 @@ import {
   itemSummaryFor,
   resolveItemSpec,
 } from "./json-schema-form-item-summary";
-import { ItemBadge, RequiredMark } from "./json-schema-form-item-row";
+import { ItemBadge, ItemBadges, RequiredMark } from "./json-schema-form-item-row";
 import { inputSizeClass } from "./json-schema-form-size";
 import { TONE_EDGE_CLASS } from "./json-schema-form-tone";
 import {
@@ -92,6 +92,7 @@ export function CardsArray({
                 {summary.title}
               </span>
               <ItemBadge badge={summary.badge} />
+              <ItemBadges badges={summary.badges} />
               {summary.flagged && <RequiredMark />}
               {summary.summary && (
                 <code className="truncate font-mono text-xs text-muted-foreground">

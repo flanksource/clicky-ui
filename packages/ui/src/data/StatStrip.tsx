@@ -49,9 +49,11 @@ export type StatStripProps = {
 function StatStripCell({
   item,
   classNames,
+  className,
 }: {
   item: StatStripItem;
   classNames: StatStripClassNames;
+  className?: string;
 }) {
   const body = (
     <>
@@ -90,6 +92,7 @@ function StatStripCell({
 
   const cellClasses = cn(
     "flex flex-col gap-0.5 bg-card px-density-3 py-density-2 text-left",
+    className,
     classNames.cell,
   );
 
@@ -122,12 +125,21 @@ function StatStripCell({
  * Cell separators come from a 1px grid gap over the container background, so
  * they stay correct however the grid wraps.
  */
+// How many columns the last cell spans so a short last row leaves no empty
+// cells (which would show as a block of the separator colour).
+const lastSpan = (count: number, columns: number) =>
+  count % columns === 0 ? 1 : columns - (count % columns) + 1;
+
+const LAST_CELL =
+  "[grid-column:span_var(--stat-last-span-sm)/span_var(--stat-last-span-sm)] md:[grid-column:span_var(--stat-last-span)/span_var(--stat-last-span)]";
+
 export function StatStrip({
   items,
   columns,
   className,
   classNames = {},
 }: StatStripProps) {
+  const cols = columns ?? Math.max(items.length, 1);
   return (
     <div
       className={cn(
@@ -140,12 +152,19 @@ export function StatStrip({
         className="grid grid-cols-2 gap-px md:grid-cols-[repeat(var(--stat-cols,4),minmax(0,1fr))]"
         style={
           {
-            "--stat-cols": columns ?? Math.max(items.length, 1),
+            "--stat-cols": cols,
+            "--stat-last-span": lastSpan(items.length, cols),
+            "--stat-last-span-sm": lastSpan(items.length, 2),
           } as CSSProperties
         }
       >
         {items.map((item, index) => (
-          <StatStripCell key={index} item={item} classNames={classNames} />
+          <StatStripCell
+            key={index}
+            item={item}
+            classNames={classNames}
+            {...(index === items.length - 1 ? { className: LAST_CELL } : {})}
+          />
         ))}
       </div>
     </div>

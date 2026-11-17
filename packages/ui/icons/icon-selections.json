@@ -3129,6 +3129,14 @@
       "note": "A group/collective distinct from users-three (a team vs a wider membership)."
     },
     {
+      "consumerName": "user-switch",
+      "group": "people-orgs",
+      "status": "NEW",
+      "outline": "ph:user-switch-thin",
+      "filled": "ph:user-switch-fill",
+      "note": "Assign or transfer threads to an agent session."
+    },
+    {
       "consumerName": "user-gear",
       "group": "people-orgs",
       "status": "NEW",

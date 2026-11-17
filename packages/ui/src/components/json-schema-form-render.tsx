@@ -26,7 +26,7 @@ import { ArrayControl } from "./json-schema-form-array";
 import { ObjectControl, StringMapControl } from "./json-schema-form-object";
 import { FieldErrorMessages, FieldErrorText } from "./json-schema-form-error-display";
 import { CustomControl } from "./json-schema-form-custom-control";
-import { rowLayoutEngine, type BuiltFieldRow, type LayoutEngine } from "./json-schema-form-extension-api";
+import { isBuiltInFormLayout, rowLayoutEngine, type BuiltFieldRow, type LayoutEngine } from "./json-schema-form-extension-api";
 import { appendInstancePath, errorsAtInstancePath } from "./json-schema-form-errors";
 import type { JsonSchemaFormError } from "./json-schema-form-error-types";
 import { applyPostExtensions } from "./json-schema-form-extensions";
@@ -69,7 +69,8 @@ import { JsonControl } from "./json-schema-form-json";
 import { NullableControl } from "./json-schema-form-nullable";
 import { FormObjectSection } from "./json-schema-form-section";
 import { FieldClearButton } from "./field-clear-button";
-import { UiText, UiCalendar, UiToggleOff, UiListNumbers, UiArray, UiCode2, UiListDashes } from "../icons";
+import { UiAdd, UiText, UiCalendar, UiToggleOff, UiListNumbers, UiArray, UiCode2, UiListDashes } from "../icons";
+import { DropdownMenu } from "../overlay/DropdownMenu";
 import { FormHelp } from "./json-schema-form-help-links";
 import { hasFormHelp } from "./json-schema-form-help-model";
 
@@ -257,7 +258,7 @@ function buildField(
   const errors = errorsAtInstancePath(ctx.errors, instancePath);
   const soft = errors.length === 0 ? softError(field) : undefined;
   const messages: JsonSchemaFormError[] =
-    errors.length > 0 ? errors : soft ? [{ instancePath, message: soft }] : [];
+    errors.length > 0 ? errors : soft ? [{ instancePath, ...soft }] : [];
   if (messages.length > 0) field = { ...field, invalid: true };
   // A field's own x-help-display wins over the form-level setting; both default
   // to the permanent paragraph every form renders today.
@@ -529,7 +530,10 @@ export function renderObjectFields(
   // full row). Only takes effect in stacked mode — inline owns its 2-track grid.
   const columns = ctx.layout.mode !== "stacked" ? 1 : normalizeColumns(schema["x-columns"]);
   const arrayEntries = entries.filter(([, prop]) => prop.type === "array");
-  const compactArrays = ctx.layout.mode !== "properties" && arrayEntries.length > 3;
+  const addMenu = ctx.layout.emptyArrays === "add-menu";
+  // Collapsing empty arrays is the built-in layouts' arrangement; a registered
+  // layout engine owns its rows, so it is handed every array row instead.
+  const compactArrays = isBuiltInFormLayout(ctx.layout.mode) && ctx.layout.mode !== "properties" && arrayEntries.length > (addMenu ? 0 : 3);
   const rowDisplay = schema["x-object-display"] === "row" && ctx.layout.mode !== "properties";
   const rows = entries.flatMap(([key, prop]): ReactNode[] => {
     if (hidden.has(key)) return [];
@@ -563,7 +567,30 @@ export function renderObjectFields(
     const available = arrayEntries.filter(([key, prop]) =>
       !hidden.has(key) && prop["x-hidden"] === undefined && (!Array.isArray(value[key]) || prop.maxItems === undefined || value[key].length < prop.maxItems),
     );
-    if (available.length > 0) {
+    const addItem = (key: string) => {
+      const prop = properties[key];
+      if (!prop || prop.type !== "array") throw new Error(`cannot add item to ${key}`);
+      const items = value[key];
+      if (items !== undefined && !Array.isArray(items)) throw new Error(`${key} is not an array`);
+      onChange({ ...value, [key]: [...(items ?? []), seedFromSchema(prop.items ?? { type: "string" })] });
+    };
+    // The add-menu offers only the arrays it hid; an array with items adds inline.
+    const empty = available.filter(([key]) => !Array.isArray(value[key]) || value[key].length === 0);
+    if (addMenu && empty.length > 0) {
+      rows.unshift(
+        <div key="keyed-array-add" data-jsf-add-menu="" className="col-span-full" style={{ gridColumn: "1 / -1" }}>
+          <DropdownMenu
+            label="Add"
+            icon={UiAdd}
+            variant="outline"
+            size="sm"
+            align="left"
+            menuLabel="Add"
+            items={empty.map(([key, prop]) => ({ label: prop.title || key, onSelect: () => addItem(key) }))}
+          />
+        </div>,
+      );
+    } else if (!addMenu && available.length > 0) {
       rows.push(
         <div key="keyed-array-add" className="col-span-full w-full max-w-72">
           <Combobox
@@ -572,13 +599,7 @@ export function renderObjectFields(
             options={available.map(([key, prop]) => ({ value: key, label: prop.title || key }))}
             value=""
             allowCustomValue={false}
-            onChange={(key) => {
-              const prop = properties[key];
-              if (!prop || prop.type !== "array") throw new Error(`cannot add item to ${key}`);
-              const items = value[key];
-              if (items !== undefined && !Array.isArray(items)) throw new Error(`${key} is not an array`);
-              onChange({ ...value, [key]: [...(items ?? []), seedFromSchema(prop.items ?? { type: "string" })] });
-            }}
+            onChange={addItem}
           />
         </div>,
       );

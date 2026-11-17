@@ -54,6 +54,8 @@ export type CommentProviderProps =CommentCallbacks & {
    * visible, so the reader is not asked to open it a second time.
    */
   initialRailMode?: CommentRailMode;
+  /** Document controls shown in the comment rail's header, including compact dialogs. */
+  railHeaderActions?: ReactNode;
   /** Recover comment UI and drafts in this tab under a document-specific key. */
   persistenceKey?: string;
 };
@@ -95,6 +97,7 @@ function CommentProviderInner({
   onRequestRevision,
   loadProposalDiff,
   initialRailMode = "closed",
+  railHeaderActions,
   persistenceKey,
 }: CommentProviderProps) {
   const [railMode, setRailMode] = useCommentState<CommentRailMode>("rail", initialRailMode);
@@ -281,6 +284,7 @@ function CommentProviderInner({
       commentCounts,
       commentMeta,
       railMode,
+      railHeaderActions,
       focusedAnchor,
       focusAnchor,
       openCommentList,
@@ -299,6 +303,7 @@ function CommentProviderInner({
       commentCounts,
       commentMeta,
       railMode,
+      railHeaderActions,
       focusedAnchor,
       focusAnchor,
       openCommentList,

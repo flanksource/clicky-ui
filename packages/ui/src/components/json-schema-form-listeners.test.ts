@@ -129,6 +129,18 @@ describe("applyListenerState", () => {
     ];
     expect(() => stateOf(schema, { LoanOverride: YES })).not.toThrow();
   });
+
+  it("accepts a target declared in a nested if/then/else of an allOf member's else", () => {
+    const schema = loanSchema([{ when: { const: YES }, show: ["NestedOnly"] }]);
+    schema.allOf = [
+      {
+        if: { required: ["Closed"] },
+        [thenKeyword]: { properties: { Closed: { type: "string" } } },
+        else: { if: { required: ["Open"] }, [thenKeyword]: {}, else: { properties: { NestedOnly: { type: "string" } } } },
+      },
+    ];
+    expect(() => stateOf(schema, { LoanOverride: YES })).not.toThrow();
+  });
 });
 
 describe("applyListenerState patch", () => {

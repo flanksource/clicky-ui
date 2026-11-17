@@ -163,6 +163,17 @@ describe("layout engines", () => {
     expect(screen.getByLabelText("Name")).toBeInTheDocument();
   });
 
+  it("hands the engine every array row, so the built-in empty-array picker never steps in for it", () => {
+    const list = (title: string) => ({ type: "array" as const, title, items: { type: "string" as const } });
+    const arrays: JsonSchemaObject = {
+      type: "object",
+      properties: { a: list("A"), b: list("B"), c: list("C"), d: list("D") },
+    };
+    renderForm(arrays, { extensions: [layoutExtension], layout: { mode: "cards" } });
+    expect(["a", "b", "c", "d"].map((key) => screen.queryByTestId(`card-${key}`) !== null)).toEqual([true, true, true, true]);
+    expect(screen.queryByRole("combobox", { name: "Add item" })).not.toBeInTheDocument();
+  });
+
   it("throws for an unregistered layout.mode", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => renderForm(nested, { layout: { mode: "masonry" } })).toThrow(/form layout "masonry".*not registered/);

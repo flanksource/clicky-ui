@@ -15,7 +15,7 @@ import { applyPostExtensions } from "./json-schema-form-extensions";
 import { appendInstancePath } from "./json-schema-form-errors";
 import { applyChangeEffects } from "./json-schema-form-listeners";
 import { tableColumnOptions, tableLayout } from "./json-schema-form-array-view";
-import { itemCountLabel, noItemsLabel, resolveItemSpec } from "./json-schema-form-item-summary";
+import { itemCountLine, resolveItemSpec } from "./json-schema-form-item-summary";
 import { labelSizeClass } from "./json-schema-form-size";
 import {
   canAddItem,
@@ -235,7 +235,7 @@ export function TableArray({
     <div className="flex flex-col gap-2">
       <div data-jsf-array-summary className="flex items-center justify-between gap-2">
         <p className={cn("text-muted-foreground", labelSizeClass[ctx.size])}>
-          {items.length === 0 ? noItemsLabel(spec) : itemCountLabel(spec, items.length)}
+          {itemCountLine(spec, items.length)}
         </p>
         <div className="flex shrink-0 items-center">{toolbar}</div>
       </div>

@@ -1,4 +1,4 @@
-import { useId, useRef, type ReactNode } from "react";
+import { isValidElement, useId, useRef, type ReactElement, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { Icon, type StaticIconComponent } from "../data/Icon";
 
@@ -9,8 +9,8 @@ export type SegmentedOption<T extends string = string> = {
   id: T;
   /** Visible label. */
   label: ReactNode;
-  /** Optional leading icon (imported `Ui*` component or runtime name). */
-  icon?: string | StaticIconComponent;
+  /** Optional leading icon (imported `Ui*` component, runtime name, or a rendered element). */
+  icon?: string | StaticIconComponent | ReactElement;
   /** Classes applied to the leading icon. */
   iconClassName?: string;
   /** Classes applied to this segment only while selected. */
@@ -154,7 +154,9 @@ export function SegmentedControl<T extends string = string>({
               active && option.activeClassName,
             )}
           >
-            {option.icon && (
+            {isValidElement(option.icon) ? (
+              <span className={cn("inline-flex shrink-0", option.iconClassName)}>{option.icon}</span>
+            ) : option.icon && (
               <Icon
                 {...(typeof option.icon === "string"
                   ? { name: option.icon }

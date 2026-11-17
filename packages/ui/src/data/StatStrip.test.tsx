@@ -36,6 +36,17 @@ describe("StatStrip", () => {
     expect(grid()).toHaveStyle({ "--stat-cols": "4" });
   });
 
+  it.each([
+    [6, 4, "3"],
+    [5, 4, "4"],
+    [8, 4, "1"],
+    [3, 2, "2"],
+  ])("stretches the last of %i cells over what %i columns leave empty in its row", (count, columns, span) => {
+    const many = Array.from({ length: count }, (_, i) => ({ label: `Stat ${i + 1}`, value: String(i) }));
+    render(<StatStrip items={many} columns={columns} />);
+    expect(screen.getByTestId("stat-strip").firstElementChild).toHaveStyle({ "--stat-last-span": span });
+  });
+
   it("renders an actionable item as a button", () => {
     const onClick = vi.fn();
     render(<StatStrip items={[{ label: "Ready", value: "5", onClick }]} />);

@@ -142,16 +142,17 @@ describe("seedFromSchema", () => {
 });
 
 describe("softError", () => {
+  // Each hint names the JSON Schema keyword it stands for, so a layout can tell missing content from wrong content.
   it("flags an empty required field", () => {
-    expect(softError(field({ required: true, value: "" }))).toBe("Required");
+    expect(softError(field({ required: true, value: "" }))).toEqual({ keyword: "required", message: "Required" });
   });
   it("flags a number below minimum", () => {
-    expect(softError(field({ kind: "number", minimum: 0, value: -3 }))).toBe("Must be ≥ 0");
+    expect(softError(field({ kind: "number", minimum: 0, value: -3 }))).toEqual({ keyword: "minimum", message: "Must be ≥ 0" });
   });
   it("flags an unknown enum value only when custom values are disallowed", () => {
     expect(
       softError(field({ kind: "enum", options: [{ value: "a", label: "a" }], value: "z" })),
-    ).toBe("Unknown value (allowed)");
+    ).toEqual({ keyword: "enum", message: "Unknown value (allowed)" });
     expect(
       softError(
         field({ kind: "enum", options: [{ value: "a", label: "a" }], value: "z", allowCustomValue: true }),

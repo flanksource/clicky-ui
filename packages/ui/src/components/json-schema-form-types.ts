@@ -342,6 +342,10 @@ export interface ArrayItemSpec {
   glyph?: string;
   /** Enum property supplying a secondary chip. */
   badge?: string;
+  /** Further chips, one per part, each the value through its pattern ("min {}"); an empty value drops its chip. */
+  badges?: Array<string | ArrayItemSummaryPart>;
+  /** `false` drops the "4 items" count line once the list has items. Defaults to true. */
+  count?: boolean;
   /** Boolean property rendered as the required mark. */
   flag?: string;
   /**
@@ -373,6 +377,7 @@ export interface ArrayItemSummary {
   summary?: string;
   glyph?: { icon?: LabelIconSpec; tone: FieldTone; label?: string };
   badge?: { icon?: LabelIconSpec; label: string };
+  badges?: string[];
   flagged?: boolean;
 }
 
@@ -545,6 +550,9 @@ export interface FieldControl {
 export interface FieldOption {
   value: string;
   label: string;
+  // The x-enum-label alone, without the "(code)" `label` appends; set only when
+  // the schema names the value. Segmented chips show it and keep `label` as the tooltip.
+  name?: string;
   // Optional leading glyph (runtime icon name or a rendered node), shown by the
   // grid enum display. Resolved from the schema's x-enum-icons.
   icon?: LabelIconSpec;

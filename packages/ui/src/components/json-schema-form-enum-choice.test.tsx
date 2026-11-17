@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { JsonSchemaForm } from "./JsonSchemaForm";
-import type { EnumDisplay, JsonSchemaObject } from "./json-schema-form-types";
+import type { EnumDisplay, FieldControl, JsonSchemaObject } from "./json-schema-form-types";
 
 const DESCRIPTIONS = {
   insert: "Insert a new activity.",
@@ -181,5 +181,27 @@ describe("JsonSchemaForm segmented enum: descriptions and default", () => {
   it("does not render the implied state once a segment is selected", () => {
     const group = renderMode({ display: "segmented", defaultValue: "insert", value: { mode: "skip" } });
     expect(group.querySelector("[data-implied]")).toBeNull();
+  });
+});
+
+describe("JsonSchemaForm segmented enum: labels and icons", () => {
+  const schema: JsonSchemaObject = {
+    type: "object",
+    properties: {
+      subject: { type: "string", title: "Subject", enum: ["scheme", "policy"], "x-enum-display": "segmented", "x-enum-labels": { scheme: "Scheme", policy: "Policy" } },
+    },
+  };
+
+  it("names each segment by its x-enum-label alone, keeping the code in its tooltip", () => {
+    render(<JsonSchemaForm schema={schema} value={{ subject: "scheme" }} onChange={vi.fn()} showPreferencesMenu={false} />);
+    const segments = within(screen.getByRole("radiogroup", { name: "Subject" })).getAllByRole("radio");
+    expect(segments.map((segment) => [segment.textContent, segment.getAttribute("title")])).toEqual([["Scheme", "Scheme (scheme)"], ["Policy", "Policy (policy)"]]);
+  });
+
+  it("renders an option icon a pre-extension supplies as an element", () => {
+    const pre = (field: FieldControl) => field.key !== "subject" ? field : { ...field, options: field.options?.map((option) => ({ ...option, icon: <svg data-subject-icon={option.value} /> })) };
+    render(<JsonSchemaForm schema={schema} value={{ subject: "scheme" }} onChange={vi.fn()} extensions={[{ name: "icons", pre: [pre] }]} showPreferencesMenu={false} />);
+    const group = screen.getByRole("radiogroup", { name: "Subject" });
+    expect([...group.querySelectorAll("[data-subject-icon]")].map((icon) => icon.getAttribute("data-subject-icon"))).toEqual(["scheme", "policy"]);
   });
 });

@@ -2,18 +2,24 @@ import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
 
 const ROW_FLOW = "[data-combobox-tag], [data-combobox-more], input";
 
-/**
- * How many leading tags fit on the control's first row beside the "+N more"
- * chip and the input. Starts from all of them and drops one per layout pass
- * until nothing wraps; a new selection or control width measures again.
- */
+type TagFit = {
+  key: string;
+  width: number;
+  min: number;
+  max: number;
+  count: number;
+};
+
 export function useSingleRowTagCount(
   anchorRef: RefObject<HTMLDivElement | null>,
   values: string[],
 ): number {
-  const [limit, setLimit] = useState<number>();
+  const [fit, setFit] = useState<TagFit>();
   const [width, setWidth] = useState(0);
   const key = values.join("\u0000");
+  const current = fit?.key === key && fit.width === width ? fit : undefined;
+  const count = current?.count ?? values.length;
+
   useEffect(() => {
     const anchor = anchorRef.current;
     if (!anchor || typeof ResizeObserver === "undefined") return;
@@ -23,12 +29,10 @@ export function useSingleRowTagCount(
     observer.observe(anchor);
     return () => observer.disconnect();
   }, [anchorRef]);
-  useLayoutEffect(() => {
-    setLimit(undefined);
-  }, [key, width]);
+
   useLayoutEffect(() => {
     const anchor = anchorRef.current;
-    if (!anchor || !values.length) return;
+    if (!anchor || count === 0) return;
     const flow = [...anchor.children].filter(
       (child): child is HTMLElement =>
         child instanceof HTMLElement && child.matches(ROW_FLOW),
@@ -36,8 +40,14 @@ export function useSingleRowTagCount(
     const first = flow[0];
     if (!first) return;
     const threshold = first.offsetTop + Math.max(first.offsetHeight / 2, 1);
-    if (!flow.some((element) => element.offsetTop > threshold)) return;
-    setLimit((current) => Math.max(0, (current ?? values.length) - 1));
+    const wraps = flow.some((element) => element.offsetTop > threshold);
+
+    // Try all tags without the overflow chip first, then narrow the range each layout pass.
+    const min = wraps ? (current && current.min < count ? current.min : 0) : count;
+    const max = wraps ? count - 1 : (current?.max ?? values.length);
+    const next = Math.ceil((min + max) / 2);
+    if (next !== count) setFit({ key, width, min, max, count: next });
   });
-  return Math.min(limit ?? values.length, values.length);
+
+  return count;
 }

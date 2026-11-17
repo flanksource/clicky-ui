@@ -1,6 +1,7 @@
 export * from "./client";
 export * from "./clipboard";
 export * from "./CommentAgentPicker";
+export * from "./CommentAgentSessions";
 export type { CommentAgentField, ProvenanceChip } from "./comment-agent-model";
 export * from "./comment-events";
 export * from "./comments-model";

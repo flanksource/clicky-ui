@@ -7,14 +7,14 @@ const ROW_CAPACITY = 2;
 
 // jsdom does no layout, so simulate a control row that fits ROW_CAPACITY
 // tags beside the "+N more" chip and the input; anything past them wraps.
-function stubRowLayout() {
+function stubRowLayout(total = FILES.length) {
   vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function (this: HTMLElement) {
     const row = this.closest("[data-jsf-control]");
     if (!row || this.parentElement !== row) return 0;
     const flow = [...row.children].filter((child) => child.matches("[data-combobox-tag], [data-combobox-more], input"));
     const index = flow.indexOf(this);
     const tags = flow.filter((child) => child.matches("[data-combobox-tag]")).length;
-    const slots = tags < FILES.length ? ROW_CAPACITY + 2 : ROW_CAPACITY + 1;
+    const slots = tags < total ? ROW_CAPACITY + 2 : ROW_CAPACITY + 1;
     return index >= slots ? 30 : 0;
   });
 }
@@ -50,5 +50,16 @@ describe("Combobox tags overflow", () => {
 
     expect(container.querySelectorAll("[data-combobox-tag]")).toHaveLength(FILES.length);
     expect(screen.queryByRole("button", { name: /more selected/ })).toBeNull();
+  });
+
+  it("fits a large staged-file selection within React's update limit", () => {
+    const files = Array.from({ length: 204 }, (_, index) => `internal/file-${index}.go`);
+    stubRowLayout(files.length);
+    const { container } = render(
+      <Combobox multiple variant="tags" value={files} onChange={vi.fn()} options={[]} />,
+    );
+
+    expect(container.querySelectorAll("[data-combobox-tag]")).toHaveLength(ROW_CAPACITY);
+    expect(screen.getByRole("button", { name: `Show ${files.length - ROW_CAPACITY} more selected` })).toBeTruthy();
   });
 });

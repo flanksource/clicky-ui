@@ -359,7 +359,9 @@ function declaredKeys(schema: JsonSchemaObject): Set<string> {
     for (const key of Object.keys(branch.properties ?? {})) keys.add(key);
   }
   for (const clause of schema.allOf ?? []) {
-    for (const branch of [clause, clause.then, clause.else]) {
+    // A member's `else` may itself be an if/then/else chain (an answer that is
+    // handled, open or not applicable), so walk every branch it can select.
+    for (const branch of [clause, ...declaredBranches(clause)]) {
       for (const key of Object.keys(branch?.properties ?? {})) keys.add(key);
     }
   }

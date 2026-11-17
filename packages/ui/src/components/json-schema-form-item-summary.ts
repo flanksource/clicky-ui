@@ -30,6 +30,7 @@ export function resolveItemSpec(
     : {};
   const title = stringArray(raw.title);
   const summary = summaryParts(raw.summary);
+  const badges = summaryParts(raw.badges);
   const glyph = typeof raw.glyph === "string" ? raw.glyph : autoGlyphKey(itemSchema);
   return {
     title: title.length > 0 ? title : DEFAULT_TITLE_KEYS,
@@ -37,6 +38,8 @@ export function resolveItemSpec(
     ...(summary.length > 0 ? { summary } : {}),
     ...(glyph ? { glyph } : {}),
     ...(typeof raw.badge === "string" && raw.badge ? { badge: raw.badge } : {}),
+    ...(badges.length > 0 ? { badges } : {}),
+    ...(raw.count === false ? { count: false } : {}),
     ...(typeof raw.flag === "string" && raw.flag ? { flag: raw.flag } : {}),
     // Only carried when the schema actually said something: an absent key means
     // every action, while an explicit empty list means none, and those two
@@ -119,6 +122,10 @@ export function itemSummaryFor({
     .filter((s): s is string => !!s)
     .join(SUMMARY_SEPARATOR);
 
+  const badges = (spec.badges ?? [])
+    .map((part) => summaryPart(obj, part))
+    .filter((s): s is string => !!s);
+
   const glyphValue = spec.glyph ? text(obj[spec.glyph]) : "";
   const glyphProp = spec.glyph ? props[spec.glyph] : undefined;
   const badgeValue = spec.badge ? text(obj[spec.badge]) : "";
@@ -147,6 +154,7 @@ export function itemSummaryFor({
           },
         }
       : {}),
+    ...(badges.length > 0 ? { badges } : {}),
     ...(spec.flag && obj[spec.flag] === true ? { flagged: true } : {}),
   };
 }
@@ -161,6 +169,13 @@ export function itemCountLabel(spec: ArrayItemSpec, count: number): string {
   return count === 1
     ? `1 ${spec.noun ?? "item"}`
     : `${count} ${spec.nounPlural ?? "items"}`;
+}
+
+// The line above a list: "No items yet" when it is empty, else the count, which
+// `x-item.count: false` drops for a list whose rows say enough.
+export function itemCountLine(spec: ArrayItemSpec, count: number): string | undefined {
+  if (count === 0) return noItemsLabel(spec);
+  return spec.count === false ? undefined : itemCountLabel(spec, count);
 }
 
 // The zero-item explanation. Falls back to the array's own description, so a

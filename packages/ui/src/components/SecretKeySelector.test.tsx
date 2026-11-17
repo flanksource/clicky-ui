@@ -229,6 +229,34 @@ describe("SecretKeySelector references", () => {
     });
   });
 
+  it("commits a path picked from the release's values as the helm key", async () => {
+    const onChange = vi.fn();
+    const loadHelmValues = vi.fn(() =>
+      Promise.resolve({ auth: { password: "••••" } }),
+    );
+    render(
+      <SecretKeySelector
+        value={{ kind: "helm", name: "mysql", key: "" }}
+        sources={["secret", "helm", "value"]}
+        {...baseProps({ onChange, loadHelmValues })}
+      />,
+    );
+    const browse = screen.getByRole("button", {
+      name: "Browse Helm value JSONPath JSON paths",
+    });
+    await waitFor(() => expect(browse).toBeEnabled());
+    expect(loadHelmValues).toHaveBeenCalledWith("mysql");
+
+    fireEvent.click(browse);
+    fireEvent.click(await screen.findByText("$.auth.password"));
+
+    expect(onChange).toHaveBeenCalledWith({
+      kind: "helm",
+      name: "mysql",
+      key: "$.auth.password",
+    });
+  });
+
   it("hints jsonpath for the helm key field", async () => {
     render(
       <SecretKeySelector
