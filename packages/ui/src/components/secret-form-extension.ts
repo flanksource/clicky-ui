@@ -26,6 +26,8 @@ export type SecretFormLoaders = {
     name: string,
     namespace: string,
   ) => Promise<KeyPreview[]>;
+  /** The Helm release's merged values, scalars masked, for the helm key's JSONPath picker. */
+  loadHelmValues?: (name: string, namespace: string) => Promise<unknown>;
   loadServiceAccounts: (namespace: string) => Promise<SecretResource[]>;
   loadOnePasswordVaults: OnePasswordLoaders["loadVaults"];
   loadOnePasswordItems: OnePasswordLoaders["loadItems"];

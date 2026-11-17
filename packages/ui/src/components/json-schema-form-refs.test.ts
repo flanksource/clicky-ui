@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { effectiveProperties } from "./json-schema-form-conditionals";
 import { rehydrateRefs } from "./json-schema-form-refs";
 import type { JsonSchemaObject } from "./json-schema-form-types";
 
@@ -125,6 +126,50 @@ describe("rehydrateRefs", () => {
     expect(out.properties.x.title).toBe("Override");
     expect(out.properties.x.description).toBe("d");
     expect(out.properties.x.type).toBe("string");
+  });
+
+  describe("a $ref beside its own conditional, properties and required (both apply, as in JSON Schema)", () => {
+    // An answer is handled, or open questions; a branch of it adds a choice that a handled answer must make.
+    const schema = {
+      properties: {
+        grouping: {
+          $ref: "#/$defs/answer",
+          properties: { choice: { type: "string" } },
+          required: ["note"],
+          if: { required: ["outcome"] },
+          then: { required: ["choice"] },
+        },
+      },
+      $defs: {
+        answer: {
+          type: "object",
+          properties: { note: { type: "string" } },
+          required: ["id"],
+          if: { required: ["open"] },
+          then: { properties: { open: { type: "array" } } },
+          else: { properties: { outcome: { type: "string" } } },
+        },
+      },
+    } as unknown as JsonSchemaObject;
+    const grouping = () => (rehydrateRefs(schema).properties as Record<string, JsonSchemaObject>).grouping!;
+    const effective = (value: Record<string, unknown>) => {
+      const { properties, required } = effectiveProperties(grouping(), value);
+      return { keys: Object.keys(properties).sort(), required: [...required].sort() };
+    };
+
+    it("keeps the referenced conditional beside the local one, each selecting on the value", () => {
+      expect([effective({}), effective({ outcome: "allowed" }), effective({ open: [] })]).toEqual([
+        { keys: ["choice", "note", "outcome"], required: ["id", "note"] },
+        { keys: ["choice", "note", "outcome"], required: ["choice", "id", "note"] },
+        { keys: ["choice", "note", "open"], required: ["id", "note"] },
+      ]);
+    });
+
+    it("leaves a $ref without a local conditional as the merged body, with no allOf", () => {
+      const plain = { properties: { x: { $ref: "#/$defs/a", properties: { b: { type: "string" } } } }, $defs: { a: { type: "object", if: { required: ["c"] }, then: {} } } } as unknown as JsonSchemaObject;
+      const x = (rehydrateRefs(plain).properties as Record<string, Record<string, unknown>>).x!;
+      expect({ allOf: x.allOf, if: x.if, properties: Object.keys(x.properties as object) }).toEqual({ allOf: undefined, if: { required: ["c"] }, properties: ["b"] });
+    });
   });
 
   it("breaks a cyclic ref with a stub instead of recursing forever", () => {

@@ -98,6 +98,13 @@ export function SecretFormField({
       loaders.loadKeyPreview(kind, name, namespace),
     [loaders, namespace],
   );
+  const loadHelmValues = useMemo(
+    () =>
+      loaders.loadHelmValues
+        ? (name: string) => loaders.loadHelmValues!(name, namespace)
+        : undefined,
+    [loaders, namespace],
+  );
   const loadServiceAccounts = useCallback(
     () => loaders.loadServiceAccounts(namespace),
     [loaders, namespace],
@@ -151,6 +158,7 @@ export function SecretFormField({
         urlSelector={{
           loadResources,
           loadKeyPreview,
+          ...(loadHelmValues ? { loadHelmValues } : {}),
           loadServiceAccounts,
           onePassword,
           ...(urlSources ? { sources: urlSources } : {}),
@@ -169,6 +177,7 @@ export function SecretFormField({
       onChange={changeSecret}
       loadResources={loadResources}
       loadKeyPreview={loadKeyPreview}
+      {...(loadHelmValues ? { loadHelmValues } : {})}
       loadServiceAccounts={loadServiceAccounts}
       onePassword={onePassword}
       {...(secretSources ? { sources: secretSources } : {})}

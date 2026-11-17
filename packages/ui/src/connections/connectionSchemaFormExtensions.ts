@@ -222,6 +222,10 @@ export function connectionSecretLoaders({
       fetcher(
         `${base}/secrets/preview?kind=${kind}&name=${encodeURIComponent(name)}${namespaceQuery(namespace)}`,
       ),
+    loadHelmValues: (name, namespace) =>
+      fetcher(
+        `${base}/secrets/helm-values?name=${encodeURIComponent(name)}${namespaceQuery(namespace)}`,
+      ),
     loadServiceAccounts: (namespace) =>
       fetcher(
         `${base}/secrets?kind=serviceaccount${namespaceQuery(namespace)}`,
@@ -371,6 +375,28 @@ export function connectionSchemaFormExtensions({
   const namespacePost: PostExtension = (field, nodes, context) => {
     const editor = context ? rootEditor(context) : undefined;
     const branch = editor ? branchOf(editor.rootValue) : undefined;
+    // kubeconfig / kubecontext head the form: they pick the cluster the
+    // namespace and secret pickers below read from.
+    if (
+      editor &&
+      branch &&
+      !field.readOnly &&
+      kubernetes === "form" &&
+      field.key === "name" &&
+      context?.instancePath === "/name" &&
+      kubernetesOnOneRow(branch)
+    ) {
+      const named = namespacePost(field, nodes, { ...context, instancePath: "" });
+      return {
+        label: createElement(
+          "div",
+          { className: "flex flex-col gap-2" },
+          kubernetesRow(editor, branch),
+          named.label,
+        ),
+        value: named.value,
+      };
+    }
     if (editor && branch && field.key === "name" && namespaceBesideName(branch)) {
       const namespace = branch.root.namespace!;
       const namespaceControl: FieldControl = {
@@ -422,10 +448,8 @@ export function connectionSchemaFormExtensions({
       field.schema.properties?.kubecontext
     ) {
       const { kubeconfig, kubecontext, ...others } = field.schema.properties;
-      const kubernetesOnRow =
-        !field.readOnly && editor && branch && kubernetesOnOneRow(branch)
-          ? kubernetesRow(editor, branch)
-          : undefined;
+      const kubernetesAtTop =
+        !field.readOnly && editor && branch && kubernetesOnOneRow(branch);
       // Hoisted fields (host/port/database) already render beside the URL.
       const rest = Object.fromEntries(
         Object.entries(others).filter(([, property]) => property["x-clicky-hoist"] !== true),
@@ -456,7 +480,7 @@ export function connectionSchemaFormExtensions({
         value: createElement(
           "div",
           { className: "space-y-4" },
-          kubernetes === "external" ? null : kubernetesOnRow ??
+          kubernetes === "external" || kubernetesAtTop ? null :
             renderGroup("Kubernetes resolution", {
                 type: "object",
                 "x-columns": 2,

@@ -4,6 +4,7 @@ import {
   useContext,
   useSyncExternalStore,
   type RefObject,
+  type ReactNode,
 } from "react";
 import {
   DOCUMENT_ANCHOR,
@@ -32,6 +33,7 @@ export type CommentContextValue = {
   commentCounts: Record<CommentAnchor, number>;
   commentMeta: Record<CommentAnchor, CommentAnchorMeta>;
   railMode: CommentRailMode;
+  railHeaderActions?: ReactNode;
   focusedAnchor: CommentAnchor | null;
   focusAnchor: (anchor: CommentAnchor) => void;
   openCommentList: () => void;

@@ -4,6 +4,7 @@ import {
   emptyItemsCopy,
   itemActionsAllow,
   itemCountLabel,
+  itemCountLine,
   itemSummaryFor,
   noItemsLabel,
   resolveItemSpec,
@@ -216,6 +217,18 @@ describe("itemSummaryFor", () => {
     expect(summarize({ ...SERVICE, role: undefined }).badge).toBeUndefined();
   });
 
+  it("adds one chip per declared badges part, through its pattern, skipping empty values", () => {
+    const array: JsonSchemaProperty = {
+      type: "array",
+      "x-item": { title: ["role"], badges: [{ property: "min", pattern: "min {}" }, { property: "max", pattern: "max {}" }, "basis"] },
+    };
+    const spec = resolveItemSpec(array, { type: "object" });
+    expect(itemSummaryFor({ item: { role: "Insured", min: 1, max: 0 }, index: 0, spec, itemSchema: { type: "object" } })).toEqual({
+      title: "Insured",
+      badges: ["min 1", "max 0"],
+    });
+  });
+
   it("flags the row only when the boolean is actually true", () => {
     expect(summarize(SERVICE).flagged).toBe(true);
     for (const required of [false, undefined, "true", 1]) {
@@ -238,6 +251,12 @@ describe("empty and count copy", () => {
     expect(itemCountLabel(spec, 1)).toBe("1 parameter");
     expect(itemCountLabel(spec, 4)).toBe("4 parameters");
     expect(noItemsLabel(spec)).toBe("No parameters yet");
+  });
+
+  it("shows the count line unless x-item turns it off, and the zero-item line either way", () => {
+    expect([itemCountLine(spec, 0), itemCountLine(spec, 4)]).toEqual(["No parameters yet", "4 parameters"]);
+    const quiet = resolveItemSpec({ ...PARAMS_ARRAY, "x-item": { ...PARAMS_ARRAY["x-item"], count: false } }, PARAM_ITEM);
+    expect([itemCountLine(quiet, 0), itemCountLine(quiet, 4)]).toEqual(["No parameters yet", undefined]);
   });
 
   it("takes the zero-item copy from the array's own description for free", () => {

@@ -8,12 +8,13 @@ import {
   type Ref,
 } from "react";
 import { Button } from "../components/button";
-import { UiComment } from "../icons";
+import { UiChatDots } from "../icons";
 import { Modal } from "../overlay/Modal";
 import { useFloatingZIndex } from "../overlay/modalStack";
 import { ResizeHandle } from "../layout/ResizeHandle";
 import { useCommentRailWidth } from "./use-comment-rail-width";
 import { cn } from "../lib/utils";
+import { useCommentContextOptional } from "./comment-context";
 
 export type CommentRailProps = {
   children: ReactNode;
@@ -43,6 +44,7 @@ export function CommentRail({
   onOpenChange,
   launcherLabel = "Open comments",
 }: CommentRailProps) {
+  const headerActions = useCommentContextOptional()?.railHeaderActions;
   const ref = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(open);
@@ -83,13 +85,14 @@ export function CommentRail({
             style={{ zIndex: floatingZIndex }}
             className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 h-12 gap-2 rounded-full px-4 shadow-lg"
           >
-            <UiComment className="size-5" />
+            <UiChatDots className="size-5" />
             {launcherLabel}
           </Button>
         ) : (
           <Modal
             open
             title="Comments"
+            headerSlot={headerActions}
             expandable={false}
             onClose={() => onOpenChange?.(false)}
           >
@@ -104,7 +107,7 @@ export function CommentRail({
       ref={ref}
       data-comment-rail=""
       className={cn(
-        "relative min-h-0 shrink-0 border-border bg-background",
+        "relative flex min-h-0 shrink-0 flex-col border-border bg-background",
         narrow ? "w-full border-t" : "border-l",
         className,
       )}
@@ -122,9 +125,13 @@ export function CommentRail({
           onChange={onWidthChange ?? setPreferred}
         />
       )}
+      {headerActions && <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-1.5">
+        <span className="text-xs font-semibold">Comments</span>
+        {headerActions}
+      </header>}
       <div
         ref={scrollRef}
-        className="h-full overflow-y-auto overscroll-contain"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
         data-comment-rail-scroll=""
       >
         {children}

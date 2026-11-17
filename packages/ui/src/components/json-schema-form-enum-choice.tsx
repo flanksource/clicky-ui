@@ -1,3 +1,4 @@
+import { isValidElement } from "react";
 import { cn } from "../lib/utils";
 import { SegmentedControl, type SegmentedSize } from "./SegmentedControl";
 import type { FieldControl, FieldOption, JsonSchemaProperty } from "./json-schema-form-types";
@@ -61,14 +62,15 @@ export function SegmentedEnumControl({ field, fieldId, readOnly, options, value,
         wrap
         options={options.map((opt) => {
           const isDefault = opt.value === defaultChoice;
-          const title = optionTitle(opt, isDefault);
+          // A chip has room for the name alone; the "Name (code)" label moves to
+          // the tooltip unless a description already holds it.
+          const title = optionTitle(opt, isDefault) ?? (opt.name ? opt.label : undefined);
           return {
             id: opt.value,
-            label: opt.label,
-            // x-enum-icons resolves to a runtime name string; SegmentedControl
-            // renders that via <Icon name>. Non-string (pre-extension) icons are
-            // dropped here since the segmented option type only takes name/component.
-            ...(typeof opt.icon === "string" ? { icon: opt.icon } : {}),
+            label: opt.name ?? opt.label,
+            // x-enum-icons resolves to a runtime name string, rendered via
+            // <Icon name>; a pre-extension may supply a rendered element instead.
+            ...(typeof opt.icon === "string" || isValidElement(opt.icon) ? { icon: opt.icon } : {}),
             ...(opt.description ? { description: opt.description } : {}),
             ...(title ? { title } : {}),
             ...(isDefault ? { marker: DEFAULT_MARKER, implied: true } : {}),

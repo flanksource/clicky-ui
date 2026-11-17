@@ -128,11 +128,11 @@ function mergeConditional(
 }
 
 // effectiveProperties merges the schema's base `properties` with the branch its
-// own `if`/`then`/`else` selects and with each `allOf` member's contribution. An
-// `if`/`then` member contributes `then.properties` when its `if` matches the
-// current value and `else.properties` when it does not; an unconditional member
-// (e.g. an inlined `$ref` composition, which carries its own `properties` and no
-// `if`) always contributes. Later members win on key collision; required is the
+// own `if`/`then`/`else` selects and with each `allOf` member's contribution. A
+// member always contributes its own `properties` (e.g. an inlined `$ref`
+// composition), and an `if`/`then` member also contributes `then.properties`
+// when its `if` matches the current value and `else.properties` when it does
+// not. Later members win on key collision; required is the
 // union. A branch REPLACES a property wholesale rather than deep-merging it, so a
 // branch that re-declares a field also re-declares its keywords (`readOnly`,
 // `x-hidden`, …). Pure and idempotent.
@@ -147,11 +147,9 @@ export function effectiveProperties(
   };
   mergeConditional(schema, context);
   for (const clause of schema.allOf ?? []) {
-    // Unconditional composition member: merge its own properties/required.
-    if (clause.if === undefined && clause.then === undefined) {
-      mergeBranch(clause, context.properties, context.required);
-      continue;
-    }
+    // A member always contributes its own properties/required (an inlined
+    // `$ref` composition), and on top of them the branch its own if selects.
+    mergeBranch(clause, context.properties, context.required);
     mergeConditional(clause, context);
   }
   return { properties: context.properties, required: [...context.required] };

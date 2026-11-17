@@ -35,6 +35,10 @@ export function ItemBadge({ badge }: { badge?: ArrayItemSummary["badge"] }) {
   );
 }
 
+export function ItemBadges({ badges }: { badges: string[] | undefined }) {
+  return <>{badges?.map((label) => <ItemBadge key={label} badge={{ label }} />)}</>;
+}
+
 // A collapsed row hides the controls that would carry a validation message, so
 // it says how many errors are inside it instead — an error the reader cannot
 // see is an error they cannot fix.

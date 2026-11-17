@@ -11,6 +11,7 @@ import { cn } from "../lib/utils";
 import { UiEdit } from "../icons";
 import { Combobox, type ComboboxOption } from "./Combobox";
 import { IconMenuPicker, type IconMenuOption } from "./icon-menu-picker";
+import { JSONPathField } from "./JSONPathField";
 import { OnePasswordSelector } from "./OnePasswordSelector";
 import type { OnePasswordLoaders } from "./OnePasswordSelector.model";
 
@@ -57,6 +58,12 @@ export type SecretKeySelectorProps = {
   /** Loads mid-masked previews for the named keyed resource's keys. */
   loadKeyPreview?: (kind: SecretKind, name: string) => Promise<KeyPreview[]>;
   /**
+   * Loads the named Helm release's merged values, with scalars already masked by
+   * the consumer, so the helm key's JSONPath picker can browse where a value
+   * lives. Without it the helm key is a plain JSONPath text field.
+   */
+  loadHelmValues?: (name: string) => Promise<unknown>;
+  /**
    * Loads the service-account names (no keys) for the "serviceaccount" source.
    * When omitted, that source's name field accepts freeform entry only.
    */
@@ -97,6 +104,7 @@ export function SecretKeySelector({
   onChange,
   loadResources,
   loadKeyPreview,
+  loadHelmValues,
   loadServiceAccounts,
   onePassword,
   sources,
@@ -173,6 +181,25 @@ export function SecretKeySelector({
       cancelled = true;
     };
   }, [loadKeyPreview, refKind, selectedName, isKeyed]);
+
+  const [helmValues, setHelmValues] = useState<unknown>();
+  const [helmValuesError, setHelmValuesError] = useState<string>();
+  useEffect(() => {
+    setHelmValues(undefined);
+    setHelmValuesError(undefined);
+    if (source !== "helm" || !selectedName || !loadHelmValues) return;
+    let cancelled = false;
+    loadHelmValues(selectedName)
+      .then((res) => !cancelled && setHelmValues(res))
+      .catch(
+        (err: unknown) =>
+          !cancelled &&
+          setHelmValuesError(err instanceof Error ? err.message : String(err)),
+      );
+    return () => {
+      cancelled = true;
+    };
+  }, [loadHelmValues, source, selectedName]);
 
   const nameOptions = useMemo<ComboboxOption[]>(
     () => resources.map((r) => ({ value: r.name, label: r.name })),
@@ -344,15 +371,28 @@ export function SecretKeySelector({
               />
             </div>
             <div className={KEY_FIELD} data-slot="secret-key-field">
-              <Combobox
-                options={keyOptions}
-                value={selectedKey}
-                onChange={setKey}
-                allowCustomValue
-                loading={previewLoading}
-                invalid={keyInvalid}
-                placeholder={selectedName ? keyPlaceholder(refKind) : "—"}
-              />
+              {refKind === "helm" ? (
+                <JSONPathField
+                  aria-label="Helm value JSONPath"
+                  value={selectedKey}
+                  onChange={setKey}
+                  disabled={!selectedName}
+                  invalid={keyInvalid || !!helmValuesError}
+                  title={helmValuesError}
+                  placeholder={selectedName ? keyPlaceholder(refKind) : "—"}
+                  {...(helmValues === undefined ? {} : { json: helmValues })}
+                />
+              ) : (
+                <Combobox
+                  options={keyOptions}
+                  value={selectedKey}
+                  onChange={setKey}
+                  allowCustomValue
+                  loading={previewLoading}
+                  invalid={keyInvalid}
+                  placeholder={selectedName ? keyPlaceholder(refKind) : "—"}
+                />
+              )}
             </div>
           </div>
         )}

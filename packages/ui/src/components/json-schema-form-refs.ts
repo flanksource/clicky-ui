@@ -65,7 +65,7 @@ export function rehydrateRefs(schema: JsonSchemaObject): JsonSchemaObject {
           siblings[k] = walk(v);
           hasSiblings = true;
         }
-        return hasSiblings ? { ...resolved, ...siblings } : resolved;
+        return hasSiblings ? mergeRefSiblings(resolved as Record<string, unknown>, siblings) : resolved;
       }
       let changed = false;
       const out: Record<string, unknown> = {};
@@ -106,6 +106,42 @@ export function rehydrateRefs(schema: JsonSchemaObject): JsonSchemaObject {
   return unresolved
     ? ({ ...resolved, $defs: walk($defs) } as JsonSchemaObject)
     : resolved;
+}
+
+// mergeRefSiblings lays a `$ref`'s sibling keywords over the referenced body.
+// Annotations (title, description, …) are replaced, but the keywords that
+// accumulate in JSON Schema do not overwrite: `properties` merge (the local
+// property wins), `required` and `allOf` concatenate, and when both sides carry
+// an `if`/`then`/`else` each becomes its own `allOf` member, so a branch's own
+// condition no longer silently drops the conditional of the schema it extends.
+function mergeRefSiblings(
+  base: Record<string, unknown>,
+  local: Record<string, unknown>
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...base, ...local };
+  if (isRecord(base.properties) && isRecord(local.properties))
+    merged.properties = { ...base.properties, ...local.properties };
+  if (Array.isArray(base.required) && Array.isArray(local.required))
+    merged.required = [...new Set([...base.required, ...local.required])];
+  const allOf = [
+    ...(Array.isArray(base.allOf) ? base.allOf : []),
+    ...(Array.isArray(local.allOf) ? local.allOf : []),
+  ];
+  const bothConditional = base.if !== undefined && local.if !== undefined;
+  if (bothConditional) {
+    delete merged.if;
+    delete merged.then;
+    delete merged.else;
+    allOf.push(conditionalOf(base), conditionalOf(local));
+  }
+  if (bothConditional || (Array.isArray(base.allOf) && Array.isArray(local.allOf))) merged.allOf = allOf;
+  return merged;
+}
+
+function conditionalOf(node: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    (["if", "then", "else"] as const).filter((key) => node[key] !== undefined).map((key) => [key, node[key]])
+  );
 }
 
 function isLocalPointerRef(ref: string): boolean {

@@ -88,12 +88,11 @@ function enumOptions(prop: JsonSchemaProperty): FieldOption[] {
     const icon = icons?.[value];
     const description = descriptions?.[value];
     const tone = tones?.[value];
+    const named = typeof desc === "string" && desc && desc !== value;
     return {
       value,
-      label:
-        typeof desc === "string" && desc && desc !== value
-          ? `${desc} (${value})`
-          : value,
+      label: named ? `${desc} (${value})` : value,
+      ...(named ? { name: desc } : {}),
       ...(typeof icon === "string" && icon ? { icon } : {}),
       ...(typeof description === "string" && description
         ? { description }

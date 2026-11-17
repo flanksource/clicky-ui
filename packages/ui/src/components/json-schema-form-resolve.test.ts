@@ -89,7 +89,7 @@ describe("resolveControl", () => {
       "x-enum-labels": { "20": "Business" },
     });
     expect(c.options).toEqual([
-      { value: "20", label: "Business (20)" },
+      { value: "20", label: "Business (20)", name: "Business" },
       { value: "30", label: "30" }, // unlabelled values stay raw
     ]);
   });
@@ -135,7 +135,7 @@ describe("resolveControl", () => {
     });
     expect(c.kind).toBe("string-map");
     expect(c.keyOptions).toEqual([
-      { value: "01", label: "Residence (01)" },
+      { value: "01", label: "Residence (01)", name: "Residence" },
       { value: "Business", label: "Business" },
     ]);
   });

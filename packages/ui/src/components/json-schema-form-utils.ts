@@ -287,20 +287,22 @@ export function orderByPriority<T>(
     .map((ranked) => ranked.entry);
 }
 
-// softError computes a display-only validation hint. It never blocks onChange.
+// softError computes a display-only validation hint, named by the JSON Schema
+// keyword it stands for (so a layout can tell missing from wrong). It never
+// blocks onChange.
 // Consumers suppress the unknown-enum hint by setting allowCustomValue.
-export function softError(field: FieldControl): string | undefined {
+export function softError(field: FieldControl): { keyword: string; message: string } | undefined {
   const v = field.value;
   const isEmpty = v === undefined || v === null || v === "";
-  if (field.required && isEmpty && !(v === null && field.nullable)) return "Required";
+  if (field.required && isEmpty && !(v === null && field.nullable)) return { keyword: "required", message: "Required" };
 
   if (field.kind === "number" && typeof field.minimum === "number" && typeof v === "number") {
-    if (v < field.minimum) return `Must be ≥ ${field.minimum}`;
+    if (v < field.minimum) return { keyword: "minimum", message: `Must be ≥ ${field.minimum}` };
   }
 
   if (field.kind === "enum" && !field.allowCustomValue && !isEmpty) {
     const known = (field.options ?? []).some((o) => o.value === String(v));
-    if (!known) return "Unknown value (allowed)";
+    if (!known) return { keyword: "enum", message: "Unknown value (allowed)" };
   }
   return undefined;
 }

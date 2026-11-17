@@ -2,6 +2,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { CommentRail } from "./CommentRail";
+import { CommentProvider } from "./CommentProvider";
+import { DEFAULT_COMMENT_STATUSES } from "./comment-types";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -18,6 +20,22 @@ function CollapsibleRail() {
     </CommentRail>
   );
 }
+
+function RailWithActions({ stacked }: { stacked: boolean }) {
+  const [hidden, setHidden] = useState(false);
+  return <CommentProvider comments={[]} config={{ statuses: DEFAULT_COMMENT_STATUSES }} railHeaderActions={
+    <button onClick={() => setHidden(!hidden)}>{hidden ? "Show annotations" : "Hide annotations"}</button>
+  }>
+    <CommentRail stacked={stacked} onOpenChange={() => undefined}><p>Existing feedback</p></CommentRail>
+  </CommentProvider>;
+}
+
+it.each([false, true])("keeps document header actions available after toggling in a stacked=%s rail", stacked => {
+  render(<RailWithActions stacked={stacked} />);
+  fireEvent.click(screen.getByRole("button", { name: "Hide annotations" }));
+  expect(screen.getByRole("button", { name: "Show annotations" })).toBeVisible();
+  expect(screen.getByText("Existing feedback")).toBeVisible();
+});
 
 it("minimizes to a floating launcher and restores the right rail", () => {
   vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1200);

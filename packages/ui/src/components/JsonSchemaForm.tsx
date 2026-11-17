@@ -58,8 +58,11 @@ function resolveFormLayout(
   const mode = modeOverride ?? baseMode;
   assertFormLayoutRegistered(mode, engines);
   const valueMaxWidth = layout?.valueMaxWidth ?? DEFAULT_VALUE_MAX_WIDTH;
-  // `help` is orthogonal to mode, so it survives a menu-driven mode flip.
-  const help = layout?.help ? { help: layout.help } : {};
+  // `help` and `emptyArrays` are orthogonal to mode, so they survive a menu-driven mode flip.
+  const help = {
+    ...(layout?.help ? { help: layout.help } : {}),
+    ...(layout?.emptyArrays ? { emptyArrays: layout.emptyArrays } : {}),
+  };
   if (mode === "properties") return { ...layout, mode, ...help };
   if (!isBuiltInFormLayout(mode)) return { ...layout, mode, valueMaxWidth, ...help };
   if (mode !== "inline") return { mode: "stacked", valueMaxWidth, ...help };

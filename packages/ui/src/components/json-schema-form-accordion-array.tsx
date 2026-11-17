@@ -6,6 +6,7 @@ import {
 } from "./json-schema-form-errors";
 import {
   ItemBadge,
+  ItemBadges,
   ItemErrorMark,
   ItemGlyph,
   RequiredMark,
@@ -14,9 +15,8 @@ import {
   addItemLabel,
   emptyItemsCopy,
   itemActionsAllow,
-  itemCountLabel,
+  itemCountLine,
   itemSummaryFor,
-  noItemsLabel,
   resolveItemSpec,
 } from "./json-schema-form-item-summary";
 import {
@@ -50,6 +50,7 @@ export function AccordionArray({
   const itemSchema = field.itemSchema ?? { type: "object" };
   const spec = field.itemSpec ?? resolveItemSpec(field.schema, itemSchema);
   const emptyCopy = emptyItemsCopy(spec, field.schema);
+  const countLine = itemCountLine(spec, items.length);
   // The array's help mode governs its whole subtree. Without this the fields
   // inside an expanded row keep the form-level default, so an accordion that
   // resolved to "hover" would still stack a two-line paragraph under every
@@ -85,6 +86,7 @@ export function AccordionArray({
         <ItemGlyph glyph={summary.glyph} />
         <span className="shrink-0 text-sm font-medium">{summary.title}</span>
         <ItemBadge badge={summary.badge} />
+        <ItemBadges badges={summary.badges} />
         {summary.flagged && <RequiredMark />}
         {summary.summary && (
           <code className="truncate font-mono text-xs text-muted-foreground">
@@ -106,11 +108,7 @@ export function AccordionArray({
   if (ctx.presentation)
     return (
       <div className="min-w-0 space-y-1">
-        <div className="text-xs text-muted-foreground">
-          {items.length === 0
-            ? noItemsLabel(spec)
-            : itemCountLabel(spec, items.length)}
-        </div>
+        {countLine !== undefined && <div className="text-xs text-muted-foreground">{countLine}</div>}
         {items.map((item, index) => (
           <div
             key={index}
@@ -132,11 +130,7 @@ export function AccordionArray({
     <AccordionList<unknown>
       items={items}
       onChange={(next) => field.onChange(next)}
-      summary={
-        items.length === 0
-          ? noItemsLabel(spec)
-          : itemCountLabel(spec, items.length)
-      }
+      {...(countLine !== undefined ? { summary: countLine } : {})}
       {...(toolbar !== undefined ? { toolbar } : {})}
       size={ctx.size}
       readOnly={readOnly}

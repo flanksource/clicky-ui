@@ -113,6 +113,10 @@ describe("session display", () => {
     expect(sessionBadgeOf({ ...base, inCmux: false, status: "active" })).toBe("not in cmux");
   });
 
+  it("shows a managed session's status without requiring a cmux pane", () => {
+    expect(sessionBadgeOf({ ...base, managed: true, inCmux: false, status: "active" })).toBe("active");
+  });
+
   it("reports how full a session's context window is, as a rounded percentage", () => {
     expect(sessionContextPercent({ ...base, context: { usedTokens: 50_000, windowTokens: 200_000 } })).toBe(25);
     expect(sessionContextPercent(base)).toBeUndefined();

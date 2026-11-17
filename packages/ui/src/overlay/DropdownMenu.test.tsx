@@ -199,9 +199,10 @@ describe("DropdownMenu", () => {
 
   it("opens via a custom trigger and selects an item", () => {
     const onSelect = vi.fn();
+    const triggerRef = vi.fn();
     render(
       <DropdownMenu
-        trigger={<button type="button">menu</button>}
+        trigger={<button ref={triggerRef} type="button">menu</button>}
         items={[{ label: "Profile", onSelect }]}
       />,
     );
@@ -212,6 +213,7 @@ describe("DropdownMenu", () => {
     expect(trigger).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(screen.getByRole("menuitem", { name: "Profile" }));
     expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(triggerRef.mock.calls).toEqual([[trigger]]);
   });
 
   it("floats at the popover layer when no modal is open", () => {

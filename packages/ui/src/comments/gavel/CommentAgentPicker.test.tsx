@@ -264,6 +264,23 @@ describe("CommentAgentPicker sessions", () => {
     expect(screen.getByRole("button", { name: "New session" }).getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("marks a selected session without adding inspection actions to the listing", () => {
+    const list = sessions({ selectedId: live.id });
+    renderPicker(fakeAgents(), { sessions: list });
+    expect(screen.getByRole("button", { name: "Use session Review changes" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByRole("button", { name: /^Inspect session/ })).toBeNull();
+    expect(list.onSelect).not.toHaveBeenCalled();
+  });
+
+  it("puts session actions before the listing and uses an icon for row assignment", () => {
+    const assignAll = { count: 3, onSession: vi.fn(), onNew: vi.fn() };
+    renderPicker(fakeAgents(), { sessions: sessions({ assignAll, onAll: vi.fn() }) });
+    const row = screen.getByRole("button", { name: "Use session Review changes" });
+    const actions = [screen.getByRole("button", { name: "All sessions…" }), screen.getByRole("button", { name: "Assign all to a new session" })];
+    expect(actions.every(action => Boolean(action.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
+    expect(screen.getByRole("button", { name: "Assign all to Review changes" }).textContent).toBe("");
+  });
+
   it.each([
     { state: "loading" as const, text: "Loading active sessions…" },
     { state: "ready" as const, text: "No active sessions." },

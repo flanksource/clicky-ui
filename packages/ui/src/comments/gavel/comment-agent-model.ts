@@ -114,7 +114,7 @@ export function inheritPatch(field: CommentAgentField): CommentAgentPatch {
 /** What a session row's badge says: that delivering resumes it, its status, or that gavel cannot reach it through cmux. */
 export function sessionBadgeOf(session: GavelAgentSession): string {
   if (session.resumable) return "resumes";
-  if (session.status !== "ended" && !session.inCmux) return "not in cmux";
+  if (session.status !== "ended" && !session.managed && !session.inCmux) return "not in cmux";
   return session.status ?? "running";
 }
 

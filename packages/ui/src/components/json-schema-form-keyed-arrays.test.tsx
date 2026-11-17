@@ -59,6 +59,45 @@ describe("inferred keyed-array objects", () => {
     expect(screen.getByRole("combobox", { name: "Add item" })).toBeInTheDocument();
   });
 
+  describe("with layout.emptyArrays = add-menu", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        name: { type: "string", title: "Name" },
+        tags: { type: "array", title: "Tags", items: { type: "object", properties: { label: { type: "string" } } } },
+        states: {
+          type: "object",
+          title: "States",
+          properties: { include: { type: "array", title: "Include", items: { type: "string" } } },
+        },
+      },
+    };
+    function MenuHarness({ initial = {} }: { initial?: Record<string, unknown> }) {
+      const [value, setValue] = useState(initial);
+      return <JsonSchemaForm schema={schema} value={value} onChange={setValue} layout={{ mode: "stacked", emptyArrays: "add-menu" }} showPreferencesMenu={false} />;
+    }
+    const addButtons = () => screen.getAllByRole("button", { name: /^Add$/ });
+
+    it("hides every empty array and offers it from one Add menu at the top of its form or section", () => {
+      render(<MenuHarness />);
+      expect(screen.queryByText("Tags")).not.toBeInTheDocument();
+      expect(screen.queryByText("Include")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add item" })).not.toBeInTheDocument();
+      const [formAdd, sectionAdd] = addButtons();
+      expect(formAdd!.compareDocumentPosition(screen.getByText("Name")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(sectionAdd!.compareDocumentPosition(screen.getByText("States")) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    });
+
+    it("adds the first item from the menu, after which the array adds inline", () => {
+      render(<MenuHarness />);
+      fireEvent.click(addButtons()[0]!);
+      fireEvent.click(screen.getByRole("menuitem", { name: "Tags" }));
+      expect(screen.getByText("Tags")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add item" })).toBeInTheDocument();
+      expect(addButtons()).toHaveLength(1);
+    });
+  });
+
   it("adds a scalar item when an array schema omits items", () => {
     render(<Harness count={4} itemless />);
     fireEvent.click(screen.getByRole("combobox", { name: "Add item" }));

@@ -130,6 +130,53 @@ it("shows how long the server took for the listing beside the filter bar", () =>
   expect(screen.getByPlaceholderText("Search spans").closest("[data-slot='filter-bar']")).toContainElement(badge);
 });
 
+const traceId = traceExample.summary.traceId;
+const waterfallRowIds = () => Array.from(document.querySelectorAll<HTMLElement>("[data-row-id]")).map(row => row.dataset.rowId);
+
+it("opens the trace from its own fetch, not from the listing rows the filters left", () => {
+  render(<OtelTraceTable {...props} spans={[]} selectedTraceId={traceId} openTrace={{ spans: traceExample.spans, total: traceExample.spans.length, loading: false }} />);
+  expect(screen.getByRole("heading", { level: 2, name: /POST \/orders/ })).toBeInTheDocument();
+  expect(screen.queryByText(/not in the loaded rows/)).toBeNull();
+  expect(screen.queryByText(/Filters and paging can leave traces incomplete/)).toBeNull();
+});
+
+it("pages a large trace: reports how many spans are loaded and asks for the next page", () => {
+  const loaded = 3;
+  const onLoadMore = vi.fn();
+  render(<OtelTraceTable {...props} selectedTraceId={traceId} openTrace={{ spans: traceExample.spans.slice(0, loaded), total: traceExample.spans.length, loading: false, onLoadMore }} />);
+  expect(screen.getByRole("status")).toHaveTextContent(`${loaded} of ${traceExample.spans.length} spans loaded`);
+  fireEvent.click(screen.getByRole("button", { name: "Load more spans" }));
+  expect(onLoadMore).toHaveBeenCalledOnce();
+});
+
+it("narrows the open trace to the spans the filters match, keeping their ancestors", () => {
+  const filters = [{ key: "filter.duration_ms", kind: "text" as const, label: "Span duration", value: ">=10ms", onChange: vi.fn() }];
+  render(
+    <OtelTraceTable
+      {...props}
+      selectedTraceId={traceId}
+      externalFilters={filters}
+      openTrace={{ spans: traceExample.spans, total: traceExample.spans.length, loading: false, matchingSpanIds: new Set(["model"]) }}
+    />,
+  );
+  expect(waterfallRowIds()).toEqual(["root", "model"]);
+  expect(screen.getByRole("status")).toHaveTextContent(`1 of ${traceExample.spans.length} spans match`);
+  expect(screen.getByText("Span duration").closest("[data-slot='filter-bar']")).toBeInTheDocument();
+});
+
+it("warns that a trace is incomplete while still showing the spans it has", () => {
+  const warning = "The profile stopped returning spans after 3 of 5; this trace is incomplete.";
+  render(<OtelTraceTable {...props} selectedTraceId={traceId} openTrace={{ spans: traceExample.spans.slice(0, 3), total: traceExample.spans.length, loading: false, warning }} />);
+  expect(screen.getByRole("heading", { level: 2, name: /POST \/orders/ })).toBeInTheDocument();
+  expect(screen.getByText(warning)).toBeInTheDocument();
+  expect(screen.queryByText(/Cannot load trace/)).toBeNull();
+});
+
+it("reports a failed trace fetch instead of an empty waterfall", () => {
+  render(<OtelTraceTable {...props} selectedTraceId={traceId} openTrace={{ spans: [], loading: false, error: "provider timed out" }} />);
+  expect(screen.getByRole("alert")).toHaveTextContent("provider timed out");
+});
+
 it("reports invalid data instead of rendering a misleading trace", () => {
   render(<OtelTraceTable {...props} spans={[traceExample.spans[0]!, traceExample.spans[0]!]} />);
   expect(screen.getByRole("alert")).toHaveTextContent("duplicate span ids");
