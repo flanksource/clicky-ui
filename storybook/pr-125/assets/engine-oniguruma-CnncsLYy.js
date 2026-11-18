@@ -1,1 +1,0 @@
-import{n as e}from"./rolldown-runtime-BCiCTKAo.js";import{a as t,i as n,n as r,o as i,r as a,t as o}from"./dist-C20NAG32.js";function s(){return(s=e((()=>{n()})))()}s();export{o as createOnigurumaEngine,r as createWasmOnigEngine,a as getDefaultWasmLoader,t as loadWasm,i as setDefaultWasmLoader};
