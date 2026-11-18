@@ -74,7 +74,7 @@ describe.each([{ width: 1920, height: 1080 }, { width: 2560, height: 1440 }])("p
     const snapshot = await browser("get", "text", "#snapshot");
     expect(snapshot).toMatch(/^<!doctype html>/);
     expect(snapshot).toContain('id="target"');
-    expect(snapshot).not.toMatch(/data-page-agent|data-react-grab(?:=|\s|>)|<script/);
+    expect(snapshot).not.toMatch(/data-page-agent|data-react-grab(?:=|\s|>)|<script/i);
     expect(await browser("get", "text", "#error")).toBe("");
     await browser("frame", "main");
   });

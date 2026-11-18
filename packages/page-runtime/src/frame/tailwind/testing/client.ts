@@ -104,7 +104,8 @@ export async function run(options: Options): Promise<unknown> {
   const params = new URLSearchParams(location.search);
   if (params.has("probe")) return probes({ ...options, root });
   if (params.has("plain")) return plainProbe({ ...options, root });
-  const name = params.get("page")!;
+  const name = params.get("page");
+  if (name === null || !Object.hasOwn(options.pages, name)) throw new Error(`unknown page ${name}`);
   const load = options.pages[name]; if (!load) throw new Error(`unknown page ${name}`);
   const module = await load();
   let runtime: Awaited<ReturnType<typeof prepareTailwind>> | undefined;

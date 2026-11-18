@@ -56,11 +56,18 @@ function comparator(actual: Version, token: string): boolean {
 }
 
 function rangeTokens(branch: string): string[] {
-  const normalized = branch.trim().replace(/(\S+)\s+-\s+(\S+)/g, (_, lo: string, hi: string) => {
+  const words = branch.trim().split(/\s+/);
+  const expanded: string[] = [];
+  for (let i = 0; i < words.length; i += 1) {
+    const lo = words[i]!;
+    const hi = words[i + 2];
+    if (words[i + 1] === "-" && hi !== undefined) {
       const end = partial(hi);
-      const bound = end.count === 3 ? `<=${hi}` : `<${upper(end.v, end.count - 1).parts.join(".")}-0`;
-      return `>=${partial(lo).v.parts.join(".")} ${bound}`;
-    }).replace(/(\^|~|>=|<=|>|<|=)\s+/g, "$1");
+      expanded.push(`>=${partial(lo).v.parts.join(".")}`, end.count === 3 ? `<=${hi}` : `<${upper(end.v, end.count - 1).parts.join(".")}-0`);
+      i += 2;
+    } else expanded.push(lo);
+  }
+  const normalized = expanded.join(" ").replace(/(\^|~|>=|<=|>|<|=)\s+/g, "$1");
   return normalized ? normalized.split(/\s+/) : ["*"];
 }
 

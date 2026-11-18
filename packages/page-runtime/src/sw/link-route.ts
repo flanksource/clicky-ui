@@ -154,7 +154,7 @@ export function createLinkRoutes(options: Options) {
     const url = new URL(request.url);
     if (url.pathname === "/frame/__runtime-link-relay" || url.pathname === "/frame/_link-relay") return new Response(linkRelayDocument({ embedders: options.profile.embedders, allowed: options.profile.links === "allow" }), { headers: { "content-type": "text/html; charset=utf-8" } });
     if (url.pathname === "/link/_control") {
-      try { return await control(request); } catch (error) { return new Response(String(error), { status: 403 }); }
+      try { return await control(request); } catch (error) { console.error("Link control request rejected", error); return new Response("Link control request rejected", { status: 403 }); }
     }
     const frame = url.pathname.startsWith("/frame/");
     if (!/^\/(src|npm|link|frame)\//.test(url.pathname) && url.pathname !== DEV_SHIM_URL && !Object.hasOwn(RUNTIME_MODULES, url.pathname)) return undefined;

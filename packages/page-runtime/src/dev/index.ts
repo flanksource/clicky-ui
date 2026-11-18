@@ -94,8 +94,9 @@ export async function createPackageHandler(options: PackageOriginOptions) {
       });
       response.end(request.method === "HEAD" ? undefined : served.body);
     } catch (error) {
+      console.error("Package request failed", error);
       response.writeHead((error as NodeJS.ErrnoException).code === "ENOENT" ? 404 : 500, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
-      response.end(error instanceof Error ? error.message : String(error));
+      response.end((error as NodeJS.ErrnoException).code === "ENOENT" ? "Package not found" : "Package request failed");
     }
   };
   return { handle, current: store.current, subscribe: store.subscribe, close: store.close };
