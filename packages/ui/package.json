@@ -1,6 +1,6 @@
 {
   "name": "@flanksource/clicky-ui",
-  "version": "0.3.63",
+  "version": "0.3.64",
   "description": "Flanksource Clicky UI — React component library built on shadcn/ui with light/dark and density theming.",
   "homepage": "https://github.com/flanksource/clicky-ui#readme",
   "bugs": "https://github.com/flanksource/clicky-ui/issues",
@@ -30,9 +30,18 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    "./react-grab": { "types": "./dist/react-grab/index.d.ts", "import": "./dist/react-grab/index.js" },
-    "./react-grab/core": { "types": "./dist/react-grab/core/index.d.ts", "import": "./dist/react-grab/core/index.js" },
-    "./react-grab/primitives": { "types": "./dist/react-grab/primitives.d.ts", "import": "./dist/react-grab/primitives.js" },
+    "./react-grab": {
+      "types": "./dist/react-grab/index.d.ts",
+      "import": "./dist/react-grab/index.js"
+    },
+    "./react-grab/core": {
+      "types": "./dist/react-grab/core/index.d.ts",
+      "import": "./dist/react-grab/core/index.js"
+    },
+    "./react-grab/primitives": {
+      "types": "./dist/react-grab/primitives.d.ts",
+      "import": "./dist/react-grab/primitives.js"
+    },
     "./react-grab/styles.css": "./dist/react-grab/styles.css",
     "./runtime/*": "./dist/runtime/*",
     ".": {
@@ -221,7 +230,6 @@
     "@flanksource/icons": "catalog:",
     "@floating-ui/react": "catalog:",
     "@lexical/react": "catalog:",
-    "@medv/finder": "catalog:",
     "@monaco-editor/react": "catalog:",
     "@radix-ui/react-compose-refs": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.1",
@@ -230,7 +238,6 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "country-flag-icons": "catalog:",
-    "dom-accessibility-api": "catalog:",
     "dompurify": "catalog:",
     "jotai": "catalog:",
     "jsonc-parser": "catalog:",
