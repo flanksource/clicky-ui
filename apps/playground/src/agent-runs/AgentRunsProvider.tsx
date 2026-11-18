@@ -31,8 +31,8 @@ import {
   createAgentSession,
 } from "./agent-runs-api";
 import { AgentRunChip } from "./AgentRunChip";
-import { rememberAgentTarget, sessionAgentTarget } from "./agent-targets";
-import { readPageTarget, rememberPageTarget } from "./page-targets";
+import { sessionAgentTarget } from "./agent-targets";
+import { usePageAgentTarget } from "./usePageAgentTarget";
 import { AgentSendFailure } from "./AgentSendFailure";
 import { AgentSessionPanel } from "./AgentSessionPanel";
 import { RunAgentDialog } from "./RunAgentDialog";
@@ -41,6 +41,7 @@ import { useProjectSession } from "./useProjectSession";
 import { fetchComments, PLAYGROUND_COMMENT_CONFIG, type AgentRunOptions, type PageComment } from "../comments/useComments";
 
 type AgentRunsContext = {
+  page?: string;
   project?: string;
   selectProject?: (project: string) => void;
   savedRuntime?: AgentSessionRuntime;
@@ -155,6 +156,7 @@ export function AgentRunsProvider({
   const [busy, setBusy] = useState(false);
   const [adoption, setAdoption] = useState<PendingAdoption | null>(null);
   const { sessions: listedSessions } = useCaptainSessions();
+  const pageSelection = usePageAgentTarget({ page, projectScope, data, sessions: listedSessions });
   const threads = (useCommentContextOptional()?.comments ?? []) as readonly Comment[];
   const threadsRef = useRef(threads);
   threadsRef.current = threads;
@@ -182,10 +184,7 @@ export function AgentRunsProvider({
     };
   }, [refresh]);
 
-  // The session a page's threads go to is this browser's choice (localStorage), read again whenever it changes.
-  const [chosenVersion, setChosenVersion] = useState(0);
-  const chosenTarget = useMemo(() => (page ? readPageTarget(page) : undefined), [page, chosenVersion]);
-  const selectedTarget = projectScope ? projectSession.target : chosenTarget;
+  const selectedTarget = projectScope ? projectSession.target ?? (page ? data?.pages[page]?.defaultTarget : undefined) : page ? pageSelection.targetFor(page) : undefined;
   const pageTarget = selectedTarget?.kind === "playground" ? undefined : selectedTarget;
   const autoRun = page ? data?.pages[page]?.autoRun ?? false : false;
   // New and replacement sessions start with the configured runtime, so only a
@@ -194,12 +193,10 @@ export function AgentRunsProvider({
 
   const choosePageTarget = useCallback(
     (chosenPage: string, next: AgentTarget) => {
-      rememberPageTarget(chosenPage, next);
-      setChosenVersion((version) => version + 1);
       if (projectScope) projectSession.remember({ target: next });
-      rememberAgentTarget(next);
+      pageSelection.remember(chosenPage, next);
     },
-    [projectScope, projectSession],
+    [projectScope, projectSession, pageSelection.remember],
   );
 
   const changePageTarget = useCallback(
@@ -228,7 +225,7 @@ export function AgentRunsProvider({
     async (comment: Comment, options: { runtime?: AgentSessionRuntime; target?: AgentTarget; fresh?: boolean } = {}) => {
       const { runtime, target: explicit, fresh = false } = options;
       const commentPage = await pageOf(comment);
-      const chosen = explicit ?? (projectScope ? projectSession.target : readPageTarget(commentPage));
+      const chosen = explicit ?? (projectScope ? projectSession.target ?? data?.pages[commentPage]?.defaultTarget : pageSelection.targetFor(commentPage));
       const session = chosen?.kind === "playground" ? undefined : chosen;
       if (projectScope && !explicit && (!projectSession.ready || !session)) throw new Error("Choose an available project session before sending feedback");
       const before = snapshotHandOffs([comment.id]);
@@ -237,7 +234,7 @@ export function AgentRunsProvider({
       if (projectScope && runtime) projectSession.remember({ runtime });
       await refresh();
     },
-    [refresh, runAgent, projectScope, projectSession, pageOf, snapshotHandOffs],
+    [refresh, runAgent, projectScope, projectSession, pageOf, snapshotHandOffs, data, pageSelection.targetFor],
   );
 
   const pointAt = useCallback(async (comment: Comment, next: AgentTarget) => {
@@ -375,10 +372,11 @@ export function AgentRunsProvider({
 
   const value = useMemo<AgentRunsContext>(
     () => ({
+      ...(page ? { page } : {}),
       ready: projectSession.ready,
       ...(projectScope ? { project: projectSession.project, selectProject: (project: string) => { try { projectSession.remember({ project }); } catch (cause) { setPanelError(describeError(cause)); } }, ...(projectSession.runtime ? { savedRuntime: projectSession.runtime } : {}) } : {}),
       data,
-      error: projectSession.error ?? panelError,
+      error: projectSession.error ?? pageSelection.error ?? panelError,
       busy,
       changeSettings,
       configureRuntime: () => openDialog({ mode: "configure", enableAutoRun: false }),
@@ -388,10 +386,8 @@ export function AgentRunsProvider({
         const target = { kind: "managed" as const, sessionId: result.session.sessionId, label: result.session.label ?? result.session.sessionId };
         // The new session must be in `data` before a project session validates it as the page's target.
         await refresh();
-        rememberPageTarget(page, target);
-        setChosenVersion((version) => version + 1);
         if (projectScope) projectSession.remember({ project, runtime, target });
-        rememberAgentTarget(target);
+        pageSelection.remember(page, target);
       },
       start,
       openPanel,
@@ -435,7 +431,7 @@ export function AgentRunsProvider({
           </div>
         ) : null,
     }),
-    [busy, changeSettings, openDialog, changePageTarget, data, panelError, hasRuntime, openPanel, pageTarget, autoRun, setAutoRun, retry, retryFresh, canRetryFresh, start, page, refresh, projectScope, projectSession, openThreads, runBatch, assignAll, listedSessions],
+    [busy, changeSettings, openDialog, changePageTarget, data, panelError, hasRuntime, openPanel, pageTarget, autoRun, setAutoRun, retry, retryFresh, canRetryFresh, start, page, refresh, projectScope, projectSession, openThreads, runBatch, assignAll, listedSessions, pageSelection.error, pageSelection.remember],
   );
 
   const submitRuntime = (runtime: AgentSessionRuntime) => {
@@ -463,11 +459,29 @@ export function AgentRunsProvider({
     );
   };
 
-  const identities = useMemo(() => Object.fromEntries((data?.sessions ?? []).map(session => {
-    const { model, provider, effort } = session.runtime.spec;
-    const metadata: AgentIdentityMetadata = { sessionName: session.label ?? session.sessionId, model, ...(typeof provider === "string" ? { provider } : {}), ...(typeof effort === "string" ? { effort } : {}) };
-    return [session.sessionId, metadata];
-  })), [data]);
+  const identities = useMemo(() => {
+    const entries: Record<string, AgentIdentityMetadata> = {};
+    for (const session of listedSessions ?? []) {
+      const metadata: AgentIdentityMetadata = {
+        sessionName: session.title,
+        ...(session.source ? { provider: session.source } : {}),
+        ...(session.model ? { model: session.model } : {}),
+      };
+      entries[session.id] = metadata;
+      if (session.captainId) entries[session.captainId] = metadata;
+    }
+    for (const session of data?.sessions ?? []) {
+      const { model, provider, effort } = session.runtime.spec;
+      entries[session.sessionId] = {
+        ...entries[session.sessionId],
+        ...(session.label ? { sessionName: session.label } : {}),
+        model,
+        ...(typeof provider === "string" ? { provider } : {}),
+        ...(typeof effort === "string" ? { effort } : {}),
+      };
+    }
+    return entries;
+  }, [data, listedSessions]);
   return (
     <AgentRuns.Provider value={value}>
       <AgentIdentityProvider identities={identities}>
@@ -496,7 +510,6 @@ export function AgentRunsProvider({
       />
       <AgentSessionPanel
         open={panel !== null}
-        {...(page ? { page } : {})}
         data={data}
         focusSessionId={panel?.focusSessionId ?? null}
         error={panelError}

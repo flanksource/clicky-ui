@@ -20,6 +20,7 @@ it("reveals more results without closing and keeps each segment separate", () =>
   const markdown = [{ key: "markdown", label: "Guide.md", to: "?page=guide" }];
   render(
     <PlaygroundNotifications
+      review={{ active: false, count: 0, onToggle: vi.fn() }}
       recent={{
         label: "Recent",
         items: [...pages, ...external, ...markdown],

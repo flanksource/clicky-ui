@@ -12,7 +12,19 @@ function header({ source, file }: Source): Header | null {
     if (/^\uFEFF?---\r?\n/.test(source)) throw new Error(`${file}:1: Unclosed YAML frontmatter`);
     return null;
   }
-  const leading = /^(?:\uFEFF|\s|\/\/[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)*(?=\S|$)/.exec(source)?.[0] ?? "";
+  let end = 0;
+  while (end < source.length) {
+    if (/[\s\uFEFF]/.test(source[end]!)) { end += 1; continue; }
+    if (source.startsWith("//", end)) {
+      const newline = source.indexOf("\n", end + 2);
+      end = newline === -1 ? source.length : newline + 1;
+    } else if (source.startsWith("/*", end)) {
+      const close = source.indexOf("*/", end + 2);
+      if (close === -1) break;
+      end = close + 2;
+    } else break;
+  }
+  const leading = source.slice(0, end);
   const match = /\/\*\r?\n---\r?\n([\s\S]*?)\r?\n---\r?\n\*\//.exec(leading);
   if (match) return { start: match.index, end: match.index + match[0].length, yamlStart: match.index + match[0].indexOf("---") + 4 + Number(match[0].includes("\r\n")), yaml: match[1]! };
   if (/\/\*\r?\n---\r?\n/.test(source.slice(0, leading.length + 8))) throw new Error(`${file}:1: Unclosed YAML dependency header`);

@@ -9,8 +9,7 @@ import {
   useCommentContext,
   type WorkspacePaneSpec,
 } from "@flanksource/clicky-ui";
-import { BookmarkletInstall } from "./BookmarkletInstall";
-import { PlaygroundAgentInstructions } from "../PlaygroundAgentInstructions";
+import { PlaygroundMoreActions } from "../PlaygroundMoreActions";
 import { useAgentRuns } from "../agent-runs/AgentRunsProvider";
 import { AgentSessionButton } from "../agent-runs/AgentSessionButton";
 import { PlaygroundPreferences } from "../PlaygroundPreferences";
@@ -100,9 +99,7 @@ export function ExternalWorkspace({
   const headerActions = (
     <>
       <VocabularyStatus problemsError={tree.problemsError} />
-      <PlaygroundAgentInstructions />
       <AgentSessionButton />
-      <BookmarkletInstall />
       <Button
         size="sm"
         variant="outline"
@@ -111,18 +108,9 @@ export function ExternalWorkspace({
       >
         {feedback.copied ? "Copied" : "Copy feedback"}
       </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={!Object.values(activity.feedback).some((page) => page.resolvedCount > 0)}
-        onClick={() =>
-          navigate(id, undefined, !review)
-        }
-      >
-        Review resolved ({Object.values(activity.feedback).reduce((count, page) => count + page.resolvedCount, 0)})
-      </Button>
-      <PlaygroundNotifications recent={recent} />
+      <PlaygroundNotifications recent={recent} review={{ active: review, count: Object.values(activity.feedback).reduce((count, page) => count + page.resolvedCount, 0), onToggle: () => navigate(id, undefined, !review) }} />
       <PlaygroundPreferences sourceDirty={false} />
+      <PlaygroundMoreActions />
     </>
   );
   const panes: WorkspacePaneSpec[] = [

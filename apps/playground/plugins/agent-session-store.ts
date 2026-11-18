@@ -52,7 +52,7 @@ export type AgentTarget = { kind: "playground" } | SessionAgentTarget;
  * entry, or the default it inherits, is enabled. Which live session a page's
  * threads are sent to is the browser's choice (localStorage), never stored here.
  */
-export type PageAgentState = { autoRun: boolean };
+export type PageAgentState = { autoRun: boolean; defaultTarget?: AgentTarget };
 
 export type AgentSessionSettings = {
   grouping: AgentSessionGrouping;

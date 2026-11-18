@@ -401,8 +401,8 @@ export class CommentsClient {
     return rows.map((row) => project(row)[0]!);
   }
   /** The agent sessions gavel can deliver to: live ones, and the scope's managed ones, ended ones resumable. */
-  async agentSessions(): Promise<GavelAgentSession[]> {
-    const sessions = await this.request<GavelAgentSession[]>(`/agent-sessions?${new URLSearchParams({ scope: this.scope })}`);
+  async agentSessions(group?: string): Promise<GavelAgentSession[]> {
+    const sessions = await this.request<GavelAgentSession[]>(`/agent-sessions?${new URLSearchParams({ scope: this.scope, ...(group ? { group } : {}) })}`);
     if (!Array.isArray(sessions)) throw new Error("Gavel comments returned an invalid agent session list");
     return sessions;
   }

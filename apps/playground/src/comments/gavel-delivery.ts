@@ -67,6 +67,8 @@ export type CommentAgentSettings = {
     provenance: Record<string, string>;
   };
   agent: { agent: CommentAgent; provenance: Record<string, { layer: string; page?: string }>; found: boolean };
+  /** An explicit session route configured by the Gavel host, which takes precedence over the rule. */
+  session?: string;
 };
 
 /** `PUT /api/v1/comments/agent`: save `agent` at `layer` (its default, or with `page` its entry for the target); `null` removes it. */

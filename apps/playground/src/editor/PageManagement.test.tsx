@@ -11,8 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PageEntry } from "../registry";
 import {
-  NewPageMenu,
-  PageActions,
+  pageActionItems,
   PageManagementDialogs,
 } from "./PageManagement";
 import { PageApiError, deleteFolder, deletePage, movePage } from "./page-api";
@@ -165,29 +164,16 @@ describe("page management", () => {
   });
 
   it("disables page actions while the source buffer is dirty", () => {
-    render(
-      <>
-        <NewPageMenu
-          disabled
-          disabledReason="Unsaved source"
-          onSelect={vi.fn()}
-        />
-        <PageActions
-          disabled
-          disabledReason="Unsaved source"
-          onSelect={vi.fn()}
-        />
-      </>,
+    expect(pageActionItems({
+      disabled: true,
+      disabledReason: "Unsaved source",
+      onSelect: vi.fn(),
+      active: true,
+    }).map(({ label, disabled, title }) => ({ label, disabled, title }))).toEqual(
+      ["New page", "New folder", "Rename", "Move", "Delete"].map(label => ({
+        label, disabled: true, title: "Unsaved source",
+      })),
     );
-
-    for (const name of ["New", "Rename", "Move", "Delete"]) {
-      expect(
-        (screen.getByRole("button", { name }) as HTMLButtonElement).disabled,
-      ).toBe(true);
-      expect(screen.getByRole("button", { name }).getAttribute("title")).toBe(
-        "Unsaved source",
-      );
-    }
   });
 
   it("starts page creation in the folder selected from the context menu", () => {

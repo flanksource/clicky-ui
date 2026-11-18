@@ -1,6 +1,5 @@
 import {
   Button,
-  DropdownMenu,
   InputField,
   Modal,
   TreePickerField,
@@ -9,7 +8,6 @@ import {
   type PathTreeNode,
 } from "@flanksource/clicky-ui";
 import {
-  UiAdd,
   UiFilePlus,
   UiFolder,
   UiPencilSimpleLine,
@@ -140,86 +138,30 @@ function Field({
   );
 }
 
-export function NewPageMenu({
+export function pageActionItems({
   disabled,
   disabledReason,
   onSelect,
+  active,
 }: {
   disabled: boolean;
   disabledReason?: string | undefined;
   onSelect: (action: PageAction) => void;
-}) {
-  const items: DropdownMenuItem[] = [
-    {
-      label: "New page",
-      icon: UiFilePlus,
-      disabled,
-      onSelect: () => onSelect("new-page"),
-    },
-    {
-      label: "New folder",
-      icon: UiFolder,
-      disabled,
-      onSelect: () => onSelect("new-folder"),
-    },
-  ];
-  if (disabled) {
-    return (
-      <Button variant="outline" size="sm" disabled title={disabledReason}>
-        <UiAdd /> New
-      </Button>
-    );
-  }
-  return (
-    <DropdownMenu
-      label="New"
-      icon={UiAdd}
-      items={items}
-      title="Create a page or folder"
-    />
-  );
-}
-
-export function PageActions({
-  disabled,
-  disabledReason,
-  onSelect,
-}: {
-  disabled: boolean;
-  disabledReason?: string | undefined;
-  onSelect: (action: PageAction) => void;
-}) {
-  return (
-    <>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={disabled}
-        title={disabledReason}
-        onClick={() => onSelect("rename")}
-      >
-        <UiPencilSimpleLine /> Rename
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={disabled}
-        title={disabledReason}
-        onClick={() => onSelect("move")}
-      >
-        <UiFolder /> Move
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={disabled}
-        title={disabledReason}
-        onClick={() => onSelect("delete")}
-      >
-        <UiTrash /> Delete
-      </Button>
-    </>
-  );
+  active: boolean;
+}): DropdownMenuItem[] {
+  const actions = [
+    { action: "new-page", label: "New page", icon: UiFilePlus },
+    { action: "new-folder", label: "New folder", icon: UiFolder },
+    ...(active ? [
+      { action: "rename", label: "Rename", icon: UiPencilSimpleLine },
+      { action: "move", label: "Move", icon: UiFolder },
+      { action: "delete", label: "Delete", icon: UiTrash },
+    ] as const : []),
+  ] as const;
+  return actions.map(({ action, label, icon }) => ({
+    label, icon, disabled, group: "File", ...(disabledReason ? { title: disabledReason } : {}),
+    onSelect: () => onSelect(action),
+  }));
 }
 
 type DialogProps = {

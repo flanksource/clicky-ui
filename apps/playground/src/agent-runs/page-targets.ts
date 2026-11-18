@@ -2,7 +2,7 @@ import type { AgentTarget, SessionAgentTarget } from "./agent-runs-api";
 
 const KEY = "playground.page-agent-targets";
 
-type PageTargets = Record<string, SessionAgentTarget>;
+type PageTargets = Record<string, AgentTarget>;
 
 function isSessionTarget(value: unknown): value is SessionAgentTarget {
   if (typeof value !== "object" || value === null) return false;
@@ -22,21 +22,25 @@ export function readPageTargets(): PageTargets {
     if (stored === null) return {};
     const value: unknown = JSON.parse(stored);
     if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
-    return Object.fromEntries(Object.entries(value).filter(([, target]) => isSessionTarget(target)));
+    return Object.fromEntries(Object.entries(value).filter(([, target]) => isSessionTarget(target) || (typeof target === "object" && target !== null && "kind" in target && target.kind === "playground")));
   } catch {
     return {};
   }
 }
 
-export function readPageTarget(page: string): SessionAgentTarget | undefined {
+export function readPageChoice(page: string): AgentTarget | undefined {
   return readPageTargets()[page];
 }
 
-/** Records the session `page`'s threads are sent to; choosing the playground agent forgets it. */
+export function readPageTarget(page: string): SessionAgentTarget | undefined {
+  const choice = readPageChoice(page);
+  return choice?.kind === "playground" ? undefined : choice;
+}
+
+/** Records an explicit choice, including the playground agent instead of a resolved server session. */
 export function rememberPageTarget(page: string, target: AgentTarget): void {
   const next = readPageTargets();
-  if (target.kind === "playground") delete next[page];
-  else next[page] = target;
+  next[page] = target;
   try {
     localStorage.setItem(KEY, JSON.stringify(next));
   } catch (cause) {

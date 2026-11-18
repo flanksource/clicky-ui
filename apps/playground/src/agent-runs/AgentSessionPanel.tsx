@@ -9,7 +9,6 @@ import {
 import { SessionInspector, SessionTail } from "@flanksource/clicky-ui/ai";
 import { UiStop } from "@flanksource/clicky-ui/icons";
 import { cn } from "@flanksource/clicky-ui/utils";
-import { AgentTargetPicker } from "./AgentTargetPicker";
 import { RuntimeIdentity } from "./RuntimeIdentity";
 
 import {
@@ -144,7 +143,6 @@ function SessionDetail({
  */
 export function AgentSessionPanel({
   open,
-  page,
   data,
   focusSessionId,
   error,
@@ -154,7 +152,6 @@ export function AgentSessionPanel({
   onClose,
 }: {
   open: boolean;
-  page?: string;
   data: AgentSessionsView | null;
   /** Session to select when the panel opens, e.g. from a thread's chip. */
   focusSessionId: string | null;
@@ -195,13 +192,6 @@ export function AgentSessionPanel({
       size={inspecting && selected ? "2xl" : "lg"}
     >
       <div className="space-y-3 text-sm">
-        {open && page && (
-          <section aria-label="Page agent target" className="space-y-2 rounded-md border border-border p-3">
-            <p className="break-all text-xs text-muted-foreground">Comments for <strong className="font-medium text-foreground">{page}</strong></p>
-            <AgentTargetPicker key={page} />
-            <p className="text-xs text-muted-foreground">Applies to future sends and auto-run comments on this page. Existing threads are not resent.</p>
-          </section>
-        )}
         {error && (
           <p role="alert" className="text-xs text-destructive">
             {error}
