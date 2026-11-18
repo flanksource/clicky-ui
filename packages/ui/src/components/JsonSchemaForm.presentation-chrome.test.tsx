@@ -30,9 +30,9 @@ describe("content-only property previews", () => {
           "input:not([type=checkbox]), textarea, select, [role=combobox], [role=slider], [role=radio], [aria-expanded]",
         ),
       ).toHaveLength(0);
-      for (const checkbox of screen.getAllByRole("checkbox")) {
-        expect(checkbox).toBeDisabled();
-        expect(checkbox).toHaveAccessibleName();
+      for (const toggle of screen.getAllByRole("switch")) {
+        expect(toggle).toBeDisabled();
+        expect(toggle).toHaveAccessibleName();
       }
       expect(container.querySelectorAll(".border-input")).toHaveLength(0);
       expect(
@@ -90,14 +90,15 @@ describe("content-only property previews", () => {
         />,
       ),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Edit String tags" }));
+    // An option-less scalar list has no menu to toggle, so use the enum list.
+    fireEvent.click(screen.getByRole("button", { name: "Edit Enum tags" }));
     expect(screen.getByRole("combobox")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Toggle options" }),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Remove api" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove small" }));
     fireEvent.click(
-      screen.getByRole("button", { name: "Cancel editing String tags" }),
+      screen.getByRole("button", { name: "Cancel editing Enum tags" }),
     );
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(

@@ -21,8 +21,10 @@ export function goroutineStateDot(state: string): string {
   return "bg-muted-foreground/40";
 }
 
+// Thread states are matched case-insensitively: a parsed dump yields "runnable",
+// the JVM diagnostics protocol sends "RUNNABLE".
 export function threadStateBadge(state: string): string {
-  switch (state) {
+  switch (state.toLowerCase()) {
     case "runnable":
       return "bg-green-50 text-green-700 dark:bg-green-500/20 dark:text-green-300";
     case "blocked":
@@ -40,7 +42,7 @@ export function threadStateBadge(state: string): string {
 }
 
 export function threadStateDot(state: string): string {
-  switch (state) {
+  switch (state.toLowerCase()) {
     case "runnable":
       return "bg-green-500";
     case "blocked":

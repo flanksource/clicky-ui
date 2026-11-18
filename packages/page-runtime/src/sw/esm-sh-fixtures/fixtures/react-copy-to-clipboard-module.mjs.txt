@@ -1,0 +1,222 @@
+/* esm.sh - react-copy-to-clipboard@5.1.1 */
+import*as __0$ from"copy-to-clipboard";import*as __1$ from"react";var require=n=>{const e=m=>typeof m.default<"u"?m.default:m,c=m=>Object.assign({__esModule:true},m);switch(n){case"copy-to-clipboard":return e(__0$);case"react":return e(__1$);default:console.error('module "'+n+'" not found');return null;}};
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x, {
+  get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
+}) : x)(function(x) {
+  if (typeof require !== "undefined") return require.apply(this, arguments);
+  throw Error('Dynamic require of "' + x + '" is not supported');
+});
+var __commonJS = (cb, mod) => function __require2() {
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// node_modules/react-copy-to-clipboard/lib/Component.js
+var require_Component = __commonJS({
+  "node_modules/react-copy-to-clipboard/lib/Component.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", {
+      value: true
+    });
+    exports.CopyToClipboard = void 0;
+    var _copyToClipboard = _interopRequireDefault(__require("copy-to-clipboard"));
+    var _react = _interopRequireDefault(__require("react"));
+    var _excluded = ["text", "onCopy", "options", "children"];
+    function _interopRequireDefault(e) {
+      return e && e.__esModule ? e : { "default": e };
+    }
+    function _typeof(o) {
+      "@babel/helpers - typeof";
+      return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function(o2) {
+        return typeof o2;
+      } : function(o2) {
+        return o2 && "function" == typeof Symbol && o2.constructor === Symbol && o2 !== Symbol.prototype ? "symbol" : typeof o2;
+      }, _typeof(o);
+    }
+    function ownKeys(e, r) {
+      var t = Object.keys(e);
+      if (Object.getOwnPropertySymbols) {
+        var o = Object.getOwnPropertySymbols(e);
+        r && (o = o.filter(function(r2) {
+          return Object.getOwnPropertyDescriptor(e, r2).enumerable;
+        })), t.push.apply(t, o);
+      }
+      return t;
+    }
+    function _objectSpread(e) {
+      for (var r = 1; r < arguments.length; r++) {
+        var t = null != arguments[r] ? arguments[r] : {};
+        r % 2 ? ownKeys(Object(t), true).forEach(function(r2) {
+          _defineProperty(e, r2, t[r2]);
+        }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function(r2) {
+          Object.defineProperty(e, r2, Object.getOwnPropertyDescriptor(t, r2));
+        });
+      }
+      return e;
+    }
+    function _objectWithoutProperties(e, t) {
+      if (null == e) return {};
+      var o, r, i = _objectWithoutPropertiesLoose(e, t);
+      if (Object.getOwnPropertySymbols) {
+        var n = Object.getOwnPropertySymbols(e);
+        for (r = 0; r < n.length; r++) o = n[r], -1 === t.indexOf(o) && {}.propertyIsEnumerable.call(e, o) && (i[o] = e[o]);
+      }
+      return i;
+    }
+    function _objectWithoutPropertiesLoose(r, e) {
+      if (null == r) return {};
+      var t = {};
+      for (var n in r) if ({}.hasOwnProperty.call(r, n)) {
+        if (-1 !== e.indexOf(n)) continue;
+        t[n] = r[n];
+      }
+      return t;
+    }
+    function _classCallCheck(a, n) {
+      if (!(a instanceof n)) throw new TypeError("Cannot call a class as a function");
+    }
+    function _defineProperties(e, r) {
+      for (var t = 0; t < r.length; t++) {
+        var o = r[t];
+        o.enumerable = o.enumerable || false, o.configurable = true, "value" in o && (o.writable = true), Object.defineProperty(e, _toPropertyKey(o.key), o);
+      }
+    }
+    function _createClass(e, r, t) {
+      return r && _defineProperties(e.prototype, r), t && _defineProperties(e, t), Object.defineProperty(e, "prototype", { writable: false }), e;
+    }
+    function _callSuper(t, o, e) {
+      return o = _getPrototypeOf(o), _possibleConstructorReturn(t, _isNativeReflectConstruct() ? Reflect.construct(o, e || [], _getPrototypeOf(t).constructor) : o.apply(t, e));
+    }
+    function _possibleConstructorReturn(t, e) {
+      if (e && ("object" == _typeof(e) || "function" == typeof e)) return e;
+      if (void 0 !== e) throw new TypeError("Derived constructors may only return object or undefined");
+      return _assertThisInitialized(t);
+    }
+    function _assertThisInitialized(e) {
+      if (void 0 === e) throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+      return e;
+    }
+    function _isNativeReflectConstruct() {
+      try {
+        var t = !Boolean.prototype.valueOf.call(Reflect.construct(Boolean, [], function() {
+        }));
+      } catch (t2) {
+      }
+      return (_isNativeReflectConstruct = function _isNativeReflectConstruct2() {
+        return !!t;
+      })();
+    }
+    function _getPrototypeOf(t) {
+      return _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf.bind() : function(t2) {
+        return t2.__proto__ || Object.getPrototypeOf(t2);
+      }, _getPrototypeOf(t);
+    }
+    function _inherits(t, e) {
+      if ("function" != typeof e && null !== e) throw new TypeError("Super expression must either be null or a function");
+      t.prototype = Object.create(e && e.prototype, { constructor: { value: t, writable: true, configurable: true } }), Object.defineProperty(t, "prototype", { writable: false }), e && _setPrototypeOf(t, e);
+    }
+    function _setPrototypeOf(t, e) {
+      return _setPrototypeOf = Object.setPrototypeOf ? Object.setPrototypeOf.bind() : function(t2, e2) {
+        return t2.__proto__ = e2, t2;
+      }, _setPrototypeOf(t, e);
+    }
+    function _defineProperty(e, r, t) {
+      return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: true, configurable: true, writable: true }) : e[r] = t, e;
+    }
+    function _toPropertyKey(t) {
+      var i = _toPrimitive(t, "string");
+      return "symbol" == _typeof(i) ? i : i + "";
+    }
+    function _toPrimitive(t, r) {
+      if ("object" != _typeof(t) || !t) return t;
+      var e = t[Symbol.toPrimitive];
+      if (void 0 !== e) {
+        var i = e.call(t, r || "default");
+        if ("object" != _typeof(i)) return i;
+        throw new TypeError("@@toPrimitive must return a primitive value.");
+      }
+      return ("string" === r ? String : Number)(t);
+    }
+    var CopyToClipboard = exports.CopyToClipboard = /* @__PURE__ */ (function(_React$PureComponent) {
+      function CopyToClipboard2() {
+        var _this;
+        _classCallCheck(this, CopyToClipboard2);
+        for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+          args[_key] = arguments[_key];
+        }
+        _this = _callSuper(this, CopyToClipboard2, [].concat(args));
+        _defineProperty(_this, "onClick", function(event) {
+          var _this$props = _this.props, text = _this$props.text, onCopy = _this$props.onCopy, children = _this$props.children, options = _this$props.options;
+          var elem = _react["default"].Children.only(children);
+          var result = (0, _copyToClipboard["default"])(text, options);
+          if (onCopy) {
+            onCopy(text, result);
+          }
+          if (elem !== null && elem !== void 0 && elem.props && typeof elem.props.onClick === "function") {
+            elem.props.onClick(event);
+          }
+        });
+        return _this;
+      }
+      _inherits(CopyToClipboard2, _React$PureComponent);
+      return _createClass(CopyToClipboard2, [{
+        key: "render",
+        value: function render() {
+          var _this$props2 = this.props, _text = _this$props2.text, _onCopy = _this$props2.onCopy, _options = _this$props2.options, children = _this$props2.children, props = _objectWithoutProperties(_this$props2, _excluded);
+          var elem = _react["default"].Children.only(children);
+          return /* @__PURE__ */ _react["default"].cloneElement(elem, _objectSpread(_objectSpread({}, props), {}, {
+            onClick: this.onClick
+          }));
+        }
+      }]);
+    })(_react["default"].PureComponent);
+    _defineProperty(CopyToClipboard, "defaultProps", {
+      onCopy: void 0,
+      options: void 0
+    });
+  }
+});
+
+// node_modules/react-copy-to-clipboard/lib/index.js
+var require_lib = __commonJS({
+  "node_modules/react-copy-to-clipboard/lib/index.js"(exports, module) {
+    "use strict";
+    var _require = require_Component();
+    var CopyToClipboard = _require.CopyToClipboard;
+    CopyToClipboard.CopyToClipboard = CopyToClipboard;
+    module.exports = CopyToClipboard;
+  }
+});
+
+// endpoint.js
+var cjsm = __toESM(require_lib());
+var endpoint_default = cjsm.default ?? cjsm;
+export {
+  endpoint_default as default
+};
+//# sourceMappingURL=react-copy-to-clipboard.development.mjs.map

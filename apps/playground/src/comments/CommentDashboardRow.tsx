@@ -1,8 +1,10 @@
+import { ActionError } from "@flanksource/clicky-ui";
 import { useState } from "react";
 import {
   Badge,
   Button,
   CommentAuthorAvatar,
+  CommentAuthorName,
   CommentMarkdown,
   DropdownMenu,
   HoverCard,
@@ -74,6 +76,7 @@ export function CommentDashboardEntry({
   replies: Comment[];
 }) {
   const agentRuns = useAgentRuns();
+  const { config } = useCommentContext();
   const status = PLAYGROUND_COMMENT_CONFIG.statuses.find(
     (entry) => entry.value === (comment.status ?? "open"),
   );
@@ -91,7 +94,7 @@ export function CommentDashboardEntry({
         <div className="flex items-center gap-2">
           <CommentAuthorAvatar author={comment.author} size="md" />
           <span className="text-sm font-medium">
-            {comment.author?.name ?? "Anonymous"}
+            <CommentAuthorName author={comment.author} />
           </span>
           <Timestamp
             value={comment.createdAt}
@@ -152,6 +155,8 @@ export function CommentDashboardEntry({
         <div className="min-w-0 space-y-2 whitespace-normal">
           <CommentMarkdown
             text={comment.body}
+            {...(comment.vocabularyRefs ? { vocabularyRefs: comment.vocabularyRefs } : {})}
+            {...(config.vocabulary ? { vocabulary: config.vocabulary } : {})}
             className="text-sm leading-relaxed"
           />
           {comment.element?.componentName && (
@@ -176,7 +181,7 @@ export function CommentDashboardActions({
   const { callbacks } = useCommentContext();
   const { confirm, dialog } = useConfirm();
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const active =
     resolveCommentStage(PLAYGROUND_COMMENT_CONFIG, comment.status) === "active";
 
@@ -187,7 +192,7 @@ export function CommentDashboardActions({
     try {
       await work();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(cause);
     } finally {
       setPending(false);
     }
@@ -327,14 +332,7 @@ export function CommentDashboardActions({
           <UiTrash className="size-4 text-destructive" />
         </Button>
       </div>
-      {error && (
-        <p
-          role="alert"
-          className="max-w-48 whitespace-normal text-xs text-destructive"
-        >
-          {error}
-        </p>
-      )}
+      {error !== null && <ActionError error={error} context={[["Artifact", comment.page], ["Comment", comment.id]]} />}
       {dialog}
     </div>
   );

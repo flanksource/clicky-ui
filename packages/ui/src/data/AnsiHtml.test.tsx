@@ -32,4 +32,32 @@ describe("AnsiHtml", () => {
     const { container } = render(<AnsiHtml text="x" as="span" />);
     expect(container.querySelector("pre")).toBeNull();
   });
+
+  it("renders Clicky truecolor without interpreting RGB channels as SGR styles", () => {
+    render(<AnsiHtml text={"\x1b[1;38;2;34;197;94mrecorded\x1b[0m"} />);
+    expect(screen.getByText("recorded")).toHaveStyle({
+      color: "rgb(34, 197, 94)",
+      fontWeight: "bold",
+    });
+    expect(screen.getByText("recorded").style.opacity).toBe("");
+  });
+
+  it("renders indexed foreground and truecolor background", () => {
+    render(<AnsiHtml text={"\x1b[38;5;196;48;2;17;24;39mindexed\x1b[0m"} />);
+    expect(screen.getByText("indexed")).toHaveStyle({
+      color: "rgb(255, 0, 0)",
+      backgroundColor: "rgb(17, 24, 39)",
+    });
+  });
+
+  it("resets foreground and intensity independently and treats empty SGR as reset", () => {
+    render(
+      <AnsiHtml
+        text={"\x1b[1;2;31mfirst\x1b[39;22msecond\x1b[32mthird\x1b[mlast"}
+      />,
+    );
+    expect(screen.getByText("second").style.cssText).toBe("");
+    expect(screen.getByText("third").style.color).not.toBe("");
+    expect(screen.getByText("last").style.cssText).toBe("");
+  });
 });

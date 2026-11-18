@@ -8,6 +8,7 @@ import { isPlainObject } from "../lib/collections";
 import { hasObjectItemProperties, isEmptyValue } from "./json-schema-form-utils";
 import { matchesFieldFilter } from "./json-schema-form-filter";
 import type { JsonSchemaFormError } from "./json-schema-form-error-types";
+import type { ResolvedFormExtensions } from "./json-schema-form-extension-api";
 import type {
   ExpressionEvaluator,
   FieldControl,
@@ -55,6 +56,7 @@ export function unmatchedFormErrors({
   hideEmpty,
   fieldFilter,
   pre,
+  extensions,
   rootValue = value,
   instancePath = "",
   expressionEvaluator,
@@ -70,6 +72,9 @@ export function unmatchedFormErrors({
   hideEmpty: boolean;
   fieldFilter?: string;
   pre: PreExtension[];
+  // The form's registered custom formats, so a custom field resolves the same
+  // way here as it renders.
+  extensions?: Pick<ResolvedFormExtensions, "formats">;
   rootValue?: Record<string, unknown>;
   instancePath?: string;
   expressionEvaluator?: ExpressionEvaluator;
@@ -81,6 +86,7 @@ export function unmatchedFormErrors({
     hideReadOnlyFields,
     hideEmpty,
     pre,
+    ...(extensions ? { extensions } : {}),
     rootValue,
     root: true,
     ...(fieldFilter ? { fieldFilter } : {}),
@@ -98,6 +104,7 @@ interface CollectOptions {
   hideEmpty: boolean;
   fieldFilter?: string;
   pre: PreExtension[];
+  extensions?: Pick<ResolvedFormExtensions, "formats">;
   rootValue: Record<string, unknown>;
   root: boolean;
   expressionEvaluator?: ExpressionEvaluator;
@@ -147,6 +154,7 @@ function collectObjectPaths(
         required: required.includes(key),
         value: value[key],
         onChange: () => {},
+        ...(options.extensions ? { extensions: options.extensions } : {}),
       }),
       prop,
       value[key],
@@ -275,6 +283,7 @@ function collectArrayPaths(
       required: false,
       value: item,
       onChange: () => {},
+      ...(options.extensions ? { extensions: options.extensions } : {}),
     });
     if (omitsWriteOnly(itemField, options)) continue;
     paths.add(itemPath);
@@ -310,6 +319,7 @@ function collectMapPaths(
       required: false,
       value: value[key],
       onChange: () => {},
+      ...(options.extensions ? { extensions: options.extensions } : {}),
     });
     if (omitsWriteOnly(valueField, options)) continue;
     paths.add(path);

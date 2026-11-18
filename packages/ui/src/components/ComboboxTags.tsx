@@ -2,7 +2,49 @@ import type { ReactNode } from "react";
 import { Icon, LabelIcon } from "../data/Icon";
 import { FilterPill } from "../data/FilterPill";
 import { UiClose } from "../icons";
+import { DropdownMenu } from "../overlay/DropdownMenu";
 import type { ComboboxOption, ComboboxTriStateMode } from "./combobox-types";
+
+type ComboboxTagsProps = {
+  disabled: boolean | undefined;
+  /** Per-value include/exclude modes; set only in tristate mode. */
+  modes: Record<string, ComboboxTriStateMode> | undefined;
+  onRemove: (value: string) => void;
+  onSetMode: (value: string, mode: string) => void;
+  options: ComboboxOption[];
+  values: string[];
+};
+
+/** The "+N more" chip: opens a scrolling list of the tags that did not fit. */
+export function ComboboxMoreTags({ values, ...tagProps }: ComboboxTagsProps) {
+  return (
+    <span data-combobox-more className="inline-flex h-6 shrink-0">
+      <DropdownMenu
+        role="dialog"
+        align="left"
+        menuLabel="More selected"
+        trigger={
+          <button
+            type="button"
+            aria-label={`Show ${values.length} more selected`}
+            className="inline-flex h-6 items-center whitespace-nowrap rounded-md border border-dashed border-border px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            +{values.length} more
+          </button>
+        }
+      >
+        {() => (
+          <div
+            data-combobox-more-list
+            className="flex max-h-60 w-80 max-w-[calc(100vw-2rem)] flex-col items-start gap-1 overflow-y-auto p-1"
+          >
+            <ComboboxTags values={values} {...tagProps} />
+          </div>
+        )}
+      </DropdownMenu>
+    </span>
+  );
+}
 
 export function ComboboxTags({
   disabled,
@@ -11,15 +53,7 @@ export function ComboboxTags({
   onSetMode,
   options,
   values,
-}: {
-  disabled: boolean | undefined;
-  /** Per-value include/exclude modes; set only in tristate mode. */
-  modes: Record<string, ComboboxTriStateMode> | undefined;
-  onRemove: (value: string) => void;
-  onSetMode: (value: string, mode: string) => void;
-  options: ComboboxOption[];
-  values: string[];
-}) {
+}: ComboboxTagsProps) {
   return values.map((value, index) => {
     const option = options.find((entry) => entry.value === value);
     const label = option?.selectedLabel ?? option?.label ?? value;

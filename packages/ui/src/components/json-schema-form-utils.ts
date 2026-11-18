@@ -86,6 +86,8 @@ export function comboboxAriaProps(
 
 export function defaultPlaceholder(schema: JsonSchemaProperty): string {
   if (schema.default != null && typeof schema.default !== "object") return String(schema.default);
+  const example = schema.examples?.[0];
+  if (example != null && typeof example !== "object") return String(example);
   return "";
 }
 
@@ -112,13 +114,29 @@ export function toStringArray(value: unknown): string[] {
 export function rendersAsSection(field: FieldControl, mode: FormLayout["mode"]): boolean {
   return (
     mode !== "properties" &&
-    (field.kind === "object" ||
+    ((field.kind === "object" && field.schema["x-object-display"] !== "row") ||
       field.layout === "table" ||
       field.arrayDisplay === "accordion" ||
       field.arrayDisplay === "cards" ||
       (field.kind === "array" &&
         field.arrayDisplay !== "stacked" &&
         hasObjectItemProperties(field.itemSchema)))
+  );
+}
+
+// nullableGroupClearable reports whether a nullable container value carries a
+// clear-to-null action. A section-rendered container shows it in its header row;
+// any other container gets the bordered ClearableFieldGroup around its body.
+export function nullableGroupClearable(field: FieldControl, readOnly: boolean): boolean {
+  if (readOnly || field.value === null || field.value === undefined) return false;
+  const tags =
+    field.kind === "array" &&
+    field.arrayDisplay === undefined &&
+    (Boolean(field.itemSchema?.enum) ||
+      ["string", "integer", "number"].includes(String(field.itemSchema?.type)));
+  return (
+    (["object", "array", "string-map"].includes(field.kind) && !tags) ||
+    (field.kind === "lookup" && Boolean(field.lookup?.multi && field.lookup?.hierarchy))
   );
 }
 
@@ -274,7 +292,7 @@ export function orderByPriority<T>(
 export function softError(field: FieldControl): string | undefined {
   const v = field.value;
   const isEmpty = v === undefined || v === null || v === "";
-  if (field.required && isEmpty) return "Required";
+  if (field.required && isEmpty && !(v === null && field.nullable)) return "Required";
 
   if (field.kind === "number" && typeof field.minimum === "number" && typeof v === "number") {
     if (v < field.minimum) return `Must be ≥ ${field.minimum}`;

@@ -6,6 +6,17 @@ import { LintSeverityIcon } from "../test-runner/MarkIcons";
 import type { LintSeverity } from "../test-runner/marks";
 import { ProblemActions } from "./ProblemActions";
 
+export type ProblemRowProps = {
+  message: string;
+  severity: LintSeverity;
+  metadata: ReactNode;
+  location: ReactNode;
+  actions: DropdownMenuItem[];
+  children: ReactNode;
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
+};
+
 export function ProblemRow({
   message,
   severity,
@@ -15,16 +26,7 @@ export function ProblemRow({
   children,
   expanded: controlled,
   onExpandedChange,
-}: {
-  message: string;
-  severity: LintSeverity;
-  metadata: ReactNode;
-  location: ReactNode;
-  actions: DropdownMenuItem[];
-  children: ReactNode;
-  expanded?: boolean;
-  onExpandedChange?: (expanded: boolean) => void;
-}) {
+}: ProblemRowProps) {
   const [localExpanded, setLocalExpanded] = useState(false);
   const expanded = controlled ?? localExpanded;
   return (

@@ -19,6 +19,8 @@ export interface PromptIndicatorProps extends PromptFilter {
   className?: string | undefined;
   /** Passed to the answer dialog to resolve the schema's `x-clicky-lookup` fields. */
   lookupFetcher?: LookupFetcher | undefined;
+  /** Passed to the answer dialog so a `format: "connection"` field can create the connection it is missing. */
+  connectionApiBase?: string | undefined;
   /**
    * Open each prompt's answer dialog once, as soon as it becomes pending:
    * closing it without answering leaves it pending in the panel rather than
@@ -36,6 +38,7 @@ export function PromptIndicator({
   enabled,
   className,
   lookupFetcher,
+  connectionApiBase,
   autoOpen = false,
   state: _ignoredState,
   ...filter
@@ -112,6 +115,7 @@ export function PromptIndicator({
           open={true}
           onClose={() => closePrompt(active.id)}
           lookupFetcher={lookupFetcher}
+          connectionApiBase={connectionApiBase}
         />
       ) : null}
     </>

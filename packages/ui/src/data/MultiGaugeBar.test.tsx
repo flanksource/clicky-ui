@@ -171,6 +171,35 @@ describe("MultiGaugeBar", () => {
     ).toBe("75%");
     expect(getByRole("img")).toHaveAccessibleName(/Heap.*Average 3.*P95 4.5/);
   });
+  it("places pointers below the track, pointing up, when markerSide is bottom", () => {
+    const trackHeightPx = 24;
+    const laneHeightPx = 8;
+    const { container } = render(
+      <MultiGaugeBar
+        label="CPU"
+        average={50}
+        markerSide="bottom"
+        markers={[
+          { label: "P90", value: 80 },
+          { label: "P95", value: 80 },
+        ]}
+      />,
+    );
+    const marker = (label: string) =>
+      container.querySelector<HTMLElement>(`[data-gauge-marker="${label}"]`);
+    expect(marker("P90")?.style.top).toBe(`${trackHeightPx}px`);
+    expect(marker("P95")?.style.top).toBe(
+      `${trackHeightPx + laneHeightPx}px`,
+    );
+    expect(marker("P90")?.querySelector("path")).toHaveAttribute(
+      "d",
+      "M0 8H10L5 0Z",
+    );
+    expect(
+      container.querySelector<HTMLElement>("[data-gauge-max]")?.style
+        .paddingTop,
+    ).toBe("0px");
+  });
   it("rejects invalid observations", () => {
     expect(() =>
       render(<MultiGaugeBar label="Invalid" average={-1} />),

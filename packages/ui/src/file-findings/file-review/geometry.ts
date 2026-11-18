@@ -2,7 +2,8 @@ import { ELEMENT_PREFIX, resolveElementAnchor } from "../../comments/anchoring/d
 import { isPatchAnchor } from "../../comments/anchoring/patch-anchor";
 import { blockAnchor, lineRangeAnchorResolver } from "../findings-comments";
 
-import { QUOTE_PREFIX, parseQuoteAnchor, resolveQuote } from "./quote-anchor";
+import type { TextQuote } from "../../comments/annotation-types";
+import { QUOTE_PREFIX, parseQuoteAnchor, resolveQuote, resolveQuoteInLines } from "./quote-anchor";
 
 /** A rectangle relative to the annotated document's top-left corner. */
 export type Box = { top: number; left: number; width: number; height: number };
@@ -22,7 +23,8 @@ export function sourceBlockOf(node: Node | null): Element | null {
  * Boxes for each anchor, relative to `origin`. A `q:` anchor finds its quote in
  * `markdown` through its section and context words; a `line:N` anchor resolves to its block like a line finding's
  * does. An anchor in `patchRanges` (an `r:` thread already placed in the
- * source) covers every block that overlaps its lines; an `e:` anchor finds its
+ * source) covers every block that overlaps its lines, or in text mode just its
+ * quoted words while the quote still lies in them; an `e:` anchor finds its
  * element by its locators and takes that element's box. An anchor that no
  * longer finds its target is left out. Entries come in document order.
  */
@@ -37,7 +39,7 @@ export function measureAnchors({
   markdown: Element;
   anchors: readonly string[];
   mode: AnchorMode;
-  patchRanges?: ReadonlyMap<string, { start: number; end: number }>;
+  patchRanges?: ReadonlyMap<string, { start: number; end: number; quote?: TextQuote }>;
 }): Map<string, Box[]> {
   const base = origin.getBoundingClientRect();
   const rel = (rect: DOMRect): Box => ({
@@ -81,6 +83,13 @@ export function measureAnchors({
     if (isPatchAnchor(anchor)) {
       const lines = patchRanges?.get(anchor);
       if (!lines) continue;
+      // The patch is authoritative; its quote only sharpens the highlight while it still lies in the matched lines.
+      const range = mode === "text" && lines.quote ? resolveQuoteInLines(markdown, lines, lines.quote) : null;
+      const words = range ? [...range.getClientRects()].filter((rect) => rect.width > 0).map(rel) : [];
+      if (words.length > 0) {
+        found.push({ anchor, boxes: words, at: words[0]!.top });
+        continue;
+      }
       const covered = [...markdown.querySelectorAll<HTMLElement>(SOURCE_BLOCK)]
         .filter((el) => Number(el.dataset.sourceStart) <= lines.end && Number(el.dataset.sourceEnd) >= lines.start)
         .flatMap(blockBoxes);

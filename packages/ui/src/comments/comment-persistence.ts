@@ -26,7 +26,7 @@ export function createStore(scope: string) {
       const base = key.replace(/:body$/, "");
       this.write(`${base}:body`, "");
       this.write(`${base}:facets`, {});
-      this.write(`${base}:rating`, undefined);
+      this.write(`${base}:target`, undefined);
       this.write(`${base}:mentions`, []);
       this.write(`${base}:open`, false);
     },

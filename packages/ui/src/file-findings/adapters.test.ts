@@ -46,6 +46,15 @@ describe("lintFindings", () => {
     ]);
   });
 
+  it("keeps a schema violation's JSON Pointer alongside its self-contained message", () => {
+    const message = "/conditions/dueDate: missing property 'fieldRef'";
+    const [finding] = lintFindings([
+      lintResult({ linter: "json", violations: [{ file: "p.yaml", line: 7, path: "/conditions/dueDate", message }] }),
+    ]);
+
+    expect([finding?.path, finding?.message]).toEqual(["/conditions/dueDate", message]);
+  });
+
   it("treats a violation without a severity as an error, as on the wire", () => {
     const [finding] = lintFindings([lintResult({ violations: [{ file: "a.go", line: 3, message: "m" }] })]);
 
@@ -219,6 +228,9 @@ function outline(nodes: FileTreeNode[], depth = 0): string[] {
 }
 
 describe("groupFindingsByFile", () => {
+  it("retains an explicitly opened empty folder", () => {
+    expect(groupFindingsByFile([], [], [{ file: "empty" }])).toEqual([{ key: "folder\u0000\u0000empty", name: "empty", kind: "folder", ref: { workDir: undefined, file: "empty" }, children: [], findings: [] }]);
+  });
   it("builds a path tree with folders before files, collapsing single-child folders", () => {
     const tree = groupFindingsByFile([
       finding("pkg/server/handler.go", WORK_DIR, 41),

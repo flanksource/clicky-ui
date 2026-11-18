@@ -1,0 +1,8 @@
+{
+  "name": "checkout-api",
+  "color": "#0ea5e9",
+  "owner": "ada",
+  "replicas": 3,
+  "endpoints": ["https://checkout.example.com", "https://checkout.internal.example.com"],
+  "notes": "Handles **checkout** for the storefront."
+}

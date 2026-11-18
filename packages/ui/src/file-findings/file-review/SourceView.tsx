@@ -1,5 +1,4 @@
 import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
-import { ProblemActions } from "../../data/diagnostics/ProblemActions";
 import type { HighlightedLine } from "../../data/code-highlight";
 import { Icon } from "../../data/Icon";
 import { tokenStyle } from "../../data/token-style";
@@ -10,6 +9,7 @@ import { authorDisplayName, getRoots, selectAnchorThreads } from "../../comments
 import { lineAnchor } from "../findings-comments";
 import type { FileFinding } from "../types";
 import { blameAge, isUncommitted, type BlameLine } from "./blame";
+import { FindingRow } from "./FindingRow";
 import { SEVERITY_MARK, bySeverityThenLine, severityOf, squiggleUnder } from "./marks";
 import { lineSegments, type SourceMark } from "./source-marks";
 
@@ -155,22 +155,13 @@ export function SourceView({
                 );
               })}
               {listed.map((f) => (
-                <span key={`${f.rule}:${f.message}`} data-source-finding={f.line} className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    aria-pressed={selected === lineAnchor(f.line)}
-                    onClick={() => onSelect(f)}
-                    className={cn(
-                      "flex min-w-0 flex-1 items-center gap-1.5 text-left font-sans text-[11px] hover:underline aria-pressed:font-semibold aria-pressed:underline",
-                      SEVERITY_MARK[severityOf(f.severity)].tone,
-                    )}
-                  >
-                    <Icon icon={SEVERITY_MARK[severityOf(f.severity)].icon} />
-                    <span className="text-foreground">{f.message}</span>
-                    <span className="text-muted-foreground">{f.source} {f.rule}</span>
-                  </button>
-                  {getFindingActions && <ProblemActions items={getFindingActions(f)} />}
-                </span>
+                <FindingRow
+                  key={`${f.rule}:${f.message}`}
+                  finding={f}
+                  selected={selected === lineAnchor(f.line)}
+                  onSelect={onSelect}
+                  getFindingActions={getFindingActions}
+                />
               ))}
             </span>
           </li>

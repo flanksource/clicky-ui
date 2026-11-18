@@ -3,6 +3,7 @@ import type { QueryBrowserResult } from "../../data/query-browser/QueryBrowser.t
 import type { ProfileColumn } from "../wizard/profileWizardModel";
 
 export type ProfileSampleResponse = Omit<QueryBrowserResult, "columns"> & {
+  mappingInputRows: Record<string, unknown>[];
   columns: ProfileColumn[];
   resultColumns?: DataTableServerColumn[];
   renderedQuery: string;

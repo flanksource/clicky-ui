@@ -7,37 +7,37 @@ import type {
 } from "./types";
 
 export const memoryRegions = [
-  { key: "eden", label: "Eden", color: "var(--fs-info-500)", heap: true },
+  { key: "eden", label: "Eden", color: "var(--clicky-info-500)", heap: true },
   {
     key: "survivor",
     label: "Survivor",
-    color: "var(--fs-hint-500)",
+    color: "var(--clicky-hint-500)",
     heap: true,
   },
-  { key: "old", label: "Old Gen", color: "var(--fs-prereq-500)", heap: true },
+  { key: "old", label: "Old Gen", color: "var(--clicky-prereq-500)", heap: true },
   {
     key: "metaspace",
     label: "Metaspace",
-    color: "var(--fs-warning-500)",
+    color: "var(--clicky-warning-500)",
     heap: false,
   },
   {
     key: "codeCache",
     label: "Code Cache",
-    color: "var(--fs-success-500)",
+    color: "var(--clicky-success-500)",
     heap: false,
   },
   {
     key: "direct",
     label: "Direct Buffers",
-    color: "var(--fs-error-500)",
+    color: "var(--clicky-error-500)",
     heap: false,
   },
 ] as const;
 
 export const nativeMemoryRegion = {
   label: "Other native",
-  color: "var(--fs-gray-400)",
+  color: "var(--clicky-gray-400)",
 };
 
 function nonNegative(values: Record<string, number>) {

@@ -186,6 +186,17 @@ function lintRuleActions(node: LintNode): LintAction[] {
   ];
 }
 
+/**
+ * A target group names no file, so `.gavel.yaml` can only ignore its rule or
+ * disable the linters beneath it.
+ */
+function lintTargetActions(node: LintNode): LintAction[] {
+  const workDir = node.work_dir ?? "";
+  if (node.ruleName) return lintRuleActions(node);
+  if (node.linterName) return [disableLinter(node.linterName, workDir)];
+  return uniqueChildLinters(node).map((child) => ({ ...disableLinter(child, workDir), key: `linter-disable:${child}` }));
+}
+
 /** Every ignore button for the selected node. A linter-error leaf has nothing to ignore. */
 export function lintNodeActions(node: LintNode, results: readonly LinterResult[]): LintAction[] {
   switch (node.kind) {
@@ -200,6 +211,8 @@ export function lintNodeActions(node: LintNode, results: readonly LinterResult[]
     case "lint-rule":
     case "lint-rule-group":
       return lintRuleActions(node);
+    case "lint-target":
+      return lintTargetActions(node);
     case "linter-error":
       return [];
   }

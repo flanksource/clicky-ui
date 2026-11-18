@@ -65,6 +65,16 @@ const problemLines = () => Array.from(document.querySelectorAll("[data-problem-l
 const tabNames = () => screen.getAllByRole("tab").map((tab) => tab.textContent?.replace(/\d+$/, "").trim());
 
 describe("FileReview", () => {
+  it("keeps a custom JSX preview mounted across tabs and supplies the current draft", () => {
+    const preview = ({ source }: { source: string }) => <iframe title="Custom preview" data-source={source} />;
+    const props = { path: "page.jsx", source: "initial", view: "preview", onViewChange: vi.fn(), preview };
+    const result = render(<FileReview {...props} />);
+    const frame = screen.getByTitle("Custom preview");
+    result.rerender(<FileReview {...props} source="draft" view="source" />);
+    expect(screen.getByTitle("Custom preview")).toBe(frame);
+    expect(frame.getAttribute("data-source")).toBe("draft");
+    expect(frame.parentElement?.className).toContain("hidden");
+  });
   it("offers only Preview and Source, and no thread counts, without findings or comments", () => {
     renderReview();
     expect({ tabs: tabNames(), counts: screen.queryByText(/open ·/) }).toEqual({ tabs: ["Preview", "Source"], counts: null });
@@ -248,6 +258,22 @@ describe("FileReview on a code file", () => {
     fireEvent.click(screen.getByRole("button", { name: `1 finding on line ${GO_FINDING.line}` }));
 
     expect({ shown, hidden, picked: listed() }).toEqual({ shown: 1, hidden: 0, picked: 1 });
+  });
+
+  it("drops a schema finding's path under its line but keeps it in the Problems list", () => {
+    const schema: FileFinding = {
+      file: GO_PATH, line: 4, severity: "error", rule: "schema", source: "json", kind: "lint",
+      path: "/conditions/dueDate", message: "/conditions/dueDate: missing property 'fieldRef'",
+    };
+    const { container, unmount } = renderCode({ findings: [schema] });
+    const underLine = container.querySelector(`[data-source-finding="4"] button`)?.textContent;
+    unmount();
+    renderCode({ findings: [schema], view: "problems" });
+
+    expect({ underLine, listed: screen.queryByText(schema.message) !== null }).toEqual({
+      underLine: "missing property 'fieldRef'json schema",
+      listed: true,
+    });
   });
 
   it("highlights a source-anchored comment on its characters", async () => {

@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Button, CommentCard } from "@flanksource/clicky-ui";
+import { Button, CommentCard, useCommentContext } from "@flanksource/clicky-ui";
 import { sortReplies, type Comment } from "@flanksource/clicky-ui/comments";
-import { PLAYGROUND_COMMENT_CONFIG } from "./useComments";
 
 export function CommentMiniThread({ replies }: { replies: Comment[] }) {
+  const { config } = useCommentContext();
   const [expanded, setExpanded] = useState(false);
   if (replies.length === 0) return null;
   const sorted = sortReplies(replies);
@@ -33,7 +33,7 @@ export function CommentMiniThread({ replies }: { replies: Comment[] }) {
         <CommentCard
           key={reply.id}
           comment={reply}
-          config={PLAYGROUND_COMMENT_CONFIG}
+          config={config}
           compact
         />
       ))}

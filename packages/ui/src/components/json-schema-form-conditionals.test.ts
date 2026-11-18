@@ -283,3 +283,34 @@ describe("effectiveProperties", () => {
     ).not.toHaveProperty("MemberGroupBenefits");
   });
 });
+
+describe("effectiveProperties on the schema's own if/then/else", () => {
+  // The shape of an answer: the conditional sits on the object itself, not in allOf, and the else branch holds another conditional.
+  const answer: JsonSchemaObject = {
+    type: "object",
+    if: { required: ["notApplicable"] },
+    [thenKeyword]: { properties: { notApplicable: { type: "string" } } },
+    else: {
+      if: { required: ["open"] },
+      [thenKeyword]: { properties: { open: { type: "array" } } },
+      else: {
+        properties: { outcome: { type: "string" }, transactions: { type: "array" } },
+        required: ["outcome"],
+        if: { properties: { outcome: { const: "manual" } }, required: ["outcome"] },
+        [thenKeyword]: { required: ["manual"], properties: { manual: { type: "string" } } },
+      },
+    },
+  };
+
+  it("takes the first branch whose condition holds", () => {
+    expect(Object.keys(effectiveProperties(answer, { notApplicable: "x" }).properties)).toEqual(["notApplicable"]);
+    expect(Object.keys(effectiveProperties(answer, { open: [] }).properties)).toEqual(["open"]);
+  });
+
+  it("falls through nested else branches, including a conditional inside the chosen branch", () => {
+    expect(Object.keys(effectiveProperties(answer, { outcome: "allowed" }).properties).sort()).toEqual(["outcome", "transactions"]);
+    const manual = effectiveProperties(answer, { outcome: "manual" });
+    expect(Object.keys(manual.properties).sort()).toEqual(["manual", "outcome", "transactions"]);
+    expect(manual.required.sort()).toEqual(["manual", "outcome"]);
+  });
+});

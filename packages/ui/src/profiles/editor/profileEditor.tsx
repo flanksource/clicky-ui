@@ -41,7 +41,6 @@ import {
 } from "../fields/profileFieldEditor";
 import { useProfileFieldState } from "../fields/profileFieldState";
 import type { ProfileSample } from "../wizard/profileWizardQueryStep";
-import { JsonPathProfileProvider } from "../query/jsonPathSampleRow";
 import type {
   ProfileColumn,
   ProfileWizardDraft,
@@ -57,6 +56,11 @@ import type {
   ProcessorSpec,
 } from "../processor/processorConfig";
 import { profileSchema } from "../profileApi";
+import { profileApiPath } from "../profileApi";
+import { sampleRequestProfile, JsonPathSampleRowsContext } from "../query/jsonPathSample";
+import { defaultSpanColumns, obsoleteSpanColumns } from "./spanColumns";
+import { ProfileSpansSection } from "./profileSpansSection";
+import { useQuery } from "@tanstack/react-query";
 
 const ProfileEditorRaw = lazy(() =>
   import("./profileEditorRaw").then((module) => ({
@@ -98,12 +102,13 @@ export function ProfileEditor({
     [initialDraft],
   );
   const [draft, setDraft] = useState<ProfileWizardDraft>(initialDraft);
-  const [section, setSection] = useState<ProfileEditorSection>("general");
+  const [section, setSection] = useState<ProfileEditorSection>(initialDraft.render === "traces" ? "spans" : "general");
   const [discovered, setDiscovered] = useState<ProfileColumn[]>(
-    initialDraft.columns ?? [],
+    initialDraft.render === "traces" ? defaultSpanColumns() : initialDraft.columns ?? [],
   );
   const [sampledColumns, setSampledColumns] = useState<ProfileColumn[]>([]);
   const [sampleRows, setSampleRows] = useState<Record<string, unknown>[]>([]);
+  const [mappingRows, setMappingRows] = useState<Record<string, unknown>[]>([]);
   const [activeField, setActiveField] = useState(
     initialDraft.columns?.[0]?.name ?? "",
   );
@@ -119,15 +124,19 @@ export function ProfileEditor({
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmResetColumns, setConfirmResetColumns] = useState(false);
   const dirty = JSON.stringify(draft) !== initialSerialized;
-  const validationError = validateProfileEditorDraft(draft);
+  const [normalizedRows, setNormalizedRows] = useState<Record<string, unknown>[]>([]);
+  const traces = draft.render === "traces";
+  const obsolete = traces ? obsoleteSpanColumns(draft.columns ?? [], discovered) : [];
+  const validationError = validateProfileEditorDraft(draft) ?? (obsolete.length ? `Columns require normalized sources: ${obsolete.join(", ")}. Reset to default or remove them.` : null);
   const sampleStale = profileSampleSignature(draft) !== lastSampleSignature;
-  const resetState = profileColumnResetState({
+  const resetState = traces ? {visible:true, disabled:false, title:"Reset to default"} : profileColumnResetState({
     providerType: draft.provider?.type ?? "",
     sampledColumnCount: sampledColumns.length,
     sampleStale,
   });
 
   const fields = useProfileFieldState({
+    normalizedOnly: traces,
     discovered,
     configured: draft.columns ?? [],
     activeName: activeField,
@@ -205,28 +214,54 @@ export function ProfileEditor({
     }
   };
 
-  const acceptSample = ({ columns, rows, sourceDraft }: ProfileSample) => {
+  const acceptSample = useCallback(({ columns, rows, sourceDraft, mappingInputRows }: ProfileSample) => {
+    if (!mappingInputRows) throw new Error("Sample response is missing mappingInputRows");
+    setMappingRows(mappingInputRows);
     setSampledColumns(structuredClone(columns));
-    setDiscovered(columns);
+    if (sourceDraft.render !== "traces") setDiscovered(columns);
     setSampleRows(rows);
     setDraft((current) => ({
       ...current,
-      columns: mergeSampledProfileColumns(current.columns ?? [], columns),
+      columns: current.render === "traces" ? current.columns ?? defaultSpanColumns() : mergeSampledProfileColumns(current.columns ?? [], columns),
     }));
     setActiveField((current) => current || columns[0]?.name || "");
     setLastSampleSignature(profileSampleSignature(sourceDraft));
-  };
+  }, []);
+
+  const sourceSample = useQuery({
+    queryKey:["profile-editor-source", profileSampleSignature(initialDraft)],
+    enabled:initialDraft.render === "traces", staleTime:Infinity, retry:false, refetchOnWindowFocus:false,
+    queryFn:async () => {
+      const response = await fetch(profileApiPath("profile/sample"), {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:sampleRequestProfile(initialDraft),params:{},previewProcessors:true})});
+      if (!response.ok) throw new Error(await response.text());
+      return await response.json() as Omit<ProfileSample,"sourceDraft">;
+    },
+  });
+  useEffect(() => {
+    if (sourceSample.data) acceptSample({...sourceSample.data,sourceDraft:initialDraft});
+    if (sourceSample.error) setError(sourceSample.error.message);
+  }, [sourceSample.data,sourceSample.error,initialDraft,acceptSample]);
+
+  const acceptNormalized = useCallback((rows: Record<string, unknown>[], columns: ProfileColumn[]) => {
+    setNormalizedRows(rows);
+    setDiscovered(columns);
+  }, []);
 
   const resetColumns = () => {
-    const first = sampledColumns[0];
+    const defaults = traces ? defaultSpanColumns() : sampledColumns;
+    const first = defaults[0];
     if (!first) throw new Error("cannot reset columns without a sample");
-    setDraft((current) => resetProfileColumns(current, sampledColumns));
+    setDraft((current) => resetProfileColumns(current, defaults));
     setActiveField(first.name);
     setConfirmResetColumns(false);
   };
 
   const sectionContent = (
     <div className="@container h-full overflow-auto p-5">
+      {traces && (section === "spans" || section === "columns") ? <div className="mb-4 flex items-center gap-3">
+        <Button type="button" variant="outline" onClick={() => setConfirmResetColumns(true)}>Reset to default</Button>
+        {validationError ? <p role="alert" className="text-sm text-destructive">{validationError}</p> : null}
+      </div> : null}
       {section === "general" ? (
         <div className="space-y-4">
           <ProfileGeneralSection draft={draft} onChange={setDraft} />
@@ -251,6 +286,10 @@ export function ProfileEditor({
           onSample={acceptSample}
         />
       ) : null}
+      {section === "spans" && traces ? <>
+        <ProfileSpansSection draft={draft} rows={mappingRows} normalizedRows={normalizedRows} onChange={setDraft} />
+        <details className="mt-4"><summary>Source sample</summary><pre className="overflow-auto text-xs">{JSON.stringify(mappingRows[0] ?? {}, null, 2)}</pre></details>
+      </> : null}
       {section === "columns" ? (
         fields.activeField ? (
           <section className="rounded-xl border bg-card p-5">
@@ -316,6 +355,7 @@ export function ProfileEditor({
       maxWidth: 480,
       content: (
         <ProfileEditorRail
+          traces={traces}
           value={section}
           status={profileEditorSectionStatus({
             draft,
@@ -386,15 +426,14 @@ export function ProfileEditor({
         content: sectionContent,
       },
     ];
-    if (section === "columns") {
+    if (section === "columns" || section === "spans" || (section === "source" && draft.search)) {
       result.push({
         id: "preview",
         label: "Preview",
         icon: <UiTable />,
         location: "bottom",
-        height: 220,
+        height: 400,
         minHeight: 120,
-        maxHeight: 520,
         slots: {
           headerTrailing: (
             <span className="text-[11px] text-muted-foreground">
@@ -406,8 +445,11 @@ export function ProfileEditor({
         },
         content: (
           <ProfileEditorPreview
+            profile={draft}
             columns={draft.columns ?? []}
-            rows={sampleRows}
+            rows={draft.render === "traces" ? mappingRows : sampleRows}
+            stale={sampleStale}
+            onNormalized={acceptNormalized}
           />
         ),
       });
@@ -420,18 +462,21 @@ export function ProfileEditor({
     fields,
     resetState,
     sampleRows,
+    mappingRows,
     sampleStale,
     section,
     sectionContent,
     processorPresets,
     processors,
     setProcessors,
+    traces,
+    acceptNormalized,
   ]);
 
   const leave = () => (dirty ? setConfirmDiscard(true) : onClose());
 
   return (
-    <JsonPathProfileProvider profile={draft}>
+    <JsonPathSampleRowsContext.Provider value={section === "spans" ? mappingRows : normalizedRows.length ? normalizedRows : sampleRows}>
       <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] bg-background">
         <header className="flex items-center gap-3 border-b border-border px-4 py-2.5">
           <nav className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
@@ -456,7 +501,7 @@ export function ProfileEditor({
           {error ? (
             <span className="truncate text-sm text-destructive">{error}</span>
           ) : null}
-          <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+          <span className="ml-auto hidden shrink-0 text-xs text-muted-foreground md:block">
             {dirty ? "Unsaved changes" : "No changes"}
           </span>
           <Button type="button" size="sm" variant="ghost" onClick={leave}>
@@ -511,7 +556,7 @@ export function ProfileEditor({
         <Modal
           open
           onClose={() => setConfirmResetColumns(false)}
-          title="Reset columns from latest sample?"
+          title={traces ? "Reset to default?" : "Reset columns from latest sample?"}
           size="sm"
           footer={
             <div className="flex w-full justify-end gap-2">
@@ -528,7 +573,7 @@ export function ProfileEditor({
                 disabled={resetState.disabled}
                 onClick={resetColumns}
               >
-                Reset columns
+                {traces ? "Reset to default" : "Reset columns"}
               </Button>
             </div>
           }
@@ -536,8 +581,7 @@ export function ProfileEditor({
           <p className="text-sm text-muted-foreground">
             Replace {fields.configuredCount} configured column
             {fields.configuredCount === 1 ? "" : "s"} with{" "}
-            {sampledColumns.length} column
-            {sampledColumns.length === 1 ? "" : "s"} from the latest sample.
+            {traces ? "the canonical default columns" : `${sampledColumns.length} columns from the latest sample`}.
             Custom labels, expressions, formatting, filtering, ordering, and
             manually added columns will be removed. The profile will remain
             unsaved until you save it.
@@ -581,7 +625,7 @@ export function ProfileEditor({
           </p>
         </Modal>
       ) : null}
-    </JsonPathProfileProvider>
+    </JsonPathSampleRowsContext.Provider>
   );
 }
 

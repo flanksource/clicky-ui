@@ -1,9 +1,15 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:5801";
+const PAGE_HOST = process.env.E2E_PAGE_HOST === "1";
+const PAGE_HOST_URL = process.env.PAGE_HOST_URL ?? "http://localhost:5810";
 
 export default defineConfig({
   testDir: "./tests",
+  ...(PAGE_HOST ? { outputDir: "../.tmp/T-host-e2e/playwright" } : {}),
+  // playground-frames specs need the built playground shell plus sibling gavel/facet checkouts; they run through
+  // playground-frames.config.ts (`pnpm --filter e2e test:playground-frames`), never this config.
+  ...(PAGE_HOST ? {} : { testIgnore: ["**/page-host/**", "**/playground-frames/**"] }),
   timeout: 60_000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
@@ -18,7 +24,10 @@ export default defineConfig({
   // e2e job and gavel's auto-discovered `playwright test` run. Set
   // E2E_ALL_BROWSERS=1 to additionally exercise firefox/webkit (requires
   // `playwright install`).
-  projects: [
+  projects: PAGE_HOST ? [{
+    name: "page-host", testMatch: "**/page-host/**/*.spec.ts",
+    use: { ...devices["Desktop Chrome"], channel: "chrome", baseURL: PAGE_HOST_URL, viewport: { width: 1920, height: 1080 } },
+  }] : [
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"], channel: "chrome" },
@@ -30,7 +39,10 @@ export default defineConfig({
         ]
       : []),
   ],
-  webServer: {
+  webServer: PAGE_HOST ? [
+    { command: "pnpm --filter page-host dev", url: PAGE_HOST_URL, reuseExistingServer: !process.env.CI, timeout: 120_000 },
+    { command: "pnpm --filter page-host dev:runtime", url: "http://localhost:5811/profile.json", reuseExistingServer: !process.env.CI, timeout: 30_000 },
+  ] : {
     command: process.env.CI
       ? "make -C .. e2e-preview"
       : "pnpm --filter kitchen-sink dev",

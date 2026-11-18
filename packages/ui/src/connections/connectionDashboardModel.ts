@@ -41,6 +41,7 @@ export type ConnectionDashboardItem = {
   /** A virtual or read-only connection: the service answers 405 to saving or deleting it. */
   readOnly?: boolean;
   source?: string;
+  layer?: string;
   /** Problems loading the connection (e.g. an invalid file); it cannot be used until they are fixed. */
   warnings?: string[];
 };
@@ -84,10 +85,20 @@ export type ConnectionLinkRenderer = (
   link: ConnectionLinkProps,
 ) => ReactNode;
 
-export type ConnectionActionsRenderer = (connection: ConnectionDashboardItem) => ReactNode;
+export type ConnectionActionsRenderer = (
+  connection: ConnectionDashboardItem,
+) => ReactNode;
 
 /** The react-query key prefix every dashboard listing is cached under. */
 export const CONNECTION_DASHBOARD_QUERY_KEY = "connection-dashboard";
+
+export const CONNECTION_LAYER_LABELS: Record<string, string> = {
+  db: "Database",
+  global: "Global files",
+  app: "Application files",
+  cwd: "Project files",
+  virtual: "Virtual",
+};
 
 export function groupConnectionDashboardLanes(
   connections: ConnectionDashboardItem[],

@@ -8,6 +8,7 @@ import {
 describe("profile sample result transport", () => {
   it("keeps authoring columns out of the QueryBrowser filter contract", () => {
     const response: ProfileSampleResponse = {
+      mappingInputRows: [{ message: "started" }],
       rows: [{ message: "started" }],
       columns: [
         { name: "message", type: "string", filter: { kind: "text" } },
@@ -23,6 +24,7 @@ describe("profile sample result transport", () => {
     };
 
     expect(profileSampleQueryResult(response)).toEqual({
+      mappingInputRows: [{ message: "started" }],
       rows: [{ message: "started" }],
       columns: [
         {
@@ -40,6 +42,7 @@ describe("profile sample result transport", () => {
   it("fails when the backend omits the resolved result-column contract", () => {
     expect(() =>
       profileSampleQueryResult({
+        mappingInputRows: [],
         rows: [],
         columns: [],
         renderedQuery: "SELECT 1",
@@ -49,6 +52,7 @@ describe("profile sample result transport", () => {
 
   it("limits lookup metadata to columns projected by the sampled query", () => {
     const response: ProfileSampleResponse = {
+      mappingInputRows: [{ message: "started" }],
       rows: [{ message: "started" }],
       columns: [
         { name: "message", type: "string", filter: { kind: "text" } },

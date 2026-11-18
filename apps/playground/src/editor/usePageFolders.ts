@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { pages } from "../registry";
+import { LIVE_SERVER } from "../live-server";
 import { fetchFolders } from "./page-api";
 import { foldersFromSlugs } from "./page-management-model";
 
@@ -17,7 +18,7 @@ export function usePageFolders(): PageFolders {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!import.meta.env.DEV) return;
+    if (!LIVE_SERVER) return;
     try {
       setFolders(await fetchFolders());
       setError(null);

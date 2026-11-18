@@ -1,6 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CommentCard } from "./CommentCard";
+import { CommentProvider } from "./CommentProvider";
+import { sampleProposal } from "./comment-fixtures";
+import { AgentIdentityProvider } from "../data/chat/AgentIdentity";
 import {
   DEFAULT_COMMENT_STATUSES,
   type Comment,
@@ -21,6 +24,16 @@ describe("CommentCard", () => {
   const agent = { id: "claude:s-1", name: "claude-opus-5-5", kind: "agent" as const };
   const handedOff = (agentRun: NonNullable<Comment["agentRun"]>): Comment => ({ ...root, status: "in_progress", assignee: agent, agentRun });
   const REQUESTED = "2026-01-01T00:01:00.000Z";
+
+  it("shows the delivered session's name as a mention instead of its launch target label", () => {
+    render(
+      <AgentIdentityProvider identities={{ "session-review": { sessionName: "Product review" } }}>
+        <CommentCard comment={handedOff({ requestedAt: REQUESTED, state: "sent", sessionId: "session-review", target: { label: "New editor-comments session" } })} config={config} />
+      </AgentIdentityProvider>,
+    );
+    expect(screen.getByTestId("agent-delivery")).toHaveTextContent("@Product review");
+    expect(screen.queryByText("New editor-comments session")).not.toBeInTheDocument();
+  });
 
   it.each([
     { run: { requestedAt: REQUESTED, state: "queued" as const }, stage: "queued", tick: "Queued" },
@@ -675,5 +688,46 @@ describe("CommentCard", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Verify totals" }));
     expect(onChecklistToggle).toHaveBeenCalledWith(0);
+  });
+
+  describe("proposal replies", () => {
+    const reply: Comment = {
+      id: "r1-p",
+      parentId: "r1",
+      body: "Here is a fix.",
+      createdAt: "2026-01-01T00:05:00.000Z",
+      author: agent,
+      proposal: sampleProposal,
+    };
+
+    it.each([
+      { name: "expanded", props: { defaultExpanded: true } },
+      { name: "collapsed", props: {} },
+    ])("renders the proposal under a $name reply", ({ props }) => {
+      render(<CommentCard comment={reply} config={config} {...props} />);
+      expect(screen.getByTestId("proposal-card")).toHaveAttribute("data-proposal-state", "proposed");
+      expect(screen.getByText("src/rollup/currency.ts")).toBeInTheDocument();
+    });
+
+    it("renders no proposal for a reply without one", () => {
+      const { proposal: _omitted, ...plain } = reply;
+      render(<CommentCard comment={plain} config={config} defaultExpanded />);
+      expect(screen.queryByTestId("proposal-card")).not.toBeInTheDocument();
+    });
+
+    it("acts through the provider's proposal callbacks with the reply's id, and stays read-only without them", async () => {
+      const onApplyProposal = vi.fn();
+      const { unmount } = render(
+        <CommentProvider comments={[reply]} config={config} onApplyProposal={onApplyProposal}>
+          <CommentCard comment={reply} config={config} defaultExpanded />
+        </CommentProvider>,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+      await waitFor(() => expect(onApplyProposal).toHaveBeenCalledWith("r1-p", "apply"));
+      unmount();
+
+      render(<CommentCard comment={reply} config={config} defaultExpanded />);
+      expect(screen.queryByRole("button", { name: "Apply" })).not.toBeInTheDocument();
+    });
   });
 });

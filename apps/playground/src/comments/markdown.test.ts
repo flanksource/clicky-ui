@@ -4,6 +4,7 @@ import { DOCUMENT_ANCHOR, type Comment } from "@flanksource/clicky-ui/comments";
 import { commentsForFolder, commentsToMarkdown, groupByPage } from "./markdown";
 import type { PageComment } from "./useComments";
 import type { CommentElementContext } from "../../plugins/comments-model";
+import type { StoredStyleEdit } from "../../plugins/comments-store";
 
 const BUTTON_ANCHOR = ":scope > div:nth-child(1) > button:nth-child(2)";
 const HEADING_ANCHOR = ":scope > h1:nth-child(1)";
@@ -27,6 +28,7 @@ const LABELS = {
 
 const MARKDOWN_OPTIONS = {
   labels: LABELS,
+  vocabularyInstructions: { facet: "Read Facet references as diagram variants." },
   pageUrl: (slug: string) =>
     `http://localhost:5274/?page=${encodeURIComponent(slug)}`,
   pagePath: (slug: string) => `apps/playground/src/pages/${slug}.tsx`,
@@ -40,6 +42,26 @@ function page(slug: string, comments: Comment[]) {
 }
 
 describe("commentsToMarkdown", () => {
+  const reference = { catalog: "facet", type: "box", id: "box/header", label: "Header", description: "A header box", references: ["facet/header.tsx"] };
+  it("prints instructions once per alias across roots, replies and pages", () => {
+    const sections = [
+      ...page("first", [comment({ id: "first", createdAt: "2026-01-01", vocabularyRefs: [reference] }), comment({ id: "reply", parentId: "first", createdAt: "2026-01-02", vocabularyRefs: [{ ...reference, id: "box/body" }] })]),
+      ...page("second", [comment({ id: "second", createdAt: "2026-01-03", vocabularyRefs: [reference] })]),
+    ];
+    const markdown = commentsToMarkdown(sections, MARKDOWN_OPTIONS);
+    expect(markdown.match(/\*\*facet vocabulary:\*\*/g)).toHaveLength(1);
+    expect(markdown.match(/Read Facet references as diagram variants\./g)).toHaveLength(1);
+    expect(markdown).toContain("facet:box/body: A header box");
+  });
+  it("rejects a referenced alias without instructions", () => {
+    expect(() => commentsToMarkdown(page("first", [comment({ id: "first", createdAt: "2026-01-01", vocabularyRefs: [reference] })]), { ...MARKDOWN_OPTIONS, vocabularyInstructions: {} })).toThrow("Unknown vocabulary alias facet");
+  });
+  it("groups references by alias after that alias's instructions", () => {
+    const git = { ...reference, catalog: "git", type: "git-object", id: "git-object/branch" };
+    const markdown = commentsToMarkdown(page("first", [comment({ id: "first", createdAt: "2026-01-01", vocabularyRefs: [reference, git, { ...reference, id: "box/body" }] })]), { ...MARKDOWN_OPTIONS, vocabularyInstructions: { ...MARKDOWN_OPTIONS.vocabularyInstructions, git: "Read Git references as objects." } });
+    expect(markdown.indexOf("facet:box/body: A header box")).toBeLessThan(markdown.indexOf("**git vocabulary:**"));
+    expect(markdown.indexOf("Read Git references as objects.")).toBeLessThan(markdown.indexOf("git:git-object/branch: A header box"));
+  });
   it("reports an empty page explicitly rather than emitting a bare heading", () => {
     expect(commentsToMarkdown(page("welcome", []), RAW_ANCHOR_OPTIONS)).toBe(
       [
@@ -227,6 +249,42 @@ describe("commentsToMarkdown", () => {
     expect(markdown).toContain(
       '**HTML:**\n```html\n<button class="btn-primary">Approve</button>\n```',
     );
+  });
+
+  it("tells the agent the refused style edit: element, source line, each attribute change and why it was refused", () => {
+    const styled = comment({
+      id: "c1",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      body: "Change fill of <rect>",
+    }) as Comment & { styleEdit: StoredStyleEdit };
+    styled.styleEdit = {
+      marker: "flanksource/_diagrams/call-path.tsx:42:7#3@0123456789ab",
+      tag: "rect",
+      changes: [
+        { attribute: "fill", from: "#fff", to: "#eef" },
+        { attribute: "width", from: 12, to: 40.5 },
+        { attribute: "strokeWidth", from: null, to: 2 },
+      ],
+      refusal: {
+        reason: "computed",
+        file: "flanksource/_diagrams/call-path.tsx",
+        line: 44,
+        column: 9,
+        message: "x is computed there, so it cannot be changed visually; open the source and edit it by hand",
+      },
+    };
+
+    const markdown = commentsToMarkdown(page("welcome", [styled]), MARKDOWN_OPTIONS);
+
+    expect(markdown.split("\n").slice(6, 13)).toEqual([
+      "- status: open",
+      "- You: Change fill of <rect>",
+      "- style edit: `<rect>` at `apps/playground/src/pages/flanksource/_diagrams/call-path.tsx:42`",
+      "  - fill: `#fff` → `#eef`",
+      "  - width: `12` → `40.5`",
+      "  - strokeWidth: (not set) → `2`",
+      "  - not applied automatically (computed) at `apps/playground/src/pages/flanksource/_diagrams/call-path.tsx:44:9`: x is computed there, so it cannot be changed visually; open the source and edit it by hand",
+    ]);
   });
 
   it("names a markdown block by its section, text and captured line instead of its anchor", () => {

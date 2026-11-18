@@ -681,6 +681,14 @@
       "note": ""
     },
     {
+      "consumerName": "minus",
+      "group": "layout-dashboard",
+      "status": "NEW",
+      "outline": "ph:minus-light",
+      "filled": "ph:minus-bold",
+      "note": "Minimize a panel to its launcher"
+    },
+    {
       "consumerName": "edit",
       "group": "forms-editing",
       "status": "NEW",
@@ -3743,6 +3751,38 @@
       "outline": "jb-site:KubernetesIcons/icons/newui/jobs",
       "filled": "skip",
       "note": "Kubernetes Job."
+    },
+    {
+      "consumerName": "k8s-service",
+      "group": "kubernetes",
+      "status": "NEW",
+      "outline": "incumbent",
+      "filled": "skip",
+      "note": "Kubernetes Service glyph from the Kubernetes community icon, without its blue heptagon badge."
+    },
+    {
+      "consumerName": "k8s-endpoint",
+      "group": "kubernetes",
+      "status": "NEW",
+      "outline": "incumbent",
+      "filled": "skip",
+      "note": "Kubernetes Endpoints glyph from the Kubernetes community icon, without its blue heptagon badge."
+    },
+    {
+      "consumerName": "k8s-ingress",
+      "group": "kubernetes",
+      "status": "NEW",
+      "outline": "incumbent",
+      "filled": "skip",
+      "note": "Kubernetes Ingress glyph from the Kubernetes community icon, without its blue heptagon badge."
+    },
+    {
+      "consumerName": "k8s-pod",
+      "group": "kubernetes",
+      "status": "NEW",
+      "outline": "incumbent",
+      "filled": "skip",
+      "note": "Kubernetes Pod glyph from the Kubernetes community icon, without its blue heptagon badge."
     },
     {
       "consumerName": "profiler-back-trace",

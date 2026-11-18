@@ -54,6 +54,14 @@ export function BookmarkletInstall() {
             browser internal pages and cross-origin frame contents are
             unsupported.
           </p>
+          <p className="text-muted-foreground">
+            For pages that block the bookmarklet, use the Gavel Chrome extension
+            from the Gavel repository's <code>extension</code> workspace package.
+            It connects directly to Gavel and captures todos offline. Build it
+            there, load <code>extension/dist</code> unpacked from{" "}
+            <code>chrome://extensions</code>, then configure the Gavel address
+            and project in its popup and turn on Enabled on this site.
+          </p>
           {error && (
             <p role="alert" className="text-destructive">
               {error}

@@ -14,7 +14,9 @@ const fake = vi.hoisted(() => {
     mouseHandlers: [] as Array<NonNullable<typeof state.onMouseDown>>,
     actions: [] as Array<{ id: string; run: () => void }>,
     selection: { startLineNumber: 3, endLineNumber: 5, endColumn: 4 },
+    zones: new Map<string, { afterLineNumber: number; heightInPx?: number; domNode: HTMLElement }>(),
   };
+  let zoneId = 0;
   const editor = {
     getValue: () => state.value,
     setValue: vi.fn(),
@@ -39,6 +41,19 @@ const fake = vi.hoisted(() => {
     revealLineInCenter: vi.fn(),
     getTopForLineNumber: (line: number) => line * 20,
     getScrollTop: () => 0,
+    changeViewZones: vi.fn((callback: (accessor: {
+      addZone: (zone: { afterLineNumber: number; heightInPx?: number; domNode: HTMLElement }) => string;
+      removeZone: (id: string) => void;
+    }) => void) =>
+      callback({
+        addZone: (zone) => {
+          const id = `zone-${++zoneId}`;
+          state.zones.set(id, zone);
+          return id;
+        },
+        removeZone: (id) => void state.zones.delete(id),
+      }),
+    ),
   };
   const registered: string[] = [];
   const monaco = {
@@ -135,6 +150,7 @@ beforeEach(() => {
   fake.state.onMouseDown = undefined;
   fake.state.mouseHandlers.length = 0;
   fake.state.actions.length = 0;
+  fake.state.zones.clear();
   fake.state.selection = { startLineNumber: 3, endLineNumber: 5, endColumn: 4 };
   fake.languages.length = 0;
   fake.registered.length = 0;
@@ -307,35 +323,38 @@ describe("AnnotatedCode", () => {
     expect(fake.monaco.editor.setModelMarkers).toHaveBeenCalledTimes(markerCalls);
   });
 
-  it("adds no inline chips unless asked", async () => {
+  it("lists no findings under their lines unless asked", async () => {
     mount();
 
     await waitFor(() => expect(fake.state.decorations).toHaveLength(2));
-    expect(fake.state.decorations.some((d) => "after" in d.options)).toBe(false);
+    expect(fake.state.zones.size).toBe(0);
   });
 
-  it("shows each line's worst finding as an inline chip with a count of the rest", async () => {
-    const line12Error: FileFinding = {
+  it("lists each finding under its line, worst first, as the review source view does", async () => {
+    const schemaError: FileFinding = {
       file: "pkg/a.go",
       line: 12,
       severity: "error",
-      message: "Undefined name",
-      source: "go vet",
+      path: "/conditions/dueDate",
+      message: "/conditions/dueDate: missing property 'fieldRef'",
+      source: "json",
+      rule: "schema",
       kind: "lint",
     };
-    mount({ inlineChips: true, findings: [...FINDINGS, line12Error] });
+    const onLineChange = vi.fn();
+    mount({ inlineFindings: true, findings: [...FINDINGS, schemaError], onLineChange });
 
-    await waitFor(() => expect(fake.state.decorations).toHaveLength(5));
-    expect(fake.state.decorations.filter((d) => "after" in d.options)).toEqual([
-      {
-        range: { startLineNumber: 12, startColumn: 80, endLineNumber: 12, endColumn: 80 },
-        options: { showIfCollapsed: true, after: { content: "Undefined name +1", inlineClassName: expect.stringContaining("text-red-500") } },
-      },
-      {
-        range: { startLineNumber: 30, startColumn: 80, endLineNumber: 30, endColumn: 80 },
-        options: { showIfCollapsed: true, after: { content: "TestA · Test failed", inlineClassName: expect.stringContaining("text-red-500") } },
-      },
-    ]);
+    await waitFor(() => expect(fake.state.zones.size).toBe(2));
+    const zones = [...fake.state.zones.values()].sort((a, b) => a.afterLineNumber - b.afterLineNumber);
+    expect(zones.map((zone) => [zone.afterLineNumber, zone.heightInPx])).toEqual([[12, 40], [30, 20]]);
+    await waitFor(() =>
+      expect([...zones[0]!.domNode.querySelectorAll("[data-source-finding]")].map((row) => row.textContent)).toEqual([
+        "missing property 'fieldRef'json schema",
+        "Unused parametergolangci-lint unparam",
+      ]),
+    );
+    fireEvent.click(within(zones[0]!.domNode).getByText("missing property 'fieldRef'"));
+    expect(onLineChange).toHaveBeenCalledWith(12);
   });
 
   it("aligns the focused thread with the editor's position of its line", async () => {

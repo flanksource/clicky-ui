@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -8,19 +8,21 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_COMMENT_STATUSES } from "../../../packages/ui/src/comments/comment-types";
 import {
   COMMENT_STATUSES,
-  COMMENTS_FILENAME,
   RESOLVED_STATUS,
   UNRESOLVED_STATUSES,
+  assertStyleEdit,
   patchComment,
   readAll,
+  withGavelAssignee,
   writeAll,
   type StoredComment,
-} from "./comments-store";
+} from "./testing/comments-store";
 
 const human = { name: "Reviewer", kind: "user" } as const;
 const agent = { name: "Agent", kind: "agent" } as const;
 const comment: StoredComment = {
   id: "root",
+  version: 1,
   body: "Check the result",
   createdAt: "2026-10-18T09:00:00.000Z",
   author: human,
@@ -75,6 +77,28 @@ describe("dashboard filter module", () => {
   });
 });
 
+describe("style edit validation", () => {
+  const styleEdit = {
+    marker: "flanksource/_d/call-path.tsx:42:7#3@0123456789ab",
+    tag: "rect",
+    changes: [{ attribute: "x", from: 1, to: 2 }],
+    refusal: { reason: "computed", file: "flanksource/_d/call-path.tsx", line: 44, column: 9, message: "x is computed there" },
+  };
+
+  // JSON has no encoding for these, so only an in-process caller can hand them over; the HTTP route sees `null`.
+  it.each([Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NaN])("rejects the non-finite value %s", (value) => {
+    expect(() => assertStyleEdit({ ...styleEdit, changes: [{ attribute: "x", from: 1, to: value }] })).toThrow(
+      /changes\[0\]\.to must be a finite number/,
+    );
+  });
+
+  it("accepts null as the target of a change that removes the attribute", () => {
+    const removal = { ...styleEdit, changes: [{ attribute: "x", from: 1, to: null }] };
+
+    expect(assertStyleEdit(removal)).toEqual(removal);
+  });
+});
+
 describe("assignment fields in the comment store", () => {
   let dir: string;
 
@@ -85,23 +109,20 @@ describe("assignment fields in the comment store", () => {
 
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-  it("loads a comments file written before assignment existed", () => {
-    writeFileSync(
-      join(dir, COMMENTS_FILENAME),
-      JSON.stringify({ sample: [comment] }),
-    );
+  it("loads comments without assignment metadata", async () => {
+    await writeAll(dir, { sample: [comment] });
 
-    const [loaded] = readAll(dir).sample ?? [];
+    const [loaded] = (await readAll(dir)).sample ?? [];
 
     expect(loaded).toEqual(comment);
     expect(loaded?.assignee).toBeUndefined();
   });
 
-  it("sets assignee and acknowledgement through a patch and clears them with null", () => {
-    writeAll(dir, { sample: [comment] });
+  it("sets assignee and acknowledgement through a patch and clears them with null", async () => {
+    await writeAll(dir, { sample: [comment] });
     const acknowledgedAt = "2026-10-18T10:00:00.000Z";
 
-    const set = patchComment(dir, comment.id, {
+    const set = await patchComment(dir, comment.id, {
       status: "in_progress",
       assignee: agent,
       acknowledgedAt,
@@ -113,25 +134,27 @@ describe("assignment fields in the comment store", () => {
       acknowledgedAt,
       acknowledgedBy: agent,
     });
-    expect(readAll(dir).sample?.[0]).toEqual(set);
+    expect((await readAll(dir)).sample?.[0]).toEqual(set);
 
-    const cleared = patchComment(dir, comment.id, {
+    const cleared = await patchComment(dir, comment.id, {
       status: "open",
       assignee: null,
       acknowledgedAt: null,
       acknowledgedBy: null,
-    });
-    expect(cleared).toEqual(comment);
-    expect(readAll(dir).sample?.[0]).toEqual(comment);
+    }, { assign: true });
+    expect(cleared).toEqual({ ...comment, version: 5, updatedAt: expect.any(String) });
+    expect((await readAll(dir)).sample?.[0]).toEqual(cleared);
   });
 
-  it("leaves assignment untouched by an unrelated patch", () => {
+  it("leaves assignment untouched by an unrelated patch", async () => {
     const held = { ...comment, status: "in_progress", assignee: agent };
-    writeAll(dir, { sample: [held] });
+    await writeAll(dir, { sample: [held] });
 
-    expect(patchComment(dir, comment.id, { body: "Edited" })).toEqual({
-      ...held,
+    expect(await patchComment(dir, comment.id, { body: "Edited" })).toEqual({
+      ...withGavelAssignee(held),
       body: "Edited",
+      version: 3,
+      updatedAt: expect.any(String),
     });
   });
 });

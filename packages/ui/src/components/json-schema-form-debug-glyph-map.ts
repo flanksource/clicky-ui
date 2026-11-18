@@ -91,6 +91,7 @@ export const KIND_GLYPH: Record<FieldControlKind, DebugGlyphPair> = {
   object: pair(UiObject),
   display: pair(UiText),
   link: pair(UiLink),
+  custom: pair(UiExtension, UiExtensionDark),
 };
 
 // The JSON Schema `type` names, read by the `type` keyword row.
@@ -121,6 +122,7 @@ const KEYWORD_GLYPH: Record<string, DebugGlyphPair> = {
   "x-discriminator": KIND_GLYPH.enum,
   "x-order": pair(UiSortAlphabetically, UiSortAlphabeticallyDark),
   "x-clicky-order": pair(UiListOrdered),
+  "x-clicky-hoist": pair(UiListOrdered),
   "x-item": pair(UiRows),
   "x-help": pair(UiQuestion),
   "x-help-display": pair(UiQuestion),
@@ -128,6 +130,7 @@ const KEYWORD_GLYPH: Record<string, DebugGlyphPair> = {
   "x-columns": pair(UiColumns),
   "x-col-span": pair(UiColumns),
   "x-layout": pair(UiLayoutDashboard),
+  "x-object-display": pair(UiLayoutDashboard),
   "x-label-position": pair(UiLayoutDashboard),
 };
 

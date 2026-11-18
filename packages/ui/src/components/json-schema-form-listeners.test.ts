@@ -267,6 +267,35 @@ describe("applyChangeEffects", () => {
     expect(commit(schema, {}, "A", 1)).toEqual({ A: 99, B: 2 });
   });
 
+  it("lets a listener target a field declared only in a branch of the schema's own if/then/else chain", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      if: { required: ["open"] },
+      [thenKeyword]: { properties: { open: { type: "array" } } },
+      else: {
+        properties: {
+          outcome: { type: "string", "x-on-change": [{ when: { const: "manual" }, require: ["manual"], else: { optional: ["manual"] } }] },
+          manual: { type: "string" },
+        },
+        required: ["outcome"],
+      },
+    };
+    const manual = applyListenerState(schema, { outcome: "manual" }, { root: {} });
+    expect(manual.required.sort()).toEqual(["manual", "outcome"]);
+    expect(Object.keys(manual.properties).sort()).toEqual(["manual", "outcome"]);
+  });
+
+  it("collects x-on-load listeners of the branch the schema's own if/then/else selects", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      if: { required: ["open"] },
+      [thenKeyword]: { properties: { open: { type: "array" } } },
+      else: { properties: { Note: { type: "string" } }, "x-on-load": [{ hide: ["Note"] }] },
+    };
+    expect(applyListenerState(schema, {}, { root: {} }).properties.Note).toMatchObject({ "x-hidden": true });
+    expect(applyListenerState(schema, { open: [] }, { root: {} }).properties).not.toHaveProperty("Note");
+  });
+
   it("evaluates expr against the post-edit object", () => {
     const evaluate = vi.fn<ExpressionEvaluator>(({ self }) => self.LoanOverride === YES);
     const schema = loanSchema([{ when: { expr: "self.LoanOverride == '01'" }, set: { LoanAmount: 1 } }]);

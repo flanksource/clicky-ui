@@ -342,7 +342,7 @@ describe("JsonSchemaForm defaults", () => {
         AutoRenew: true,
       });
       expect(screen.getByDisplayValue("00")).toBeInTheDocument();
-      expect(screen.getByRole("checkbox")).toBeChecked();
+      expect(screen.getByRole("switch")).toBeChecked();
     });
 
     it("commits no default and renders none", () => {
@@ -354,7 +354,7 @@ describe("JsonSchemaForm defaults", () => {
       expect(onChange).not.toHaveBeenCalled();
       expect(screen.getByDisplayValue("G0000011")).toBeInTheDocument();
       expect(screen.queryByDisplayValue("00")).toBeNull();
-      expect(screen.getByRole("checkbox")).not.toBeChecked();
+      expect(screen.getByRole("switch")).not.toBeChecked();
     });
 
     // Editing one field spreads the form's effective value, so suppressing only
@@ -447,7 +447,7 @@ describe("JsonSchemaForm number coercion", () => {
 });
 
 describe("JsonSchemaForm boolean fallback", () => {
-  it("renders a checkbox for a boolean value", () => {
+  it("renders a switch for a boolean value", () => {
     render(
       <JsonSchemaForm
         schema={{ type: "object", properties: { spawned: { type: "boolean" } } }}
@@ -455,7 +455,7 @@ describe("JsonSchemaForm boolean fallback", () => {
         onChange={vi.fn()}
       />,
     );
-    expect(screen.getByRole("checkbox")).toBeChecked();
+    expect(screen.getByRole("switch")).toBeChecked();
   });
 
   it("falls back to a text input when the value is a non-boolean (token)", () => {
@@ -466,7 +466,7 @@ describe("JsonSchemaForm boolean fallback", () => {
         onChange={vi.fn()}
       />,
     );
-    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
     expect(screen.getByRole("textbox")).toHaveValue("{{flag}}");
   });
 });
@@ -543,9 +543,10 @@ describe("JsonSchemaForm string-map", () => {
     render(
       <JsonSchemaForm schema={schema} value={{ members: { "Approved/Rejected": "Approved" } }} onChange={onChange} />,
     );
-    const input = screen.getAllByRole("textbox").find((el) => (el as HTMLInputElement).value === "Approved");
-    expect(input).toBeTruthy();
-    fireEvent.change(input as HTMLElement, { target: { value: "Rejected" } });
+    fireEvent.click(screen.getByRole("button", { name: "Edit Approved/Rejected" }));
+    const input = screen.getByRole("textbox", { name: "Approved/Rejected" });
+    fireEvent.change(input, { target: { value: "Rejected" } });
+    fireEvent.keyDown(input, { key: "Enter" });
     expect(onChange).toHaveBeenCalledWith({ members: { "Approved/Rejected": "Rejected" } });
   });
 });
@@ -1503,9 +1504,12 @@ describe("JsonSchemaForm preferences menu", () => {
     fireEvent.click(screen.getByRole("button", { name: "Form display options" }));
   }
 
+  // The control height is carried by the InputField chrome wrapping the input.
   function firstInput(container: HTMLElement): HTMLElement {
-    const el = container.querySelector<HTMLElement>("input[data-jsf-input]");
-    if (!el) throw new Error("no [data-jsf-input] input rendered");
+    const el = container
+      .querySelector<HTMLElement>("input[data-jsf-input]")
+      ?.closest<HTMLElement>("[data-jsf-control]");
+    if (!el) throw new Error("no [data-jsf-input] input inside a [data-jsf-control] rendered");
     return el;
   }
 
@@ -1855,6 +1859,19 @@ describe("JsonSchemaForm discriminator wizard", () => {
     fireEvent.click(screen.getByRole("button", { name: /change type/i }));
     expect(onChange).toHaveBeenCalledWith({ name: "x" });
   });
+
+  it("locks the kind when hiddenKeys hides the discriminator: branch fields, no header or change affordance", () => {
+    render(<JsonSchemaForm schema={schema} value={{ type: "postgres" }} onChange={vi.fn()} hiddenKeys={["type"]} />);
+    expect(screen.getByText("Name")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /change type/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("postgres")).not.toBeInTheDocument();
+  });
+
+  it("honours hiddenKeys for the branch fields of a chosen kind", () => {
+    render(<JsonSchemaForm schema={schema} value={{ type: "postgres" }} onChange={vi.fn()} hiddenKeys={["name"]} />);
+    expect(screen.queryByText("Name")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /change type/i })).toBeInTheDocument();
+  });
 });
 
 describe("JsonSchemaForm x-clicky-order", () => {
@@ -1907,7 +1924,7 @@ describe("JsonSchemaForm presentation extensions", () => {
     expect(onChange).toHaveBeenCalledWith({ mode: "manual" });
   });
 
-  it("renders x-input-suffix-icon in the input adornment wrapper and reserves padding", () => {
+  it("renders x-input-suffix-icon in the input adornment wrapper, after the input and in flow", () => {
     const schema: JsonSchemaObject = {
       type: "object",
       properties: {
@@ -1922,10 +1939,16 @@ describe("JsonSchemaForm presentation extensions", () => {
         showPreferencesMenu={false}
       />,
     );
-    expect(container.querySelector("[data-jsf-control]")).not.toBeNull();
-    expect(container.querySelector("input[data-jsf-input]")).toHaveClass("pr-8");
-    // The adornment icon is sized to size-4 to match the library's InputField icon.
-    expect(container.querySelector("[data-jsf-control] .size-4")).not.toBeNull();
+    const input = container.querySelector("input[data-jsf-input]");
+    const control = input?.closest("[data-jsf-control]");
+    expect(control).not.toBeNull();
+    // The adornment sits after the input inside the same InputField chrome, in
+    // normal flow, so no `pr-*` padding is needed to keep text clear of it.
+    const icon = control?.querySelector(".size-4");
+    expect(icon).not.toBeNull();
+    const adornment = [...(control?.children ?? [])].find((child) => child.contains(icon!));
+    expect(adornment?.previousElementSibling).toBe(input);
+    expect(input).not.toHaveClass("pr-8");
   });
 
   it("applies object-level x-classes to the fields grid container", () => {

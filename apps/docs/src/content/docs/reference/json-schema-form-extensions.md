@@ -67,7 +67,7 @@ const mode = {
 | `accordion` | Objects | Opens as summary rows with one editor open at a time, whatever the column count. |
 | `cards` | Objects | Titled cards with all item editors visible. |
 | `stacked` | Objects | Full sub-forms labelled by item number. |
-| `list` | Scalars | Compact editable list items. |
+| `list` | Strings | Numbered editable rows with the same add, reorder, and remove actions as boolean arrays. |
 
 With no `x-array-display` and no `x-layout: "table"`, an object array opens by its visible column count — the union across rows of the cells each row's own listeners show. Up to `x-table-max-columns` (array-level, default `4`) scalar columns open as a grid; wider items, or items holding a nested object or object list, open as summary rows with their fields labelled inline. A ⋮ menu on the array's summary line switches between **Grid**, **Stack form** and **Inline form** over the same value; it is hidden in read-only property previews.
 
@@ -128,12 +128,16 @@ With no `x-array-display` and no `x-layout: "table"`, an object array opens by i
 
 Form-wide property rows use `layout={{ mode: "properties" }}` on `JsonSchemaForm`. This is a form prop, not a field-level `x-layout` value. See [layout and display preferences](/guides/json-schema-form/#layout-and-display-preferences).
 
+String maps declared with `additionalProperties: { type: "string" }` use a properties table inside inline and stacked forms too. Select a key or value to edit it; save or cancel the draft, use **Add field** for another entry, or remove an entry while editing its key. Read-only maps show their saved values without edit actions.
+
 | Extension | Value | Behavior |
 | --- | --- | --- |
-| `x-number-display` | `slider` | Renders a bounded numeric value as a single-thumb slider. The schema must provide `maximum`; `minimum` defaults through the normal numeric control behavior. |
+| `x-number-display` | `slider` or `stepper` | `slider` renders a bounded numeric value and requires `maximum`. `stepper` accepts manually entered decimals and adds buttons and arrow-key stepping by `multipleOf`, or 1 when unconstrained. |
 | `x-md-editor` | MDX editor options | Configures a field with `format: "md"`. Options control the toolbar and enabled MDXEditor plugins. Import `@flanksource/clicky-ui/mdx-editor.css` in the host. |
 | `x-help` | `{ source?, section?, body? }` | Adds generated inline help. `body` is appended to a distinct standard `description`; `source` and `section` remain metadata. |
 | `x-clicky-lookup` | lookup descriptor | Replaces a string field with a lazy, searchable entity-reference picker. Requires a form-level `lookupFetcher`. |
+
+For decimal coordinates with one-unit steppers, use `{ type: "number", "x-number-display": "stepper" }`. Do not add `multipleOf: 1` unless the value must be an integer. For example, entering `80.125` and clicking **Increase** produces `81.125`.
 
 ### Lookup descriptor
 

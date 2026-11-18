@@ -3,9 +3,13 @@ export { AnnotationSurface, type AnnotationSurfaceProps } from "./comments/Annot
 export type {
   AnnotationCapture,
   PatchAnchor,
+  RegionAnchor,
+  TextQuote,
   CommentScreenshotCapture,
   CommentScreenshotUnavailableReason,
 } from "./comments/annotation-types";
+export { DriftBadge, DriftList, ReanchorButton, type DriftItem, type PickedAnchor, type Retarget } from "./comments/DriftList";
+export { RegionOverlay, type RegionOverlayItem, type RegionOverlayProps } from "./comments/RegionOverlay";
 export {
   captureScreenshot,
   releaseScreenshotCapture,
@@ -59,10 +63,13 @@ export {
   type MentionTextareaProps,
 } from "./comments/MentionTextarea";
 export { CommentCard, type CommentCardProps } from "./comments/CommentCard";
+export { ProposalCard, type ProposalCardProps } from "./comments/ProposalCard";
+export { CommentCapture, type CommentCaptureContext } from "./comments/CommentCapture";
 export {
   CommentComposer,
   type CommentComposerProps,
 } from "./comments/CommentComposer";
+export { DefaultDeliveryLine } from "./comments/DefaultDeliveryLine";
 export {
   CommentThreadList,
   type CommentThreadListProps,

@@ -1,7 +1,8 @@
-import type { CommentScreenshotCapture } from "./annotation-types";
+import type { CommentScreenshotCapture, TextQuote } from "./annotation-types";
 import type { CommentVocabulary, CommentVocabularyItem } from "./comment-vocabulary";
 import type { ReactNode } from "react";
 import type { StaticIconComponent } from "../data/Icon";
+import type { GitDiffPayload } from "../data/git/types";
 
 /** Semantic tone driving a status/facet color (maps onto Badge tones). */
 export type CommentTone =
@@ -145,6 +146,40 @@ export type CommentAgentRun = {
   repliedAt?: string;
 };
 
+export type CommentProposalState =
+  | "proposed"
+  | "applied"
+  | "staged"
+  | "rejected"
+  | "revision_requested"
+  | "superseded";
+
+/** One file touched by a proposed patch. */
+export type CommentProposalFile = {
+  path: string;
+  additions: number;
+  deletions: number;
+};
+
+/**
+ * A patch an agent proposes in a reply, held by the host as `commit` on `ref`
+ * (off `base`). Only a `proposed` one can be acted on; the diff is fetched on
+ * demand via `CommentCallbacks.loadProposalDiff`.
+ */
+export type CommentProposal = {
+  ref: string;
+  base: string;
+  commit: string;
+  files: CommentProposalFile[];
+  state: CommentProposalState;
+  /** Who applied, staged, rejected or asked for revisions. */
+  decidedBy?: CommentAuthor;
+  /** ISO-8601 time of that decision. */
+  decidedAt?: string;
+  /** The rejection reason or revision request. */
+  feedback?: string;
+};
+
 /** A single comment. Replies set `parentId`; roots leave it null. */
 export type Comment = {
   /** Transient delivery state supplied by an optimistic host. Never persisted as a workflow status. */
@@ -162,6 +197,8 @@ export type Comment = {
   parentId?: string | null;
   /** Where the comment is anchored; null/absent = document-level. */
   anchor?: CommentAnchor | null;
+  /** The exact words a patch-anchored (`r:`) root was written on, which the host stores beside the patch; roots only. */
+  quote?: TextQuote;
   /** Optional positive/negative review signal; roots only. */
   rating?: CommentRating;
   /** Human decision on an opted-in playground review element; roots only. */
@@ -183,18 +220,31 @@ export type Comment = {
   vocabularyRefs?: CommentVocabularyItem[];
   refs?: CommentRefGroup[];
   checklist?: CommentChecklistItem[];
+  /** A patch proposed by this reply; replies only. */
+  proposal?: CommentProposal;
 };
 
 /** Payload for creating a new root comment. */
 export type CommentCreateInput = {
   body: string;
   anchor?: CommentAnchor | null;
+  /**
+   * The exact selected words, stored beside a patch (`r:`) anchor's lines (never
+   * inside the anchor): it must lie in those lines, and only sharpens the highlight.
+   */
+  quote?: TextQuote;
   rating?: CommentRating;
   reviewDecision?: CommentReviewDecision;
   facets?: Record<string, string>;
   mentions?: CommentMention[];
   /** Hand the new root straight to someone, e.g. when a finding is assigned. */
   assignee?: CommentAuthor;
+  /**
+   * The `config.targets` entry explicitly picked from the composer's target
+   * menu. An `@name` typed into the body is never turned into a target here:
+   * the host receives the plain body and resolves the mention itself.
+   */
+  target?: CommentMention;
   /** A capture of the anchored region, set by the built-in "Post with screenshot" variant. */
   screenshot?: CommentScreenshotCapture;
 };
@@ -231,6 +281,21 @@ export type CommentCallbacks = {
   ) => void | Promise<void>;
   onUpdateRating?: (id: string, rating: CommentRating) => void | Promise<void>;
   onDelete?: (id: string) => void | Promise<void>;
+  /** Replace the body of root `id`. Presence adds an Edit action to each root. */
+  onEdit?: (id: string, body: string) => void | Promise<void>;
+  /** Replace the body of reply `messageId` in thread `rootId`. Presence adds an Edit action to each reply. */
+  onEditReply?: (
+    rootId: string,
+    messageId: string,
+    body: string,
+  ) => void | Promise<void>;
+  /** Delete reply `messageId` from thread `rootId`. Presence routes a reply's Delete here instead of `onDelete`. */
+  onDeleteReply?: (
+    rootId: string,
+    messageId: string,
+  ) => void | Promise<void>;
+  /** Turn a thread (the root first, then its replies in order) into a todo. Presence adds "Create todo" to each root. */
+  onCreateTodo?: (thread: readonly Comment[]) => void | Promise<void>;
   onChecklistToggle?: (
     id: string,
     index: number,
@@ -238,7 +303,39 @@ export type CommentCallbacks = {
   ) => void | Promise<void>;
   /** Fired when a posted comment references a mentionable. */
   onMention?: (mention: CommentMention, context: { body: string }) => void;
+  /** Apply a proposed patch to the working tree, or stage it in the index. */
+  onApplyProposal?: (
+    commentId: string,
+    mode: "apply" | "stage",
+  ) => void | Promise<void>;
+  /** Reject a proposed patch, optionally saying why. */
+  onRejectProposal?: (
+    commentId: string,
+    reason?: string,
+  ) => void | Promise<void>;
+  /** Ask the proposer to revise; `feedback` is required. */
+  onRequestRevision?: (
+    commentId: string,
+    feedback: string,
+  ) => void | Promise<void>;
+  /** Fetch a proposal's unified diff when its card is first expanded. */
+  loadProposalDiff?: (commentId: string) => Promise<GitDiffPayload>;
 };
+
+/** The slice of {@link CommentCallbacks} a proposal card acts through. */
+export type CommentProposalCallbacks = Pick<
+  CommentCallbacks,
+  | "onApplyProposal"
+  | "onRejectProposal"
+  | "onRequestRevision"
+  | "loadProposalDiff"
+>;
+
+/**
+ * Where the host sends a new comment that names no target: `label` names it,
+ * `layer` names the settings layer whose rule says so, `description` says why.
+ */
+export type CommentDefaultDelivery = { label: string; layer?: string; description?: string };
 
 /** Static configuration shared across the comment components. */
 export type CommentConfig = {
@@ -251,6 +348,20 @@ export type CommentConfig = {
   mentionables?: CommentMentionable[];
   /** People/agents a root can be assigned to; the Assign menu lists exactly these. */
   assignees?: CommentMentionable[];
+  /**
+   * Where a new comment can be sent (e.g. an agent session or runtime). The
+   * composer offers them in its target picker and @-completion, and posts the
+   * chosen one as `CommentCreateInput.target`; the host decides what sending means.
+   */
+  targets?: CommentMentionable[];
+  /**
+   * Where a new comment goes when it names no target: the host's rule for this
+   * page, previewed in the target picker and stated under the root composer
+   * while a rule is enabled. A reply is delivered only when it names an
+   * `@target`, so the reply input never states it. `null` says it is not delivered;
+   * unset says the host does not know (or does not deliver comments).
+   */
+  defaultDelivery?: CommentDefaultDelivery | null;
   /** Status values a checklist item cycles through on click. */
   checklistStatusCycle?: string[];
 };

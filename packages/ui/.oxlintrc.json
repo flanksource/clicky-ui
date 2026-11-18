@@ -35,6 +35,12 @@
       "rules": {
         "clicky-ui/no-direct-z-index": "off"
       }
+    },
+    {
+      "files": ["react-grab/**"],
+      "rules": {
+        "react/only-export-components": "off"
+      }
     }
   ],
   "ignorePatterns": ["src/icons/components/**", "scripts/build-icons.ts"]

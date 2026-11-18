@@ -33,9 +33,9 @@ describe("JsonSchemaForm explicit array visibility", () => {
   it("honors a show listener for an empty array on the first edit", () => {
     render(<Harness />);
     expect(screen.queryByText("Dependent paths")).toBeNull();
-    fireEvent.click(screen.getByRole("checkbox", { name: "Enable dependent paths" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Enable dependent paths" }));
     expect(screen.getByText("Dependent paths")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("checkbox", { name: "Enable dependent paths" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Enable dependent paths" }));
     expect(screen.queryByText("Dependent paths")).toBeNull();
   });
 });

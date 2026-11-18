@@ -1,115 +1,58 @@
-import {
-  useCallback,
-  type CSSProperties,
-  type KeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
-} from "react";
+import { type CSSProperties } from "react";
+import { ResizeHandle } from "./ResizeHandle";
 import { UiChevronDown, UiChevronRight } from "../icons";
 import { cn } from "../lib/utils";
 import {
   WORKSPACE_COLLAPSED_RAIL_WIDTH,
+  WORKSPACE_DEFAULT_SIDE_WIDTH,
   type WorkspaceLayoutState,
   type WorkspacePaneSpec,
+  type WorkspaceSideArrangement,
 } from "./Workspace.model";
 
 export type WorkspaceUpdate = (
   change: (current: WorkspaceLayoutState) => WorkspaceLayoutState,
 ) => void;
 
-type ResizeHandleProps = {
-  orientation: "horizontal" | "vertical";
-  value: number;
-  min: number;
-  max: number;
-  pointerFactor: number;
-  label: string;
-  testId: string;
-  className?: string;
-  onChange: (value: number) => void;
+/**
+ * Which headers sit under the workspace's absolutely positioned top-right
+ * controls, and from which width: the center pane in the stacked layout, then
+ * whichever pane owns the top-right corner once the regions sit side by side
+ * (the first right pane while the right side is shown, otherwise the center).
+ */
+export type WorkspaceTopRightReserve = "always" | "stacked" | "wide";
+
+const TOP_RIGHT_RESERVE_CLASS: Record<WorkspaceTopRightReserve, string> = {
+  always: "pr-[var(--workspace-top-right-reserve,0px)]",
+  stacked:
+    "pr-[var(--workspace-top-right-reserve,0px)] @3xl/workspace:pr-2",
+  wide: "@3xl/workspace:pr-[var(--workspace-top-right-reserve,0px)]",
 };
 
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
+/** `"wide"` rails the header only once the regions sit side by side; narrower, it stays a full-width row. */
+type PaneCompact = boolean | "wide";
 
-function WorkspaceResizeHandle(props: ResizeHandleProps) {
-  const {
-    orientation,
-    value,
-    min,
-    max,
-    pointerFactor,
-    label,
-    testId,
-    className,
-    onChange,
-  } = props;
-  const onPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      const start = orientation === "vertical" ? event.clientX : event.clientY;
-      const initial = value;
-      const onMove = (moveEvent: PointerEvent) => {
-        const current =
-          orientation === "vertical" ? moveEvent.clientX : moveEvent.clientY;
-        onChange(clamp(initial + (current - start) * pointerFactor, min, max));
-      };
-      const onUp = () => {
-        document.removeEventListener("pointermove", onMove);
-        document.removeEventListener("pointerup", onUp);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-      };
-      document.addEventListener("pointermove", onMove);
-      document.addEventListener("pointerup", onUp);
-      document.body.style.cursor =
-        orientation === "vertical" ? "col-resize" : "row-resize";
-      document.body.style.userSelect = "none";
-    },
-    [max, min, onChange, orientation, pointerFactor, value],
-  );
+const COMPACT_CLASS = {
+  header: {
+    always: "min-h-12 flex-col flex-nowrap px-1 py-2",
+    wide: "@3xl/workspace:min-h-12 @3xl/workspace:flex-col @3xl/workspace:flex-nowrap @3xl/workspace:px-1 @3xl/workspace:py-2",
+  },
+  toggle: { always: "flex-col", wide: "@3xl/workspace:flex-col" },
+  label: {
+    always: "[writing-mode:vertical-rl]",
+    wide: "@3xl/workspace:[writing-mode:vertical-rl]",
+  },
+} as const;
 
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const step = event.shiftKey ? 48 : 16;
-    const lowerKey = orientation === "vertical" ? "ArrowLeft" : "ArrowUp";
-    const upperKey = orientation === "vertical" ? "ArrowRight" : "ArrowDown";
-    if (event.key === "Home") onChange(min);
-    else if (event.key === "End") onChange(max);
-    else if (event.key === lowerKey)
-      onChange(clamp(value - step * pointerFactor, min, max));
-    else if (event.key === upperKey)
-      onChange(clamp(value + step * pointerFactor, min, max));
-    else return;
-    event.preventDefault();
-  };
-
-  return (
-    <div
-      role="separator"
-      tabIndex={0}
-      aria-label={label}
-      aria-orientation={orientation}
-      aria-valuemin={min}
-      aria-valuemax={max}
-      aria-valuenow={Math.round(value)}
-      data-testid={testId}
-      className={cn(
-        "absolute z-20 hidden bg-border transition-colors hover:bg-primary focus-visible:bg-primary focus-visible:outline-none @3xl/workspace:block",
-        orientation === "vertical"
-          ? "top-0 h-full w-1 cursor-col-resize"
-          : "left-0 h-1 w-full cursor-row-resize",
-        className,
-      )}
-      onPointerDown={onPointerDown}
-      onKeyDown={onKeyDown}
-    />
-  );
-}
+const COMPACT_WIDE_TRAILING_CLASS = "@3xl/workspace:hidden";
 
 type PaneViewProps = {
   pane: WorkspacePaneSpec;
   collapsed: boolean;
-  compact: boolean;
+  compact: PaneCompact;
+  /** Fills the full height of a column once collapsed, so its rail runs the whole side. */
+  fillColumn?: boolean;
+  reserveTopRight?: WorkspaceTopRightReserve | undefined;
   onToggle: () => void;
 };
 
@@ -117,8 +60,13 @@ function WorkspacePaneView({
   pane,
   collapsed,
   compact,
+  fillColumn,
+  reserveTopRight,
   onToggle,
 }: PaneViewProps) {
+  const mode = compact === "wide" ? "wide" : "always";
+  const compactClass = (part: keyof typeof COMPACT_CLASS) =>
+    compact ? COMPACT_CLASS[part][mode] : undefined;
   const headerContent = (
     <>
       {pane.collapsible !== false &&
@@ -136,7 +84,7 @@ function WorkspacePaneView({
       <span
         className={cn(
           "min-w-0 flex-1 truncate text-xs font-semibold",
-          compact && "[writing-mode:vertical-rl]",
+          compactClass("label"),
         )}
       >
         {pane.label}
@@ -150,26 +98,29 @@ function WorkspacePaneView({
       className={cn(
         "flex min-h-0 min-w-0 flex-col overflow-hidden bg-background",
         collapsed ? "shrink-0" : "flex-1",
+        collapsed && fillColumn && "@3xl/workspace:flex-1",
         pane.className,
       )}
     >
       {pane.showHeader !== false ? (
         <header
           className={cn(
-            "flex h-9 shrink-0 items-center gap-1 border-b border-border bg-muted/40 px-2",
-            compact && "h-auto min-h-12 flex-col px-1 py-2",
+            // A crowded header wraps its trailing slot onto a second row instead of clipping it.
+            "flex min-h-9 shrink-0 flex-wrap items-center gap-x-1 border-b border-border bg-muted/40 px-2",
+            compactClass("header"),
+            reserveTopRight && TOP_RIGHT_RESERVE_CLASS[reserveTopRight],
           )}
         >
           {pane.collapsible === false ? (
-            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+            <div className="flex min-w-0 flex-[1_1_16rem] items-center gap-1.5">
               {headerContent}
             </div>
           ) : (
             <button
               type="button"
               className={cn(
-                "flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                compact && "flex-col",
+                "flex min-w-0 flex-[1_1_16rem] items-center gap-1.5 rounded-sm text-left hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                compactClass("toggle"),
               )}
               aria-expanded={!collapsed}
               aria-label={`${collapsed ? "Expand" : "Collapse"} ${typeof pane.label === "string" ? pane.label : pane.id}`}
@@ -178,8 +129,13 @@ function WorkspacePaneView({
               {headerContent}
             </button>
           )}
-          {!compact && pane.slots?.headerTrailing && (
-            <div className="flex shrink-0 items-center gap-1">
+          {compact !== true && pane.slots?.headerTrailing && (
+            <div
+              className={cn(
+                "ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-1 py-0.5",
+                compact && COMPACT_WIDE_TRAILING_CLASS,
+              )}
+            >
               {pane.slots.headerTrailing}
             </div>
           )}
@@ -202,29 +158,115 @@ function WorkspacePaneView({
 type SideRegionProps = {
   location: "left" | "right";
   panes: WorkspacePaneSpec[];
+  /** "columns" lays the panes next to each other once the workspace is wide enough; "stack" divides one shared region. */
+  arrangement: WorkspaceSideArrangement;
   state: WorkspaceLayoutState;
   update: WorkspaceUpdate;
+  /** Applies to the pane that owns the top-right corner: the first pane of a stack, the last column of a right side. */
+  reserveTopRight?: WorkspaceTopRightReserve;
 };
+
+const DEFAULT_COLUMN_MIN_WIDTH = 160;
+const DEFAULT_COLUMN_MAX_WIDTH = 720;
+
+/** A column's width while open; `collapsed` columns shrink to a rail. */
+function columnWidth(pane: WorkspacePaneSpec, state: WorkspaceLayoutState) {
+  if (state.collapsed[pane.id]) return WORKSPACE_COLLAPSED_RAIL_WIDTH;
+  return (
+    state.paneWidths[pane.id] ?? pane.width ?? WORKSPACE_DEFAULT_SIDE_WIDTH
+  );
+}
+
+type SideColumnProps = {
+  location: "left" | "right";
+  pane: WorkspacePaneSpec;
+  width: number;
+  collapsed: boolean;
+  reserveTopRight: WorkspaceTopRightReserve | undefined;
+  update: WorkspaceUpdate;
+};
+
+/** One pane of a "columns" side: full width while stacked, its own resizable width once the regions sit side by side. */
+function WorkspaceSideColumn({
+  location,
+  pane,
+  width,
+  collapsed,
+  reserveTopRight,
+  update,
+}: SideColumnProps) {
+  return (
+    <div
+      data-testid={`workspace-stack-${pane.id}`}
+      style={{ "--workspace-pane-width": `${width}px` } as CSSProperties}
+      className={cn(
+        "relative flex min-h-0 flex-col @3xl/workspace:h-full @3xl/workspace:w-[var(--workspace-pane-width)] @3xl/workspace:flex-none",
+        collapsed ? "shrink-0" : "flex-1",
+      )}
+    >
+      <WorkspacePaneView
+        pane={pane}
+        collapsed={collapsed}
+        compact={collapsed ? "wide" : false}
+        fillColumn
+        reserveTopRight={reserveTopRight}
+        onToggle={() =>
+          update((current) => ({
+            ...current,
+            collapsed: { ...current.collapsed, [pane.id]: !collapsed },
+          }))
+        }
+      />
+      {!collapsed && pane.resizable !== false && (
+        <ResizeHandle
+          orientation="vertical"
+          value={width}
+          min={pane.minWidth ?? DEFAULT_COLUMN_MIN_WIDTH}
+          max={pane.maxWidth ?? DEFAULT_COLUMN_MAX_WIDTH}
+          pointerFactor={location === "left" ? 1 : -1}
+          label={`Resize ${typeof pane.label === "string" ? pane.label : pane.id}`}
+          testId={`workspace-resize-pane-${pane.id}`}
+          className={cn(
+            "hidden @3xl/workspace:block",
+            location === "left" ? "right-0" : "left-0",
+          )}
+          onChange={(nextWidth) =>
+            update((current) => ({
+              ...current,
+              paneWidths: { ...current.paneWidths, [pane.id]: nextWidth },
+            }))
+          }
+        />
+      )}
+    </div>
+  );
+}
 
 export function WorkspaceSideRegion({
   location,
   panes,
+  arrangement,
   state,
   update,
+  reserveTopRight,
 }: SideRegionProps) {
   if (panes.length === 0) return null;
+  const columns = arrangement === "columns";
   const sideCollapsed = state.sideCollapsed[location];
   const allCollapsed = panes.every((pane) => state.collapsed[pane.id]);
   const width = sideCollapsed
     ? 0
-    : allCollapsed
-      ? WORKSPACE_COLLAPSED_RAIL_WIDTH
-      : location === "left"
-        ? state.leftWidth
-        : state.rightWidth;
+    : columns
+      ? panes.reduce((total, pane) => total + columnWidth(pane, state), 0)
+      : allCollapsed
+        ? WORKSPACE_COLLAPSED_RAIL_WIDTH
+        : location === "left"
+          ? state.leftWidth
+          : state.rightWidth;
   const min = Math.max(...panes.map((pane) => pane.minWidth ?? 160));
   const max = Math.min(...panes.map((pane) => pane.maxWidth ?? 720));
   const canResize =
+    !columns &&
     !sideCollapsed &&
     !allCollapsed &&
     panes.some((pane) => pane.resizable !== false);
@@ -246,10 +288,29 @@ export function WorkspaceSideRegion({
         location === "left"
           ? "@3xl/workspace:order-none @3xl/workspace:col-start-1 @3xl/workspace:row-start-1 @3xl/workspace:border-r"
           : "order-3 @3xl/workspace:order-none @3xl/workspace:col-start-3 @3xl/workspace:row-start-1 @3xl/workspace:border-l",
+        columns && "@3xl/workspace:flex-row",
         sideCollapsed && "hidden border-0 @3xl/workspace:flex",
       )}
     >
       {!sideCollapsed &&
+        columns &&
+        panes.map((pane, index) => (
+          <WorkspaceSideColumn
+            key={pane.id}
+            location={location}
+            pane={pane}
+            width={columnWidth(pane, state)}
+            collapsed={state.collapsed[pane.id] ?? false}
+            reserveTopRight={
+              index === (location === "right" ? panes.length - 1 : 0)
+                ? reserveTopRight
+                : undefined
+            }
+            update={update}
+          />
+        ))}
+      {!sideCollapsed &&
+        !columns &&
         panes.map((pane, index) => {
           const collapsed = state.collapsed[pane.id] ?? false;
           const nextPane = panes[index + 1];
@@ -271,6 +332,7 @@ export function WorkspaceSideRegion({
                 pane={pane}
                 collapsed={collapsed}
                 compact={allCollapsed}
+                reserveTopRight={index === 0 ? reserveTopRight : undefined}
                 onToggle={() =>
                   update((current) => ({
                     ...current,
@@ -282,7 +344,7 @@ export function WorkspaceSideRegion({
                 nextPane &&
                 pane.resizable !== false &&
                 nextPane.resizable !== false && (
-                  <WorkspaceResizeHandle
+                  <ResizeHandle
                     orientation="horizontal"
                     // Seed from the pane's current flex basis (0 when unsized) so the
                     // drag starts where the divider actually is — no snap on first move.
@@ -292,7 +354,7 @@ export function WorkspaceSideRegion({
                     pointerFactor={stackPointerFactor}
                     label={`Resize ${typeof pane.label === "string" ? pane.label : pane.id}`}
                     testId={`workspace-resize-stack-${pane.id}`}
-                    className="bottom-0"
+                    className="bottom-0 hidden @3xl/workspace:block"
                     onChange={(height) =>
                       update((current) => ({
                         ...current,
@@ -308,7 +370,7 @@ export function WorkspaceSideRegion({
           );
         })}
       {canResize && (
-        <WorkspaceResizeHandle
+        <ResizeHandle
           orientation="vertical"
           value={width}
           min={min}
@@ -316,7 +378,7 @@ export function WorkspaceSideRegion({
           pointerFactor={location === "left" ? 1 : -1}
           label={`Resize ${location} workspace panes`}
           testId={`workspace-resize-${location}`}
-          className={location === "left" ? "right-0" : "left-0"}
+          className={cn("hidden @3xl/workspace:block", location === "left" ? "right-0" : "left-0")}
           onChange={(nextWidth) =>
             update((current) => ({
               ...current,
@@ -333,12 +395,14 @@ type SingleRegionProps = {
   pane: WorkspacePaneSpec;
   state: WorkspaceLayoutState;
   update: WorkspaceUpdate;
+  reserveTopRight?: WorkspaceTopRightReserve;
 };
 
 export function WorkspaceSingleRegion({
   pane,
   state,
   update,
+  reserveTopRight,
 }: SingleRegionProps) {
   const collapsed = state.collapsed[pane.id] ?? false;
   const isBottom = pane.location === "bottom";
@@ -363,6 +427,7 @@ export function WorkspaceSingleRegion({
         pane={pane}
         collapsed={collapsed}
         compact={false}
+        reserveTopRight={reserveTopRight}
         onToggle={() =>
           update((current) => ({
             ...current,
@@ -371,7 +436,7 @@ export function WorkspaceSingleRegion({
         }
       />
       {isBottom && !collapsed && pane.resizable !== false && (
-        <WorkspaceResizeHandle
+        <ResizeHandle
           orientation="horizontal"
           value={state.bottomHeight}
           min={pane.minHeight ?? 96}
@@ -379,7 +444,7 @@ export function WorkspaceSingleRegion({
           pointerFactor={-1}
           label={`Resize ${typeof pane.label === "string" ? pane.label : pane.id}`}
           testId="workspace-resize-bottom"
-          className="top-0"
+          className="top-0 hidden @3xl/workspace:block"
           onChange={(bottomHeight) =>
             update((current) => ({ ...current, bottomHeight }))
           }

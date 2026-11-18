@@ -1,3 +1,4 @@
+import { configureTestComments } from "./testing/comments-store";
 // @vitest-environment node
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -9,7 +10,7 @@ import { PromptAssociations } from "./prompt-associations";
 
 import { createAgentRuns, playgroundAgentRuns } from "./agent-runs-server";
 import { playgroundComments } from "./comments-server";
-import { readAll, type StoredComment } from "./comments-store";
+import { readAll, type StoredComment } from "./testing/comments-store";
 import { CaptainHttpError, CaptainUnreachableError } from "./captain-client";
 import {
   createPromptRuns,
@@ -125,6 +126,7 @@ describe("playground prompt runs", () => {
   beforeEach(async () => {
     mkdirSync(join(process.cwd(), ".tmp"), { recursive: true });
     dir = mkdtempSync(join(process.cwd(), ".tmp", "prompt-runs-"));
+    configureTestComments(dir);
     captain = new StubCaptain();
     captain.prompts = [DIAGRAM_SMELLS];
     captainURL = await captain.listen();
@@ -144,10 +146,9 @@ describe("playground prompt runs", () => {
             dir,
             gavelURL: captainURL,
             workspace: REPO_ROOT,
-            onCreated: agentRuns.autoRunComment,
           }),
         ),
-        playgroundComments({ dir, onCreated: agentRuns.autoRunComment }),
+        playgroundComments({ dir }),
       ],
       server: { host: "127.0.0.1", port: 0 },
     });
@@ -201,8 +202,8 @@ describe("playground prompt runs", () => {
     return found as PromptRun;
   }
 
-  function pageComments(): StoredComment[] {
-    return readAll(dir)[PAGE] ?? [];
+  async function pageComments(): Promise<StoredComment[]> {
+    return (await readAll(dir))[PAGE] ?? [];
   }
 
   it("recovers a durably queued association with protected inputs and creates one result comment", async () => {
@@ -214,7 +215,7 @@ describe("playground prompt runs", () => {
     const secret = "private-association-canary";
     const records = new PromptAssociations(dir);
     records.protect(associationId, {
-      request: { element: ELEMENT, variables: { token: secret } },
+      request: { element: ELEMENT, variables: { token: secret }, spec: SPEC },
       launch: {
         preparationId: "prepared",
         config: { lint: {} },
@@ -252,7 +253,7 @@ describe("playground prompt runs", () => {
         associationId,
       ).request.variables.token,
     ).toBe(secret);
-    expect(pageComments()).toHaveLength(1);
+    expect(await pageComments()).toHaveLength(1);
     const reopened = createPromptRuns({
       dir,
       gavelURL: captainURL,
@@ -263,7 +264,7 @@ describe("playground prompt runs", () => {
       { state: "done" },
     ]);
     expect(captain.callsTo("POST", /^\/api\/launch\/lint$/)).toHaveLength(1);
-    expect(pageComments()).toHaveLength(1);
+    expect(await pageComments()).toHaveLength(1);
   });
 
   it("lists captain's prompts and derives a prompt's argument schema from its template", async () => {
@@ -301,9 +302,19 @@ describe("playground prompt runs", () => {
     captain.nextRunFailure = { status: 422, body: { error: refusal } };
     const response = await startRun();
     expect(response.status).toBe(422);
-    expect(await response.json()).toEqual({
+    const body = await response.json();
+    expect(body).toEqual({
       error: refusal,
+      context: {
+        Endpoint: expect.stringMatching(/\/api\/launch\/lint$/),
+        Method: "POST",
+        Status: "422",
+        "Content type": "application/json",
+      },
+      details: [{ label: "Response", value: JSON.stringify({ error: refusal }) }],
+      stacktrace: expect.stringContaining(`Error: ${refusal}`),
     });
+    expect(JSON.stringify(body)).not.toMatch(/Captain command|clicky prompt run|docs\/arch\.svg/);
   });
 
   it("answers an invalid request with what to fix", async () => {
@@ -315,7 +326,7 @@ describe("playground prompt runs", () => {
     });
   });
 
-  it("runs the prompt one-shot and records its violations as a captain-authored checklist comment", async () => {
+  it("runs the prompt one-shot and records its violations as a prompt-authored checklist comment", async () => {
     captain.nextSummary = {
       event: "done",
       data: { success: true, structuredOutput: { violations: VIOLATIONS } },
@@ -353,13 +364,20 @@ describe("playground prompt runs", () => {
 
     const done = await settled(run.runId);
     expect(done.state).toBe("done");
-    const [comment] = pageComments();
+    const [comment] = await pageComments();
     expect(comment).toMatchObject({
       id: done.commentId,
       status: "open",
       anchor: ANCHOR,
       element: ELEMENT,
-      author: { name: "captain", kind: "agent", via: "prompt:diagram-smells" },
+      author: {
+        name: "diagram-smells",
+        kind: "agent",
+        model: SPEC.model,
+        effort: SPEC.effort,
+        sessionId: `session-of-${run.runId}`,
+        via: "prompt:diagram-smells",
+      },
       checklist: [
         {
           label:
@@ -381,14 +399,16 @@ describe("playground prompt runs", () => {
     expect(comment?.agentRun).toBeUndefined();
   });
 
-  it("hands the result to the agent session on behalf of the requester when auto-run is on", async () => {
+  it("leaves the result to its human even when the page auto-runs: gavel routes only human-authored roots", async () => {
     await fetch(`${baseUrl}/__playground/agent-sessions/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        autoRun: true,
-        runtime: { spec: { model: "m-1" } },
-      }),
+      body: JSON.stringify({ runtime: { spec: { model: "m-1" } } }),
+    });
+    await fetch(`${baseUrl}/__playground/agent-sessions/auto-run`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ page: PAGE, autoRun: true }),
     });
     captain.nextSummary = {
       event: "done",
@@ -396,20 +416,12 @@ describe("playground prompt runs", () => {
     };
     const { run } = (await (await startRun()).json()) as { run: PromptRun };
     await settled(run.runId);
+    // Give a would-be background delivery time to start.
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    await vi.waitFor(
-      () => expect(pageComments()[0]?.agentRun?.state).toBe("sent"),
-      {
-        timeout: 3000,
-      },
-    );
-    const chat = captain.callsTo("POST", /^\/api\/v1\/prompt\/run$/);
-    expect(chat).toHaveLength(1);
-    expect(JSON.stringify(chat[0]?.body)).toContain("Label overflows its box.");
-    expect(pageComments()[0]).toMatchObject({
-      status: "in_progress",
-      assignee: { name: "m-1", kind: "agent" },
-    });
+    const [comment] = await pageComments();
+    expect(comment?.body).toContain("Label overflows its box.");
+    expect(comment?.agentRun).toBeUndefined();
   });
 
   it.each([
@@ -430,7 +442,7 @@ describe("playground prompt runs", () => {
     captain.nextSummary = summary;
     const { run } = (await (await startRun()).json()) as { run: PromptRun };
     expect(await settled(run.runId)).toMatchObject(expected);
-    expect(pageComments()).toEqual([]);
+    expect(await pageComments()).toEqual([]);
   });
 
   it.each([

@@ -56,6 +56,11 @@ export function CommentReplyInput({ parentId, config, onSubmit, onCancel, pinned
           {submitting ? "Sending…" : "Send"}
         </Button>
       </div>
+      {(config.mentionables?.length ?? 0) > 0 && (
+        <p data-testid="reply-delivery" className="text-[11px] leading-4 text-muted-foreground">
+          Replies are delivered only when they name an @target
+        </p>
+      )}
       {error !== null && <ActionError error={error} context={[["Operation", "Send reply"], ["Thread", parentId]]} />}
     </div>
   );

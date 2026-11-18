@@ -40,6 +40,21 @@ function violation(file: string | undefined, rule: string, line = 1): LinterResu
   return [{ file, line, severity: "error", rule: { method: rule }, message: `${rule} at ${file}` }];
 }
 
+// A data check whose findings point at a SQL file, at entities, at a page, and at nothing placeable.
+const LOOPING = { method: "looping-spawn" };
+const dataLint: LinterResult = {
+  linter: "data-lint",
+  work_dir: "/r",
+  violations: [
+    { file: "/r/checks/loops.sql", line: 120, severity: "warning", rule: LOOPING, message: "query" },
+    { severity: "error", rule: LOOPING, message: "P-1001 x3", locations: [{ entity: { kind: "Policy", id: "p1" } }] },
+    { severity: "warning", rule: LOOPING, message: "tr", locations: [{ entity: { kind: "AsTransaction", id: "t1" } }] },
+    { severity: "warning", rule: LOOPING, message: "row", locations: [{ url: { url: "https://oipa.example.com/p/1", css: ".row" } }] },
+    { severity: "warning", rule: LOOPING, message: "P-1002 x4", locations: [{ entity: { kind: "Policy", id: "p2" } }, { url: { url: "https://x.example.com" } }] },
+    { severity: "info", rule: LOOPING, message: "shot", locations: [{ image: { src: "s.png", x: 0, y: 0, width: 4, height: 4 } }] },
+  ],
+};
+
 describe("buildLintTree linter-rule-file", () => {
   it("nests linter -> rule -> collapsed folder/file chains, sorted by name", () => {
     const [linter] = buildLintTree({ results: [golangci], grouping: "linter-rule-file", filters: none });
@@ -63,13 +78,28 @@ describe("buildLintTree linter-rule-file", () => {
     expect(errcheckFile!.violations!.map((v) => v.line)).toEqual([41, 88]);
   });
 
-  it("keeps violations without a file on the rule group", () => {
+  it("puts violations without a file or a located target under Other in the rule group", () => {
     const [linter] = buildLintTree({ results: [betterleaks], grouping: "linter-rule-file", filters: none });
     const [rule] = linter!.children!;
     expect(rule!.kind).toBe("lint-rule-group");
-    expect(rule!.children ?? []).toHaveLength(0);
-    expect(rule!.noFileViolations).toHaveLength(1);
     expect(rule!.failed).toBe(true);
+    expect(rule!.children!.map((c) => [c.name, c.kind, c.targetKind, c.ruleName, c.violations?.length])).toEqual([
+      ["Other", "lint-target", "other", "generic-api-key", 1],
+    ]);
+    expect(rule!.children![0]!.route_path).toBe("betterleaks/generic-api-key/other");
+  });
+
+  it("groups file-less violations by entity kind and url host after the rule's files", () => {
+    const [linter] = buildLintTree({ results: [dataLint], grouping: "linter-rule-file", filters: none });
+    const [rule] = linter!.children!;
+    expect(rule!.children!.map((c) => [c.name, c.kind, c.targetKind, c.violations?.length])).toEqual([
+      ["checks/loops.sql", "lint-file", undefined, 1],
+      ["AsTransaction", "lint-target", "entity", 1],
+      ["Policy", "lint-target", "entity", 2],
+      ["oipa.example.com", "lint-target", "url", 1],
+      ["Other", "lint-target", "other", 1],
+    ]);
+    expect(lintNodeCount(rule!)).toBe(6);
   });
 
   it("assigns unique URL-safe route paths and resolves them back to nodes", () => {
@@ -116,6 +146,18 @@ describe("buildLintTree linter-file", () => {
     expect(server.children![1]!.violations).toHaveLength(2);
     expect(server.target_path).toBe("pkg/server");
   });
+
+  it("lists file-less target groups beside the linter's files", () => {
+    const [linter] = buildLintTree({ results: [dataLint], grouping: "linter-file", filters: none });
+    expect(linter!.children!.map((c) => [c.name, c.kind])).toEqual([
+      ["checks/loops.sql", "lint-file"],
+      ["AsTransaction", "lint-target"],
+      ["Policy", "lint-target"],
+      ["oipa.example.com", "lint-target"],
+      ["Other", "lint-target"],
+    ]);
+    expect(linter!.children![2]).toMatchObject({ linterName: "data-lint", work_dir: "/r" });
+  });
 });
 
 describe("buildLintTree file-linter-rule", () => {
@@ -137,17 +179,29 @@ describe("buildLintTree file-linter-rule", () => {
     });
   });
 
-  it("lists linters whose findings carry no file after the file tree", () => {
+  it("roots file-less findings at their target group after the file tree, with linters then rules beneath", () => {
     const results: LinterResult[] = [
       { linter: "alpha", work_dir: "/r", violations: violation("/r/a.go", "a-rule") },
       { ...betterleaks, work_dir: "/r" },
+      dataLint,
     ];
     const tree = buildLintTree({ results, grouping: "file-linter-rule", filters: none });
+    // Folders sort before files, so the collapsed checks/ folder leads.
     expect(tree.map((n) => [n.name, n.kind])).toEqual([
+      ["checks/loops.sql", "lint-file"],
       ["a.go", "lint-file"],
-      ["betterleaks", "linter"],
+      ["AsTransaction", "lint-target"],
+      ["Policy", "lint-target"],
+      ["oipa.example.com", "lint-target"],
+      ["Other", "lint-target"],
     ]);
-    expect(tree[1]!.children![0]!.kind).toBe("lint-rule");
+    const other = tree[5]!;
+    expect(other.children!.map((c) => [c.name, c.kind])).toEqual([
+      ["betterleaks", "linter"],
+      ["data-lint", "linter"],
+    ]);
+    expect(other.children![0]!.children![0]).toMatchObject({ kind: "lint-rule", ruleName: "generic-api-key", file: undefined });
+    expect(lintNodeCount(other)).toBe(2);
   });
 });
 
@@ -171,6 +225,17 @@ describe("buildLintTree summary", () => {
     const names = linter!.children![0]!.children!.map((c) => c.name);
     expect(names).toHaveLength(6);
     expect(names[5]).toBe("… 2 more files");
+  });
+
+  it("lists file-less violations by target group beside the rule's files", () => {
+    const [linter] = buildLintTree({ results: [dataLint], grouping: "summary", filters: none });
+    expect(linter!.children![0]!.children!.map((c) => [c.name, c.kind])).toEqual([
+      ["checks/loops.sql:120", "lint-file"],
+      ["Policy (2)", "lint-target"],
+      ["AsTransaction", "lint-target"],
+      ["oipa.example.com", "lint-target"],
+      ["Other", "lint-target"],
+    ]);
   });
 
   it("shows a skipped linter as a skipped leaf with its reason", () => {

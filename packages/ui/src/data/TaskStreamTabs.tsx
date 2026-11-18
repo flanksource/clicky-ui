@@ -14,6 +14,12 @@ export interface TaskStreamTab {
   /** Stable across renders; also the tab's label when no `label` is given. */
   id: string;
   label?: string;
+  /**
+   * What the pane is drawn on. A "terminal" pane (the default) sits on the black
+   * output surface with light text; a "plain" one carries its own theme-aware
+   * content, such as a session inspector, and is not boxed in black.
+   */
+  surface?: "terminal" | "plain";
   render: () => ReactNode;
 }
 
@@ -100,9 +106,14 @@ export function TaskStreamTabs({ task, extraTabs }: { task: TaskSnapshot; extraT
   const active = tabs.find((tab) => tab.id === selected) ?? tabs[0];
   if (!active) return null;
 
+  const plain = active.surface === "plain";
   return (
-    <div className="mt-2 overflow-hidden rounded border bg-black" onClick={(event) => event.stopPropagation()}>
-      <div className="flex items-center gap-1 border-b border-white/10 px-1 py-1 text-[10px]">
+    <div
+      data-task-stream-tabs
+      className={cn("mt-2 overflow-hidden rounded border", !plain && "bg-black")}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <div className={cn("flex items-center gap-1 border-b px-1 py-1 text-[10px]", plain ? "bg-muted/30" : "border-white/10")}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -110,7 +121,13 @@ export function TaskStreamTabs({ task, extraTabs }: { task: TaskSnapshot; extraT
             aria-current={tab.id === active.id}
             className={cn(
               "rounded px-2 py-0.5",
-              tab.id === active.id ? "bg-white/10 text-gray-100" : "text-gray-400 hover:text-gray-200",
+              plain
+                ? tab.id === active.id
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+                : tab.id === active.id
+                  ? "bg-white/10 text-gray-100"
+                  : "text-gray-400 hover:text-gray-200",
             )}
             onClick={() => setSelected(tab.id)}
           >

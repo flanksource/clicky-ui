@@ -1,4 +1,5 @@
 import type { CommentElementCaptureContext } from "../../plugins/comments-model";
+import type { AgentPin } from "@flanksource/page-runtime/schema";
 
 export const EXTERNAL_PAGES_ROUTE = "/__playground/external-pages";
 export const BOOKMARKLET_ROUTE = "/__playground/bookmarklet.js";
@@ -10,6 +11,12 @@ export type ExternalPage = {
   base: string;
   urls: string[];
 };
+
+export function externalTitle(options: { url: string; title: string }): string {
+  if (options.title.trim()) return options.title;
+  const url = new URL(options.url);
+  return url.protocol === "file:" ? decodeURIComponent(url.pathname).split("/").filter(Boolean).at(-1) ?? url.href : url.hostname;
+}
 
 export function externalUrl(input: string): { url: string; base: string } {
   const url = new URL(input);
@@ -34,6 +41,14 @@ export type Selection = {
 };
 
 export type HostState = { url: string; title: string; selection?: Selection };
+export type Presentation = "compact" | "draft" | "rail";
+/** The presentations a user picks for the panel; `compact` is the hover popover. */
+export type PanelMode = Exclude<Presentation, "draft">;
+
+export function panelMode(input: unknown): PanelMode {
+  if (input !== "rail" && input !== "compact") throw new Error(`Invalid panel mode ${JSON.stringify(input)}`);
+  return input;
+}
 export type AnchorState = {
   anchor: string;
   label: string;
@@ -41,15 +56,31 @@ export type AnchorState = {
   top?: number;
 };
 export type HostMessage =
+  | { type: "presentation"; mode: Presentation }
+  | { type: "fab-position"; x: number; y: number }
+  | { type: "sidebar-width"; width: number }
+  | { type: "hover-size"; width: number; height: number }
   | { type: "state"; state: HostState }
   | { type: "anchors"; anchors: AnchorState[] }
   | { type: "focus"; anchor: string }
   | { type: "error"; error: string };
 export type PanelMessage =
-  | { type: "ready" }
+  | { type: "open-rail" }
+  | { type: "dialog"; open: boolean }
+  | { type: "fab-position"; x: number; y: number }
+  | { type: "minimize" }
+  | { type: "draft"; active: boolean; posted?: boolean; anchor?: string }
+  | { type: "draft-size"; height: number }
+  /** `mode` and `hover` restore the panel's remembered presentation; a panel without them opens as a hover popover. */
+  | { type: "ready"; width: number; mode?: PanelMode; hover?: { width: number; height: number } }
+  /** The user switched an open panel between the side rail and the hover popover. */
+  | { type: "presentation-request"; mode: PanelMode }
+  | { type: "sidebar-layout"; width: number; maximized: boolean }
   | { type: "close" }
   | { type: "pick"; screenshot?: boolean }
   | { type: "page" }
+  /** The panel changed this site's agent session; the host persists it in the page's grabber settings. `null` clears it. */
+  | { type: "settings"; session: string | null }
   | {
       type: "scroll";
       anchor: string;
@@ -58,7 +89,7 @@ export type PanelMessage =
       offset?: number;
     }
   | { type: "highlight"; anchor: string | null }
-  | { type: "pins"; anchors: string[] };
+  | { type: "pins"; anchors: AgentPin[] };
 
 export function envelope(session: string, message: HostMessage | PanelMessage) {
   return { bridge: BRIDGE, session, message };

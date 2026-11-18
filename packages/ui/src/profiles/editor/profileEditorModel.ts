@@ -17,6 +17,7 @@ export function profileEditorSchema(): JsonSchemaObject {
 }
 
 export const profileEditorSections = [
+  { id: "spans", label: "Spans", hint: "Canonical fields and attributes" },
   { id: "general", label: "General", hint: "Name, namespace, render mode" },
   {
     id: "source",
@@ -68,6 +69,7 @@ export function profileEditorSectionStatus({
     ? draft.processors.length
     : 0;
   return {
+    spans: {},
     general: { attention: !draft.profile?.trim() },
     source: {
       badge: draft.provider?.type || undefined,
@@ -105,13 +107,37 @@ export function profileSchemaProjection(keys: string[]): JsonSchemaObject {
   };
 }
 
-export function providerOptionsSchema(providerType: string): JsonSchemaObject {
+// An option rendered with the workload-URL selector is an inline address used
+// instead of a saved connection, so it belongs beside the connection picker.
+const INLINE_CONNECTION_COMPONENT = "k8s-url-selector";
+
+/**
+ * A provider's options schema. `part` splits it: "connection" keeps only the
+ * inline-address options that stand in for a saved connection, "query" keeps
+ * everything else.
+ */
+export function providerOptionsSchema(
+  providerType: string,
+  part: "connection" | "query",
+): JsonSchemaObject {
   const definition = profileSchema().$defs?.[providerType];
   const options = definition?.properties?.options;
   if (!options || options.type !== "object") {
-    return { type: "object", properties: {}, additionalProperties: true };
+    return part === "connection"
+      ? { type: "object", properties: {} }
+      : { type: "object", properties: {}, additionalProperties: true };
   }
-  return options as JsonSchemaObject;
+  const schema = structuredClone(options) as JsonSchemaObject;
+  schema.properties = Object.fromEntries(
+    Object.entries(schema.properties ?? {}).filter(
+      ([, field]) =>
+        (field["x-clicky-component"] === INLINE_CONNECTION_COMPONENT) ===
+        (part === "connection"),
+    ),
+  );
+  if (schema.required)
+    schema.required = schema.required.filter((key) => key in schema.properties!);
+  return schema;
 }
 
 export function providerConnectionSchema(): JsonSchemaObject {
@@ -204,6 +230,11 @@ export function profileSampleSignature(draft: ProfileWizardDraft): string {
   return JSON.stringify({
     provider: draft.provider ?? {},
     query: draft.query ?? "",
+    search:draft.search,
+    namespace: draft.namespace,
+    imports: draft.imports,
+    params: draft.params,
+    processors: draft.processors,
   });
 }
 

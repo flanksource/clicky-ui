@@ -12,24 +12,28 @@ import type { JsonSchemaObject, JsonSchemaProperty, RenderContext } from "./json
 // "Change" affordance and renders the matched branch's fields (the discriminator
 // itself hidden, since the header already shows it). It returns nodes meant to be
 // children of the form's FieldsGrid (the header/phase-1 block span the full grid
-// width; phase-2 field rows snap to the grid tracks as usual).
+// width; phase-2 field rows snap to the grid tracks as usual). A host that hides
+// the discriminator via `hiddenKeys` has fixed the kind itself, so phase 2 then
+// renders the branch fields with no header and no way to change it.
 export function DiscriminatedForm({
   schema,
   value,
   onChange,
   ctx,
   discKey,
+  hiddenKeys = [],
 }: {
   schema: JsonSchemaObject;
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
   ctx: RenderContext;
   discKey: string;
+  hiddenKeys?: string[];
 }): ReactNode {
   const prop = schema.properties?.[discKey];
   // A schema that names a discriminator it does not define is malformed; render
   // it as an ordinary form rather than silently hiding everything.
-  if (!prop) return <>{ctx.render.renderObjectFields(schema, value, onChange, ctx)}</>;
+  if (!prop) return <>{ctx.render.renderObjectFields(schema, value, onChange, ctx, { hiddenKeys })}</>;
 
   const current = value[discKey];
   const required = (schema.required ?? []).includes(discKey);
@@ -56,6 +60,11 @@ export function DiscriminatedForm({
     );
   }
 
+  const branchFields = ctx.render.renderObjectFields(schema, value, onChange, ctx, {
+    hiddenKeys: [...hiddenKeys, discKey],
+  });
+  if (hiddenKeys.includes(discKey)) return <>{branchFields}</>;
+
   const selected = String(current);
   const change = () => {
     const next = { ...value };
@@ -75,9 +84,7 @@ export function DiscriminatedForm({
           </button>
         )}
       </div>
-      {ctx.render.renderObjectFields(schema, value, onChange, ctx, {
-        hiddenKeys: [discKey],
-      })}
+      {branchFields}
     </>
   );
 }

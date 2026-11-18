@@ -14,9 +14,11 @@ function hasContextMeterMetadata(metadata: SessionMetadataSummary) {
 export function SessionContextMeter({
   metadata,
   mode,
+  className,
 }: {
   metadata: SessionMetadataSummary;
   mode: ContextMeterMode;
+  className?: string;
 }) {
   if (!hasContextMeterMetadata(metadata)) return null;
   const context = metadata.context;
@@ -27,6 +29,7 @@ export function SessionContextMeter({
   return (
     <ContextMeter
       mode={mode}
+      {...(className ? { className } : {})}
       usedPercent={context ? 100 - context.freePercent : undefined}
       {...(context
         ? {

@@ -69,7 +69,30 @@ export function ObjectControl({
     ...(typeof field.schema["x-classes"] === "string"
       ? { "x-classes": field.schema["x-classes"] }
       : {}),
+    ...(field.schema["x-object-display"] === "row"
+      ? { "x-object-display": "row" as const }
+      : {}),
   };
+  const childCtx: RenderContext = {
+    ...ctx,
+    readOnly: ctx.readOnly || field.readOnly === true,
+    depth: ctx.depth + 1,
+  };
+  const onChange = (next: Record<string, unknown>) => field.onChange(next);
+  if (subSchema["x-object-display"] === "row" && ctx.layout.mode !== "properties") {
+    return (
+      <div
+        data-jsf-object-row=""
+        className={cn(
+          "flex w-full min-w-0 flex-nowrap items-start",
+          fieldInnerGapClass[ctx.size],
+          subSchema["x-classes"],
+        )}
+      >
+        {ctx.render.renderObjectFields(subSchema, obj, onChange, childCtx)}
+      </div>
+    );
+  }
   // No border/box: nested objects render as flat headed sections (see
   // ObjectSection in renderFieldRow) rather than progressively indented
   // sub-forms, so deep schemas stay readable as a single column.
@@ -92,16 +115,7 @@ export function ObjectControl({
         ? { className: subSchema["x-classes"] }
         : {})}
     >
-      {ctx.render.renderObjectFields(
-        subSchema,
-        obj,
-        (next) => field.onChange(next),
-        {
-          ...ctx,
-          readOnly: ctx.readOnly || field.readOnly === true,
-          depth: ctx.depth + 1,
-        },
-      )}
+      {ctx.render.renderObjectFields(subSchema, obj, onChange, childCtx)}
     </FieldsGrid>
   );
 }
@@ -112,6 +126,25 @@ export function ObjectControl({
 // Values recurse through the shared pipeline, so a value that is itself an object
 // or array renders structurally and pre/post extensions apply to it.
 export function StringMapControl({
+  field,
+  ctx,
+}: {
+  field: FieldControl;
+  ctx: RenderContext;
+}) {
+  const properties = ctx.layout.mode === "properties";
+  if (!properties && field.valueSchema?.type === "string" && !field.valuePatternSchemas?.length) {
+    const layout = { ...ctx.layout, mode: "properties" as const };
+    return (
+      <FieldsGrid layout={layout} size={ctx.size}>
+        <StringMapEntries field={field} ctx={{ ...ctx, layout }} />
+      </FieldsGrid>
+    );
+  }
+  return <StringMapEntries field={field} ctx={ctx} />;
+}
+
+function StringMapEntries({
   field,
   ctx,
 }: {
@@ -342,7 +375,7 @@ export function StringMapControl({
                                     size: propertyControlSize[ctx.size],
                                   }}
                                   renderPreview={(previewField) => (
-                                    <span>{String(previewField.value)}</span>
+                                    <span>{previewField.value === "" ? "New field" : String(previewField.value)}</span>
                                   )}
                                   renderEditor={(draft) => (
                                     <div className="flex min-w-0 items-center gap-1">
@@ -413,7 +446,7 @@ export function StringMapControl({
           variant={properties ? "ghost" : "outline"}
           onClick={addEntry}
           className={cn(
-            "gap-1.5",
+            "self-start gap-1.5",
             properties && "col-span-full justify-self-start m-1",
             inputSizeClass[
               properties ? propertyControlSize[ctx.size] : childCtx.size

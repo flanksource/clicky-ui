@@ -40,6 +40,7 @@ export function dateRangeFilterProps(
 }
 
 export function clearFilterBarFilter(filter: FilterBarFilter) {
+  if (filter.kind === "enum" && filter.required) return;
   if (
     filter.kind === "text" ||
     filter.kind === "lookup" ||
@@ -85,6 +86,7 @@ export function isFilterBarFilterActive(filter: FilterBarFilter) {
       String(filter.to ?? "").trim() !== ""
     );
   }
+  if (filter.kind === "enum" && filter.required) return false;
   if (
     filter.kind === "text" ||
     filter.kind === "lookup" ||

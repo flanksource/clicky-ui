@@ -4,6 +4,7 @@ import type { FieldTone } from "./json-schema-form-tone";
 import type { MdxEditorPluginOptions } from "./mdx-editor-options";
 import type { LookupDescriptor } from "./json-schema-form-runtime-types";
 import type { ChangeListener } from "./json-schema-form-listener-types";
+import type { FormExtensionSource } from "./json-schema-form-extension-api";
 
 export type { FieldTone };
 export type * from "./json-schema-form-runtime-types";
@@ -15,12 +16,19 @@ export type * from "./json-schema-form-listener-types";
 // Every `x-*` key declared here must also be documented in the published
 // meta-schema, schemas/json-schema-form.schema.json (enforced by its test).
 export interface JsonSchemaProperty {
+  // "row" lays the object's fields out side by side as one compact control
+  // (like SecretKeySelector): no visible per-field labels, the object's own
+  // label names the row.
+  "x-object-display"?: "flat" | "accordion" | "row";
   type?: JsonSchemaType | JsonSchemaType[];
   description?: string;
   title?: string;
   enum?: unknown[];
   const?: unknown;
   default?: unknown;
+  // Standard JSON Schema keyword. The first scalar example is the input's
+  // placeholder when there is no scalar default.
+  examples?: unknown[];
   // Standard JSON Schema string format. `date`/`date-time` drive a date control.
   format?: string;
   // Standard JSON Schema 2020-12 keyword. When true the form renders the field
@@ -105,14 +113,17 @@ export interface JsonSchemaProperty {
   // Array-level: how to summarize one item in a collapsed accordion row. Every
   // value names a property of the item. See ArrayItemSpec.
   "x-item"?: ArrayItemSpec;
-  // Render a bounded number (needs `maximum`) as a single-thumb slider with a
-  // progress-filled track instead of a numeric input.
-  "x-number-display"?: "slider";
+  // "slider" needs a maximum; "stepper" accepts arbitrary decimals while its
+  // buttons and arrow keys increment by multipleOf, or 1 when unconstrained.
+  "x-number-display"?: "slider" | "stepper";
   // Per-property render order: lower values sort first, properties without it
   // keep document order after the ordered ones. Composes across merged if/then
   // branches (each field carries its own order), unlike the object-level
   // `x-order` array.
   "x-clicky-order"?: number;
+  // Render this field in the parent object's grid, at its own `x-clicky-order`,
+  // instead of in its own object's section. The value stays in the nested object.
+  "x-clicky-hoist"?: boolean;
   // Options passed to the MDXEditor-backed markdown field when `format: "md"`.
   "x-md-editor"?: MdxEditorPluginOptions;
   // Optional inline help metadata emitted by CLI/schema generators. The form
@@ -180,7 +191,7 @@ export interface JsonSchemaProperty {
   "x-icon"?: string;
   // Per-field layout override, winning over `x-label-position` and the form
   // layout. "table" renders an array of objects (or a map) as compact rows.
-  "x-layout"?: "inline" | "stack" | "table";
+  "x-layout"?: FieldLayout;
   // Array-level: the most visible columns an object array with no display hint
   // opens as a grid; wider arrays open as the inline item form. Default 4.
   "x-table-max-columns"?: number;
@@ -214,6 +225,9 @@ export interface JsonSchemaConditional {
   properties?: Record<string, JsonSchemaProperty>;
   required?: string[];
   additionalProperties?: boolean | JsonSchemaProperty;
+  // An inlined `$ref` member keeps its referenced schema's title and closure.
+  unevaluatedProperties?: boolean;
+  title?: string;
   description?: string;
   // An unconditional member's load listeners, applied after the object's own.
   "x-on-load"?: ChangeListener[];
@@ -233,6 +247,10 @@ export interface JsonSchemaObject extends JsonSchemaProperty {
   // the matched branch's fields (the picker collapses to a compact header with a
   // "change" affordance). Drives the two-phase connection form.
   "x-discriminator"?: string;
+  // Code modules for this form: inline TSX or `ref` paths a host loads through
+  // JsonSchemaForm's `extensionLoader`. Read on the root object only, and
+  // stripped before the renderer walks the schema.
+  "x-clicky-extensions"?: FormExtensionSource[];
 }
 
 export type FieldControlKind =
@@ -259,7 +277,14 @@ export type FieldControlKind =
   // schema fields that label/structure a form rather than collect a value.
   | "display"
   // A read-only external hyperlink.
-  | "link";
+  | "link"
+  // A field whose schema `format` a form extension registered a renderer for
+  // (FormExtension.formats); `FieldControl.format` names which.
+  | "custom";
+
+// A per-field `x-layout`: a built-in override, or the name of a layout engine a
+// form extension registered (FormExtension.layouts).
+export type FieldLayout = "inline" | "stack" | "table" | (string & Record<never, never>);
 
 // How a display control renders (FieldControl.displayVariant): a bold section
 // "heading", a muted block of "text", a horizontal "divider", or an empty
@@ -363,6 +388,7 @@ export interface JsonSchemaHelpBlock {
 // transform it. `value`/`onChange` are carried here so post-extension adornments
 // (e.g. an insert-snippet button) can read and mutate the field.
 export interface FieldControl {
+  nullable?: boolean;
   key: string;
   kind: FieldControlKind;
   label: string;
@@ -490,7 +516,11 @@ export interface FieldControl {
   // "inline"/"stack" force the field's subtree into that FormLayout mode;
   // "table" renders an array (or string-map) as compact rows with column
   // headers. Takes precedence over the form-level layout.
-  layout?: "inline" | "stack" | "table";
+  layout?: FieldLayout;
+
+  // custom — the schema `format` a form extension renders. Set only on a
+  // resolved "custom" control, where it selects the renderer.
+  format?: string;
 
   // array — the schema each item is rendered against (recursively).
   itemSchema?: JsonSchemaProperty;
@@ -523,5 +553,19 @@ export interface FieldOption {
   description?: string;
   // Optional hue, resolved from the schema's x-enum-tones. Used where a value
   // is rendered as a coloured mark (e.g. the accordion array's item glyph).
+  tone?: FieldTone;
+  // Optional right-aligned marks beside the option, e.g. how a connection is
+  // reached (proxy / svc / via). Rendered by lookup pickers as small badges.
+  badges?: FieldOptionBadge[];
+  // Optional section header the option is listed under by lookup pickers, e.g.
+  // a connection's type. Options sharing a group are listed together.
+  group?: string;
+}
+
+// FieldOptionBadge is one small mark on an option row. `icon` is a runtime icon
+// name or a rendered node; `tone` is the hue.
+export interface FieldOptionBadge {
+  label: string;
+  icon?: LabelIconSpec;
   tone?: FieldTone;
 }

@@ -15,6 +15,7 @@ import {
   type ProcessTreeNode,
 } from "./process-tree";
 import { Sparkline } from "./Sparkline";
+import { ProcessUsageBars } from "./ProcessUsageBars";
 import type { ProcessNodeRow, ProcessSampleRow } from "./types";
 
 /** Roots and their direct children start open; deeper levels open on demand or to reveal the selection. */
@@ -49,18 +50,20 @@ export type ProcessTraceTreeProps = {
   loading?: boolean;
   /** A load failure, shown as a banner above the tree. */
   error?: string;
+  /** Show compact CPU/RAM bars alongside the row's command, status and sparkline. */
+  showUsageBars?: boolean;
 };
 
 /** The tree is controlled by a host that owns the expand-all buttons, so the tree never changes it. */
 const hostOwnedExpandAll = () => {};
 
-function ProcessRow({ node, selected, series }: { node: ProcessTreeNode; selected: boolean; series: number[] | undefined }) {
+function ProcessRow({ node, selected, series, showUsageBars, memoryPercent }: { node: ProcessTreeNode; selected: boolean; series: number[] | undefined; showUsageBars: boolean; memoryPercent: number | undefined }) {
   const { row, exited } = node;
   return (
     <div
       data-process-key={row.key}
       {...(exited ? { "data-exited": "true" } : {})}
-      className={cn("flex min-w-0 flex-1 items-center gap-1.5", exited && "opacity-60")}
+      className={cn("flex min-w-0 flex-1 items-center gap-1.5", showUsageBars && "flex-wrap sm:flex-nowrap", exited && "opacity-60")}
       title={row.command}
     >
       <Icon
@@ -71,7 +74,7 @@ function ProcessRow({ node, selected, series }: { node: ProcessTreeNode; selecte
         {processLabel({ pid: row.pid, name: row.name, command: row.command })}
       </span>
       <span className="shrink-0 text-xs text-muted-foreground">pid {row.pid}</span>
-      <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground" title={row.command} data-process-command="">
+      <span className={cn("min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground", showUsageBars && "order-last basis-full sm:order-none sm:basis-auto")} title={row.command} data-process-command="">
         {row.command}
       </span>
       {series ? <Sparkline values={series} label={`CPU % over ${series.length} samples`} /> : null}
@@ -79,7 +82,7 @@ function ProcessRow({ node, selected, series }: { node: ProcessTreeNode; selecte
         <Icon icon={processStateIcon(row.status)} />
         {row.status}
       </span>
-      {exited ? (
+      {showUsageBars ? <ProcessUsageBars row={row} memoryPercent={memoryPercent} /> : exited ? (
         <>
           <span className="shrink-0 text-xs tabular-nums text-muted-foreground" title="Lifetime">
             {formatDuration(processLifetimeMs(row))}
@@ -126,10 +129,18 @@ export function ProcessTraceTree({
   onHideExitedChange,
   loading = false,
   error,
+  showUsageBars = false,
 }: ProcessTraceTreeProps) {
   const full = useMemo(() => buildProcessForest(nodes), [nodes]);
   const roots = useMemo(() => (hideExited ? pruneExitedProcesses(full) : full), [full, hideExited]);
   const series = useMemo(() => cpuSeriesByKey(samples ?? []), [samples]);
+  const latestSamples = useMemo(() => {
+    const latest = new Map<string, ProcessSampleRow>();
+    for (const sample of samples ?? []) {
+      if (!latest.has(sample.key) || latest.get(sample.key)!.tick < sample.tick) latest.set(sample.key, sample);
+    }
+    return latest;
+  }, [samples]);
   const selected = useMemo(
     () => (selectedKey ? (flattenForest(roots).find((node) => node.row.key === selectedKey) ?? null) : null),
     [roots, selectedKey],
@@ -192,7 +203,7 @@ export function ProcessTraceTree({
         defaultOpen={(_node, depth) => depth < OPEN_DEPTH}
         onSelect={(node) => onSelect(node.row.key)}
         renderRow={({ node, selected: isSelected }) => (
-          <ProcessRow node={node} selected={isSelected} series={series.get(node.row.key)} />
+          <ProcessRow node={node} selected={isSelected} series={series.get(node.row.key)} showUsageBars={showUsageBars} memoryPercent={latestSamples.get(node.row.key)?.memoryPercent} />
         )}
         rowClass={(_node, isSelected) =>
           isSelected ? "bg-primary/10 border-l-2 border-primary" : "hover:bg-accent"

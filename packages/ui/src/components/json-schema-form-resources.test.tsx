@@ -21,12 +21,12 @@ describe("resource schema editing", () => {
       { type: "object", title: "Custom policy", properties: { path: { type: "string", title: "Path" } } },
     ] } } };
     render(<Form schema={schema} initial={{ access: "read" }} />);
-    fireEvent.change(screen.getByRole("combobox", { name: "Access format" }), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Custom policy" }));
     fireEvent.change(screen.getByLabelText("Path"), { target: { value: "/workspace" } });
     expect(screen.getByRole("status")).toHaveTextContent('{"access":{"path":"/workspace"}}');
-    fireEvent.change(screen.getByRole("combobox", { name: "Access format" }), { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Named policy" }));
     expect(screen.getByRole("status")).toHaveTextContent('{"access":"read"}');
-    fireEvent.change(screen.getByRole("combobox", { name: "Access format" }), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Custom policy" }));
     expect(screen.getByLabelText("Path")).toHaveValue("/workspace");
   });
 
@@ -45,10 +45,10 @@ describe("resource schema editing", () => {
       { type: "object", title: "Read policy", properties: { kind: { const: "read" }, path: { type: "string", title: "Path" } } },
       { type: "object", title: "Write policy", properties: { kind: { const: "write" }, path: { type: "string", title: "Path" } } },
     ] } } }} initial={{ access: { kind: "read", path: "/read" } }} />);
-    fireEvent.change(screen.getByRole("combobox", { name: "Access format" }), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Write policy" }));
     expect(screen.getByRole("status")).toHaveTextContent('"kind":"write"');
     fireEvent.change(screen.getByLabelText("Path"), { target: { value: "/write" } });
-    fireEvent.change(screen.getByRole("combobox", { name: "Access format" }), { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Read policy" }));
     expect(screen.getByLabelText("Path")).toHaveValue("/read");
   });
 
@@ -56,9 +56,9 @@ describe("resource schema editing", () => {
     render(<Form schema={{ properties: { sandbox: { title: "Sandbox", anyOf: [
       { type: "boolean", title: "Toggle" }, { type: "string", title: "Command" }, { type: "null", title: "Unset" },
     ] } } }} initial={{ sandbox: false }} />);
-    fireEvent.change(screen.getByRole("combobox", { name: "Sandbox format" }), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Clear Sandbox to null" }));
     expect(screen.getByRole("status")).toHaveTextContent('{"sandbox":null}');
-    fireEvent.change(screen.getByRole("combobox", { name: "Sandbox format" }), { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Toggle" }));
     expect(screen.getByRole("status")).toHaveTextContent('{"sandbox":false}');
   });
 
@@ -75,7 +75,7 @@ describe("resource schema editing", () => {
       type: "object", additionalProperties: { format: "json" },
       properties: { enabled: { type: "boolean", title: "Enable sandbox", description: "Confine the child process." } },
     } } }} initial={{ sandbox: {} }} />);
-    fireEvent.click(screen.getByRole("checkbox", { name: "Enable sandbox" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Enable sandbox" }));
     expect(screen.getByRole("status")).toHaveTextContent('{"sandbox":{"enabled":true}}');
     expect(screen.getByText("Confine the child process.")).toBeInTheDocument();
   });

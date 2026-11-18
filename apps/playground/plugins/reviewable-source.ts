@@ -59,7 +59,7 @@ function literalRowId(row: ObjectLiteralExpression): string | undefined {
     : undefined;
 }
 
-function validSource(source: string): string {
+export function validSource(source: string): string {
   const result = ts.transpileModule(source, {
     fileName: "page.tsx",
     reportDiagnostics: true,
@@ -191,7 +191,7 @@ export function markReviewableSource(
 export function deleteReviewableSource(
   source: string,
   reviewId: string,
-): string {
+): { source: string; removed: { start: number; end: number } } {
   const file = sourceFile(source);
   const rowMatches = file
     .getDescendantsOfKind(SyntaxKind.ObjectLiteralExpression)
@@ -215,8 +215,9 @@ export function deleteReviewableSource(
     if (!row) throw new Error("review row disappeared");
     const array = row.getParentIfKind(SyntaxKind.ArrayLiteralExpression);
     if (!array) throw new Error("review row is not in a literal array");
+    const removed = { start: row.getStart(), end: row.getEnd() };
     array.removeElement(row);
-    return validSource(file.getFullText());
+    return { source: validSource(file.getFullText()), removed };
   }
   const opening = jsxMatches[0];
   if (!opening) throw new Error("review JSX node disappeared");
@@ -232,9 +233,9 @@ export function deleteReviewableSource(
     );
   }
   const text = file.getFullText();
-  return validSource(
+  return { removed: { start: element.getStart(), end: element.getEnd() }, source: validSource(
     text.slice(0, element.getStart()) + text.slice(element.getEnd()),
-  );
+  ) };
 }
 
 function reviewClass(value: string, rejected: boolean): string {

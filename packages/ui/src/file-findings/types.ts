@@ -23,6 +23,12 @@ export type FileFinding = {
   endColumn?: number | undefined;
   severity: LintSeverity;
   message: string;
+  /**
+   * JSON Pointer of the document value a schema finding is about. `message`
+   * still begins with `<path>: `; a view showing the finding at that value
+   * drops the prefix (see `messageAtValue`).
+   */
+  path?: string | undefined;
   /** The linter or test framework that raised it. */
   source: string;
   /** Rule id for lint findings; the test name for test findings. */

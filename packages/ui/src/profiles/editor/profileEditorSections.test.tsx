@@ -58,4 +58,25 @@ describe("ProfileSourceSection", () => {
       await screen.findByRole("option", { name: "warehouse (postgres)" }),
     ).toBeInTheDocument();
   });
+
+  it("renders the inline address beside the connection picker and keeps the other options when either is edited", () => {
+    const options = { index: "logs-*", address: "" };
+    const draft = { profile: "Logs", provider: { type: "opensearch", options } };
+    const onChange = vi.fn();
+    render(
+      <ProfileSourceSection draft={draft} discovered={[]} sampleStale={false} onChange={onChange} onSample={vi.fn()} />,
+    );
+    const address = screen.getByRole("textbox", { name: "Address" });
+    const sourceCard = screen.getByRole("combobox", { name: "Connection" }).closest("section");
+    expect(sourceCard).toContainElement(address);
+    expect(screen.getAllByRole("textbox", { name: "Address" })).toHaveLength(1);
+
+    const inlineURL = "https://search.example.test";
+    fireEvent.change(address, { target: { value: inlineURL } });
+    expect(onChange).toHaveBeenLastCalledWith({ ...draft, provider: { ...draft.provider, options: { ...options, address: inlineURL } } });
+
+    const pattern = "traces-*";
+    fireEvent.change(screen.getByRole("textbox", { name: "Index" }), { target: { value: pattern } });
+    expect(onChange).toHaveBeenLastCalledWith({ ...draft, provider: { ...draft.provider, options: { ...options, index: pattern } } });
+  });
 });

@@ -1,31 +1,69 @@
 import { useRef, useState } from "react";
 import { Select } from "./select";
-import { unionBranches, matchesUnionBranch, branchType, seedUnionBranch } from "./json-schema-form-union-model";
+import { SegmentedControl } from "./SegmentedControl";
+import {
+  unionBranches, matchesUnionBranch, branchTitle, branchType, seedUnionBranch,
+  stringListBranch, stringListTags, stringListValue,
+} from "./json-schema-form-union-model";
 import type { FieldControl, RenderContext } from "./json-schema-form-types";
 
+const MAX_SEGMENTED_BRANCHES = 6;
+
 export function UnionControl({ field, fieldId, ctx }: { field: FieldControl; fieldId: string; ctx: RenderContext }) {
+  const list = stringListBranch(unionBranches(field.schema));
+  return list
+    ? <StringListControl field={field} list={list} ctx={ctx} />
+    : <BranchControl field={field} fieldId={fieldId} ctx={ctx} />;
+}
+
+// A `string | string[]` union is one tag field: a single value reads as one
+// tag, and the value keeps the string form until a second tag is added.
+function StringListControl({ field, list, ctx }: { field: FieldControl; list: FieldControl["schema"]; ctx: RenderContext }) {
+  const { oneOf: _oneOf, anyOf: _anyOf, ...base } = field.schema;
+  const prop = { ...base, ...list, title: field.label };
+  const nodes = ctx.render.renderFieldNodes({ key: field.key, prop, required: field.required,
+    value: stringListTags(field.value), onChange: (tags) => field.onChange(stringListValue(tags)), instancePath: ctx.instancePath }, ctx);
+  return <>{nodes?.value}</>;
+}
+
+function BranchControl({ field, fieldId, ctx }: { field: FieldControl; fieldId: string; ctx: RenderContext }) {
   const drafts = useRef(new Map<number, unknown>());
-  const [preferred, setPreferred] = useState(0);
+  const [preferred, setPreferred] = useState<number | null>(null);
   const branches = unionBranches(field.schema);
-  const matched = branches[preferred] && matchesUnionBranch(branches[preferred], field.value) ? preferred : branches.findIndex((branch) => matchesUnionBranch(branch, field.value));
+  const preferredBranch = preferred === null ? undefined : branches[preferred];
+  const matched = preferredBranch && (matchesUnionBranch(preferredBranch, field.value) || (branchType(preferredBranch) === "string" && typeof field.value === "string")) ? preferred! : branches.findIndex((branch) => matchesUnionBranch(branch, field.value));
   const selected = matched < 0 ? 0 : matched;
   const branch = branches[selected];
   if (!branch) throw new Error(`Union ${field.key} has no branch`);
   const { oneOf: _oneOf, anyOf: _anyOf, ...base } = field.schema;
-  const prop = { ...base, ...branch, title: field.label };
+  const prop = { ...base, ...branch, title: field.label, ...(field.nullable ? { anyOf: [branch, { type: "null" as const }] } : {}) };
   const nodes = ctx.render.renderFieldNodes({ key: field.key, prop, required: field.required,
     value: field.value, onChange: field.onChange, instancePath: ctx.instancePath }, ctx);
-  return <div className="flex min-w-0 flex-col gap-2">
-    <Select id={`${fieldId}-variant`} aria-label={`${field.label} format`} value={String(selected)} disabled={ctx.readOnly || field.readOnly}
-      options={branches.map((item, i) => ({ value: String(i), label: item.title && branches.filter((other) => other.title === item.title).length === 1 ? item.title : `${item.title ?? "Variant"} (${branchType(item)} ${i + 1})` }))}
-      onChange={(event) => {
-        const next = Number(event.target.value);
-        const target = branches[next];
-        if (!target) throw new Error(`Unknown union variant ${next}`);
-        drafts.current.set(selected, field.value);
-        setPreferred(next);
-        field.onChange(drafts.current.has(next) ? drafts.current.get(next) : seedUnionBranch(target));
-      }} />
+  const inferFromValue = branches.every((item) =>
+    ["string", "number", "integer", "boolean"].includes(branchType(item)) && Object.keys(item).every((key) => key === "type"),
+  );
+  const disabled = ctx.readOnly || field.readOnly;
+  const options = branches.map((item, i) => {
+    const title = branchTitle(item);
+    return { value: String(i), label: title && branches.filter((other) => branchTitle(other) === title).length === 1 ? title : `${title ?? "Variant"} (${branchType(item)} ${i + 1})` };
+  });
+  const selectBranch = (value: string) => {
+    const next = Number(value);
+    const target = branches[next];
+    if (!target) throw new Error(`Unknown union variant ${next}`);
+    if (matched >= 0) drafts.current.set(selected, field.value);
+    setPreferred(next);
+    field.onChange(drafts.current.has(next) ? drafts.current.get(next) : seedUnionBranch(target));
+  };
+  // Like the endpoint access-mode picker: a segmented choice above the branch
+  // fields, falling back to a select once the choice set is too large to scan.
+  const picker = options.length <= MAX_SEGMENTED_BRANCHES
+    ? <SegmentedControl value={String(selected)} wrap aria-label={`${field.label} format`} onChange={selectBranch}
+      options={options.map((option) => ({ id: option.value, label: option.label, ...(disabled ? { disabled } : {}) }))} />
+    : <Select id={`${fieldId}-variant`} aria-label={`${field.label} format`} value={String(selected)} disabled={disabled}
+      options={options} onChange={(event) => selectBranch(event.target.value)} />;
+  return <div className="flex min-w-0 flex-col gap-density-2" data-jsf-union>
+    {!inferFromValue && <div className="min-w-0">{picker}</div>}
     {branchType(branch) === "null" ? <code>null</code> : nodes?.value}
   </div>;
 }

@@ -3,24 +3,38 @@
 // watcher's events. Rendered inside FixtureDetail; split out so adapterViews.tsx
 // stays focused on the command/CEL body.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/button";
-import { Badge, type BadgeTone } from "../Badge";
+import { SegmentedControl, type SegmentedOption } from "../../components/SegmentedControl";
+import { Badge, type BadgeSize, type BadgeTone } from "../Badge";
+import { UiDatabase, UiHourglass, UiWarningTriangle } from "../../icons";
+import { formatBytes, formatShort } from "../../lib/format";
+import { MetricTile } from "../diagnostics/MetricTile";
+import { Sparkline } from "../charts/Sparkline";
+import type { GaugeTone } from "../Gauge";
 import { CodeBlock } from "../CodeBlock";
 import { JsonView } from "../JsonView";
+import { JsonSchemaForm } from "../../components/JsonSchemaForm";
 import type { StepSourceResult } from "./stepSource";
-import { formatTestDuration, useSelectDetailTab } from "../test-runner";
-import { UiHourglass } from "../../icons";
+import { formatTestDuration, useSelectDetailTab, type Test } from "../test-runner";
 import {
   clockTime,
+  stepFormState,
   formatDelay,
   formatExportValue,
   policySummary,
   waitDecidedBy,
   type ExecutionHeader,
   type StepDetail,
+  type StepForm,
+  type StepFormState,
   type StepExport,
+  type StepQuery,
+  type StepQueryBatch,
+  type StepQueryConnection,
+  type StepQuerySample,
+  type StepQuerySession,
   type WaitCondition,
   type WaitDetail,
   type WaitOutcome,
@@ -41,7 +55,57 @@ function Section({ name, title, aside, children }: { name: string; title: string
   );
 }
 
-/** The host's answerable form for a step waiting on a person. */
+// ── Form ────────────────────────────────────────────────────────────────────
+
+const FORM_BADGE: Record<StepFormState, { label: string; tone: BadgeTone }> = {
+  answered: { label: "Answered", tone: "success" },
+  rejected: { label: "Rejected", tone: "warning" },
+  supplied: { label: "Supplied", tone: "info" },
+  unanswered: { label: "Not answered", tone: "danger" },
+};
+
+const ignoreChange = () => {};
+
+function StepFormBadge({ state, size }: { state: StepFormState; size?: BadgeSize }) {
+  const { label, tone } = FORM_BADGE[state];
+  return <Badge tone={tone} clickToCopy={false} {...(size ? { size } : {})}>{label}</Badge>;
+}
+
+/**
+ * The tree row's step badge: "Awaiting answer" while the step waits on its
+ * form, then how the form was answered. Null for any other node.
+ */
+export function StepRowBadge({ node }: { node: Test }) {
+  if (node.waiting) {
+    return (
+      <span className="flex shrink-0 items-center" data-step-badge="">
+        <Badge tone="warning" size="xs" icon={UiHourglass} clickToCopy={false}>Awaiting answer</Badge>
+      </span>
+    );
+  }
+  const state = stepFormState(node);
+  if (!state) return null;
+  return (
+    <span className="flex shrink-0 items-center" data-step-badge="">
+      <StepFormBadge state={state} size="xs" />
+    </span>
+  );
+}
+
+/** The form a `form` step (or `params:`) showed, read-only through the same JsonSchemaForm the prompt dialog used. */
+export function StepFormSection({ form }: { form: StepForm }) {
+  const by = [form.answeredBy && `by ${form.answeredBy}`, form.answeredAt && `at ${clockTime(form.answeredAt)}`].filter(Boolean).join(" ");
+  return (
+    <Section name="form" title="Form" aside={<StepFormBadge state={form.state} />}>
+      <div className="text-sm font-medium">{form.title}</div>
+      {form.description ? <div className="text-xs text-muted-foreground">{form.description}</div> : null}
+      {by ? <div className="text-[11px] text-muted-foreground">{by}</div> : null}
+      <JsonSchemaForm schema={form.schema} value={form.values} onChange={ignoreChange} readOnly />
+    </Section>
+  );
+}
+
+/** The host's answerable form for a step waiting on a person, headed like the answered form it becomes. */
 export function StepPendingFormSection({ children }: { children: ReactNode }) {
   return (
     <Section
@@ -51,6 +115,202 @@ export function StepPendingFormSection({ children }: { children: ReactNode }) {
     >
       {children}
     </Section>
+  );
+}
+
+// ── Query ───────────────────────────────────────────────────────────────────
+
+type QueryView = "template" | "sql";
+
+function ValueTable({ name, keyLabel, rows }: { name: string; keyLabel: string; rows: [string, unknown][] }) {
+  return (
+    <table className="w-full table-fixed border-collapse text-left text-[11px]" {...{ [`data-query-${name}`]: "" }}>
+      <thead className="text-muted-foreground">
+        <tr className="border-b border-border">
+          <th className="w-[28%] py-1 pr-2 font-medium">{keyLabel}</th>
+          <th className="py-1 font-medium">Value</th>
+        </tr>
+      </thead>
+      <tbody className="font-mono">
+        {rows.map(([key, value]) => (
+          <tr key={key} className="border-b border-border/60 align-top last:border-0">
+            <td className="break-words py-1 pr-2">{key}</td>
+            <td className="break-all py-1">{formatExportValue(value)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/**
+ * A query step's query: the template as authored and the statement commons-db
+ * issued, behind a compact Template / SQL switch, then the params by name and
+ * the values bound to the statement's placeholders.
+ */
+export function StepQuerySection({ query }: { query: StepQuery }) {
+  const [view, setView] = useState<QueryView>("template");
+  const params = Object.entries(query.params ?? {});
+  const args = query.arguments ?? [];
+  const options: SegmentedOption<QueryView>[] = [
+    { id: "template", label: "Template", title: "The query as authored, with its params references" },
+    query.sql
+      ? { id: "sql", label: "SQL", title: "The statement issued, params bound to driver placeholders" }
+      : { id: "sql", label: "SQL", title: "No issued statement was recorded", disabled: true },
+  ];
+  return (
+    <Section name="query" title="Query">
+      {(query.connection || query.session) && <QueryConnection connection={query.connection} session={query.session} />}
+      {query.queryFile ? <div className="break-all font-mono text-[11px] text-muted-foreground" title={query.queryFile}>{query.queryFile}</div> : null}
+      <div className="min-w-0" data-query-code={view}>
+        <CodeBlock
+          language="sql"
+          source={view === "sql" && query.sql ? query.sql : query.template}
+          copyable
+          toolbar={<SegmentedControl size="sm" value={view} options={options} onChange={setView} aria-label="Query view" />}
+        />
+      </div>
+      {params.length > 0 && <ValueTable name="params" keyLabel="Param" rows={params} />}
+      {args.length > 0 && <ValueTable name="arguments" keyLabel="Argument" rows={args.map((value, i) => [String(i + 1), value])} />}
+      {(query.batches?.length ?? 0) > 0 && <QueryBatches batches={query.batches!} />}
+      {(query.diagnose || query.diagnoseError) && (
+        <QueryDiagnose samples={query.diagnose ?? []} dropped={query.diagnoseDropped} error={query.diagnoseError} engine={query.session?.engine} />
+      )}
+    </Section>
+  );
+}
+
+/** `spid 57` (SQL Server), `pid 4121` (Postgres), `conn 88` (MySQL), `query <id>` (ClickHouse); undefined when the id is unknown. */
+function sessionLabel({ engine, sessionId, queryId }: StepQuerySession): string | undefined {
+  switch (engine) {
+    case "sqlserver": return `spid ${sessionId}`;
+    case "postgres": return `pid ${sessionId}`;
+    case "mysql": return `conn ${sessionId}`;
+    case "clickhouse": return queryId ? `query ${queryId}` : undefined;
+    default: return `${engine} ${sessionId}`;
+  }
+}
+
+/** The connection's name and type, then where it points — host, user and database — and the server session, as copyable label badges. */
+function QueryConnection({ connection, session }: { connection: StepQueryConnection | undefined; session: StepQuerySession | undefined }) {
+  const host = connection?.host && connection.port ? `${connection.host}:${connection.port}` : connection?.host;
+  const targets: [string, string | undefined][] = [["host", host], ["user", connection?.user], ["db", connection?.database], ["server", session?.server]];
+  const sessionText = session && sessionLabel(session);
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px]" data-query-connection="">
+      <UiDatabase className="shrink-0 text-muted-foreground" aria-hidden />
+      {connection && <span className="font-medium">{connection.name}</span>}
+      {connection && <span className="text-muted-foreground">{connection.type}</span>}
+      {sessionText && (
+        <span className="inline-flex min-w-0" data-query-session="">
+          <Badge size="xs" tone="info" maxWidth={40}>{sessionText}</Badge>
+        </span>
+      )}
+      {targets.map(([label, value]) =>
+        value ? (
+          <span key={label} className="inline-flex min-w-0" data-query-target={label}>
+            <Badge variant="label" size="xs" label={label} value={value} maxWidth={48} />
+          </span>
+        ) : null,
+      )}
+    </div>
+  );
+}
+
+function batchLabel({ batch, run }: { batch: number; run: number }): string {
+  return run > 1 ? `batch ${batch} run ${run}` : `batch ${batch}`;
+}
+
+/** The program's batches that have ended, each with the rows it changed where reported. */
+function QueryBatches({ batches }: { batches: StepQueryBatch[] }) {
+  return (
+    <div className="flex min-w-0 flex-wrap gap-1" data-query-batches="">
+      {batches.map((batch) => (
+        <Badge key={`${batch.batch}:${batch.run}`} size="xs" clickToCopy={false} tone="success">
+          {batchLabel(batch)} done{batch.rowsAffected !== undefined ? ` · ${batch.rowsAffected} row(s)` : ""}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
+type DiagnoseMetric = {
+  label: string;
+  /** Postgres reports no CPU, IO or memory per session, so these stay hidden for it. */
+  hiddenFor?: readonly string[];
+  value: (sample: StepQuerySample) => string;
+  tone?: (sample: StepQuerySample) => GaugeTone;
+  /** Shown only when this holds (Blocked by, only while blocked). */
+  when?: (sample: StepQuerySample) => boolean;
+};
+
+const NO_CPU_OR_IO = ["postgres"] as const;
+
+const DIAGNOSE_METRICS: DiagnoseMetric[] = [
+  { label: "State", value: (s) => s.state || s.command || "unknown" },
+  { label: "Elapsed", value: (s) => formatDelay(s.elapsedMs ?? 0) },
+  { label: "CPU", hiddenFor: NO_CPU_OR_IO, value: (s) => formatDelay(s.cpuMs ?? 0) },
+  { label: "Logical reads", hiddenFor: NO_CPU_OR_IO, value: (s) => formatShort(s.logicalReads ?? 0) },
+  { label: "Reads", hiddenFor: NO_CPU_OR_IO, value: (s) => formatShort(s.reads ?? 0) },
+  { label: "Writes", hiddenFor: NO_CPU_OR_IO, value: (s) => formatShort(s.writes ?? 0) },
+  { label: "Memory", hiddenFor: NO_CPU_OR_IO, value: (s) => formatBytes(s.memoryBytes ?? 0) },
+  {
+    label: "Wait",
+    value: (s) => (s.waitType ? `${s.waitType}${s.waitMs ? ` ${formatDelay(s.waitMs)}` : ""}` : "none"),
+    tone: (s) => (s.waitType ? "warning" : "neutral"),
+  },
+  { label: "Blocked by", value: (s) => String(s.blockedBy), tone: () => "danger", when: (s) => (s.blockedBy ?? 0) > 0 },
+];
+
+const DIAGNOSE_SPARKS: { key: "cpu" | "logicalReads"; label: string; hiddenFor: readonly string[]; read: (s: StepQuerySample) => number }[] = [
+  { key: "cpu", label: "CPU", hiddenFor: NO_CPU_OR_IO, read: (s) => s.cpuMs ?? 0 },
+  { key: "logicalReads", label: "Logical reads", hiddenFor: NO_CPU_OR_IO, read: (s) => s.logicalReads ?? 0 },
+];
+
+/**
+ * AutoDiagnose output for a slow statement: the latest sample of its server
+ * session as metric tiles (those its engine reports), the sample count, and CPU
+ * and logical-reads trends across the samples. A diagnose error — the sampler
+ * could not read the server's activity views — shows as a warning; the query is
+ * unaffected.
+ */
+function QueryDiagnose({ samples, dropped, error, engine }: { samples: StepQuerySample[]; dropped: number | undefined; error: string | undefined; engine: string | undefined }) {
+  const latest = samples[samples.length - 1];
+  const sampleEngine = latest?.engine ?? engine;
+  const visible = (metric: { hiddenFor?: readonly string[] | undefined }) => !(sampleEngine && metric.hiddenFor?.includes(sampleEngine));
+  const count = `${samples.length} sample${samples.length === 1 ? "" : "s"}${dropped ? ` · ${dropped} older dropped` : ""}`;
+  return (
+    <div className="min-w-0 space-y-1.5" data-query-diagnose="">
+      {error && (
+        <div className="flex items-start gap-1.5 text-[11px] text-yellow-700 dark:text-yellow-400" data-query-diagnose-error="">
+          <UiWarningTriangle className="mt-px shrink-0" aria-hidden />
+          <span className="min-w-0 break-words">{error}</span>
+        </div>
+      )}
+      {latest && (
+        <>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground" data-query-diagnose-count="">{count}</div>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-1">
+            {DIAGNOSE_METRICS.filter((m) => visible(m) && (m.when?.(latest) ?? true)).map((m) => (
+              <MetricTile key={m.label} label={m.label} value={m.value(latest)} tone={m.tone?.(latest) ?? "neutral"} />
+            ))}
+          </div>
+          {latest.waitResource && (
+            <div className="break-all font-mono text-[11px] text-muted-foreground" data-query-diagnose-wait-resource="">{latest.waitResource}</div>
+          )}
+          {samples.length > 1 && (
+            <div className="flex flex-wrap gap-3">
+              {DIAGNOSE_SPARKS.filter(visible).map((spark) => (
+                <div key={spark.key} className="flex items-center gap-1.5 text-[10px] text-muted-foreground" data-query-spark={spark.key}>
+                  <span>{spark.label}</span>
+                  <Sparkline values={samples.map(spark.read)} width={96} height={22} />
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -130,12 +390,15 @@ function stepPosition({ rowIndex, line }: ExecutionHeader): string | undefined {
   return line !== undefined ? `line ${line}` : undefined;
 }
 
-/** Where a fixture step came from (file · step · section), its kind and state, and when it ran. */
+/**
+ * Where a fixture step came from (file · step · section), its execution kind and state, and when it ran.
+ * A typed step's kind is already the detail header's tool badge, so an execution kind equal to it is not repeated.
+ */
 export function ExecutionHeaderView({ header, stepKind }: { header: ExecutionHeader; stepKind?: string }) {
   const place = [stepPosition(header), header.sectionPath].filter(Boolean).join(" · ");
-  const kinds = [header.kind, stepKind].filter((kind, i, all): kind is string => !!kind && all.indexOf(kind) === i);
+  const kind = header.kind !== stepKind ? header.kind : undefined;
   const window = header.startedAt && header.finishedAt ? `${clockTime(header.startedAt)} → ${clockTime(header.finishedAt)}` : header.startedAt ? `started ${clockTime(header.startedAt)}` : undefined;
-  if (!header.file && !place && kinds.length === 0 && !header.state && !window && header.durationNs === undefined) return null;
+  if (!header.file && !place && !kind && !header.state && !window && header.durationNs === undefined) return null;
   return (
     <div className="min-w-0 space-y-1" data-execution-header="">
       {(header.file || place) && (
@@ -146,7 +409,7 @@ export function ExecutionHeaderView({ header, stepKind }: { header: ExecutionHea
         </div>
       )}
       <div className="flex min-w-0 flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-        {kinds.map((kind) => <Badge key={kind} size="xs" clickToCopy={false}>{kind}</Badge>)}
+        {kind && <Badge size="xs" clickToCopy={false}>{kind}</Badge>}
         {header.state && <Badge size="xs" clickToCopy={false} tone={STATE_TONE[header.state] ?? "neutral"}>{header.state}</Badge>}
         {window && <span className="font-mono">{window}</span>}
         {header.durationNs !== undefined && <span>{formatTestDuration(header.durationNs)}</span>}
@@ -161,6 +424,37 @@ export function FailureCallout({ children }: { children: ReactNode }) {
     <div className={cn("whitespace-pre-wrap break-words rounded border px-2 py-1.5 text-sm", ALERT_ROW)} data-failure-callout="">
       {children}
     </div>
+  );
+}
+
+// ── Failed tests ────────────────────────────────────────────────────────────
+
+function failedLeaves(node: Test): Test[] {
+  if (!node.children?.length) return node.failed || node.timed_out ? [node] : [];
+  return node.children.flatMap(failedLeaves);
+}
+
+/** A test step's failing cases: name, location and the assertion message of each. */
+export function StepFailedTestsSection({ node }: { node: Test }) {
+  const failed = node.children?.length ? failedLeaves(node) : [];
+  if (failed.length === 0) return null;
+  return (
+    <Section name="failed-tests" title={`Failed tests (${failed.length})`}>
+      <ul className="space-y-1.5">
+        {failed.map((test, index) => (
+          <li key={test.task_id ?? `${test.name}-${index}`} className={cn("space-y-0.5 rounded border px-2 py-1.5", ALERT_ROW)} data-failed-test={test.name}>
+            <div className="flex min-w-0 items-baseline gap-2 text-sm">
+              <span className="min-w-0 break-words font-medium">{test.name}</span>
+              {test.file && (
+                <span className="shrink-0 font-mono text-[11px] opacity-80">{test.line ? `${test.file}:${test.line}` : test.file}</span>
+              )}
+              {test.duration !== undefined && <span className="ml-auto shrink-0 text-[11px] opacity-80">{formatTestDuration(test.duration)}</span>}
+            </div>
+            {test.message && <pre className="whitespace-pre-wrap break-words font-mono text-xs">{test.message}</pre>}
+          </li>
+        ))}
+      </ul>
+    </Section>
   );
 }
 
@@ -221,10 +515,6 @@ export function StepKindSections({ step, renderWait }: { step: StepDetail; rende
   const viewOutputs = selectTab && step.outputs !== undefined ? () => selectTab("outputs") : undefined;
   return (
     <>
-      <div className="text-[11px] text-muted-foreground" data-step-ref="">
-        {step.step.kind} · {step.step.id}
-        {step.background && " · background"}
-      </div>
       {step.wait && (renderWait ? renderWait(step.wait) : <StepWait wait={step.wait} {...(viewOutputs ? { onViewOutputs: viewOutputs } : {})} />)}
       {step.events.length > 0 && (
         <Section name="events" title="Events">

@@ -17,7 +17,7 @@ import type { LintSourceLoader } from "./ViolationSnippet";
 import { lintNodeActions } from "./actions";
 import { buildLintTree, findLintNode } from "./grouping";
 import { countLintBySeverity, isLinterErrored } from "./stats";
-import type { LintAction, LintFilters, LintGrouping, LintNode, LinterResult, LintSeverity } from "./types";
+import type { EntityHref, LintAction, LintFilters, LintGrouping, LintNode, LinterResult, LintSeverity } from "./types";
 
 export type LintResultsProps = {
   results: readonly LinterResult[];
@@ -50,6 +50,11 @@ export type LintResultsProps = {
    * snippet the linter reported.
    */
   loadSource?: LintSourceLoader;
+  /**
+   * Where an entity location (`{kind, id, name}`) links in the host, e.g. its
+   * entity page. Return undefined, or omit the prop, to show the entity as a plain chip.
+   */
+  entityHref?: EntityHref;
   /** Renders the prompt run behind a linter in its detail pane (see LintDetailPanelProps.renderRun). */
   renderRun?: LintDetailPanelProps["renderRun"];
   /** Actions at the right end of the header bar (e.g. re-run, export). */
@@ -125,6 +130,7 @@ export function LintResults({
   ignoreBusy,
   onOpenFile,
   loadSource,
+  entityHref,
   renderRun,
   headerSlot,
   title,
@@ -193,6 +199,7 @@ export function LintResults({
       ignoreBusy={ignoreBusy}
       onOpenFile={onOpenFile}
       loadSource={loadSource}
+      entityHref={entityHref}
       renderRun={renderRun}
     />
   );
@@ -229,6 +236,7 @@ export function LintResults({
               ignoreBusy={ignoreBusy}
               onOpenFile={onOpenFile}
               loadSource={loadSource}
+              entityHref={entityHref}
             />
           </div>
         </>

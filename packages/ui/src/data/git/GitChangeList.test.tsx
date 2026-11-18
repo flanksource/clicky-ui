@@ -230,8 +230,31 @@ describe("GitDiffPanel line annotations", () => {
     await waitFor(() => expect(screen.getByText("looks good")).toBeInTheDocument());
     const addRow = document.querySelector('[data-diff-line="add"]') as HTMLElement;
     expect(addRow.nextElementSibling?.getAttribute("data-diff-widget")).toBe("c1");
-    fireEvent.click(addRow.querySelector("button") as HTMLElement);
-    expect(onLineAction).toHaveBeenCalledWith({ side: "new", line: 2, content: "B" });
+    const button = addRow.querySelector("button") as HTMLElement;
+    fireEvent.click(button);
+    expect(onLineAction).toHaveBeenCalledWith({ side: "new", line: 2, content: "B", element: button });
+  });
+
+  it("forwards lineSelection so a single-file diff can stage lines and hunks", async () => {
+    const onChange = vi.fn();
+    render(
+      <GitDiffPanel
+        payload={payload}
+        lineSelection={{
+          isSelected: () => false,
+          onChange,
+          label: (target, selected) => `${selected ? "Unstage" : "Stage"} ${target.side} line ${target.line}`,
+          hunkLabel: (hunk, selected) => `${selected ? "Unstage" : "Stage"} hunk ${hunk}`,
+        }}
+      />,
+    );
+    await waitFor(() => expect(document.querySelector("[data-diff-line]")).not.toBeNull());
+    fireEvent.click(screen.getByRole("checkbox", { name: "Stage new line 2" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Stage hunk 1" }));
+    expect(onChange.mock.calls).toEqual([
+      [[{ side: "new", line: 2 }], true],
+      [[{ side: "old", line: 2 }, { side: "new", line: 2 }], true],
+    ]);
   });
 
   it("renders no gutter buttons without onLineAction", async () => {

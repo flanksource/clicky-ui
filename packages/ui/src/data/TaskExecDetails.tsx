@@ -1,5 +1,6 @@
 import { CopyButton } from "../components/CopyButton";
 import { shellCommandLine } from "../lib/shell-command";
+import { ElapsedDuration } from "./ElapsedDuration";
 import { JsonView } from "./JsonView";
 import type { TaskExecDetails } from "./TaskSnapshot";
 
@@ -11,17 +12,8 @@ const EXEC_KEYS = new Set([
   "status",
   "exitCode",
   "started",
-  "duration",
+  "finished",
 ]);
-
-function formatExecDuration(nanoseconds: number): string {
-  const milliseconds = nanoseconds / 1_000_000;
-  if (milliseconds < 1000) return `${Number(milliseconds.toFixed(1))}ms`;
-  const seconds = milliseconds / 1000;
-  if (seconds < 60) return `${Number(seconds.toFixed(1))}s`;
-  const minutes = Math.floor(seconds / 60);
-  return `${minutes}m ${Number((seconds % 60).toFixed(1))}s`;
-}
 
 export function TaskCommandLine({
   command,
@@ -62,7 +54,7 @@ export function TaskExecDetailsView({ details }: { details: TaskExecDetails }) {
         <span>{details.status}</span>
         {details.pid !== undefined && <span className="font-mono text-foreground">pid {details.pid}</span>}
         <span className="font-mono text-foreground">exit {details.exitCode}</span>
-        {details.duration !== undefined && <span>{formatExecDuration(details.duration)}</span>}
+        <ElapsedDuration startedAt={details.started} finishedAt={details.finished} />
         {details.started && <span>started {details.started}</span>}
       </div>
       {Object.keys(extra).length > 0 && (

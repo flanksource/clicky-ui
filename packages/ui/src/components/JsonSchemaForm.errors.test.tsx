@@ -20,6 +20,14 @@ function renderForm(
   );
 }
 
+// Text inputs render inside an InputField chrome (`[data-jsf-control]`); field
+// errors are siblings of that chrome, not of the native input.
+function controlOf(input: HTMLElement): HTMLElement {
+  const control = input.closest<HTMLElement>("[data-jsf-control]");
+  if (!control) throw new Error("input is not inside a [data-jsf-control] wrapper");
+  return control;
+}
+
 describe("JsonSchemaForm authoritative errors", () => {
   it("renders every exact field error below the control and suppresses its soft hint", () => {
     renderForm(
@@ -46,7 +54,7 @@ describe("JsonSchemaForm authoritative errors", () => {
     );
 
     const input = screen.getByRole("textbox", { name: /^Name/ });
-    const messages = input.nextElementSibling;
+    const messages = controlOf(input).nextElementSibling;
     expect(messages).toHaveTextContent("Enter at least three characters");
     expect(messages).toHaveTextContent("Name is required");
     expect(screen.queryByText("Required")).not.toBeInTheDocument();
@@ -144,7 +152,7 @@ describe("JsonSchemaForm authoritative errors", () => {
     );
 
     const amount = screen.getByRole("textbox", { name: "Amount" });
-    expect(amount.nextElementSibling).toHaveTextContent(
+    expect(controlOf(amount).nextElementSibling).toHaveTextContent(
       "Amount does not balance"
     );
   });
@@ -176,7 +184,7 @@ describe("JsonSchemaForm authoritative errors", () => {
     fireEvent.click(within(screen.getByTitle("1 error").closest<HTMLElement>("[data-accordion-row]")!).getByRole("button", { expanded: false }));
 
     const account = screen.getByRole("textbox", { name: "Account" });
-    expect(account.nextElementSibling).toHaveTextContent("Select an account");
+    expect(controlOf(account).nextElementSibling).toHaveTextContent("Select an account");
   });
 
   it("escapes slash and tilde tokens while descending through maps", () => {
@@ -209,7 +217,7 @@ describe("JsonSchemaForm authoritative errors", () => {
     );
 
     const dimension = screen.getByRole("textbox", { name: "Dimension code" });
-    expect(dimension.nextElementSibling).toHaveTextContent(
+    expect(controlOf(dimension).nextElementSibling).toHaveTextContent(
       "Choose a valid dimension"
     );
   });
@@ -274,7 +282,7 @@ describe("JsonSchemaForm authoritative errors", () => {
       within(summary).queryByText("Name is invalid")
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("textbox", { name: "Name" }).nextElementSibling
+      controlOf(screen.getByRole("textbox", { name: "Name" })).nextElementSibling
     ).toHaveTextContent("Name is invalid");
   });
 });

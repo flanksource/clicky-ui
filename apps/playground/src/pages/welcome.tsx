@@ -66,12 +66,8 @@ export default function Welcome() {
         <Step n={3} title="Leave anchored feedback">
           Select an element with react-grab, then choose Comment or Comment with
           screenshot. Write a note in the focused rail and choose Post comment or
-          Post with screenshot. Pins are
-          anchored to the element and persist to{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">
-            apps/playground/.playground/comments.json
-          </code>
-          , together with its React component/source path and a 4 KB HTML
+          Post with screenshot. Pins stay anchored to the element, together with
+          its React component/source path and a 4 KB HTML
           snapshot. Screenshot capture is optional; if requested but unavailable
           or cancelled, the note is still saved with that state recorded.
         </Step>

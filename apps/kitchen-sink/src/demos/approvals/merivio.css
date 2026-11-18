@@ -75,7 +75,7 @@
 
   background-color: var(--mv-paper);
   color: var(--mv-ink);
-  font-family: "Geist", var(--fs-font-sans), system-ui, sans-serif;
+  font-family: "Geist", var(--clicky-font-sans), system-ui, sans-serif;
   font-size: 13.5px;
   line-height: 1.45;
   letter-spacing: -0.005em;
@@ -110,7 +110,7 @@
 
 /* Geist Mono with tabular figures wherever the library asks for monospace. */
 .merivio :where(.font-mono, code, kbd, pre, textarea, input) {
-  font-family: "Geist Mono", var(--fs-font-mono), ui-monospace, monospace;
+  font-family: "Geist Mono", var(--clicky-font-mono), ui-monospace, monospace;
 }
 
 .merivio :where(.font-mono, code, kbd, pre) {

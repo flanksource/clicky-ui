@@ -11,7 +11,12 @@ function setup(readOnly = false) {
         properties: {
           name: { type: "string", title: "Name" },
           notes: { type: "string", title: "Notes", format: "textarea" },
-          tags: { type: "array", title: "Tags", items: { type: "string" } },
+          // Enum items give the tag picker a menu; an option-less list has none.
+          tags: {
+            type: "array",
+            title: "Tags",
+            items: { type: "string", enum: ["api", "web"] },
+          },
         },
       }}
       value={{ name: "Original", notes: "Notes", tags: ["api"] }}

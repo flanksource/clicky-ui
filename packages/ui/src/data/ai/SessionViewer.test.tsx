@@ -97,7 +97,7 @@ describe("SessionViewer", () => {
     expect(screen.queryByText(/Tests: 8 passed/)).not.toBeInTheDocument();
   });
 
-  it("toggles user and assistant message bodies from their headers", () => {
+  it("toggles user and assistant message bodies from their headers", async () => {
     render(
       <SessionViewer
         showHeader={false}
@@ -118,23 +118,25 @@ describe("SessionViewer", () => {
       />,
     );
     const userHeader = screen.getByRole("button", {
-      name: "Toggle initial prompt message",
+      name: "Initial prompt · User body",
     });
     const assistantHeader = screen.getByRole("button", {
       name: "Toggle assistant message",
     });
 
-    expect(userHeader).toHaveAttribute("aria-expanded", "true");
+    expect(userHeader).toHaveAttribute("aria-expanded", "false");
     expect(assistantHeader).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(userHeader);
+    expect(await screen.findByText("User body", { selector: "p" })).toBeInTheDocument();
     expect(assistantHeader).toHaveTextContent("Agent");
     fireEvent.click(userHeader);
     fireEvent.click(assistantHeader);
-    expect(screen.queryByText("User body")).not.toBeInTheDocument();
+    expect(screen.queryByText("User body", { selector: "p" })).not.toBeInTheDocument();
     expect(screen.queryByText("Assistant body")).not.toBeInTheDocument();
 
     fireEvent.click(userHeader);
     fireEvent.click(assistantHeader);
-    expect(screen.getByText("User body")).toBeInTheDocument();
+    expect(await screen.findByText("User body", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByText("Assistant body")).toBeInTheDocument();
   });
 

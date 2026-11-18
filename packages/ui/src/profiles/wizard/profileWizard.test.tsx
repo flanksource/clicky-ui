@@ -1,7 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ProfileFieldManager } from "../fields/profileFieldManager";
-import { profileFormatOptions, profileUnitOptions } from "../fields/profileFieldIcons";
+import {
+  profileFormatOptions,
+  profileUnitOptions,
+} from "../fields/profileFieldIcons";
 import {
   applyVisibleFieldSelection,
   filterProfileFields,
@@ -62,7 +65,10 @@ describe("advancing past the query step", () => {
     expect(
       profileWizardStepReady(
         "query",
-        { query: "", provider: { options: { search: { query: { op: "bool" } } } } },
+        {
+          query: "",
+          provider: { options: { search: { query: { op: "bool" } } } },
+        },
         sampled,
       ),
     ).toBe(true);
@@ -72,6 +78,16 @@ describe("advancing past the query step", () => {
     expect(
       profileWizardStepReady("query", { query: "  ", provider: {} }, sampled),
     ).toBe(false);
+  });
+
+  it("accepts canonical logical conditions after sampling", () => {
+    expect(
+      profileWizardStepReady(
+        "query",
+        { search: { query: { op: "match_all" } } },
+        sampled,
+      ),
+    ).toBe(true);
   });
 
   it("blocks a query that has never been sampled", () => {

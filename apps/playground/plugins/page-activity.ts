@@ -1,11 +1,12 @@
 import { readdirSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import type { Plugin } from "vite";
+import type { MiddlewareApp } from "./middleware";
 
 const ID = "virtual:playground-page-activity";
 const RESOLVED = `\0${ID}`;
 
-function pageUpdates(pagesDir: string): Record<string, string> {
+export function pageUpdates(pagesDir: string): Record<string, string> {
   const updates: Record<string, string> = {};
   function walk(directory: string, prefix: string) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -26,24 +27,7 @@ export function playgroundPageActivity(pagesDir: string): Plugin {
     resolveId: (id) => id === ID ? RESOLVED : undefined,
     load: (id) => id === RESOLVED ? `export default ${JSON.stringify(pageUpdates(pagesDir))}` : undefined,
     configureServer(server) {
-      server.middlewares.use("/__playground/page-activity", (req, res) => {
-        if (req.method !== "GET") {
-          res.statusCode = 405;
-          res.setHeader("Allow", "GET");
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "Page activity only supports GET" }));
-          return;
-        }
-        try {
-          res.setHeader("Content-Type", "application/json");
-          res.setHeader("Cache-Control", "no-store");
-          res.end(JSON.stringify({ updated: pageUpdates(pagesDir) }));
-        } catch (cause) {
-          res.statusCode = 500;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: cause instanceof Error ? cause.message : String(cause) }));
-        }
-      });
+      registerPageActivityMiddleware({ middlewares: server.middlewares, pagesDir });
       server.watcher.on("all", (_event, file) => {
         if (!resolve(file).startsWith(resolve(pagesDir) + sep)) return;
         const module = server.moduleGraph.getModuleById(RESOLVED);
@@ -51,4 +35,25 @@ export function playgroundPageActivity(pagesDir: string): Plugin {
       });
     },
   };
+}
+
+export function registerPageActivityMiddleware({ middlewares, pagesDir }: { middlewares: MiddlewareApp; pagesDir: string }): void {
+  middlewares.use("/__playground/page-activity", (req, res) => {
+    if (req.method !== "GET") {
+      res.statusCode = 405;
+      res.setHeader("Allow", "GET");
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ error: "Page activity only supports GET" }));
+      return;
+    }
+    try {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Cache-Control", "no-store");
+      res.end(JSON.stringify({ updated: pageUpdates(pagesDir) }));
+    } catch (cause) {
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ error: cause instanceof Error ? cause.message : String(cause) }));
+    }
+  });
 }

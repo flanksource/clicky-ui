@@ -8,6 +8,27 @@ const OPTIONS = [
 ];
 
 describe("Combobox menu filter", () => {
+  it("keeps header actions outside the listbox when search has no matches", () => {
+    const create = vi.fn();
+    render(
+      <Combobox
+        searchPlacement="menu"
+        ariaLabel="Target"
+        value="model-a"
+        options={OPTIONS}
+        onChange={vi.fn()}
+        menuHeader={<button onClick={create}>New session</button>}
+      />,
+    );
+    fireEvent.click(screen.getByRole("combobox"));
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "no-match" },
+    });
+    const action = screen.getByRole("button", { name: "New session" });
+    expect(screen.getByRole("listbox")).not.toContainElement(action);
+    fireEvent.click(action);
+    expect(create).toHaveBeenCalledOnce();
+  });
   it("renders the filter only in the popup and selects by keyboard", () => {
     const onChange = vi.fn();
     render(

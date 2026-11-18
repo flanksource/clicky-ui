@@ -62,6 +62,11 @@ describe("SessionInspector", () => {
     expect(
       within(initialPrompt).getByText("Initial prompt"),
     ).toBeInTheDocument();
+    fireEvent.click(
+      within(initialPrompt).getByRole("button", {
+        name: "Initial prompt · Review parser",
+      }),
+    );
     expect(
       await within(initialPrompt).findByRole("heading", {
         name: "Review parser",
@@ -245,6 +250,11 @@ describe("SessionInspector", () => {
     expect(
       screen.getByRole("tree", { name: "Session files" }),
     ).toBeInTheDocument();
+    // The file tree lists written files only until the Read toggle is pressed.
+    expect(
+      screen.queryByRole("treeitem", { name: "pkg/session/session.go" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Read/ }));
     expect(
       screen.getByRole("treeitem", { name: "pkg/session/session.go" }),
     ).toBeInTheDocument();

@@ -1,5 +1,37 @@
 # @flanksource/clicky-ui
 
+`CommentCapture` from `@flanksource/clicky-ui/comments` shows a captured element's page URL, component, source, HTML and optional screenshot. Pass these fields through `capture`; omit it to show the empty state. Its sidebar summary stays on one line and expands on click. Pass `expanded` for a dedicated Capture tab, and use `renderRootDetails` on `CommentThreadList` or `CommentSidePanel` to retain context in both the sidebar and maximized thread.
+
+To name delivery badges, wrap comments in `AgentIdentityProvider` from `@flanksource/clicky-ui/chat` and set `identities[sessionId].sessionName` to the session title. The badge shows `@session-name` with the delivery receipt; an unavailable name is shown as `@session-id`.
+
+## React Grab element picker
+
+The react-grab fork in `react-grab/` ships as `@flanksource/clicky-ui/react-grab`. Like upstream, it renders with Solid, which is bundled into the picker, and embeds Tailwind v4 CSS in a shadow root. It needs no React of its own and never registers a renderer with the page's React DevTools hook, so it inspects and freezes only the page's React. Import the main entry to initialize automatically, or initialize explicitly through the core entry:
+
+```tsx
+import { init } from "@flanksource/clicky-ui/react-grab/core";
+
+const picker = init();
+// Dispose when the owning page or extension unloads.
+picker.dispose();
+```
+
+Pages can attach literal context with any `data-grab-*` attribute. Attributes on `html` and `body` supply page context; attributes on the selected element and its ancestors supply element context, ordered from outermost to innermost. Sibling attributes are excluded. Attribute values retain multiline text and are never executed or parsed as JSON.
+
+```html
+<html data-grab-project="acme" data-grab-context="Order management">
+  <body data-grab-route="/orders">
+    <section data-grab-context="Pending orders">
+      <button data-grab-order-id="order-7" data-grab-context="Approve this order">Approve</button>
+    </section>
+  </body>
+</html>
+```
+
+Context is included in copied element information, element references and `getStackContext()` results, including extension TODO captures. `getGrabContext(element)` returns structured page and element entries; `formatGrabContext(context)` formats them as text. Both are exported from the main and core entries. Open shadow-root ancestors are included; iframe context comes from the selected element's document.
+
+Build with `pnpm --filter @flanksource/clicky-ui build:react-grab`. Run `check:react-grab`, `test:react-grab` and `check:react-grab-fork` through the same filter. The normal Clicky UI build includes these picker artifacts and upstream license notices.
+
 Flanksource's React component library built on [shadcn/ui](https://ui.shadcn.com/) with light/dark theming and density presets.
 
 ## Install
@@ -28,6 +60,22 @@ export function App() {
   );
 }
 ```
+
+## Tailwind picker fields
+
+`TailwindColorPickerField` and `TailwindNumberPickerField` combine a raw value and a searchable Tailwind lookup in one input. Import them and `TailwindPickerValue` from `@flanksource/clicky-ui/components`. Values explicitly distinguish `{ kind: "literal", value: "#326ce5" }` or `{ kind: "literal", value: 14 }` from `{ kind: "utility", value: "text-sm" }`. `onChange` receives typing immediately, keeping unfinished numeric text such as `"33."` intact; it is the host's responsibility to validate drafts and apply literal values or classes.
+
+```tsx
+import { useState } from "react";
+import { TailwindNumberPickerField, type TailwindPickerValue } from "@flanksource/clicky-ui/components";
+
+export function FontSizeField() {
+  const [value, setValue] = useState<TailwindPickerValue>({ kind: "literal", value: 14 });
+  return <TailwindNumberPickerField ariaLabel="Font size" property="fontSize" value={value} onChange={setValue} />;
+}
+```
+
+Color `utility` selects the class prefix (`bg`, `text`, `fill`, `stroke`, or `border`; defaults to `bg`). Choices include theme tokens and the Tailwind palette, with a native color swatch for literal entry. `resolveColor` can resolve CSS variables in a selected element's theme. Number `property` selects the `fontSize`, `strokeWidth`, or `opacity` scale. Both accept `ariaLabel` for the accessible name, `id` for an external label, `size` for control density, and `disabled` to prevent editing. Optional `onReset` adds an in-field reset button; `resetLabel` overrides its accessible label. Class choices remain separate from presentation attributes so hosts can preserve unrelated classes and responsive variants. Run `pnpm dev:storybook` from the repository root to inspect **Forms / Tailwind pickers**.
 
 ## Runtime settings
 
@@ -391,6 +439,29 @@ arbitrary z-index, hand-rolled inline styles, hardcoded colors / raw theme
 storage access, and icons imported from unapproved libraries or faked with
 emoji. See [`oxlint-plugins/README.md`](./oxlint-plugins/README.md) for the full
 guide.
+
+## Resizable comment rails and detail tabs
+
+Wrap a sidebar in `CommentRail` to get a persistent, accessible right-edge pane. Pointer dragging, arrow keys, Shift+arrows and Home/End resize within 280–640px, constrained by the surrounding document. Use `stacked` to follow a host's narrow-layout breakpoint. Optional `width` and `onWidthChange` make the width controlled; otherwise the origin-wide preference persists in localStorage. FileReview exposes the corresponding `sidebarWidth` and `onSidebarWidthChange` props and preserves independent document/rail scrolling.
+
+```tsx
+import { CommentRail, CommentSidePanel } from "@flanksource/clicky-ui/comments";
+
+<CommentRail>
+  <CommentSidePanel
+    className="w-full"
+    previewLines={3}
+    detailTabs={[
+      { id: "capture", label: "Capture", render: thread => <Capture comment={thread[0]!} /> },
+      { id: "agents", label: "Agents", render: thread => <ThreadAgents comments={thread} /> },
+    ]}
+  />
+</CommentRail>
+```
+
+`previewLines` limits rendered body lines and exposes Show more / Show less only on overflow. Maximized bodies are always full. `detailTabs` are host-owned slots mounted only while selected; keep network and application context in those adapters. `onMaximizedChange(open)` lets an embedded host coordinate its available space. The same options pass through CommentThread, CommentThreadList and FileReview's `comments` configuration. Maximized threads retain the existing reply draft in a pinned footer across tabs and failed sends. `threadToMarkdown` serializes a thread for Copy; to preview it, add a `detailTabs` entry that renders it (for example with `Markdown` from `@flanksource/clicky-ui/data`), so the comments surface never pulls in the Markdown/streamdown pipeline.
+
+`AgentIdentity` from `@flanksource/clicky-ui/chat` accepts `model`, `provider`, `effort` and an optional fallback `label`. It reuses the provider colors, short model formatter and effort glyph catalog. `AgentIdentityProvider` supplies known runtime metadata by `identityId` without changing stored comment authors. Unknown identities/effort remain visible rather than being guessed. The interactive `Comments/Review details` Storybook story demonstrates rails, previews, detail tabs and scrolling drafts.
 
 ## Comments in an external document
 

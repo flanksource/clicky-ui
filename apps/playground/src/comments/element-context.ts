@@ -1,4 +1,4 @@
-import type { ReactGrabAPI, SourceInfo } from "react-grab";
+import type { ReactGrabAPI, SourceInfo } from "@flanksource/clicky-ui/react-grab";
 
 import {
   COMMENT_ELEMENT_HTML_LIMIT,

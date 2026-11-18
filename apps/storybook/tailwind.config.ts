@@ -6,6 +6,7 @@ const config: Config = {
   content: [
     "./.storybook/**/*.{ts,tsx,mdx}",
     "./src/**/*.{ts,tsx,mdx}",
+    "./stories/**/*.{ts,tsx,mdx}",
     "../../packages/ui/src/**/*.{ts,tsx,mdx}",
   ],
 };

@@ -10,6 +10,7 @@ import {
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join } from "node:path";
 import type { Connect, Plugin } from "vite";
+import type { MiddlewareApp } from "./middleware";
 
 export const EXPORTS_ROUTE = "/__playground/exports";
 const MAX_EXPORT_BYTES = 64 * 1024 * 1024;
@@ -121,10 +122,14 @@ export function playgroundExports(options: { dir: string }): Plugin {
   return {
     name: "playground-exports",
     configureServer(server) {
-      server.middlewares.use(EXPORTS_ROUTE, middleware(options.dir));
+      registerExportsMiddleware({ ...options, middlewares: server.middlewares });
     },
     configurePreviewServer(server) {
-      server.middlewares.use(EXPORTS_ROUTE, middleware(options.dir));
+      registerExportsMiddleware({ ...options, middlewares: server.middlewares });
     },
   };
+}
+
+export function registerExportsMiddleware({ middlewares, dir }: { middlewares: MiddlewareApp; dir: string }): void {
+  middlewares.use(EXPORTS_ROUTE, middleware(dir));
 }

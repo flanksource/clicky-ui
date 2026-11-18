@@ -7,7 +7,8 @@ import {
   patchAnchor,
   type PatchMatch,
 } from "../../comments/anchoring/patch-anchor";
-import type { PatchAnchor } from "../../comments/annotation-types";
+import type { PatchAnchor, TextQuote } from "../../comments/annotation-types";
+import { quoteLiesInLines } from "./quote-anchor";
 import type { LineRange } from "./selection-lines";
 import type { SourceMark } from "./source-marks";
 
@@ -24,11 +25,19 @@ export function placePatches(raw: string, anchors: readonly string[]): Map<strin
   );
 }
 
-/** The current lines of every placement the file still contains exactly once. */
-export function patchLineRanges(placements: ReadonlyMap<string, PatchPlacement>): Map<string, { start: number; end: number }> {
-  const ranges = new Map<string, { start: number; end: number }>();
+/** The current lines of a placed patch, with the quote it was made on, if any. */
+export type PatchLineRange = { start: number; end: number; quote?: TextQuote };
+
+/**
+ * The current lines of every placement the file still contains exactly once.
+ * `quotes` are the selected words each thread was written on, kept by the host
+ * beside the patch (never in the anchor), keyed by anchor.
+ */
+export function patchLineRanges(placements: ReadonlyMap<string, PatchPlacement>, quotes: ReadonlyMap<string, TextQuote> = new Map()): Map<string, PatchLineRange> {
+  const ranges = new Map<string, PatchLineRange>();
   for (const { anchor, match } of placements.values()) {
-    if (match.state === "matched") ranges.set(anchor, { start: match.startLine, end: match.endLine });
+    const quote = quotes.get(anchor);
+    if (match.state === "matched") ranges.set(anchor, { start: match.startLine, end: match.endLine, ...(quote ? { quote } : {}) });
   }
   return ranges;
 }
@@ -48,15 +57,13 @@ export function patchLabel({ patch, match }: PatchPlacement): string {
   return `${match.state === "outdated" ? "Outdated" : "Ambiguous"} · ${describePatch(patch)}`;
 }
 
-/** Why a thread is listed apart from the text, for the placements that could not be placed. */
-export function patchNote(match: PatchMatch): string | null {
-  if (match.state === "outdated") return "The lines this was written on have changed or been removed.";
-  if (match.state === "ambiguous") return "The lines this was written on appear more than once in the file.";
-  return null;
-}
-
-/** The anchor and label for a selection of `raw`'s lines. */
-export function patchDraft(raw: string, { startLine, endLine }: LineRange): { anchor: string; label: string } {
-  const patch = capturePatch(raw, startLine, endLine);
-  return { anchor: patchAnchor(patch), label: describePatch(patch) };
+/**
+ * The anchor and label for a selection of `raw`'s lines. A `quote` of the
+ * selected words is returned beside the anchor (the host stores it next to the
+ * patch, never inside it) only when it lies inside those lines, which the
+ * server requires; otherwise the patch alone anchors the thread.
+ */
+export function patchDraft({ raw, lines, quote }: { raw: string; lines: LineRange; quote?: TextQuote | null | undefined }): { anchor: string; label: string; quote?: TextQuote } {
+  const patch = capturePatch(raw, lines.startLine, lines.endLine);
+  return { anchor: patchAnchor(patch), label: describePatch(patch), ...(quote && quoteLiesInLines(quote, patch.lines) ? { quote } : {}) };
 }

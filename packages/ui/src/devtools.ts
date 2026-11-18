@@ -19,6 +19,8 @@ export type { DebugConsoleDockProps } from "./devtools/DebugConsoleDock";
 
 export { DebugConsoleButton } from "./devtools/DebugConsoleButton";
 export type { DebugConsoleButtonProps } from "./devtools/DebugConsoleButton";
+export { RuntimeIndicatorBadge } from "./devtools/RuntimeIndicatorBadge";
+export type { RuntimeIndicatorBadgeProps } from "./devtools/RuntimeIndicatorBadge";
 
 export {
   DebugClient,

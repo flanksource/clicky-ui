@@ -12,6 +12,7 @@ import {
 import { modelGroupsForMode } from "./RuntimeBar.selection";
 import type { SpecRuntimeFamily, SpecRuntimeModeOption } from "./runtime-mode";
 import { UNSPECIFIED_LABEL, unspecifiedHint } from "./unspecified";
+import { shortContextModelName } from "../chat/ContextMeter.model";
 
 export type RuntimeBarIdentityProps = {
   family: SpecRuntimeFamily;
@@ -117,7 +118,7 @@ function ModelCaption(props: RuntimeBarIdentityProps) {
         />
       )}
       <span className="min-w-0 truncate font-mono text-xs font-semibold text-foreground">
-        {label}
+        {shortContextModelName(label)}
       </span>
     </>
   );
@@ -160,7 +161,7 @@ function RuntimeModelPicker(props: RuntimeBarIdentityProps) {
       return models.length
         ? models.map((model) => ({
             value: model.id,
-            label: model.label.trim() || model.id,
+            label: shortContextModelName(model.label.trim() || model.id),
             group: family.label,
             icon,
           }))

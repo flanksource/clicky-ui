@@ -2,6 +2,7 @@ import { Icon } from "../data/Icon";
 import { UiKey, UiLink, UiLock, UiWarningTriangle } from "../icons";
 import { cn } from "../lib/utils";
 import { ConnectionTypeIcon } from "./iconProvider";
+import { CONNECTION_LAYER_LABELS } from "./connectionDashboardModel";
 import type {
   ConnectionDashboardHealthState,
   ConnectionDashboardItem,
@@ -71,24 +72,43 @@ export function ConnectionDashboardRow({
       {renderConnectionLink(connection, {
         ...(health?.detail ? { title: health.detail } : {}),
         className:
-          "flex min-w-0 flex-1 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+          "flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 md:flex-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
         children: (
           <>
             <span className="shrink-0" aria-hidden>
               <ConnectionTypeIcon type={connection.type} className="size-4" />
             </span>
-            <span className="w-32 shrink-0 truncate text-sm font-medium md:w-40" title={connection.name}>
+            <span
+              className="min-w-0 flex-1 truncate text-sm font-medium md:w-40 md:shrink-0 md:flex-none"
+              title={connection.name}
+            >
               {connection.name}
             </span>
-            <div className="min-w-0 flex-1">
+            <div className="order-3 w-full min-w-0 md:order-none md:w-auto md:flex-1">
               <EndpointLine endpoint={connection.endpoint} />
-              {connection.source && <div className="truncate text-xs text-muted-foreground" title={connection.source}>{connection.source}</div>}
+              {connection.layer && (
+                <span
+                  className="text-xs text-muted-foreground"
+                  title="Storage layer"
+                >
+                  {CONNECTION_LAYER_LABELS[connection.layer] ??
+                    connection.layer}
+                </span>
+              )}
+              {connection.source && (
+                <div
+                  className="truncate text-xs text-muted-foreground"
+                  title={connection.source}
+                >
+                  {connection.source}
+                </div>
+              )}
             </div>
-            <div className="hidden shrink-0 items-center gap-1.5 lg:flex">
+            <div className="order-4 flex w-full flex-wrap items-center gap-1.5 md:order-none md:w-auto md:shrink-0">
               <SecretChip count={connection.secretCount} />
               <RiskChips connection={connection} />
             </div>
-            <span className="w-24 shrink-0 text-right text-xs text-muted-foreground">
+            <span className="shrink-0 text-right text-xs text-muted-foreground md:w-24">
               {connection.profileCount === 0 ? (
                 <span className="text-muted-foreground/60">unused</span>
               ) : (
@@ -143,7 +163,11 @@ function HealthDot({
   );
 }
 
-function EndpointLine({ endpoint }: { endpoint: ConnectionDashboardItem["endpoint"] }) {
+function EndpointLine({
+  endpoint,
+}: {
+  endpoint: ConnectionDashboardItem["endpoint"];
+}) {
   if (!endpoint) {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -152,7 +176,9 @@ function EndpointLine({ endpoint }: { endpoint: ConnectionDashboardItem["endpoin
       </span>
     );
   }
-  const indirect = ["connection", "host", "portforward"].includes(endpoint.scheme);
+  const indirect = ["connection", "host", "portforward"].includes(
+    endpoint.scheme,
+  );
   return (
     <span className="flex min-w-0 items-center gap-1.5 font-mono text-xs">
       <span
@@ -165,9 +191,14 @@ function EndpointLine({ endpoint }: { endpoint: ConnectionDashboardItem["endpoin
       >
         {endpoint.scheme}
       </span>
-      <span className="truncate text-foreground" title={`${endpoint.host}${endpoint.path ?? ""}`}>
+      <span
+        className="truncate text-foreground"
+        title={`${endpoint.host}${endpoint.path ?? ""}`}
+      >
         {endpoint.host}
-        {endpoint.path ? <span className="text-muted-foreground">{endpoint.path}</span> : null}
+        {endpoint.path ? (
+          <span className="text-muted-foreground">{endpoint.path}</span>
+        ) : null}
       </span>
     </span>
   );
@@ -219,14 +250,22 @@ export function ConnectionHealthLegend() {
         <span className="inline-block size-2 rounded-full border border-muted-foreground/50" />
         not checked
       </span>
-      {(["healthy", "credentials", "unreachable", "unverifiable", "unknown"] as const).map(
-        (state) => (
-          <span key={state} className="inline-flex items-center gap-1.5">
-            <span className={cn("inline-block h-3 w-0.5", HEALTH_STYLES[state].dot)} />
-            {HEALTH_LEGEND_LABELS[state]}
-          </span>
-        ),
-      )}
+      {(
+        [
+          "healthy",
+          "credentials",
+          "unreachable",
+          "unverifiable",
+          "unknown",
+        ] as const
+      ).map((state) => (
+        <span key={state} className="inline-flex items-center gap-1.5">
+          <span
+            className={cn("inline-block h-3 w-0.5", HEALTH_STYLES[state].dot)}
+          />
+          {HEALTH_LEGEND_LABELS[state]}
+        </span>
+      ))}
     </p>
   );
 }

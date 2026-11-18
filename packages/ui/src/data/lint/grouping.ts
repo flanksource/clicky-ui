@@ -10,6 +10,7 @@
 
 import { matchesFilterState } from "../test-runner/filterState";
 import { slugify } from "../test-runner/routePath";
+import { violationTargetGroup, type LintTargetGroup } from "./locations";
 import { collapsedPathSegments, decorateLintFile, normalizeLintPath, relPath } from "./paths";
 import {
   isLinterErrored,
@@ -168,17 +169,12 @@ function uniqueWorkDir(children: readonly Draft[]): string | undefined {
   return dirs.size === 1 ? Array.from(dirs)[0] : undefined;
 }
 
-function withNoFileViolations(node: Draft, noFile: readonly Violation[]): Draft {
-  if (noFile.length === 0) return node;
-  const failed = node.failed || worstSeverity(noFile) !== "info";
-  return { ...node, noFileViolations: byLine(noFile), failed, passed: !failed };
-}
-
 function violationLeaf(args: {
   name: string;
-  kind: "lint-file" | "lint-rule";
-  file: string;
-  rawFile: string;
+  kind: "lint-file" | "lint-rule" | "lint-target";
+  /** Absent for a leaf of file-less violations. */
+  file?: string | undefined;
+  rawFile?: string | undefined;
   linterName: string;
   violations: readonly Violation[];
   workDir: string | undefined;
@@ -198,13 +194,46 @@ function violationLeaf(args: {
   };
 }
 
-function linterNode(
-  linterName: string,
-  result: LinterResult | undefined,
-  children: Draft[],
-  noFile: readonly Violation[] = [],
-): Draft {
-  return withNoFileViolations({ ...container(linterName, "linter", children), linter: result, linterName }, noFile);
+function linterNode(linterName: string, result: LinterResult | undefined, children: Draft[]): Draft {
+  return { ...container(linterName, "linter", children), linter: result, linterName };
+}
+
+// ---------------------------------------------------------------------------
+// Target groups: where violations without a file are placed
+
+const TARGET_ORDER: Record<LintTargetGroup["kind"], number> = { entity: 0, url: 1, other: 2 };
+
+type TargetBucket = { group: LintTargetGroup; flats: FlatViolation[] };
+
+/** File-less violations bucketed by target group: entity kinds, then URL hosts, then "Other", by name within each. */
+function targetBuckets(flats: readonly FlatViolation[]): TargetBucket[] {
+  const buckets = new Map<string, TargetBucket>();
+  for (const f of flats) {
+    if (f.file) continue;
+    const group = violationTargetGroup(f.v);
+    const key = `${group.kind}\u0000${group.name}`;
+    const bucket = buckets.get(key);
+    if (bucket) bucket.flats.push(f);
+    else buckets.set(key, { group, flats: [f] });
+  }
+  return Array.from(buckets.values()).sort(
+    (a, b) => TARGET_ORDER[a.group.kind] - TARGET_ORDER[b.group.kind] || a.group.name.localeCompare(b.group.name),
+  );
+}
+
+/** A leaf per target group the file-less `flats` fall into. */
+function targetLeaves(flats: readonly FlatViolation[], linterName: string, ruleName?: string): Draft[] {
+  return targetBuckets(flats).map(({ group, flats: bucket }) => ({
+    ...violationLeaf({
+      name: group.name,
+      kind: "lint-target",
+      linterName,
+      violations: bucket.map((f) => f.v),
+      workDir: bucket[0]!.workDir,
+    }),
+    targetKind: group.kind,
+    ...(ruleName ? { ruleName } : {}),
+  }));
 }
 
 function linterErrorNode(result: LinterResult): Draft {
@@ -324,17 +353,13 @@ function groupByLinterRuleFile(results: readonly LinterResult[], filters: LintFi
         .sort()
         .map((rule) => {
           const flats = byRule.get(rule)!;
-          const children = fileNodes(fileTrieFor(flats), linterName, rule);
-          const node = container(rule, "lint-rule-group", children);
-          return withNoFileViolations(
-            {
-              ...node,
-              linterName,
-              ruleName: rule,
-              work_dir: uniqueWorkDir(children) ?? meta.get(linterName)?.work_dir,
-            },
-            flats.filter((f) => !f.file).map((f) => f.v),
-          );
+          const children = [...fileNodes(fileTrieFor(flats), linterName, rule), ...targetLeaves(flats, linterName, rule)];
+          return {
+            ...container(rule, "lint-rule-group", children),
+            linterName,
+            ruleName: rule,
+            work_dir: uniqueWorkDir(children) ?? meta.get(linterName)?.work_dir,
+          };
         });
       return linterNode(linterName, meta.get(linterName), ruleNodes);
     });
@@ -347,12 +372,10 @@ function groupByLinterFile(results: readonly LinterResult[], filters: LintFilter
     .sort()
     .map((linterName) => {
       const flats = byLinter.get(linterName)!;
-      return linterNode(
-        linterName,
-        meta.get(linterName),
-        fileNodes(fileTrieFor(flats), linterName),
-        flats.filter((f) => !f.file).map((f) => f.v),
-      );
+      return linterNode(linterName, meta.get(linterName), [
+        ...fileNodes(fileTrieFor(flats), linterName),
+        ...targetLeaves(flats, linterName),
+      ]);
     });
 }
 
@@ -372,62 +395,85 @@ function groupByFileLinterRule(results: readonly LinterResult[], filters: LintFi
     entry.rules.set(rule, [...(entry.rules.get(rule) ?? []), f.v]);
   }
 
-  const fileless = groupBy(flat.filter((f) => !f.file), (f) => f.linter);
-  const filelessNodes = Array.from(fileless.keys())
-    .sort()
-    .map((linterName) => {
-      const byRule = groupBy(fileless.get(linterName)!, (f) => ruleKeyFor(f.v));
+  // File-less findings are rooted at their target group, with linters then rules beneath, as a file is.
+  const targetRoots = targetBuckets(flat).map(({ group, flats }) => {
+    const byLinter = groupBy(flats, (f) => f.linter);
+    const linterDrafts = sortedKeys(byLinter).map((linterName) => {
+      const byRule = groupBy(byLinter.get(linterName)!, (f) => ruleKeyFor(f.v));
       const workDir = meta.get(linterName)?.work_dir;
-      const leaves = Array.from(byRule.keys())
-        .sort()
-        .map((rule) => ({
-          ...violationLeaf({
-            name: rule,
-            kind: "lint-rule",
-            file: "",
-            rawFile: "",
-            linterName,
-            violations: byRule.get(rule)!.map((f) => f.v),
-            workDir,
-          }),
-          ruleName: rule,
-          file: undefined,
-          target_path: undefined,
-        }));
-      return linterNode(linterName, meta.get(linterName), leaves);
+      const leaves = sortedKeys(byRule).map((rule) => ({
+        ...violationLeaf({
+          name: rule,
+          kind: "lint-rule",
+          linterName,
+          violations: byRule.get(rule)!.map((f) => f.v),
+          workDir,
+        }),
+        ruleName: rule,
+      }));
+      return { ...linterNode(linterName, meta.get(linterName), leaves), work_dir: workDir };
     });
+    return {
+      ...container(group.name, "lint-target", linterDrafts),
+      targetKind: group.kind,
+      work_dir: uniqueWorkDir(linterDrafts),
+    };
+  });
 
-  return [...fileLinterNodes(trie, meta), ...filelessNodes];
+  return [...fileLinterNodes(trie, meta), ...targetRoots];
 }
 
-function summaryFileLabel(file: string | undefined, violations: readonly Violation[]): string {
-  if (!file) return "(no file)";
+function summaryFileLabel(file: string, violations: readonly Violation[]): string {
   if (violations.length > 1) return `${file} (${violations.length})`;
   const v = violations[0];
   if (v?.line) return v.column ? `${file}:${v.line}:${v.column}` : `${file}:${v.line}`;
   return file;
 }
 
-function summaryRuleNode(rule: string, linterName: string, flats: readonly FlatViolation[]): Draft {
-  const byFile = groupBy(flats, (f) => f.file ?? "");
-  const keys = Array.from(byFile.keys());
-  const files: Draft[] = keys.slice(0, SUMMARY_FILE_LIMIT).map((key) => {
-    const group = byFile.get(key)!;
+/** A summary place: a file, or the target group of a file-less violation. */
+function summaryPlaceKey(f: FlatViolation): string {
+  if (f.file) return `file\u0000${f.file}`;
+  const group = violationTargetGroup(f.v);
+  return `${group.kind}\u0000${group.name}`;
+}
+
+function summaryPlaceNode(rule: string, linterName: string, group: readonly FlatViolation[]): Draft {
+  const first = group[0]!;
+  const violations = group.map((f) => f.v);
+  if (!first.file) {
+    const target = violationTargetGroup(first.v);
     return {
       ...violationLeaf({
-        name: summaryFileLabel(group[0]!.file, group.map((f) => f.v)),
-        kind: "lint-file",
-        file: group[0]!.file ?? "",
-        rawFile: group[0]!.rawFile ?? "",
+        name: violations.length > 1 ? `${target.name} (${violations.length})` : target.name,
+        kind: "lint-target",
         linterName,
-        violations: group.map((f) => f.v),
-        workDir: group[0]!.workDir,
+        violations,
+        workDir: first.workDir,
       }),
-      file: group[0]!.file,
-      target_path: group[0]!.rawFile,
+      targetKind: target.kind,
       ruleName: rule,
     };
-  });
+  }
+  return {
+    ...violationLeaf({
+      name: summaryFileLabel(first.file, violations),
+      kind: "lint-file",
+      file: first.file,
+      rawFile: first.rawFile,
+      linterName,
+      violations,
+      workDir: first.workDir,
+    }),
+    ruleName: rule,
+  };
+}
+
+function summaryRuleNode(rule: string, linterName: string, flats: readonly FlatViolation[]): Draft {
+  const byPlace = groupBy(flats, summaryPlaceKey);
+  const keys = Array.from(byPlace.keys());
+  const files: Draft[] = keys
+    .slice(0, SUMMARY_FILE_LIMIT)
+    .map((key) => summaryPlaceNode(rule, linterName, byPlace.get(key)!));
   const remaining = keys.length - files.length;
   if (remaining > 0) {
     files.push({

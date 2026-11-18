@@ -62,10 +62,10 @@ export function MultiGaugeLegend({ jvm = false }: { jvm?: boolean }) {
       {[
         {
           label: jvm ? "Initial heap" : "Request",
-          color: "fill-[var(--fs-info)]",
+          color: "fill-[var(--clicky-info)]",
         },
-        { label: "P90", color: "fill-[var(--fs-warning)]" },
-        { label: "P95", color: "fill-[var(--fs-error)]" },
+        { label: "P90", color: "fill-[var(--clicky-warning)]" },
+        { label: "P95", color: "fill-[var(--clicky-error)]" },
         { label: jvm ? "Maximum" : "Limit", color: "fill-muted-foreground" },
       ].map(({ label, color }) => (
         <span key={label} className="inline-flex items-center gap-1.5">

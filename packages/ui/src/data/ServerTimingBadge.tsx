@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { UiClock } from "../icons";
 import { HoverCard, type HoverCardPlacement } from "../overlay/HoverCard";
 import {
@@ -9,12 +10,18 @@ import {
 
 export interface ServerTimingBadgeProps {
   metrics?: readonly ServerTimingMetric[];
+  /** Heading of the breakdown card; the trigger is labelled "Show <title>". */
+  title?: string;
+  /** Rendered under the phase breakdown inside the card, e.g. a link to a fuller log. */
+  footer?: ReactNode;
   placement?: HoverCardPlacement;
   className?: string;
 }
 
 export function ServerTimingBadge({
   metrics,
+  title = "Server timing",
+  footer,
   placement = "bottom",
   className,
 }: ServerTimingBadgeProps) {
@@ -30,7 +37,7 @@ export function ServerTimingBadge({
       trigger={
         <button
           type="button"
-          aria-label="Show server timing"
+          aria-label={`Show ${title.toLowerCase()}`}
           className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2 text-xs tabular-nums text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
         >
           <UiClock className="h-3.5 w-3.5" />
@@ -42,7 +49,7 @@ export function ServerTimingBadge({
     >
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-4 text-xs font-medium">
-          <span className="text-foreground">Server timing</span>
+          <span className="text-foreground">{title}</span>
           <span className="tabular-nums text-muted-foreground">
             {formatServerTimingDuration(total.duration)}
           </span>
@@ -84,6 +91,7 @@ export function ServerTimingBadge({
             })}
           </ul>
         )}
+        {footer ? <div className="border-t border-border pt-2">{footer}</div> : null}
       </div>
     </HoverCard>
   );

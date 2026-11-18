@@ -1,4 +1,5 @@
 import { Icon } from "../Icon";
+import { ElapsedDuration } from "../ElapsedDuration";
 import { Badge } from "../Badge";
 import { IconButton } from "../../components/IconButton";
 import { UiClass, UiRefresh, UiStop } from "../../icons";
@@ -29,20 +30,25 @@ const NAME_TONE: Record<string, string> = {
 
 const MESSAGE_STATUSES = new Set(["failed", "timedout", "warned", "aborted", "skipped"]);
 
-/** Per-status roll-up count badges shown on a container row. */
+/**
+ * Per-status roll-up count badges shown on a container row. A roll-up that is
+ * all passed shows none: the row's green outcome icon already says so, and a
+ * lone green count only repeats it. The passed count shows beside any other
+ * status.
+ */
 function CountBadges({ node }: { node: Test }) {
   const s = sum(node);
-  if (s.total === 0) return null;
+  if (s.total === 0 || s.passed === s.total) return null;
   return (
     <span className="flex shrink-0 items-center gap-1">
-      {s.passed > 0 && <Badge tone="success" variant="solid" size="xxs" count={s.passed} />}
-      {s.failed > 0 && <Badge tone="danger" variant="solid" size="xxs" count={s.failed} />}
-      {s.warned > 0 && <Badge tone="warning" variant="outline" size="xxs" count={s.warned} />}
-      {s.timedout > 0 && <Badge tone="warning" variant="solid" size="xxs" count={s.timedout} />}
-      {s.aborted > 0 && <Badge tone="neutral" variant="soft" size="xxs" count={s.aborted} />}
-      {s.skipped > 0 && <Badge tone="neutral" variant="soft" size="xxs" count={s.skipped} />}
-      {s.running > 0 && <Badge tone="info" variant="solid" size="xxs" count={s.running} />}
-      {s.pending > 0 && <Badge tone="neutral" variant="soft" size="xxs" count={s.pending} />}
+      {s.passed > 0 && <Badge tone="success" variant="outline" className="rounded-sm" size="xxs" count={s.passed} />}
+      {s.failed > 0 && <Badge tone="danger" variant="outline" className="rounded-sm" size="xxs" count={s.failed} />}
+      {s.warned > 0 && <Badge tone="warning" variant="outline" className="rounded-sm" size="xxs" count={s.warned} />}
+      {s.timedout > 0 && <Badge tone="danger" variant="outline" className="rounded-sm" size="xxs" count={s.timedout} />}
+      {s.aborted > 0 && <Badge tone="neutral" variant="outline" className="rounded-sm" size="xxs" count={s.aborted} />}
+      {s.skipped > 0 && <Badge tone="neutral" variant="outline" className="rounded-sm" size="xxs" count={s.skipped} />}
+      {s.running > 0 && <Badge tone="info" variant="outline" className="rounded-sm" size="xxs" count={s.running} />}
+      {s.pending > 0 && <Badge tone="neutral" variant="outline" className="rounded-sm" size="xxs" count={s.pending} />}
     </span>
   );
 }
@@ -62,6 +68,7 @@ export function TestTreeNode({ node, selected }: { node: Test; selected: boolean
   const fwNode = fwAdapter?.renderFrameworkIcon?.({ node, runner });
   const leadingAdapter = runner.adapters.resolveRowLeading(node, runner);
   const dur = node.duration || (hasChildren ? totalDuration(node) : 0);
+  const live = !!node.running && !!node.started && !node.duration;
   const canRerun = !!runner.onRerun && node.framework !== "task";
   const canStop = !!runner.onStop && !!node.can_stop && !!node.task_id;
   const showMessage = status && (MESSAGE_STATUSES.has(status) || (node.framework === "task" && (status === "running" || status === "pending")));
@@ -115,8 +122,15 @@ export function TestTreeNode({ node, selected }: { node: Test; selected: boolean
         </span>
       )}
 
-      {dur > 0 && (
-        <span className="shrink-0 text-xs text-muted-foreground">{formatTestDuration(dur)}</span>
+      {live ? (
+        <ElapsedDuration
+          startedAt={node.started}
+          finishedAt={undefined}
+          format={(ms) => formatTestDuration(ms * 1e6)}
+          className="shrink-0 text-xs text-muted-foreground"
+        />
+      ) : (
+        dur > 0 && <span className="shrink-0 text-xs text-muted-foreground">{formatTestDuration(dur)}</span>
       )}
 
       {hasChildren && <CountBadges node={node} />}

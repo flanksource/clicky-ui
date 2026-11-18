@@ -36,6 +36,7 @@ export class StubCaptain {
   nextRunFailure: { status: number; body: unknown } | undefined;
   /** Rows `GET /api/captain/sessions/live` answers, as captain shapes them. */
   liveSessions: Record<string, unknown>[] = [];
+  projects: { value: string; label: string; path: string }[] = [];
   /** How `POST /api/captain/sessions/{id}/deliver` answers a live session. */
   deliverResult: CaptainDeliverResult = { channel: "claude-socket", status: "sent" };
   server!: Server;
@@ -77,6 +78,7 @@ export class StubCaptain {
     };
 
     if (method === "POST" && path === "/api/launch/prepare") return json(200,{preparationId:"prepared",directory:"/workspace"});
+    if (method === "POST" && path === "/api/launch/lint/filter") return json(200, body?.["results"]);
     if (method === "GET" && path === "/api/launch/prompts") {
       const query = new URL(url,"http://stub.local").searchParams;
       const key = query.get("prompt");
@@ -161,6 +163,7 @@ export class StubCaptain {
     if (method === "GET" && path === "/api/captain/sessions/live") {
       return json(200, { sessions: this.liveSessions, total: this.liveSessions.length });
     }
+    if (method === "GET" && path === "/api/captain/projects") return json(200, { projects: this.projects });
     const deliver = /^\/api\/captain\/sessions\/([^/]+)\/deliver$/.exec(path);
     if (method === "POST" && deliver) {
       const id = decodeURIComponent(deliver[1] ?? "");

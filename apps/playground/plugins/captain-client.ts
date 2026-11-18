@@ -94,13 +94,15 @@ export type CaptainMessageResult = {
  */
 export type CaptainLiveSession = {
   id: string;
+  key?: string;
+  detailAvailable?: boolean;
   source: string;
   title?: string;
   slug?: string;
   initialPrompt?: string;
   model?: string;
   cwd?: string;
-  live?: { pid?: number; active?: boolean; surface?: { surfaceId?: string } | null } | null;
+  live?: { pid?: number; active?: boolean; status?: string; surface?: { surfaceId?: string } | null } | null;
 };
 
 /** How captain delivered a message into a live session it did not launch. */
@@ -290,6 +292,10 @@ export class CaptainClient {
       { method: "GET" },
     );
     return sessions;
+  }
+
+  listProjects(): Promise<{ projects: { value: string; label: string; path: string }[] }> {
+    return this.json("/api/captain/projects", { method: "GET" });
   }
 
   /**

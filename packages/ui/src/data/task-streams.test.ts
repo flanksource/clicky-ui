@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyTaskLogsDelta,
   applyTaskOutputDelta,
   emptyTaskStreams,
+  MAX_TASK_LOGS,
+  type TaskLogsDelta,
   type TaskOutputDelta,
   type TaskStreams,
   withTaskStreams,
 } from "./task-streams";
-import type { TaskSnapshot } from "./TaskSnapshot";
+import type { LogEntry, TaskSnapshot } from "./TaskSnapshot";
 
 const stdout = (delta: Partial<TaskOutputDelta>): TaskOutputDelta => ({
   id: "t1",
@@ -126,5 +129,90 @@ describe("withTaskStreams", () => {
       stdout: "out\n",
       stdoutTruncated: true,
     });
+  });
+});
+
+const entry = (seq: number): LogEntry => ({
+  seq,
+  level: "info",
+  message: `line ${seq}`,
+  time: "2026-10-15T07:00:00Z",
+});
+const entries = (from: number, to: number): LogEntry[] =>
+  Array.from({ length: to - from + 1 }, (_, i) => entry(from + i));
+const logsDelta = (delta: Partial<TaskLogsDelta>): TaskLogsDelta => ({ id: "t1", entries: [], ...delta });
+
+describe("applyTaskLogsDelta", () => {
+  it("starts the log from a reset frame", () => {
+    expect(applyTaskLogsDelta(emptyTaskStreams, logsDelta({ entries: entries(1, 3), reset: true })).logs).toEqual(
+      entries(1, 3),
+    );
+  });
+
+  it("starts the log from a first frame that is not marked reset", () => {
+    expect(applyTaskLogsDelta(emptyTaskStreams, logsDelta({ entries: entries(1, 2) })).logs).toEqual(entries(1, 2));
+  });
+
+  it("appends entries after the ones already held", () => {
+    const held = applyTaskLogsDelta(emptyTaskStreams, logsDelta({ entries: entries(1, 2) }));
+
+    expect(applyTaskLogsDelta(held, logsDelta({ entries: entries(3, 4) })).logs).toEqual(entries(1, 4));
+  });
+
+  it("ignores entries whose seq it already holds", () => {
+    const held = applyTaskLogsDelta(emptyTaskStreams, logsDelta({ entries: entries(1, 3) }));
+
+    expect(applyTaskLogsDelta(held, logsDelta({ entries: entries(2, 5) })).logs).toEqual(entries(1, 5));
+  });
+
+  it("replaces what it holds on reset, as after the server cleared its log", () => {
+    const held = applyTaskLogsDelta(emptyTaskStreams, logsDelta({ entries: entries(1, 3) }));
+
+    expect(applyTaskLogsDelta(held, logsDelta({ entries: entries(10, 11), reset: true })).logs).toEqual(entries(10, 11));
+  });
+
+  it("keeps the newest entries once it holds more than the cap", () => {
+    const held = applyTaskLogsDelta(emptyTaskStreams, logsDelta({ entries: entries(1, MAX_TASK_LOGS) }));
+    const grown = applyTaskLogsDelta(held, logsDelta({ entries: entries(MAX_TASK_LOGS + 1, MAX_TASK_LOGS + 5) }));
+
+    expect(grown.logs).toEqual(entries(6, MAX_TASK_LOGS + 5));
+  });
+
+  it("caps a reset frame larger than the cap too", () => {
+    const grown = applyTaskLogsDelta(
+      emptyTaskStreams,
+      logsDelta({ entries: entries(1, MAX_TASK_LOGS + 3), reset: true }),
+    );
+
+    expect(grown.logs).toEqual(entries(4, MAX_TASK_LOGS + 3));
+  });
+
+  it("leaves the output streams alone", () => {
+    const held = applyTaskOutputDelta(emptyTaskStreams, stdout({ data: "out\n" }));
+
+    expect(applyTaskLogsDelta(held, logsDelta({ entries: entries(1, 1) }))).toMatchObject({
+      stdout: "out\n",
+      stdoutEnd: 4,
+      logs: entries(1, 1),
+    });
+  });
+});
+
+describe("withTaskStreams logs", () => {
+  const snapshot: TaskSnapshot = { id: "t1", name: "build", type: "task", status: "running" };
+
+  it("merges accumulated logs into a snapshot that carries none", () => {
+    const streams = applyTaskLogsDelta(emptyTaskStreams, logsDelta({ entries: entries(1, 2) }));
+
+    expect(withTaskStreams(snapshot, streams).logs).toEqual(entries(1, 2));
+  });
+
+  // The polling fallback never fills the streams, so its JSON logs are the only
+  // copy there is and must come through untouched.
+  it("passes a snapshot's own logs through when no logs were streamed", () => {
+    const own = { ...snapshot, logs: entries(7, 8) };
+    const streams = applyTaskOutputDelta(emptyTaskStreams, stdout({ data: "out\n" }));
+
+    expect(withTaskStreams(own, streams).logs).toEqual(entries(7, 8));
   });
 });

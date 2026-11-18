@@ -19,7 +19,7 @@ const preset: Partial<Config> = {
         "8xl": "1536px",
         "9xl": "1920px",
       },
-      // Tokens are full-color aliases of the Flanksource fs-tokens (see
+      // Tokens are full-color aliases of the Flanksource clicky-tokens (see
       // styles/tokens.css), so they are referenced directly with var(--token)
       // — no hsl() wrapper. Tailwind v4 applies opacity modifiers via color-mix.
       colors: {
@@ -93,8 +93,8 @@ const preset: Partial<Config> = {
       // utilities fall back to Tailwind's default families (e.g. `font-mono`
       // resolves to ui-monospace/SF Mono instead of Fira Code).
       fontFamily: {
-        sans: "var(--fs-font-sans)",
-        mono: "var(--fs-font-mono)",
+        sans: "var(--clicky-font-sans)",
+        mono: "var(--clicky-font-mono)",
       },
     },
   },

@@ -13,6 +13,8 @@ import { UiComment } from "../icons";
 import type { DropdownMenuItem } from "../overlay/DropdownMenu";
 import { CommentThread } from "./CommentThread";
 import { CommentThreadList } from "./CommentThreadList";
+import { DRIFT_LABEL, type AnchorDrift } from "./anchoring/drift";
+import { DriftList, type DriftItem, type Retarget } from "./DriftList";
 import type { CommentDetailOptions } from "./comment-detail";
 import {
   useCommentContextOptional,
@@ -57,6 +59,17 @@ export type CommentSidePanelProps = CommentDetailOptions & {
    * actions that start from an assignment, such as running an agent.
    */
   extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
+  /**
+   * Anchors that have drifted, keyed like the comments' anchors: patch lines
+   * outdated or ambiguous, elements or words moved, ambiguous or gone. Threads
+   * on them are listed, with why, in one drift list above the feed; the feed
+   * still holds every thread.
+   */
+  drift?: Readonly<Record<CommentAnchor, AnchorDrift>>;
+  /** Stores the new anchor of a re-anchored thread (gavel `retarget`). Offers Re-anchor in the drift list; needs `pickAnchor`. */
+  onRetarget?: Retarget["onRetarget"];
+  /** Starts the host's pick for a thread on this anchor (an element click, a text selection) and resolves with the new anchor, or null when cancelled. */
+  pickAnchor?: Retarget["pickAnchor"];
 };
 
 function defaultAnchorLabel(anchor: CommentAnchor): string {
@@ -75,11 +88,30 @@ function useAnchorLabel(props: CommentSidePanelProps) {
     defaultAnchorLabel(anchor);
 }
 
+/** One drift item per anchor in `drift` that has a root thread among `roots`, in the roots' order. */
+function driftItemsOf({
+  roots,
+  drift,
+  label,
+}: {
+  roots: readonly Comment[];
+  drift: Readonly<Record<CommentAnchor, AnchorDrift>>;
+  label: (anchor: CommentAnchor) => string;
+}): DriftItem[] {
+  const ids = new Map<CommentAnchor, Comment["id"][]>();
+  for (const root of roots) {
+    const anchor = root.anchor ?? DOCUMENT_ANCHOR;
+    if (drift[anchor]) ids.set(anchor, [...(ids.get(anchor) ?? []), root.id]);
+  }
+  return [...ids].map(([anchor, rootIds]) => ({ ids: rootIds, anchor, label: label(anchor), drift: drift[anchor]! }));
+}
+
 function LocationMeta({ label }: { label: string }) {
   return (
     <span
       data-testid="comment-location-meta"
-      className="inline-flex items-center rounded-full bg-muted px-2 py-1 text-[10px] font-medium text-muted-foreground"
+      title={label}
+      className="inline-block max-w-full truncate rounded-full bg-muted px-2 py-1 align-middle text-[10px] font-medium text-muted-foreground"
     >
       {label}
     </span>
@@ -159,10 +191,12 @@ function AllComments({
   renderRootDetails,
   extraAssignItems,
   detailOptions,
+  drift,
 }: {
   ctx: CommentContextValue;
   comments: Comment[];
   label: (a: CommentAnchor) => string;
+  drift: Readonly<Record<CommentAnchor, AnchorDrift>> | undefined;
   emptyLabel: string;
   threadToMarkdown?: (thread: readonly Comment[]) => string;
   renderRootDetails?: (comment: Comment) => ReactNode;
@@ -220,11 +254,12 @@ function AllComments({
         compact
         renderRootMeta={(c) => {
           const anchor = c.anchor ?? DOCUMENT_ANCHOR;
+          const state = drift?.[anchor]?.state;
           const available =
             anchor === DOCUMENT_ANCHOR || ctx.getAnchorTop(anchor) != null;
           return (
             <LocationMeta
-              label={`${label(anchor)}${available ? "" : " · Unavailable"}`}
+              label={`${label(anchor)}${state ? ` · ${DRIFT_LABEL[state]}` : available ? "" : " · Unavailable"}`}
             />
           );
         }}
@@ -365,7 +400,13 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
     };
   }, [ctx, focusedAnchor, props.focusedAlignment]);
 
+  if (props.onRetarget && !props.pickAnchor)
+    throw new Error("CommentSidePanel: `onRetarget` needs `pickAnchor`, the pick that finds the new anchor");
   if (!ctx) return null;
+  const retarget =
+    props.onRetarget && props.pickAnchor
+      ? { pickAnchor: props.pickAnchor, onRetarget: props.onRetarget }
+      : undefined;
 
   // Threads, not cards: a reply is part of its root, never a separate entry.
   const counts = getRoots(ctx.comments).reduce(
@@ -451,9 +492,17 @@ export function CommentSidePanel(props: CommentSidePanelProps) {
           </button>
         )}
       </div>
+      {ctx.railMode !== "closed" && props.drift && (
+        <DriftList
+          items={driftItemsOf({ roots: getRoots(visible), drift: props.drift, label })}
+          retarget={retarget}
+          onSelect={(item) => ctx.focusAnchor(item.anchor)}
+        />
+      )}
       {ctx.railMode === "all" ? (
         <AllComments
           detailOptions={detailOptions}
+          drift={props.drift}
           ctx={ctx}
           comments={visible}
           label={label}

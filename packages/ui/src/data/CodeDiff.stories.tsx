@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import { CodeDiff } from "./CodeDiff";
@@ -260,5 +261,85 @@ export const SplitLongLinesNarrow: Story = {
       expect(left.scrollWidth).toBeLessThanOrEqual(left.clientWidth);
       expect(right.scrollWidth).toBeLessThanOrEqual(right.clientWidth);
     }
+  },
+};
+
+const SELECTION_UNIFIED = `@@ -1,5 +1,5 @@
+ export function greet(name: string) {
+-  const a = "Hi";
+-  const b = name;
++  const greeting = "Hello";
++  const target = name.trim();
+   return greeting + target;
+ }
+@@ -10,2 +10,2 @@
+ export const VERSION = 1;
+-export const NAME = "old";
++export const NAME = "new";`;
+
+const lineId = (target: { side: string; line: number }) => `${target.side}:${target.line}`;
+
+function SelectionDiff({ view, disabled }: { view: "unified" | "split"; disabled?: boolean }) {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  return (
+    <CodeDiff
+      language="typescript"
+      view={view}
+      unified={SELECTION_UNIFIED}
+      lineSelection={{
+        isSelected: (target) => selected.has(lineId(target)),
+        onChange: (targets, on) =>
+          setSelected((prev) => {
+            const next = new Set(prev);
+            for (const target of targets) {
+              if (on) next.add(lineId(target));
+              else next.delete(lineId(target));
+            }
+            return next;
+          }),
+        label: (target, on) => `${on ? "Unselect" : "Select"} ${target.side} line ${target.line}`,
+        hunkLabel: (hunk, on) => `${on ? "Unselect" : "Select"} hunk ${hunk}`,
+        ...(disabled ? { disabled } : {}),
+      }}
+    />
+  );
+}
+
+// `lineSelection` puts a checkbox-like box in the gutter of every added and
+// deleted line and a tri-state box on each hunk header (empty / dash / check).
+// Click toggles a line, shift-click selects the changed lines back to the last
+// click within the hunk. Hosts use it to stage lines and hunks.
+export const LineSelection: Story = {
+  render: () => <SelectionDiff view="unified" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // The direct userEvent APIs each start a fresh session, so a held Shift would not reach the next click; one setup() session keeps it.
+    const user = userEvent.setup();
+    await waitFor(() => expect(canvas.getAllByRole("checkbox").length).toBe(8));
+    const hunk = canvas.getByRole("checkbox", { name: "Select hunk 1" });
+    expect(hunk).toHaveAttribute("aria-checked", "false");
+
+    await user.click(canvas.getByRole("checkbox", { name: "Select old line 2" }));
+    expect(canvas.getByRole("checkbox", { name: "Select hunk 1" })).toHaveAttribute("aria-checked", "mixed");
+
+    await user.keyboard("{Shift>}");
+    await user.click(canvas.getByRole("checkbox", { name: "Select new line 3" }));
+    await user.keyboard("{/Shift}");
+    expect(canvas.getByRole("checkbox", { name: "Unselect hunk 1" })).toHaveAttribute("aria-checked", "true");
+
+    await user.click(canvas.getByRole("checkbox", { name: "Unselect hunk 1" }));
+    expect(canvas.getByRole("checkbox", { name: "Select hunk 1" })).toHaveAttribute("aria-checked", "false");
+  },
+};
+
+export const LineSelectionSplit: Story = {
+  render: () => <SelectionDiff view="split" />,
+};
+
+export const LineSelectionDisabled: Story = {
+  render: () => <SelectionDiff view="unified" disabled />,
+  play: async ({ canvasElement }) => {
+    const boxes = within(canvasElement).getAllByRole("checkbox");
+    expect(boxes.every((box) => (box as HTMLButtonElement).disabled)).toBe(true);
   },
 };

@@ -223,7 +223,7 @@ export type DetailEvicted = {
 export type { HARFile, HAREntry };
 
 /** The console's tabs, in the order they appear. */
-export const DEBUG_TABS = ["queries", "network", "console", "inspection"] as const;
+export const DEBUG_TABS = ["queries", "network", "console", "inspection", "runtimes"] as const;
 export type DebugTab = (typeof DEBUG_TABS)[number];
 
 /**

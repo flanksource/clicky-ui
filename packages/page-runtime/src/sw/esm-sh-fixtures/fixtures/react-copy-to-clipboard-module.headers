@@ -1,0 +1,11 @@
+HTTP/2 200 
+date: Sat, 07 Nov 2026 18:10:49 GMT
+content-type: application/javascript; charset=utf-8
+access-control-allow-origin: *
+cache-control: public, max-age=31536000, immutable
+last-modified: Sat, 07 Nov 2026 18:10:32 GMT
+server: cloudflare
+vary: Accept-Encoding
+cf-cache-status: MISS
+cf-ray: a56e4c011d0809c3-HFA
+

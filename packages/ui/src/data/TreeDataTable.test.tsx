@@ -21,6 +21,14 @@ const props = {
 const names = () => screen.getAllByRole("row").slice(1).map((row) => row.querySelector("td")?.textContent);
 
 describe("TreeDataTable", () => {
+  it("disables header sorting so descendants stay beneath their parents", () => {
+    render(<TreeDataTable {...props} defaultExpanded columns={props.columns.map((column) => ({ ...column, sortable: true }))} />);
+    const headers = screen.getAllByRole("columnheader");
+    expect(headers.map((header) => header.textContent)).toEqual(["Permission", "Status"]);
+    headers.forEach((header) => fireEvent.click(header));
+    expect(names()).toEqual(["Acme", "Policy", "Claim", "Globex", "Quote"]);
+  });
+
   it("lists open subtrees in tree order with parents and leaves sharing columns", () => {
     render(<TreeDataTable {...props} defaultExpanded={(node) => node.id === "acme"} />);
     expect(names()).toEqual(["Acme", "Policy", "Claim", "Globex"]);

@@ -7,6 +7,7 @@ import {
 import { UiDebug } from "../icons";
 import { cn } from "../lib/utils";
 import { debugStore, type DebugStore } from "./debugStore";
+import { RuntimeIndicatorBadge } from "./RuntimeIndicatorBadge";
 
 /**
  * The console's trigger, styled as navbar chrome for AppShell's actions slot.
@@ -38,7 +39,7 @@ export function DebugConsoleButton({
   const badge = failures > 0 ? failures : state.records.length;
 
   return (
-    <button
+    <span className="inline-flex shrink-0 items-center gap-1"><button
       type="button"
       aria-label={label}
       aria-pressed={open}
@@ -64,7 +65,7 @@ export function DebugConsoleButton({
           {badge > 99 ? "99+" : badge}
         </span>
       ) : null}
-    </button>
+    </button><RuntimeIndicatorBadge /></span>
   );
 }
 

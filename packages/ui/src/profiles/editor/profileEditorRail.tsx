@@ -30,11 +30,13 @@ export function ProfileEditorRail({
   value,
   status,
   collections = {},
+  traces = false,
   onChange,
 }: {
   value: ProfileEditorSection;
   status: Record<ProfileEditorSection, ProfileSectionStatus>;
   collections?: ProfileEditorRailCollections;
+  traces?: boolean;
   onChange: (section: ProfileEditorSection) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<ProfileEditorSection>>(
@@ -44,6 +46,7 @@ export function ProfileEditorRail({
   return (
     <nav className="w-full overflow-auto p-1.5" aria-label="Profile sections">
       {profileEditorSections.map((section) => {
+        if (section.id === "spans" && !traces) return null;
         const active = section.id === value;
         const collection = collectionSections.has(section.id);
         const open = collection && expanded.has(section.id);
@@ -124,6 +127,7 @@ export function ProfileEditorRail({
 function iconForSection(section: ProfileEditorSection): ReactNode {
   switch (section) {
     case "general":
+    case "spans":
       return <UiSliders className="size-4" />;
     case "source":
       return <UiDatabaseZap className="size-4" />;

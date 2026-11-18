@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { resolveLookupScope } from "../components/form-lookup-context";
 import type { LookupFetcher } from "../components/json-schema-form-types";
 import { lookupOptionsToFieldOptions } from "./formMetadata";
+import { lookupNodePresentation } from "./lookupOptionPresentation";
 import type { OperationsApiClient } from "./useOperations";
 
 /**
@@ -13,6 +14,9 @@ import type { OperationsApiClient } from "./useOperations";
  * is given no fetcher — so an outer provider is shadowed rather than inherited.
  * Every form that renders lookup fields therefore has to pass one of its own,
  * which is why this is a shared hook rather than one form's private helper.
+ *
+ * Each option also carries the node's icon, description, tone, group and badges,
+ * which the lookup picker draws around the label.
  *
  * Returns undefined when the client exposes no lookup endpoint; the field then
  * degrades to a free-text combobox.
@@ -36,6 +40,10 @@ export function useOperationLookupFetcher(
       return lookupOptionsToFieldOptions(filter).map((option) => ({
         value: option.value,
         label: option.label,
+        ...lookupNodePresentation(
+          option.value,
+          filter.options?.[option.value] ?? filter.selected?.[option.value],
+        ),
       }));
     };
   }, [client]);

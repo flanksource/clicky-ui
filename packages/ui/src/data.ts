@@ -17,10 +17,12 @@ export {
   CodeDiff,
   type CodeDiffProps,
   type CodeDiffView,
+  type DiffLineSelection,
   type DiffLineTarget,
   type DiffLineWidget,
   type DiffSide,
 } from "./data/CodeDiff";
+export type { DiffSelectionState, DiffSelectionTarget } from "./data/code-diff-selection";
 export { CodeLine, type CodeLineProps } from "./data/CodeLine";
 export { SymbolBadge, type SymbolBadgeProps, type SymbolBadgeStyle } from "./data/SymbolBadge";
 export {
@@ -178,6 +180,8 @@ export {
   SchemaViewerRow,
   SchemaFieldMetaPanel,
   type SchemaViewerProps,
+  type SchemaViewerSection,
+  type SchemaViewerView,
   type SchemaViewerProps as SchemaBrowserProps,
   type SchemaFieldMetaPanelProps,
 } from "./data/SchemaViewer";
@@ -202,6 +206,7 @@ export {
 } from "./data/Properties";
 export { formatPropertyLabel } from "./data/properties-utils";
 export { LogViewer, type LogViewerProps } from "./data/LogViewer";
+export { parseLogSections, type LogSection } from "./data/log-sections";
 export {
   LogsTable,
   type LogsTableInput,
@@ -469,6 +474,7 @@ export {
   type DebugConsoleRequest,
 } from "./data/debugConsoleSignal";
 export { useDebugAction } from "./data/useDebugAction";
+export { registerDebugRuntime, debugRuntimes, subscribeToDebugRuntimes, clearDebugRuntimes, type DebugRuntime } from "./data/debugRuntime";
 export * from "./data/clicky-export";
 export {
   type LogEntry,
@@ -477,6 +483,8 @@ export {
   type TaskProcessDetails,
   type TaskResourceLimits,
   type TaskSnapshot,
+  type TaskSessionRef,
+  type TaskSessionSummary,
   type TaskRunMeta,
   isTerminalStatus,
   allGroupsTerminal,
@@ -486,6 +494,20 @@ export {
   type TaskExtraTabs,
   type TaskStreamTab,
 } from "./data/TaskStreamTabs";
+export {
+  defaultTaskSessionRenderers,
+  type TaskSessionContext,
+  type TaskSessionRenderer,
+  type TaskSessionRenderers,
+} from "./data/TaskSession";
+export { TaskSessionChip } from "./data/TaskSession.chip";
+export { SessionSummaryLine } from "./data/TaskSession.summary";
+export {
+  createTaskSessionFeed,
+  type TaskSessionFeed,
+  type TaskSessionFeedRef,
+  type TaskSessionFeedSource,
+} from "./data/task-session-feed";
 export { TaskMetadataChips, type TaskHeaderExtra } from "./data/TaskHeaderExtras";
 export { TaskMetadata } from "./data/TaskProcessMetadata";
 export {
@@ -521,6 +543,18 @@ export {
 export { TaskProgress, type TaskProgressProps } from "./data/TaskProgress";
 export { TaskManager, type TaskManagerProps } from "./data/TaskManager";
 export {
+  TaskPoolUsage,
+  TaskRunConcurrency,
+  type TaskPoolUsageProps,
+  type TaskRunConcurrencyProps,
+} from "./data/TaskPoolUsage";
+export {
+  TASK_POOL_METRIC_RUN_ID,
+  taskPoolMetrics,
+  taskConcurrencyMetrics,
+  taskMetricSeries,
+} from "./data/task-pool-metrics";
+export {
   taskQueryKeys,
   type TaskRunQueryKeyOptions,
   type TaskRunsQueryKeyOptions,
@@ -544,6 +578,7 @@ export {
   type DiagnosticsDetailPanelProps,
 } from "./data/diagnostics/DiagnosticsDetailPanel";
 export { StackDumpView, type StackDumpViewProps } from "./data/diagnostics/StackDumpView";
+export { ThreadStateFilterChips, type ThreadStateFilterChipsProps } from "./data/diagnostics/ThreadStateFilterChips";
 export { MetricTile, type MetricTileProps } from "./data/diagnostics/MetricTile";
 export { cpuTone, memoryTone } from "./data/diagnostics/metric-tone";
 export type { ProcessNode, StackCapture, RunMeta } from "./data/diagnostics/types";
@@ -617,6 +652,7 @@ export {
   type ErrorDetailsProps,
 } from "./data/diagnostics/ErrorDetails";
 export { ActionError } from "./data/diagnostics/ActionError";
+export { ProblemRow, type ProblemRowProps } from "./data/diagnostics/ProblemRow";
 export {
   normalizeErrorDiagnostics,
   parseDiagnosticsStackTrace,

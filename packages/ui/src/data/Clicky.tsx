@@ -59,6 +59,8 @@ import { Tree } from "./Tree";
 import { ObjectGraph, type ObjectGraphNode } from "./ObjectGraph";
 import { ExecutionTree, type ExecutionNode } from "./ExecutionTree";
 import { Icon } from "./Icon";
+import { getFallbackIconProvider } from "./icon-fallback";
+import { CLICKY_ICONIFY_GLYPHS } from "./clicky-icon-glyphs";
 import { UiCheck, UiCloudDownload, UiEllipsis } from "../icons";
 import { CodeBlock } from "./CodeBlock";
 import { JsonView } from "./JsonView";
@@ -190,7 +192,7 @@ export type ClickyNode = {
     | "object-graph"
     | "execution-tree";
   plain?: string;
-  filterValue?: string | number | boolean;
+  filterValue?: string | number | boolean | null;
   style?: ClickyStyle;
   text?: string;
   children?: ClickyNode[];
@@ -2422,19 +2424,27 @@ function ClickyCommandResponse({
   return <ClickyTextPreview title="Response body" content={rawText} />;
 }
 
+// An icon node draws clicky-ui's own glyph for the Iconify ids it knows, then a
+// host-registered provider's, and otherwise the node's unicode — never the
+// runtime placeholder, which would turn every unknown glyph into a "?".
 function ClickyIconNode({ node }: { node: ClickyNode }) {
   const inlineStyle = toInlineStyle(node.style, node.plain ?? node.unicode);
+  const className = node.style?.className;
+  const glyph = node.iconify ? CLICKY_ICONIFY_GLYPHS[node.iconify] : undefined;
 
   return (
     <span
       style={inlineStyle}
       title={node.tooltip?.plain}
       className="inline-flex items-center"
+      data-clicky-icon={node.iconify ?? ""}
     >
-      {node.iconify ? (
-        <Icon name={node.iconify} />
+      {glyph ? (
+        <Icon icon={glyph} {...(className ? { className } : {})} />
+      ) : node.iconify && getFallbackIconProvider() ? (
+        <Icon name={node.iconify} {...(className ? { className } : {})} />
       ) : (
-        <span>{node.unicode ?? node.plain}</span>
+        <span className={className}>{node.unicode ?? node.plain}</span>
       )}
     </span>
   );
@@ -2897,7 +2907,7 @@ export function ClickyTable({
       ...(column.filterKey ? { filterKey: column.filterKey } : {}),
       serverFilterValue: (value) => {
         const node = value as ClickyNode;
-        return node.filterValue ?? clickyNodeText(node);
+        return node.filterValue !== undefined ? node.filterValue : clickyNodeText(node);
       },
       serverFilterLabel: (value) => clickyNodeText(value as ClickyNode),
       ...(column.grow !== undefined ? { grow: column.grow } : {}),
@@ -3559,10 +3569,12 @@ function ClickyStackTraceNode({ node }: { node: ClickyNode }) {
 }
 
 function ClickyCollapsed({ node }: { node: ClickyNode }) {
+  const [expanded, setExpanded] = useState(false);
   return (
-    <details className="rounded-md border border-border bg-background">
-      <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-foreground">
+    <details className="rounded-md border border-border bg-background" onToggle={(event) => setExpanded(event.currentTarget.open)}>
+      <summary className="cursor-pointer break-words px-3 py-2 text-sm font-medium text-foreground">
         <ClickyNodeRenderer node={node.label} />
+        <span className="ml-2 inline-block text-xs font-normal text-muted-foreground">{expanded ? "Show less" : "Show more"}</span>
       </summary>
       {node.content && (
         <div className="border-t border-border px-3 py-3">
@@ -3890,8 +3902,8 @@ function isExecutionResponse(value: unknown): value is ExecutionResponse {
  */
 function clickyNodeSortValue(
   node: ClickyNode | null | undefined,
-): string | number | boolean {
-  return node?.filterValue ?? clickyNodeText(node);
+): string | number | boolean | null {
+  return node?.filterValue !== undefined ? node.filterValue : clickyNodeText(node);
 }
 
 /**

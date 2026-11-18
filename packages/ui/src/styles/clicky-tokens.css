@@ -1,0 +1,254 @@
+/* ==========================================================================
+   Flanksource Design System — Colors & Type
+   Based on Flanksource Brand Guidelines (Mission Control, Canary Checker, Config DB)
+
+   Vendored into clicky-ui as the canonical token source. The shadcn tokens in
+   tokens.css alias these `--clicky-*` variables. Fonts (Open Sans / Merriweather /
+   Fira Code) are NOT @imported here — a remote @import is invalid mid-bundle;
+   consumers load the font faces themselves (e.g. a <link> in the page shell).
+
+   Light values bind to both :root and [data-theme="light"] so a nested
+   light-themed subtree on a dark page resets correctly (mirrors clicky's
+   original convention).
+   ========================================================================== */
+
+:root,
+[data-theme="light"] {
+  /* -----------------------------------------------------------------
+     COLORS — Primary / Brand
+     ----------------------------------------------------------------- */
+  --clicky-primary-blue: #3578e5;        /* Links, CTAs, primary actions */
+  --clicky-cta-blue: #0053f8;            /* High-emphasis buttons */
+  --clicky-dark-navy: #131f3b;           /* Footer, dark backgrounds */
+
+  /* Accent */
+  --clicky-sky-500: #0ea5e9;             /* Accent highlights */
+  --clicky-indigo-500: #6366f1;          /* Secondary accent */
+
+  /* Grayscale (Tailwind-style scale used throughout Flanksource products) */
+  --clicky-gray-50:  #f9fafb;
+  --clicky-gray-100: #f3f4f6;
+  --clicky-gray-200: #e5e7eb;
+  --clicky-gray-300: #d1d5db;
+  --clicky-gray-400: #9ca3af;
+  --clicky-gray-500: #6b7280;
+  --clicky-gray-600: #4b5563;
+  --clicky-gray-700: #374151;
+  --clicky-gray-800: #1f2937;
+  --clicky-gray-900: #111827;
+  --clicky-gray-950: #030712;
+
+  /* -----------------------------------------------------------------
+     SEMANTIC — Tailwind-derived modern palette
+     Built on Tailwind v3 ramps. We bias one stop deeper than typical
+     "candy" usage (600 over 500) for calmer, more legible UI.
+     ----------------------------------------------------------------- */
+
+  /* Success — Tailwind emerald (less neon than green-500) */
+  --clicky-success-50:  #ecfdf5;  /* emerald-50 */
+  --clicky-success-100: #d1fae5;  /* emerald-100 */
+  --clicky-success-200: #a7f3d0;  /* emerald-200 */
+  --clicky-success-500: #10b981;  /* emerald-500 */
+  --clicky-success-600: #059669;  /* emerald-600 */
+  --clicky-success-700: #047857;  /* emerald-700 */
+  --clicky-success: var(--clicky-success-600);
+
+  /* Error — Tailwind rose (warmer & less harsh than red-600) */
+  --clicky-error-50:  #fff1f2;    /* rose-50 */
+  --clicky-error-100: #ffe4e6;    /* rose-100 */
+  --clicky-error-200: #fecdd3;    /* rose-200 */
+  --clicky-error-500: #f43f5e;    /* rose-500 */
+  --clicky-error-600: #e11d48;    /* rose-600 */
+  --clicky-error-700: #be123c;    /* rose-700 */
+  --clicky-error: var(--clicky-error-600);
+
+  /* Warning — Tailwind amber, deepened to 600 for body text contrast */
+  --clicky-warning-50:  #fffbeb;  /* amber-50 */
+  --clicky-warning-100: #fef3c7;  /* amber-100 */
+  --clicky-warning-200: #fde68a;  /* amber-200 */
+  --clicky-warning-500: #f59e0b;  /* amber-500 */
+  --clicky-warning-600: #d97706;  /* amber-600 */
+  --clicky-warning-700: #b45309;  /* amber-700 */
+  --clicky-warning: var(--clicky-warning-600);
+
+  /* Info — Tailwind sky (distinct from #3578e5 brand blue) */
+  --clicky-info-50:  #f0f9ff;     /* sky-50 */
+  --clicky-info-100: #e0f2fe;     /* sky-100 */
+  --clicky-info-200: #bae6fd;     /* sky-200 */
+  --clicky-info-500: #0ea5e9;     /* sky-500 */
+  --clicky-info-600: #0284c7;     /* sky-600 */
+  --clicky-info-700: #0369a1;     /* sky-700 */
+  --clicky-info: var(--clicky-info-600);
+
+  /* Hint — Tailwind teal, for tooltips & "did you know" */
+  --clicky-hint-50:  #f0fdfa;     /* teal-50 */
+  --clicky-hint-100: #ccfbf1;     /* teal-100 */
+  --clicky-hint-200: #99f6e4;     /* teal-200 */
+  --clicky-hint-500: #14b8a6;     /* teal-500 */
+  --clicky-hint-600: #0d9488;     /* teal-600 */
+  --clicky-hint-700: #0f766e;     /* teal-700 */
+  --clicky-hint: var(--clicky-hint-600);
+
+  /* Prerequisite — Tailwind violet, for "you need this first" */
+  --clicky-prereq-50:  #f5f3ff;   /* violet-50 */
+  --clicky-prereq-100: #ede9fe;   /* violet-100 */
+  --clicky-prereq-200: #ddd6fe;   /* violet-200 */
+  --clicky-prereq-500: #8b5cf6;   /* violet-500 */
+  --clicky-prereq-600: #7c3aed;   /* violet-600 */
+  --clicky-prereq-700: #6d28d9;   /* violet-700 */
+  --clicky-prereq: var(--clicky-prereq-600);
+
+  /* -----------------------------------------------------------------
+     SEMANTIC COLOR TOKENS — light mode default
+     ----------------------------------------------------------------- */
+  /* Foreground */
+  --clicky-fg-1: #061431;                /* Primary text */
+  --clicky-fg-2: #030712;                /* Heading text */
+  --clicky-fg-3: #374151;                /* Secondary body */
+  --clicky-fg-muted: #666666;            /* Muted / tertiary */
+  --clicky-fg-subtle: #9ca3af;           /* Captions, placeholders */
+  --clicky-fg-on-brand: #ffffff;         /* Text on blue */
+  --clicky-fg-link: var(--clicky-primary-blue);
+
+  /* Background */
+  --clicky-bg-canvas: #ffffff;           /* App canvas */
+  --clicky-bg-subtle: #f9fafb;           /* Section bg */
+  --clicky-bg-muted:  #f3f4f6;           /* Card panels */
+  --clicky-bg-inset:  #e5e7eb;           /* Inset / code bg */
+  --clicky-bg-inverse: var(--clicky-dark-navy);
+  --clicky-bg-brand: var(--clicky-primary-blue);
+  --clicky-bg-cta: var(--clicky-cta-blue);
+
+  /* Border */
+  --clicky-border-subtle: #e5e7eb;
+  --clicky-border-default: #d1d5db;
+  --clicky-border-strong: #9ca3af;
+  --clicky-border-focus: var(--clicky-primary-blue);
+
+  /* -----------------------------------------------------------------
+     TYPOGRAPHY — families
+     ----------------------------------------------------------------- */
+  --clicky-font-sans: 'Open Sans', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
+  --clicky-font-serif: 'Merriweather', Georgia, serif;
+  --clicky-font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Sizes (from brand guidelines) */
+  --clicky-text-xs:   0.8125rem;  /* 13px */
+  --clicky-text-sm:   0.875rem;   /* 14px */
+  --clicky-text-base: 1rem;       /* 16px */
+  --clicky-text-md:   1rem;       /* H3-H6 */
+  --clicky-text-lg:   1.25rem;    /* H2, 20px */
+  --clicky-text-xl:   1.5rem;     /* H1, 24px */
+  --clicky-text-2xl:  2rem;       /* Display S, 32px */
+  --clicky-text-3xl:  2.5rem;     /* Display M, 40px */
+  --clicky-text-4xl:  3.5rem;     /* Display L, 56px */
+
+  /* Weights */
+  --clicky-weight-regular: 400;
+  --clicky-weight-medium: 500;
+  --clicky-weight-semibold: 600;
+  --clicky-weight-bold: 700;
+
+  /* Line heights */
+  --clicky-lh-body: 1.75;
+  --clicky-lh-tight: 1.5;
+  --clicky-lh-heading: 1.2;
+
+  /* Letter spacing */
+  --clicky-tracking-body: 0.03rem;
+  --clicky-tracking-heading: normal;
+  --clicky-tracking-wide: 0.08rem;
+
+  /* -----------------------------------------------------------------
+     RADII
+     ----------------------------------------------------------------- */
+  --clicky-radius-xs: 2px;
+  --clicky-radius-sm: 4px;
+  --clicky-radius-md: 6px;
+  --clicky-radius-lg: 8px;
+  --clicky-radius-xl: 12px;
+  --clicky-radius-2xl: 16px;
+  --clicky-radius-full: 9999px;
+
+  /* -----------------------------------------------------------------
+     SHADOWS (Tailwind-style, matched to Flanksource surfaces)
+     ----------------------------------------------------------------- */
+  --clicky-shadow-xs: 0 1px 2px 0 rgba(6, 20, 49, 0.05);
+  --clicky-shadow-sm: 0 1px 2px 0 rgba(6, 20, 49, 0.06), 0 1px 3px 0 rgba(6, 20, 49, 0.10);
+  --clicky-shadow-md: 0 4px 6px -1px rgba(6, 20, 49, 0.08), 0 2px 4px -2px rgba(6, 20, 49, 0.06);
+  --clicky-shadow-lg: 0 10px 15px -3px rgba(6, 20, 49, 0.08), 0 4px 6px -4px rgba(6, 20, 49, 0.05);
+  --clicky-shadow-xl: 0 20px 25px -5px rgba(6, 20, 49, 0.10), 0 8px 10px -6px rgba(6, 20, 49, 0.06);
+  --clicky-shadow-focus: 0 0 0 3px rgba(53, 120, 229, 0.25);
+
+  /* -----------------------------------------------------------------
+     SPACING (4px base unit)
+     ----------------------------------------------------------------- */
+  --clicky-space-1: 4px;
+  --clicky-space-2: 8px;
+  --clicky-space-3: 12px;
+  --clicky-space-4: 16px;
+  --clicky-space-5: 20px;
+  --clicky-space-6: 24px;
+  --clicky-space-8: 32px;
+  --clicky-space-10: 40px;
+  --clicky-space-12: 48px;
+  --clicky-space-16: 64px;
+  --clicky-space-20: 80px;
+  --clicky-space-24: 96px;
+
+  /* -----------------------------------------------------------------
+     TRANSITIONS
+     ----------------------------------------------------------------- */
+  --clicky-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --clicky-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --clicky-duration-fast: 120ms;
+  --clicky-duration-base: 180ms;
+  --clicky-duration-slow: 280ms;
+}
+
+/* ==========================================================================
+   Dark mode overrides — applied via [data-theme="dark"]
+   Mission Control dark UI uses gray-900/950 canvas
+   ========================================================================== */
+[data-theme="dark"] {
+  --clicky-fg-1: #f9fafb;
+  --clicky-fg-2: #ffffff;
+  --clicky-fg-3: #d1d5db;
+  --clicky-fg-muted: #9ca3af;
+  --clicky-fg-subtle: #6b7280;
+
+  --clicky-bg-canvas: #030712;
+  --clicky-bg-subtle: #111827;
+  --clicky-bg-muted:  #1f2937;
+  --clicky-bg-inset:  #374151;
+
+  --clicky-border-subtle: #1f2937;
+  --clicky-border-default: #374151;
+  --clicky-border-strong: #4b5563;
+
+  /* Semantic — dark mode lifts the subtle/border stops, keeps mid-stop for icons */
+  /* dark-mode: invert ramp — surface goes deep, text goes light */
+  --clicky-success-50: #022c22; --clicky-success-100: #064e3b; --clicky-success-200: #065f46;
+  --clicky-success-500: #34d399; --clicky-success-600: #6ee7b7; --clicky-success-700: #a7f3d0;
+  --clicky-success: var(--clicky-success-500);
+
+  --clicky-error-50: #4c0519; --clicky-error-100: #881337; --clicky-error-200: #9f1239;
+  --clicky-error-500: #fb7185; --clicky-error-600: #fda4af; --clicky-error-700: #fecdd3;
+  --clicky-error: var(--clicky-error-500);
+
+  --clicky-warning-50: #451a03; --clicky-warning-100: #78350f; --clicky-warning-200: #92400e;
+  --clicky-warning-500: #fbbf24; --clicky-warning-600: #fcd34d; --clicky-warning-700: #fde68a;
+  --clicky-warning: var(--clicky-warning-500);
+
+  --clicky-info-50: #082f49; --clicky-info-100: #0c4a6e; --clicky-info-200: #075985;
+  --clicky-info-500: #38bdf8; --clicky-info-600: #7dd3fc; --clicky-info-700: #bae6fd;
+  --clicky-info: var(--clicky-info-500);
+
+  --clicky-hint-50: #042f2e; --clicky-hint-100: #134e4a; --clicky-hint-200: #115e59;
+  --clicky-hint-500: #2dd4bf; --clicky-hint-600: #5eead4; --clicky-hint-700: #99f6e4;
+  --clicky-hint: var(--clicky-hint-500);
+
+  --clicky-prereq-50: #2e1065; --clicky-prereq-100: #4c1d95; --clicky-prereq-200: #5b21b6;
+  --clicky-prereq-500: #a78bfa; --clicky-prereq-600: #c4b5fd; --clicky-prereq-700: #ddd6fe;
+  --clicky-prereq: var(--clicky-prereq-500);
+}

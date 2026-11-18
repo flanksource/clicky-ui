@@ -19,6 +19,7 @@ import { dirname, join } from "node:path";
 
 import type { PromptRun } from "./prompt-runs-server";
 import type { StoredAuthor } from "./comments-store";
+import type { LinterResult } from "../../../packages/ui/src/data/lint/types";
 
 export type PromptAssociation = PromptRun & {
   associationId: string;
@@ -26,6 +27,8 @@ export type PromptAssociation = PromptRun & {
   origin: string;
   requestedBy: StoredAuthor;
   callbackSent?: boolean;
+  files?: string[];
+  results?: LinterResult[];
 };
 
 export class PromptAssociations {

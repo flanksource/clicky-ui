@@ -1,10 +1,20 @@
 // @vitest-environment node
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { createSource, listFolderPages, pagePath, readSource, writeSource } from "./pages-store";
+import {
+  createSource,
+  listFolderPages,
+  pagePath,
+  pagesFilePath,
+  readPagesFile,
+  readSource,
+  writePagesFile,
+  writeSource,
+} from "./pages-store";
+import { sourceHash } from "./source-hash";
 
 describe("pages store", () => {
   let pagesDir: string;
@@ -79,5 +89,81 @@ describe("pages store", () => {
     write("docs/notes.txt");
 
     expect(listFolderPages(pagesDir, "docs")).toEqual(["docs/guide", "docs/intro", "docs/widget"]);
+  });
+
+  describe("pages files", () => {
+    const helper = "docs/_helper/diagram.tsx";
+
+    beforeEach(() => {
+      mkdirSync(join(pagesDir, "docs/_helper"));
+      write(helper, "export const a = 1;\n");
+    });
+
+    it("reads a _ helper with its content hash", () => {
+      const read = readPagesFile(pagesDir, helper);
+
+      expect(read).toEqual({ file: helper, source: "export const a = 1;\n", hash: sourceHash("export const a = 1;\n") });
+    });
+
+    it("writes a _ helper when the hash it was opened at is current, and returns the new hash", () => {
+      const { hash } = readPagesFile(pagesDir, helper);
+
+      const written = writePagesFile(pagesDir, helper, "export const a = 2;\n", hash);
+
+      expect(written).toEqual({ file: helper, hash: sourceHash("export const a = 2;\n") });
+      expect(readFileSync(join(pagesDir, helper), "utf8")).toBe("export const a = 2;\n");
+    });
+
+    it("refuses a write with 409 when the file changed since it was opened", () => {
+      const { hash } = readPagesFile(pagesDir, helper);
+      write(helper, "export const a = 3;\n");
+
+      expect(() => writePagesFile(pagesDir, helper, "export const a = 2;\n", hash)).toThrow(
+        expect.objectContaining({ statusCode: 409, message: expect.stringContaining("changed since it was opened") }),
+      );
+      expect(readFileSync(join(pagesDir, helper), "utf8")).toBe("export const a = 3;\n");
+    });
+
+    it.each([".md", ".mdx"])("writes frontmatter through the hashed file API for %s pages", extension => {
+      const file = `docs/guide${extension}`;
+      const source = "# Guide\n";
+      const updated = '---\ndependencies:\n  entities: "^7"\n---\n# Guide\n';
+      write(file, source);
+      const opened = readPagesFile(pagesDir, file);
+      expect(writePagesFile(pagesDir, file, updated, opened.hash)).toEqual({ file, hash: sourceHash(updated) });
+      expect(readPagesFile(pagesDir, file).source).toBe(updated);
+      expect(() => writePagesFile(pagesDir, file, source, opened.hash)).toThrow(expect.objectContaining({ statusCode: 409 }));
+    });
+
+    it.each([
+      ["a parent segment", "docs/../docs/_helper/diagram.tsx", 400],
+      ["an absolute path", "/etc/hosts.ts", 400],
+      ["a backslash", "docs\\_helper\\diagram.tsx", 400],
+      ["an empty segment", "docs//_helper/diagram.tsx", 400],
+      ["another extension", "docs/guide.txt", 400],
+      ["a missing file", "docs/_helper/missing.tsx", 404],
+    ])("refuses %s", (_name, rel, statusCode) => {
+      write("docs/guide.md", "# guide");
+
+      expect(() => pagesFilePath(pagesDir, rel)).toThrow(expect.objectContaining({ statusCode }));
+    });
+
+    it("refuses a symlinked file and a file under a symlinked directory", () => {
+      const outside = mkdtempSync(join(tmpdir(), "playground-outside-"));
+      writeFileSync(join(outside, "leak.tsx"), "export const leak = 1;\n");
+      symlinkSync(join(outside, "leak.tsx"), join(pagesDir, "docs/_helper/link.tsx"));
+      symlinkSync(outside, join(pagesDir, "docs/linked"));
+
+      try {
+        expect(() => pagesFilePath(pagesDir, "docs/_helper/link.tsx")).toThrow(
+          expect.objectContaining({ statusCode: 400, message: expect.stringContaining("symbolic link") }),
+        );
+        expect(() => pagesFilePath(pagesDir, "docs/linked/leak.tsx")).toThrow(
+          expect.objectContaining({ statusCode: 400, message: expect.stringContaining("symbolic link") }),
+        );
+      } finally {
+        rmSync(outside, { recursive: true, force: true });
+      }
+    });
   });
 });

@@ -4,6 +4,9 @@ import { CommentDraftCard } from "../../comments/CommentDraftCard";
 import { CommentThread } from "../../comments/CommentThread";
 import type { Comment, CommentCallbacks, CommentConfig, CommentCreateAction } from "../../comments/comment-types";
 import { DOCUMENT_ANCHOR } from "../../comments/comment-types";
+import { getRoots } from "../../comments/comment-utils";
+import { DriftBadge, ReanchorButton, type Retarget } from "../../comments/DriftList";
+import type { DriftState } from "../../comments/anchoring/drift";
 import { UiChevronDown, UiChevronRight } from "../../icons";
 import type { FileReviewThreadOptions } from "./FileReview";
 
@@ -12,6 +15,8 @@ export type FileThreadEntry = {
   anchor: string;
   /** What the thread is on: "File", or why it is listed apart, e.g. "Outdated · Lines 5–7". */
   label: string;
+  /** Set for a thread whose anchor drifted: outdated, ambiguous, moved or orphaned. Absent for a whole-file thread. */
+  drift?: DriftState;
   /** One line saying why, for a thread that lost its place. */
   note?: string | null;
   thread: Comment[];
@@ -30,6 +35,7 @@ export function FileThreads({
   options,
   renderRootDetails,
   composerActions,
+  retarget,
   onCreate,
   onDiscardDraft,
 }: {
@@ -41,6 +47,7 @@ export function FileThreads({
   options: FileReviewThreadOptions;
   renderRootDetails: ((comment: Comment) => ReactNode) | undefined;
   composerActions: readonly CommentCreateAction[] | undefined;
+  retarget: Retarget | undefined;
   onCreate: NonNullable<CommentCallbacks["onCreate"]>;
   onDiscardDraft: () => void;
 }) {
@@ -66,7 +73,7 @@ export function FileThreads({
           )}
           {entries.map((entry) => (
             <div key={entry.anchor} data-file-thread={entry.anchor} className="rounded-lg border border-border bg-card">
-              <FileThreadCard entry={entry} config={config} callbacks={callbacks} options={options} renderRootDetails={renderRootDetails} />
+              <FileThreadCard entry={entry} config={config} callbacks={callbacks} options={options} renderRootDetails={renderRootDetails} retarget={retarget} />
             </div>
           ))}
         </div>
@@ -105,11 +112,12 @@ export function FileDraftCard({
  * the same thread reads alike in this list and in a comment rail.
  */
 export function FileThreadCard({
-  entry: { anchor, label, note, thread },
+  entry: { anchor, label, drift, note, thread },
   config,
   callbacks,
   options,
   renderRootDetails,
+  retarget,
   defaultExpanded = true,
 }: {
   entry: FileThreadEntry;
@@ -117,13 +125,17 @@ export function FileThreadCard({
   callbacks: CommentCallbacks;
   options: FileReviewThreadOptions;
   renderRootDetails: ((comment: Comment) => ReactNode) | undefined;
+  /** Offers Re-anchor on a thread in drift. */
+  retarget?: Retarget | undefined;
   defaultExpanded?: boolean;
 }) {
   return (
     <>
-      <div className="px-2 pt-2 text-[11px] text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-2 px-2 pt-2 text-[11px] text-muted-foreground">
+        {drift && <DriftBadge state={drift} />}
         <span className="font-medium">{label}</span>
-        {note && <span> — {note}</span>}
+        {note && <span className="min-w-0 flex-1"> — {note}</span>}
+        {drift && retarget && <ReanchorButton item={{ ids: getRoots(thread).map((root) => root.id), anchor, label, drift: { state: drift } }} retarget={retarget} />}
       </div>
       <CommentThread
         {...options}

@@ -1,6 +1,7 @@
 import type { KeyboardEvent, ReactNode } from "react";
 import type { LabelIconSpec } from "../data/Icon";
 import type { FormSize } from "./json-schema-form-size";
+import type { ClearableFieldProps } from "./field-clear-button";
 
 export type ComboboxOption = {
   value: string;
@@ -43,11 +44,13 @@ export type ComboboxOption = {
   count?: number;
 };
 
-type ComboboxBaseProps = {
+type ComboboxBaseProps = ClearableFieldProps & {
   /** Available options, rendered in the order provided. */
   options: ComboboxOption[];
   /** Ghost text when no value is set. */
   placeholder?: string;
+  /** Entry prompt that stays visible beside selected tags. */
+  inputPlaceholder?: string;
   /** Optional label rendered inline inside the control, before the input. */
   label?: ReactNode;
   /**
@@ -111,6 +114,8 @@ type ComboboxBaseProps = {
    * consumer fetches and feeds matching options back via the `options` prop.
    */
   onSearch?: (query: string) => void;
+  /** Reports raw user typing immediately, before Enter or selection commits it. */
+  onInputValueChange?: (value: string) => void;
   /** Called when a key is pressed in the input. */
   onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
   /** Trailing in-field adornment, rendered left of the clear/chevron controls. */
@@ -119,6 +124,8 @@ type ComboboxBaseProps = {
   prefix?: ReactNode;
   /** Non-interactive content pinned below the option rows. */
   footer?: ReactNode;
+  /** Controls rendered above popup options, outside the listbox. */
+  menuHeader?: ReactNode;
 };
 
 export type ComboboxSingleProps = ComboboxBaseProps & {

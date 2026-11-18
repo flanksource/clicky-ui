@@ -14,13 +14,12 @@ export function playgroundMarkdown(options: { sourceRoot: string }): Plugin {
   return {
     name: "playground-markdown",
     enforce: "pre",
-    resolveId(source, importer) {
+    async resolveId(source, importer) {
       if (!source.endsWith(QUERY)) return undefined;
       const request = source.slice(0, -QUERY.length);
-      const file = path.isAbsolute(request)
-        ? request
-        : path.resolve(importer ? path.dirname(importer) : sourceRoot, request);
-      return `${file}${QUERY}`;
+      const resolved = await this.resolve(request, importer, { skipSelf: true });
+      if (!resolved) throw new Error(`Cannot resolve guidance source: ${source}`);
+      return `${resolved.id}${QUERY}`;
     },
     load(id) {
       if (!id.endsWith(QUERY)) return undefined;

@@ -9,7 +9,15 @@ import {
   type DiffLine,
   type DiffLineType,
 } from "./code-diff";
+import {
+  diffLineTarget,
+  hunkTargets,
+  rangeTargets,
+  selectionState,
+  type DiffSelectionTarget,
+} from "./code-diff-selection";
 import { highlightToLines, type HighlightedLine } from "./code-highlight";
+import { DiffSelectionBox, DiffSelectionSpacer } from "./DiffSelectionBox";
 import { HighlightedTokens } from "./HighlightedTokens";
 
 export type CodeDiffView = "unified" | "split";
@@ -34,6 +42,8 @@ export interface DiffLineTarget {
   side: DiffSide;
   line: number;
   content: string;
+  /** The clicked gutter button, for anchoring a popover such as a comment draft. */
+  element: HTMLElement;
 }
 
 /** A node rendered as a full-width row directly below the row at `(side, line)`. */
@@ -44,9 +54,32 @@ export interface DiffLineWidget {
   node: ReactNode;
 }
 
+/**
+ * Gutter selection (e.g. staging): a checkbox-like box on every added/deleted
+ * line and a tri-state box on each hunk header. Controlled by the host.
+ */
+export interface DiffLineSelection {
+  /** Whether a changed line (added = side "new", deleted = side "old") is selected (e.g. staged). */
+  isSelected: (target: DiffSelectionTarget) => boolean;
+  /** Toggle one line, a shift-click range, or every changed line of a hunk. `selected` is the new state. */
+  onChange: (targets: DiffSelectionTarget[], selected: boolean) => void;
+  disabled?: boolean;
+  /** Accessible name for a line's box, e.g. (t, selected) => `${selected ? "Unstage" : "Stage"} line ${t.line}`. Defaults to "Select added line N" / "Select removed line N" (and "Deselect ..."). */
+  label?: (target: DiffSelectionTarget, selected: boolean) => string;
+  /** Accessible name for a hunk header's box; `hunk` is 1-based and `selected` is true when every changed line is selected. Defaults to "Select hunk N" / "Deselect hunk N". */
+  hunkLabel?: (hunk: number, selected: boolean) => string;
+}
+
+type SelectionControls = {
+  selection: DiffLineSelection;
+  onLineClick: (hunk: number, line: number, shiftKey: boolean) => void;
+  onHunkClick: (hunk: number) => void;
+};
+
 type LineAnnotations = {
   onLineAction: ((target: DiffLineTarget) => void) | undefined;
   lineWidgets: DiffLineWidget[] | undefined;
+  selection: SelectionControls | undefined;
 };
 
 export type CodeDiffProps = CodeDiffInput & {
@@ -61,6 +94,13 @@ export type CodeDiffProps = CodeDiffInput & {
    * in array order. A context line matches both its `old` and `new` number.
    */
   lineWidgets?: DiffLineWidget[] | undefined;
+  /**
+   * Adds a selection box in the gutter of every added/deleted line (click
+   * toggles, shift-click selects the changed lines of the same hunk back to the
+   * last click) and a tri-state box on each hunk header that toggles the whole
+   * hunk. Context lines get no box. Works in unified and split views.
+   */
+  lineSelection?: DiffLineSelection | undefined;
   /** Highlighter language hint, e.g. `typescript`, `go`, `python`. */
   language?: string | undefined;
   /** Unified (single column) or split (side-by-side). Defaults to `unified`. */
@@ -78,6 +118,8 @@ export type CodeDiffProps = CodeDiffInput & {
 
 type ResolvedLine = {
   line: DiffLine;
+  /** Position within the hunk, the address a selection click reports. */
+  index: number;
   oldTokens: HighlightedLine | undefined;
   newTokens: HighlightedLine | undefined;
 };
@@ -102,8 +144,8 @@ const MARKER: Record<DiffLineType, string> = { context: "", add: "+", remove: "-
 
 export function CodeDiff(props: CodeDiffProps) {
   const { language, view: viewProp = "unified", showLineNumbers = true, bare = false, className } = props;
-  const { unified, original, modified, originalLabel, modifiedLabel, onLineAction, lineWidgets } = props;
-  const annotations: LineAnnotations = { onLineAction, lineWidgets };
+  const { unified, original, modified, originalLabel, modifiedLabel, onLineAction, lineWidgets, lineSelection } = props;
+  const [anchor, setAnchor] = useState<{ hunks: DiffHunk[]; hunk: number; line: number } | null>(null);
 
   // `view` prop seeds the default; the header toggle then owns it.
   const [view, setView] = useState<CodeDiffView>(viewProp);
@@ -148,6 +190,33 @@ export function CodeDiff(props: CodeDiffProps) {
     [hunks, tokens],
   );
 
+  const selection = useMemo<SelectionControls | undefined>(() => {
+    if (!lineSelection) return undefined;
+    const linesOf = (hunk: number) => {
+      const found = hunks[hunk];
+      if (!found) throw new Error(`CodeDiff selection: no hunk ${hunk}`);
+      return found.lines;
+    };
+    return {
+      selection: lineSelection,
+      onLineClick: (hunk, index, shiftKey) => {
+        const lines = linesOf(hunk);
+        const line = lines[index];
+        const target = line && diffLineTarget(line);
+        if (!target) throw new Error(`CodeDiff selection: line ${hunk}:${index} is not a changed line`);
+        const from = anchor?.hunks === hunks && anchor.hunk === hunk ? anchor.line : undefined;
+        const targets = shiftKey && from !== undefined ? rangeTargets(lines, from, index) : [target];
+        lineSelection.onChange(targets, !lineSelection.isSelected(target));
+        setAnchor({ hunks, hunk, line: index });
+      },
+      onHunkClick: (hunk) => {
+        const targets = hunkTargets(linesOf(hunk));
+        lineSelection.onChange(targets, selectionState(targets, lineSelection.isSelected) !== "all");
+      },
+    };
+  }, [lineSelection, hunks, anchor]);
+  const annotations: LineAnnotations = { onLineAction, lineWidgets, selection };
+
   // Only a diff that spans more than one file labels its hunks with the path —
   // a single-file diff's path is already known from its surrounding context.
   const multiFile =
@@ -162,9 +231,9 @@ export function CodeDiff(props: CodeDiffProps) {
       <Fragment key={index}>
         {filePath && <FileHeader path={filePath} />}
         {view === "split" ? (
-          <SplitHunk hunk={hunk} showLineNumbers={showLineNumbers} annotations={annotations} />
+          <SplitHunk hunk={hunk} index={index} showLineNumbers={showLineNumbers} annotations={annotations} />
         ) : (
-          <UnifiedHunk hunk={hunk} showLineNumbers={showLineNumbers} annotations={annotations} />
+          <UnifiedHunk hunk={hunk} index={index} showLineNumbers={showLineNumbers} annotations={annotations} />
         )}
       </Fragment>
     );
@@ -228,9 +297,10 @@ function resolveHunks(
   return hunks.map((hunk) => ({
     header: hunk.header,
     path: hunk.path,
-    lines: hunk.lines.map((line) => {
+    lines: hunk.lines.map((line, index) => {
       const resolved: ResolvedLine = {
         line,
+        index,
         oldTokens: line.type === "add" ? undefined : oldTokens?.[oldCursor],
         newTokens: line.type === "remove" ? undefined : newTokens?.[newCursor],
       };
@@ -243,6 +313,7 @@ function resolveHunks(
 
 type HunkProps = {
   hunk: ResolvedHunk;
+  index: number;
   showLineNumbers: boolean;
   annotations: LineAnnotations;
 };
@@ -270,19 +341,25 @@ function WidgetRows({ widgets }: { widgets: DiffLineWidget[] }) {
   );
 }
 
-function UnifiedHunk({ hunk, showLineNumbers, annotations }: HunkProps) {
-  const { onLineAction, lineWidgets } = annotations;
+function UnifiedHunk({ hunk, index: hunkIndex, showLineNumbers, annotations }: HunkProps) {
+  const { onLineAction, lineWidgets, selection } = annotations;
   return (
     <>
-      {hunk.header && <HunkHeader header={hunk.header} />}
+      <HunkHeader hunk={hunk} index={hunkIndex} selection={selection} />
       {hunk.lines.map((resolved, index) => {
         const { line } = resolved;
         const tokens = line.type === "remove" ? resolved.oldTokens : resolved.newTokens;
         const actionSide: DiffSide = line.type === "remove" ? "old" : "new";
         const widgets = lineWidgets?.filter((w) => lineHasPosition(line, w.side, w.line));
+        const selected = selection ? isLineSelected(selection, line) : false;
         return (
           <Fragment key={index}>
-            <div className={cn("group flex", ROW_TINT[line.type])} data-diff-line={line.type}>
+            <div
+              className={cn("group flex", ROW_TINT[line.type], selected && SELECTED_ROW)}
+              data-diff-line={line.type}
+              data-selected={selected || undefined}
+            >
+              {selection && <LineBox controls={selection} hunk={hunkIndex} resolved={resolved} />}
               {showLineNumbers && (
                 <>
                   <Gutter
@@ -314,12 +391,12 @@ function UnifiedHunk({ hunk, showLineNumbers, annotations }: HunkProps) {
   );
 }
 
-function SplitHunk({ hunk, showLineNumbers, annotations }: HunkProps) {
+function SplitHunk({ hunk, index: hunkIndex, showLineNumbers, annotations }: HunkProps) {
   const pairs = useMemo(() => pairLines(hunk.lines), [hunk.lines]);
-  const { onLineAction, lineWidgets } = annotations;
+  const { onLineAction, lineWidgets, selection } = annotations;
   return (
     <>
-      {hunk.header && <HunkHeader header={hunk.header} />}
+      <HunkHeader hunk={hunk} index={hunkIndex} selection={selection} />
       {pairs.map((pair, index) => {
         const widgets = lineWidgets?.filter(
           (w) =>
@@ -332,15 +409,19 @@ function SplitHunk({ hunk, showLineNumbers, annotations }: HunkProps) {
               <SplitCell
                 resolved={pair.left}
                 side="old"
+                hunk={hunkIndex}
                 showLineNumbers={showLineNumbers}
                 onLineAction={onLineAction}
+                selection={selection}
               />
               <span aria-hidden className="w-px shrink-0 bg-border" />
               <SplitCell
                 resolved={pair.right}
                 side="new"
+                hunk={hunkIndex}
                 showLineNumbers={showLineNumbers}
                 onLineAction={onLineAction}
+                selection={selection}
               />
             </div>
             {widgets && <WidgetRows widgets={widgets} />}
@@ -380,13 +461,17 @@ function pairLines(lines: ResolvedLine[]): SplitPair[] {
 function SplitCell({
   resolved,
   side,
+  hunk,
   showLineNumbers,
   onLineAction,
+  selection,
 }: {
   resolved: ResolvedLine | undefined;
   side: DiffSide;
+  hunk: number;
   showLineNumbers: boolean;
   onLineAction: LineAnnotations["onLineAction"];
+  selection: SelectionControls | undefined;
 }) {
   if (!resolved) return <div className="min-w-0 flex-1 basis-0" />;
   const { line } = resolved;
@@ -395,13 +480,17 @@ function SplitCell({
   const type: DiffLineType = active ? line.type : "context";
   const number = side === "old" ? line.oldNumber : line.newNumber;
   const tokens = side === "old" ? resolved.oldTokens : resolved.newTokens;
+  const selected = active && selection ? isLineSelected(selection, line) : false;
   return (
     // Equal, shrinkable halves whose code wraps: with `whitespace-pre` a long
     // line painted past its half and over the other side in a narrow container.
     <div
-      className={cn("group flex min-w-0 flex-1 basis-0", active && ROW_TINT[line.type])}
+      className={cn("group flex min-w-0 flex-1 basis-0", active && ROW_TINT[line.type], selected && SELECTED_ROW)}
       data-diff-line={type}
+      data-selected={selected || undefined}
     >
+      {selection &&
+        (active ? <LineBox controls={selection} hunk={hunk} resolved={resolved} /> : <DiffSelectionSpacer />)}
       {showLineNumbers && (
         <Gutter value={number} line={line} side={side} actionSide={side} onLineAction={onLineAction} />
       )}
@@ -425,9 +514,68 @@ function FileHeader({ path }: { path: string }) {
   );
 }
 
-function HunkHeader({ header }: { header: string }) {
+const SELECTED_ROW =
+  "relative before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-emerald-500";
+
+function isLineSelected(controls: SelectionControls, line: DiffLine): boolean {
+  const target = diffLineTarget(line);
+  return target !== undefined && controls.selection.isSelected(target);
+}
+
+// A box for a changed line; context lines get a spacer so columns stay aligned.
+function LineBox({ controls, hunk, resolved }: { controls: SelectionControls; hunk: number; resolved: ResolvedLine }) {
+  const target = diffLineTarget(resolved.line);
+  if (!target) return <DiffSelectionSpacer />;
+  const { selection } = controls;
+  const selected = selection.isSelected(target);
   return (
-    <div className="select-none bg-muted/60 px-2 py-0.5 text-muted-foreground">{header}</div>
+    <DiffSelectionBox
+      state={selected ? "all" : "none"}
+      label={
+        selection.label?.(target, selected) ??
+        `${selected ? "Deselect" : "Select"} ${target.side === "new" ? "added" : "removed"} line ${target.line}`
+      }
+      disabled={selection.disabled === true}
+      onToggle={(event) => controls.onLineClick(hunk, resolved.index, event.shiftKey)}
+    />
+  );
+}
+
+function HunkHeader({
+  hunk,
+  index,
+  selection,
+}: {
+  hunk: ResolvedHunk;
+  index: number;
+  selection: SelectionControls | undefined;
+}) {
+  if (!selection) {
+    return hunk.header ? (
+      <div className="select-none bg-muted/60 px-2 py-0.5 text-muted-foreground">{hunk.header}</div>
+    ) : null;
+  }
+  const targets = hunkTargets(hunk.lines.map((resolved) => resolved.line));
+  const state = selectionState(targets, selection.selection.isSelected);
+  const allSelected = state === "all";
+  const number = index + 1;
+  return (
+    <div data-diff-hunk={number} className="flex select-none items-center bg-muted/60 pr-2 text-muted-foreground">
+      {targets.length === 0 ? (
+        <DiffSelectionSpacer />
+      ) : (
+        <DiffSelectionBox
+          state={state}
+          label={
+            selection.selection.hunkLabel?.(number, allSelected) ??
+            `${allSelected ? "Deselect" : "Select"} hunk ${number}`
+          }
+          disabled={selection.selection.disabled === true}
+          onToggle={() => selection.onHunkClick(index)}
+        />
+      )}
+      <span className="min-w-0 flex-1 truncate py-0.5">{hunk.header ?? `Hunk ${number}`}</span>
+    </div>
   );
 }
 
@@ -454,8 +602,8 @@ function Gutter({
         <button
           type="button"
           aria-label={`Comment on line ${value}`}
-          onClick={() => onLineAction({ side, line: value, content: line.content })}
-          className="absolute inset-y-0 left-0.5 flex items-center rounded-sm bg-background text-primary opacity-0 hover:text-primary/80 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover:opacity-100"
+          onClick={(event) => onLineAction({ side, line: value, content: line.content, element: event.currentTarget })}
+          className="absolute inset-y-0 left-0.5 flex items-center rounded-sm text-primary opacity-0 hover:text-primary/80 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring group-hover:opacity-100"
         >
           <UiAdd className="size-3.5" />
         </button>

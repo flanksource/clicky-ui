@@ -58,6 +58,7 @@ import { DropdownMenuDemo } from "./demos/DropdownMenuDemo";
 import { DiagnosticsDemo } from "./demos/DiagnosticsDemo";
 import { ErrorWrapperDemo } from "./demos/ErrorWrapperDemo";
 import { StackTraceDemo } from "./demos/StackTraceDemo";
+import { QueryStepDemo } from "./demos/QueryStepDemo";
 import { HarPanelDemo } from "./demos/HarPanelDemo";
 import { CommandFormDemo } from "./demos/CommandFormDemo";
 import { OperationDialogsDemo } from "./demos/OperationDialogsDemo";
@@ -67,6 +68,7 @@ import { SearchInputDemo } from "./demos/SearchInputDemo";
 import { TimelineDemo } from "./demos/TimelineDemo";
 import { SessionViewerDemo } from "./demos/SessionViewerDemo";
 import { SessionInspectorDemo } from "./demos/SessionInspectorDemo";
+import { TaskSessionDemo } from "./demos/TaskSessionDemo";
 import { ToastDemo } from "./demos/ToastDemo";
 import { CommentsDemo } from "./demos/CommentsDemo";
 import { GavelStylingComparisonDemo } from "./demos/GavelStylingComparisonDemo";
@@ -477,6 +479,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         icon: UiBug,
       },
       {
+        id: "query-step",
+        label: "Query step session",
+        component: QueryStepDemo,
+        icon: UiBug,
+      },
+      {
         id: "har-panel",
         label: "HarPanel",
         component: HarPanelDemo,
@@ -538,6 +546,12 @@ export const DEMO_GROUPS: DemoGroup[] = [
         id: "session-inspector",
         label: "SessionInspector",
         component: SessionInspectorDemo,
+        icon: UiRobotAi,
+      },
+      {
+        id: "task-session",
+        label: "TaskProgress session",
+        component: TaskSessionDemo,
         icon: UiRobotAi,
       },
       { id: "toast", label: "Toast", component: ToastDemo },

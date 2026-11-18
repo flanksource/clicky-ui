@@ -358,7 +358,12 @@ export function parseElementAnchor(anchor: string): CommentLocator[] {
 
 /** Resolves an `e:` anchor's locators within `root`; null when none finds the element (orphaned). */
 export function resolveElementAnchor(root: Element, anchor: string): CommentMatch | null {
-  return electElement(locatorVotes(root, parseElementAnchor(anchor)));
+  return resolveLocators(root, parseElementAnchor(anchor));
+}
+
+/** The element most of `locators` agree on within `root`; null when none finds one. `conflict` says they disagreed. */
+export function resolveLocators(root: Element, locators: readonly CommentLocator[]): CommentMatch | null {
+  return electElement(locatorVotes(root, locators));
 }
 
 function electElement(matches: readonly ElementVote[]): CommentMatch | null {

@@ -32,19 +32,32 @@ export type AgentSessionRuntime = {
  * playground's own session. `sessionId` is captain's session id; `label` is
  * what the picker showed, kept for chips once the session has ended.
  */
-export type CaptainAgentTarget = { kind: "captain"; sessionId: string; label: string };
+export type CaptainAgentTarget = {
+  kind: "captain";
+  sessionId: string;
+  label: string;
+};
+export type ManagedAgentTarget = {
+  kind: "managed";
+  sessionId: string;
+  label: string;
+};
+export type SessionAgentTarget = CaptainAgentTarget | ManagedAgentTarget;
 
-/** Where a page's threads go; `playground` is the playground's own session. */
-export type AgentTarget = { kind: "playground" } | CaptainAgentTarget;
+/** Where a page's threads are sent; `playground` is a gavel-managed session started with the playground's runtime. */
+export type AgentTarget = { kind: "playground" } | SessionAgentTarget;
+
+/**
+ * A page's auto-run as gavel's settings hold it: the page's comment-agent
+ * entry, or the default it inherits, is enabled. Which live session a page's
+ * threads are sent to is the browser's choice (localStorage), never stored here.
+ */
+export type PageAgentState = { autoRun: boolean };
 
 export type AgentSessionSettings = {
-  /** Send every new top-level human comment to its agent session on creation. */
-  autoRun: boolean;
   grouping: AgentSessionGrouping;
-  /** Runtime every new session starts with. */
+  /** Runtime every gavel-managed session starts with. */
   runtime?: AgentSessionRuntime;
-  /** Per-page captain targets; a page without one uses the playground session. */
-  targets?: Record<string, CaptainAgentTarget>;
 };
 
 /**
@@ -52,6 +65,9 @@ export type AgentSessionSettings = {
  * playground restart keeps talking to the same live session.
  */
 export type AgentSession = {
+  purpose?: "target";
+  cwd?: string;
+  label?: string;
   runId: string;
   sessionId: string;
   /** The page this session serves, or `null` for the shared session. */
@@ -69,8 +85,12 @@ export type AgentSessionsFile = {
   sessions: AgentSession[];
 };
 
+/** What `GET /__playground/agent-sessions` answers: the file, plus the auto-run state of the requested `page`. */
+export type AgentSessionsView = AgentSessionsFile & {
+  pages: Record<string, PageAgentState>;
+};
+
 export const DEFAULT_AGENT_SESSION_SETTINGS: AgentSessionSettings = {
-  autoRun: false,
   grouping: "shared",
 };
 
@@ -107,7 +127,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isRuntime(value: unknown): value is AgentSessionRuntime {
-  return isRecord(value) && isRecord(value["spec"]) && typeof value["spec"]["model"] === "string";
+  return (
+    isRecord(value) &&
+    isRecord(value["spec"]) &&
+    typeof value["spec"]["model"] === "string"
+  );
 }
 
 export function isCaptainTarget(value: unknown): value is CaptainAgentTarget {
@@ -120,8 +144,15 @@ export function isCaptainTarget(value: unknown): value is CaptainAgentTarget {
   );
 }
 
-function isTargets(value: unknown): boolean {
-  return value === undefined || (isRecord(value) && Object.values(value).every(isCaptainTarget));
+export function isSessionTarget(value: unknown): value is SessionAgentTarget {
+  return (
+    isCaptainTarget(value) ||
+    (isRecord(value) &&
+      value["kind"] === "managed" &&
+      typeof value["sessionId"] === "string" &&
+      value["sessionId"] !== "" &&
+      typeof value["label"] === "string")
+  );
 }
 
 function isSession(value: unknown): value is AgentSession {
@@ -129,6 +160,10 @@ function isSession(value: unknown): value is AgentSession {
     isRecord(value) &&
     typeof value["runId"] === "string" &&
     typeof value["sessionId"] === "string" &&
+    (value["purpose"] === undefined ||
+      (value["purpose"] === "target" &&
+        typeof value["cwd"] === "string" &&
+        typeof value["label"] === "string")) &&
     (value["page"] === null || typeof value["page"] === "string") &&
     typeof value["startedAt"] === "string" &&
     isRuntime(value["runtime"]) &&
@@ -136,20 +171,31 @@ function isSession(value: unknown): value is AgentSession {
   );
 }
 
-function assertAgentSessionsFile(value: unknown, file: string): AgentSessionsFile {
+function assertAgentSessionsFile(
+  value: unknown,
+  file: string,
+): AgentSessionsFile {
   const settings = isRecord(value) ? value["settings"] : undefined;
   const sessions = isRecord(value) ? value["sessions"] : undefined;
+  const moved = isRecord(settings)
+    ? ["autoRun", "targets"].filter((key) => key in settings)
+    : [];
+  if (moved.length > 0) {
+    throw new Error(
+      `${file} has settings.${moved.join(" and settings.")}, which moved out of this file (auto-run is a page entry in gavel's comment agent settings; a page's session target lives in the browser); remove ${moved.length > 1 ? "them" : "it"} from the file and set the page's target and auto-run again in the playground`,
+    );
+  }
   if (
     !isRecord(settings) ||
-    typeof settings["autoRun"] !== "boolean" ||
-    !AGENT_SESSION_GROUPINGS.includes(settings["grouping"] as AgentSessionGrouping) ||
+    !AGENT_SESSION_GROUPINGS.includes(
+      settings["grouping"] as AgentSessionGrouping,
+    ) ||
     (settings["runtime"] !== undefined && !isRuntime(settings["runtime"])) ||
-    !isTargets(settings["targets"]) ||
     !Array.isArray(sessions) ||
     !sessions.every(isSession)
   ) {
     throw new Error(
-      `${file} must hold {settings:{autoRun, grouping: ${AGENT_SESSION_GROUPINGS.join("|")}, runtime?, targets?:{<page>:{kind:"captain", sessionId, label}}}, sessions:[{runId, sessionId, page, runtime:{spec:{model}}, startedAt, state: ${AGENT_SESSION_STATES.join("|")}}]} — fix or delete it`,
+      `${file} must hold {settings:{grouping: ${AGENT_SESSION_GROUPINGS.join("|")}, runtime?}, sessions:[{runId, sessionId, page, runtime:{spec:{model}}, startedAt, state: ${AGENT_SESSION_STATES.join("|")}}]} — fix or delete it`,
     );
   }
   return value as AgentSessionsFile;

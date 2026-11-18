@@ -1,0 +1,19 @@
+{
+  "name": "@flanksource/page-runtime-build",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flanksource/clicky-ui.git",
+    "directory": "packages/page-runtime"
+  },
+  "publishConfig": { "access": "public" },
+  "exports": {
+    ".": { "types": "./types/build/index.d.ts", "default": "./index.mjs" },
+    "./dependencies": { "types": "./types/build/dependencies.d.ts", "default": "./dependencies.mjs" }
+  },
+  "files": ["*.mjs", "*.map", "types"],
+  "dependencies": { "rolldown": "1.2.18", "es-module-lexer": "^3.0.0" },
+  "engines": { "node": ">=24" }
+}

@@ -16,6 +16,8 @@ import { LabelIcon } from "../data/Icon";
 import { resolveItemSpec } from "./json-schema-form-item-summary";
 import { isFieldTone } from "./json-schema-form-tone";
 import { unionBranches } from "./json-schema-form-union-model";
+import { nullableSchema } from "./json-schema-form-nullable-model";
+import type { ResolvedFormExtensions } from "./json-schema-form-extension-api";
 
 // isOpenStringMap reports whether a property is an object whose entries are
 // described by a sub-schema in `additionalProperties` (a typed key/value map) or
@@ -203,6 +205,9 @@ export interface ResolveControlArgs {
   required: boolean;
   value: unknown;
   onChange: (next: unknown) => void;
+  // The form's registered custom formats. A property whose standard `format` is
+  // registered resolves as kind "custom"; any other format resolves as before.
+  extensions?: Pick<ResolvedFormExtensions, "formats">;
 }
 
 // resolveControl infers a base, render-ready FieldControl from a property
@@ -211,13 +216,14 @@ export interface ResolveControlArgs {
 // standard `format: date`/`date-time` keyword, which is a schema-declared signal
 // (not a name guess) and so drives a date control directly. First match wins.
 export function resolveControl(args: ResolveControlArgs): FieldControl {
+  const nonNull = nullableSchema(args.prop);
+  if (nonNull) return { ...resolveControl({ ...args, prop: nonNull }), nullable: true };
   const { key, prop, required, value, onChange } = args;
   const labelIcon = prop["x-icon"];
   const xLayout = prop["x-layout"];
-  const explicitLayout =
-    xLayout === "inline" || xLayout === "stack" || xLayout === "table"
-      ? xLayout
-      : undefined;
+  // Any named layout is kept: a built-in override, or a layout engine a form
+  // extension registered. buildField rejects a name nothing registered.
+  const explicitLayout = typeof xLayout === "string" && xLayout !== "" ? xLayout : undefined;
   // `x-label-position` is a friendlier alias over the same per-field layout knob:
   // "top" stacks the label above the value; "left" forces inline. `x-layout` wins.
   const labelPosition = prop["x-label-position"];
@@ -282,6 +288,12 @@ export function resolveControl(args: ResolveControlArgs): FieldControl {
     ...(inputClassName ? { inputClassName } : {}),
     ...(colSpan != null ? { colSpan } : {}),
   };
+
+  // A format a form extension registered renders through that extension, ahead
+  // of every structural inference below (the extension owns the control).
+  if (typeof prop.format === "string" && args.extensions?.formats.has(prop.format)) {
+    return { ...base, kind: "custom", format: prop.format };
+  }
 
   // An `x-clicky-lookup` field is an async entity-reference picker: options load
   // lazily from another entity's list endpoint. Single-select also allows

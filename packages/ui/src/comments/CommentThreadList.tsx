@@ -37,7 +37,15 @@ export type CommentThreadListProps = CommentDetailOptions & {
   /** Caller-owned entries appended to each root's "Assign…" submenu. */
   extraAssignItems?: (comment: Comment) => DropdownMenuItem[];
   onChecklistToggle?: (id: string, index: number) => void;
-  onDelete?: (id: string) => void;
+  onDelete?: (id: string) => void | Promise<void>;
+  /** Replace the body of root `id`. Presence adds Edit to each root. */
+  onEdit?: (id: string, body: string) => void | Promise<void>;
+  /** Replace the body of a reply. Presence adds Edit to each reply. */
+  onEditReply?: (rootId: string, messageId: string, body: string) => void | Promise<void>;
+  /** Delete a reply. Presence routes a reply's Delete here instead of `onDelete`. */
+  onDeleteReply?: (rootId: string, messageId: string) => void | Promise<void>;
+  /** Create a todo from a thread (root first, then its replies). Presence adds "Create todo" to each root. */
+  onCreateTodo?: (thread: readonly Comment[]) => void | Promise<void>;
   /** Submit a reply to `parent`. Presence enables the inline reply affordance. */
   onReply?: (parent: Comment, body: string) => void | Promise<void>;
 };
@@ -67,6 +75,10 @@ export function CommentThreadList({
   extraAssignItems,
   onChecklistToggle,
   onDelete,
+  onEdit,
+  onEditReply,
+  onDeleteReply,
+  onCreateTodo,
   onReply,
 }: CommentThreadListProps) {
   const [replyingTo, setReplyingTo] = useCommentState<string | null>(`thread-list:${comments[0]?.anchor ?? "general"}:replying`, null);
@@ -96,8 +108,17 @@ export function CommentThreadList({
     setMaximizedTab("thread");
   }
 
-  function cardHandlers(id: string) {
+  /** Handlers for `message`, a root or one of the replies of `thread` (whose first comment is the root). */
+  function cardHandlers(message: Comment, thread: readonly Comment[]) {
+    const id = message.id;
+    // A reply's edit and delete are addressed to its thread's root, never to the parent it answers (which may itself be a reply).
+    const rootId = thread[0]!.id;
+    const isReply = id !== rootId;
+    const deleteReply = isReply ? onDeleteReply : undefined;
+    const edit = isReply ? onEditReply && ((body: string) => onEditReply(rootId, id, body)) : onEdit && ((body: string) => onEdit(id, body));
     return {
+      ...(edit ? { onEdit: edit } : {}),
+      ...(!isReply && onCreateTodo ? { onCreateTodo: () => onCreateTodo(thread) } : {}),
       ...(onUpdateStatus
         ? { onUpdateStatus: (status: string) => onUpdateStatus(id, status) }
         : {}),
@@ -113,7 +134,11 @@ export function CommentThreadList({
       ...(onChecklistToggle
         ? { onChecklistToggle: (index: number) => onChecklistToggle(id, index) }
         : {}),
-      ...(onDelete ? { onDelete: () => onDelete(id) } : {}),
+      ...(deleteReply
+        ? { onDelete: () => deleteReply(rootId, id) }
+        : onDelete
+          ? { onDelete: () => onDelete(id) }
+          : {}),
     };
   }
 
@@ -146,7 +171,7 @@ export function CommentThreadList({
                   ? { onCopy: () => copyText(threadToMarkdown(thread)) }
                   : {})}
                 {...(renderBody ? { renderBody } : {})}
-                {...cardHandlers(root.id)}
+                {...cardHandlers(root, thread)}
                 {...(onReply ? { onReply: () => setReplyingTo(root.id) } : {})}
               />
               {renderRootDetails?.(root)}
@@ -165,7 +190,7 @@ export function CommentThreadList({
                         ? { onCopy: () => copyText(threadToMarkdown(thread)) }
                         : {})}
                       {...(renderBody ? { renderBody } : {})}
-                      {...cardHandlers(reply.id)}
+                      {...cardHandlers(reply, thread)}
                     />
                   ))}
                 </div>
@@ -210,7 +235,7 @@ export function CommentThreadList({
                           }
                         : {})}
                       {...(renderBody ? { renderBody } : {})}
-                      {...cardHandlers(message.id)}
+                      {...cardHandlers(message, maximizedThread)}
                       {...(onReply
                         ? { onReply: () => replyBar.current?.querySelector<HTMLElement>('[role="textbox"]')?.focus() }
                         : {})}

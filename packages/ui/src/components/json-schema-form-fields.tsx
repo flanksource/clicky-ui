@@ -1,11 +1,18 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "../lib/utils";
 import { formatDateTimeRelative } from "../data/cells/timestamp-format";
 import { Combobox } from "./Combobox";
 import { DateField } from "./DateField";
+import { ColorSwatch } from "./json-schema-form-color";
+import { InputField } from "./InputField";
+import { Switch } from "./Switch";
+import { ClearableFieldGroup } from "./clearable-field-group";
+import { NumberStepperControl } from "./json-schema-form-number-stepper";
 import { RadioGroupControl, SegmentedEnumControl } from "./json-schema-form-enum-choice";
 import { GridControl } from "./json-schema-form-grid";
+import { ConnectionLookupControl } from "./json-schema-form-connection";
 import { LookupTreeControl } from "./json-schema-form-lookup-tree";
+import { fieldOptionToComboboxOption } from "./lookup-option-view";
 import { TagsComboboxControl } from "./json-schema-form-tags-combobox";
 import { resolveLookupScope, useLookupFetcher } from "./form-lookup-context";
 import type { FieldControl, FieldOption } from "./json-schema-form-types";
@@ -49,30 +56,6 @@ export function ReadOnlyValue({ field, fieldId, size }: { field: FieldControl; f
   );
 }
 
-// FieldAdornmentWrapper positions a field's leading/trailing in-field adornments
-// (FieldControl.prefix at the left edge, FieldControl.suffix at the right). The
-// container is tagged data-jsf-control so an adornment can locate its sibling
-// input[data-jsf-input] (e.g. for caret-aware insertion). With neither adornment
-// it renders the input bare, so unadorned fields are byte-for-byte unchanged.
-function FieldAdornmentWrapper({
-  prefix,
-  suffix,
-  children,
-}: {
-  prefix?: ReactNode;
-  suffix?: ReactNode;
-  children: ReactNode;
-}) {
-  if (!prefix && !suffix) return <>{children}</>;
-  return (
-    <div data-jsf-control className="relative">
-      {prefix && <div className="absolute inset-y-0 left-1.5 flex items-center">{prefix}</div>}
-      {children}
-      {suffix && <div className="absolute inset-y-0 right-1.5 flex items-center">{suffix}</div>}
-    </div>
-  );
-}
-
 export function StringControl({
   field,
   fieldId,
@@ -84,9 +67,20 @@ export function StringControl({
   readOnly: boolean;
   size: FormSize;
 }) {
+  // format:"color" prefixes the text input with a native color picker bound to the
+  // same value; a consumer-set `prefix` wins if both are present.
+  const prefix =
+    field.prefix ??
+    (field.schema.format === "color" ? (
+      <ColorSwatch label={field.label} value={toText(field.value)} disabled={readOnly} onPick={field.onChange} />
+    ) : undefined);
   return (
-    <FieldAdornmentWrapper prefix={field.prefix} suffix={field.suffix}>
-      <input
+      <InputField
+        prefix={prefix}
+        suffix={field.suffix}
+        clearable={field.nullable === true}
+        clearLabel={`Clear ${field.label} to null`}
+        onClear={() => field.onChange(null)}
         id={fieldId}
         // format:"password" masks secret material (API keys, client secrets);
         // autoComplete new-password stops browsers from offering saved logins.
@@ -94,13 +88,13 @@ export function StringControl({
         autoComplete={field.schema.format === "password" ? "new-password" : undefined}
         data-jsf-input
         {...fieldAriaProps(field, fieldId)}
-        className={cn(inputClass(size), field.prefix && "pl-8", field.suffix && "pr-8", field.inputClassName)}
+        className={controlHeightClass[size]}
+        inputClassName={cn(labelSizeClass[size], field.inputClassName)}
         value={toText(field.value)}
         disabled={readOnly}
         placeholder={defaultPlaceholder(field.schema)}
-        onChange={(e) => field.onChange(e.target.value)}
+        onChange={(value) => field.onChange(value)}
       />
-    </FieldAdornmentWrapper>
   );
 }
 
@@ -119,6 +113,9 @@ export function NumberControl({
   if (field.schema["x-number-display"] === "slider" && typeof field.schema.maximum === "number") {
     return <NumberSliderControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
   }
+  if (field.schema["x-number-display"] === "stepper") {
+    return <NumberStepperControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
+  }
   // Default type="text" (not number) so non-numeric values a consumer permits —
   // e.g. template tokens — are not silently dropped by the browser. A schema that
   // declares `multipleOf` opts into a real `<input type="number">` (native step,
@@ -133,8 +130,12 @@ export function NumberControl({
     <span className="pointer-events-none select-none text-muted-foreground">{field.unit}</span>
   ) : undefined);
   return (
-    <FieldAdornmentWrapper prefix={field.prefix} suffix={suffix}>
-      <input
+      <InputField
+        prefix={field.prefix}
+        suffix={suffix}
+        clearable={field.nullable === true}
+        clearLabel={`Clear ${field.label} to null`}
+        onClear={() => field.onChange(null)}
         id={fieldId}
         type={native ? "number" : "text"}
         inputMode="decimal"
@@ -147,12 +148,12 @@ export function NumberControl({
           : {})}
         data-jsf-input
         {...fieldAriaProps(field, fieldId)}
-        className={cn(inputClass(size), field.prefix && "pl-8", suffix && "pr-8", field.inputClassName)}
+        className={controlHeightClass[size]}
+        inputClassName={cn(labelSizeClass[size], field.inputClassName)}
         value={toText(field.value)}
         disabled={readOnly}
         placeholder={defaultPlaceholder(field.schema)}
-        onChange={(e) => {
-          const raw = e.target.value;
+        onChange={(raw) => {
           // Coerce mid-typing ONLY when the parse round-trips to the same text
           // (e.g. "100", "33.5") — so an in-progress decimal like "33." or a
           // trailing-zero "33.30" keeps its raw text instead of collapsing to a
@@ -171,7 +172,6 @@ export function NumberControl({
           }
         }}
       />
-    </FieldAdornmentWrapper>
   );
 }
 
@@ -202,6 +202,7 @@ export function NumberSliderControl({
   const value = hasValue ? Math.min(max, Math.max(min, raw)) : min;
   const percent = max > min ? ((value - min) / (max - min)) * 100 : 0;
   return (
+    <ClearableFieldGroup clearable={field.nullable === true && !readOnly && field.value != null} clearLabel={`Clear ${field.label} to null`} onClear={() => field.onChange(null)}>
     <div className="flex items-center gap-3">
       <div className="relative h-6 min-w-0 flex-1">
         <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-border" />
@@ -228,6 +229,7 @@ export function NumberSliderControl({
         {hasValue ? value.toLocaleString() : "—"}
       </span>
     </div>
+    </ClearableFieldGroup>
   );
 }
 
@@ -265,6 +267,10 @@ export function DateControl({
   }
   return (
     <DateField
+      clearable={field.nullable === true}
+      clearLabel={`Clear ${field.label} to null`}
+      onClear={() => field.onChange(null)}
+      disabled={readOnly}
       mode={field.dateFormat === "date-time" ? "datetime" : "date"}
       id={fieldId}
       aria-label={field.label}
@@ -291,21 +297,20 @@ export function BooleanControl({
   readOnly: boolean;
   size: FormSize;
 }) {
-  // Only render a checkbox when the value is genuinely boolean (or unset).
+  // Only render a switch when the value is genuinely boolean (or unset).
   // A non-boolean value (e.g. a token a consumer left in place) renders as text
   // so it is preserved and editable.
   if (typeof field.value === "boolean" || field.value === undefined || field.value === null) {
     return (
       <div className={cn("flex items-center gap-1", controlHeightClass[size])}>
         {field.prefix}
-        <input
+        <Switch
           id={fieldId}
-          type="checkbox"
-          className="h-4 w-4 accent-primary"
+          data-jsf-input
           {...fieldAriaProps(field, fieldId)}
           checked={field.value === true}
           disabled={readOnly}
-          onChange={(e) => field.onChange(e.target.checked)}
+          onChange={field.onChange}
         />
       </div>
     );
@@ -327,16 +332,16 @@ export function EnumControl({
   const value = toText(field.value);
   const options = withSyntheticValue(field.options ?? [], value);
   if (field.display === "grid") {
-    return <GridControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} />;
+    return <ClearableFieldGroup clearable={field.nullable === true && !readOnly && field.value != null} clearLabel={`Clear ${field.label} to null`} onClear={() => field.onChange(null)}><GridControl field={field} fieldId={fieldId} readOnly={readOnly} size={size} /></ClearableFieldGroup>;
   }
   if (field.display === "radio") {
     return (
-      <RadioGroupControl field={field} fieldId={fieldId} readOnly={readOnly} options={options} value={value} size={size} />
+      <ClearableFieldGroup clearable={field.nullable === true && !readOnly && field.value != null} clearLabel={`Clear ${field.label} to null`} onClear={() => field.onChange(null)}><RadioGroupControl field={field} fieldId={fieldId} readOnly={readOnly} options={options} value={value} size={size} /></ClearableFieldGroup>
     );
   }
   if (field.display === "segmented") {
     return (
-      <SegmentedEnumControl field={field} fieldId={fieldId} readOnly={readOnly} options={options} value={value} size={size} />
+      <ClearableFieldGroup clearable={field.nullable === true && !readOnly && field.value != null} clearLabel={`Clear ${field.label} to null`} onClear={() => field.onChange(null)}><SegmentedEnumControl field={field} fieldId={fieldId} readOnly={readOnly} options={options} value={value} size={size} /></ClearableFieldGroup>
     );
   }
   return (
@@ -347,6 +352,9 @@ export function EnumControl({
       disabled={readOnly}
       size={size}
       allowCustomValue={field.allowCustomValue ?? false}
+      {...(field.nullable ? { clearable: true } : {})}
+      clearLabel={`Clear ${field.label} to null`}
+      {...(field.nullable ? { onClear: () => field.onChange(null) } : {})}
       onChange={(v) => field.onChange(v)}
       prefix={field.prefix}
       suffix={field.suffix}
@@ -363,21 +371,48 @@ export function EnumControl({
 // (debounced) typed query drives server-side search. Single-select keeps
 // allowCustomValue on so a value outside the option set still commits (e.g. an
 // inline DSN). When no fetcher is wired it degrades to a free-text combobox.
-export function LookupControl({
-  field,
-  fieldId,
-  readOnly,
-  size,
-  rootValue,
-}: {
+export function LookupControl(props: {
   field: FieldControl;
   fieldId: string;
   readOnly: boolean;
   size: FormSize;
   rootValue?: Record<string, unknown>;
 }) {
-  const fetcher = useLookupFetcher();
+  // A failed lookup is shown under the control until the next one succeeds; the
+  // options already loaded stay as they were.
+  const [error, setError] = useState<string>();
+  const errorId = `${props.fieldId}-lookup-error`;
+  return (
+    <>
+      <LookupInput {...props} onError={setError} {...(error ? { errorId } : {})} />
+      {error && (
+        <p id={errorId} role="alert" data-jsf-lookup-error className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
+
+function LookupInput({
+  field,
+  fieldId,
+  readOnly,
+  size,
+  rootValue,
+  onError,
+  errorId,
+}: {
+  field: FieldControl;
+  fieldId: string;
+  readOnly: boolean;
+  size: FormSize;
+  rootValue?: Record<string, unknown>;
+  onError: (message: string | undefined) => void;
+  errorId?: string;
+}) {
   const descriptor = field.lookup;
+  const fetcher = useLookupFetcher(descriptor);
   const value = toText(field.value);
   const [options, setOptions] = useState<FieldOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -394,11 +429,14 @@ export function LookupControl({
       setLoading(true);
       const root = rootRef.current;
       fetcher({ descriptor, query, ...(root ? { rootValue: root } : {}) })
-        .then((next) => setOptions(next))
-        .catch(() => setOptions([]))
+        .then((next) => {
+          setOptions(next);
+          onError(undefined);
+        })
+        .catch((cause: unknown) => onError(cause instanceof Error ? cause.message : String(cause)))
         .finally(() => setLoading(false));
     },
-    [descriptor, fetcher],
+    [descriptor, fetcher, onError],
   );
 
   // Re-fetch the head set when the scope (a sibling field, e.g. provider type)
@@ -450,6 +488,7 @@ export function LookupControl({
       <Combobox
         id={fieldId}
         options={withSyntheticValue([], value)}
+        {...(field.nullable ? { clearable: true, clearLabel: `Clear ${field.label} to null`, onClear: () => field.onChange(null) } : {})}
         value={value}
         disabled={readOnly}
         size={size}
@@ -461,10 +500,27 @@ export function LookupControl({
     );
   }
 
+  // A `format: "connection"` field is picked by its `connection://` ref from a
+  // typed, grouped picker that can create the connection it is missing.
+  if (field.schema.format === "connection") {
+    return (
+      <ConnectionLookupControl
+        field={field}
+        fieldId={fieldId}
+        readOnly={readOnly}
+        size={size}
+        options={options}
+        loading={loading}
+        onSearch={onSearch}
+      />
+    );
+  }
+
   return (
     <Combobox
       id={fieldId}
-      options={withSyntheticValue(options, value)}
+      options={withSyntheticValue(options, value).map(fieldOptionToComboboxOption)}
+      {...(field.nullable ? { clearable: true, clearLabel: `Clear ${field.label} to null`, onClear: () => field.onChange(null) } : {})}
       value={value}
       disabled={readOnly}
       size={size}
@@ -473,6 +529,7 @@ export function LookupControl({
       onSearch={onSearch}
       onChange={(v) => field.onChange(v)}
       {...comboboxAriaProps(field, fieldId)}
+      {...(errorId ? { invalid: true as const, describedBy: errorId } : {})}
       {...(defaultPlaceholder(field.schema) ? { placeholder: defaultPlaceholder(field.schema) } : {})}
     />
   );
@@ -508,25 +565,24 @@ export function TextareaControl({
     );
   }
   return (
-    <FieldAdornmentWrapper prefix={field.prefix} suffix={field.suffix}>
-      <textarea
+      <InputField
+        as="textarea"
+        prefix={field.prefix}
+        suffix={field.suffix}
+        clearable={field.nullable === true}
+        clearLabel={`Clear ${field.label} to null`}
+        onClear={() => field.onChange(null)}
         id={fieldId}
         data-jsf-input
         {...fieldAriaProps(field, fieldId)}
         rows={4}
-        className={cn(
-          inputClass(size),
-          "h-auto min-h-[5rem] resize-y",
-          field.prefix && "pl-8",
-          field.suffix && "pr-8",
-          field.inputClassName,
-        )}
+        className="h-auto min-h-[5rem]"
+        inputClassName={cn(labelSizeClass[size], field.inputClassName)}
         value={text}
         disabled={readOnly}
         placeholder={defaultPlaceholder(field.schema)}
-        onChange={(e) => field.onChange(e.target.value)}
+        onChange={(value) => field.onChange(value)}
       />
-    </FieldAdornmentWrapper>
   );
 }
 
@@ -558,6 +614,9 @@ export function MarkdownControl({
   return (
     <Suspense fallback={fallback}>
       <LazyMdxEditorField
+        clearable={field.nullable === true}
+        clearLabel={`Clear ${field.label} to null`}
+        onClear={() => field.onChange(null)}
         id={fieldId}
         value={toText(field.value)}
         readOnly={readOnly}

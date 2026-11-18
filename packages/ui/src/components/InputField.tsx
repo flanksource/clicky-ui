@@ -10,6 +10,7 @@ import {
 } from "react";
 import { cn } from "../lib/utils";
 import { useHotkey } from "../hooks/use-hotkey";
+import { FieldClearButton, type ClearableFieldProps } from "./field-clear-button";
 
 type NativeInputProps = Omit<
   InputHTMLAttributes<HTMLInputElement>,
@@ -23,7 +24,7 @@ type NativeTextareaProps = Omit<
 
 type InputFieldSharedProps<
   TElement extends HTMLInputElement | HTMLTextAreaElement,
-> = {
+> = ClearableFieldProps & {
   /** Controlled input value. */
   value?: string | undefined;
   /** Native input type. Ignored when `as="textarea"`. */
@@ -99,6 +100,9 @@ export const InputField = forwardRef<
     inputClassName,
     shortcutClassName,
     type = "text",
+    clearable,
+    onClear,
+    clearLabel,
     ...rest
   },
   forwardedRef,
@@ -127,6 +131,8 @@ export const InputField = forwardRef<
 
   return (
     <div
+      data-clearable-field
+      data-jsf-control
       className={cn(
         "flex w-full gap-density-2 rounded-md border border-border bg-background px-density-2",
         "focus-within:ring-2 focus-within:ring-ring",
@@ -200,6 +206,7 @@ export const InputField = forwardRef<
       {suffix && (
         <span className="inline-flex shrink-0 items-center">{suffix}</span>
       )}
+      {clearable && value !== undefined && value !== "" && !rest.disabled && !rest.readOnly && <FieldClearButton {...(onClear ? { onClear } : {})} {...(clearLabel ? { clearLabel } : {})} />}
       {shortcut && (
         <kbd
           className={cn(

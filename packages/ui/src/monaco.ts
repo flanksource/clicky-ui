@@ -6,6 +6,7 @@ export {
   DocumentRichEditor,
   type DocumentEditorProps,
   type DocumentFormProps,
+  type DocumentSchemaFormProps,
   type DocumentRichEditorProps,
 } from "./monaco/DocumentEditor";
 export { documentParts } from "./monaco/document-source";

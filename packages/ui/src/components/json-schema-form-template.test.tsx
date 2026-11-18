@@ -98,7 +98,7 @@ describe("templateValuePre prefix wiring", () => {
     expect(screen.getByRole("combobox", { name: "role" })).toBeInTheDocument();
     expect(screen.getByRole("spinbutton", { name: "percent" })).toBeInTheDocument();
     expect(screen.getByLabelText("start")).toHaveAttribute("type", "date");
-    expect(screen.getByRole("checkbox", { name: "active" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "active" })).toBeChecked();
     openTemplateMenu(3);
     fireEvent.click(screen.getByRole("menuitem", { name: "{{source.Value}}" }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ active: "{{source.Value}}" }));

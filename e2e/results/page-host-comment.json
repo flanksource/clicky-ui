@@ -1,0 +1,6 @@
+{
+  "chromium": "native current-tab capture and host crop passed",
+  "firefox": "Unverified: current-tab capture handles unavailable",
+  "webkit": "Unverified: current-tab capture handles unavailable",
+  "pinAfterEdit": "found"
+}

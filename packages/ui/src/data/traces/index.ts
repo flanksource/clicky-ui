@@ -1,4 +1,11 @@
 export { TraceView, type TraceViewProps } from "./TraceView";
+export { TopView, type TopViewProps, type TopViewState, type SampleFrame, type TopMetric } from "./TopView";
+export { WeightedProfile, type WeightedProfileProps } from "./WeightedProfile";
+export type { WeightedNode, WeightedHierarchy } from "./weighted-layout";
+export { TraceFeed, type TraceFeedProps } from "./TraceFeed";
+export { ProcessTraceHeader, type ProcessTraceHeaderProps } from "./ProcessTraceHeader";
+export type { ProcessHeaderRow, ProcessHeaderSnapshot } from "./process-header";
+export type { TraceFeedPage, TraceFeedRecord, TraceFeedRequest } from "./trace-feed";
 export { TraceHarView, type TraceHarViewProps } from "./TraceHarView";
 export { exchangeToHarEntry, type ExchangeToHarEntryOptions } from "./har-adapter";
 export { SqlTraceTable, type SqlTraceTableProps } from "./SqlTraceTable";

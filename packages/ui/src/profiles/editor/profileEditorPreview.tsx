@@ -1,4 +1,6 @@
 import type { ProfileColumn } from "../wizard/profileWizardModel";
+import type { ProfileWizardDraft } from "../wizard/profileWizardModel";
+import { ProfileMappingPreview } from "./profileMappingPreview";
 
 /**
  * The configured columns applied to the rows returned by the last sample, so
@@ -9,10 +11,25 @@ import type { ProfileColumn } from "../wizard/profileWizardModel";
 export function ProfileEditorPreview({
   columns,
   rows,
+  profile,
+  stale = false,
+  onNormalized,
 }: {
   columns: ProfileColumn[];
   rows: Record<string, unknown>[];
+  profile?: ProfileWizardDraft;
+  stale?: boolean;
+  onNormalized?: (rows: Record<string, unknown>[], columns: ProfileColumn[]) => void;
 }) {
+  if (stale)
+    return (
+      <p role="status">
+        Source or query settings changed. Run a new sample to refresh the
+        mapping preview.
+      </p>
+    );
+  if (profile?.render === "traces")
+    return <ProfileMappingPreview profile={profile} rows={rows} {...(onNormalized ? {onNormalized} : {})} />;
   const shown = columns.filter((column) => !column.hidden);
 
   if (rows.length === 0 || shown.length === 0) {

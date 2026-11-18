@@ -5,6 +5,7 @@ import { Tree } from "../data/Tree";
 import { UiFileCode, UiFolder, UiImage, UiLoader } from "../icons";
 import { SplitPane } from "../layout/SplitPane";
 import { cn } from "../lib/utils";
+import { ContextMenu } from "../overlay/ContextMenu";
 import { groupFindingsByFile } from "./adapters";
 import {
   FileReview,
@@ -47,6 +48,7 @@ export type FileFindingsViewProps = {
    * findings shows a zero count and opens like any other.
    */
   files?: readonly FileRef[] | undefined;
+  folders?: readonly FileRef[] | undefined;
   /** The open file or folder, or null for none. Controlled so the host can keep it in its URL. */
   selected: FileTreeSelection | null;
   onSelect: (selection: FileTreeSelection) => void;
@@ -89,6 +91,7 @@ export type FileFindingsViewProps = {
   fileToolbar?: ((file: FileRef) => ReactNode) | undefined;
   /** Host tabs after the open file's Preview, Source and Problems. */
   fileTabs?: ((file: FileRef) => FileReviewTab[]) | undefined;
+  filePreview?: ((file: FileRef) => FileReviewProps["preview"]) | undefined;
   /** Host tabs after the open folder's Problems. */
   folderTabs?: ((folder: FileRef) => FolderTab[]) | undefined;
   /**
@@ -161,8 +164,17 @@ function FileTreeRow({
     const render = slots?.[part];
     return render ? render({ node, selected, default: fallback }) : fallback;
   };
+  // Right-click anywhere on the tree's row (this content's parent) opens the same actions as the kebab.
+  const [row, setRow] = useState<HTMLElement | null>(null);
+  const label = node.kind === "folder" ? "Folder actions" : "File actions";
   return (
     <>
+      {actions.length > 0 && (
+        // The menu is portaled, but its React events still bubble to the row, which would select it.
+        <span hidden ref={(anchor) => setRow(anchor?.parentElement ?? null)} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+          <ContextMenu contextTarget={row} menuLabel={label} menuItems={actions} />
+        </span>
+      )}
       {slot("icon", <Icon icon={node.kind === "folder" ? UiFolder : isImagePath(node.ref.file) ? UiImage : UiFileCode} className="shrink-0 text-muted-foreground" />)}
       {slot(
         "name",
@@ -172,7 +184,7 @@ function FileTreeRow({
       )}
       <span className="flex-1" />
       {slot("badges", <SeverityCounts findings={node.findings} />)}
-      <NodeActions variant="row" items={actions} label={node.kind === "folder" ? "Folder actions" : "File actions"} />
+      <NodeActions variant="row" items={actions} label={label} />
     </>
   );
 }
@@ -254,6 +266,7 @@ type FileViewerProps = Pick<
   tabs: FileReviewTab[];
   actions: DropdownMenuItem[];
   toolbar: ReactNode;
+  preview: FileReviewProps["preview"];
   comments: FileReviewComments | undefined;
   /** Serves the file as an image. */
   imageUrl: string | undefined;
@@ -264,7 +277,7 @@ type FileViewerProps = Pick<
   onSourceChange: ((source: string) => void) | undefined;
 };
 
-function FileViewer({ file, showPath, findings, state, view, tabs, actions, toolbar, comments, imageUrl, raster, resolveUrl, onSourceChange, selectToComment, authorFilter, layout, onLayoutChange, ...review }: FileViewerProps) {
+function FileViewer({ file, showPath, findings, state, view, tabs, actions, toolbar, preview, comments, imageUrl, raster, resolveUrl, onSourceChange, selectToComment, authorFilter, layout, onLayoutChange, ...review }: FileViewerProps) {
   const ready = state?.status === "ready" ? state : null;
   let body: ReactNode;
   if (!raster && !ready) {
@@ -289,6 +302,7 @@ function FileViewer({ file, showPath, findings, state, view, tabs, actions, tool
         findings={findings}
         tabs={tabs}
         toolbar={toolbar}
+        preview={preview}
         {...(ready ? { source: ready.text } : {})}
         {...(imageUrl ? { imageUrl } : {})}
         {...(resolveUrl ? { resolveUrl } : {})}
@@ -334,6 +348,7 @@ function FileViewer({ file, showPath, findings, state, view, tabs, actions, tool
 export function FileFindingsView({
   findings,
   files,
+  folders,
   selected,
   onSelect,
   view,
@@ -345,6 +360,7 @@ export function FileFindingsView({
   getFolderActions,
   fileToolbar,
   fileTabs,
+  filePreview,
   folderTabs,
   comments,
   treeNode,
@@ -354,7 +370,7 @@ export function FileFindingsView({
   className,
   ...review
 }: FileFindingsViewProps) {
-  const tree = useMemo(() => groupFindingsByFile(findings, files), [findings, files]);
+  const tree = useMemo(() => groupFindingsByFile(findings, files, folders), [findings, files, folders]);
   const selectedNode = useMemo(() => findNode(tree, selected), [tree, selected]);
   const openFile = selectedNode?.kind === "file" ? selectedNode.ref : null;
   const openKey = openFile ? fileRefKey(openFile) : null;
@@ -420,6 +436,7 @@ export function FileFindingsView({
   } else {
     const file = selectedNode.ref;
     const tabs = fileTabs?.(file) ?? [];
+    const preview = filePreview?.(file);
     const markdown = isMarkdownPath(file.file);
     const image = Boolean(fileUrl) && isImagePath(file.file);
     const raster = Boolean(fileUrl) && isRasterImagePath(file.file);
@@ -430,7 +447,8 @@ export function FileFindingsView({
         showPath={showPath}
         findings={selectedNode.findings}
         state={state}
-        view={fileView(view, { markdown, image, raster }, tabs)}
+        view={fileView(view, { markdown: markdown || Boolean(preview), image, raster }, tabs)}
+        preview={preview}
         onViewChange={onViewChange}
         tabs={tabs}
         actions={nodeActions(selectedNode)}

@@ -76,8 +76,8 @@ export function CommentDashboard({
       aria-label="Comment dashboard"
       className="flex h-full min-h-0 flex-col gap-4 p-density-4"
     >
-      <header className="flex items-start justify-between gap-3">
-        <div>
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+        <div className="min-w-0">
           <h1 className="text-lg font-semibold">Comments</h1>
           <p className="text-sm text-muted-foreground">
             Feedback across all pages ·{" "}
@@ -96,7 +96,7 @@ export function CommentDashboard({
             Comments and replies refresh every 5 seconds
           </p>
         </div>
-        <div className="flex flex-wrap items-start justify-end gap-2">
+        <div className="flex flex-wrap items-start gap-2 sm:justify-end">
           <CommentDashboardCopy
             comments={comments}
             selected={data}

@@ -16,8 +16,8 @@ export function PropertySelectionPreview({
   field: FieldControl;
   ctx: RenderContext;
 }) {
-  const fetcher = useLookupFetcher();
   const descriptor = field.lookup;
+  const fetcher = useLookupFetcher(descriptor);
   const rootValue = ctx.rootValue;
   const [options, setOptions] = useState<FieldOption[]>([]);
   const [error, setError] = useState<string>();

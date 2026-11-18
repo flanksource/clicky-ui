@@ -26,7 +26,7 @@ export type Trace = {
 export type Category = "agent" | "llm" | "db" | "other";
 export const CATEGORY_LABEL: Record<Category, string> = { agent: "Agent", llm: "LLM", db: "Database", other: "Other" };
 /** Shared theme colors for the four span categories. */
-export const CATEGORY_COLOR: Record<Category, string> = { agent: "var(--primary)", llm: "var(--fs-prereq-500)", db: "var(--fs-info)", other: "var(--muted-foreground)" };
+export const CATEGORY_COLOR: Record<Category, string> = { agent: "var(--primary)", llm: "var(--clicky-prereq-500)", db: "var(--clicky-info)", other: "var(--muted-foreground)" };
 
 export function category(span: Span): Category {
   const op = span.attributes?.["gen_ai.operation.name"];

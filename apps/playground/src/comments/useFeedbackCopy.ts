@@ -4,8 +4,10 @@ import type { Comment } from "@flanksource/clicky-ui/comments";
 
 import { folderForPage, pages, type PageEntry } from "../registry";
 import { externalPage } from "../bookmarklet/external-catalog";
+import { pageSourcePath } from "../documents/review-target";
 import type { ExternalPage } from "../bookmarklet/model";
 import { writeClipboard } from "./clipboard";
+import { useVocabulary } from "../vocabularies/context";
 import {
   commentsForFolder,
   commentsToMarkdown,
@@ -30,10 +32,12 @@ export function useFeedbackCopy({
   labels: Record<string, string>;
 }) {
   const [copied, setCopied] = useState(false);
+  const { snapshot } = useVocabulary();
   const [copyError, setCopyError] = useState<string | null>(null);
   const markdownOptions = useMemo(
     () => ({
       labels,
+      vocabularyInstructions: Object.fromEntries((snapshot?.catalogs ?? []).map(catalog => [catalog.alias, catalog.instructions])),
       pageUrl: (page: string) => {
         const target = externalPage(page);
         if (target) return target.urls[0]!;
@@ -45,7 +49,7 @@ export function useFeedbackCopy({
       },
       pagePath: (page: string) => {
         if (!page.startsWith("external:"))
-          return `apps/playground/src/pages/${page}.tsx`;
+          return pageSourcePath(page);
         const url = externalPage(page)?.urls[0];
         if (!url)
           throw new Error(`External page ${page} is missing from the catalog`);
@@ -70,7 +74,7 @@ export function useFeedbackCopy({
         };
       },
     }),
-    [labels],
+    [labels, snapshot],
   );
 
   const copyMarkdown = useCallback(

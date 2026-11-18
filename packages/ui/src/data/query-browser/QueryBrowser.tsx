@@ -449,7 +449,7 @@ export function QueryBrowser({
   );
 
   return (
-    <div className={cn("h-[calc(100vh-15rem)] min-h-[32rem]", className)}>
+    <div className={cn("h-[calc(100vh-15rem)] min-h-[32rem] min-w-0", className)}>
       {navigator ? (
         <SplitPane defaultSplit={navigatorSplit} left={navigator} right={workspace} />
       ) : (

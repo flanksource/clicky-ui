@@ -6,6 +6,7 @@ import type {
 } from "./json-schema-form-error-types";
 import type { FormSize } from "./json-schema-form-size";
 import type { SortMode, LayoutMode } from "./json-schema-form-preferences";
+import type { FormExtension, FormExtensionSource, ResolvedFormExtensions } from "./json-schema-form-extension-api";
 import type {
   FieldControl,
   FieldOption,
@@ -107,6 +108,8 @@ export type PreExtension = (
 // optional third arg carries `rootValue` (the form's top-level value) so a
 // replacement widget can read sibling fields without global state.
 export interface PostExtensionContext {
+  /** Input id shared with the field label, for replacement controls. */
+  fieldId?: string;
   rootValue?: Record<string, unknown>;
   onRootChange?: (next: Record<string, unknown>) => void;
   /**
@@ -165,6 +168,8 @@ export interface RenderApi {
 // pre/post extension stacks (so they apply at EVERY depth, not just the top
 // level), and the current depth (for keys/labels).
 export interface RenderContext extends FormErrorContext {
+  showTypeIcons?: boolean;
+  objectDisplay?: "flat" | "accordion";
   readOnly: boolean;
   // This subtree is a view: set by the form-level `readOnly` prop and by any
   // readOnly field (a read-only object, array or map) for its descendants.
@@ -201,8 +206,13 @@ export interface RenderContext extends FormErrorContext {
   // debug renders the fields the form would hide, marked with why, and gives
   // every field a hover card saying where it comes from (the menu's Debug).
   debug?: boolean;
+  // The merged hook stacks: the `pre`/`post` props first, then each form
+  // extension's, so they apply at every depth in one order.
   pre: PreExtension[];
   post: PostExtension[];
+  // The form's merged extension registry: custom formats, lookup handlers,
+  // layout engines and slot replacements. See FormExtension.
+  extensions: ResolvedFormExtensions;
   // The form's top-level value, threaded unchanged through every depth so a
   // widget can read sibling fields (e.g. a selected namespace).
   rootValue?: Record<string, unknown>;
@@ -242,6 +252,10 @@ export interface FormLayout {
   help?: HelpDisplay;
 }
 export interface JsonSchemaFormProps extends FormErrorProps {
+  /** Infer label icons from standard schema types and formats. Explicit icons win. */
+  showTypeIcons?: boolean;
+  /** Presentation of nested objects; the document root remains open. */
+  objectDisplay?: "flat" | "accordion";
   schema: JsonSchemaObject;
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
@@ -321,11 +335,35 @@ export interface JsonSchemaFormProps extends FormErrorProps {
   pre?: PreExtension[];
   post?: PostExtension[];
   /**
+   * Form extensions: bundles of pre/post hooks, custom field types (keyed by
+   * schema `format`), lookup handlers (keyed by `x-clicky-lookup.url`), layout
+   * engines (keyed by `layout.mode` / `x-layout`) and slot replacements. Their
+   * hooks run after the `pre`/`post` props. Registering a built-in name or the
+   * same name from two extensions throws.
+   */
+  extensions?: FormExtension[];
+  /**
+   * Opts into the extensions the schema declares in its root
+   * `x-clicky-extensions`: the form loads each source through this function once
+   * per distinct list of declared sources, shows `Loading` meanwhile, and merges
+   * the results after `extensions`. A schema that declares sources with no loader
+   * throws; a rejected load is rethrown during render.
+   */
+  extensionLoader?: (source: FormExtensionSource, index: number) => Promise<FormExtension>;
+  /**
    * Resolves options for `x-clicky-lookup` fields (async entity-reference
    * pickers). When set, the form provides it to its lookup controls via context.
    * Hosts typically build it from the operations api client's lookup endpoint.
    */
   lookupFetcher?: LookupFetcher;
+  /**
+   * Where the commons-db connections service is mounted (e.g. `/api/v1`). When
+   * set, a `format: "connection"` lookup ends with a "New {type} connection…"
+   * footer that opens the create dialog against it and selects the result. The
+   * create dialog needs a react-query QueryClientProvider from the host. Left
+   * unset, the picker offers only what the lookup returns.
+   */
+  connectionApiBase?: string;
   /**
    * Evaluates the `when.expr` of `x-on-change` listeners. The form has no
    * built-in expression language; a schema that uses `expr` without this prop
@@ -371,3 +409,23 @@ export interface JsonSchemaFormProps extends FormErrorProps {
    */
   applyDefaults?: boolean;
 }
+
+/**
+ * The serializable subset of JsonSchemaFormProps: everything except the schema
+ * and value (passed separately) and the function-valued props. A host that cannot
+ * pass functions to the form — one rendering it inside a sandboxed frame — sends
+ * these; form extensions supply the function-valued parts from the inside.
+ */
+export type FormDataProps = Omit<
+  JsonSchemaFormProps,
+  | "schema"
+  | "value"
+  | "onChange"
+  | "pre"
+  | "post"
+  | "extensions"
+  | "extensionLoader"
+  | "lookupFetcher"
+  | "expressionEvaluator"
+  | "onRootChange"
+>;

@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useVocabulary } from "../vocabularies/context";
+import { VocabularyStatus } from "../vocabularies/VocabularyStatus";
+import { VocabularyGenerationHost } from "../vocabularies/config";
 import {
   Button,
   CommentProvider,
@@ -7,8 +10,9 @@ import {
   ThemeProvider,
   useCommentContext,
   type CommentScrollOptions,
+  useCommentRailWidth,
 } from "@flanksource/clicky-ui";
-import { CommentCapture } from "../comments/CommentCapture";
+import { useCommentDetails } from "../comments/useCommentDetails";
 import {
   PLAYGROUND_COMMENT_CONFIG,
   request,
@@ -16,7 +20,8 @@ import {
   type PageComment,
 } from "../comments/useComments";
 import { commentsToMarkdown } from "../comments/markdown";
-import { tallyAnchors } from "../comments/useDomAnchors";
+import { commentPins } from "../browser-mode/comment-pins";
+import type { AgentPin } from "@flanksource/page-runtime/schema";
 import { PlaygroundCommentReview } from "../comments/PlaygroundCommentReview";
 import { AgentRunsProvider, useAgentRuns } from "../agent-runs/AgentRunsProvider";
 import { AgentTargetPicker } from "../agent-runs/AgentTargetPicker";
@@ -26,24 +31,35 @@ import {
   type ExternalPage,
   type HostState,
   type AnchorState,
+  type Presentation,
 } from "./model";
 import { sendToHost, useHostBridge } from "./useHostBridge";
+import { useHostDialog } from "./useHostDialog";
+import { FloatingDraft } from "./FloatingDraft";
 
 type PageSession = { page: ExternalPage; state: HostState };
+let detailOpen = false;
+
+function maximizeHost(open: boolean) {
+  detailOpen = open;
+  const stored = localStorage.getItem("playground.bookmarklet.width");
+  sendToHost({ type: "sidebar-layout", width: stored === null ? 400 : Number(stored), maximized: open });
+}
 
 export function BookmarkletPanel() {
+  const [sidebarWidth] = useCommentRailWidth(400, "playground.bookmarklet.width");
   const bridge = useHostBridge();
+  useEffect(() => {
+    if (window.parent !== window) sendToHost({ type: "sidebar-layout", width: sidebarWidth, maximized: detailOpen });
+  }, [sidebarWidth]);
   const [sessions, setSessions] = useState<Record<string, PageSession>>({});
   const [active, setActive] = useState<string>();
-  const [candidates, setCandidates] = useState<ExternalPage[]>([]);
   const [error, setError] = useState("");
-  const [pending, setPending] = useState(false);
   const [retry, setRetry] = useState(0);
   const stateRef = useRef(bridge.state);
   stateRef.current = bridge.state;
 
   async function associate(state: HostState, mergeInto?: string) {
-    setPending(true);
     setError("");
     try {
       const { page } = await request<{ page: ExternalPage }>(
@@ -64,11 +80,8 @@ export function BookmarkletPanel() {
         [page.id]: { page, state: stateRef.current ?? state },
       }));
       setActive(page.id);
-      setCandidates([]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setPending(false);
     }
   }
 
@@ -77,7 +90,6 @@ export function BookmarkletPanel() {
     if (!state) return;
     let cancelled = false;
     setActive(undefined);
-    setCandidates([]);
     setError("");
     void request<{ page: ExternalPage | null; candidates: ExternalPage[] }>(
       `${EXTERNAL_PAGES_ROUTE}?url=${encodeURIComponent(state.url)}`,
@@ -91,8 +103,7 @@ export function BookmarkletPanel() {
             [page.id]: { page, state: stateRef.current ?? state },
           }));
           setActive(page.id);
-        } else if (result.candidates.length) setCandidates(result.candidates);
-        else await associate(state);
+        } else await associate(state, result.candidates[0]?.id);
       })
       .catch((cause: unknown) => {
         if (!cancelled)
@@ -116,14 +127,17 @@ export function BookmarkletPanel() {
   return (
     <ThemeProvider>
       <DensityProvider>
+        <VocabularyGenerationHost />
         <main className="flex h-dvh min-h-0 flex-col bg-background text-foreground">
-          <header className="flex items-center gap-2 border-b border-border p-3">
+          <header className={bridge.floating ? "hidden" : "flex items-center gap-2 border-b border-border p-3"}>
             <h1
               className="min-w-0 flex-1 truncate text-sm font-semibold"
               title={bridge.state?.url}
             >
               Playground comments
             </h1>
+            <VocabularyStatus />
+            <Button size="sm" variant="ghost" onClick={() => sendToHost({ type: "minimize" })}>Minimize</Button>
             <Button
               size="sm"
               variant="ghost"
@@ -147,65 +161,25 @@ export function BookmarkletPanel() {
               </Button>
             </div>
           )}
-          {candidates.length > 0 && (
-            <section className="space-y-3 p-3 text-sm">
-              <h2 className="font-semibold">Different query parameters</h2>
-              <p className="break-all text-xs text-muted-foreground">
-                {bridge.state?.url}
-              </p>
-              <p>
-                Merge this URL into an existing comment set, or start a new set.
-                This choice is remembered.
-              </p>
-              {candidates.map((page) => (
-                <div
-                  key={page.id}
-                  className="space-y-1 rounded-md border border-border p-2"
-                >
-                  <p className="font-medium">{page.title}</p>
-                  <p className="break-all text-xs text-muted-foreground">
-                    {page.urls.join("\n")}
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={pending}
-                    onClick={() => {
-                      if (bridge.state) void associate(bridge.state, page.id);
-                    }}
-                  >
-                    Merge
-                  </Button>
-                </div>
-              ))}
-              <Button
-                size="sm"
-                disabled={pending}
-                onClick={() => {
-                  if (bridge.state) void associate(bridge.state);
-                }}
-              >
-                New comment set
-              </Button>
-            </section>
-          )}
-          {!active && !candidates.length && !error && !bridge.error && (
+          {!active && !error && !bridge.error && (
             <p role="status" className="p-3 text-sm">
               Connecting to this page…
             </p>
           )}
-          {Object.values(sessions).map((value) => (
+          {Object.values(sessions).filter(value => value.page.id === active).map((value) => (
             <div
               key={value.page.id}
               className={
                 active === value.page.id
-                  ? "min-h-0 flex-1 overflow-y-auto p-3"
+                  ? bridge.floating ? "min-h-0 flex-1 overflow-y-auto p-2" : "min-h-0 flex-1 overflow-y-auto p-3"
                   : "hidden"
               }
             >
               <SessionRail
                 {...value}
                 visible={active === value.page.id}
+                floating={bridge.floating}
+                presentation={bridge.presentation}
                 anchors={bridge.anchors}
                 {...(bridge.focus ? { focus: bridge.focus } : {})}
               />
@@ -223,12 +197,18 @@ function SessionRail({
   visible,
   anchors,
   focus,
-}: PageSession & { visible: boolean; anchors: AnchorState[]; focus?: string }) {
+  floating,
+  presentation,
+}: PageSession & { visible: boolean; floating: boolean; presentation: Presentation; anchors: AnchorState[]; focus?: string }) {
+  const { vocabulary } = useVocabulary();
+  const commentConfig = useMemo(() => ({ ...PLAYGROUND_COMMENT_CONFIG, ...(vocabulary ? { vocabulary } : {}) }), [vocabulary]);
   const content = useRef<HTMLDivElement>(null);
+  const deliveryReady = useRef(false);
   const comments = useComments(page.id, content, {
     enabled: visible,
     poll: true,
     capture: async (input) => {
+      if (!deliveryReady.current) throw new Error("Choose an available project session before posting");
       if (
         !visible ||
         !state.selection ||
@@ -251,8 +231,9 @@ function SessionRail({
   };
   return (
     <CommentProvider
+      persistenceKey={page.id}
       comments={comments.comments}
-      config={PLAYGROUND_COMMENT_CONFIG}
+      config={commentConfig}
       initialRailMode="all"
       onCreate={comments.create}
       onReply={comments.reply}
@@ -268,7 +249,7 @@ function SessionRail({
           ?.top ?? null
       }
     >
-      <AgentRunsProvider runAgent={comments.runAgent} page={page.id}>
+      <AgentRunsProvider runAgent={comments.runAgent} page={page.id} projectScope>
         {comments.error && (
           <p role="alert" className="text-sm text-destructive">
             {comments.error}
@@ -278,6 +259,9 @@ function SessionRail({
           page={page}
           state={state}
           visible={visible}
+          floating={floating}
+          presentation={presentation}
+          deliveryReady={deliveryReady}
           anchors={anchors}
           comments={comments.allComments.filter(
             (value) => value.page === page.id,
@@ -298,15 +282,24 @@ function RailContents({
   focus,
   comments,
   onReopen,
+  floating,
+  presentation,
+  deliveryReady,
 }: PageSession & {
   visible: boolean;
+  floating: boolean;
+  presentation: Presentation;
+  deliveryReady: React.RefObject<boolean>;
   anchors: AnchorState[];
   focus?: string;
   comments: PageComment[];
   onReopen: (id: string, body: string) => Promise<void>;
 }) {
   const ctx = useCommentContext();
+  const { snapshot } = useVocabulary();
   const agentRuns = useAgentRuns();
+  deliveryReady.current = agentRuns.ready;
+  useHostDialog(visible);
   const [review, setReview] = useState(false);
   const [selected, setSelected] = useState<string>();
   const labels = Object.fromEntries(
@@ -314,14 +307,17 @@ function RailContents({
   );
   if (state.selection) labels[state.selection.anchor] = state.selection.label;
   const pins = JSON.stringify(
-    tallyAnchors(ctx.comments).map((value) => value.anchor),
+    commentPins(comments.filter(comment => ctx.comments.some(visible => visible.id === comment.id))),
   );
   useEffect(() => {
     if (visible)
-      sendToHost({ type: "pins", anchors: JSON.parse(pins) as string[] });
+      sendToHost({ type: "pins", anchors: JSON.parse(pins) as AgentPin[] });
   }, [visible, pins, state]);
   useEffect(() => {
-    if (visible && state.selection) ctx.focusAnchor(state.selection.anchor);
+    if (visible && state.selection) {
+      ctx.focusAnchor(state.selection.anchor);
+      sendToHost({ type: "draft", active: true, anchor: state.selection.anchor });
+    }
   }, [visible, state.selection, ctx.focusAnchor]);
   useEffect(() => {
     if (visible && focus) ctx.focusAnchor(focus);
@@ -330,14 +326,15 @@ function RailContents({
     if (visible)
       sendToHost({
         type: "highlight",
-        anchor: ctx.highlightAnchor ?? ctx.focusedAnchor,
+        anchor: ctx.highlightAnchor,
       });
-  }, [visible, ctx.highlightAnchor, ctx.focusedAnchor]);
+  }, [visible, ctx.highlightAnchor]);
   const markdown = (
     thread: readonly import("@flanksource/clicky-ui").Comment[],
   ) =>
     commentsToMarkdown([{ page: page.id, comments: [...thread] }], {
       labels,
+      vocabularyInstructions: Object.fromEntries((snapshot?.catalogs ?? []).map(catalog => [catalog.alias, catalog.instructions])),
       pageUrl: () => state.url,
       pagePath: () => state.url,
       screenshotUrl: (url) => new URL(url, location.origin).href,
@@ -347,6 +344,7 @@ function RailContents({
         resolve: `${location.origin}/__playground/comments/${encodeURIComponent(id)}/resolve`,
       }),
     });
+  const detailTabs = useCommentDetails({ threadToMarkdown: markdown });
   const queue = comments.filter(
     (comment) => !comment.parentId && comment.status === "resolved",
   );
@@ -354,6 +352,7 @@ function RailContents({
     if (!queue.some((value) => value.id === selected))
       setSelected(queue[0]?.id);
   }, [comments, selected]);
+  if (visible && floating && state.selection) return <FloatingDraft selection={state.selection} />;
   return (
     <>
       <p className="mb-3 break-all text-xs text-muted-foreground">
@@ -361,9 +360,12 @@ function RailContents({
       </p>
       <div className="mb-3">
         <AgentTargetPicker />
+        {agentRuns.error && <p role="alert" className="text-xs text-destructive">{agentRuns.error}</p>}
+        {!agentRuns.target && <p className="text-xs text-muted-foreground">Switch to a live session or create a new session before posting.</p>}
       </div>
       <div className="mb-3 flex flex-wrap gap-2">
         <Button
+          disabled={!deliveryReady.current}
           size="sm"
           variant="outline"
           onClick={() => sendToHost({ type: "pick" })}
@@ -371,6 +373,7 @@ function RailContents({
           Select element
         </Button>
         <Button
+          disabled={!deliveryReady.current}
           size="sm"
           variant="outline"
           onClick={() => sendToHost({ type: "pick", screenshot: true })}
@@ -378,12 +381,14 @@ function RailContents({
           Select with screenshot
         </Button>
         <Button
+          disabled={!deliveryReady.current}
           size="sm"
           variant="outline"
           onClick={() => sendToHost({ type: "page" })}
         >
           Comment on page
         </Button>
+        {presentation === "compact" && <Button size="sm" variant="outline" onClick={() => sendToHost({ type: "open-rail" })}>Open sidebar</Button>}
         <Button
           size="sm"
           variant="outline"
@@ -393,8 +398,9 @@ function RailContents({
           Review resolved ({queue.length})
         </Button>
       </div>
-      {review ? (
+      {presentation === "compact" ? null : review ? (
         <PlaygroundCommentReview
+          onMaximizedChange={maximizeHost}
           allComments={comments}
           selectedId={selected}
           config={ctx.config}
@@ -420,6 +426,9 @@ function RailContents({
         />
       ) : (
         <CommentSidePanel
+          previewLines={3}
+          detailTabs={detailTabs}
+          onMaximizedChange={maximizeHost}
           compact
           focusedAlignment="flow"
           className="!w-full"
@@ -434,12 +443,7 @@ function RailContents({
             },
           ]}
           extraAssignItems={agentRuns.extraAssignItems}
-          renderRootDetails={(comment) => (
-            <>
-              <CommentCapture comment={comment} />
-              {agentRuns.renderRunDetails(comment)}
-            </>
-          )}
+          renderRootDetails={agentRuns.renderRunDetails}
           threadToMarkdown={markdown}
         />
       )}

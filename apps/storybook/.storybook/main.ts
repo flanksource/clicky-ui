@@ -2,7 +2,9 @@ import type { StorybookConfig } from "@storybook/react-vite";
 import tailwindcss from "@tailwindcss/vite";
 
 const config: StorybookConfig = {
-  stories: ["../../../packages/ui/src/**/*.stories.@(ts|tsx|mdx)"],
+  stories: [
+    "../../../packages/ui/src/**/*.stories.@(ts|tsx|mdx)",
+  ],
   // Sample assets referenced by stories (e.g. the Markdown image section) live
   // with the kitchen-sink so both apps serve one copy.
   staticDirs: ["../../kitchen-sink/public"],

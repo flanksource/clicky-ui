@@ -16,6 +16,8 @@ describe("matchSourceRoute", () => {
     ["DELETE", "/", true, "delete"],
     ["POST", "/folders", false, "create-folder"],
     ["DELETE", "/folders", true, "delete-folder"],
+    ["GET", "/files", true, "read-file"],
+    ["PUT", "/files", true, "write-file"],
   ])("maps %s %s with target=%s to %s", (method, path, hasTarget, route) => {
     expect(matchSourceRoute(method, path, hasTarget)).toBe(route);
   });
@@ -26,6 +28,9 @@ describe("matchSourceRoute", () => {
     // Every destructive route has to name what it acts on.
     ["DELETE", "/folders", false],
     ["GET", "/folders", false],
+    ["GET", "/files", false],
+    ["PUT", "/files", false],
+    ["DELETE", "/files", true],
     ["POST", "/unknown", false],
   ])("rejects unsupported %s %s with target=%s", (method, path, hasTarget) => {
     expect(matchSourceRoute(method, path, hasTarget)).toBeUndefined();

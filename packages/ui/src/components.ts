@@ -32,6 +32,9 @@ export {
 } from "./components/clipboard";
 export { SplitButton, type SplitButtonProps } from "./components/SplitButton";
 export { InputField, type InputFieldProps } from "./components/InputField";
+export { TailwindColorPickerField, type TailwindColorPickerFieldProps } from "./components/TailwindColorPickerField";
+export { TailwindNumberPickerField, type TailwindNumberPickerFieldProps } from "./components/TailwindNumberPickerField";
+export type { TailwindPickerValue } from "./components/tailwind-picker-types";
 export {
   DimensionField,
   type DimensionFieldProps,
@@ -312,6 +315,34 @@ export {
   useLookupFetcher,
   resolveLookupScope,
 } from "./components/form-lookup-context";
+export {
+  RESERVED_FIELD_LAYOUTS,
+  RESERVED_FORMATS,
+  RESERVED_FORM_LAYOUTS,
+  defineFormExtension,
+  mergeFormExtensions,
+  type BuiltFieldRow,
+  type FieldTypeProps,
+  type FieldTypeRenderer,
+  type FormExtension,
+  type FormExtensionSource,
+  type FormSlots,
+  type LayoutEngine,
+  type ResolvedFormExtensions,
+} from "./components/json-schema-form-extension-api";
+// The default form slots, so a replacement can wrap them.
+export {
+  FormNoMatches,
+  FormPreferencesMenu,
+  FormTitle,
+} from "./components/json-schema-form-chrome";
+export { FormFieldFilter } from "./components/json-schema-form-filter-input";
+export {
+  FieldsGrid,
+  SectionHeading,
+  type FieldsGridProps,
+} from "./components/json-schema-form-layout";
+export { useConnectionApiBase } from "./components/form-connection-context";
 export { DEFAULT_FORM_SIZE } from "./components/json-schema-form-size";
 export type { FormSize } from "./components/json-schema-form-size";
 export {
@@ -344,6 +375,8 @@ export type {
 } from "./components/json-schema-form-template";
 export type {
   JsonSchemaFormProps,
+  FormDataProps,
+  FieldLayout,
   FormLayout,
   JsonSchemaObject,
   JsonSchemaProperty,
@@ -352,6 +385,7 @@ export type {
   FieldControl,
   FieldControlKind,
   FieldOption,
+  FieldOptionBadge,
   EnumDisplay,
   ArrayDisplay,
   ArrayItemAction,
@@ -395,6 +429,8 @@ export {
   type WorkspacePaneLocation,
   type WorkspacePaneSlots,
   type WorkspacePaneSpec,
+  type WorkspaceSideArrangement,
+  type WorkspaceSideArrangements,
   type WorkspaceSideLocation,
 } from "./layout/Workspace";
 export {
@@ -404,6 +440,7 @@ export {
   type AppShellNavGroup,
   type AppShellNavSection,
 } from "./layout/AppShell";
+export { NavigationTree, type NavigationTreeProps } from "./layout/NavigationTree";
 export {
   type AppShellNavDrag,
   type AppShellNavDropKind,
@@ -444,6 +481,7 @@ export {
   type HoverCardProps,
   type HoverCardPlacement,
 } from "./overlay/HoverCard";
+export { HelpTip, type HelpTipProps } from "./overlay/HelpTip";
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
 export { LocalPathPicker, type LocalPathPickerProps } from "./components/LocalPathPicker";
 export { isLocalHostname, type LocalPathLoader, type LocalPathListing } from "./components/local-path";
@@ -508,3 +546,7 @@ export {
   type ToastOptions,
   type ToastTone,
 } from "./overlay/toast-context";
+export { WorkspaceAccessDialog } from "./components/WorkspaceAccessDialog";
+export type { WorkspaceAccessDialogProps } from "./components/WorkspaceAccessDialog";
+export { workspaceAccessClient } from "./components/workspace-access-client";
+export type { WorkspaceAccessClient, WorkspaceAccessRoot } from "./components/workspace-access-client";

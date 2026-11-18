@@ -547,6 +547,11 @@ export const AllTabs: Story = {
       await expect(page.getByText("Review parity")).toBeInTheDocument();
 
       await userEvent.click(canvas.getByRole("tab", { name: "Files 2" }));
+      // The file tree lists written files only until the Read toggle is pressed.
+      await expect(
+        canvas.queryByRole("treeitem", { name: "pkg/session/session.go" }),
+      ).not.toBeInTheDocument();
+      await userEvent.click(canvas.getByRole("button", { name: /^Read/ }));
       await expect(
         canvas.getByRole("treeitem", { name: "pkg/session/session.go" }),
       ).toBeInTheDocument();

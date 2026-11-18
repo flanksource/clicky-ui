@@ -7,7 +7,7 @@ import { useCopyFlash, type CopyFlashState } from "../../components/clipboard";
 import type { DropdownMenuItem } from "../../overlay/DropdownMenu";
 import { cn } from "../../lib/utils";
 import { JsonView } from "../JsonView";
-import { TabButton } from "../TabButton";
+import { TabButton, type TabButtonVariant } from "../TabButton";
 import { OpenInFilesLink } from "../OpenInFilesLink";
 import { relPath } from "../lint/paths";
 import {
@@ -118,11 +118,49 @@ function CopyDetailsButton({ node }: { node: Test }) {
   );
 }
 
-function DetailHeader({ node, actionNode, actions, attemptChooser }: { node: Test; actionNode: Test; actions?: ReactNode; attemptChooser?: ReactNode }) {
+type DetailHeaderProps = { node: Test; actionNode: Test; actions?: ReactNode; attemptChooser?: ReactNode };
+
+/** The attempt chooser, adapter actions, copy and rerun/stop controls for the shown node. */
+function DetailActions({ node, actionNode, actions, attemptChooser }: DetailHeaderProps) {
   const runner = useTestRunner();
-  const outcome = outcomeFor(node);
   const canRerun = !!runner.onRerun && actionNode.framework !== "task";
   const canStop = !!runner.onStop && !!actionNode.can_stop && !!actionNode.task_id;
+  return (
+    <div className="ml-auto flex shrink-0 items-center gap-1" data-detail-actions="">
+      {attemptChooser}
+      {actions}
+      <CopyDetailsButton node={node} />
+      {canRerun && (
+        <Button
+          size="sm"
+          disabled={runner.busy.rerun}
+          onClick={() => runner.onRerun!(actionNode)}
+          title="Rerun this test or subtree"
+        >
+          <Icon icon={UiRefresh} className="mr-1 text-sm" />
+          {runner.busy.rerun ? "Running..." : "Rerun"}
+        </Button>
+      )}
+      {canStop && (
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={runner.busy.stop}
+          onClick={() => runner.onStop!(actionNode)}
+          title="Stop this running task"
+        >
+          <Icon icon={UiStop} className="mr-1 text-sm" />
+          {runner.busy.stop ? "Stopping..." : "Stop"}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function DetailHeader(props: DetailHeaderProps) {
+  const { node } = props;
+  const runner = useTestRunner();
+  const outcome = outcomeFor(node);
   const location = node.file ? `${node.file}${node.line ? `:${node.line}` : ""}` : undefined;
   return (
     <div
@@ -168,34 +206,7 @@ function DetailHeader({ node, actionNode, actions, attemptChooser }: { node: Tes
           }}
         />
       )}
-      <div className="ml-auto flex shrink-0 items-center gap-1">
-        {attemptChooser}
-        {actions}
-        <CopyDetailsButton node={node} />
-        {canRerun && (
-          <Button
-            size="sm"
-            disabled={runner.busy.rerun}
-            onClick={() => runner.onRerun!(actionNode)}
-            title="Rerun this test or subtree"
-          >
-            <Icon icon={UiRefresh} className="mr-1 text-sm" />
-            {runner.busy.rerun ? "Running..." : "Rerun"}
-          </Button>
-        )}
-        {canStop && (
-          <Button
-            size="sm"
-            variant="destructive"
-            disabled={runner.busy.stop}
-            onClick={() => runner.onStop!(actionNode)}
-            title="Stop this running task"
-          >
-            <Icon icon={UiStop} className="mr-1 text-sm" />
-            {runner.busy.stop ? "Stopping..." : "Stop"}
-          </Button>
-        )}
-      </div>
+      <DetailActions {...props} />
     </div>
   );
 }
@@ -204,8 +215,13 @@ function DetailHeader({ node, actionNode, actions, attemptChooser }: { node: Tes
  * The right pane. Resolves the node's adapter for body / tabs / header actions,
  * falling back to the built-in default body. Shows an empty state when nothing
  * is selected.
+ *
+ * `header="actions"` drops the node's identity (outcome, name, tool, duration,
+ * location) for hosts that already show it, e.g. an expandable card, and keeps
+ * only the controls, in the tab row when there are tabs. `tabVariant` picks the
+ * tab row style (filled `pill`, the default, or `underline`).
  */
-export function TestDetailPanel() {
+export function TestDetailPanel({ header = "full", tabVariant = "pill" }: { header?: "full" | "actions"; tabVariant?: TabButtonVariant } = {}) {
   const runner = useTestRunner();
   const selected = runner.selected;
   const [attemptSelection, setAttemptSelection] = useState<{ key: string; id: number } | null>(null);
@@ -249,6 +265,13 @@ export function TestDetailPanel() {
   const detailAdapter = runner.adapters.resolveDetail(node, runner);
   const actionAdapter = runner.adapters.resolveActions(selected, runner);
   const tabs = runner.adapters.resolveTabs(node, runner);
+  if ((node.stdout || node.stderr) && !tabs.some((tab) => tab.id === "stdout")) {
+    tabs.unshift({
+      id: "stdout",
+      label: "Stdout",
+      render: () => <div className="p-density-4"><TestOutput node={node} view="full" /></div>,
+    });
+  }
   const ownsScroll = runner.adapters.ownsScroll(node, runner);
 
   const body = (
@@ -263,11 +286,20 @@ export function TestDetailPanel() {
   // A size container, so log blocks can cap themselves at a share of the pane (cqh).
   const detailRegion = cn("min-h-0 flex-1 [container-type:size]", !ownsScroll && "overflow-y-auto");
 
+  const headerProps: DetailHeaderProps = { node, actionNode: selected, actions, attemptChooser };
+  const fullHeader = header === "full";
+
   // No extra tabs → just the body under the header.
   if (tabs.length === 0) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <DetailHeader node={node} actionNode={selected} actions={actions} attemptChooser={attemptChooser} />
+        {fullHeader ? (
+          <DetailHeader {...headerProps} />
+        ) : (
+          <div className="flex shrink-0 border-b border-border px-density-2 py-density-1">
+            <DetailActions {...headerProps} />
+          </div>
+        )}
         <div className={detailRegion}>{body}</div>
       </div>
     );
@@ -279,16 +311,18 @@ export function TestDetailPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <DetailHeader node={node} actionNode={selected} actions={actions} attemptChooser={attemptChooser} />
-      <div className="flex shrink-0 items-center gap-1 border-b border-border px-density-2 py-density-1">
+      {fullHeader && <DetailHeader {...headerProps} />}
+      <div className={cn("flex shrink-0 items-center gap-1 border-b border-border px-density-2", tabVariant === "underline" ? "items-stretch" : "py-density-1")}>
         {allTabs.map((t) => (
           <TabButton
             key={t.id}
             active={active.id === t.id}
             onClick={() => setActiveTab(t.id)}
             label={t.label}
+            variant={tabVariant}
           />
         ))}
+        {!fullHeader && <DetailActions {...headerProps} />}
       </div>
       <div className={detailRegion}>{active.render()}</div>
     </div>

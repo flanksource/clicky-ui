@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { isValidElement } from "react";
+import { isValidElement, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { JsonSchemaForm } from "../components/JsonSchemaForm";
 import type { FieldControl, JsonSchemaObject } from "../components/json-schema-form-types";
@@ -152,8 +152,56 @@ describe("connectionSchemaFormExtensions", () => {
     expect(post.reduce((acc, extension) => extension(readOnly, acc), nodes)).toEqual(nodes);
   });
 
-  it("returns no pre extensions", () => {
-    expect(connectionSchemaFormExtensions(options(credentialSchema())).pre).toEqual([]);
+  it("puts name and namespace on one row, host and port on one row, and kubeconfig/kubecontext on one row", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        name: { type: "string", title: "Name" },
+        namespace: { type: "string", title: "Namespace", "x-clicky-component": "k8s-namespace-selector" },
+        properties: {
+          type: "object",
+          title: "Properties",
+          properties: {
+            kubeconfig: { type: "string", title: "Kubeconfig file", "x-clicky-component": "k8s-kubeconfig-selector" },
+            kubecontext: { type: "string", title: "Kubecontext", "x-clicky-component": "k8s-context-selector" },
+            host: { type: "string", title: "Host", "x-clicky-hoist": true },
+            port: { type: "string", title: "Port", "x-clicky-hoist": true },
+          },
+        },
+      },
+    };
+    const root = { namespace: "default", properties: { host: "db.internal" } };
+    const onRootChange = vi.fn();
+    const fetcher = (async (url: string) =>
+      url.includes("/contexts") ? { contexts: [] } : []) as ConnectionJsonFetcher;
+    const extensions = connectionSchemaFormExtensions({ apiBase: API_BASE, schema, fetcher });
+    render(
+      <JsonSchemaForm
+        schema={schema}
+        value={root}
+        onChange={() => {}}
+        rootValue={root}
+        onRootChange={onRootChange}
+        pre={extensions.pre}
+        post={extensions.post}
+        showPreferencesMenu={false}
+      />,
+    );
+
+    expect(screen.getByText("Host:Port")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Port" })).toHaveAttribute("placeholder", "Port");
+    expect(screen.queryByText("Kubernetes resolution")).not.toBeInTheDocument();
+    const nameRow = screen.getByRole("textbox", { name: "Name" }).closest(".grid");
+    expect(nameRow).toContainElement(screen.getByRole("combobox", { name: "Namespace" }));
+    expect(screen.getByRole("group", { name: "Kubernetes" })).toContainElement(
+      screen.getByRole("textbox", { name: "Kubeconfig file" }),
+    );
+    expect(screen.getByRole("textbox", { name: "Kubeconfig file" })).toHaveAttribute("placeholder", "$KUBECONFIG");
+    fireEvent.change(screen.getByRole("textbox", { name: "Port" }), { target: { value: "5433" } });
+    expect(onRootChange).toHaveBeenLastCalledWith({
+      namespace: "default",
+      properties: { host: "db.internal", port: "5433" },
+    });
   });
 
   it("offers a credential field only the schema's secret sources", async () => {
@@ -175,6 +223,34 @@ describe("connectionSchemaFormExtensions", () => {
     );
 
     expect(await openSourceOptions("Secret value source")).toEqual(["Secret", "ConfigMap", "Helm"]);
+  });
+
+  it("leaves hoisted address fields beside the URL rather than repeating them in the properties group", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        url: { type: "string", title: "Database URL", "x-clicky-order": 2 },
+        properties: {
+          type: "object",
+          title: "Properties",
+          "x-clicky-order": 7,
+          properties: {
+            kubeconfig: { type: "string", title: "Kubeconfig file" },
+            kubecontext: { type: "string", title: "Kubecontext" },
+            host: { type: "string", title: "Host", "x-clicky-order": 2.1, "x-clicky-hoist": true },
+            sslmode: { type: "string", title: "SSL mode" },
+          },
+        },
+      },
+    };
+    const extensions = connectionSchemaFormExtensions({ apiBase: API_BASE, schema, fetcher: neverFetch });
+    render(
+      <JsonSchemaForm schema={schema} value={{}} onChange={() => {}} post={extensions.post} showPreferencesMenu={false} />,
+    );
+
+    expect(screen.getAllByText("Host")).toHaveLength(1);
+    expect(screen.getByRole("region", { name: "Properties" })).toHaveTextContent("SSL mode");
+    expect(screen.getByRole("region", { name: "Properties" })).not.toHaveTextContent("Host");
   });
 
   it("offers a credential field every source when the schema carries no hints", async () => {
@@ -215,5 +291,85 @@ describe("mergeConnectionFormExtensions", () => {
     );
 
     expect(merged).toEqual({ pre, post });
+  });
+});
+
+describe("connection Kubernetes placement", () => {
+  it("leaves kubeconfig and kubecontext out of the form when the host places them externally", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        properties: {
+          type: "object",
+          title: "Properties",
+          properties: {
+            kubeconfig: { type: "string", title: "Kubeconfig file", "x-clicky-component": "k8s-kubeconfig-selector" },
+            kubecontext: { type: "string", title: "Kubecontext", "x-clicky-component": "k8s-context-selector" },
+            database: { type: "string", title: "Database" },
+          },
+        },
+      },
+    };
+    const extensions = connectionSchemaFormExtensions({
+      apiBase: API_BASE,
+      schema,
+      fetcher: neverFetch as ConnectionJsonFetcher,
+      kubernetes: "external",
+    });
+    render(
+      <JsonSchemaForm
+        schema={schema}
+        value={{}}
+        onChange={() => {}}
+        rootValue={{}}
+        onRootChange={() => {}}
+        pre={extensions.pre}
+        post={extensions.post}
+        showPreferencesMenu={false}
+      />,
+    );
+
+    expect({
+      kubeconfig: screen.queryByRole("textbox", { name: "Kubeconfig file" }),
+      kubecontext: screen.queryByRole("combobox", { name: "Kubecontext" }),
+      database: screen.getByRole("textbox", { name: "Database" }) !== null,
+    }).toEqual({ kubeconfig: null, kubecontext: null, database: true });
+  });
+});
+
+describe("connection URL selector modes", () => {
+  it("keeps a workload mode selected when the URL field seeds a default source", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          "x-clicky-component": "k8s-url-selector",
+          "x-clicky-default-source": "value",
+        },
+      },
+    };
+    const fetcher = (async () => []) as ConnectionJsonFetcher;
+    const extensions = connectionSchemaFormExtensions({ apiBase: API_BASE, schema, fetcher });
+    function Form() {
+      const [value, setValue] = useState<Record<string, unknown>>({});
+      return (
+        <JsonSchemaForm
+          schema={schema}
+          value={value}
+          onChange={setValue}
+          rootValue={value}
+          onRootChange={setValue}
+          pre={extensions.pre}
+          post={extensions.post}
+          showPreferencesMenu={false}
+        />
+      );
+    }
+    render(<Form />);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Service" }));
+
+    expect(screen.getByRole("radio", { name: "Service" })).toHaveAttribute("aria-checked", "true");
   });
 });

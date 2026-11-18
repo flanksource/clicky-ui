@@ -8,9 +8,10 @@ import type {
   UnifiedSessionInput,
 } from "../data/ai/SessionViewer.unified";
 
-/** A scripted stand-in for the session follow stream: tests push `entry`,
- *  `state` and `error` frames, or a bare connection failure, through `emit`
- *  and `failConnection`. */
+/** A scripted stand-in for an SSE stream: tests push named frames (a session
+ *  follow stream's `entry`, `state` and `error`; a task stream's `task` and
+ *  `session`), or a bare connection failure, through `emit` and
+ *  `failConnection`. */
 export class FakeEventSource implements EventSourceLike {
   static instances: FakeEventSource[] = [];
   readyState = 1;
@@ -39,7 +40,7 @@ export class FakeEventSource implements EventSourceLike {
     this.readyState = 2;
   }
 
-  emit(type: "entry" | "state" | "error", data: unknown) {
+  emit(type: string, data: unknown) {
     this.dispatch(
       new MessageEvent(type, {
         data: typeof data === "string" ? data : JSON.stringify(data),

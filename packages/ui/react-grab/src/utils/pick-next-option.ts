@@ -1,0 +1,16 @@
+// Derived from react-grab (MIT, Copyright (c) 2025 Aiden Bai): packages/react-grab/src/utils/pick-next-option.ts
+import type { EnumEditableOption } from "../types.js";
+
+export const pickNextOption = (
+  options: ReadonlyArray<EnumEditableOption>,
+  currentValue: string,
+  direction: 1 | -1,
+): EnumEditableOption | null => {
+  if (options.length === 0) return null;
+  const currentIndex = options.findIndex((option) => option.value === currentValue);
+  const baseIndex = currentIndex === -1 ? 0 : currentIndex;
+  const nextIndex = (baseIndex + direction + options.length) % options.length;
+  const next = options[nextIndex];
+  if (!next || next.value === currentValue) return null;
+  return next;
+};

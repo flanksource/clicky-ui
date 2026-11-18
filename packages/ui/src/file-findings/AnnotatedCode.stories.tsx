@@ -85,7 +85,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "A source file in Monaco with its findings as squiggles, gutter dots and read-only threads in a rail. Read-only unless `onChange` is given; `inlineChips` adds each line's worst finding after its text. Needs a `MonacoProvider` above it.",
+          "A source file in Monaco with its findings as squiggles, gutter dots and read-only threads in a rail. Read-only unless `onChange` is given; `inlineFindings` lists each line's findings under it, as the review source view does. Needs a `MonacoProvider` above it.",
       },
     },
   },
@@ -119,12 +119,17 @@ export const Editable: Story = {
   },
 };
 
-export const InlineChips: Story = {
-  render: () => <Harness inlineChips />,
+export const InlineFindings: Story = {
+  render: () => <Harness inlineFindings />,
   play: async ({ canvasElement }) => {
-    // Monaco renders spaces in its view lines as no-break spaces.
-    const text = () => (canvasElement.textContent ?? "").replace(/\u00a0/g, " ");
-    await waitFor(() => expect(text()).toContain("Vale.Repetition · 'is' is repeated +1"));
-    await expect(text()).toContain("MD022 · Headings should be surrounded by blank lines");
+    const rows = () => [...canvasElement.querySelectorAll<HTMLElement>("[data-source-finding]")];
+    await waitFor(() => expect(rows()).toHaveLength(3));
+    await expect(rows().map((row) => [row.dataset.sourceFinding, row.textContent])).toEqual([
+      ["3", "'is' is repeatedvale Vale.Repetition"],
+      ["3", "Line length exceeds 80 charactersmarkdownlint MD013"],
+      ["4", "Headings should be surrounded by blank linesmarkdownlint MD022"],
+    ]);
+    // The rows render into view-zone nodes that Monaco attaches to the document on a later frame, and a detached node measures 0.
+    await waitFor(() => expect(rows().map((row) => row.getBoundingClientRect().height)).toEqual([20, 20, 20]));
   },
 };

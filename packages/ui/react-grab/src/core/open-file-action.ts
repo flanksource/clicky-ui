@@ -1,0 +1,31 @@
+// Derived from react-grab (MIT, Copyright (c) 2025 Aiden Bai): packages/react-grab/src/core/open-file-action.ts
+import { OpenFileError } from "../errors.js";
+import type { OpenFileActionHooks } from "../types.js";
+import { requestOpenFile } from "../utils/open-file.js";
+import { reportRecoverableError } from "../utils/report-recoverable-error.js";
+
+const reportOpenFileError = (
+  error: unknown,
+  filePath: string,
+  lineNumber: number | undefined,
+): void => {
+  reportRecoverableError(
+    error instanceof OpenFileError ? error : new OpenFileError(filePath, lineNumber, error),
+  );
+};
+
+export const executeOpenFileAction = (
+  filePath: string,
+  lineNumber: number | undefined,
+  hooks: OpenFileActionHooks,
+): void => {
+  try {
+    if (hooks.onOpenFile(filePath, lineNumber)) return;
+
+    void requestOpenFile(filePath, lineNumber, hooks.transformOpenFileUrl).catch((error) => {
+      reportOpenFileError(error, filePath, lineNumber);
+    });
+  } catch (error) {
+    reportOpenFileError(error, filePath, lineNumber);
+  }
+};

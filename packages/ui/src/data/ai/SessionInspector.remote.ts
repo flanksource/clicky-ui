@@ -4,6 +4,11 @@ import {
   type EventSourceFactory,
   type EventSourceLike,
 } from "../../hooks/event-source";
+import type {
+  SessionFeedHandlers,
+  SessionFeedSubscription,
+  SessionFollowState,
+} from "./session-feed";
 import type { SessionCollectionInput } from "./SessionInspector.collection-types";
 import type {
   SessionUIMessage,
@@ -33,6 +38,15 @@ import type {
 // requests): the first frame's value is the baseline (no refetch from it
 // alone), and any later frame whose `facets` differs from the last one seen
 // also triggers a refetch, independently of `revision`.
+//
+// A host that already receives these frames elsewhere (a task stream that
+// multiplexes them) passes a `feed` instead: the same entry/state/error
+// handling runs, fed by the subscription rather than an EventSource. Its
+// frames carry only what happens after they start, so the feed is subscribed
+// before the first read and entries that land while it is in flight are merged
+// into the result.
+
+export type { SessionFollowState } from "./session-feed";
 
 export const TERMINAL_SESSION_LIFECYCLES = [
   "succeeded",
@@ -61,6 +75,10 @@ export interface RemoteSessionOptions {
   /** Messages per read: the first read's `tail` and each history page's
    *  `limit`. Defaults to DEFAULT_SESSION_PAGE_SIZE. */
   pageSize?: number;
+  /** Live changes supplied by the host. When given, no EventSource is opened:
+   *  the feed is subscribed while the session is followed (see `follow`) and
+   *  `eventSourceFactory` is not used. */
+  feed?: SessionFeedSubscription;
 }
 
 export interface RemoteSessionState {
@@ -71,17 +89,6 @@ export interface RemoteSessionState {
   hasOlder?: boolean;
   /** A `loadOlder` page is in flight. */
   loadingOlder?: boolean;
-}
-
-/** The payload of a follow stream's `state` frame. */
-export interface SessionFollowState {
-  revision: number;
-  lifecycleStatus: string;
-  activityState: string;
-  /** Opaque fingerprint of non-message session facets (plan, todos, files,
-   *  approval requests). Always sent by captain — see the module doc above
-   *  for how it's used to decide whether to refetch. */
-  facets: string;
 }
 
 export interface RemoteSessionHandle {
@@ -160,6 +167,7 @@ export function openRemoteSession(
   {
     follow,
     pageSize = DEFAULT_SESSION_PAGE_SIZE,
+    feed,
     eventSourceFactory,
     onChange,
   }: RemoteSessionOptions & {
@@ -174,6 +182,7 @@ export function openRemoteSession(
   const streamed = new Map<string, { message: SessionUIMessage; seq: number }>();
   let closed = false;
   let source: EventSourceLike | undefined;
+  let unsubscribeFeed: (() => void) | undefined;
   let state: RemoteSessionState = { loading: true };
   let revision: number | undefined;
   let facets: string | undefined;
@@ -188,7 +197,10 @@ export function openRemoteSession(
   const stopFollowing = () => {
     source?.close();
     source = undefined;
+    unsubscribeFeed?.();
+    unsubscribeFeed = undefined;
   };
+  const origin = () => (feed ? `the session feed for ${src}` : url);
   const fail = (message: string) => {
     stopFollowing();
     emit({ ...state, loading: false, error: message });
@@ -261,34 +273,36 @@ export function openRemoteSession(
     }
   };
 
-  const onEntry = (event: Event) => {
-    const message = readFrame(event);
-    if (message === undefined) return;
+  const acceptEntry = (message: unknown, raw: string) => {
     if (!isRecord(message) || typeof message.id !== "string" || !message.id) {
-      fail(`Entry frame from ${url} has no message id: ${String((event as MessageEvent).data)}`);
+      fail(`Entry frame from ${origin()} has no message id: ${raw}`);
       return;
     }
     const entry = message as unknown as SessionUIMessage;
     streamed.set(message.id, { message: entry, seq: ++seq });
-    const session = state.session!;
+    // A feed is subscribed before the first read lands: the read merges what
+    // was streamed meanwhile, so there is nothing to show yet.
+    const session = state.session;
+    if (!session) return;
     emit({
       ...state,
       session: { ...session, messages: mergeSessionMessages(session.messages, [entry]) },
     });
   };
 
-  const onState = (event: Event) => {
-    const frame = readFrame(event);
-    if (frame === undefined) return;
+  const acceptState = (frame: unknown, raw: string) => {
     if (
       !isRecord(frame) ||
       typeof frame.revision !== "number" ||
       typeof frame.lifecycleStatus !== "string" ||
       typeof frame.facets !== "string"
     ) {
-      fail(`State frame from ${url} lacks a numeric revision, a lifecycleStatus, and facets: ${String((event as MessageEvent).data)}`);
+      fail(`State frame from ${origin()} lacks a numeric revision, a lifecycleStatus, and facets: ${raw}`);
       return;
     }
+    // Before the first read the read itself is authoritative; a feed's state
+    // frame that beats it has nothing to add.
+    if (!state.session) return;
     const next = frame as unknown as SessionFollowState;
     emit({
       ...state,
@@ -312,6 +326,24 @@ export function openRemoteSession(
       });
     }
     if (isTerminalSessionLifecycle(next.lifecycleStatus)) stopFollowing();
+  };
+
+  const onEntry = (event: Event) => {
+    const message = readFrame(event);
+    if (message !== undefined) acceptEntry(message, String((event as MessageEvent).data));
+  };
+
+  const onState = (event: Event) => {
+    const frame = readFrame(event);
+    if (frame !== undefined) acceptState(frame, String((event as MessageEvent).data));
+  };
+
+  const followFeed = (subscribe: SessionFeedSubscription) => {
+    unsubscribeFeed = subscribe({
+      onEntry: (entry) => acceptEntry(entry, JSON.stringify(entry)),
+      onState: (next) => acceptState(next, JSON.stringify(next)),
+      onError: (error) => fail(`Session feed for ${src} reported an error: ${error}`),
+    });
   };
 
   // Resumes after the newest real message held, so the server replays only
@@ -353,13 +385,21 @@ export function openRemoteSession(
     es.addEventListener("error", onError);
   };
 
+  // A feed delivers only what happens after it is subscribed, so it is
+  // subscribed before the read rather than after it.
+  if (feed && follow !== false) followFeed(feed);
+
   const loaded = refresh().then(
     (session) => {
       if (!session) throw new Error(`Session ${src} was closed before it loaded`);
       const lifecycle = session.lifecycleStatus;
       const wanted =
         follow ?? (lifecycle !== undefined && !isTerminalSessionLifecycle(lifecycle));
-      if (wanted && !closed) startFollowing();
+      if (feed) {
+        if (!wanted) stopFollowing();
+      } else if (wanted && !closed) {
+        startFollowing();
+      }
       return session;
     },
     (reason: unknown) => {
@@ -392,11 +432,16 @@ export interface RemoteSessionView extends RemoteSessionState {
  *  unmounting, closes the previous stream. */
 export function useRemoteSession(
   src: string | undefined,
-  { follow, pageSize }: RemoteSessionOptions = {},
+  { follow, pageSize, feed }: RemoteSessionOptions = {},
 ): RemoteSessionView {
   const eventSourceFactory = useEventSourceFactory();
   const factoryRef = useRef(eventSourceFactory);
   factoryRef.current = eventSourceFactory;
+  // A host usually builds the subscription inline, so only its presence — not
+  // its identity — restarts the session.
+  const feedRef = useRef(feed);
+  feedRef.current = feed;
+  const hasFeed = feed !== undefined;
   const handleRef = useRef<RemoteSessionHandle>(undefined);
   const [snapshot, setSnapshot] = useState<{
     src: string;
@@ -409,6 +454,15 @@ export function useRemoteSession(
     const handle = openRemoteSession(src, {
       ...(follow === undefined ? {} : { follow }),
       ...(pageSize === undefined ? {} : { pageSize }),
+      ...(hasFeed
+        ? {
+            feed: (handlers: SessionFeedHandlers) => {
+              const current = feedRef.current;
+              if (!current) throw new Error(`The session feed for ${src} was removed while it was followed`);
+              return current(handlers);
+            },
+          }
+        : {}),
       eventSourceFactory: factoryRef.current,
       onChange: (state) => setSnapshot({ src, state }),
     });
@@ -419,7 +473,7 @@ export function useRemoteSession(
       handle.close();
       if (handleRef.current === handle) handleRef.current = undefined;
     };
-  }, [src, follow, pageSize]);
+  }, [src, follow, pageSize, hasFeed]);
 
   const loadOlder = useCallback(() => handleRef.current?.loadOlder() ?? Promise.resolve(), []);
   const state = src === undefined ? IDLE : snapshot?.src === src ? snapshot.state : LOADING;

@@ -3,8 +3,7 @@ import type { ReactNode } from "react";
 import { hashKey, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
 import { cn } from "../lib/utils";
-import { formatDuration } from "../lib/format";
-import { useResourceClock } from "../hooks/use-resource-clock";
+import { ElapsedDuration } from "./ElapsedDuration";
 import { useTaskRun, useTaskRuns } from "../hooks/use-task-run";
 import type { FilterBarFilter } from "../components/FilterBar";
 import { Icon } from "./Icon";
@@ -14,10 +13,12 @@ import { ProgressBar } from "./ProgressBar";
 import { TaskProgress } from "./TaskProgress";
 import { taskWorkProgress } from "./task-work-progress";
 import type { TaskControlAction, TaskRunMeta, TaskSnapshot } from "./TaskSnapshot";
+import { resolveTaskSession, type TaskSessionRenderers } from "./TaskSession";
 import type { TaskHeaderExtra } from "./TaskHeaderExtras";
 import type { TaskExtraTabs } from "./TaskStreamTabs";
 import { taskQueryKeys } from "./task-query-keys";
 import { taskSegments, taskStatusColor, taskStatusIcon } from "./task-status";
+import { TaskPoolUsage, TaskRunConcurrency } from "./TaskPoolUsage";
 
 // TaskManager is the generic clicky-ui task-manager view: it lists every run
 // (TaskRunMeta) from GET {basePath}/tasks with kind/status filters, and expands
@@ -59,9 +60,16 @@ export interface TaskManagerProps {
    * for a task falls back to the default metadata chips.
    */
   headerExtra?: TaskHeaderExtra;
+  /**
+   * Renderers for the session a run or task drives, keyed by session type and
+   * layered over the built-in captain renderer.
+   */
+  sessionRenderers?: TaskSessionRenderers;
   renderRunDetails?: (run: TaskRunMeta, snapshots: TaskSnapshot[]) => ReactNode;
   controlUrl?: (run: TaskRunMeta, action: TaskControlAction) => string | undefined;
   showTaskControls?: (run: TaskRunMeta) => boolean;
+  /** Show the worker-pool gauges above the run listing. Default true. */
+  showPool?: boolean;
 }
 
 type RunTableRow = Record<string, unknown> & {
@@ -92,10 +100,47 @@ const startedColumn: DataTableColumn<RunTableRow> = { key: "startedAt", label: "
 const durationColumn: DataTableColumn<RunTableRow> = {
   key: "duration", label: "Duration", sortable: true,
   accessor: (row) => row.startedAt ? Date.parse(row.finishedAt ?? new Date().toISOString()) - Date.parse(row.startedAt) : null,
-  render: (_, row) => <RunDuration startedAt={row.startedAt} finishedAt={row.finishedAt} />,
+  render: (_, row) => (
+    <ElapsedDuration
+      startedAt={row.startedAt}
+      finishedAt={row.finishedAt}
+      fallback={<span className="text-muted-foreground">—</span>}
+    />
+  ),
 };
-const runColumns: DataTableColumn<RunTableRow>[] = [
-  { key: "name", label: "Run", sortable: true, grow: true, minWidth: 220 },
+// A run that drives a session shows its summary line under the run name.
+function runNameCell(row: RunTableRow, sessionRenderers: TaskSessionRenderers | undefined, detail?: ReactNode): ReactNode {
+  const session = row.run.session;
+  return (
+    <div className="min-w-0 space-y-0.5">
+      <div className="font-medium">{row.name}</div>
+      {detail}
+      {session && (
+        <div className="min-w-0 text-xs">{resolveTaskSession({ session, task: runGroupSnapshot(row.run), renderers: sessionRenderers }).summary}</div>
+      )}
+    </div>
+  );
+}
+
+function runGroupSnapshot(run: TaskRunMeta): TaskSnapshot {
+  return {
+    id: run.id,
+    name: run.name,
+    type: "group",
+    status: run.status,
+    groupId: run.id,
+    ...(run.kind ? { kind: run.kind } : {}),
+    ...(run.startedAt ? { startedAt: run.startedAt } : {}),
+    ...(run.finishedAt ? { finishedAt: run.finishedAt } : {}),
+    ...(run.session ? { session: run.session } : {}),
+  };
+}
+
+const runColumns = (sessionRenderers: TaskSessionRenderers | undefined): DataTableColumn<RunTableRow>[] => [
+  {
+    key: "name", label: "Run", sortable: true, grow: true, minWidth: 220,
+    render: (_, row) => runNameCell(row, sessionRenderers),
+  },
   {
     key: "status", label: "Status", sortable: true,
     render: (_, row) => (
@@ -111,20 +156,17 @@ const runColumns: DataTableColumn<RunTableRow>[] = [
   startedColumn,
   { key: "finishedAt", label: "Finished", kind: "timestamp", sortable: true },
 ];
-const compactRunColumns: DataTableColumn<RunTableRow>[] = [
+const compactRunColumns = (sessionRenderers: TaskSessionRenderers | undefined): DataTableColumn<RunTableRow>[] => [
   {
     key: "name", label: "Run", sortable: true, grow: true, minWidth: 220,
-    render: (_, row) => (
-      <div className="space-y-0.5">
-        <div className="font-medium">{row.name}</div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{applicationLabel(row.kind)}</span>
-          <span className={cn("inline-flex items-center gap-1 capitalize", taskStatusColor(row.status))}>
-            <Icon icon={taskStatusIcon(row.status)} />{row.status}
-          </span>
-        </div>
+    render: (_, row) => runNameCell(row, sessionRenderers, (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span>{applicationLabel(row.kind)}</span>
+        <span className={cn("inline-flex items-center gap-1 capitalize", taskStatusColor(row.status))}>
+          <Icon icon={taskStatusIcon(row.status)} />{row.status}
+        </span>
       </div>
-    ),
+    )),
   },
   progressColumn,
   startedColumn,
@@ -141,9 +183,11 @@ export function TaskManager({
   onSelectRun,
   extraTabs,
   headerExtra,
+  sessionRenderers,
   renderRunDetails,
   controlUrl,
   showTaskControls,
+  showPool = true,
 }: TaskManagerProps) {
   const [kindFilter, setKindFilter] = useState<string>(kind ?? "");
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -217,44 +261,46 @@ export function TaskManager({
     run,
   })), [runs]);
   const openId = onSelectRun ? selectedId : localSelectedId;
+  const columns = useMemo(
+    () => (compact ? compactRunColumns(sessionRenderers) : runColumns(sessionRenderers)),
+    [compact, sessionRenderers],
+  );
 
   return (
-    <DataTable
-      {...(className ? { className } : {})}
-      data={rows}
-      columns={compact ? compactRunColumns : runColumns}
-      emptyMessage="No background tasks."
-      externalFilters={filters}
-      filterBarProps={{ trailing: <span className="text-xs text-muted-foreground">{status}</span> }}
-      getRowId={(row) => row.id}
-      defaultSort={{ key: "startedAt", dir: "desc" }}
-      expandedRowIds={openId ? [openId] : []}
-      onExpandedRowIdsChange={(ids) => {
-        const next = ids.find((id) => id !== openId) ?? null;
-        if (onSelectRun) onSelectRun(next);
-        else setLocalSelectedId(next);
-      }}
-      renderExpandedRow={(row) => (
-        <ExpandedRun
-          run={row.run}
-          basePath={basePath}
-          pollMs={pollMs}
-          runsQueryKey={runsQueryKey}
-          extraTabs={extraTabs}
-          headerExtra={headerExtra}
-          renderRunDetails={renderRunDetails}
-          controlUrl={controlUrl}
-          showTaskControls={showTaskControls}
-        />
-      )}
-    />
+    <>
+      {showPool && <TaskPoolUsage basePath={apiBase} className="mb-3" />}
+      <DataTable
+        {...(className ? { className } : {})}
+        data={rows}
+        columns={columns}
+        emptyMessage="No background tasks."
+        externalFilters={filters}
+        filterBarProps={{ trailing: <span className="text-xs text-muted-foreground">{status}</span> }}
+        getRowId={(row) => row.id}
+        defaultSort={{ key: "startedAt", dir: "desc" }}
+        expandedRowIds={openId ? [openId] : []}
+        onExpandedRowIdsChange={(ids) => {
+          const next = ids.find((id) => id !== openId) ?? null;
+          if (onSelectRun) onSelectRun(next);
+          else setLocalSelectedId(next);
+        }}
+        renderExpandedRow={(row) => (
+          <ExpandedRun
+            run={row.run}
+            basePath={basePath}
+            pollMs={pollMs}
+            runsQueryKey={runsQueryKey}
+            extraTabs={extraTabs}
+            headerExtra={headerExtra}
+            sessionRenderers={sessionRenderers}
+            renderRunDetails={renderRunDetails}
+            controlUrl={controlUrl}
+            showTaskControls={showTaskControls}
+          />
+        )}
+      />
+    </>
   );
-}
-
-function RunDuration({ startedAt, finishedAt }: { startedAt: string | undefined; finishedAt: string | undefined }) {
-  const now = useResourceClock(!!startedAt && !finishedAt);
-  if (!startedAt) return <span className="text-muted-foreground">—</span>;
-  return <span className="tabular-nums">{formatDuration(Math.max(0, (finishedAt ? Date.parse(finishedAt) : now) - Date.parse(startedAt)))}</span>;
 }
 
 function applicationLabel(kind: string): string {
@@ -275,6 +321,7 @@ function ExpandedRun({
   runsQueryKey,
   extraTabs,
   headerExtra,
+  sessionRenderers,
   renderRunDetails,
   controlUrl,
   showTaskControls,
@@ -285,12 +332,13 @@ function ExpandedRun({
   runsQueryKey: QueryKey;
   extraTabs: TaskExtraTabs | undefined;
   headerExtra: TaskHeaderExtra | undefined;
+  sessionRenderers: TaskSessionRenderers | undefined;
   renderRunDetails: TaskManagerProps["renderRunDetails"];
   controlUrl: TaskManagerProps["controlUrl"];
   showTaskControls: TaskManagerProps["showTaskControls"];
 }) {
   const runId = run.id;
-  const { snapshots, status } = useTaskRun({ id: runId, basePath, pollMs });
+  const { snapshots, status, sessionFeed } = useTaskRun({ id: runId, basePath, pollMs });
   const apiBase = basePath ?? "/api/v1";
   const queryClient = useQueryClient();
   const pendingControls = useRef(new Map<string, Promise<void>>());
@@ -354,6 +402,7 @@ function ExpandedRun({
           <span key={key} className="font-mono">{key}={value}</span>
         ))}
       </div>
+      <TaskRunConcurrency basePath={apiBase} runId={runId} />
       {renderRunDetails?.(run, snapshots)}
       <TaskProgress
         snapshots={snapshots}
@@ -365,6 +414,8 @@ function ExpandedRun({
         metricsBaseUrl={`${apiBase}/tasks/metrics/`}
         {...(extraTabs ? { extraTabs } : {})}
         {...(headerExtra ? { headerExtra } : {})}
+        {...(sessionRenderers ? { sessionRenderers } : {})}
+        {...(sessionFeed ? { sessionFeed } : {})}
       />
     </div>
   );

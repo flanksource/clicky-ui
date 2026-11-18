@@ -1,0 +1,34 @@
+import { mkdir, mkdtemp, readFile, symlink } from "node:fs/promises";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { resolve } from "node:path";
+import { expect, it } from "vitest";
+import type { Fragment } from "../schema.ts";
+import { prepareCommonJsSources } from "./commonjs.ts";
+import { compileCommonJsSource } from "../sw/compile.ts";
+import { sourceHash } from "../sw/source-hash.ts";
+import { exampleLink, exampleLock } from "./testing-fixtures.ts";
+import { compileLinkModule } from "../sw/link-compiler.ts";
+
+it("uses the runtime-set converter and actual export analysis for the declared icons/mi alias", async () => {
+  const libraryDir = fileURLToPath(new URL("../../../ui/node_modules/@flanksource/icons/", import.meta.url));
+  const base = JSON.parse(await readFile(new URL("../../../ui/dist/runtime/importmap.json", import.meta.url), "utf8")) as Fragment;
+  const parent = resolve("../../.tmp/V-runtime-for-j/commonjs"); await mkdir(parent, { recursive: true });
+  const outDir = await mkdtemp(`${parent}/converted-`);
+  await symlink(fileURLToPath(new URL("../../../ui/node_modules", import.meta.url)), `${outDir}/node_modules`, "dir");
+  const prepared = await prepareCommonJsSources({ libraryDir, outDir, runtimePath: "dist/runtime/source-commonjs", paths: ["mi/index.js"], base });
+  const converted = prepared.commonjs["mi/index.js"]!;
+  const original = await readFile(`${libraryDir}/mi/index.js`, "utf8");
+  expect(converted.hash).toBe(sourceHash(original));
+  const target = prepared.files[converted.target];
+  expect(target).toBeDefined();
+  const module = await import(/* @vite-ignore */ pathToFileURL(target!).href);
+  expect({ Docker: typeof module.Docker, Aws: typeof module.Aws, IconMap: typeof module.IconMap }).toEqual({ Docker: "function", Aws: "function", IconMap: "object" });
+  expect(module.default.Docker).toBe(module.Docker);
+  const forwarded = compileCommonJsSource({ path: "mi/index.js", code: original, conversion: { ...converted, target: "/link/icons/" + converted.target } });
+  expect(forwarded).toContain('export * from "/link/icons/');
+  const link = exampleLink(); link.id = "icons";
+  link.build = { ...link.build, library: prepared.fragment.name, version: JSON.parse(await readFile(`${libraryDir}/package.json`, "utf8")).version, fragment: prepared.fragment, modules: { "mi/index.js": { resolutions: {} } }, commonjs: prepared.commonjs };
+  const compiled = await compileLinkModule({ path: "/link/icons/mi/index.js", code: original, lock: exampleLock(), links: [link], sources: [], query: new URLSearchParams(), plugins: {} as never });
+  expect([...compiled.matchAll(/from "([^"]+)"/g)].map((match) => decodeURIComponent(new URL(match[1]!, "https://runtime.invalid").pathname))).toEqual([`/link/icons/${converted.target}`, `/link/icons/${converted.target}`]);
+  expect(() => compileCommonJsSource({ path: "mi/index.js", code: original + "\n", conversion: converted })).toThrow(/rebuild/);
+});

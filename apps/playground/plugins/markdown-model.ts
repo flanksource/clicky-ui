@@ -2,6 +2,12 @@ export type GuidanceTone = "do" | "avoid" | "rule";
 
 export type GuidanceBlock =
   | {
+      kind: "vocabulary";
+      alias: string;
+      instructions: string;
+      items: import("../../../packages/ui/src/comments/comment-vocabulary").CommentVocabularyItem[];
+    }
+  | {
       kind: "section";
       title: string;
       description?: string;

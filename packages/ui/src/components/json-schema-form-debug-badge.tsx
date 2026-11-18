@@ -15,6 +15,8 @@ export interface FieldDebugInfo {
   field: FieldControl;
   prop: JsonSchemaProperty;
   hiddenReason: string | undefined;
+  // The form extension that provides this field's control (a custom format).
+  source?: string;
 }
 
 const FOOTER_BUTTON = "inline-flex items-center gap-1 rounded px-1 text-[11px] text-sky-700 hover:bg-muted dark:text-sky-300";
@@ -109,7 +111,7 @@ function ClampedCard({
 
 // FieldDebugDetails is the card's content. The dialog's own header already
 // names the field, so it renders without the heading.
-function FieldDebugDetails({ fieldKey, instancePath, field, prop, hiddenReason, withHeading = true }: FieldDebugInfo & { withHeading?: boolean }) {
+function FieldDebugDetails({ fieldKey, instancePath, field, prop, hiddenReason, source, withHeading = true }: FieldDebugInfo & { withHeading?: boolean }) {
   return (
     <div className="space-y-1.5">
       {withHeading && (
@@ -126,6 +128,11 @@ function FieldDebugDetails({ fieldKey, instancePath, field, prop, hiddenReason, 
       {hiddenReason !== undefined && (
         <p className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
           <Icon icon={UiEyeClosed} /> {hiddenReason}
+        </p>
+      )}
+      {source !== undefined && (
+        <p data-debug-extension={source} className="text-muted-foreground">
+          Rendered by form extension <span className="font-mono">{source}</span> (format <span className="font-mono">{field.format}</span>)
         </p>
       )}
       {prop.description && <p className="text-muted-foreground">{prop.description}</p>}

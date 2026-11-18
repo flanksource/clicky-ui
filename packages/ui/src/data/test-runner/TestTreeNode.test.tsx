@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
 import { TestTreeNode } from "./TestTreeNode";
 import { TestRunnerProvider } from "./context";
 import { createTestRunnerRegistry } from "./adapter";
@@ -31,9 +31,15 @@ function renderRow(node: Test) {
 }
 
 describe("TestTreeNode count badges", () => {
-  it("uses a neutral badge for aborted children", () => {
+  it("uses a neutral outline badge for aborted children", () => {
     renderRow({ name: "plan", children: [{ name: "not run", aborted: true, skipped: true }] });
-    expect(screen.getByText("1").parentElement).toHaveClass("bg-muted", "text-foreground");
+    expect(screen.getByText("1").parentElement).toHaveClass("bg-transparent", "border-border", "text-foreground", "rounded-sm");
+  });
+  it("renders a failed count as a danger outline badge, not a filled pill", () => {
+    renderRow({ name: "plan", children: [{ name: "broken", failed: true }] });
+    const badge = screen.getByText("1").parentElement;
+    expect(badge).toHaveClass("bg-transparent", "border-red-500", "rounded-sm");
+    expect(badge).not.toHaveClass("bg-red-500", "rounded-full");
   });
   // A subtree of warnings only (a lint rule, a soft-failing suite) still has a
   // size worth showing; without a warned badge its row carried no count at all.
@@ -41,6 +47,17 @@ describe("TestTreeNode count badges", () => {
     const warnedLeaves = Array.from({ length: 3 }, (_, i) => ({ name: `w${i}`, warned: true }));
     renderRow({ name: "rule", children: warnedLeaves } as Test);
     expect(screen.getByText("3")).toBeTruthy();
+  });
+  // A container whose children all passed already says so with its green
+  // outcome icon; a lone green count repeats it.
+  it.each([1, 4])("shows no badge on a container whose %i children all passed", (count) => {
+    const passedLeaves = Array.from({ length: count }, (_, i) => ({ name: `p${i}`, passed: true }));
+    renderRow({ name: "step", children: passedLeaves } as Test);
+    expect(screen.queryByText(String(count))).toBeNull();
+  });
+  it("keeps the passed count beside another status", () => {
+    renderRow({ name: "plan", children: [{ name: "ok", passed: true }, { name: "ok2", passed: true }, { name: "broken", failed: true }] } as Test);
+    expect([screen.getByText("2").parentElement?.className.includes("border-green-500"), screen.getByText("1").parentElement?.className.includes("border-red-500")]).toEqual([true, true]);
   });
 });
 
@@ -99,5 +116,36 @@ describe("TestTreeNode framework mark", () => {
     step.unmount();
     const test = renderRow(spec as Test);
     expect(test.container.querySelector('svg[aria-label="Playwright"]')).not.toBeNull();
+  });
+});
+
+describe("TestTreeNode duration", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.parse("2026-10-15T07:00:05Z"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("ticks a running task node from its started timestamp", () => {
+    renderRow({ name: "install", framework: "task", running: true, started: "2026-10-15T07:00:00Z" } as Test);
+    expect(screen.getByText("5.0s")).toBeTruthy();
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(screen.getByText("7.0s")).toBeTruthy();
+  });
+
+  it("shows a finished node's reported duration, not the time since it started", () => {
+    renderRow({ name: "install", passed: true, started: "2026-10-15T07:00:00Z", duration: 1.5e9 } as Test);
+    expect(screen.getByText("1.5s")).toBeTruthy();
+    expect(screen.queryByText("5.0s")).toBeNull();
+  });
+
+  it("shows no duration for a running node that has neither started nor a duration", () => {
+    const { container } = renderRow({ name: "install", running: true } as Test);
+    expect(container.textContent).not.toMatch(/\d(ms|s)$/);
   });
 });

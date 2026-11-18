@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { DocumentEditor } from "./DocumentEditor";
+import { DocumentEditor, DocumentForm, type DocumentSchemaFormProps } from "./DocumentEditor";
 vi.mock("./MonacoEditor", () => ({
   MonacoEditor: ({
     value,
@@ -110,6 +110,26 @@ describe("DocumentEditor", () => {
     expect(screen.getByRole("textbox", { name: /name/ })).toHaveValue(
       "initial",
     );
+  });
+  it("renders the document through a host Form and writes its edits back into the source", () => {
+    const onChange = vi.fn();
+    const schema = {
+      type: "object",
+      "x-clicky-extensions": [{ ref: "extensions/pickers.tsx" }],
+      properties: { name: { type: "string" } },
+    } as const;
+    const Form = vi.fn(({ value, onChange: change }: DocumentSchemaFormProps) => (
+      <button type="button" onClick={() => change({ ...value, name: "renamed" })}>
+        Host form for {String(value["name"])}
+      </button>
+    ));
+    render(<DocumentForm path="config.yaml" value={"name: initial\n"} onChange={onChange} schema={schema} Form={Form} />);
+    fireEvent.click(screen.getByRole("button", { name: "Host form for initial" }));
+    expect({
+      schema: Form.mock.calls[0]?.[0].schema,
+      applyDefaults: Form.mock.calls[0]?.[0].applyDefaults,
+      saved: onChange.mock.calls,
+    }).toEqual({ schema, applyDefaults: false, saved: [["name: renamed\n"]] });
   });
   it("retains invalid source when form parsing fails", () => {
     const onChange = vi.fn();
