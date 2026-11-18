@@ -24,7 +24,7 @@ async function bundle(entry: string): Promise<string> {
   const chunk = result.output.find((file) => file.type === "chunk"); if (!chunk || chunk.type !== "chunk") throw new Error("Missing test bundle"); return chunk.code;
 }
 function serve(handle: (request: IncomingMessage, response: ServerResponse) => Promise<void>): Server {
-  return createServer((request, response) => { void handle(request, response).catch((error: unknown) => { response.statusCode = 500; response.end(String(error)); }); });
+  return createServer((request, response) => { void handle(request, response).catch((error: unknown) => { console.error("Link test request failed", error); response.statusCode = 500; response.end("Link test request failed"); }); });
 }
 
 export async function startLinkTestServer() {
@@ -58,7 +58,7 @@ export async function startLinkTestServer() {
     response.setHeader("access-control-allow-origin", "*"); response.setHeader("cache-control", "no-store");
     const path = resolve(checkout, "." + decodeURIComponent(new URL(request.url!, "http://localhost").pathname));
     if (!path.startsWith(checkout + sep)) { response.statusCode = 403; response.end("outside checkout"); return; }
-    try { response.end(await readFile(path)); } catch (error) { response.statusCode = 404; response.end(String(error)); }
+    try { response.end(await readFile(path)); } catch (error) { console.error("Link test file unavailable", error); response.statusCode = 404; response.end("Link test file unavailable"); }
   });
   const sourceOrigin = await listen(source);
   let hostOrigin = ""; let runtimeOrigin = "";
@@ -100,7 +100,7 @@ export async function startLinkTestServer() {
     if (url.pathname === "/control") { response.end(`<!doctype html><p>Unlinked control</p><script>parent.postMessage("control-ready",${JSON.stringify(hostOrigin)})</script>`); return; }
     if (url.pathname === "/test-frame") {
       const map = { imports: Object.fromEntries(Object.entries(lock.map.imports).map(([name, target]) => [name, moduleUrl(target)])), scopes: Object.fromEntries(Object.entries(lock.map.scopes).map(([scope, table]) => [scope, Object.fromEntries(Object.entries(table).map(([name, target]) => [name, moduleUrl(target)]))])) };
-      response.end(`<!doctype html><html><head><script type="importmap">${JSON.stringify(map)}</script></head><body><div id="root"></div><script type="module">try{await import("/src/page.tsx?page=page.tsx");const ready=()=>{const marker=document.querySelector("[data-link-edit]");if(marker&&document.querySelectorAll("tbody tr").length===2)requestAnimationFrame(()=>requestAnimationFrame(()=>parent.postMessage({marker:marker.textContent,at:performance.timeOrigin+performance.now(),reactInstances:globalThis.reactInstances,reactEvaluations:globalThis.__LINK_REACT_EVALUATIONS__},${JSON.stringify(hostOrigin)})));else requestAnimationFrame(ready)};ready()}catch(e){parent.postMessage({error:String(e)},${JSON.stringify(hostOrigin)})}</script></body></html>`); return;
+      response.end(`<!doctype html><html><head><script type="importmap">${JSON.stringify(map).replaceAll("<", "\\u003c")}</script></head><body><div id="root"></div><script type="module">try{await import("/src/page.tsx?page=page.tsx");const ready=()=>{const marker=document.querySelector("[data-link-edit]");if(marker&&document.querySelectorAll("tbody tr").length===2)requestAnimationFrame(()=>requestAnimationFrame(()=>parent.postMessage({marker:marker.textContent,at:performance.timeOrigin+performance.now(),reactInstances:globalThis.reactInstances,reactEvaluations:globalThis.__LINK_REACT_EVALUATIONS__},${JSON.stringify(hostOrigin)})));else requestAnimationFrame(ready)};ready()}catch(e){parent.postMessage({error:String(e)},${JSON.stringify(hostOrigin)})}</script></body></html>`); return;
     }
     response.statusCode = 404; response.end("missing runtime test page");
   });

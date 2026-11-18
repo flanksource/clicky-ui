@@ -181,7 +181,7 @@ async function addEsmPackage(options: AdditionalOptions): Promise<Record<string,
       const [prefix, suffix = ""] = path.replace(/^\.\//, "").split("*");
       for (const file of paths) {
         const relative = file.slice(root.length + 1);
-        if (relative.startsWith(prefix!) && relative.endsWith(suffix)) imports[specifier.replace("*", relative.slice(prefix!.length, relative.length - suffix.length))] = `/npm/${file}`;
+        if (relative.startsWith(prefix!) && relative.endsWith(suffix)) imports[specifier.replaceAll("*", () => relative.slice(prefix!.length, relative.length - suffix.length))] = `/npm/${file}`;
       }
     } else imports[specifier] = `/npm/${root}/${path.replace(/^\.\//, "")}`;
   }

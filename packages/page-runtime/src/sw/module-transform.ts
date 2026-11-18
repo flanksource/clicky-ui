@@ -51,7 +51,17 @@ const PLAIN_NAME = new RegExp(String.raw`^${IDENTIFIER}$`, "u");
 
 function unquote(name: string): string {
   if (name.startsWith('"')) return JSON.parse(name) as string;
-  if (name.startsWith("'")) return JSON.parse(`"${name.slice(1, -1).replace(/\\'/g, "'").replace(/"/g, '\\"')}"`) as string;
+  if (name.startsWith("'")) {
+    let json = '"';
+    for (let i = 1; i < name.length - 1; i += 1) {
+      const char = name[i]!;
+      if (char === "\\") {
+        const escaped = name[++i]!;
+        json += escaped === "'" ? "'" : `\\${escaped}`;
+      } else json += char === '"' ? '\\"' : char;
+    }
+    return JSON.parse(`${json}"`) as string;
+  }
   return name;
 }
 

@@ -189,7 +189,7 @@ export function exportEntries(dir: string): Array<{ specifier: string; path: str
     for (const path of filesUnder(dirname(base))) {
       if (!path.startsWith(base) || !path.endsWith(targetSuffix) || path.endsWith(".d.ts")) continue;
       const captured = path.slice(base.length, path.length - targetSuffix.length).split(sep).join("/");
-      entries.push({ specifier: specifier.replace("*", captured), path });
+      entries.push({ specifier: specifier.replaceAll("*", () => captured), path });
     }
   }
   return entries;

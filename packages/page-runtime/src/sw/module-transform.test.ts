@@ -29,6 +29,11 @@ beforeAll(async () => {
 });
 
 describe("parseClause", () => {
+  it("preserves escaped backslashes before quotes in single-quoted module names", () => {
+    expect(parseClause(String.raw`{ 'a\\"b' as c }`)).toEqual({
+      bindings: [{ imported: 'a\\"b', local: "c" }], namespace: null,
+    });
+  });
   it.each([
     ["{ a, b as c }", { bindings: [{ imported: "a", local: "a" }, { imported: "b", local: "c" }], namespace: null }],
     ["d, { e }", { bindings: [{ imported: "default", local: "d" }, { imported: "e", local: "e" }], namespace: null }],

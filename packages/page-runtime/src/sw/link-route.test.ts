@@ -124,6 +124,7 @@ describe("link route compilation and invalidation", () => {
     const handler = createLinkRoutes({ origin, version: "test", profile, caches: memoryCaches(), store: memoryLinkStorage(), plugins: BASE_PLUGINS, load: async () => ({ lock: exampleLock(), files: {} }) });
     const response = await handler(new Request(`${origin}/link/_control`, { method: "POST", body: JSON.stringify({ developerOverrides: "true", command: { type: "install", link: exampleLink() } }) }));
     expect(response?.status).toBe(403);
+    expect(await response?.text()).toBe("Link control request rejected");
   });
   it("rejects linked requests outside the page override", async () => {
     const handler = createLinkRoutes({ origin, version: "test", profile, caches: memoryCaches(), store: memoryLinkStorage(), plugins: BASE_PLUGINS, load: async () => ({ lock: exampleLock(), files: {} }) });
