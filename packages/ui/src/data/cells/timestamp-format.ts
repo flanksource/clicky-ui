@@ -1,4 +1,16 @@
-import type { TimeRangePresetGroup } from "../../components/TimeRange";
+import type { TimeRangePreset, TimeRangePresetGroup } from "../../components/TimeRange";
+
+export const LAST_24_HOURS = { label: "Last 24 hours", from: "now-24h", to: "now" };
+
+export const TIMESTAMP_RANGE_PRESETS: TimeRangePreset[] = [
+  { label: "Last 5 minutes", from: "now-5m", to: "now" },
+  { label: "Last 15 minutes", from: "now-15m", to: "now" },
+  { label: "Last 1 hour", from: "now-1h", to: "now" },
+  { label: "Last 6 hours", from: "now-6h", to: "now" },
+  LAST_24_HOURS,
+  { label: "Last 7 days", from: "now-7d", to: "now" },
+  { label: "Last 30 days", from: "now-30d", to: "now" },
+];
 
 export type TimestampMode = "auto" | "absolute" | "relative" | "time";
 

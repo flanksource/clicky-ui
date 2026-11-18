@@ -223,6 +223,10 @@ function buildField(
       ...(ctx.onRootChange ? { onRootChange: ctx.onRootChange } : {}),
     });
   }
+  // Debug mode keeps a dropped field for inspection, as its control alone: the
+  // extension that dropped it may own its rendering elsewhere (a post-extension
+  // drawing it beside another field), so post-extensions never see it.
+  const keptForDebug = !field;
   if (!field) {
     if (hide("dropped by a form extension")) return null;
     field = beforeDrop;
@@ -312,7 +316,7 @@ function buildField(
   ({ label, value } = applyPostExtensions(
     valueCtx.readOnly ? { ...field, readOnly: true } : field,
     { label, value },
-    ctx.post,
+    keptForDebug ? [] : ctx.post,
     postCtx,
   ));
   if (ctx.layout.mode === "properties" && !nestedProperty && field.kind !== "display" && field.kind !== "link") {
@@ -320,13 +324,13 @@ function buildField(
       renderPreview={(previewField) => applyPostExtensions(
         { ...previewField, readOnly: true },
         { label, value: <PropertyValuePreview field={previewField} fieldId={`${fieldId}-preview`} ctx={{ ...valueCtx, idPrefix: `${ctx.idPrefix ?? ""}-preview` }} /> },
-        ctx.post,
+        keptForDebug ? [] : ctx.post,
         postCtx,
       ).value}
       renderEditor={(draftField, draftCtx) => applyPostExtensions(
         draftField,
         { label, value: renderValueControl(draftField, draftCtx) },
-        draftCtx.post,
+        keptForDebug ? [] : draftCtx.post,
         { ...postCtx, ...(draftCtx.rootValue ? { rootValue: draftCtx.rootValue } : {}), ...(draftCtx.onRootChange ? { onRootChange: draftCtx.onRootChange } : {}) },
       ).value} />;
   }

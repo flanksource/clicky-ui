@@ -93,6 +93,25 @@ describe("JsonSchemaForm debug mode", () => {
     expect(hiddenRows(container)).toEqual({ Computed: "hidden: read-only", Blank: "hidden: empty" });
   });
 
+  it("shows a field a pre-extension dropped without handing it to the post-extensions", () => {
+    const schema: JsonSchemaObject = {
+      type: "object",
+      properties: { Repository: { type: "string", title: "Repository" }, Branch: { type: "string", title: "Branch" } },
+    };
+    const pre = (field: { key: string }) => (field.key === "Repository" ? null : field);
+    const post = vi.fn((field: { key: string }, nodes: { label: unknown; value: unknown }) => {
+      if (field.key === "Repository") throw new Error("Repository reached the post-extensions");
+      return nodes;
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ debug: true }));
+    const { container } = render(
+      <JsonSchemaForm schema={schema} value={{}} onChange={vi.fn()} preferencesStorageKey={STORAGE_KEY} pre={[pre as never]} post={[post as never]} />,
+    );
+
+    expect(hiddenRows(container)).toEqual({ Repository: "dropped by a form extension" });
+    expect(post.mock.calls.map(([field]) => field.key)).toContain("Branch");
+  });
+
   it("tells where a field comes from: its query, its default and its schema", () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ debug: true }));
     renderForm();

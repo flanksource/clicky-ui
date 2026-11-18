@@ -28,7 +28,7 @@ const schema: JsonSchemaObject = {
 function fieldLabels(container: HTMLElement): string[] {
   return Array.from(container.querySelectorAll("input[id]"), (input) => {
     const label = container.querySelector(`label[for="${input.id}"]`);
-    return label?.textContent?.replace("*", "").trim() ?? input.id;
+    return label?.textContent?.replaceAll("*", "").trim() ?? input.id;
   });
 }
 
