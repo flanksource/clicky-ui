@@ -12,7 +12,7 @@ export function useCaptainSessions(page?: string) {
     setError(null);
     const load = async () => {
       try {
-        const linked = page ? Object.entries(readPageTargets()).filter(([key]) => pageInSessionScope(key, page)).map(([, target]) => target.sessionId) : [];
+        const linked = page ? Object.entries(readPageTargets()).flatMap(([key, target]) => pageInSessionScope(key, page) && target.kind !== "playground" ? [target.sessionId] : []) : [];
         const next = await fetchCaptainSessions(page, linked);
         if (active) { setSessions(next); setError(null); }
       } catch (cause) {

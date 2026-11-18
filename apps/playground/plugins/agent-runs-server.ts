@@ -28,6 +28,7 @@ import {
   type AgentSessionSettings,
   type AgentSessionsFile,
   type AgentSessionsView,
+  type AgentTarget,
   type PageAgentState,
   type SessionAgentTarget,
 } from "./agent-session-store";
@@ -807,7 +808,18 @@ export function createAgentRuns(options: AgentRunsOptions) {
   /** The stored file, and the auto-run state of `page` when one is asked about. */
   async function sessionsView(page?: string): Promise<AgentSessionsView> {
     const { settings, sessions } = await verifiedSessions();
-    return { settings, sessions, pages: page ? { [page]: autoRunOf(await (await commentsClient(dir)).agent(page)) } : {} };
+    if (!page) return { settings, sessions, pages: {} };
+    const gavel = await commentsClient(dir);
+    const rule = await gavel.agent(page);
+    const group = rule.agent.agent.group ?? (rule.agent.agent.enabled ? "comments:shared" : settings.grouping === "page" ? `playground:page:${page}` : "playground:shared");
+    const candidates = await gavel.agentSessions(rule.session ? undefined : group);
+    if (!rule.session && candidates.length > 1) throw new Error(`Gavel returned multiple current sessions for comment group ${group}; update the Gavel server`);
+    const selected = rule.session ? candidates.find(session => session.id === rule.session) : candidates[0];
+    if (rule.session && !selected) throw new Error(`Default comment session ${rule.session} is unavailable`);
+    const defaultTarget: AgentTarget | undefined = selected
+      ? { kind: selected.managed ? "managed" : "captain", sessionId: selected.id, label: selected.title }
+      : undefined;
+    return { settings, sessions, pages: { [page]: { ...autoRunOf(rule), ...(defaultTarget ? { defaultTarget } : {}) } } };
   }
 
   async function proxy(

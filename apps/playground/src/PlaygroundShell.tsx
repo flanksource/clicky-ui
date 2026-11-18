@@ -48,7 +48,7 @@ import { useCommentDetails } from "./comments/useCommentDetails";
 import { PlaygroundCommentReview } from "./comments/PlaygroundCommentReview";
 import { useResolvedCommentReview } from "./comments/useResolvedCommentReview";
 import { AnnotationVisibilityProvider } from "./annotations";
-import { PageActions, PageManagementDialogs } from "./editor/PageManagement";
+import { PageManagementDialogs } from "./editor/PageManagement";
 import { usePageFolders } from "./editor/usePageFolders";
 import { usePageMoveDrag } from "./editor/usePageMoveDrag";
 import { fileSourceTarget, useSource } from "./editor/useSource";
@@ -56,6 +56,7 @@ import { MarkdownPage } from "./markdown/MarkdownPage";
 import { usePageGuidance } from "./markdown/usePageGuidance";
 import { PlaygroundBanner as Banner } from "./PlaygroundShellParts";
 import { PlaygroundBodyHeader } from "./PlaygroundBodyHeader";
+import { PlaygroundEditFab, type PlaygroundEditFabProps } from "./PlaygroundEditFab";
 import {
   PlaygroundMobileActions,
   PlaygroundShellActions,
@@ -134,12 +135,10 @@ export type PlaygroundShellProps = {
   view: PlaygroundView;
   annotations: AnnotationVisibility;
   showRejected: boolean;
-  onShowRejectedChange: (show: boolean) => void;
   review?: "resolved";
   selectedCommentId?: string;
   pageHref: (slug: string) => string;
   onViewChange: (view: PlaygroundView) => void;
-  onAnnotationsChange: (annotations: AnnotationVisibility) => void;
   onNavigate: (slug?: string) => void;
   onReviewNavigate: (page: string, comment?: string) => void;
   onReviewExit: () => void;
@@ -171,12 +170,10 @@ export function PlaygroundShell({
   view,
   annotations,
   showRejected,
-  onShowRejectedChange,
   review,
   selectedCommentId,
   pageHref,
   onViewChange,
-  onAnnotationsChange,
   onNavigate,
   onReviewNavigate,
   onReviewExit,
@@ -376,11 +373,7 @@ export function PlaygroundShell({
   const railVisible =
     Boolean(active) && !folderPage && view === "preview" &&
     // A markdown page shows its own threads; only the resolved-review queue needs the rail there.
-    (!markdownPage || review === "resolved") &&
-    (annotations === "visible" || review === "resolved") &&
-    (review === "resolved" ||
-      ctx.railMode !== "closed" ||
-      ctx.comments.length > 0);
+    (!markdownPage || review === "resolved");
   const openCommentCount = ctx.comments.filter(comment => !comment.parentId && ctx.config.statuses.some(status => status.value === comment.status && status.unresolved)).length;
   // Commenting inside a portaled dialog: lift the rail over the modal backdrop
   // so its composer can be clicked without closing the dialog.
@@ -399,33 +392,37 @@ export function PlaygroundShell({
     onViewChange("preview");
   }, [unsupportedView, onViewChange]);
   const actionPage = pageAction?.page ?? active;
-  const pageActions = active && !repositoryDocument && !folderPage ? (
-    <PageActions
-      disabled={filesystemActionsDisabled}
-      disabledReason={filesystemActionsDisabledReason}
-      onSelect={(action) => setPageAction({ action, page: active })}
-    />
-  ) : undefined;
   const shellActionProps: PlaygroundShellActionsProps = {
+    fileActions: Boolean(active && !repositoryDocument && !folderPage),
     recent,
     view,
-    annotations,
-    showRejected,
-    onShowRejectedChange,
     copyDisabled: pageGuidance.markdown === null,
     pageMarkdownCopied: pageGuidance.copied,
     onViewChange,
-    onAnnotationsChange,
     onCopyPage: () => void pageGuidance.copyPage(),
     filesystemActionsDisabled,
     ...(filesystemActionsDisabledReason
       ? { filesystemActionsDisabledReason }
       : {}),
-    onNewPage: (action) => setPageAction({ action }),
+    onPageAction: (action) => setPageAction({ action, ...(active ? { page: active } : {}) }),
     active: Boolean(active) && !folderPage,
     markdownPage,
+    sourceDirty: sourceBusy,
+    reviewActive: review === "resolved",
+    reviewCount: Object.values(activity.feedback).reduce((count, page) => count + page.resolvedCount, 0),
+    onToggleReview: () => review === "resolved" ? onReviewExit() : onReviewNavigate(active?.slug ?? ""),
+    onCommentWholePage: () => { setCommentDraft(null); ctx.focusAnchor(DOCUMENT_ANCHOR); },
+    feedbackCopied: feedback.copied,
+    onCopyFeedback: feedback.copyFeedback,
+    feedbackCopyActions: feedback.copyActions,
+    pageCommentCount: ctx.comments.length,
+    problemsError: tree.problemsError,
+  };
+  const editFabVisible = Boolean(active) && !markdownPage && !folderPage;
+  const editFabProps: PlaygroundEditFabProps = {
     editing,
     sourceDirty: sourceBusy,
+    showDesign: view === "preview",
     onToggleEditing: () => {
       setDesigning(false);
       setEditTarget((target) => (target ? null : { kind: "page" }));
@@ -444,25 +441,15 @@ export function PlaygroundShell({
         : visualPending
           ? { designDisabledReason: "Finish the visual edit before leaving Design mode" }
           : {}),
-    reviewActive: review === "resolved",
-    reviewCount: Object.values(activity.feedback).reduce((count, page) => count + page.resolvedCount, 0),
-    onToggleReview: () => review === "resolved" ? onReviewExit() : onReviewNavigate(active?.slug ?? ""),
-    onCommentWholePage: () => { setCommentDraft(null); ctx.focusAnchor(DOCUMENT_ANCHOR); },
-    feedbackCopied: feedback.copied,
-    onCopyFeedback: feedback.copyFeedback,
-    feedbackCopyActions: feedback.copyActions,
-    pageCommentCount: ctx.comments.length,
-    problemsError: tree.problemsError,
   };
 
   // Below the workspace's stacking width the header keeps only the compact cluster; the rest
-  // moves into the "More actions" row at the top of the page.
+  // moves into the page toolbar row at the top of the page.
   const headerActions = (
     <>
       <div className="hidden flex-wrap items-center justify-end gap-1.5 @3xl/workspace:flex">
         {activeMeta?.appShellActions}
         <PlaygroundShellActions {...shellActionProps} />
-        {pageActions}
       </div>
       <div className="flex items-center gap-1 @3xl/workspace:hidden">
         <PlaygroundMobileActions
@@ -480,7 +467,6 @@ export function PlaygroundShell({
     >
       {activeMeta?.appShellActions}
       <PlaygroundShellActions {...shellActionProps} overflow />
-      {pageActions}
     </div>
   );
   const pageContent = (
@@ -490,6 +476,7 @@ export function PlaygroundShell({
       {!active ? <div className="min-h-0 flex-1 overflow-auto"><CommentDashboard comments={allComments} loading={commentsLoading} error={commentsError} pageHref={pageHref} /></div> : <div className="flex min-h-0 flex-1 flex-col">
         <RunningSessionBars key={active.slug} page={active.slug} />
         <div className="flex min-h-0 flex-1">
+        <div className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", editFabVisible && "pt-14")}>
         <div
           ref={attachScrollRef}
           className="relative min-w-0 flex-1 overflow-auto"
@@ -653,6 +640,8 @@ export function PlaygroundShell({
               </>
             )}
           </ReviewProvider>
+        </div>
+        {editFabVisible && <PlaygroundEditFab {...editFabProps} />}
         </div>
 
         {railVisible && (

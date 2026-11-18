@@ -7,7 +7,7 @@ import {
   useRouter,
   type AppShellNavSection,
 } from "@flanksource/clicky-ui";
-import { UiQueue } from "@flanksource/clicky-ui/icons";
+import { UiChecks, UiQueue } from "@flanksource/clicky-ui/icons";
 
 type Category = "external" | "pages" | "markdown";
 const PAGE_SIZE = 8;
@@ -24,8 +24,10 @@ const CATEGORIES = [
 
 export function PlaygroundNotifications({
   recent,
+  review,
 }: {
   recent: AppShellNavSection;
+  review: { active: boolean; count: number; onToggle: () => void };
 }) {
   const router = useRouter();
   const [category, setCategory] = useState<Category>("pages");
@@ -107,32 +109,51 @@ export function PlaygroundNotifications({
       }
     >
       {(close) => (
-        <div
-          className="min-h-0 overflow-y-auto overscroll-contain"
-          aria-label="Recent change results"
-        >
-          {items.slice(0, limit).map((item) => (
+        <>
+          <div className="shrink-0 border-b border-border p-1">
             <Button
-              key={item.key}
+              size="sm"
               variant="ghost"
-              className="h-auto w-full justify-start gap-2 rounded-none px-3 py-2 text-left"
+              className="w-full justify-start gap-2"
+              aria-pressed={review.active}
+              disabled={review.count === 0 && !review.active}
               onClick={() => {
-                router.navigate(item.to);
                 close();
+                review.onToggle();
               }}
             >
-              {item.icon && (
-                <Icon
-                  {...(typeof item.icon === "string"
-                    ? { name: item.icon }
-                    : { icon: item.icon })}
-                  className="size-4 shrink-0"
-                />
-              )}
-              {item.label}
+              <UiChecks className="size-4" />
+              {review.active ? "Exit resolved review" : "Show resolved"} (
+              {review.count})
             </Button>
-          ))}
-        </div>
+          </div>
+          <div
+            className="min-h-0 overflow-y-auto overscroll-contain"
+            aria-label="Recent change results"
+          >
+            {items.slice(0, limit).map((item) => (
+              <Button
+                key={item.key}
+                variant="ghost"
+                className="h-auto w-full justify-start gap-2 rounded-none px-3 py-2 text-left"
+                onClick={() => {
+                  router.navigate(item.to);
+                  close();
+                }}
+              >
+                {item.icon && (
+                  <Icon
+                    {...(typeof item.icon === "string"
+                      ? { name: item.icon }
+                      : { icon: item.icon })}
+                    className="size-4 shrink-0"
+                  />
+                )}
+                {item.label}
+              </Button>
+            ))}
+          </div>
+        </>
       )}
     </DropdownMenu>
   );

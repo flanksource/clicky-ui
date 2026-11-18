@@ -12,6 +12,7 @@ import {
 import { AgentRunsProvider } from "./agent-runs/AgentRunsProvider";
 import { PromptRunsProvider } from "./prompt-runs/PromptRunsProvider";
 import { PLAYGROUND_COMMENT_CONFIG, useComments } from "./comments/useComments";
+import { CommentVisibilityMenu } from "./comments/CommentVisibilityMenu";
 import { PlaygroundShell } from "./PlaygroundShell";
 import { ArtifactSearch } from "./navigation/ArtifactSearch";
 import { VocabularyReference } from "./vocabularies/VocabularyReference";
@@ -104,6 +105,7 @@ export function App() {
             persistenceKey={route.page || "__dashboard"}
             comments={comments.comments}
             config={commentConfig}
+            railHeaderActions={active && route.view === "preview" ? <CommentVisibilityMenu annotations={route.annotations} showRejected={route.showRejected ?? false} onAnnotationsChange={onAnnotationsChange} onShowRejectedChange={onShowRejectedChange} /> : undefined}
             resolveAnchor={strictAnchorResolver}
             {...(!isExternal ? { onCreate: comments.create } : {})}
             onReply={comments.reply}
@@ -138,12 +140,10 @@ export function App() {
                 view={route.view}
                 annotations={route.annotations}
                 showRejected={route.showRejected ?? false}
-                onShowRejectedChange={onShowRejectedChange}
                 {...(route.review ? { review: route.review } : {})}
                 {...(route.comment ? { selectedCommentId: route.comment } : {})}
                 pageHref={pageHref}
                 onViewChange={onViewChange}
-                onAnnotationsChange={onAnnotationsChange}
                 onNavigate={onNavigate}
                 onReviewNavigate={onReviewNavigate}
                 onReviewExit={onReviewExit}

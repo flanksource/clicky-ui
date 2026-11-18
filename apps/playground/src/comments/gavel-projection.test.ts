@@ -66,6 +66,22 @@ it.each([
   expect(root?.assignee).toEqual(expected);
 });
 
+it("links the Gavel assignee and its replies to the recorded session", () => {
+  const assignee = { kind: "agent", id: "gavel:actor-1", label: "Gavel agent" };
+  const [root, reply, olderReply, otherReply] = project({
+    ...native,
+    assignee,
+    content: { ...native.content, agentRun: { sessionId: "session-9", requestedAt: "2026-11-01T10:05:00Z", state: "sent" } },
+    messages: [
+      { id: "reply", bodyMarkdown: "Done", author: assignee, createdAt: "2026-11-01T10:06:00Z" },
+      { id: "old", bodyMarkdown: "Earlier reply", author: assignee, createdAt: "2026-11-01T10:04:00Z" },
+      { id: "other", bodyMarkdown: "Other reply", author: { ...assignee, id: "gavel:actor-2" }, createdAt: "2026-11-01T10:06:00Z" },
+    ],
+  }, { attachmentUrl });
+  expect([root?.assignee?.sessionId, reply?.author?.sessionId, olderReply?.author?.sessionId, otherReply?.author?.sessionId])
+    .toEqual(["session-9", "session-9", undefined, undefined]);
+});
+
 it("keeps an empty body empty and names rating-only comments", () => {
   expect(bodyFor({ id: "x", body: "", createdAt: "", author: null, rating: "positive" })).toBe("Positive feedback");
   expect(bodyFor({ id: "x", body: "", createdAt: "", author: null })).toBe("Negative feedback");

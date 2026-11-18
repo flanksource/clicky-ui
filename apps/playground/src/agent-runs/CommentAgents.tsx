@@ -7,7 +7,6 @@ import { useAgentRuns } from "./AgentRunsProvider";
 import { agentSessionSrc } from "./agent-runs-api";
 import { commentAgentSessions } from "./comment-agents";
 import { readPageTarget } from "./page-targets";
-import { RuntimeIdentity } from "./RuntimeIdentity";
 
 export function CommentAgents({ thread }: { thread: readonly Comment[] }) {
   const { data, error } = useAgentRuns();
@@ -15,6 +14,7 @@ export function CommentAgents({ thread }: { thread: readonly Comment[] }) {
   const page = (thread[0] as PageComment | undefined)?.page;
   const sessions = commentAgentSessions(thread, data, page ? readPageTarget(page) : undefined);
   const inspected = sessions.find(entry => entry.id === selected);
+  const assignee = thread[0]?.assignee;
   const people = thread.flatMap(comment => [
     ...(comment.author?.kind === "agent" ? [{ author: comment.author, role: "Author" }] : []),
     ...(comment.assignee ? [{ author: comment.assignee, role: "Assignee" }] : []),
@@ -24,10 +24,9 @@ export function CommentAgents({ thread }: { thread: readonly Comment[] }) {
     {error && <p role="alert" className="text-destructive">{error}</p>}
     {people.length > 0 && <ul className="space-y-2">{people.map(({ author, role }, index) => <li key={`${role}:${index}`} className="flex flex-wrap items-center gap-2">
       <span className="text-muted-foreground">{role}</span>
-      {author.kind === "agent" ? <AgentIdentity label={author.name} model={author.name} {...(author.sessionId ? { identityId: author.sessionId } : {})} /> : <><CommentAuthorAvatar author={author} bare /><span>{author.name}</span></>}
+      {author.kind === "agent" ? <AgentIdentity showSession label={author.name} model={author.model ?? author.name} {...(author.sessionId ? { identityId: author.sessionId } : {})} /> : <><CommentAuthorAvatar author={author} bare /><span>{author.name}</span></>}
       {author.via && <span>via {author.via}</span>}
       {author.cost !== undefined && <span>${author.cost.toFixed(4)} reported cost</span>}
-      {author.sessionId && <code className="break-all">{author.sessionId}</code>}
     </li>)}</ul>}
     {(thread as readonly PageComment[]).map(comment => <div key={comment.id} className="space-y-1">
       {comment.agentRun && <div>{comment.agentRun.state} · requested <Timestamp value={comment.agentRun.requestedAt} format="relative" />
@@ -37,13 +36,14 @@ export function CommentAgents({ thread }: { thread: readonly Comment[] }) {
       {comment.promptRun && <details><summary>Prompt: {comment.promptRun.promptName}</summary><pre className="overflow-auto whitespace-pre-wrap">{JSON.stringify(comment.promptRun, null, 2)}</pre></details>}
     </div>)}
     {!data && !error && <p role="status">Loading page sessions…</p>}
-    {data && sessions.length === 0 && <p className="text-muted-foreground">No agent sessions are linked to this thread or page.</p>}
+    {data && sessions.length === 0 && <p className="text-muted-foreground">{assignee?.kind === "agent"
+      ? "This assignment has no linked session."
+      : "No agent sessions are linked to this thread or page."}</p>}
     <ul className="space-y-2">{sessions.map(entry => <li key={entry.id} className="rounded-md border border-border p-2">
       <button type="button" className="flex w-full flex-wrap items-center gap-2 text-left" aria-pressed={selected === entry.id} onClick={() => setSelected(entry.id)}>
-        {entry.session ? <RuntimeIdentity runtime={entry.session.runtime} /> : <AgentIdentity label={entry.label ?? "Historical session"} />}
+        <AgentIdentity showSession identityId={entry.id} label={entry.session?.label ?? entry.label ?? "Historical session"} />
         <span className="text-muted-foreground">{entry.associations.join(" · ")}</span>
         {entry.session && <span>{entry.session.state} · <Timestamp value={entry.session.startedAt} format="relative" />{entry.session.endedAt && <> · ended <Timestamp value={entry.session.endedAt} format="relative" /></>}</span>}
-        <code className="w-full break-all text-muted-foreground">{entry.id}</code>
       </button>
       {entry.session?.error && <p role="alert" className="text-destructive">{entry.session.error}</p>}
       {!entry.session && <p className="mt-1 text-muted-foreground">Historical or external session. Select to load its retained Captain context.</p>}

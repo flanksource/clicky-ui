@@ -132,13 +132,19 @@ export function project(
   // Gavel owns the assignee; a copy left in the playground fields is never the current one.
   const { page: _page, assignee: _assignee, ...fields } = c.content.playground;
   const capture = c.attachments?.find((a) => a.name === "screenshot.png");
+  const run = c.content.agentRun;
+  const sessionId = run?.sessionId;
+  const assignedSession = sessionId && c.assignee?.kind === "agent" &&
+    (c.assignee.id.startsWith("gavel:") || c.assignee.id.endsWith(`:${sessionId}`))
+    ? { sessionId }
+    : {};
   const root: StoredComment = {
     ...fields,
     id: c.id,
     version: c.version,
     body: fields.body === "" ? "" : c.bodyMarkdown,
     author: fields.author ?? authorFor(c.author),
-    ...(c.assignee ? { assignee: authorFor(c.assignee) } : {}),
+    ...(c.assignee ? { assignee: { ...authorFor(c.assignee), ...assignedSession } } : {}),
     status: c.status,
     createdAt: new Date(c.createdAt).toISOString(),
     ...(c.updatedAt !== c.createdAt
@@ -162,7 +168,7 @@ export function project(
           },
         }
       : {}),
-    ...(c.content.agentRun ? { agentRun: agentRunFor(c.content.agentRun, c.messages ?? []) } : {}),
+    ...(run ? { agentRun: agentRunFor(run, c.messages ?? []) } : {}),
   };
   return [
     root,
@@ -172,7 +178,11 @@ export function project(
       rootId: c.id,
       version: c.version,
       body: m.bodyMarkdown,
-      author: m.content?.playground.author ?? authorFor(m.author),
+      author: {
+        ...(run && m.author.kind === "agent" && m.author.id === c.assignee?.id &&
+          Date.parse(m.createdAt) >= Date.parse(run.requestedAt) ? assignedSession : {}),
+        ...(m.content?.playground.author ?? authorFor(m.author)),
+      },
       createdAt: new Date(m.createdAt).toISOString(),
       parentId: c.id,
       anchor: root.anchor ?? null,
