@@ -6,6 +6,11 @@ import type { BadgeTone } from "../Badge";
 import type { Test, TestSummary } from "./types";
 import { matchesFilterState, type FilterState } from "./filterState";
 
+/** The forest's leaves — the tests themselves, without their package and suite groups. */
+export function testLeaves(tests: readonly Test[]): Test[] {
+  return tests.flatMap((test) => (test.children?.length ? testLeaves(test.children) : [test]));
+}
+
 // --- roll-up counts ------------------------------------------------------
 
 /**

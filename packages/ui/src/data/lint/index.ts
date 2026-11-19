@@ -3,7 +3,8 @@
 
 export { LintResults, type LintResultsProps, type LintView } from "./LintResults";
 export { LintTable, type LintTableProps } from "./LintTable";
-export { LintList, lintListGroups, type LintListProps } from "./LintList";
+export { LintList, type LintListProps } from "./LintList";
+export { lintListGroups } from "./list-grouping";
 export { LintFilterBar, LintFilterFacets, LintGroupingPicker, type LintFilterBarProps } from "./LintFilterBar";
 export { LintDetailPanel, type LintDetailPanelProps } from "./LintDetail";
 export { LintTreeNode } from "./LintTreeNode";

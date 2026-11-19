@@ -2,6 +2,7 @@ import { UiFile, UiFolderGit, UiGitBranch, UiGitCommit, UiPlayCircle, UiTag, UiW
 import { Avatar } from "../../Avatar";
 import type { GitBranchOption, GitCommitOption, GitConnectionOption, GitPickerProps, GitPipelineExecutionOption, GitPipelineOption, GitRefOption, GitRepositoryOption } from "./types";
 import { ReferencePicker, type ReferenceChoice } from "./ReferencePicker";
+import { GIT_REF_GROUP_LIMITS } from "./git-ref-group-limits";
 
 function dateLabel(date?: string): string {
   return date ? new Date(date).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "";
@@ -28,12 +29,6 @@ export function GitRepositoryPicker(props: GitPickerProps<GitRepositoryOption>) 
 export function GitBranchPicker(props: GitPickerProps<GitBranchOption>) {
   return <ReferencePicker {...props} label={props.label ?? "Branch"} plural="branches" option={(item) => branchOption(item, "refs/heads/")} />;
 }
-
-/** The newest branches and tags a ref picker lists before "Show more"; a search reaches every ref. */
-export const GIT_REF_GROUP_LIMITS = [
-  { group: "Branches", limit: 50, plural: "branches" },
-  { group: "Tags", limit: 10, plural: "tags" },
-] as const;
 
 export function GitRefPicker(props: GitPickerProps<GitRefOption> & { allowCustomRef?: boolean }) {
   return <ReferencePicker {...props} label={props.label ?? "Git ref"} plural="refs" groupLimits={GIT_REF_GROUP_LIMITS} {...(props.allowCustomRef ? { custom: (value: string) => value.trim() ? { value: value.trim(), label: value.trim(), icon: <UiGitCommit /> } : null } : {})}

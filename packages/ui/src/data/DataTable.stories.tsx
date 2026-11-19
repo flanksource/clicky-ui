@@ -1739,6 +1739,7 @@ function ListLayoutShowcase({ width }: { width: number }) {
 }
 
 export const ListLayout: Story = {
+  tags: ["browser"],
   render: () => <ListLayoutShowcase width={360} />,
   parameters: {
     docs: {
@@ -1761,6 +1762,7 @@ export const ListLayout: Story = {
 };
 
 export const ListLayoutAboveBreakpoint: Story = {
+  tags: ["browser"],
   render: () => <ListLayoutShowcase width={900} />,
   parameters: {
     docs: {

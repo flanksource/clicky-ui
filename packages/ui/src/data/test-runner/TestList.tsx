@@ -4,14 +4,9 @@ import { cn } from "../../lib/utils";
 import { UiChevronDown, UiChevronRight } from "../../icons";
 import type { Test } from "./types";
 import { useTestRunner } from "./context";
-import { outcomeFor } from "./status";
+import { outcomeFor, testLeaves } from "./status";
 import { OutcomeIcon } from "./MarkIcons";
 import { TestDetailPanel } from "./TestDetailPanel";
-
-/** The forest's leaves — the tests themselves, without their package and suite groups. */
-export function testLeaves(tests: readonly Test[]): Test[] {
-  return tests.flatMap((test) => (test.children?.length ? testLeaves(test.children) : [test]));
-}
 
 function sameTest(a: Test, b: Test | null): boolean {
   if (!b) return false;

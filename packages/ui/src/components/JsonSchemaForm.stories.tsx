@@ -562,6 +562,7 @@ const markdownSchema: JsonSchemaObject = {
 };
 
 export const MarkdownField: Story = {
+  tags: ["browser"],
   render: (args) => <FormHarness {...args} wrapperClassName="max-w-4xl" />,
   args: {
     schema: markdownSchema,
