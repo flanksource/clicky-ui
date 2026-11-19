@@ -69,7 +69,7 @@ export function ReferencePicker<T>({ label, plural, option, custom, groupLimits 
   const error = props.error ?? data.error;
   const loading = props.loading || data.loading;
   return <div className={cn("min-w-0 space-y-1.5", props.className)}>
-    <label htmlFor={id} className="block text-sm font-medium text-foreground">{label}</label>
+    <label htmlFor={id} className={props.showLabel === false ? "sr-only" : "block text-sm font-medium text-foreground"}>{label}</label>
     {props.help && <p id={`${id}-help`} className="text-xs text-muted-foreground">{props.help}</p>}
     <Combobox id={id} ariaLabel={label} value={props.value} options={options}
       menuWidth={720}

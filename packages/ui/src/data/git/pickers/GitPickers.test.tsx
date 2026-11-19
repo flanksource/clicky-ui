@@ -33,6 +33,15 @@ describe("controlled Git pickers", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    [undefined, "block text-sm font-medium text-foreground"],
+    [false, "sr-only"],
+  ])("draws its label with showLabel=%s as %s and keeps it naming the combobox", (showLabel, className) => {
+    render(<GitBranchPicker label="Release Branch" {...(showLabel === undefined ? {} : { showLabel })} items={[branch]} value="" onChange={vi.fn()} />);
+    const input = screen.getByRole("combobox", { name: "Release Branch" });
+    expect({ className: screen.getByText("Release Branch", { selector: "label" }).className, labelled: (input as HTMLInputElement).labels?.[0]?.textContent }).toEqual({ className, labelled: "Release Branch" });
+  });
+
   it("shows author metadata and a compact selected SHA while emitting the full SHA", () => {
     render(<GitCommitPicker items={[{ ...branch, subject: "Validate dependent benefits" }]} value={sha} onChange={vi.fn()} />);
     expect(screen.getByRole("combobox", { name: "Commit" })).toHaveValue(sha.slice(0, 7));
