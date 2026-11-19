@@ -208,8 +208,15 @@ export function sessionKey(itemId: string) {
   return `${itemId}:session`;
 }
 
-export function branchKeys(node: SessionHierarchyNode): string[] {
-  return [node.key, ...node.children.flatMap(branchKeys)];
+// A session id selects that session — its agents and turns — and not the child
+// sessions nested under it: those are ids of their own, picked separately.
+export function ownSessionKeys(node: SessionHierarchyNode): string[] {
+  return [
+    node.key,
+    ...node.children
+      .filter((child) => child.kind !== "session")
+      .flatMap(ownSessionKeys),
+  ];
 }
 
 export function initialCheckedKeys(
@@ -219,7 +226,7 @@ export function initialCheckedKeys(
   const checked = new Set<string>();
   for (const sessionId of sessionIds) {
     const node = findNode(roots, sessionKey(sessionId));
-    if (node) branchKeys(node).forEach((key) => checked.add(key));
+    if (node) ownSessionKeys(node).forEach((key) => checked.add(key));
   }
   return checked;
 }
@@ -233,7 +240,7 @@ export function toggleHierarchyBranch(
   const next = new Set(checked);
   const node = findNode(roots, key);
   if (!node) return next;
-  for (const branchKey of branchKeys(node)) {
+  for (const branchKey of ownSessionKeys(node)) {
     if (include) next.add(branchKey);
     else next.delete(branchKey);
   }
@@ -241,13 +248,17 @@ export function toggleHierarchyBranch(
   return next;
 }
 
+// A node is checked when all of its own content is; a child session is its own
+// selection, so it neither completes nor breaks the parent above it.
 function normalizeCheckedRoots(
   roots: SessionHierarchyNode[],
   checked: Set<string>,
 ) {
   const visit = (node: SessionHierarchyNode): boolean => {
-    if (node.children.length === 0) return checked.has(node.key);
-    const complete = node.children.every(visit);
+    node.children.filter((child) => child.kind === "session").forEach(visit);
+    const own = node.children.filter((child) => child.kind !== "session");
+    if (own.length === 0) return checked.has(node.key);
+    const complete = own.map(visit).every(Boolean);
     if (complete) checked.add(node.key);
     else checked.delete(node.key);
     return complete;

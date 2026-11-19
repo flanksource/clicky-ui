@@ -30,6 +30,34 @@ describe("summarizeToolInput", () => {
     expect(summarizeToolInput("Read", undefined)).toBe("");
   });
 
+  describe("ApplyPatch", () => {
+    const repo = "/repo";
+    const files = [
+      { op: "update", path: `${repo}/cmd/a.go`, old: "x\n", new: "y\n" },
+      { op: "add", path: `${repo}/cmd/b.go`, content: "z\n" },
+      { op: "delete", path: `${repo}/cmd/c.go` },
+    ];
+
+    it("names a multi-file patch's file count and cwd-relative paths", () => {
+      expect(summarizeToolInput("ApplyPatch", { files, input: "*** Begin Patch" }, repo)).toBe(
+        "3 files: cmd/a.go, cmd/b.go, cmd/c.go",
+      );
+    });
+
+    it("names a single-file move or delete by its operation and path", () => {
+      expect(
+        summarizeToolInput("ApplyPatch", { file_path: `${repo}/a.go`, operation: "delete" }, repo),
+      ).toBe("delete a.go");
+      expect(
+        summarizeToolInput(
+          "ApplyPatch",
+          { file_path: `${repo}/a.go`, operation: "move", to: `${repo}/b.go` },
+          repo,
+        ),
+      ).toBe("move a.go → b.go");
+    });
+  });
+
   it("relativizes file paths against the event cwd", () => {
     expect(summarizeToolInput("Read", { file_path: "/repo/src/a.ts" }, "/repo")).toBe("src/a.ts");
     expect(summarizeToolInput("Write", { file_path: "/elsewhere/a.ts" }, "/repo")).toBe(
@@ -129,6 +157,15 @@ describe("toolInputParams", () => {
       toolInputParams("Edit", { file_path: "a.ts", old_string: "a", new_string: "b" }),
     ).toEqual([]);
     expect(toolInputParams("Write", { file_path: "a.ts", content: "x" })).toEqual([]);
+    expect(
+      toolInputParams("ApplyPatch", {
+        input: "*** Begin Patch",
+        files: [{ op: "update", path: "a.go" }],
+        file_path: "a.go",
+        operation: "move",
+        to: "b.go",
+      }),
+    ).toEqual([]);
   });
 
   it("skips empty values and collapses multiline values to one truncated line", () => {
@@ -150,6 +187,27 @@ describe("toolInputParams", () => {
 });
 
 describe("toolDiff", () => {
+  it("turns a multi-file ApplyPatch into one segment per changed file", () => {
+    expect(
+      toolDiff("ApplyPatch", {
+        input: "*** Begin Patch",
+        files: [
+          { op: "update", path: "a.go", old: "x\ny\n", new: "x\nz\n" },
+          { op: "add", path: "b.go", content: "n\n" },
+          { op: "delete", path: "c.go" },
+        ],
+      }),
+    ).toEqual({
+      added: 2,
+      removed: 1,
+      segments: [
+        { original: "x\ny\n", modified: "x\nz\n" },
+        { original: "", modified: "n\n" },
+      ],
+      language: "go",
+    });
+  });
+
   it("treats a Write as one all-added segment and infers the language", () => {
     expect(toolDiff("Write", { file_path: "a.ts", content: "a\nb\nc" })).toEqual({
       added: 3,

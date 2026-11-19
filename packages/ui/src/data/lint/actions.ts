@@ -9,7 +9,9 @@ const DISABLE_TITLE = "Add {source} to .gavel.yaml";
 
 export function folderPattern(path: string | undefined): string {
   if (!path) return "**";
-  const trimmed = path.replace(/\/+$/, "");
+  let end = path.length;
+  while (end > 0 && path[end - 1] === "/") end -= 1;
+  const trimmed = path.slice(0, end);
   return trimmed ? `${trimmed}/**` : "**";
 }
 

@@ -145,7 +145,14 @@ export function ToolBody({
               "cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           )}
         >
-          <div className="min-w-0 flex-1">
+          <div
+            data-shell-command
+            data-clamped={hasDetail && !open}
+            className={cn(
+              "min-w-0 flex-1",
+              hasDetail && !open && "max-h-12 overflow-hidden",
+            )}
+          >
             <CodeBlock bare language="bash" source={command} />
           </div>
           <ApprovalBadge event={event} />

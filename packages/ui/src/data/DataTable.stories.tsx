@@ -1694,3 +1694,84 @@ export const MobilePhone: Story = {
     },
   },
 };
+
+const STATUS_DOT: Record<string, string> = {
+  healthy: "bg-emerald-500",
+  degraded: "bg-amber-500",
+};
+
+const listColumns: DataTableColumn<Row>[] = [
+  { key: "service", label: "Service", listRole: "title" },
+  {
+    key: "status",
+    label: "Status",
+    listRole: "status",
+    listRender: (value) => (
+      <span
+        role="img"
+        aria-label={String(value)}
+        title={String(value)}
+        className={`inline-block size-2 rounded-full ${STATUS_DOT[String(value)] ?? "bg-muted-foreground"}`}
+      />
+    ),
+  },
+  { key: "restarts", label: "Restarts", listRole: "meta", listRender: (value) => `${String(value)} restarts` },
+  { key: "owner", label: "Owner", listRole: "meta" },
+  { key: "notes", label: "Notes", listRole: "hidden" },
+];
+
+function ListLayoutShowcase({ width }: { width: number }) {
+  const [open, setOpen] = useState<string[]>([]);
+  return (
+    <div style={{ width }} className="rounded-md border border-dashed border-border p-2">
+      <DataTable
+        data={rows}
+        columns={listColumns}
+        getRowId={(row) => row.service}
+        layout="auto"
+        showGlobalFilter
+        expandedRowIds={open}
+        onExpandedRowIdsChange={setOpen}
+        renderExpandedRow={(row) => <p className="text-sm">{row.notes}</p>}
+      />
+    </div>
+  );
+}
+
+export const ListLayout: Story = {
+  render: () => <ListLayoutShowcase width={360} />,
+  parameters: {
+    docs: {
+      description: {
+        story:
+          '`layout="auto"` in a 360px container: each row is its title and a status icon, then a meta line of the `meta` columns (Notes is `listRole: "hidden"`). Sort moves into the ⋯ menu; search and row detail work as in the grid.',
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await waitFor(() =>
+      expect(canvasElement.querySelectorAll("[data-list-item]")).toHaveLength(rows.length),
+    );
+    await expect(canvas.queryByRole("columnheader", { name: /Status/ })).toBeNull();
+    await expect(canvas.getByRole("img", { name: "degraded" })).toBeInTheDocument();
+    await userEvent.click(canvas.getByText("worker"));
+    await expect(canvas.getByText("Background job processor with retry queues.")).toBeVisible();
+  },
+};
+
+export const ListLayoutAboveBreakpoint: Story = {
+  render: () => <ListLayoutShowcase width={900} />,
+  parameters: {
+    docs: {
+      description: {
+        story: 'The same `layout="auto"` table in a 900px container stays a grid.',
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("columnheader", { name: /Status/ })).toBeVisible();
+    await expect(canvasElement.querySelector("[data-list-item]")).toBeNull();
+  },
+};

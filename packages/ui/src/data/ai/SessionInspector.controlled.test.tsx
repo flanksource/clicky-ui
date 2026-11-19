@@ -10,7 +10,9 @@ import { SessionInspector } from "./SessionInspector";
 import {
   buildSessionHierarchy,
   checkedSessionIds,
+  hierarchyCheckState,
   initialCheckedKeys,
+  toggleHierarchyBranch,
   type SessionCollectionInput,
 } from "./SessionInspector.collection";
 import {
@@ -61,6 +63,54 @@ describe("checkedSessionIds", () => {
     expect(checkedSessionIds(roots, initialCheckedKeys(roots, ids))).toEqual(
       ids,
     );
+  });
+
+  it("selects a session without the child sessions nested under it", () => {
+    const nested = {
+      ...COLLECTION,
+      sessions: [
+        ...COLLECTION.sessions,
+        { id: "sub", parentId: "primary", label: "Subagent", src: "/sessions/sub" },
+      ],
+    };
+    const nestedRoots = buildSessionHierarchy(nested, new Map());
+
+    expect(
+      checkedSessionIds(nestedRoots, initialCheckedKeys(nestedRoots, ["primary"])),
+    ).toEqual(["primary"]);
+  });
+
+  describe("a child session nested under its parent", () => {
+    const nested = {
+      ...COLLECTION,
+      sessions: [
+        ...COLLECTION.sessions.map((item) =>
+          item.id === "parallel" ? { ...item, parentId: "primary" } : item,
+        ),
+        { id: "sibling", parentId: "primary", label: "Sibling", src: "/sessions/sibling" },
+      ],
+    };
+    const nestedRoots = buildSessionHierarchy(nested, new Map());
+    const primary = nestedRoots[0]!;
+    const child = primary.children.find((node) => node.item?.id === "parallel")!;
+
+    it("is picked without unchecking the parent's own content", () => {
+      const next = toggleHierarchyBranch(
+        nestedRoots,
+        initialCheckedKeys(nestedRoots, ["primary"]),
+        child.key,
+        true,
+      );
+
+      expect(hierarchyCheckState(primary, next)).toBe("checked");
+      expect(checkedSessionIds(nestedRoots, next)).toEqual(["primary", "parallel"]);
+    });
+
+    it("stays out when only the parent is toggled", () => {
+      const next = toggleHierarchyBranch(nestedRoots, new Set(), primary.key, true);
+
+      expect(checkedSessionIds(nestedRoots, next)).toEqual(["primary"]);
+    });
   });
 
   it("counts a session whose only checked node is one of its turns", () => {

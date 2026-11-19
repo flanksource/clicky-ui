@@ -11,6 +11,7 @@ const RUN: TaskRunMeta = {
   name: "fix-run",
   kind: "sql-fix",
   status: "warning",
+  startedAt: new Date().toISOString(),
   total: 1,
   completed: 1,
   failed: 0,
@@ -64,8 +65,38 @@ describe("TaskManager selection", () => {
     expect(await screen.findByText("g1: 2 snapshots")).toBeInTheDocument();
   });
 
+  it("defaults to the last 24 hours and changes the time range from the filter bar", async () => {
+    const now = Date.now();
+    const day = 86_400_000;
+    const delivered = [
+      { ...RUN, id: "recent", name: "Recent run", startedAt: new Date(now - day / 2).toISOString() },
+      { ...RUN, id: "older", name: "Older run", startedAt: new Date(now - 2 * day).toISOString() },
+      { ...RUN, id: "oldest", name: "Oldest run", startedAt: new Date(now - 8 * day).toISOString() },
+    ];
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => delivered }) as Response));
+    renderManager(createClient(), <TaskManager showPool={false} />);
+
+    expect(await screen.findByText("Recent run")).toBeInTheDocument();
+    expect(screen.queryByText("Older run")).not.toBeInTheDocument();
+    const timeFilter = () => screen.getByRole("button", { name: /^Time range filter/ });
+    expect(timeFilter()).toHaveTextContent("Last 24 hours");
+
+    fireEvent.click(timeFilter());
+    fireEvent.click(screen.getByRole("button", { name: /^Last 7 days/ }));
+    expect(screen.getByText("Older run")).toBeInTheDocument();
+    expect(screen.queryByText("Oldest run")).not.toBeInTheDocument();
+
+    fireEvent.click(timeFilter());
+    fireEvent.click(screen.getByRole("button", { name: "Clear", exact: true }));
+    expect(screen.getByText("Oldest run")).toBeInTheDocument();
+  });
+
   it("expands the run matching selectedId and drills into its tasks", async () => {
-    vi.stubGlobal("fetch", mockFetch());
+    const historicRun = { ...RUN, startedAt: "2025-01-01T00:00:00Z" };
+    const fetchRun = mockFetch();
+    vi.stubGlobal("fetch", (input: RequestInfo | URL) => String(input).endsWith("/tasks")
+      ? Promise.resolve({ ok: true, json: async () => [historicRun] })
+      : fetchRun(input));
     renderManager(createClient(), <TaskManager basePath="/api/v1" selectedId="g1" onSelectRun={() => {}} />);
 
     // The run row renders from the listing.
@@ -163,13 +194,15 @@ describe("TaskManager selection", () => {
   });
 
   it("shows run labels as tags and formats the elapsed duration from run timestamps", async () => {
+    const finishedAt = new Date();
+    const startedAt = new Date(finishedAt.getTime() - 120_000);
     vi.stubGlobal("fetch", vi.fn(async () => ({
       ok: true,
       json: async () => [{
         ...RUN,
         labels: { team: "platform", region: "eu" },
-        startedAt: "2026-10-15T07:00:00Z",
-        finishedAt: "2026-10-15T07:02:00Z",
+        startedAt: startedAt.toISOString(),
+        finishedAt: finishedAt.toISOString(),
       }],
     }) as Response));
 

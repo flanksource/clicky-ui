@@ -9,6 +9,10 @@ import {
   type SessionInspectorTab,
 } from "./SessionInspector.tabs.model";
 import { useInspectorTab } from "./SessionInspector.tab-state";
+import {
+  useHostTabs,
+  type SessionInspectorHostTab,
+} from "./SessionInspector.host-tabs";
 import { SessionViewer, type SessionViewerProps } from "./SessionViewer";
 import {
   getSessionMetadata,
@@ -29,6 +33,7 @@ export function LegacySessionInspector({
   layout = "default",
   metadata,
   toolbarActions,
+  hostTabs,
 }: {
   session: SessionInput;
   className?: string;
@@ -40,8 +45,10 @@ export function LegacySessionInspector({
   layout?: "default" | "compact";
   metadata?: SessionMetadataSummary;
   toolbarActions?: ReactNode;
+  hostTabs?: readonly SessionInspectorHostTab[];
 }) {
   const compact = layout === "compact";
+  const host = useHostTabs(hostTabs, compact);
   const [menuHost, setMenuHost] = useState<HTMLSpanElement | null>(null);
   const [tab, setTab] = useInspectorTab(
     defaultTab,
@@ -71,9 +78,11 @@ export function LegacySessionInspector({
     >
       {compact ? (
         <CompactSessionInspectorToolbar
-          tabs={compactTabs}
-          activeTab={tab}
-          onSelect={(next) => setTab(next as SessionInspectorTab)}
+          tabs={[...compactTabs, ...host.items]}
+          activeTab={host.active?.id ?? tab}
+          onSelect={(next) => {
+            if (!host.select(next)) setTab(next as SessionInspectorTab);
+          }}
           onMenuHost={setMenuHost}
           {...(compactMetadata ? { metadata: compactMetadata } : {})}
           {...(toolbarActions ? { toolbarActions } : {})}
@@ -87,7 +96,7 @@ export function LegacySessionInspector({
             <div
               className={cn(
                 "min-h-0 flex-1 overflow-hidden",
-                tab !== "transcript" && "hidden",
+                (host.active || tab !== "transcript") && "hidden",
               )}
             >
               <SessionViewer
@@ -100,7 +109,11 @@ export function LegacySessionInspector({
                 showContextMeter={false}
               />
             </div>
-            {tab !== "transcript" ? (
+            {host.active ? (
+              <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+                {host.active.content}
+              </div>
+            ) : tab !== "transcript" ? (
               <div className="min-h-0 flex-1 overflow-auto p-density-4">
                 <SessionInspectorPanel
                   tab={tab}

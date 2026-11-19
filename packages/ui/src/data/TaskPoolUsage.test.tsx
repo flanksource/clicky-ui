@@ -1,12 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { EventSourceProvider } from "../hooks/event-source-provider";
 import type { EventSourceFactory } from "../hooks/event-source";
 import { TimeseriesStreamProvider } from "./timeseries-stream-provider";
 import { createFakeEventSourceFactory } from "./timeseries-stream.fixtures";
-import { TaskPoolUsage, TaskRunConcurrency } from "./TaskPoolUsage";
+import { TaskPoolSummary, TaskPoolUsage, TaskRunConcurrency } from "./TaskPoolUsage";
 
 const BASE_PATH = "/api/v1";
 const RUN_ID = "run-7";
@@ -62,6 +62,69 @@ describe("TaskPoolUsage", () => {
     }
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
+  });
+});
+
+describe("TaskPoolSummary", () => {
+  function SummaryHarness({ factory }: { factory: EventSourceFactory }) {
+    const [expanded, setExpanded] = useState(false);
+    return (
+      <Harness factory={factory}>
+        <TaskPoolSummary basePath={BASE_PATH} expanded={expanded} onExpandedChange={setExpanded} controls="pool-gauges" />
+        {expanded && <div id="pool-gauges">gauges</div>}
+      </Harness>
+    );
+  }
+
+  it.each([
+    { busy: 1, slots: 1, queued: 0, supervisors: 0, text: "1 busy · 1 slot · 0 queued · 0 supervisors", shown: "1 busy · 1 slot" },
+    { busy: 3, slots: 4, queued: 5, supervisors: 1, text: "3 busy · 4 slots · 5 queued · 1 supervisor", shown: "3 busy · 4 slots · 5 queued · 1 supervisor" },
+  ])("folds the pool gauges into one line: $shown", async ({ busy, slots, queued, supervisors, text, shown }) => {
+    const fake = createFakeEventSourceFactory();
+    render(<SummaryHarness factory={fake.factory} />);
+    await waitFor(() => expect(fake.opened).toHaveLength(1));
+
+    act(() => fake.latest().emit("snapshot", {
+      series: [
+        series("pool:workers-busy", busy),
+        series("pool:workers-limit", 8),
+        series("pool:slots-used", slots),
+        series("pool:slots-capacity", 8),
+        series("pool:queued", queued),
+        series("pool:supervisors", supervisors),
+      ],
+    }));
+
+    const toggle = await screen.findByRole("button", { name: `Worker pool: ${text}` });
+    expect(toggle.textContent).toBe(shown);
+    expect(toggle).toHaveAttribute("title", `Worker pool: ${text}`);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveAttribute("aria-controls", "pool-gauges");
+  });
+
+  it("expands to the gauges on tap and collapses again", async () => {
+    const fake = createFakeEventSourceFactory();
+    render(<SummaryHarness factory={fake.factory} />);
+    await waitFor(() => expect(fake.opened).toHaveLength(1));
+    const toggle = screen.getByRole("button", { name: /^Worker pool/ });
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("gauges")).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("gauges")).not.toBeInTheDocument();
+  });
+
+  it("says the pool metrics failed instead of showing stale counts", async () => {
+    const fake = createFakeEventSourceFactory();
+    render(<SummaryHarness factory={fake.factory} />);
+    await waitFor(() => expect(fake.opened).toHaveLength(1));
+
+    act(() => fake.latest().emit("error", { error: "metric store unavailable" }));
+
+    expect(await screen.findByRole("button", { name: "Worker pool: metrics unavailable: metric store unavailable" })).toBeInTheDocument();
   });
 });
 

@@ -2,7 +2,10 @@ import { useCallback, useRef, useState } from "react";
 import { Button } from "../components/button";
 import { DropdownMenu, type DropdownMenuItem } from "../overlay/DropdownMenu";
 import { Modal } from "../overlay/Modal";
-import { UiChevronDown, UiEllipsis } from "../icons";
+import { UiChevronDown, UiClose, UiEllipsis } from "../icons";
+import { useMediaQuery } from "../hooks/use-media-query";
+import { belowBreakpoint } from "../lib/breakpoints";
+import { cn } from "../lib/utils";
 import { Icon } from "./Icon";
 import type {
   DataTableSelectionAction,
@@ -22,22 +25,41 @@ import { splitSelectionActions } from "./selectionActionSplit";
 function SelectionCountNotice({
   count,
   onClear,
+  compact,
 }: {
   count: number;
   onClear: () => void;
+  compact: boolean;
 }) {
   return (
     <div
       role="status"
       data-testid="data-table-selection-count"
-      className="flex flex-wrap items-center gap-density-2 text-xs text-muted-foreground"
+      className={cn(
+        "flex items-center gap-density-2 text-xs text-muted-foreground",
+        compact ? "shrink-0 whitespace-nowrap" : "flex-wrap",
+      )}
     >
       <span className="font-medium text-foreground">
         {count.toLocaleString()} selected
       </span>
-      <Button type="button" variant="outline" size="sm" onClick={onClear}>
-        Clear selection
-      </Button>
+      {compact ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          aria-label="Clear selection"
+          title="Clear selection"
+          onClick={onClear}
+        >
+          <Icon icon={UiClose} />
+        </Button>
+      ) : (
+        <Button type="button" variant="outline" size="sm" onClick={onClear}>
+          Clear selection
+        </Button>
+      )}
     </div>
   );
 }
@@ -119,6 +141,11 @@ export type SelectionActionBarProps<T extends Record<string, unknown>> = {
    * dropdowns are never capped — they are what the bar is for.
    */
   maxButtons?: number;
+  /**
+   * Phone layout: the count stays on one line and Clear shrinks to an icon, so
+   * the bar fits a single row. Defaults to the viewport being below `sm`.
+   */
+  compact?: boolean;
   className?: string;
 };
 
@@ -137,8 +164,10 @@ export function SelectionActionBar<T extends Record<string, unknown>>({
   context,
   showCount = true,
   maxButtons,
+  compact,
   className,
 }: SelectionActionBarProps<T>) {
+  const phone = useMediaQuery(belowBreakpoint("sm"));
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
   const [confirming, setConfirming] =
     useState<DataTableSelectionAction<T> | null>(null);
@@ -230,6 +259,7 @@ export function SelectionActionBar<T extends Record<string, unknown>>({
         <SelectionCountNotice
           count={context.selectedScope?.total ?? context.selectedRowIds.length}
           onClear={context.clearSelection}
+          compact={compact ?? phone}
         />
       ) : null}
       <span className={className}>

@@ -15,6 +15,8 @@ import {
 import { TestRunnerProvider, type TestRunnerContext } from "./context";
 import { TestTree } from "./TestTree";
 import { TestDetailPanel } from "./TestDetailPanel";
+import { TestList } from "./TestList";
+import { TestViewToggle, type TestRunnerView } from "./TestViewToggle";
 import { TestRunSummary } from "./TestRunSummary";
 import { TestFilterBar } from "./TestFilterBar";
 import type { FetchProcessMetrics } from "./process-metrics";
@@ -91,6 +93,13 @@ export type TestRunnerProps = {
    * the runner doesn't render a second bordered bar underneath it.
    */
   hideHeader?: boolean;
+  /**
+   * "tree" (the default) shows the test tree beside a detail pane; "list" shows
+   * one row per test whose detail opens beneath it.
+   */
+  view?: TestRunnerView;
+  /** Called by the Tree / List toggle beside "Copy details". Omit to hide the toggle. */
+  onViewChange?: (next: TestRunnerView) => void;
   /** Initial left-pane width percentage. */
   defaultSplit?: number;
   startTime?: number | null;
@@ -141,6 +150,8 @@ export function TestRunner({
   showSummary = true,
   headerSlot,
   hideHeader = false,
+  view = "tree",
+  onViewChange,
   defaultSplit = 45,
   startTime,
   endTime,
@@ -159,6 +170,8 @@ export function TestRunner({
       filters,
       expandAll,
       busy: busy ?? {},
+      view,
+      onViewChange,
       activeTab,
       onTabChange,
       activeAttempt,
@@ -182,6 +195,8 @@ export function TestRunner({
       filters,
       expandAll,
       busy,
+      view,
+      onViewChange,
       activeTab,
       onTabChange,
       activeAttempt,
@@ -255,7 +270,24 @@ export function TestRunner({
           </div>
         )}
 
-        {roomy ? (
+        {view === "list" ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            {(filterBar || onViewChange) && (
+              <div
+                className="flex min-w-0 shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-density-3 py-density-1"
+                data-test-list-toolbar=""
+              >
+                {filterBar}
+                <div className="ml-auto">
+                  <TestViewToggle />
+                </div>
+              </div>
+            )}
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <TestList />
+            </div>
+          </div>
+        ) : roomy ? (
           <SplitPane
             className="min-h-0 flex-1"
             defaultSplit={defaultSplit}

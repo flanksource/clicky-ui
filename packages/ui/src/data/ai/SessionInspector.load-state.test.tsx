@@ -68,6 +68,29 @@ describe("SessionInspector onLoadStateChange", () => {
     expect(onLoadStateChange.mock.calls[0]![0]).toEqual({ status: "loading" });
   });
 
+  it("reports loading, then ready for a collection whose current session loads from src", async () => {
+    stubSessionFetch({ [TAIL]: [() => jsonResponse(remoteSession())] });
+    const onLoadStateChange = vi.fn<(state: SessionInspectorLoadState) => void>();
+    const collection = {
+      kind: "session-collection" as const,
+      id: "family",
+      currentSessionId: "remote",
+      sessions: [
+        { id: "remote", src: SRC },
+        { id: "sub", parentId: "remote", src: "/api/captain/sessions/sub" },
+      ],
+    };
+
+    renderWithFakeStream(
+      <SessionInspector session={collection} onLoadStateChange={onLoadStateChange} />,
+    );
+
+    await waitFor(() =>
+      expect(onLoadStateChange).toHaveBeenLastCalledWith({ status: "ready" }),
+    );
+    expect(onLoadStateChange.mock.calls[0]![0]).toEqual({ status: "loading" });
+  });
+
   it("reports an error when the follow stream sends a terminal error frame", async () => {
     stubSessionFetch({ [TAIL]: [() => jsonResponse(remoteSession())] });
     const onLoadStateChange = vi.fn<(state: SessionInspectorLoadState) => void>();

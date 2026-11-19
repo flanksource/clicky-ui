@@ -7,6 +7,8 @@ type OverflowState = {
   atStart: boolean;
   atEnd: boolean;
   interacted: boolean;
+  /** Height of the sticky header, the only band the prompt may sit in. */
+  headerHeight: number;
 };
 
 const INITIAL_STATE: OverflowState = {
@@ -14,6 +16,7 @@ const INITIAL_STATE: OverflowState = {
   atStart: true,
   atEnd: true,
   interacted: false,
+  headerHeight: 0,
 };
 
 export function DataTableOverflowCue({ scroll }: { scroll: HTMLDivElement | null }) {
@@ -33,6 +36,7 @@ export function DataTableOverflowCue({ scroll }: { scroll: HTMLDivElement | null
         atStart,
         atEnd: remaining <= 1 || scroll.scrollLeft >= remaining - 1,
         interacted: current.interacted || !atStart,
+        headerHeight: scroll.querySelector("thead")?.offsetHeight ?? 0,
       }));
     };
 
@@ -71,15 +75,23 @@ export function DataTableOverflowCue({ scroll }: { scroll: HTMLDivElement | null
           className="pointer-events-none absolute inset-y-0 right-0 z-20 w-8 bg-gradient-to-l from-background to-transparent"
         />
       ) : null}
-      {state.atStart && !state.interacted ? (
+      {/* The prompt lives in the sticky header's band: anywhere lower it
+          covers the first row's cells. No laid-out header, no prompt. */}
+      {state.atStart && !state.interacted && state.headerHeight > 0 ? (
         <span
-          className={cn(
-            "pointer-events-none absolute right-2 top-10 z-30 inline-flex items-center gap-1 rounded-full",
-            "border border-border bg-background/95 px-2 py-1 text-[10px] font-medium text-muted-foreground shadow-sm",
-          )}
+          data-testid="data-table-overflow-prompt"
+          className="pointer-events-none absolute right-2 z-30 flex items-center"
+          style={{ top: 0, height: state.headerHeight }}
         >
-          More columns
-          <UiArrowRight aria-hidden className="size-3" />
+          <span
+            className={cn(
+              "inline-flex max-h-full items-center gap-1 rounded-full leading-none",
+              "border border-border bg-background/95 px-2 py-0.5 text-[10px] font-medium text-muted-foreground shadow-sm",
+            )}
+          >
+            More columns
+            <UiArrowRight aria-hidden className="size-3" />
+          </span>
         </span>
       ) : null}
     </>

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   chooseTimestampFormat,
   formatDateTimeRelative,
+  formatRelativeTime,
   formatTimestamp,
   parseTimestamp,
   resolveDateMath,
@@ -125,6 +126,30 @@ describe("formatTimestamp", () => {
 
   it("renders iso as YYYY-MM-DD HH:mm in local time", () => {
     expect(formatTimestamp(t, "iso")).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+  });
+});
+
+describe("formatRelativeTime token style", () => {
+  const t = new Date("2026-04-15T12:00:00Z");
+  const WEEK = 7 * DAY;
+
+  it.each([
+    { elapsed: 0, token: "now" },
+    { elapsed: 59 * SECOND, token: "now" },
+    { elapsed: MINUTE, token: "1m" },
+    { elapsed: 59 * MINUTE + 59 * SECOND, token: "59m" },
+    { elapsed: 2 * HOUR + 40 * MINUTE, token: "2h" },
+    { elapsed: 23 * HOUR + 59 * MINUTE, token: "23h" },
+    { elapsed: 3 * DAY, token: "3d" },
+    { elapsed: 6 * DAY + 23 * HOUR, token: "6d" },
+    { elapsed: 4 * WEEK + 2 * DAY, token: "4w" },
+    { elapsed: 400 * DAY, token: "1y" },
+  ])("renders $token for an elapsed $elapsed ms", ({ elapsed, token }) => {
+    expect(formatRelativeTime(t, new Date(t.getTime() + elapsed), { style: "token" })).toBe(token);
+  });
+
+  it("marks a future instant with the in prefix", () => {
+    expect(formatRelativeTime(t, new Date(t.getTime() - 5 * MINUTE), { style: "token" })).toBe("in 5m");
   });
 });
 

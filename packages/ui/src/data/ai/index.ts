@@ -450,6 +450,7 @@ export {
   type SessionInspectorOptions,
   type SessionInspectorProps,
   type SessionInspectorTab,
+  type SessionInspectorHostTab,
 } from "./SessionInspector";
 export {
   fetchRemoteSession,
