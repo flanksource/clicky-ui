@@ -1,3 +1,4 @@
+import { randomUUID } from "../../../lib/random-uuid";
 import { useRef, useState, type ReactNode } from "react";
 import { UiLayers, UiSave } from "../../../icons";
 import {
@@ -122,7 +123,7 @@ export function useRuntimePresetMenu(options: RuntimePresetMenuOptions): {
       onSelect: () => {
         setError(undefined);
         setDraft({
-          ...newPresetRecord(catalog, crypto.randomUUID()),
+          ...newPresetRecord(catalog, randomUUID()),
           spec: runtimeBarPresetSpec(options.value.spec),
         });
       },

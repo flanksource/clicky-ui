@@ -1,3 +1,4 @@
+import { randomUUID } from "../../../lib/random-uuid";
 import { cn } from "../../../lib/utils";
 import type { SpecRuntimeFamily } from "../../runtime/runtime-mode";
 import type { RuntimePreset, RuntimeProfile } from "../runtime-profile";
@@ -56,7 +57,7 @@ export function RuntimeProfilesWorkspace({
   secretSelector,
   persistence,
   recordMeta,
-  newId = () => crypto.randomUUID(),
+  newId = () => randomUUID(),
   className,
 }: RuntimeProfilesWorkspaceProps) {
   const selectedPreset = presets.find(
