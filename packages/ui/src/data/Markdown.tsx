@@ -15,6 +15,7 @@ import { ConfirmDialog } from "../overlay/ConfirmDialog";
 import { useRouter } from "../rpc/router";
 import { Callout, type CalloutProps } from "./Callout";
 import { CodeBlock } from "./CodeBlock";
+import { DELIMITED_LANGUAGES, parseDelimited } from "./delimited";
 import { rehypeSourceBlocks, sourceAttributes, type SourceAttributes } from "./markdown-source-blocks";
 import { rehypeDocumentUrls } from "./markdown-urls";
 
@@ -179,7 +180,10 @@ function MarkdownCode({ className, children, ...rest }: MarkdownCodeProps) {
   }
   const language = /language-([\w-]+)/.exec(className ?? "")?.[1];
   const source = nodeText(children).replace(/\n$/, "");
-  const block = (
+  const delimiter = language ? DELIMITED_LANGUAGES[language.toLowerCase()] : undefined;
+  const block = delimiter ? (
+    <MarkdownDelimitedTable source={source} delimiter={delimiter} />
+  ) : (
     <CodeBlock
       source={source}
       language={language}
@@ -191,6 +195,33 @@ function MarkdownCode({ className, children, ...rest }: MarkdownCodeProps) {
   );
   const anchors = sourceAttributes(rest);
   return Object.keys(anchors).length > 0 ? <div {...anchors}>{block}</div> : block;
+}
+
+// A ```csv / ```tsv fence: the first row is the header, short rows are padded
+// to the widest row, and it is styled like a GFM table.
+function MarkdownDelimitedTable({ source, delimiter }: { source: string; delimiter: string }) {
+  const [header = [], ...body] = parseDelimited(source, delimiter);
+  const columns = Array.from({ length: Math.max(header.length, ...body.map((row) => row.length)) }, (_, index) => index);
+  return (
+    <MarkdownTable>
+      <MarkdownTableHead>
+        <tr>
+          {columns.map((index) => (
+            <MarkdownTableHeaderCell key={index}>{header[index] ?? ""}</MarkdownTableHeaderCell>
+          ))}
+        </tr>
+      </MarkdownTableHead>
+      <MarkdownTableBody>
+        {body.map((row, rowIndex) => (
+          <tr key={rowIndex}>
+            {columns.map((index) => (
+              <MarkdownTableCell key={index}>{row[index] ?? ""}</MarkdownTableCell>
+            ))}
+          </tr>
+        ))}
+      </MarkdownTableBody>
+    </MarkdownTable>
+  );
 }
 
 // Streamdown's default `pre` unwraps to its `code` child, marking it as a block.

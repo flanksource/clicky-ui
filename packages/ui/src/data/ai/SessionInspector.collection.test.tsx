@@ -6,6 +6,7 @@ import {
   within,
 } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { UiGitCommit } from "../../icons";
 import { emptyVerifySummary } from "../verification/verify-report";
 import { SessionInspector } from "./SessionInspector";
 import type { SessionCollectionInput } from "./SessionInspector.collection";
@@ -50,6 +51,43 @@ describe("SessionInspector session collections", () => {
     expect(
       screen.getByRole("button", { name: "parallel · 1. fixture · failed" }),
     ).toBeInTheDocument();
+  });
+
+  it("lists host tabs in the compact toolbar and swaps the transcript for the selected host view", () => {
+    const hostTab = {
+      id: "branch-changes",
+      label: "Branch changes",
+      icon: UiGitCommit,
+      content: <p>host view body</p>,
+    };
+    const { container } = render(
+      <div className="h-[720px]">
+        <SessionInspector session={COLLECTION} layout="compact" hostTabs={[hostTab]} />
+      </div>,
+    );
+    const toolbar = screen.getByRole("toolbar", { name: "Session detail controls" });
+
+    expect(screen.queryByText("host view body")).not.toBeInTheDocument();
+    fireEvent.click(within(toolbar).getByRole("tab", { name: "Branch changes" }));
+    expect(screen.getByText("host view body")).toBeInTheDocument();
+    expect(container.querySelector("[data-event-kind]")?.closest(".hidden")).not.toBeNull();
+
+    fireEvent.click(within(toolbar).getByRole("button", { name: "More session tabs" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Transcript" }));
+    expect(screen.queryByText("host view body")).not.toBeInTheDocument();
+  });
+
+  it("refuses host tabs outside the compact layout and ids that shadow inspector tabs", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const tab = { id: "branch-changes", label: "Changes", icon: UiGitCommit, content: null };
+    expect(() => render(<SessionInspector session={COLLECTION} hostTabs={[tab]} />)).toThrow(
+      'SessionInspector hostTabs require layout="compact"',
+    );
+    expect(() =>
+      render(
+        <SessionInspector session={COLLECTION} layout="compact" hostTabs={[{ ...tab, id: "files" }]} />,
+      ),
+    ).toThrow('SessionInspector host tab id "files" collides with an inspector tab');
   });
 
   it("renders compact controls on one overflow-safe line and moves the hierarchy into session options", () => {
@@ -116,6 +154,22 @@ describe("SessionInspector session collections", () => {
     expect(
       within(toolbar).getByRole("button", { name: "Session options" }),
     ).toBeInTheDocument();
+  });
+
+  it("leaves a child session out of the transcript until it is picked", () => {
+    const nested: SessionCollectionInput = {
+      ...COLLECTION,
+      sessions: COLLECTION.sessions.map((item) =>
+        item.id === "parallel" ? { ...item, parentId: "primary" } : item,
+      ),
+    };
+    render(<SessionInspector session={nested} />);
+
+    expect(
+      screen.getByRole("button", { name: "Select session content: 1 of 2 sessions" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("primary answer")).toBeInTheDocument();
+    expect(screen.queryByText("parallel answer")).not.toBeInTheDocument();
   });
 
   it("includes every explicitly selected session on first render", () => {

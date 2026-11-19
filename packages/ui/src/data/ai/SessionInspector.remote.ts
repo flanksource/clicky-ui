@@ -494,7 +494,7 @@ export function useReportLoadState({
   enabled,
   onChange,
 }: {
-  state: RemoteSessionState;
+  state: Pick<RemoteSessionState, "loading" | "error">;
   enabled: boolean;
   onChange: ((state: SessionInspectorLoadState) => void) | undefined;
 }) {

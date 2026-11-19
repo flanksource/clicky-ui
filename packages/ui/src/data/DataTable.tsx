@@ -29,7 +29,6 @@ import {
   type FilterBarNumberValue,
   type FilterBarDurationValue,
   type FilterBarProps,
-  type FilterBarRangePreset,
   type FilterBarRangeProps,
   type FilterBarSearchProps,
 } from "../components/FilterBar";
@@ -64,9 +63,12 @@ import {
   UiFullscreen,
   UiArrowLeft,
   UiArrowRight,
+  UiArrowUp,
+  UiArrowDown,
 } from "../icons";
 import { useMediaQuery } from "../hooks/use-media-query";
-import { belowBreakpoint } from "../lib/breakpoints";
+import { useContainerWiderThan } from "../hooks/use-container-width";
+import { belowBreakpoint, BREAKPOINTS } from "../lib/breakpoints";
 import {
   DensityMenuSection,
   MenuActionSection,
@@ -86,6 +88,7 @@ import {
   modeToFormat,
   parseTimestamp,
   resolveDateMath,
+  TIMESTAMP_RANGE_PRESETS,
   type TimestampFormat,
   type TimestampOptions,
 } from "./cells/timestamp-format";
@@ -120,6 +123,14 @@ import {
 import { DataTableGroupingControls } from "./DataTableGroupingControls";
 import { SelectionActionBar } from "./SelectionActionBar";
 import { DataTableOverflowCue } from "./DataTableOverflowCue";
+import { DataTableListItem } from "./DataTableList";
+import {
+  resolveListRoles,
+  type DataTableLayout,
+  type DataTableListRole,
+} from "./data-table-list";
+
+export type { DataTableLayout, DataTableListRole };
 
 export type { TimestampOptions, TagsOptions };
 
@@ -212,18 +223,6 @@ export type DataTableRowDetailContext<
   filterActionsByColumn: Record<string, TagActionsContextValue>;
 };
 
-// Mirrors the preset list used by the trace UI's TraceFilters so log/trace
-// tables share the same vocabulary out of the box.
-const TIMESTAMP_RANGE_PRESETS: FilterBarRangePreset[] = [
-  { label: "Last 5 minutes", from: "now-5m", to: "now" },
-  { label: "Last 15 minutes", from: "now-15m", to: "now" },
-  { label: "Last 1 hour", from: "now-1h", to: "now" },
-  { label: "Last 6 hours", from: "now-6h", to: "now" },
-  { label: "Last 24 hours", from: "now-24h", to: "now" },
-  { label: "Last 7 days", from: "now-7d", to: "now" },
-  { label: "Last 30 days", from: "now-30d", to: "now" },
-];
-
 export type DataTableColumn<
   T extends Record<string, unknown> = Record<string, unknown>,
 > = {
@@ -271,6 +270,18 @@ export type DataTableColumn<
   align?: "left" | "center" | "right";
   /** Custom cell renderer. */
   render?: (value: unknown, row: T) => ReactNode;
+  /**
+   * Where the column lands when the table lays out as a list (`layout`).
+   * Unset: the first column is the title, the first `kind: "status"` column
+   * the status, and every other column a meta item.
+   */
+  listRole?: DataTableListRole;
+  /**
+   * Renderer used in the list layout instead of `render` — an icon for a
+   * status, a compact token for a meta item. Returning null drops the item
+   * from the meta line, as does an empty value.
+   */
+  listRender?: (value: unknown, row: T) => ReactNode;
   /** Sort key derived from the raw value and row. */
   sortValue?: (value: unknown, row: T) => unknown;
   /** Filter token or tokens derived from the raw value and row. */
@@ -832,6 +843,21 @@ type DataTableInnerProps<
   /** Render each result as a full-width card while retaining filters and paging. */
   renderCard?: (row: T) => ReactNode;
   /**
+   * Grid or list. "auto" lays the rows out as a list — title and status, then
+   * a meta line, per each column's `listRole` — while the table's container is
+   * narrower than `listBreakpoint`, and as the grid otherwise. Sorting moves
+   * to the preferences menu in the list; filters, selection, row click and
+   * row detail work in both. Defaults to "table".
+   */
+  layout?: DataTableLayout;
+  /** Container width in pixels below which `layout: "auto"` lists. Defaults to the `sm` breakpoint (640). */
+  listBreakpoint?: number;
+  /**
+   * Content rendered between the filter bar and the rows — a panel one of the
+   * bar's own controls discloses, so it opens under the control and not above it.
+   */
+  toolbarPanel?: ReactNode;
+  /**
    * How `renderExpandedRow` detail is surfaced when a row is clicked.
    * - "row" (default): expands an inline detail row beneath the clicked row.
    *   Multiple rows can be open at once.
@@ -1012,6 +1038,9 @@ function DataTableInner<T extends Record<string, unknown>>({
   expandedRowIds,
   onExpandedRowIdsChange,
   renderCard,
+  layout = "table",
+  listBreakpoint = BREAKPOINTS.sm,
+  toolbarPanel,
   detailStyle = "row",
   detailDialogTitle,
   detailDialogSize = "lg",
@@ -1041,6 +1070,12 @@ function DataTableInner<T extends Record<string, unknown>>({
     defaultGroupingMode,
     onGroupingModeChange,
   });
+  if (renderCard && layout !== "table") {
+    throw new Error('DataTable renderCard cannot be combined with layout="list" or "auto"');
+  }
+  const { ref: layoutRef, wider: roomyForTable } =
+    useContainerWiderThan(listBreakpoint);
+  const listMode = layout === "list" || (layout === "auto" && !roomyForTable);
   const columns = useMemo<DataTableColumn<T>[]>(
     () =>
       columnsInput.map((column) =>
@@ -1325,7 +1360,12 @@ function DataTableInner<T extends Record<string, unknown>>({
     !renderCard && hideableColumns && hideableColumnCount > 1;
   const resolvedShowDensityControl =
     showDensityControl ?? showColumnVisibilityControl;
-  const hasMenuActions = Boolean(menuActions && menuActions.length > 0);
+  // A list has no headers to click, so its sort lives in the preferences menu.
+  const listSortColumns = listMode
+    ? effectiveColumns.filter((column) => column.sortable !== false)
+    : [];
+  const hasMenuActions =
+    Boolean(menuActions && menuActions.length > 0) || listSortColumns.length > 0;
   const showTablePreferencesControl =
     showColumnVisibilityControl ||
     resolvedShowDensityControl ||
@@ -1834,6 +1874,27 @@ function DataTableInner<T extends Record<string, unknown>>({
     !onSortChange &&
     !(isSinglePage(pagination, data.length) && !infinite?.hasMore);
 
+  const preferencesMenuActions: DataTableMenuAction[] = [
+    ...listSortColumns.map((column) => {
+      const active = sort?.key === column.key;
+      return {
+        id: `sort:${column.key}`,
+        label: labelText(column),
+        section: "Sort by",
+        ...(active
+          ? {
+              icon: sort.dir === "asc" ? UiArrowUp : UiArrowDown,
+              iconClassName: "text-primary",
+              description: sort.dir === "asc" ? "Ascending" : "Descending",
+            }
+          : {}),
+        ...(pageLocalSort ? { disabled: true } : {}),
+        onSelect: () => toggle(column.key),
+      };
+    }),
+    ...(menuActions ?? []),
+  ];
+
   // Every row the filters left is rendered — virtualization (below) decides
   // which of them reach the DOM, and it holds no window state of its own.
   //
@@ -2273,7 +2334,13 @@ function DataTableInner<T extends Record<string, unknown>>({
   >({});
   const headRowRef = useRef<HTMLTableRowElement | null>(null);
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
-  const tableColumnCount = renderCard ? 1 : visibleColumns.length + (rowSelection ? 1 : 0);
+  const tableColumnCount = renderCard
+    ? 1
+    : (listMode ? 1 : visibleColumns.length) + (rowSelection ? 1 : 0);
+  const listRoles = useMemo(
+    () => (listMode ? resolveListRoles(visibleColumns) : null),
+    [listMode, visibleColumns],
+  );
   // Hiding or showing a column changes what width the rest should get, so
   // the pins are keyed on the visible set rather than the declared one.
   const visibleColumnKeysSignature = visibleColumns
@@ -2281,7 +2348,7 @@ function DataTableInner<T extends Record<string, unknown>>({
     .join(" ");
 
   useEffect(() => {
-    if (!virtualOptions || renderCard) {
+    if (!virtualOptions || renderCard || listMode) {
       setPinnedColumnWidths({});
       return;
     }
@@ -2313,7 +2380,7 @@ function DataTableInner<T extends Record<string, unknown>>({
       observer.disconnect();
     };
     // Density changes cell padding, so it changes the natural widths too.
-  }, [virtualOptions, visibleColumnKeysSignature, rowSelection, density, renderCard]);
+  }, [virtualOptions, visibleColumnKeysSignature, rowSelection, density, renderCard, listMode]);
 
   // Expanded-row detail spans every column, so on a table wider than its
   // container it would wrap at the table's width and scroll sideways with the
@@ -2510,11 +2577,117 @@ function DataTableInner<T extends Record<string, unknown>>({
     setHeaderFilterMenu(menuStateFromTrigger(event, columnKey));
   };
 
+  // A cell's server-filter actions and tag affordances, shared by the grid and
+  // the list so a value keeps them in either layout.
+  const decorateCell = (
+    row: T,
+    column: DataTableColumn<T>,
+    rawValue: unknown,
+    base: ReactNode,
+  ): { content: ReactNode; hasCellFilterActions: boolean } => {
+    let content = base;
+    const serverFilterValue = resolveServerFilterValue(rawValue, row, column);
+    const serverFilterDisplayValue = resolveCellFilterDisplayValue(
+      rawValue,
+      row,
+      column,
+    );
+    const filterKey = column.filterKey;
+    const hasCellFilterActions =
+      !!filterKey && !!onCellFilterChange && serverFilterValue !== undefined;
+    if (filterKey && onCellFilterChange && serverFilterValue !== undefined) {
+      content = (
+        <CellFilterActions
+          value={serverFilterValue}
+          {...(serverFilterDisplayValue !== undefined
+            ? { displayValue: serverFilterDisplayValue }
+            : {})}
+          mode={cellFilters?.[filterKey]?.[serverFilterValue]}
+          onChange={(mode) =>
+            onCellFilterChange({ key: filterKey, value: serverFilterValue, mode })
+          }
+        >
+          {content}
+        </CellFilterActions>
+      );
+    }
+    // Tag cells get the + / − filter affordance via context;
+    // copy-to-clipboard works without it too.
+    if (column.kind === "tags" && filterActionsByColumn[column.key]) {
+      content = (
+        <TagActionsProvider value={filterActionsByColumn[column.key]!}>
+          {content}
+        </TagActionsProvider>
+      );
+    }
+    return { content, hasCellFilterActions };
+  };
+
+  // One real <a href> per row whose ::after overlay stretches across the whole
+  // (relative) row: right/middle-click give native "open in new tab", plain
+  // left-click routes client-side. The overlay paints over the cell, so a cell
+  // with filter actions lifts them above it — otherwise the link swallows the
+  // hover that reveals the include/exclude buttons.
+  const linkRow = (href: string, content: ReactNode, liftContent: boolean) =>
+    renderLink({
+      to: href,
+      // A stretched anchor over the whole row would otherwise start a native
+      // link drag on pointerdown-and-move, which swallows the horizontal touch
+      // pan a wide table needs.
+      draggable: false,
+      onDragStart: (event) => event.preventDefault(),
+      className:
+        "hover:underline after:absolute after:inset-0 after:content-[''] [-webkit-user-drag:none]",
+      children: liftContent ? (
+        <span className="relative z-10 inline-flex min-w-0 items-center">
+          {content}
+        </span>
+      ) : (
+        content
+      ),
+    });
+
+  // A meta item is dropped when its renderer returns nothing, or — for a
+  // column without one — when its value is empty, so the meta line never
+  // carries a dangling separator.
+  const listCell = (row: T, column: DataTableColumn<T>) => {
+    const rawValue = resolveColumnValue(row, column);
+    const render = column.listRender ?? column.render;
+    const base = render ? render(rawValue, row) : formatCell(rawValue);
+    const empty = render
+      ? base == null || base === false || base === ""
+      : rawValue == null || rawValue === "" || (Array.isArray(rawValue) && rawValue.length === 0);
+    return { empty, ...decorateCell(row, column, rawValue, base) };
+  };
+
+  const renderListItem = (
+    row: T,
+    roles: NonNullable<typeof listRoles>,
+    href: string | undefined,
+  ) => {
+    const title = listCell(row, roles.title);
+    const status = roles.status ? listCell(row, roles.status).content : null;
+    const meta = roles.meta.flatMap((column) => {
+      const cell = listCell(row, column);
+      if (cell.empty) return [];
+      return [{ key: column.key, label: labelText(column), content: cell.content }];
+    });
+    return (
+      <DataTableListItem
+        title={href ? linkRow(href, title.content, title.hasCellFilterActions) : title.content}
+        status={status}
+        meta={meta}
+      />
+    );
+  };
+
   return (
     <DensityValueProvider density={densityOverride ?? "comfortable"}>
       <div
+        ref={layoutRef}
         className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-1", className)}
         data-density={densityOverride}
+        data-layout={listMode ? "list" : renderCard ? "cards" : "table"}
       >
         {(showFilterBar || selectionToolbar || selectionBarNode) && (
           <FilterBar
@@ -2536,6 +2709,8 @@ function DataTableInner<T extends Record<string, unknown>>({
             filters={barFilters}
           />
         )}
+
+        {toolbarPanel}
 
         {renderCard && !pageLocalSort && effectiveColumns.some((column) => column.sortable !== false) && (
           <div className="flex shrink-0 items-center gap-2 px-1 text-xs text-muted-foreground">
@@ -2592,14 +2767,19 @@ function DataTableInner<T extends Record<string, unknown>>({
           >
             <table
               className={cn(
-                renderCard ? "w-full text-left text-sm" : "w-max min-w-full text-left text-sm",
-                // Cards own one bounded column; tabular views pin widths after measurement.
-                renderCard || Object.keys(pinnedColumnWidths).length > 0
+                renderCard || listMode ? "w-full text-left text-sm" : "w-max min-w-full text-left text-sm",
+                // Cards and list items own one bounded column; tabular views pin widths after measurement.
+                renderCard || listMode || Object.keys(pinnedColumnWidths).length > 0
                   ? "table-fixed"
                   : "table-auto",
               )}
             >
-              {renderCard ? <colgroup><col /></colgroup> : <colgroup>
+              {renderCard ? <colgroup><col /></colgroup> : listMode ? (
+                <colgroup>
+                  {rowSelection ? <col className="w-10" /> : null}
+                  <col />
+                </colgroup>
+              ) : <colgroup>
                 {rowSelection && error == null ? (
                   <col className="w-10" />
                 ) : null}
@@ -2626,6 +2806,31 @@ function DataTableInner<T extends Record<string, unknown>>({
               </colgroup>}
               {renderCard ? (
                 <thead className="sr-only"><tr><th scope="col">Results</th></tr></thead>
+              ) : listMode ? (
+                // A list has no column headers; with selection the head keeps
+                // only the select-all box, everything else is for screen readers.
+                <thead className={rowSelection && selectAllEnabled && error == null ? "border-b border-border bg-muted text-xs text-muted-foreground" : "sr-only"}>
+                  <tr>
+                    {rowSelection ? (
+                      <th className={cn("w-10 text-center", DATA_TABLE_HEADER_DENSITY_CLASS)}>
+                        {selectAllEnabled ? (
+                          <input
+                            ref={selectAllRef}
+                            type="checkbox"
+                            aria-label="Select all visible rows"
+                            checked={allVisibleSelected}
+                            disabled={!!selectedScope || selectableVisibleRows.length === 0}
+                            onChange={toggleVisibleSelection}
+                            className="size-3.5 rounded border-border accent-primary"
+                          />
+                        ) : null}
+                      </th>
+                    ) : null}
+                    <th scope="col" className={cn("font-medium", DATA_TABLE_HEADER_DENSITY_CLASS)}>
+                      {rowSelection && selectAllEnabled ? "Select all" : "Results"}
+                    </th>
+                  </tr>
+                </thead>
               ) : (
               <thead className="sticky top-0 z-10 bg-muted shadow-[0_1px_0_0_var(--tw-shadow-color)] shadow-border">
                 <tr
@@ -2762,7 +2967,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                   />
                 ) : loading && visibleSorted.length === 0 ? (
                   <DataTableLoadingRows
-                    columns={visibleColumns}
+                    columns={listMode ? visibleColumns.slice(0, 1) : visibleColumns}
                     rowCount={loadingRowCount}
                     message={loadingMessage}
                     selection={!!rowSelection}
@@ -2994,74 +3199,24 @@ function DataTableInner<T extends Record<string, unknown>>({
                               />
                             </td>
                           ) : null}
-                          {visibleColumns.map((column, index) => {
+                          {listRoles ? (
+                            <td className="min-w-0 border-0 px-density-3 py-density-2">
+                              {renderListItem(record.row, listRoles, href)}
+                            </td>
+                          ) : visibleColumns.map((column, index) => {
                             const rawValue = resolveColumnValue(
                               record.row,
                               column,
                             );
-                            let content: ReactNode = column.render
-                              ? column.render(rawValue, record.row)
-                              : formatCell(rawValue);
-
-                            const serverFilterValue = resolveServerFilterValue(
-                              rawValue,
-                              record.row,
-                              column,
-                            );
-                            const serverFilterDisplayValue =
-                              resolveCellFilterDisplayValue(
-                                rawValue,
+                            const { content, hasCellFilterActions } =
+                              decorateCell(
                                 record.row,
                                 column,
+                                rawValue,
+                                column.render
+                                  ? column.render(rawValue, record.row)
+                                  : formatCell(rawValue),
                               );
-                            const hasCellFilterActions =
-                              !!column.filterKey &&
-                              !!onCellFilterChange &&
-                              serverFilterValue !== undefined;
-                            if (
-                              column.filterKey &&
-                              onCellFilterChange &&
-                              serverFilterValue !== undefined
-                            ) {
-                              const filterKey = column.filterKey;
-                              content = (
-                                <CellFilterActions
-                                  value={serverFilterValue}
-                                  {...(serverFilterDisplayValue !== undefined
-                                    ? { displayValue: serverFilterDisplayValue }
-                                    : {})}
-                                  mode={
-                                    cellFilters?.[filterKey]?.[
-                                      serverFilterValue
-                                    ]
-                                  }
-                                  onChange={(mode) =>
-                                    onCellFilterChange({
-                                      key: filterKey,
-                                      value: serverFilterValue,
-                                      mode,
-                                    })
-                                  }
-                                >
-                                  {content}
-                                </CellFilterActions>
-                              );
-                            }
-
-                            // Tag cells get the + / − filter affordance via
-                            // context; copy-to-clipboard works without it too.
-                            if (
-                              column.kind === "tags" &&
-                              filterActionsByColumn[column.key]
-                            ) {
-                              content = (
-                                <TagActionsProvider
-                                  value={filterActionsByColumn[column.key]!}
-                                >
-                                  {content}
-                                </TagActionsProvider>
-                              );
-                            }
 
                             return (
                               <td
@@ -3078,33 +3233,7 @@ function DataTableInner<T extends Record<string, unknown>>({
                               >
                                 <CellContent column={column}>
                                   {href && index === 0
-                                    ? // One real <a href> per row whose ::after
-                                      // overlay stretches across the whole (relative)
-                                      // row: right/middle-click give native "open in
-                                      // new tab", plain left-click routes client-side.
-                                      // The overlay paints over the cell, so a cell
-                                      // with filter actions lifts them above it —
-                                      // otherwise the link swallows the hover that
-                                      // reveals the include/exclude buttons.
-                                      renderLink({
-                                        to: href,
-                                        // A stretched anchor over the whole row would
-                                        // otherwise start a native link drag on
-                                        // pointerdown-and-move, which swallows the
-                                        // horizontal touch pan a wide table needs.
-                                        draggable: false,
-                                        onDragStart: (event) =>
-                                          event.preventDefault(),
-                                        className:
-                                          "hover:underline after:absolute after:inset-0 after:content-[''] [-webkit-user-drag:none]",
-                                        children: hasCellFilterActions ? (
-                                          <span className="relative z-10 inline-flex min-w-0 items-center">
-                                            {content}
-                                          </span>
-                                        ) : (
-                                          content
-                                        ),
-                                      })
+                                    ? linkRow(href, content, hasCellFilterActions)
                                     : content}
                                 </CellContent>
                               </td>
@@ -3144,7 +3273,7 @@ function DataTableInner<T extends Record<string, unknown>>({
               </tbody>
             </table>
           </div>
-          {!renderCard && <DataTableOverflowCue scroll={scrollElement} />}
+          {!renderCard && !listMode && <DataTableOverflowCue scroll={scrollElement} />}
         </div>
 
         {renderedFooter !== null && (
@@ -3189,7 +3318,7 @@ function DataTableInner<T extends Record<string, unknown>>({
             columns={effectiveColumns}
             hiddenColumns={hiddenColumns}
             activeColumnKey={columnMenu.columnKey}
-            actions={menuActions ?? []}
+            actions={preferencesMenuActions}
             showColumnVisibilityControl={showColumnVisibilityControl}
             showDensityControl={resolvedShowDensityControl}
             showThemeControl={showThemeControl}
@@ -3208,7 +3337,7 @@ function DataTableInner<T extends Record<string, unknown>>({
             columns={effectiveColumns}
             hiddenColumns={hiddenColumns}
             anchor={columnMenu}
-            actions={menuActions ?? []}
+            actions={preferencesMenuActions}
             showColumnVisibilityControl={showColumnVisibilityControl}
             showDensityControl={resolvedShowDensityControl}
             showThemeControl={showThemeControl}

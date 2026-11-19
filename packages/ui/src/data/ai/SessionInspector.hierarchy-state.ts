@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  branchKeys,
   buildSessionHierarchy,
   checkedSessionIds,
   collectionSession,
   filterSessionCollection,
   initialCheckedKeys,
+  ownSessionKeys,
   toggleHierarchyBranch,
   validateSessionCollection,
   type SessionCollectionInput,
@@ -215,7 +215,7 @@ export function useSessionHierarchy(
       if (checked.has(node.key)) {
         setChecked((previous) => {
           const next = new Set(previous);
-          branchKeys(nextNode).forEach((key) => next.add(key));
+          ownSessionKeys(nextNode).forEach((key) => next.add(key));
           return next;
         });
       }
@@ -314,12 +314,15 @@ function reconcileCheckedBranches(
   checked: ReadonlySet<string>
 ) {
   const next = new Set(checked);
+  // A checked node takes in what loads under it — its agents and turns — but a
+  // child session stays as picked: it is its own selection.
   const visit = (node: SessionHierarchyNode) => {
-    if (checked.has(node.key)) {
-      branchKeys(node).forEach((key) => next.add(key));
+    if (!checked.has(node.key)) {
+      node.children.forEach(visit);
       return;
     }
-    node.children.forEach(visit);
+    ownSessionKeys(node).forEach((key) => next.add(key));
+    node.children.filter((child) => child.kind === "session").forEach(visit);
   };
   roots.forEach(visit);
   return next;

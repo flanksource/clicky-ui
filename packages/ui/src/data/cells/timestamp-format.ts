@@ -227,11 +227,40 @@ function formatIso(date: Date): string {
   return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
 }
 
-// formatRelativeTime renders a compact "30s ago" / "in 5m" / "just now" string.
-export function formatRelativeTime(date: Date, now: Date = new Date()): string {
+export type RelativeTimeOptions = {
+  /**
+   * "phrase" (default) reads "30s ago" / "in 5m" / "just now". "token" is the
+   * list-row form — now / 5m / 2h / 3d / 4w / 1y, floored so a token never
+   * claims the next unit early — for a meta line where "ago" is implied.
+   */
+  style?: "phrase" | "token";
+};
+
+const TOKEN_UNITS: ReadonlyArray<[unit: string, seconds: number]> = [
+  ["y", 365 * 86400],
+  ["w", 7 * 86400],
+  ["d", 86400],
+  ["h", 3600],
+  ["m", 60],
+];
+
+// formatRelativeTime renders a compact "30s ago" / "in 5m" / "just now" string,
+// or with style "token" the bare now / 5m / 2h / 3d / 4w token.
+export function formatRelativeTime(
+  date: Date,
+  now: Date = new Date(),
+  options: RelativeTimeOptions = {},
+): string {
   const diffMs = now.getTime() - date.getTime();
   const future = diffMs < 0;
   const abs = Math.abs(diffMs);
+  if (options.style === "token") {
+    const seconds = Math.floor(abs / 1000);
+    const match = TOKEN_UNITS.find(([, size]) => seconds >= size);
+    if (!match) return "now";
+    const token = `${Math.floor(seconds / match[1])}${match[0]}`;
+    return future ? `in ${token}` : token;
+  }
   const sec = Math.round(abs / 1000);
 
   let value: string;

@@ -162,3 +162,19 @@ export const SingleKind: Story = {
     </div>
   ),
 };
+
+export const PhoneWidth: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "In a 360px container the runs lay out as a list (title + status icon, then duration · age), the pool gauges fold into a summary on the toolbar row and the stream status becomes a dot.",
+      },
+    },
+  },
+  render: () => (
+    <div style={{ width: 360 }}>
+      <TaskManager basePath="/api/v1" />
+    </div>
+  ),
+};

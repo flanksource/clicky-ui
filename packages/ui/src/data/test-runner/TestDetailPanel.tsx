@@ -30,6 +30,7 @@ import { toolKeyFor } from "./marks";
 import { OutcomeIcon, ToolIcon } from "./MarkIcons";
 import { TestFailureDetail, TestOutput } from "./TestFailureDetail";
 import { TestAttemptDetail } from "./TestAttemptDetail";
+import { TestViewToggle } from "./TestViewToggle";
 
 /** Built-in detail body — used when no adapter contributes `renderDetail`. */
 function DefaultDetailBody({ node }: { node: Test }) {
@@ -129,6 +130,8 @@ function DetailActions({ node, actionNode, actions, attemptChooser }: DetailHead
     <div className="ml-auto flex shrink-0 items-center gap-1" data-detail-actions="">
       {attemptChooser}
       {actions}
+      {/* The list view carries the toggle in its toolbar, so its inline detail doesn't repeat it. */}
+      {runner.view !== "list" && <TestViewToggle />}
       <CopyDetailsButton node={node} />
       {canRerun && (
         <Button

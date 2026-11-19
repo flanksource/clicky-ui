@@ -57,7 +57,43 @@ const CONSUMED_INPUT_KEYS: Record<string, readonly string[]> = {
   MultiEdit: ["file_path", "notebook_path", "path", "edits"],
   NotebookEdit: ["file_path", "notebook_path", "path"],
   AskUserQuestion: ["questions", "question", "prompt", "text", "header", "context", "description", "options"],
+  ApplyPatch: ["input", "patch", "arguments", "files", "file_path", "operation", "to"],
 };
+
+/** One file of a Codex patch, as captain's ParseApplyPatch emits it. */
+interface ApplyPatchFile {
+  op?: string;
+  path?: string;
+  move_to?: string;
+  content?: string;
+  old?: string;
+  new?: string;
+}
+
+function applyPatchFiles(input: Record<string, unknown>): ApplyPatchFile[] {
+  const files = input["files"];
+  if (!Array.isArray(files)) return [];
+  return files.filter(
+    (file): file is ApplyPatchFile => typeof file === "object" && file !== null,
+  );
+}
+
+function summarizeApplyPatch(
+  input: Record<string, unknown>,
+  cwd?: string,
+): string {
+  const files = applyPatchFiles(input);
+  if (files.length > 1) {
+    const paths = files.map((file) => relativizePath(file.path ?? "", cwd));
+    return `${files.length} files: ${paths.join(", ")}`;
+  }
+  const path = typeof input["file_path"] === "string" ? input["file_path"] : files[0]?.path;
+  if (!path) return "";
+  const operation = typeof input["operation"] === "string" ? input["operation"] : files[0]?.op;
+  const to = typeof input["to"] === "string" ? input["to"] : files[0]?.move_to;
+  const target = to ? ` → ${relativizePath(to, cwd)}` : "";
+  return `${operation ? `${operation} ` : ""}${relativizePath(path, cwd)}${target}`;
+}
 
 /** Flatten a tool's input into JetBrains-style `name: value` inline params:
  *  single-line values, cwd-relativized and truncated so the row never wraps. */
@@ -136,7 +172,10 @@ export function toolDiff(
   if (counts.added === 0 && counts.removed === 0) return undefined;
 
   const language = languageFromPath(
-    str("file_path") || str("notebook_path") || str("path"),
+    str("file_path") ||
+      str("notebook_path") ||
+      str("path") ||
+      (applyPatchFiles(input)[0]?.path ?? ""),
   );
   return { ...counts, segments, ...(language ? { language } : {}) };
 }
@@ -154,6 +193,14 @@ function toolDiffSegments(
     const original = str("old_string");
     const modified = str("new_string") || str("new_source");
     return original || modified ? [{ original, modified }] : undefined;
+  }
+  if (tool === "ApplyPatch") {
+    return applyPatchFiles(input)
+      .map((file) => ({
+        original: file.old ?? "",
+        modified: file.new ?? file.content ?? "",
+      }))
+      .filter((segment) => segment.original !== "" || segment.modified !== "");
   }
   if (tool === "MultiEdit") {
     const edits = input["edits"];
@@ -212,6 +259,8 @@ export function summarizeToolInput(
     case "MultiEdit":
     case "NotebookEdit":
       return relativizePath(first("file_path", "notebook_path", "path"), cwd);
+    case "ApplyPatch":
+      return summarizeApplyPatch(input, cwd);
     case "Grep":
       return [str("pattern"), str("path")].filter(Boolean).join(" ");
     case "Glob":

@@ -97,6 +97,16 @@ describe("SessionViewer", () => {
     expect(screen.queryByText(/Tests: 8 passed/)).not.toBeInTheDocument();
   });
 
+  it("clamps a collapsed shell command and shows it whole once expanded", () => {
+    render(<SessionViewer session={SAMPLE_SESSION} />);
+    const header = screen.getByRole("button", { name: "Toggle response" });
+    const commandBlock = () => header.querySelector("[data-shell-command]");
+
+    expect(commandBlock()).toHaveAttribute("data-clamped", "true");
+    fireEvent.click(header);
+    expect(commandBlock()).toHaveAttribute("data-clamped", "false");
+  });
+
   it("toggles user and assistant message bodies from their headers", async () => {
     render(
       <SessionViewer
@@ -770,6 +780,38 @@ describe("SessionViewer", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("keeps following on open when rows grow before the initial scroll event lands", () => {
+    const { container } = render(
+      <SessionViewer
+        session={assistantLog(30)}
+        scrollable
+        windowSize={10}
+        batchSize={10}
+        showHeader={false}
+        showMenu={false}
+      />,
+    );
+    const scroller = container.querySelector(
+      "div.overflow-y-auto",
+    ) as HTMLElement;
+    const grownHeight = 1600;
+    Object.defineProperty(scroller, "scrollHeight", {
+      configurable: true,
+      value: grownHeight,
+    });
+    Object.defineProperty(scroller, "clientHeight", {
+      configurable: true,
+      value: 200,
+    });
+
+    fireEvent.scroll(scroller);
+
+    expect(scroller.scrollTop).toBe(grownHeight);
+    expect(
+      screen.queryByRole("button", { name: "Scroll to bottom" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("pauses following after scrolling up until Scroll to bottom is clicked", () => {
     const { container, rerender } = render(
       <SessionViewer
@@ -796,6 +838,7 @@ describe("SessionViewer", () => {
 
     scroller.scrollTop = 800;
     fireEvent.scroll(scroller);
+    fireEvent.wheel(scroller, { deltaY: -100 });
     scroller.scrollTop = 700;
     fireEvent.scroll(scroller);
     expect(

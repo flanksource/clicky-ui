@@ -1,14 +1,26 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { hashKey, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
 import { cn } from "../lib/utils";
 import { ElapsedDuration } from "./ElapsedDuration";
 import { useTaskRun, useTaskRuns } from "../hooks/use-task-run";
-import type { FilterBarFilter } from "../components/FilterBar";
+import { useResourceClock } from "../hooks/use-resource-clock";
+import { useContainerWiderThan } from "../hooks/use-container-width";
+import { BREAKPOINTS } from "../lib/breakpoints";
+import { UiTimer } from "../icons";
+import type { FilterBarFilter, FilterBarRangeProps } from "../components/FilterBar";
 import { Icon } from "./Icon";
 import { DataTable, type DataTableColumn } from "./DataTable";
 import { splitTagToken } from "./cells/tag-utils";
+import {
+  formatRelativeTime,
+  LAST_24_HOURS,
+  parseTimestamp,
+  resolveDateMath,
+  TIMESTAMP_RANGE_PRESETS,
+} from "./cells/timestamp-format";
+import { formatTaskDuration } from "./task-run-format";
 import { ProgressBar } from "./ProgressBar";
 import { TaskProgress } from "./TaskProgress";
 import { taskWorkProgress } from "./task-work-progress";
@@ -18,11 +30,9 @@ import type { TaskHeaderExtra } from "./TaskHeaderExtras";
 import type { TaskExtraTabs } from "./TaskStreamTabs";
 import { taskQueryKeys } from "./task-query-keys";
 import { taskSegments, taskStatusColor, taskStatusIcon } from "./task-status";
-import { TaskPoolUsage, TaskRunConcurrency } from "./TaskPoolUsage";
+import { TaskPoolSummary, TaskPoolUsage, TaskRunConcurrency } from "./TaskPoolUsage";
 
-// TaskManager is the generic clicky-ui task-manager view: it lists every run
-// (TaskRunMeta) from GET {basePath}/tasks with kind/status filters, and expands
-// each row into a live <TaskProgress> for that run id.
+// TaskManager filters task runs and expands each row into a live <TaskProgress>.
 //
 // Requires a react-query QueryClientProvider in the host app (like
 // TimeseriesPanel and CacheBrowser): control actions run through useMutation,
@@ -35,6 +45,10 @@ export interface TaskManagerProps {
   kind?: string;
   /** Restrict the listing to runs whose labels contain every key/value pair. */
   labels?: Record<string, string>;
+  /** Host-controlled start-time range. Omit for the default last 24 hours. */
+  timeRange?: { from: string; to: string };
+  /** Pair with timeRange to persist the range in the host's URL. */
+  onTimeRangeChange?: FilterBarRangeProps["onApply"];
   pollMs?: number;
   className?: string;
   /** Keep the run columns usable in a narrow panel. */
@@ -84,8 +98,13 @@ type RunTableRow = Record<string, unknown> & {
 };
 
 const progressColumn: DataTableColumn<RunTableRow> = {
-  key: "progress", label: "Progress", minWidth: 180,
+  key: "progress", label: "Progress", minWidth: 180, listRole: "meta",
   accessor: (row) => taskWorkProgress(row.run).done,
+  // A one-task run's "1/1 done" says nothing its status icon does not.
+  listRender: (_, row) => {
+    const progress = taskWorkProgress(row.run);
+    return progress.total > 1 ? <span className="tabular-nums">{progress.label}</span> : null;
+  },
   render: (_, row) => {
     const progress = taskWorkProgress(row.run);
     return (
@@ -96,9 +115,22 @@ const progressColumn: DataTableColumn<RunTableRow> = {
     );
   },
 };
-const startedColumn: DataTableColumn<RunTableRow> = { key: "startedAt", label: "Started", kind: "timestamp", sortable: true };
+// In a list the start time is what tells repeated run names apart, so it reads
+// as a compact age token (5m, 2h) with the full instant on hover.
+const startedColumn: DataTableColumn<RunTableRow> = {
+  key: "startedAt", label: "Started", kind: "timestamp", sortable: true, listRole: "meta",
+  listRender: (value) => {
+    const started = parseTimestamp(value);
+    if (!started) return null;
+    return (
+      <time dateTime={started.toISOString()} title={started.toLocaleString()} className="tabular-nums">
+        {formatRelativeTime(started, new Date(), { style: "token" })}
+      </time>
+    );
+  },
+};
 const durationColumn: DataTableColumn<RunTableRow> = {
-  key: "duration", label: "Duration", sortable: true,
+  key: "duration", label: "Duration", sortable: true, listRole: "meta",
   accessor: (row) => row.startedAt ? Date.parse(row.finishedAt ?? new Date().toISOString()) - Date.parse(row.startedAt) : null,
   render: (_, row) => (
     <ElapsedDuration
@@ -106,6 +138,27 @@ const durationColumn: DataTableColumn<RunTableRow> = {
       finishedAt={row.finishedAt}
       fallback={<span className="text-muted-foreground">—</span>}
     />
+  ),
+  listRender: (_, row) => row.startedAt ? (
+    <>
+      <UiTimer aria-hidden className="size-3 shrink-0" />
+      <ElapsedDuration startedAt={row.startedAt} finishedAt={row.finishedAt} format={formatTaskDuration} />
+    </>
+  ) : null,
+};
+const statusColumn: DataTableColumn<RunTableRow> = {
+  key: "status", label: "Status", sortable: true, listRole: "status",
+  render: (_, row) => (
+    <span className={cn("inline-flex items-center gap-1.5 capitalize", taskStatusColor(row.status))}>
+      <Icon icon={taskStatusIcon(row.status)} {...(row.status === "running" ? { className: "animate-spin" } : {})} />
+      {row.status}
+    </span>
+  ),
+  // The list has room for the icon only; the word stays its accessible name.
+  listRender: (_, row) => (
+    <span role="img" aria-label={row.status} title={row.status} className={cn("inline-flex", taskStatusColor(row.status))}>
+      <Icon icon={taskStatusIcon(row.status)} {...(row.status === "running" ? { className: "animate-spin" } : {})} />
+    </span>
   ),
 };
 // A run that drives a session shows its summary line under the run name.
@@ -138,27 +191,19 @@ function runGroupSnapshot(run: TaskRunMeta): TaskSnapshot {
 
 const runColumns = (sessionRenderers: TaskSessionRenderers | undefined): DataTableColumn<RunTableRow>[] => [
   {
-    key: "name", label: "Run", sortable: true, grow: true, minWidth: 220,
+    key: "name", label: "Run", sortable: true, grow: true, minWidth: 220, listRole: "title",
     render: (_, row) => runNameCell(row, sessionRenderers),
   },
-  {
-    key: "status", label: "Status", sortable: true,
-    render: (_, row) => (
-      <span className={cn("inline-flex items-center gap-1.5 capitalize", taskStatusColor(row.status))}>
-        <Icon icon={taskStatusIcon(row.status)} {...(row.status === "running" ? { className: "animate-spin" } : {})} />
-        {row.status}
-      </span>
-    ),
-  },
+  statusColumn,
   durationColumn,
   progressColumn,
-  { key: "labels", label: "Labels", kind: "tags", tags: { maxVisible: 2 }, minWidth: 160 },
+  { key: "labels", label: "Labels", kind: "tags", tags: { maxVisible: 2 }, minWidth: 160, listRole: "hidden" },
   startedColumn,
-  { key: "finishedAt", label: "Finished", kind: "timestamp", sortable: true },
+  { key: "finishedAt", label: "Finished", kind: "timestamp", sortable: true, listRole: "hidden" },
 ];
 const compactRunColumns = (sessionRenderers: TaskSessionRenderers | undefined): DataTableColumn<RunTableRow>[] => [
   {
-    key: "name", label: "Run", sortable: true, grow: true, minWidth: 220,
+    key: "name", label: "Run", sortable: true, grow: true, minWidth: 220, listRole: "title",
     render: (_, row) => runNameCell(row, sessionRenderers, (
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span>{applicationLabel(row.kind)}</span>
@@ -176,6 +221,8 @@ export function TaskManager({
   basePath,
   kind,
   labels,
+  timeRange,
+  onTimeRangeChange,
   pollMs,
   className,
   compact,
@@ -192,6 +239,9 @@ export function TaskManager({
   const [kindFilter, setKindFilter] = useState<string>(kind ?? "");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [labelFilter, setLabelFilter] = useState("");
+  const [localTimeRange, setLocalTimeRange] = useState({ from: LAST_24_HOURS.from, to: LAST_24_HOURS.to });
+  const { from, to } = timeRange ?? localTimeRange;
+  const now = useResourceClock(from.startsWith("now") || to.startsWith("now"));
   const [filterOptions, setFilterOptions] = useState({ kinds: [] as string[], labels: [] as string[] });
   const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -261,21 +311,66 @@ export function TaskManager({
     run,
   })), [runs]);
   const openId = onSelectRun ? selectedId : localSelectedId;
+  const visibleRows = useMemo(() => {
+    if (!from && !to) return rows;
+    const reference = new Date(Math.max(now, Date.now()));
+    const lower = from ? resolveDateMath(from, reference)?.getTime() ?? NaN : -Infinity;
+    const upper = to ? resolveDateMath(to, reference)?.getTime() ?? NaN : Infinity;
+    return rows.filter((row) => {
+      if (row.id === openId) return true;
+      const started = Date.parse(row.startedAt ?? "");
+      return started >= lower && started <= upper;
+    });
+  }, [from, to, now, openId, rows]);
   const columns = useMemo(
     () => (compact ? compactRunColumns(sessionRenderers) : runColumns(sessionRenderers)),
     [compact, sessionRenderers],
   );
 
+  // Below the phone breakpoint the pool gauges fold into a one-line summary on
+  // the toolbar row and the stream status into a dot, so the runs start right
+  // under one row of controls.
+  const { ref: widthRef, wider: roomy } = useContainerWiderThan(BREAKPOINTS.sm);
+  const [poolExpanded, setPoolExpanded] = useState(false);
+  const poolPanelId = useId();
+
   return (
-    <>
-      {showPool && <TaskPoolUsage basePath={apiBase} className="mb-3" />}
+    <div ref={widthRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
+      {showPool && roomy && <TaskPoolUsage basePath={apiBase} className="mb-3" />}
       <DataTable
         {...(className ? { className } : {})}
-        data={rows}
+        data={visibleRows}
         columns={columns}
+        layout="auto"
         emptyMessage="No background tasks."
         externalFilters={filters}
-        filterBarProps={{ trailing: <span className="text-xs text-muted-foreground">{status}</span> }}
+        {...(showPool && !roomy && poolExpanded
+          ? { toolbarPanel: <TaskPoolUsage id={poolPanelId} basePath={apiBase} className="mb-2" /> }
+          : {})}
+        externalTimeRange={{
+          from,
+          to,
+          onApply: onTimeRangeChange ?? ((from, to) => setLocalTimeRange({ from, to })),
+          presets: TIMESTAMP_RANGE_PRESETS,
+          timeEnabled: true,
+        }}
+        filterBarProps={roomy ? {
+          trailing: <span className="text-xs text-muted-foreground">{status}</span>,
+        } : {
+          ...(showPool ? {
+            children: (
+              <TaskPoolSummary
+                basePath={apiBase}
+                expanded={poolExpanded}
+                onExpandedChange={setPoolExpanded}
+                controls={poolPanelId}
+                // Absorbs the row's shortfall so Filters, the range and ⋮ keep their size.
+                className="-ml-1.5 shrink-[100]"
+              />
+            ),
+          } : {}),
+          trailing: <StreamStatusDot status={status} />,
+        }}
         getRowId={(row) => row.id}
         defaultSort={{ key: "startedAt", dir: "desc" }}
         expandedRowIds={openId ? [openId] : []}
@@ -299,7 +394,26 @@ export function TaskManager({
           />
         )}
       />
-    </>
+    </div>
+  );
+}
+
+function streamStatusColor(status: string): string {
+  if (status === "connected" || status === "polling" || status === "complete") return "bg-emerald-500";
+  if (status === "connecting" || status === "idle") return "bg-amber-500";
+  return "bg-rose-500";
+}
+
+/** The run listing's transport state as a dot; the word is its name and tooltip. */
+function StreamStatusDot({ status }: { status: string }) {
+  const label = `Task stream: ${status}`;
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className={cn("mx-1 inline-block size-2 shrink-0 rounded-full", streamStatusColor(status))}
+    />
   );
 }
 

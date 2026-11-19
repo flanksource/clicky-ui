@@ -325,3 +325,18 @@ describe("SelectionActionBar", () => {
     expect(headings.filter(Boolean)).toEqual(["Edit", "Run", "Danger"]);
   });
 });
+
+describe("SelectionActionBar on a phone", () => {
+  it("keeps the count on one line and shrinks Clear to an icon that still names itself", () => {
+    const ctx = context();
+    render(<SelectionActionBar actions={[button("Run")]} context={ctx} compact />);
+
+    const count = screen.getByTestId("data-table-selection-count");
+    expect(count).toHaveClass("whitespace-nowrap");
+    expect(count).not.toHaveClass("flex-wrap");
+    const clear = within(count).getByRole("button", { name: "Clear selection" });
+    expect(clear.textContent).toBe("");
+    fireEvent.click(clear);
+    expect(ctx.clearSelection).toHaveBeenCalledOnce();
+  });
+});

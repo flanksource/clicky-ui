@@ -4,7 +4,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type RefObject,
+  type RefCallback,
 } from "react";
 
 // Progressive windowing for the SessionViewer log. A recorded session runs to
@@ -56,6 +56,11 @@ export function isNearTop(scrollTop: number, threshold: number): boolean {
   return scrollTop <= threshold;
 }
 
+// How long after a wheel, touch, key or pointer release a scroll event is still
+// attributed to the reader (smooth scrolling keeps emitting after the input).
+const USER_SCROLL_INTENT_MS = 500;
+const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
+
 export interface SessionScrollOptions {
   /** Number of filtered events available to render. */
   total: number;
@@ -82,8 +87,8 @@ export interface SessionScrollOptions {
 }
 
 export interface SessionScrollState {
-  scrollRef: RefObject<HTMLDivElement | null>;
-  contentRef: RefObject<HTMLDivElement | null>;
+  scrollRef: RefCallback<HTMLDivElement>;
+  contentRef: RefCallback<HTMLDivElement>;
   startIndex: number;
   hasMore: boolean;
   following: boolean;
@@ -98,8 +103,15 @@ export function useSessionScroll(
   const bottomThreshold = options.bottomThreshold ?? 64;
   const topThreshold = options.topThreshold ?? 600;
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
+  // The container mounts only once the session has events, so its listeners and
+  // observers key off the mounted element rather than the first render's ref.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+  const [contentEl, setContentEl] = useState<HTMLDivElement | null>(null);
+  const attachScroll = useCallback((node: HTMLDivElement | null) => {
+    scrollRef.current = node;
+    setScrollEl(node);
+  }, []);
   const followingRef = useRef(true);
   const lastScrollTopRef = useRef(0);
   const anchorHeightRef = useRef<number | null>(null);
@@ -235,53 +247,94 @@ export function useSessionScroll(
     loadingOlderRef.current = false;
   }, [enabled, visibleCount, total, scrollToBottom]);
 
-  // Track pinned-to-bottom, and load older rows as the reader nears the top.
+  // Only the reader pauses following. Scroll events also fire for our own
+  // programmatic pins and for layout shifts (rows highlighting, the viewport
+  // resizing), and those land before the ResizeObserver re-pins — so a scroll
+  // that no user input caused re-pins instead of pausing.
   useEffect(() => {
-    const el = scrollRef.current;
+    const el = scrollEl;
     if (!enabled || !el) return;
+    let pointerHeld = false;
+    let intentUntil = 0;
+    const markIntent = () => {
+      intentUntil = performance.now() + USER_SCROLL_INTENT_MS;
+    };
+    const userScrolling = () => pointerHeld || performance.now() < intentUntil;
+    const setFollowingTo = (value: boolean) => {
+      followingRef.current = value;
+      setFollowing(value);
+    };
     const onScroll = () => {
       const movedUp = el.scrollTop < lastScrollTopRef.current;
-      if (movedUp || !isPinnedToBottom(el, bottomThreshold)) {
-        followingRef.current = false;
-        setFollowing(false);
+      const pinned = isPinnedToBottom(el, bottomThreshold);
+      if (followingRef.current && userScrolling() && (movedUp || !pinned)) {
+        setFollowingTo(false);
+      } else if (followingRef.current && !pinned) {
+        scrollToBottom();
       }
       lastScrollTopRef.current = el.scrollTop;
       lastScrollHeightRef.current = el.scrollHeight;
       if (movedUp && isNearTop(el.scrollTop, topThreshold)) loadOlder();
     };
     const onWheel = (event: WheelEvent) => {
+      markIntent();
       if (event.deltaY >= 0) return;
-      followingRef.current = false;
-      setFollowing(false);
-      if (isNearTop(el.scrollTop, topThreshold)) loadOlder();
+      const nearTop = isNearTop(el.scrollTop, topThreshold);
+      const canLoadOlder = hasMoreRef.current || onReachStartRef.current !== undefined;
+      // A log that fits without scrolling has nowhere to scroll up to, unless
+      // the gesture is about to load older rows above it.
+      if (el.scrollHeight > el.clientHeight || (nearTop && canLoadOlder)) setFollowingTo(false);
+      if (nearTop) loadOlder();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (SCROLL_KEYS.has(event.key)) markIntent();
+    };
+    const onPointerDown = () => {
+      pointerHeld = true;
+    };
+    const onPointerUp = () => {
+      pointerHeld = false;
+      markIntent();
     };
     // Rendered rows first; once every local row is mounted, ask for history.
     const loadOlder = () => {
       if (hasMoreRef.current) growOlderRef.current();
       else onReachStartRef.current?.();
     };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    el.addEventListener("wheel", onWheel, { passive: true });
+    const listeners: [EventTarget, string, EventListener][] = [
+      [el, "scroll", onScroll],
+      [el, "wheel", onWheel as EventListener],
+      [el, "touchmove", markIntent],
+      [el, "keydown", onKeyDown as EventListener],
+      [el, "pointerdown", onPointerDown],
+      [window, "pointerup", onPointerUp],
+      [window, "pointercancel", onPointerUp],
+    ];
+    for (const [target, type, listener] of listeners) {
+      target.addEventListener(type, listener, { passive: true });
+    }
     return () => {
-      el.removeEventListener("scroll", onScroll);
-      el.removeEventListener("wheel", onWheel);
+      for (const [target, type, listener] of listeners) {
+        target.removeEventListener(type, listener);
+      }
     };
-  }, [enabled, bottomThreshold, topThreshold]);
+  }, [enabled, scrollEl, bottomThreshold, topThreshold, scrollToBottom]);
 
-  // Keep the newest row in view as rows grow (shiki highlighting settles after paint).
+  // Keep the newest row in view as rows grow (shiki highlighting settles after
+  // paint) and as the viewport itself resizes (a drawer or panel opening).
   useEffect(() => {
-    const content = contentRef.current;
-    if (!enabled || !content || typeof ResizeObserver === "undefined") return;
+    if (!enabled || !scrollEl || !contentEl || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => {
       if (followingRef.current) scrollToBottom();
     });
-    observer.observe(content);
+    observer.observe(contentEl);
+    observer.observe(scrollEl);
     return () => observer.disconnect();
-  }, [enabled, scrollToBottom]);
+  }, [enabled, scrollEl, contentEl, scrollToBottom]);
 
   return {
-    scrollRef,
-    contentRef,
+    scrollRef: attachScroll,
+    contentRef: setContentEl,
     startIndex,
     hasMore,
     following,

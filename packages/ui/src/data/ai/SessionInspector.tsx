@@ -26,6 +26,10 @@ import { type ApprovalResolveHandler } from "./SessionInspector.approvals-model"
 import { LegacySessionInspector } from "./SessionInspector.legacy";
 import { useInspectorTab } from "./SessionInspector.tab-state";
 import {
+  useHostTabs,
+  type SessionInspectorHostTab,
+} from "./SessionInspector.host-tabs";
+import {
   useRemoteCollection,
   useRemoteSession,
   useReportLoadState,
@@ -42,6 +46,7 @@ import {
 import type { UnifiedSessionInput } from "./SessionViewer.unified";
 
 export type { SessionInspectorTab } from "./SessionInspector.tabs.model";
+export type { SessionInspectorHostTab } from "./SessionInspector.host-tabs";
 
 /**
  * Either an in-memory `session` or a session URL `src` (never both — the
@@ -66,6 +71,8 @@ export interface SessionInspectorOptions {
   metadata?: SessionMetadataSummary;
   /** Host controls rendered before Session options in the compact toolbar. */
   toolbarActions?: ReactNode;
+  /** Host views listed after the inspector's tabs in the compact toolbar. */
+  hostTabs?: readonly SessionInspectorHostTab[];
   defaultTab?: SessionInspectorTab;
   /** Controlled active tab (e.g. from the URL); pair with `onTabChange`. */
   tab?: SessionInspectorTab;
@@ -82,9 +89,10 @@ export interface SessionInspectorOptions {
    *  tab still lists pending requests but renders no Approve/Deny controls. */
   onResolveApproval?: ApprovalResolveHandler;
   composer?: ReactNode;
-  /** With `src`: fires on the initial load result (`loading`, then `ready` or
-   *  `error`) and when the follow stream later sends a terminal error frame.
-   *  Never fires for an in-memory `session`. */
+  /** With `src`, or a collection whose current item loads from `src`: fires on
+   *  the initial load result (`loading`, then `ready` or `error`) and when the
+   *  follow stream later sends a terminal error frame. Never fires for an
+   *  in-memory session. */
   onLoadStateChange?: (state: SessionInspectorLoadState) => void;
 }
 
@@ -110,17 +118,22 @@ export function SessionInspector({
     ...followOptions,
     ...(feed ? { feed } : {}),
   });
-  useReportLoadState({
-    state: remote,
-    enabled: src !== undefined,
-    onChange: onLoadStateChange,
-  });
   const collection =
     session !== undefined && isSessionCollectionInput(session)
       ? session
       : undefined;
   const remoteCollection = useRemoteCollection(collection, followOptions);
   const status = src !== undefined ? remote : remoteCollection;
+  const currentItem = collection?.sessions.find(
+    (item) => item.id === collection.currentSessionId,
+  );
+  useReportLoadState({
+    state: status,
+    enabled:
+      src !== undefined ||
+      (currentItem?.session === undefined && currentItem?.src !== undefined),
+    onChange: onLoadStateChange,
+  });
   const resolved: SessionInspectorInput | undefined =
     src !== undefined
       ? remote.session
@@ -191,6 +204,7 @@ function SessionInspectorView({
   layout = "default",
   metadata,
   toolbarActions,
+  hostTabs,
 }: SessionInspectorOptions & {
   session: SessionInspectorInput;
   follow?: boolean;
@@ -230,6 +244,7 @@ function SessionInspectorView({
       ...(layout === "compact" ? { layout } : {}),
       ...(metadata ? { metadata } : {}),
       ...(toolbarActions ? { toolbarActions } : {}),
+      ...(hostTabs ? { hostTabs } : {}),
     };
     return (
       <CollectionSessionInspector
@@ -251,6 +266,7 @@ function SessionInspectorView({
       {...(layout === "compact" ? { layout } : {})}
       {...(metadata ? { metadata } : {})}
       {...(toolbarActions ? { toolbarActions } : {})}
+      {...(hostTabs ? { hostTabs } : {})}
     />
   );
 }
@@ -272,6 +288,7 @@ function CollectionSessionInspector({
   layout = "default",
   metadata,
   toolbarActions,
+  hostTabs,
 }: SessionInspectorOptions & {
   collection: SessionCollectionInput;
   follow?: boolean;
@@ -282,6 +299,7 @@ function CollectionSessionInspector({
     ...(follow === undefined ? {} : { follow }),
   });
   const compact = layout === "compact";
+  const host = useHostTabs(hostTabs, compact);
   const [menuHost, setMenuHost] = useState<HTMLSpanElement | null>(null);
   const outputVisible = hasStructuredOutput(hierarchy.current);
   const [tab, setTab] = useInspectorTab(
@@ -340,9 +358,11 @@ function CollectionSessionInspector({
     >
       {compact ? (
         <CompactSessionInspectorToolbar
-          tabs={compactTabs}
-          activeTab={tab}
-          onSelect={(next) => setTab(next as SessionInspectorTab)}
+          tabs={[...compactTabs, ...host.items]}
+          activeTab={host.active?.id ?? tab}
+          onSelect={(next) => {
+            if (!host.select(next)) setTab(next as SessionInspectorTab);
+          }}
           onMenuHost={setMenuHost}
           {...(compactMetadata ? { metadata: compactMetadata } : {})}
           {...(toolbarActions ? { toolbarActions } : {})}
@@ -370,7 +390,7 @@ function CollectionSessionInspector({
             <div
               className={cn(
                 "min-h-0 flex-1 overflow-hidden",
-                tab !== "transcript" && "hidden",
+                (host.active || tab !== "transcript") && "hidden",
               )}
             >
               <SessionTranscript
@@ -381,7 +401,11 @@ function CollectionSessionInspector({
                 }}
               />
             </div>
-            {tab !== "transcript" ? (
+            {host.active ? (
+              <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+                {host.active.content}
+              </div>
+            ) : tab !== "transcript" ? (
               <div className="min-h-0 flex-1 overflow-auto p-density-4">
                 <SessionInspectorPanel
                   tab={tab}

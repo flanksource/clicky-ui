@@ -9,6 +9,7 @@ import type { TestFilters } from "./filterState";
 import type { TestNodeAdapterRegistry } from "./adapter";
 import type { FetchProcessMetrics } from "./process-metrics";
 import type { OpenFileTarget } from "../OpenInFilesLink";
+import type { TestRunnerView } from "./TestViewToggle";
 
 export type TestRunnerContext = {
   /** The (already filtered, host-owned) test forest to render. */
@@ -31,6 +32,10 @@ export type TestRunnerContext = {
   expandAll: boolean | null;
   /** In-flight action flags driving button disabled/spinner states. */
   busy: { rerun?: boolean; stop?: boolean };
+  /** "tree" (tree beside detail, the default when absent) or "list" (one row per test, detail beneath). */
+  view?: TestRunnerView | undefined;
+  /** Called by the Tree / List toggle; when absent the toggle is hidden. */
+  onViewChange?: ((next: TestRunnerView) => void) | undefined;
 
   /**
    * Active detail-tab id. When provided, TestDetailPanel renders this tab

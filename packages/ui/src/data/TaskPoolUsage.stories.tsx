@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
-import { expect, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 import type { EventSourceFactory } from "../hooks/event-source";
 import { EventSourceProvider } from "../hooks/event-source-provider";
 import { TimeseriesStreamProvider } from "./timeseries-stream-provider";
 import { FakeEventSource } from "./timeseries-stream.fixtures";
-import { TaskPoolUsage, TaskRunConcurrency } from "./TaskPoolUsage";
+import { TaskPoolSummary, TaskPoolUsage, TaskRunConcurrency } from "./TaskPoolUsage";
 
 const RUN_ID = "commit-gavel";
 
@@ -51,15 +51,23 @@ function fakePoolHub(state: PoolState): EventSourceFactory {
   };
 }
 
-function PoolHarness({ state, runId }: { state: PoolState; runId?: string }) {
+function PoolHarness({ state, runId, collapsed }: { state: PoolState; runId?: string; collapsed?: boolean }) {
   const [client] = useState(() => new QueryClient());
   const [factory] = useState(() => fakePoolHub(state));
+  const [expanded, setExpanded] = useState(false);
   return (
     <QueryClientProvider client={client}>
       <EventSourceProvider value={factory}>
         <TimeseriesStreamProvider>
-          <div className="space-y-3">
-            <TaskPoolUsage basePath="/api/v1" />
+          <div className="space-y-3" style={collapsed ? { width: 360 } : undefined}>
+            {collapsed ? (
+              <>
+                <TaskPoolSummary basePath="/api/v1" expanded={expanded} onExpandedChange={setExpanded} controls="story-pool-gauges" />
+                {expanded ? <TaskPoolUsage id="story-pool-gauges" basePath="/api/v1" /> : null}
+              </>
+            ) : (
+              <TaskPoolUsage basePath="/api/v1" />
+            )}
             {runId ? <TaskRunConcurrency basePath="/api/v1" runId={runId} /> : null}
           </div>
         </TimeseriesStreamProvider>
@@ -91,5 +99,16 @@ export const SaturatedWithThrottledRun: Story = {
     await expect(await canvas.findByLabelText("Workers busy: 4")).toBeInTheDocument();
     await expect(await canvas.findByLabelText("Queued: 9")).toBeInTheDocument();
     await expect(await canvas.findByLabelText("Waiting for a permit: 3")).toBeInTheDocument();
+  },
+};
+
+export const CollapsedSummary: Story = {
+  args: { state: SATURATED, collapsed: true },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toggle = await canvas.findByRole("button", { name: "Worker pool: 4 busy · 4 slots · 9 queued · 1 supervisor" });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(toggle);
+    await expect(await canvas.findByLabelText("Queued: 9")).toBeInTheDocument();
   },
 };

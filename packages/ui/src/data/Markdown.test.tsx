@@ -106,6 +106,20 @@ describe("Markdown code blocks", () => {
     expect(container.querySelector(".not-prose")).not.toBeNull();
   });
 
+  it.each([
+    ["csv", 'name,note\nweb,"a, b"\napi'],
+    ["tsv", "name\tnote\nweb\ta, b\napi"],
+  ])("renders a %s fence as a table headed by its first row", async (language, source) => {
+    const { container } = render(<Markdown sourceBlocks text={`intro\n\n\`\`\`${language}\n${source}\n\`\`\``} />);
+
+    await waitFor(() => expect(container.querySelector("table")).not.toBeNull());
+    const rows = [...container.querySelectorAll("tr")].map((row) => [...row.querySelectorAll("th,td")].map((cell) => cell.textContent));
+    expect(rows).toEqual([["name", "note"], ["web", "a, b"], ["api", ""]]);
+    expect(container.querySelector("thead th")?.textContent).toBe("name");
+    expect(container.querySelector("pre")).toBeNull();
+    expect(container.querySelector('[data-source-start="3"]')?.querySelector("table")).not.toBeNull();
+  });
+
   it("leaves inline code as a plain <code> element", async () => {
     const { container } = render(<Markdown text={"Run `pnpm build` to compile."} />);
 

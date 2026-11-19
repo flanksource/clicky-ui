@@ -5,6 +5,8 @@ export { TestRunner, type TestRunnerProps } from "./TestRunner";
 export { TestTree } from "./TestTree";
 export { TestTreeNode } from "./TestTreeNode";
 export { TestDetailPanel } from "./TestDetailPanel";
+export { TestList, testLeaves } from "./TestList";
+export { TestViewToggle, type TestRunnerView } from "./TestViewToggle";
 export { TestFailureDetail, TestOutput } from "./TestFailureDetail";
 export { TestAttemptDetail, type TestAttemptDetailProps } from "./TestAttemptDetail";
 export { TestAttempts } from "./TestAttempts";
