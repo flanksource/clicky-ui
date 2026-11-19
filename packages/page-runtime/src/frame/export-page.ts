@@ -1,3 +1,4 @@
+import { randomUUID } from "@flanksource/clicky-ui/utils";
 import type { CompilerPlugin, FrameConfig, PageLock } from "../schema.ts";
 import { EXPORT_COMPILER_URL } from "../sw/runtime-module.ts";
 import { waitForReadiness } from "./readiness.ts";
@@ -32,7 +33,7 @@ export async function exportPageModule<T extends ExportModule>(options: { config
   });
   const code = await compileExportMdx({ path: config.page, code: source, remark });
   await options.request({ page: config.page, message: { type: "export-module", path: config.page, code } });
-  const url = new URL(entry); url.searchParams.set("export", crypto.randomUUID());
+  const url = new URL(entry); url.searchParams.set("export", randomUUID());
   return await import(url.href) as T;
 }
 

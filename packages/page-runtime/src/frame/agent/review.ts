@@ -1,3 +1,4 @@
+import { randomUUID } from "@flanksource/clicky-ui/utils";
 import { getFiberFromHostInstance } from "bippy";
 import { captureLocators, describeElement, COMMENT_ELEMENT_HTML_LIMIT, COMMENT_ELEMENT_HTML_TRUNCATION } from "@flanksource/clicky-ui/comments";
 import type { ReviewAction, ReviewElement, ReviewFrameMessage, ReviewHostMessage } from "../../review-schema.ts";
@@ -92,8 +93,8 @@ export function createReviewAgent(options: { root: HTMLElement; send(message: Re
       if (!isPageElement({ element: node, root: options.root })) throw new Error("Review target must belong to the page");
       const reviewable = node.closest("[data-review-id]");
       if (kind !== "mark" && (!reviewable || !options.root.contains(reviewable))) throw new Error("Selected element is not reviewable");
-      const id = kind === "mark" ? `new:${crypto.randomUUID()}` : reviewable!.getAttribute("data-review-id")!;
-      action({ node: kind === "mark" ? node : reviewable!, id, action: kind, requestId: crypto.randomUUID() });
+      const id = kind === "mark" ? `new:${randomUUID()}` : reviewable!.getAttribute("data-review-id")!;
+      action({ node: kind === "mark" ? node : reviewable!, id, action: kind, requestId: randomUUID() });
     },
     enabled: () => visible,
     dispose(): void {

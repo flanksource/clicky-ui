@@ -1,3 +1,4 @@
+import { randomUUID } from "@flanksource/clicky-ui/utils";
 import type { BridgeEnvelope, FrameConfig, FrameMessage, JsonValue, RuntimeError, RuntimePhase, RuntimeProfile } from "../schema.ts";
 import { createFrameBridge, workerRequest } from "./bridge.ts";
 import { waitForReadiness } from "./readiness.ts";
@@ -202,7 +203,7 @@ export async function bootFrame(): Promise<void> {
     const send = (message: FrameMessage) => bridge.send(message);
     const mountedPage = mountPage({ module: pageModule, ...(layout ? { layout } : {}), runtime, data: pageData, file: config.page, root: pageRoot, wrap, send });
     updateSources = async (files) => {
-      const revision = crypto.randomUUID();
+      const revision = randomUUID();
       const revised = (path: string) => { const url = new URL(path, location.href); url.searchParams.set("revision", revision); return url.href; };
       const paths = Object.keys(files);
       if (paths.length && paths.every(path => path.endsWith(".css"))) {

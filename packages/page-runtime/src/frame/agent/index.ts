@@ -1,3 +1,4 @@
+import { randomUUID } from "@flanksource/clicky-ui/utils";
 import { init } from "@flanksource/clicky-ui/react-grab/core";
 import type { ReactGrabAPI } from "@flanksource/clicky-ui/react-grab";
 import { getFiberFromHostInstance } from "bippy";
@@ -34,7 +35,7 @@ export function startPageAgent(options: PageAgentOptions) {
   const registered = new Map<string, Element>();
   const overlay = mountAgentOverlay({ root: options.root, send: options.send, registered });
   const review = createReviewAgent({ ...options, componentName: (element) => api.getDisplayName(element), containedAnchors: overlay.containedAnchors });
-  const plugin = `page-agent-${crypto.randomUUID()}`;
+  const plugin = `page-agent-${randomUUID()}`;
   const previousAction = api.getToolbarState()?.defaultAction;
   const previousEnabled = api.isEnabled();
   let picking = false;
