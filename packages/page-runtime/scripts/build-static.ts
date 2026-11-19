@@ -66,6 +66,16 @@ export async function buildStatic(options: BuildStaticOptions = {}): Promise<voi
   });
   await build({ ...failOnUnresolved, input: resolve(root, "src/frame/devtools-hook.ts"), plugins, platform: "browser", transform: { define: { "process.env.NODE_ENV": JSON.stringify("development") } }, output: { file: resolve(outDir, "devtools-hook.js"), format: "iife" } });
   await writeFile(resolve(outDir, "bootstrap.html"), frameDocument().html);
+  await build({
+    ...failOnUnresolved,
+    input: resolve(root, "src/frame/document-entry.ts"),
+    plugins,
+    platform: "browser",
+    transform: { define: { "process.env.NODE_ENV": JSON.stringify("development"), "process.env": "{}" } },
+    output: { file: resolve(outDir, "document.js"), name: "FacetDocumentRuntime", format: "iife", minify: true },
+  });
+  await build({ ...failOnUnresolved, input: resolve(root, "src/frame/document-mount.ts"), platform: "browser",
+    output: { file: resolve(outDir, "document-bundle.js"), name: "FacetDocumentRuntime", format: "iife", minify: true } });
   await build({ input: resolve(root, "src/editing.ts"), external: ["react"], platform: "browser", output: { file: resolve(outDir, "editing.js"), format: "es" } });
 }
 

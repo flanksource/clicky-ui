@@ -11,20 +11,23 @@ import { transformModule } from "../sw/module-transform.ts";
 import { packageOf } from "./trace.ts";
 import { dependencyBarrelIndex } from "./dependency-barrel-index.ts";
 
-export function dependencyBarrels({ target, root }: { target: "node" | "browser"; root: string }): Plugin {
+export function dependencyBarrels({ target, root, barrelSource, external }: { target: "node" | "browser"; root: string; barrelSource: "published" | "installed"; external: ReadonlySet<string> }): Plugin {
   const resolver = new ResolverFactory({ conditionNames: [target, "import", "default"], mainFields: target === "browser" ? ["browser", "module", "main"] : ["module", "main"], extensions: [".mjs", ".js", ".cjs", ".json"], symlinks: true });
   const loaded = new Set<string>();
   const indexed = new Set<string>();
   const directories = new Map<string, string>();
+  const installedIdentities = new Map<string, number>();
   let index: BarrelIndex = { modules: [], barrels: {} };
   const canonical = (path: string) => {
     const pkg = packageOf(path);
-    const key = `${pkg.name}@${pkg.version}`;
+    if (barrelSource === "installed" && !installedIdentities.has(pkg.dir)) installedIdentities.set(pkg.dir, installedIdentities.size);
+    const instance = installedIdentities.get(pkg.dir);
+    const key = `${pkg.name}@${pkg.version}${instance === undefined ? "" : `+installed.${instance}`}`;
     directories.set(key, pkg.dir);
     if (!loaded.has(pkg.dir)) {
       loaded.add(pkg.dir);
       const file = join(pkg.dir, "dist/runtime/barrels.json");
-      if (existsSync(file)) {
+      if (barrelSource === "published" && existsSync(file)) {
         const manifest = JSON.parse(readFileSync(join(pkg.dir, "package.json"), "utf8")) as { sideEffects?: boolean | string[] };
         index = mergeBarrels([index, guardedBarrels({ index: JSON.parse(readFileSync(file, "utf8")) as BarrelIndex, name: pkg.name, version: pkg.version, ...(manifest.sideEffects === undefined ? {} : { sideEffects: manifest.sideEffects }) })]);
       }
@@ -49,19 +52,21 @@ export function dependencyBarrels({ target, root }: { target: "node" | "browser"
       const from = entry ? root : dirname(id);
       const url = entry ? "/runtime-entry.js" : canonical(id);
       for (const item of parsed.module.staticImports) {
+        if (external.has(item.moduleRequest.value)) continue;
         const path = resolver.sync(from, item.moduleRequest.value).path;
         if (path) {
           canonical(path);
           if (!indexed.has(path)) {
             indexed.add(path);
             const pkg = packageOf(path);
-            if (!existsSync(join(pkg.dir, "dist/runtime/barrels.json"))) {
+            if (barrelSource === "installed" || !existsSync(join(pkg.dir, "dist/runtime/barrels.json"))) {
               index = mergeBarrels([index, dependencyBarrelIndex({ path, canonical, resolve: (from, source) => resolver.sync(from, source).path })]);
             }
           }
         }
       }
       return transformModule(code, { url, barrels: index, known: () => false, resolveBare(source) {
+        if (external.has(source)) return null;
         const path = resolver.sync(from, source).path;
         return path ? canonical(path) : null;
       } }).code;

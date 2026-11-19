@@ -25,6 +25,20 @@ export function validateFrameMessage(value: unknown): FrameMessage {
       if (!["connecting", "booting", "mounted", "fonts", "images", "stylesheets", "diagrams", "hook", "quiescence", "ready"].includes(String(m.state))) throw new Error("message.state: invalid status");
       break;
     case "snapshot": keys(m, ["type", "html"], "message"); text(m.html, "snapshot.html", true); break;
+    case "prepared-render":
+      keys(m, ["type", "lock", "navigate", "runtimeVersion"], "message");
+      validateLock(m.lock);
+      if (typeof m.navigate !== "boolean") throw new Error("prepared-render.navigate: expected boolean");
+      text(m.runtimeVersion, "prepared-render.runtimeVersion");
+      break;
+    case "rendered":
+      keys(m, ["type", "html", "modulesMs", "readinessMs", "snapshotMs"], "message");
+      if (typeof m.html !== "string") throw new Error("rendered.html: expected string");
+      for (const field of ["modulesMs", "readinessMs", "snapshotMs"]) {
+        const duration = m[field];
+        if (typeof duration !== "number" || !Number.isFinite(duration) || duration < 0) throw new Error(`rendered.${field}: invalid duration`);
+      }
+      break;
     case "emit":
       keys(m, ["type", "event", "payload"], "message"); text(m.event, "emit.event");
       if (!("payload" in m)) throw new Error("emit.payload: required");
@@ -75,6 +89,12 @@ export function validateHostMessage(value: unknown): HostMessage {
       for (const [path, source] of Object.entries(record(m.files, "files"))) { validateSourcePath(path); if (source !== null) text(source, path, true); }
       break;
     case "reload": keys(m, ["type"], "message"); break;
+    case "prepare-render":
+      keys(m, ["type", "open"], "message");
+      keys(record(m.open, "prepare-render.open"), ["page", "layout", "manifest", "files", "sourceProvider", "policy"], "prepare-render.open");
+      validateHostMessage({ ...record(m.open, "prepare-render.open"), type: "open" });
+      break;
+    case "render": keys(m, ["type", "data"], "message"); validateJson(m.data); break;
     case "theme":
       keys(m, ["type", "theme", "density"], "message");
       if (!["light", "dark"].includes(String(m.theme)) || !["compact", "comfortable", "spacious"].includes(String(m.density))) throw new Error("theme: invalid theme/density");

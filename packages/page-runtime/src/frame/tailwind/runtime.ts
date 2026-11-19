@@ -7,7 +7,7 @@ import type { TailwindActivity } from "../../activity-schema.ts";
 type Compiled = { compiler: Awaited<ReturnType<typeof compileLibraries>>; candidates: Set<string> };
 const compilers = new Map<string, Promise<Compiled>>();
 const IDLE_PERSIST_MS = 1000;
-export type TailwindOptions = { libraries: LibraryStyles[]; loaders: CompilerLoaders; runtimeVersion: string; root: HTMLElement; candidates: string[]; store: TailwindStore; timeoutMs: number; onError: (error: unknown) => void; onActivity?: (activity: TailwindActivity) => void };
+export type TailwindOptions = { libraries: LibraryStyles[]; loaders: CompilerLoaders; runtimeVersion: string; root: HTMLElement; candidates: string[]; store?: TailwindStore; timeoutMs: number; onError: (error: unknown) => void; onActivity?: (activity: TailwindActivity) => void };
 
 export function loadTailwind(options: Pick<TailwindOptions, "libraries" | "loaders" | "runtimeVersion" | "onActivity">): Promise<Compiled> {
   const key = libraryKey(options);
@@ -46,7 +46,7 @@ export async function prepareTailwind(options: TailwindOptions) {
   const source = new Set(options.candidates);
   const candidates = new Set(source);
   const key = await cssCacheKey({ libraryKey: library, candidates: source });
-  const cached = await options.store.read(key);
+  const cached = await options.store?.read(key);
   if (cached) for (const candidate of cached.record.domClasses) candidates.add(candidate);
   const fresh = classesUnder({ node: options.root, root: options.root, candidates });
   performance.mark("page-runtime:css-cache");
@@ -73,12 +73,12 @@ export async function prepareTailwind(options: TailwindOptions) {
     if (pending) {
       pending(); pending = undefined;
       const write = { key, libraryKey: library, candidates: [...source].sort(), domClasses: [...candidates].filter((name) => !source.has(name)).sort(), css: current };
-      persisted = persisted.then(() => options.store.write(write));
+      persisted = persisted.then(() => options.store?.write(write));
       void persisted.catch(report);
     }
     return persisted;
   };
-  const persist = () => { pending ??= whenIdle(() => { void flush(); }); };
+  const persist = () => { if (options.store) pending ??= whenIdle(() => { void flush(); }); };
   const update = () => {
     const startMs = performance.now();
     current = build();

@@ -2,8 +2,9 @@ import { mkdtemp, mkdir, writeFile, rm, cp, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
-import { afterEach, expect, test } from "vitest";
-import { buildDependencyRuntime } from "./dependency-runtime.ts";
+import { runInNewContext } from "node:vm";
+import { afterEach, expect, test, vi } from "vitest";
+import { buildDependencyRuntime, buildInstalledDependencyRuntime } from "./dependency-runtime.ts";
 import { ensureDependencyRuntime } from "./dependency-cache.ts";
 import { dependencyRuntimePlugin } from "./dependency-plugin.ts";
 import { rolldown } from "rolldown";
@@ -71,6 +72,24 @@ test("relocates assets referenced through import.meta.url", async () => {
   expect(existsSync(library.image)).toBe(true);
 });
 
+test("packages a module worker and its imports relative to the compiled browser entry", async () => {
+  const root = await fixture();
+  const library = join(root, "node_modules/example-lib");
+  await writeFile(join(library, "browser.js"), 'export const create = () => new Worker(new URL("echo.worker.js", import.meta.url), { type: "module" });');
+  await writeFile(join(library, "echo.worker.js"), 'import { reply } from "./reply.js"; self.onmessage = () => self.postMessage(reply);');
+  await writeFile(join(library, "reply.js"), 'export const reply = "worker dependency was bundled";');
+  const outDir = join(root, "compiled");
+  const runtime = await buildDependencyRuntime({ root, outDir, entries: ["example-lib"], target: "browser" });
+  const worker = Object.keys(runtime.integrity).find(file => /^assets\/echo\.worker-.*\.js$/.test(file));
+  expect(worker).toBeDefined();
+  const self = { onmessage: () => undefined, postMessage: vi.fn() };
+  runInNewContext(await readFile(join(outDir, worker!), "utf8"), { self });
+  self.onmessage();
+  expect(self.postMessage).toHaveBeenCalledWith("worker dependency was bundled");
+  expect(Object.keys(runtime.inputs)).toContain(resolve(library, "reply.js"));
+  expect(await readFile(join(outDir, runtime.imports["example-lib"]!), "utf8")).toContain(worker!);
+});
+
 test("honors explicit browser:false mappings while rejecting undeclared builtins", async () => {
   const root = await fixture();
   await writeFile(join(root, "node_modules/example-lib/package.json"), JSON.stringify({ name: "example-lib", version: "1.0.0", type: "module", main: "./browser.js", browser: { fs: false } }));
@@ -106,6 +125,19 @@ test("keeps side effects when deriving an unpublished barrel index", async () =>
   await writeFile(join(library, "browser.js"), 'import { state } from "./leaf.js"; state.initialized = true; export { state };');
   const runtime = await buildDependencyRuntime({ root, outDir: join(root, "compiled"), entries: ["example-lib"], target: "browser", exports: { "example-lib": ["state"] } });
   expect((await import(pathToFileURL(join(process.cwd(), root, "compiled", runtime.imports["example-lib"]!)).href)).state).toEqual({ initialized: true });
+});
+
+test("derives project runtime barrels from its installed dependency graph", async () => {
+  const root = await fixture();
+  const library = join(root, "node_modules/example-lib");
+  await writeFile(join(library, "package.json"), JSON.stringify({ name: "example-lib", version: "1.0.0", type: "module", sideEffects: false, main: "./browser.js" }));
+  await mkdir(join(library, "dist/runtime"), { recursive: true });
+  await writeFile(join(library, "dist/runtime/barrels.json"), JSON.stringify({ modules: ["published-dependency@3.0.0/leaf.js"], barrels: { "example-lib@1.0.0/browser.js": { value: 0 } } }));
+  await writeFile(join(library, "leaf.js"), 'export const value = "installed value";');
+  await writeFile(join(library, "browser.js"), 'export { value } from "./leaf.js";');
+  const outDir = join(root, "compiled");
+  const runtime = await buildInstalledDependencyRuntime({ root, outDir, entries: ["example-lib"], target: "node", exports: { "example-lib": ["value"] } });
+  expect((await import(pathToFileURL(resolve(outDir, runtime.imports["example-lib"]!)).href)).value).toBe("installed value");
 });
 
 test.each(["node", "browser"] as const)("preserves missing optional dynamic imports as runtime failures (%s)", async target => {

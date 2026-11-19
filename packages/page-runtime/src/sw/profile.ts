@@ -35,7 +35,8 @@ function url(value: unknown, path: string, originOnly = false): void {
 
 export function validateProfile(value: unknown): RuntimeProfile {
   const p = record(value, "profile");
-  keys(p, ["runtimeDomain", "embedders", "packageOrigin", "registry", "managed", "dependencies", "policy", "convert", "minReleaseAgeDays", "network", "csp", "links", "sources", "readinessTimeoutMs"], "profile");
+  keys(p, ["runtimeDomain", "embedders", "packageOrigin", "registry", "managed", "dependencies", "runtimeExports", "policy", "convert", "minReleaseAgeDays", "network", "csp", "links", "sources", "readinessTimeoutMs", "renderJobs"], "profile");
+  if (p.renderJobs !== undefined && p.renderJobs !== true) throw new Error("profile.renderJobs: expected true");
   if (typeof p.runtimeDomain !== "string" || !/^[a-z0-9.-]+(?::\d+)?$/i.test(p.runtimeDomain)) throw new Error("profile.runtimeDomain: invalid domain");
   url(p.packageOrigin, "packageOrigin");
   url(p.registry, "registry");
@@ -44,6 +45,7 @@ export function validateProfile(value: unknown): RuntimeProfile {
   const managed = record(p.managed, "managed");
   for (const [name, range] of Object.entries(managed)) if (!name || typeof range !== "string" || !range.trim()) throw new Error(`managed.${name}: expected range`);
   if (p.dependencies !== undefined) validateDependencies(p.dependencies, "profile.dependencies");
+  if (p.runtimeExports !== undefined && p.runtimeExports !== true) throw new Error("profile.runtimeExports: expected true");
   validatePolicy(p.policy);
   if (p.convert !== undefined) {
     const convert = record(p.convert, "convert");

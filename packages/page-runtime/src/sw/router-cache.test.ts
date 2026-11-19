@@ -24,6 +24,19 @@ it("links MDX exports against lazy CSS and component sources", async () => {
   expect(await result.text()).toContain("/src/editor/page.css?module");
 });
 
+it("routes a switched frame's relative dependencies after the worker restarts", async () => {
+  const options = { origin, version: "render", profile: { ...profile, renderJobs: true as const }, caches: memoryCaches(), plugins: BASE_PLUGINS };
+  const a = `${"a".repeat(64)}/report.tsx`;
+  const b = `${"b".repeat(64)}/report.tsx`;
+  const router = createRouter(options);
+  for (const [page, name] of [[a, "first"], [b, "second"]] as const) {
+    await router.message({ type: "open", page, lock: { ...exampleLock(), page }, manifest: { dependencies: {} }, files: { [page]: `export default "${name}";` } });
+  }
+  const restarted = createRouter(options);
+  const response = await restarted.route(new Request(`${origin}/src/${b}?page=${a}&revision=second-job`));
+  expect(await response.text()).toContain('"second"');
+});
+
 it("resolves lazy JSX imports against the source index and lets draft overlays override HTTP sources", async () => {
   const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response('export default "disk";'));
   const page = "editor/page.jsx";

@@ -7,7 +7,7 @@ import { buildDependencyRuntime, type DependencyRuntime, type DependencyRuntimeO
 export type CachedDependencyRuntime = DependencyRuntime & { root: string };
 
 export async function ensureDependencyRuntime(options: Omit<DependencyRuntimeOptions, "outDir"> & { cacheDir: string }): Promise<CachedDependencyRuntime> {
-  const identity = createHash("sha256").update(JSON.stringify({ root: resolve(options.root), target: options.target, entries: [...new Set(options.entries)].sort(), exports: options.exports, external: options.external, lock: readFileSync(join(options.root, "pnpm-lock.yaml"), "utf8"), compiler: readFileSync(new URL(import.meta.url)), abi: process.versions.modules })).digest("hex");
+  const identity = createHash("sha256").update(JSON.stringify({ root: resolve(options.root), target: options.target, entries: [...new Set(options.entries)].sort(), exports: options.exports, external: options.external, externalVersions: options.externalVersions, resolvedEntries: options.resolvedEntries, lock: readFileSync(join(options.root, "pnpm-lock.yaml"), "utf8"), compiler: readFileSync(new URL(import.meta.url)), abi: process.versions.modules })).digest("hex");
   await mkdir(options.cacheDir, { recursive: true });
   const pointer = join(options.cacheDir, `${identity}.json`);
   const lock = `${pointer}.lock`;

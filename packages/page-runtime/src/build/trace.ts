@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isBuiltin } from "node:module";
 import { dirname, extname, join, relative, sep } from "node:path";
 import { ResolverFactory, type ResolveResult } from "rolldown/experimental";
@@ -163,18 +163,18 @@ function exportTarget(value: unknown): string | null {
 
 function filesUnder(dir: string): string[] {
   if (!existsSync(dir)) return [];
-  return readdirSync(dir, { recursive: true, encoding: "utf8" })
-    .map((entry) => join(dir, entry))
-    .filter((path) => statSync(path).isFile());
+  return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const path = join(dir, entry.name);
+    if (entry.isFile()) return [path];
+    return entry.isDirectory() && entry.name !== "node_modules" ? filesUnder(path) : [];
+  });
 }
 
 /** Every entry point a package's `exports` declares for the browser, with `*` patterns expanded. */
 export function exportEntries(dir: string): Array<{ specifier: string; path: string }> {
   const manifest = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { name: string; exports?: unknown };
-  const exportsField = manifest.exports;
-  if (!exportsField || typeof exportsField !== "object" || Array.isArray(exportsField)) {
-    throw new Error(`${manifest.name} has no subpath exports map`);
-  }
+  if (manifest.exports === undefined) throw new Error(`${manifest.name} has no exports map`);
+  const exportsField = manifest.exports && typeof manifest.exports === "object" && !Array.isArray(manifest.exports) && Object.keys(manifest.exports).some(key => key.startsWith(".")) ? manifest.exports : { ".": manifest.exports };
   const entries: Array<{ specifier: string; path: string }> = [];
   for (const [key, value] of Object.entries(exportsField)) {
     const target = exportTarget(value);
@@ -185,8 +185,10 @@ export function exportEntries(dir: string): Array<{ specifier: string; path: str
       continue;
     }
     const [targetPrefix = "", targetSuffix = ""] = target.split("*");
+    if (!target.includes("*")) continue;
     const base = join(dir, targetPrefix);
-    for (const path of filesUnder(dirname(base))) {
+    const search = targetPrefix.endsWith("/") ? base : dirname(base);
+    for (const path of filesUnder(search)) {
       if (!path.startsWith(base) || !path.endsWith(targetSuffix) || path.endsWith(".d.ts")) continue;
       const captured = path.slice(base.length, path.length - targetSuffix.length).split(sep).join("/");
       entries.push({ specifier: specifier.replaceAll("*", () => captured), path });

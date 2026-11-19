@@ -43,6 +43,10 @@ export function frameDocument(options: { config?: FrameConfig; preload?: Iterabl
 
 export function contentSecurityPolicy(profile: RuntimeProfile, nonce: string): string {
   const directives: Record<string, string[]> = { "script-src": ["'self'", `'nonce-${nonce}'`], "style-src": ["'self'", "'unsafe-inline'"], "img-src": ["'self'", "data:", "blob:"], "connect-src": ["'self'", profile.packageOrigin, profile.registry, ...profile.network.allow.map((v) => new URL(v).origin)], "frame-ancestors": profile.embedders };
+  if (profile.renderJobs) {
+    Object.assign(directives, { "default-src": ["'none'"], "base-uri": ["'self'"], "form-action": ["'none'"], "worker-src": ["'self'"] });
+    directives["connect-src"]!.push("blob:");
+  }
   if (profile.convert) directives["connect-src"]!.push(profile.convert.origin);
   if (profile.csp.wasm) directives["script-src"]!.push("'wasm-unsafe-eval'");
   for (const [name, values] of Object.entries(profile.csp.add)) directives[name] = [...(directives[name] ?? []), ...values];
@@ -53,6 +57,7 @@ export function createRouter(options: RouterOptions) {
   const profile = validateProfile(options.profile); const fetcher = options.fetch ?? fetch;
   const store = options.caches.open(`page-runtime-${options.version}-pages`);
   const output = options.caches.open(`page-runtime-${options.version}-compiled`);
+  const transpiled = profile.renderJobs ? options.caches.open(`page-runtime-${options.version}-transpiled`) : undefined;
   const packages = options.caches.open(`page-runtime-${options.version}-packages`);
   const pages = new Map<string, Promise<StoredPage>>();
   const modules = new WeakMap<PageLock, Map<string, Promise<{ response: Response; activity: WorkerActivity }>>>();
@@ -69,6 +74,7 @@ export function createRouter(options: RouterOptions) {
   const database = lazyRuntimeDb(options.indexedDB ? { factory: options.indexedDB } : {});
   const linkRoute = createLinkRoutes({ ...options, load, database });
   const key = (page: string) => `${options.origin}/__runtime/pages/${encodeURIComponent(page)}`;
+  const sourceOwnerKey = (namespace: string) => `${options.origin}/__runtime/render-owner/${namespace}`;
   async function load(page: string): Promise<StoredPage> {
     let pending = pages.get(page);
     if (!pending) {
@@ -89,10 +95,12 @@ export function createRouter(options: RouterOptions) {
     }
     return pending;
   }
-  async function message(value: unknown): Promise<void> {
+  async function message(value: unknown): Promise<FrameConfig> {
     const m = validateHostMessage(value);
     if (m.type !== "open") throw new Error("worker requires open message");
     validateSourcePath(m.page);
+    const namespace = profile.renderJobs ? m.page.split('/')[0]! : undefined;
+    if (namespace && !/^[a-f0-9]{64}$/.test(namespace)) throw new Error("render source requires a content namespace");
     const previous = await (await store).match(key(m.page));
     const saved = previous ? await previous.json() as StoredPage : undefined;
     const policy = m.policy ?? profile.policy;
@@ -101,7 +109,9 @@ export function createRouter(options: RouterOptions) {
     if (m.sourceProvider && new URL(m.sourceProvider.url).origin !== options.origin) throw new Error("source provider must use the runtime origin");
     const savedPage: StoredPage = { lock, files: m.files, ...(m.sourceProvider ? { sourceProvider: m.sourceProvider } : {}), ...(m.layout ? { layout: m.layout } : {}), manifest: m.manifest, policy };
     await (await store).put(key(m.page), Response.json(savedPage));
+    if (namespace) await (await store).put(sourceOwnerKey(namespace), new Response(m.page));
     pages.set(m.page, Promise.resolve(savedPage));
+    return { page: m.page, entry: moduleUrl(`/src/${m.page}`), ...(m.layout ? { layout: moduleUrl(`/src/${m.layout}`) } : {}), lock, profile, runtimeVersion: options.version };
   }
   async function update(page: string, value: unknown): Promise<void> {
     const m = validateHostMessage(value);
@@ -146,15 +156,26 @@ export function createRouter(options: RouterOptions) {
     const paths = sourcePaths(saved);
     const hash = await digest(new TextEncoder().encode(serial({ compiler: COMPILER_REVISION, code, lock: saved.lock, query: [...url.searchParams], paths })));
     const cacheKey = `${options.origin}/__runtime/compiled/${encodeURIComponent(hash)}`;
-    const hit = await (await output).match(cacheKey);
+    const jobModule = !!transpiled && url.searchParams.has("revision");
+    const hit = jobModule ? undefined : await (await output).match(cacheKey);
     if (hit) { activity.source = "cache"; activity.cache = "storage"; activity.outputBytes = hit.headers.has("content-length") ? Number(hit.headers.get("content-length")) : (await hit.clone().arrayBuffer()).byteLength; return hit; }
     let result;
-    try { result = await compilePage({ path: `${url.pathname}${url.search}`, code, lock: saved.lock, sources: paths, plugins: options.plugins, activity }); }
+    const transpile = jobModule ? async (compile: () => Promise<string>) => {
+      const sourceKey = await digest(new TextEncoder().encode(serial({ compiler: COMPILER_REVISION, path, code })));
+      const url = `${options.origin}/__runtime/transpiled/${encodeURIComponent(sourceKey)}`;
+      const cache = await transpiled!;
+      const cached = await cache.match(url);
+      if (cached) return cached.text();
+      const source = await compile();
+      await cache.put(url, new Response(source));
+      return source;
+    } : undefined;
+    try { result = await compilePage({ path: `${url.pathname}${url.search}`, code, lock: saved.lock, sources: paths, plugins: options.plugins, activity, ...(transpile ? { transpile } : {}) }); }
     catch (error) { throw error instanceof RuntimeFailure ? error : new RuntimeFailure(runtimeError({ error, phase: "compile", file: path })); }
     activity.outputBytes = byteLength(result.code);
     if (/\.(css|json)$/.test(path) || url.searchParams.has("raw") || url.searchParams.has("url")) { activity.source = "generated"; activity.generated = extensionOf(path) + " module"; }
     const response = new Response(result.code, { headers: { ...JS, "content-length": String(activity.outputBytes), "x-page-candidates": encodeURIComponent(JSON.stringify(result.candidates)) } });
-    await (await output).put(cacheKey, response.clone());
+    if (!jobModule) await (await output).put(cacheKey, response.clone());
     await putCandidates(await database(), { page: saved.lock.page, module: url.pathname, sourceHash: hash, candidates: result.candidates });
     return response;
   }
@@ -212,8 +233,14 @@ export function createRouter(options: RouterOptions) {
   }
   async function serve(request: Request, activity: WorkerActivity, onError?: (error: ReturnType<typeof runtimeError>) => void): Promise<Response> {
     const url = new URL(request.url);
-    const page = url.searchParams.get("page") ?? (url.pathname.startsWith("/frame/") ? decodeURIComponent(url.pathname.slice(7)) : null);
+    let page = url.searchParams.get("page") ?? (url.pathname.startsWith("/frame/") ? decodeURIComponent(url.pathname.slice(7)) : null);
     try {
+      if (profile.renderJobs && url.pathname.startsWith("/src/")) {
+        const namespace = url.pathname.split('/')[2]!;
+        const owner = /^[a-f0-9]{64}$/.test(namespace) ? await (await store).match(sourceOwnerKey(namespace)) : undefined;
+        if (!owner) throw new Error(`${url.pathname}: render source is not registered`);
+        page = await owner.text();
+      }
       if (activity.kind === "npm" && !activity.package) throw new Error(`invalid npm request: ${url.pathname}`);
       if (url.origin !== options.origin) {
         if (!permitsNetwork(profile, url.href)) { activity.error = { phase: "fetch", message: `egress denied: ${url.href}` }; activity.outputBytes = byteLength(activity.error.message); return new Response(activity.error.message, { status: 403 }); }

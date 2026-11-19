@@ -8,10 +8,11 @@ import { CONVERTED_ENTRY, crawlConvertedPackage } from "./converted.ts";
 import type { LibraryLink } from "../link/types.ts";
 import { assertLinksAllowed, validateLink } from "../link/validation.ts";
 import { composeLinkOverrides } from "../link/overrides.ts";
+import { applyRuntimeExports } from "./runtime-exports.ts";
 
 export type PackageManifest = { name: string; version: string; type?: string; main?: string; module?: string; exports?: unknown; dependencies?: Record<string, string>; peerDependencies?: Record<string, string>; sideEffects?: boolean | string[] };
 type Metadata = { versions: Record<string, PackageManifest>; time: Record<string, string> };
-export type ResolveOptions = { page: string; profile: RuntimeProfile; manifest: FolderManifest; lock?: PageLock; fetch?: typeof fetch; now?: number; links?: readonly LibraryLink[]; developerOverrides?: boolean };
+export type ResolveOptions = { page: string; profile: RuntimeProfile; manifest: FolderManifest; lock?: PageLock; fetch?: typeof fetch; now?: number; links?: readonly LibraryLink[]; developerOverrides?: boolean; runtimeExportsUrl?: string };
 class CommonJsOnlyError extends Error {}
 
 export async function fetchJson<T>(fetcher: typeof fetch, url: string): Promise<T> {
@@ -100,6 +101,7 @@ export async function resolvePage(options: ResolveOptions): Promise<PageLock> {
   }
   const fetcher = options.fetch ?? fetch; const now = options.now ?? Date.now();
   const requests = { ...profile.managed, ...profile.dependencies, ...options.manifest.dependencies, ...options.manifest.pageRuntime?.pages?.[options.page] };
+  if (profile.runtimeExports) Object.assign(requests, profile.managed);
   const versions: Record<string, string> = {}; const manifests: PackageManifest[] = []; const fragments: Fragment[] = []; const indices: BarrelIndex[] = [];
   const required = ["@flanksource/clicky-ui", "@flanksource/facet"];
   for (const name of [...required, ...Object.keys(profile.managed).filter(name => !required.includes(name)).sort()]) {
@@ -129,7 +131,8 @@ export async function resolvePage(options: ResolveOptions): Promise<PageLock> {
   const facet = manifests[1]!;
   const facetRange = facet.dependencies?.["@flanksource/clicky-ui"] ?? facet.peerDependencies?.["@flanksource/clicky-ui"];
   if (!facetRange || !satisfiesVersion(versions["@flanksource/clicky-ui"]!, facetRange)) throw new Error(`${facet.name}@${facet.version} declares @flanksource/clicky-ui ${facetRange ?? "missing"} (package.json), rejects ${versions["@flanksource/clicky-ui"]} (folder/page override)`);
-  const additional = Object.entries(requests).filter(([name]) => !Object.hasOwn(profile.managed, name) && !manifests.some((m) => m.name === name) && !links.some(link => link.build.library === name));
+  const pinned = profile.runtimeExports ? applyRuntimeExports(await fetchJson(fetcher, options.runtimeExportsUrl ?? new URL("/runtime-exports.json", profile.packageOrigin).href), composed, versions) : {};
+  const additional = Object.entries(requests).filter(([name]) => !Object.hasOwn(pinned, name) && !Object.hasOwn(profile.managed, name) && !manifests.some((m) => m.name === name) && !links.some(link => link.build.library === name));
   const listings: Record<string, string> = {};
   for (const [name, range] of additional) {
     if (BASE_PACKAGES.includes(name)) throw new Error(`${options.page}: ${name} is part of the shared runtime set and cannot be declared as a dependency`);
