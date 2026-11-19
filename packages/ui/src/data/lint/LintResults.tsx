@@ -4,9 +4,10 @@ import { Tree } from "../Tree";
 import { SplitPane } from "../../layout/SplitPane";
 import { useContainerWiderThan } from "../../hooks/use-container-width";
 import { cn } from "../../lib/utils";
-import { UiArrowLeft, UiListChecks, UiListTree, UiTable } from "../../icons";
+import { UiArrowLeft, UiListChecks, UiListDashes, UiListTree, UiTable } from "../../icons";
 import { SegmentedControl, type SegmentedOption } from "../../components/SegmentedControl";
 import { LintTable } from "./LintTable";
+import { LintList } from "./LintList";
 import type { OpenFileTarget } from "../OpenInFilesLink";
 import { LintSeverityIcon } from "../test-runner/MarkIcons";
 import { LintDetailPanel, type LintDetailPanelProps } from "./LintDetail";
@@ -62,8 +63,10 @@ export type LintResultsProps = {
   /** Header title. Defaults to a "Lint Results" heading; pass `null` for none. */
   title?: ReactNode;
   /**
-   * "tree" (the default) shows the grouped tree beside a detail pane; "table"
-   * lists every violation as a row whose detail opens beneath it.
+   * "tree" (the default) shows the grouped tree beside a detail pane; "list"
+   * prints linter → file → violation lines like `gavel lint` on a terminal;
+   * "table" lists every violation as a sortable row. In both, a violation's
+   * detail opens beneath it.
    */
   view?: LintView;
   /** Called by the Tree / Table toggle. Omit to hide the toggle. */
@@ -73,10 +76,11 @@ export type LintResultsProps = {
   className?: string;
 };
 
-export type LintView = "tree" | "table";
+export type LintView = "tree" | "list" | "table";
 
 const VIEW_OPTIONS: SegmentedOption<LintView>[] = [
   { id: "tree", label: "Tree", icon: UiListTree },
+  { id: "list", label: "List", icon: UiListDashes },
   { id: "table", label: "Table", icon: UiTable },
 ];
 
@@ -225,7 +229,22 @@ export function LintResults({
         </div>
       )}
 
-      {view === "table" ? (
+      {view === "list" ? (
+        <>
+          {filterBar}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <LintList
+              results={results}
+              filters={filters}
+              onIgnore={onIgnore}
+              ignoreBusy={ignoreBusy}
+              onOpenFile={onOpenFile}
+              loadSource={loadSource}
+              entityHref={entityHref}
+            />
+          </div>
+        </>
+      ) : view === "table" ? (
         <>
           {filterBar}
           <div className="min-h-0 flex-1 overflow-y-auto" data-lint-table="">

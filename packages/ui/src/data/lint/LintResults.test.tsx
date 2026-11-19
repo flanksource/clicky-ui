@@ -264,7 +264,14 @@ describe("LintResults", () => {
       const onViewChange = vi.fn();
       render(<Harness onViewChange={onViewChange} />);
       fireEvent.click(screen.getByRole("radio", { name: /Table/ }));
-      expect(onViewChange).toHaveBeenCalledWith("table");
+      fireEvent.click(screen.getByRole("radio", { name: /List/ }));
+      expect(onViewChange.mock.calls).toEqual([["table"], ["list"]]);
+    });
+
+    it("renders the list view as `gavel lint`-style lines", () => {
+      render(<Harness results={[golangci]} view="list" onViewChange={vi.fn()} />);
+      expect(document.querySelector('[data-lint-list-linter="golangci-lint"]')).not.toBeNull();
+      expect(document.querySelector("[data-lint-table]")).toBeNull();
     });
 
     it("lists the filtered violations as rows, errors first, and opens a row's violation card beneath it", () => {

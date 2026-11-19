@@ -80,11 +80,20 @@ export function Conversation({
             {emptyState}
           </div>
         ) : (
-          <div className="flex flex-col gap-8 p-4">
-            {messages.map((message) => (
-              <Message key={message.id} message={message} {...actions} />
+          <div className="flex flex-col p-4">
+            {messages.map((message, index) => (
+              <Message
+                key={message.id}
+                message={message}
+                className={index === 0 ? undefined : messageSpacing(messages[index - 1]!.role, message.role)}
+                {...actions}
+              />
             ))}
-            {isWaiting && <LoadingIndicator />}
+            {isWaiting && (
+              <LoadingIndicator
+                className={messages.length === 0 ? undefined : messageSpacing(messages[messages.length - 1]!.role, "assistant")}
+              />
+            )}
 
           </div>
         )}
@@ -124,9 +133,18 @@ function hasVisibleAssistantResponse(messages: UIMessage[]) {
   });
 }
 
-function LoadingIndicator() {
+/**
+ * Space above a message: a turn boundary (the speaker changes) gets room to
+ * breathe, while one speaker's consecutive messages — an agent's run of tool
+ * calls, each its own message — stay packed together.
+ */
+function messageSpacing(previous: UIMessage["role"], current: UIMessage["role"]): string {
+  return previous === current ? "mt-2" : "mt-8";
+}
+
+function LoadingIndicator({ className }: { className?: string | undefined }) {
   return (
-    <div className="flex w-full max-w-[95%] items-center gap-2 text-sm text-muted-foreground">
+    <div className={cn("flex w-full max-w-[95%] items-center gap-2 text-sm text-muted-foreground", className)}>
       <Icon icon={UiLoader} className="size-4 shrink-0 animate-spin" />
       <span>Waiting for response...</span>
     </div>

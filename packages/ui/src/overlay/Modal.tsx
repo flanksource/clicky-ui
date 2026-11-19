@@ -31,6 +31,8 @@ export type ConfirmCloseOptions = {
 export type ModalProps = {
   /** Controls whether the modal is mounted. */
   open: boolean;
+  /** Suspend the overlay while its hosted form submits in the background. */
+  minimized?: boolean;
   /** Called when the modal requests to close. */
   onClose: () => void;
   /**
@@ -69,6 +71,8 @@ export type ModalProps = {
   headerSlot?: ReactNode;
   /** Footer content pinned below the scrollable body. */
   footer?: ReactNode;
+  /** Submission error shown above the footer and announced when the dialog opens. */
+  error?: ReactNode;
   /**
    * Whether the body scrolls its overflow. Default `true`. Set `false` when the
    * body owns a single fill-height child that scrolls internally (e.g. a
@@ -123,6 +127,7 @@ function visibleFocusableElements(container: HTMLElement): HTMLElement[] {
 
 export function Modal({
   open,
+  minimized = false,
   onClose,
   confirmClose = false,
   title,
@@ -136,6 +141,7 @@ export function Modal({
   className,
   headerSlot,
   footer,
+  error,
   scrollBody = true,
   children,
 }: ModalProps) {
@@ -144,14 +150,19 @@ export function Modal({
   const [titleText, setTitleText] = useState<string>();
   // A rich title has no string to name the dialog by, so name it by the text
   // the title rendered. Portaled dialogs are only commentable when named.
+  // The effect runs after every commit, so it only sets state when the text
+  // changed: an unconditional set re-renders each commit and loops under React 19.
   useLayoutEffect(() => {
-    setTitleText(titleRef.current?.textContent?.replace(/\s+/g, " ").trim() || undefined);
+    const text = titleRef.current?.textContent?.replace(/\s+/g, " ").trim() || undefined;
+    if (text !== titleText) setTitleText(text);
   });
   const closeTimerRef = useRef<number | undefined>(undefined);
   const openFrameRef = useRef<number | undefined>(undefined);
   const [present, setPresent] = useState(open);
   const [mobileVisible, setMobileVisible] = useState(false);
-  const { depth } = useModalStack(present);
+  const visible = present && !minimized;
+  const active = open && visible;
+  const { depth } = useModalStack(visible);
   const [expanded, setExpanded] = useState(false);
   // When confirmClose is active, a close request opens this prompt instead of
   // closing outright; onClose only fires once the user confirms the discard.
@@ -213,21 +224,25 @@ export function Modal({
     if (!confirmClose) setConfirming(false);
   }, [confirmClose]);
 
-  useEscapeLayer(present, () => {
+  useEscapeLayer(visible, () => {
     if (!open || !closeOnEsc) return;
     // While the prompt is up, Escape dismisses the prompt rather than the modal.
     if (confirming) setConfirming(false);
     else requestClose();
   });
 
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus();
-    return () => prev?.focus?.();
-  }, [open]);
+  useLayoutEffect(() => {
+    if (!active) return;
+    const previous = document.activeElement;
+    dialogRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected) {
+        previous.focus({ preventScroll: true });
+      }
+    };
+  }, [active]);
 
-  if (!present) return null;
+  if (!visible) return null;
 
   const overlay = (
     <div
@@ -349,6 +364,15 @@ export function Modal({
         >
           {children}
         </div>
+        {error != null && error !== false && error !== "" && (
+          <div
+            role="alert"
+            data-slot="modal-error"
+            className="mx-density-4 mb-density-3 max-h-32 shrink-0 overflow-auto rounded-md border border-destructive/40 bg-destructive/5 px-density-3 py-density-2 text-sm wrap-break-word text-destructive"
+          >
+            {error}
+          </div>
+        )}
         {footer && (
           <div
             data-slot="modal-footer"

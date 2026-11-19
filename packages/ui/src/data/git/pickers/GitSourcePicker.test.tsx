@@ -61,6 +61,34 @@ describe("GitSourcePicker repository catalog", () => {
     expect(screen.getByRole("combobox", { name: "Repository" })).toHaveValue("acme/rules");
   });
 
+  it("shows the newest 50 branches and 10 tags, reveals more per group, and searches every ref", async () => {
+    const api = client();
+    const day = (n: number) => new Date(Date.UTC(2026, 0, 1 + n)).toISOString();
+    vi.mocked(api.refs).mockResolvedValue({
+      branches: Array.from({ length: 60 }, (_, n) => ({ name: `b${String(n).padStart(2, "0")}`, sha, date: day(n) })),
+      tags: Array.from({ length: 12 }, (_, n) => ({ name: `t${String(n).padStart(2, "0")}`, sha, date: day(n) })),
+    });
+    render(<GitSourcePicker client={api} value={{ connection: "primary", repo: "acme/rules", ref: "" }} onChange={vi.fn()} />);
+    const ref = await screen.findByRole("combobox", { name: "Git ref" });
+    await waitFor(() => expect(api.refs).toHaveBeenCalled());
+    fireEvent.focus(ref);
+    const labels = () => screen.getAllByRole("option").map((option) => option.title.split("\n")[0]);
+    await waitFor(() => expect(labels()).toHaveLength(60));
+    expect([labels()[0], labels()[49], labels()[50], labels()[59]])
+      .toEqual(["refs/heads/b59", "refs/heads/b10", "refs/tags/t11", "refs/tags/t02"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show 10 more branches" }));
+    expect(labels()).toHaveLength(70);
+    expect(screen.queryByRole("button", { name: /more branches/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show 2 more tags" }));
+    expect(labels()).toHaveLength(72);
+
+    fireEvent.change(ref, { target: { value: "b0" } });
+    // The typed text is also offered as a custom ref; the listed refs are every match.
+    await waitFor(() => expect(labels().filter((label) => label?.startsWith("refs/")))
+      .toEqual(Array.from({ length: 10 }, (_, n) => `refs/heads/b0${9 - n}`)));
+  });
+
   it("offers only branches in branch mode and clears the ref when a repository is cleared", async () => {
     const api = client();
     const onChange = vi.fn();

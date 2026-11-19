@@ -2,24 +2,36 @@ import type { ReactNode } from "react";
 import { DensityValueProvider } from "../../hooks/density-provider";
 import { CodeBlock } from "../CodeBlock";
 import { CodeDiff } from "../CodeDiff";
-import type {
-  SessionQuestion,
-  ToolDiff,
-  ToolParam,
+import { Icon } from "../Icon";
+import { cn } from "../../lib/utils";
+import { UiCheck, UiCircleOutline } from "../../icons";
+import {
+  optionAnswered,
+  type SessionQuestion,
+  type ToolDiff,
+  type ToolParam,
 } from "./SessionViewer.input";
 
+/**
+ * One question with its options listed one per line. Once `answer` is known the
+ * chosen options are marked and the rest muted; an answer that matches no
+ * option (a typed-in reply) is shown beneath them.
+ */
 export function QuestionCard({
   question,
   index,
+  answer,
 }: {
   question: SessionQuestion;
   index: number;
+  answer?: readonly string[] | undefined;
 }) {
   const label =
     question.context ||
     (question.id ? `Question ${question.id}` : `Question ${index + 1}`);
+  const freeText = answer?.filter((value) => !question.options.some((option) => optionAnswered(option, [value]))) ?? [];
   return (
-    <div className="rounded-md border border-sky-500/20 bg-sky-500/5 px-density-3 py-density-2">
+    <div className="rounded-md border border-sky-500/20 bg-sky-500/5 px-density-3 py-density-2" data-question-card="">
       <div className="text-[11px] font-medium uppercase text-muted-foreground">
         {label}
       </div>
@@ -27,20 +39,39 @@ export function QuestionCard({
         {question.text}
       </div>
       {question.options.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {question.options.map((option) => (
-            <span
-              key={option.value}
-              className="rounded border border-border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground"
-            >
-              <span className="font-medium text-foreground">
-                {option.label}
-              </span>
-              {option.description && (
-                <span className="ml-1">{option.description}</span>
-              )}
-            </span>
-          ))}
+        <ul className="mt-1.5 flex list-none flex-col gap-1 p-0">
+          {question.options.map((option) => {
+            const chosen = !!answer && optionAnswered(option, answer);
+            return (
+              <li
+                key={option.value}
+                data-chosen={answer ? String(chosen) : undefined}
+                className={cn(
+                  "flex items-start gap-1.5 rounded border bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground",
+                  chosen ? "border-sky-500/60" : "border-border",
+                  answer && !chosen && "opacity-50",
+                )}
+              >
+                {answer && (
+                  <Icon
+                    icon={chosen ? UiCheck : UiCircleOutline}
+                    className={cn("mt-0.5 size-3 shrink-0", chosen ? "text-sky-600 dark:text-sky-400" : "text-muted-foreground")}
+                    aria-label={chosen ? "Chosen" : "Not chosen"}
+                  />
+                )}
+                <span className="min-w-0">
+                  <span className="font-medium text-foreground">{option.label}</span>
+                  {option.description && <span className="ml-1">{option.description}</span>}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {freeText.length > 0 && (
+        <div className="mt-1.5 whitespace-pre-wrap break-words text-xs text-foreground" data-question-free-answer="">
+          <span className="mr-1 text-[11px] font-medium uppercase text-muted-foreground">Answer</span>
+          {freeText.join(", ")}
         </div>
       )}
     </div>

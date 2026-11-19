@@ -483,6 +483,16 @@ export {
 } from "./overlay/HoverCard";
 export { HelpTip, type HelpTipProps } from "./overlay/HelpTip";
 export { Modal, type ModalProps, type ModalSize } from "./overlay/Modal";
+export { ModalProvider, type ModalProviderProps } from "./overlay/ModalProvider";
+export {
+  useModal,
+  type HostedModalProps,
+  type ModalContextValue,
+  type ModalDraft,
+  type ModalFormDefinition,
+  type ModalSubmission,
+  type ModalSubmissionResult,
+} from "./overlay/modal-context";
 export { LocalPathPicker, type LocalPathPickerProps } from "./components/LocalPathPicker";
 export { isLocalHostname, type LocalPathLoader, type LocalPathListing } from "./components/local-path";
 export {

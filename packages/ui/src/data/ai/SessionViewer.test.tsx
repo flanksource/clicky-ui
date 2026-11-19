@@ -216,6 +216,59 @@ describe("SessionViewer", () => {
     ).toBeInTheDocument();
   });
 
+  it.each([
+    {
+      name: "a Codex answers map keyed by question id",
+      response: '{"answers":{"scope":{"answers":["Global"]},"reason":{"answers":["Ship it today"]}}}',
+    },
+    {
+      name: "Claude's quoted question=answer text",
+      response: '"Which scope should the rule use?"="Global", "Why?"="Ship it today"',
+    },
+  ])("merges $name into the question cards, marking the chosen option and muting the rest", ({ response }) => {
+    const { container } = render(
+      <SessionViewer
+        showHeader={false}
+        session={[
+          {
+            type: "assistant",
+            uuid: "ask-answered",
+            tool_use: {
+              tool: "AskUserQuestion",
+              input: {
+                questions: [
+                  {
+                    id: "scope",
+                    header: "Scope",
+                    question: "Which scope should the rule use?",
+                    options: [{ label: "Project" }, { label: "Global" }, { label: "Session" }],
+                  },
+                  { id: "reason", header: "Reason", question: "Why?", options: [{ label: "Tidy up" }] },
+                ],
+              },
+              response,
+            },
+          },
+        ]}
+      />,
+    );
+
+    const cards = [...container.querySelectorAll("[data-question-card]")];
+    expect({
+      options: [...cards[0]!.querySelectorAll("li")].map((li) => [li.textContent, li.getAttribute("data-chosen")]),
+      vertical: cards[0]!.querySelector("ul")?.className.includes("flex-col"),
+      mutedUnchosen: cards[0]!.querySelector('li[data-chosen="false"]')?.className.includes("opacity-50"),
+      freeAnswer: cards[1]!.querySelector("[data-question-free-answer]")?.textContent,
+      rawAnswerBlock: screen.queryByText(response),
+    }).toEqual({
+      options: [["Project", "false"], ["Global", "true"], ["Session", "false"]],
+      vertical: true,
+      mutedUnchosen: true,
+      freeAnswer: "AnswerShip it today",
+      rawAnswerBlock: null,
+    });
+  });
+
   it("renders a pending question overlay and returns answers keyed by question id", async () => {
     const onDecision = vi.fn();
     render(

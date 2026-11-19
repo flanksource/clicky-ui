@@ -65,6 +65,24 @@ describe("TestNodeAdapterRegistry.resolveFrameworkIcon", () => {
   });
 });
 
+describe("TestNodeAdapterRegistry.resolveRowLabel", () => {
+  it.each([
+    { label: "the first matching adapter's label", adapters: [adapter("skip", { match: () => false, rowLabel: () => "wrong" }), adapter("strip", { rowLabel: ({ node: n }) => n.name.replace(/^customer activity /, "") })], expected: "SchemeReceipting" },
+    { label: "undefined (the humanized name) without a label adapter", adapters: [adapter("icon", { renderRowLeading: () => "•" })], expected: undefined },
+  ])("returns $label", ({ adapters, expected }) => {
+    expect(createTestRunnerRegistry(adapters).resolveRowLabel(node("customer activity SchemeReceipting"), runner)).toBe(expected);
+  });
+});
+
+describe("TestNodeAdapterRegistry.resolveFrameworkBadge", () => {
+  it.each([
+    { label: "the first matching adapter's content", adapters: [adapter("skip", { match: () => false, frameworkBadge: () => "wrong" }), adapter("runner", { frameworkBadge: () => "Web" })], expected: "Web" },
+    { label: "null (the framework name alone) without a badge adapter", adapters: [adapter("icon", { renderRowLeading: () => "•" })], expected: null },
+  ])("returns $label", ({ adapters, expected }) => {
+    expect(createTestRunnerRegistry(adapters).resolveFrameworkBadge(node("x"), runner)).toBe(expected);
+  });
+});
+
 describe("TestNodeAdapterRegistry.resolveTabs", () => {
   it("merges tabs across all matching adapters in registration order", () => {
     const reg = createTestRunnerRegistry([
