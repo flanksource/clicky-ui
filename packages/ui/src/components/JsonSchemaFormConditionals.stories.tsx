@@ -124,7 +124,7 @@ export const StateMachine: Story = {
     });
 
     await step("Updating swaps to the else branch and adds the not-guarded field", async () => {
-      await userEvent.click(canvas.getByRole("radio", { name: "Update (02)" }));
+      await userEvent.click(canvas.getByRole("radio", { name: "Update" }));
       await waitFor(() => expect(canvas.getByText("Current member class group")).toBeInTheDocument());
       expect(canvas.queryByText("New member class group")).not.toBeInTheDocument();
       expect(canvas.getByText("Change reason")).toBeInTheDocument();
@@ -132,7 +132,7 @@ export const StateMachine: Story = {
 
     await step("Loan override reveals the hidden loan fields", async () => {
       expect(canvas.queryByText("Loan amount")).not.toBeInTheDocument();
-      await userEvent.click(canvas.getByRole("radio", { name: "Yes (01)" }));
+      await userEvent.click(canvas.getByRole("radio", { name: "Yes" }));
       await waitFor(() => expect(canvas.getByText("Loan amount")).toBeInTheDocument());
       expect(canvas.getByText("Loan rate")).toBeInTheDocument();
     });

@@ -85,7 +85,7 @@ export function Conversation({
               <Message
                 key={message.id}
                 message={message}
-                className={index === 0 ? undefined : messageSpacing(messages[index - 1]!.role, message.role)}
+                {...(index > 0 ? { className: messageSpacing(messages[index - 1]!.role, message.role) } : {})}
                 {...actions}
               />
             ))}

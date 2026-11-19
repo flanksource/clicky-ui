@@ -201,7 +201,7 @@ type Story = StoryObj<typeof meta>;
 export const OutputSurvivesLaterTaskFrames: Story = {
   render: () => (
     <div className="max-w-2xl">
-      <TaskManager basePath="/api/v1" />
+      <TaskManager basePath="/api/v1" timeRange={{ from: "2026-06-02T00:00:00Z", to: "2026-06-03T00:00:00Z" }} />
     </div>
   ),
   play: async ({ canvasElement }) => {

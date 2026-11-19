@@ -21,7 +21,7 @@ worker.addEventListener("message", (event) => event.waitUntil((async () => {
 })()));
 worker.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
-  if (url.origin !== worker.location.origin || !/^\/(src|link|npm|frame)\//.test(url.pathname)) return;
+  if (url.origin !== worker.location.origin || !/^\/(src|link|npm|frame|__runtime)\//.test(url.pathname)) return;
   event.respondWith((async () => {
     const { request, owner } = await pageClients.request(event);
     const response = await (await router).route(request, { onError: (error) => { void worker.clients.matchAll().then((clients) => { for (const client of clients) client.postMessage({ error: `${error.phase}: ${error.file}: ${error.message}` }); }); } });

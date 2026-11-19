@@ -90,15 +90,15 @@ describe("JsonSchemaForm listeners demo", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Paths · x-on-load" }));
     expect(screen.queryByRole("table")).toBeNull();
 
-    fireEvent.click(screen.getByRole("radio", { name: "Override (01)" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Override" }));
     const headers = () => within(screen.getByRole("table")).getAllByRole("columnheader").map((th) => th.textContent);
     expect(headers()).toEqual(["Term", "Rate", ""]);
 
-    fireEvent.click(screen.getByRole("radio", { name: "With fees (01)" }));
+    fireEvent.click(screen.getByRole("radio", { name: "With fees" }));
     expect(headers()).toEqual(["Term", "Rate", "Fee", ""]);
     expect(screen.getByDisplayValue("4.5").tagName).toBe("INPUT");
 
-    fireEvent.click(screen.getByRole("radio", { name: "Locked (01)" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Locked" }));
     expect(screen.queryByDisplayValue("4.5")).toBeNull();
     expect(screen.getByText("4.5").closest("[data-jsf-readonly]")).not.toBeNull();
   });

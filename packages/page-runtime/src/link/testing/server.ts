@@ -19,8 +19,8 @@ async function listen(server: Server): Promise<string> {
   const address = server.address(); if (!address || typeof address === "string") throw new Error("No server port");
   return `http://127.0.0.1:${address.port}`;
 }
-async function bundle(entry: string): Promise<string> {
-  const result = await build({ input: entry, platform: "browser", resolve: { conditionNames: ["worker", "browser", "import", "default"] }, transform: { define: { "process.env.NODE_ENV": JSON.stringify("development"), "process.env": "{}" } }, output: { format: "iife" }, write: false });
+async function bundle(entry: string, { format = "iife", external = [] }: { format?: "es" | "iife"; external?: string[] } = {}): Promise<string> {
+  const result = await build({ input: entry, external, platform: "browser", resolve: { conditionNames: ["worker", "browser", "import", "default"] }, transform: { define: { "process.env.NODE_ENV": JSON.stringify("development"), "process.env": "{}" } }, output: { format }, write: false });
   const chunk = result.output.find((file) => file.type === "chunk"); if (!chunk || chunk.type !== "chunk") throw new Error("Missing test bundle"); return chunk.code;
 }
 function serve(handle: (request: IncomingMessage, response: ServerResponse) => Promise<void>): Server {
@@ -90,17 +90,20 @@ export async function startLinkTestServer() {
   }
   const workerCode = await bundle(join(here, "worker.ts"));
   const clientCode = await bundle(join(here, "client.ts"));
+  const editingCode = await bundle(join(here, "../../editing.ts"), { format: "es", external: ["react"] });
   const runtime = serve(async (request, response) => {
     const url = new URL(request.url!, runtimeOrigin); response.setHeader("cache-control", "no-store");
     if (url.pathname === "/worker.js") { response.setHeader("content-type", "text/javascript"); response.end(workerCode); return; }
+    if (url.pathname === "/editing.js") { response.setHeader("content-type", "text/javascript"); response.end(editingCode); return; }
     if (url.pathname === "/profile.json") { response.setHeader("content-type", "application/json"); response.end(JSON.stringify(profile)); return; }
     if (url.pathname.startsWith("/packages/")) { const file = runtimeFiles.get(decodeURIComponent(url.pathname.slice(10))); if (!file) throw new Error(`Missing package ${url.pathname}`); response.end(await readFile(file)); return; }
     response.setHeader("content-type", "text/html");
-    if (url.pathname === "/setup") { response.end(`<!doctype html><script>navigator.serviceWorker.addEventListener("message",e=>parent.postMessage(e.data,${JSON.stringify(hostOrigin)}));window.addEventListener("message",e=>{if(e.source!==parent||e.origin!==${JSON.stringify(hostOrigin)})return;navigator.serviceWorker.controller.postMessage(e.data,e.ports)});(async()=>{await navigator.serviceWorker.register("/worker.js");await navigator.serviceWorker.ready;if(!navigator.serviceWorker.controller)await new Promise(r=>navigator.serviceWorker.addEventListener("controllerchange",r,{once:true}));parent.postMessage("runtime-ready",${JSON.stringify(hostOrigin)})})()</script>`); return; }
-    if (url.pathname === "/control") { response.end(`<!doctype html><p>Unlinked control</p><script>parent.postMessage("control-ready",${JSON.stringify(hostOrigin)})</script>`); return; }
+    const hostConfig = `<script type="application/json" id="host-origin">${JSON.stringify(hostOrigin).replaceAll("<", "\\u003c")}</script>`;
+    if (url.pathname === "/setup") { response.end(`<!doctype html>${hostConfig}<script>const hostOrigin=JSON.parse(document.getElementById("host-origin").textContent);navigator.serviceWorker.addEventListener("message",e=>parent.postMessage(e.data,hostOrigin));window.addEventListener("message",e=>{if(e.source!==parent||e.origin!==hostOrigin)return;navigator.serviceWorker.controller.postMessage(e.data,e.ports)});(async()=>{await navigator.serviceWorker.register("/worker.js");await navigator.serviceWorker.ready;if(!navigator.serviceWorker.controller)await new Promise(r=>navigator.serviceWorker.addEventListener("controllerchange",r,{once:true}));parent.postMessage("runtime-ready",hostOrigin)})()</script>`); return; }
+    if (url.pathname === "/control") { response.end(`<!doctype html><p>Unlinked control</p>${hostConfig}<script>const hostOrigin=JSON.parse(document.getElementById("host-origin").textContent);parent.postMessage("control-ready",hostOrigin)</script>`); return; }
     if (url.pathname === "/test-frame") {
       const map = { imports: Object.fromEntries(Object.entries(lock.map.imports).map(([name, target]) => [name, moduleUrl(target)])), scopes: Object.fromEntries(Object.entries(lock.map.scopes).map(([scope, table]) => [scope, Object.fromEntries(Object.entries(table).map(([name, target]) => [name, moduleUrl(target)]))])) };
-      response.end(`<!doctype html><html><head><script type="importmap">${JSON.stringify(map).replaceAll("<", "\\u003c")}</script></head><body><div id="root"></div><script type="module">try{await import("/src/page.tsx?page=page.tsx");const ready=()=>{const marker=document.querySelector("[data-link-edit]");if(marker&&document.querySelectorAll("tbody tr").length===2)requestAnimationFrame(()=>requestAnimationFrame(()=>parent.postMessage({marker:marker.textContent,at:performance.timeOrigin+performance.now(),reactInstances:globalThis.reactInstances,reactEvaluations:globalThis.__LINK_REACT_EVALUATIONS__},${JSON.stringify(hostOrigin)})));else requestAnimationFrame(ready)};ready()}catch(e){parent.postMessage({error:String(e)},${JSON.stringify(hostOrigin)})}</script></body></html>`); return;
+      response.end(`<!doctype html><html><head><script type="importmap">${JSON.stringify(map).replaceAll("<", "\\u003c")}</script></head><body><div id="root"></div>${hostConfig}<script type="module">const hostOrigin=JSON.parse(document.getElementById("host-origin").textContent);try{await import("/src/page.tsx?page=page.tsx");const ready=()=>{const marker=document.querySelector("[data-link-edit]");if(marker&&document.querySelectorAll("tbody tr").length===2)requestAnimationFrame(()=>requestAnimationFrame(()=>parent.postMessage({marker:marker.textContent,at:performance.timeOrigin+performance.now(),reactInstances:globalThis.reactInstances,reactEvaluations:globalThis.__LINK_REACT_EVALUATIONS__},hostOrigin)));else requestAnimationFrame(ready)};ready()}catch(e){parent.postMessage({error:String(e)},hostOrigin)}</script></body></html>`); return;
     }
     response.statusCode = 404; response.end("missing runtime test page");
   });

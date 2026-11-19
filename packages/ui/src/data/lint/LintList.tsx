@@ -3,44 +3,15 @@ import { Icon } from "../Icon";
 import { cn } from "../../lib/utils";
 import { UiChevronRight, UiFileText } from "../../icons";
 import { useProblemExpansion } from "../diagnostics/use-problem-expansion";
-import { diagnosticKeys } from "../diagnostics/diagnostic-identity";
 import { ProblemActions } from "../diagnostics/ProblemActions";
 import { LintSeverityIcon, ToolIcon } from "../test-runner/MarkIcons";
 import { toolMark } from "../test-runner/marks";
 import { ViolationDetail, type HostActionProps } from "./LintDetail";
 import { violationMenuItems } from "./violation-menu-items";
-import { flattenLint, type FlatViolation } from "./grouping";
+import type { FlatViolation } from "./grouping";
+import { lintListGroups, NO_FILE } from "./list-grouping";
 import { severityOf } from "./stats";
 import type { LintFilters, LinterResult } from "./types";
-
-type ListedViolation = { id: string; flat: FlatViolation };
-type FileGroup = { file: string; violations: ListedViolation[] };
-type LinterGroup = { linter: string; count: number; files: FileGroup[] };
-
-const NO_FILE = "";
-
-/** Linter → file → violation, in run order with files sorted and violations by line, as `gavel lint` prints them. */
-export function lintListGroups(results: readonly LinterResult[], filters: LintFilters): LinterGroup[] {
-  const all = flattenLint(results, filters);
-  const keys = diagnosticKeys(all.map((f) => [f.workDir, f.rawFile, f.linter, f.v.rule?.method, f.v.line, f.v.column, f.v.end_line, f.v.end_column, f.v.message, f.v.severity]));
-  const byLinter = new Map<string, Map<string, ListedViolation[]>>();
-  all.forEach((flat, i) => {
-    const files = byLinter.get(flat.linter) ?? new Map<string, ListedViolation[]>();
-    byLinter.set(flat.linter, files);
-    const file = flat.file ?? NO_FILE;
-    files.set(file, [...(files.get(file) ?? []), { id: keys[i]!, flat }]);
-  });
-  return [...byLinter].map(([linter, files]) => ({
-    linter,
-    count: [...files.values()].reduce((sum, list) => sum + list.length, 0),
-    files: [...files]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([file, violations]) => ({
-        file,
-        violations: violations.slice().sort((a, b) => (a.flat.v.line ?? 0) - (b.flat.v.line ?? 0)),
-      })),
-  }));
-}
 
 function position(flat: FlatViolation): string {
   const { line, column } = flat.v;

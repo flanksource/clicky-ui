@@ -225,7 +225,7 @@ export const ChangeListeners: Story = {
     });
 
     await step("Update swaps the fields and sets a change reason", async () => {
-      await userEvent.click(canvas.getByRole("radio", { name: "Update (02)" }));
+      await userEvent.click(canvas.getByRole("radio", { name: "Update" }));
       await waitFor(() => expect(canvas.getByText("Current member class group")).toBeInTheDocument());
       expect(canvas.queryByText("New member class group")).not.toBeInTheDocument();
       expect(canvas.getByLabelText(/^Change reason/)).toHaveValue("Amendment");
@@ -234,7 +234,7 @@ export const ChangeListeners: Story = {
     await step("Loan override enables the rate and sets a starting amount", async () => {
       expect(canvas.getByLabelText(/^Loan rate/)).toBeDisabled();
       expect(canvas.queryByText("Loan amount")).not.toBeInTheDocument();
-      await userEvent.click(canvas.getByRole("radio", { name: "Yes (01)" }));
+      await userEvent.click(canvas.getByRole("radio", { name: "Yes" }));
       await waitFor(() => expect(canvas.getByLabelText(/^Loan amount/)).toHaveValue("1000"));
       expect(canvas.getByLabelText(/^Loan rate/)).not.toBeDisabled();
     });
@@ -249,7 +249,7 @@ export const ChangeListeners: Story = {
 
     await step("Turning the override off hides and resets the loan fields", async () => {
       await userEvent.type(canvas.getByLabelText(/^Loan rate/), "{backspace}9");
-      await userEvent.click(canvas.getByRole("radio", { name: "No (00)" }));
+      await userEvent.click(canvas.getByRole("radio", { name: "No" }));
       await waitFor(() => expect(canvas.queryByText("Loan amount")).not.toBeInTheDocument());
       expect(canvas.queryByText("Approval code")).not.toBeInTheDocument();
       expect(formValue(canvas)).toMatchObject({ LoanOverride: "00", LoanRate: 3.5 });
@@ -284,20 +284,20 @@ export const PathTargetsAndOnLoad: Story = {
     });
 
     await step("A path listener reveals the loan-term group, without its load-hidden fee column", async () => {
-      await userEvent.click(canvas.getByRole("radio", { name: "Override (01)" }));
+      await userEvent.click(canvas.getByRole("radio", { name: "Override" }));
       await waitFor(() => expect(canvas.getAllByRole("table")).toHaveLength(1));
       expect(columnHeaders(canvas.getByRole("table"))).toEqual(["Term", "Rate"]);
     });
 
     await step("A cell path reveals the fee column", async () => {
-      await userEvent.click(canvas.getByRole("radio", { name: "With fees (01)" }));
+      await userEvent.click(canvas.getByRole("radio", { name: "With fees" }));
       await waitFor(() => expect(columnHeaders(canvas.getByRole("table"))).toEqual(["Term", "Rate", "Fee"]));
     });
 
     await step("A second group toggles independently of the first", async () => {
-      await userEvent.click(canvas.getByRole("radio", { name: "Benefit table (01)" }));
+      await userEvent.click(canvas.getByRole("radio", { name: "Benefit table" }));
       await waitFor(() => expect(canvas.getAllByRole("table")).toHaveLength(2));
-      await userEvent.click(canvas.getByRole("radio", { name: "Default (02)" }));
+      await userEvent.click(canvas.getByRole("radio", { name: "Default" }));
       await waitFor(() => expect(canvas.getAllByRole("table")).toHaveLength(1));
       expect(columnHeaders(canvas.getByRole("table"))).toEqual(["Benefit", "Cover"]);
     });
