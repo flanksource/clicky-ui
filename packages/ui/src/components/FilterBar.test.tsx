@@ -843,6 +843,21 @@ describe("FilterBar", () => {
     measurement.mockRestore();
   });
 
+  it("leaves the row to search when every filter moved into the overflow panel", async () => {
+    const media = mockMatchMedia(PHONE_WIDTH);
+    const { container } = render(
+      <FilterBar
+        search={{ value: "", onChange: vi.fn(), placeholder: "Title" }}
+        filters={[{ key: "team", kind: "text", label: "Team", value: "", onChange: vi.fn() }]}
+      />,
+    );
+
+    await screen.findByRole("button", { name: /^(more )?filters$/i });
+    expect(container.querySelector("[data-filter-bar-list]")).not.toHaveClass("flex-1");
+
+    media.mockRestore();
+  });
+
   it("moves all filters into the overflow panel on mobile widths", async () => {
     const media = mockMatchMedia(PHONE_WIDTH);
 

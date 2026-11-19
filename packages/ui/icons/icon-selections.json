@@ -2268,8 +2268,8 @@
       "consumerName": "repo -> folder-git",
       "group": "git-source-control",
       "status": "ALIAS",
-      "outline": "ph:git-fork-light",
-      "filled": "ph:git-fork-fill",
+      "outline": "incumbent:git",
+      "filled": "incumbent:git",
       "note": ""
     },
     {

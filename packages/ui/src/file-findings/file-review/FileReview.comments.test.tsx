@@ -281,6 +281,51 @@ describe("FileReview patch comments in Preview", () => {
     });
   });
 
+  describe("a selection in a table", () => {
+    // Header on line 3, delimiter on 4, Alice on 5, Bob on 6.
+    const TABLE = ["# People", "", "| Name | Age |", "| --- | --- |", "| Alice | 30 |", "| Bob | 25 |", ""].join("\n");
+    const BOB_LINE = 6;
+    const BOB_AGE = { keyColumn: "Name", key: "Bob", column: "Age", row: 1, col: 1 };
+    const cellText = async (container: HTMLElement, text: string) =>
+      waitFor(() => {
+        const cell = [...container.querySelectorAll("td")].find((td) => td.textContent === text);
+        if (!cell) throw new Error(`no cell ${text} yet`);
+        return cell;
+      });
+
+    it("anchors a selection inside one cell on its row's line alone, with the cell beside the patch", async () => {
+      const onCreate = vi.fn(async () => {});
+      const { container } = review({ path: MD_PATH, source: TABLE, view: "preview", comments: { callbacks: { onCreate } } });
+      const cell = await cellText(container, "25");
+      const range = document.createRange();
+      range.selectNodeContents(cell);
+      window.getSelection()!.removeAllRanges();
+      window.getSelection()!.addRange(range);
+      fireEvent.mouseUp(cell);
+      await openDraft();
+      await post("Too young?");
+      await waitFor(() => expect(onCreate).toHaveBeenCalled());
+      const input = onCreate.mock.calls[0]![0];
+      expect({ anchor: input.anchor, cell: input.cell, quote: input.quote?.exact }).toEqual({
+        anchor: patchAnchor(capturePatch(TABLE, BOB_LINE, BOB_LINE)),
+        cell: BOB_AGE,
+        quote: "25",
+      });
+    });
+
+    it("labels a thread on a cell by its row key and column", async () => {
+      const anchor = patchAnchor(capturePatch(TABLE, BOB_LINE, BOB_LINE));
+      const { container } = review({
+        path: MD_PATH,
+        source: TABLE,
+        view: "preview",
+        comments: { items: [{ ...rootComment("t4", anchor, "Too young?"), cell: BOB_AGE }] },
+      });
+      await waitFor(() => expect(withAttr(container, "data-card-anchor", anchor)).not.toHaveLength(0));
+      expect(within(withAttr(container, "data-card-anchor", anchor)[0] as HTMLElement).getByText("row[Bob][Age]")).toBeTruthy();
+    });
+  });
+
   it("stores no quote for a Source selection, whose lines are the source itself", async () => {
     const onCreate = vi.fn(async () => {});
     review({ path: MD_PATH, source: MD, view: "source", comments: { callbacks: { onCreate } } });

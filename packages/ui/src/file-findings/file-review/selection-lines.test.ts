@@ -46,6 +46,40 @@ describe("previewSelectionLines", () => {
     const outside = document.querySelector("#outside")!;
     expect(previewSelectionLines(selectText(outside, outside), markdown)).toBeNull();
   });
+
+  describe("in a table, whose rows are one source line each", () => {
+    // Header on line 12, delimiter on 13, body rows on 14 and 15.
+    beforeEach(() => {
+      markdown.insertAdjacentHTML(
+        "beforeend",
+        `<div data-source-start="12" data-source-end="15"><table>
+          <thead><tr><th>Name</th><th>Age</th></tr></thead>
+          <tbody><tr><td>Alice</td><td>30</td></tr><tr><td>Bob</td><td>25</td></tr></tbody>
+        </table></div>`,
+      );
+    });
+    const cell = (text: string) => [...markdown.querySelectorAll("td, th")].find((c) => c.textContent === text)!;
+
+    it("covers only the row of a selection across its cells", () => {
+      expect(previewSelectionLines(selectText(cell("Bob"), cell("25")), markdown)).toEqual({ startLine: 15, endLine: 15 });
+    });
+
+    it("covers the header's line for a selection in the header", () => {
+      expect(previewSelectionLines(selectText(cell("Age"), cell("Age")), markdown)).toEqual({ startLine: 12, endLine: 12 });
+    });
+
+    it("covers the rows a selection spans, and a block before them from its start", () => {
+      expect({
+        rows: previewSelectionLines(selectText(cell("Alice"), cell("25")), markdown),
+        intoTable: previewSelectionLines(selectText(block("p:last-of-type"), cell("30")), markdown),
+      }).toEqual({ rows: { startLine: 14, endLine: 15 }, intoTable: { startLine: 10, endLine: 14 } });
+    });
+
+    it("covers the whole block of a table whose lines are not one per row", () => {
+      markdown.querySelector<HTMLElement>("[data-source-start='12']")!.dataset.sourceEnd = "18";
+      expect(previewSelectionLines(selectText(cell("Bob"), cell("Bob")), markdown)).toEqual({ startLine: 12, endLine: 18 });
+    });
+  });
 });
 
 describe("sourceSelectionLines", () => {

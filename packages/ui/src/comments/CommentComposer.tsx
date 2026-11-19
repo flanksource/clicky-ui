@@ -319,7 +319,9 @@ export function CommentComposer({
         className="min-h-[48px] pr-10 [@media(pointer:coarse)]:pr-12"
       />
       {error !== null && <ActionError error={error} context={[["Operation", "Post comment"], ["Anchor", anchor ?? "Whole page"]]} />}
-      <DefaultDeliveryLine delivery={config.defaultDelivery} className="mt-1 text-[11px] leading-4 text-muted-foreground" />
+      {config.renderDeliveryPreview
+        ? config.renderDeliveryPreview({ body, ...(target ? { target } : {}) })
+        : <DefaultDeliveryLine delivery={config.defaultDelivery} className="mt-1 text-[11px] leading-4 text-muted-foreground" />}
       {collapsible && (
         <button
           type="button"

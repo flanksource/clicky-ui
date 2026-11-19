@@ -18,8 +18,7 @@ export function agentDeliveryStage(run: CommentAgentRun): AgentDeliveryStage {
 }
 
 /** The provider's glyph for an agent's model (or name), and its brand tint; the robot when no provider is known. */
-export function agentGlyph(model: string): { icon: StaticIconComponent; className?: string } {
-  const provider = modelProvider(model);
+export function agentGlyph(model: string, provider = modelProvider(model)): { icon: StaticIconComponent; className?: string } {
   const icon = providerIcon(provider);
   const className = providerIconColor(provider);
   return icon ? { icon, ...(className ? { className } : {}) } : { icon: UiRobotAi };

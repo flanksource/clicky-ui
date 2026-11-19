@@ -4,6 +4,8 @@ import {
   UiCalendar,
   UiCheck,
   UiClass,
+  UiFolderGit,
+  UiFolderGitFilled,
   UiSearch,
   UiServerProcess,
   UiShieldCheck,
@@ -27,6 +29,13 @@ describe("generated icons", () => {
     expect(screen.getByRole("img", { name: "calendar" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "class" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "server process" })).toBeInTheDocument();
+  });
+
+  it("uses the Git logo for both repository icon variants", () => {
+    expect([UiFolderGit.__source, UiFolderGitFilled.__source]).toEqual([
+      "incumbent:git",
+      "incumbent:git",
+    ]);
   });
 
   it("exports change icon aliases", () => {

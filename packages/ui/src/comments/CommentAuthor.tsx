@@ -1,3 +1,4 @@
+import { useContext } from "react";
 import { Avatar } from "../data/Avatar";
 import { Icon } from "../data/Icon";
 import { HoverCard } from "../overlay/HoverCard";
@@ -5,6 +6,7 @@ import { resolveSize, type SizeToken } from "../lib/size";
 import { useDensityValue } from "../hooks/use-density";
 import { agentGlyph } from "./agent-delivery";
 import { AgentIdentity } from "../data/chat/AgentIdentity";
+import { AgentIdentityContext } from "../data/chat/agent-identity-context";
 import { authorDisplayName } from "./comment-utils";
 import type { CommentAuthor as CommentAuthorModel } from "./comment-types";
 
@@ -22,6 +24,7 @@ export function CommentAuthorName({ author }: { author: CommentAuthorModel | nul
   return (
     <AgentIdentity
       hideIcon
+      showSession
       model={author.model ?? author.name}
       {...(author.model ? { label: author.name } : {})}
       {...(author.effort ? { effort: author.effort } : {})}
@@ -73,7 +76,9 @@ function AgentChip({
   size: number;
 }) {
   const icon = author.icon;
-  const glyph = agentGlyph(author.model ?? author.name);
+  const identities = useContext(AgentIdentityContext);
+  const session = author.sessionId ? identities[author.sessionId] : undefined;
+  const glyph = agentGlyph(session?.model ?? author.model ?? author.name, session?.provider);
   return (
     <span
       role="img"

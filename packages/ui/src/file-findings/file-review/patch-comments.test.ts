@@ -100,6 +100,22 @@ describe("patchDraft", () => {
   it("drops a blank quote", () => {
     expect(patchDraft({ raw: source, lines: { startLine: 2, endLine: 3 }, quote: { prefix: "", exact: "", suffix: "" } })).not.toHaveProperty("quote");
   });
+
+  describe("on a table cell", () => {
+    const cell = { keyColumn: "Name", key: "Bob", column: "Age", row: 1, col: 1 };
+
+    it("returns the cell beside the anchor and names the thread by it", () => {
+      expect(patchDraft({ raw: source, lines: { startLine: 4, endLine: 4 }, cell })).toEqual({
+        anchor: patchAnchor(capturePatch(source, 4, 4)),
+        label: "row[Bob][Age]",
+        cell,
+      });
+    });
+
+    it("throws for a cell on more than its row's one line", () => {
+      expect(() => patchDraft({ raw: source, lines: { startLine: 4, endLine: 5 }, cell })).toThrow(/one line/);
+    });
+  });
 });
 
 describe("patch quotes", () => {
@@ -107,13 +123,14 @@ describe("patch quotes", () => {
 
   it("follows the patch when it moves, carrying the thread's quote with its current lines", () => {
     const inserted = ["a", "b", ...original].join("\n");
-    expect([...patchLineRanges(placePatches(inserted, [thread]), new Map([[thread, quote]]))]).toEqual([[thread, { start: 9, end: 10, quote }]]);
+    expect([...patchLineRanges(placePatches(inserted, [thread]), new Map([[thread, { quote }]]))]).toEqual([[thread, { start: 9, end: 10, quote }]]);
   });
 
-  it("carries a quote only for an anchor it has one for", () => {
-    expect([...patchLineRanges(placePatches(source, [thread, other]), new Map([[thread, quote]]))]).toEqual([
+  it("carries a quote and a table cell only for an anchor it has them for", () => {
+    const cell = { keyColumn: "Name", key: "Bob", column: "Age", row: 1, col: 1 };
+    expect([...patchLineRanges(placePatches(source, [thread, other]), new Map([[thread, { quote }], [other, { cell }]]))]).toEqual([
       [thread, { start: 7, end: 8, quote }],
-      [other, { start: 10, end: 10 }],
+      [other, { start: 10, end: 10, cell }],
     ]);
   });
 

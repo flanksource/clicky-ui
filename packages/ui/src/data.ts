@@ -64,6 +64,8 @@ export {
   type DataTableColumn,
   type DataTableColumnInput,
   type DataTableColumnKind,
+  type DataTableLayout,
+  type DataTableListRole,
   type DataTableCursorPagination,
   type DataTableFooterContext,
   type DataTableInfinite,
@@ -122,6 +124,7 @@ export {
   formatTimestamp,
   parseTimestamp,
   modeToFormat,
+  type RelativeTimeOptions,
   type TimestampFormat,
   type TimestampMode,
 } from "./data/cells/timestamp-format";
@@ -543,8 +546,10 @@ export {
 export { TaskProgress, type TaskProgressProps } from "./data/TaskProgress";
 export { TaskManager, type TaskManagerProps } from "./data/TaskManager";
 export {
+  TaskPoolSummary,
   TaskPoolUsage,
   TaskRunConcurrency,
+  type TaskPoolSummaryProps,
   type TaskPoolUsageProps,
   type TaskRunConcurrencyProps,
 } from "./data/TaskPoolUsage";
