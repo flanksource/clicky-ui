@@ -1,3 +1,4 @@
+import { randomUUID } from "@flanksource/clicky-ui/utils";
 import type { FrameConfig, FrameMessage } from "../schema.ts";
 import type { ActivityMessage, RuntimeResolution, TailwindActivity, WorkerActivity } from "../activity-schema.ts";
 import { validateActivity } from "../activity-schema.ts";
@@ -15,7 +16,7 @@ export function runtimeResolution(options: { config: FrameConfig; importMap: str
 }
 
 export function createFrameActivity(options: { send: (message: FrameMessage) => void; error: (error: Error) => void }) {
-  const load = crypto.randomUUID(); const navigationStart = performance.timeOrigin;
+  const load = randomUUID(); const navigationStart = performance.timeOrigin;
   let runtime: RuntimeResolution | undefined;
   let builds: TailwindActivity[] = [];
   let records: WorkerActivity[] = [];

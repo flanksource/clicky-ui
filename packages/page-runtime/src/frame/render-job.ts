@@ -1,3 +1,4 @@
+import { randomUUID } from "@flanksource/clicky-ui/utils";
 import type { BridgeEnvelope, FrameConfig, FrameMessage, JsonValue, PageLock, RuntimePhase } from "../schema.ts";
 import { workerRequest } from "./bridge.ts";
 import { exportHtml } from "./export.ts";
@@ -48,7 +49,7 @@ export function frameRenderJobs(initial: FrameConfig | undefined) {
 
 async function renderDocument(options: { config: FrameConfig; runtime: Promise<ReactRuntime>; data: JsonValue }): Promise<FrameMessage> {
   const { config, data } = options;
-  const revision = crypto.randomUUID();
+  const revision = randomUUID();
   const revised = (path: string) => {
     const module = new URL(path, location.href);
     module.searchParams.set("revision", revision);

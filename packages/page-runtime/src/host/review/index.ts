@@ -1,3 +1,4 @@
+import { randomUUID } from "@flanksource/clicky-ui/utils";
 import type { ReviewAction, ReviewActionRequest, ReviewHostMessage, ReviewState } from "../../review-schema.ts";
 import { validateReviewFrameMessage, validateReviewHostMessage } from "./validation.ts";
 
@@ -16,11 +17,11 @@ export function createRemoteReview(options: RemoteReviewOptions) {
     });
   }
   return {
-    remove: (id: string, removed: boolean) => request({ type: "review-remove", requestId: crypto.randomUUID(), id, removed }),
-    list: () => request({ type: "review-list", requestId: crypto.randomUUID() }),
-    select: (id: string | null) => request({ type: "review-select", requestId: crypto.randomUUID(), id }),
-    setVisibility: (settings: { visible: boolean; showRejected: boolean }) => request({ type: "review-visibility", requestId: crypto.randomUUID(), ...settings }),
-    action: (settings: { id: string; action: ReviewAction }) => request({ type: "review-action", requestId: crypto.randomUUID(), ...settings }),
+    remove: (id: string, removed: boolean) => request({ type: "review-remove", requestId: randomUUID(), id, removed }),
+    list: () => request({ type: "review-list", requestId: randomUUID() }),
+    select: (id: string | null) => request({ type: "review-select", requestId: randomUUID(), id }),
+    setVisibility: (settings: { visible: boolean; showRejected: boolean }) => request({ type: "review-visibility", requestId: randomUUID(), ...settings }),
+    action: (settings: { id: string; action: ReviewAction }) => request({ type: "review-action", requestId: randomUUID(), ...settings }),
     receive(value: unknown): void {
       if (disposed) throw new Error("Remote review is disposed");
       const message = validateReviewFrameMessage(value);

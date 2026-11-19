@@ -1,3 +1,4 @@
+import { randomUUID } from "@flanksource/clicky-ui/utils";
 import { useLayoutEffect, useRef, type IframeHTMLAttributes } from "react";
 import type { FrameMessage, HostMessage, JsonValue, Theme } from "../schema.ts";
 import { createBridge, type PageBridge } from "./bridge.ts";
@@ -23,7 +24,7 @@ export function PageFrame({ runtimeOrigin, origin = "cross-origin", open, theme,
     const target = frame.current?.contentWindow;
     if (!target || !frame.current) throw new Error("PageFrame has no contentWindow");
     validateFrameOrigin({ runtimeOrigin, hostOrigin: location.origin, origin });
-    const session = crypto.randomUUID();
+    const session = randomUUID();
     const debug = registerPageRuntimeDebug({ session, page: open.page, origin: runtimeOrigin });
     let opened = false;
     bridge.current = createBridge({ target, origin: runtimeOrigin, session, direction: "host", onError: (error) => { debug.fail(error); latest.current.onError(error); }, onMessage: (envelope) => {

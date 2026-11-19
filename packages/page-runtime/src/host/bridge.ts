@@ -1,3 +1,4 @@
+import { randomUUID } from "@flanksource/clicky-ui/utils";
 import type { BridgeEnvelope, FrameMessage, HostMessage } from "../schema.ts";
 import { validateEnvelope } from "./validation.ts";
 
@@ -36,7 +37,7 @@ export function createBridge(options: BridgeOptions) {
   return {
     send,
     request(message: HostMessage | FrameMessage, requestOptions: { timeoutMs?: number } = {}): Promise<BridgeEnvelope> {
-      const id = crypto.randomUUID();
+      const id = randomUUID();
       return new Promise((resolve, reject) => {
         const timeoutMs = requestOptions.timeoutMs ?? options.timeoutMs ?? 15000;
         if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("bridge request timeout must be a positive finite number");

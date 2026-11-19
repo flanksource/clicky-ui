@@ -1,3 +1,4 @@
+import { randomUUID } from "@flanksource/clicky-ui/utils";
 import type { RuntimeProfile } from "../../schema.ts";
 import type { LinkCommand, LinkReply } from "../../link/types.ts";
 import { assertLinksAllowed } from "../../link/validation.ts";
@@ -12,7 +13,7 @@ export function linkRelayPath(options: { relayPath?: string }): string {
 export async function connectLinkRuntime(options: { runtimeOrigin: string; profile: Pick<RuntimeProfile, "links">; developerOverrides: boolean; timeoutMs?: number; relayPath?: string }) {
   assertLinksAllowed(options);
   if (new URL(options.runtimeOrigin).origin !== options.runtimeOrigin) throw new Error("Link runtime must be an origin");
-  const session = crypto.randomUUID();
+  const session = randomUUID();
   const frame = document.createElement("iframe");
   frame.hidden = true;
   frame.title = "Library link connection";
