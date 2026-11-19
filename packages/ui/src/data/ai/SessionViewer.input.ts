@@ -398,6 +398,60 @@ function booleanField(input: Record<string, unknown>, key: string): boolean {
   return input[key] === true;
 }
 
+/**
+ * What each question was answered with, read from the question tool's response:
+ * Codex's `{"answers":{id:{"answers":[…]}}}`, a plain `{"answers":{id|text: value}}`
+ * map, or Claude's `"question"="answer"` text. A question the response does not
+ * answer is absent, so the caller can still show the raw response.
+ */
+export function answersFromToolResponse(
+  response: string | undefined,
+  questions: readonly SessionQuestion[],
+): Map<string, string[]> {
+  const found = new Map<string, string[]>();
+  if (!response) return found;
+  const byKey = answerMapFromJson(response) ?? answerMapFromText(response);
+  for (const question of questions) {
+    const values = byKey.get(question.id) ?? byKey.get(question.text);
+    if (values?.length) found.set(question.id, values);
+  }
+  return found;
+}
+
+function answerValues(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+  if (isRecord(value)) return answerValues(value.answers ?? value.answer);
+  return [];
+}
+
+/** The `answers` map of a JSON response, or null when the response is not one. */
+function answerMapFromJson(response: string): Map<string, string[]> | null {
+  const trimmed = response.trim();
+  if (!trimmed.startsWith("{")) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed) || !isRecord(parsed.answers)) return null;
+  return new Map(Object.entries(parsed.answers).map(([key, value]) => [key, answerValues(value)]));
+}
+
+const QUOTED_ANSWER = /"((?:[^"\\]|\\.)*)"="((?:[^"\\]|\\.)*)"/g;
+
+function answerMapFromText(response: string): Map<string, string[]> {
+  return new Map([...response.matchAll(QUOTED_ANSWER)].map((match) => [match[1]!, [match[2]!]]));
+}
+
+/** Whether an answer picked this option; a Claude multi-select answer joins its picks with ", ". */
+export function optionAnswered(option: SessionQuestionOption, answers: readonly string[]): boolean {
+  return answers.some((answer) =>
+    answer === option.value || answer === option.label || answer.split(", ").includes(option.label),
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }

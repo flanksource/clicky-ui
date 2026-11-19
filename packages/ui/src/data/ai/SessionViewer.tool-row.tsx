@@ -6,6 +6,7 @@ import { Icon } from "../Icon";
 import {
   questionsFromApproval,
   questionsFromToolInput,
+  answersFromToolResponse,
   shellCommand,
   summarizeToolInput,
   toolDiff,
@@ -297,6 +298,7 @@ function QuestionToolBody({
   const questions = typedQuestions?.length
     ? questionsFromApproval(typedQuestions)
     : questionsFromToolInput(event.toolInput);
+  const answers = answersFromToolResponse(event.toolResponse, questions);
   const summary = summarizeToolInput(
     event.tool ?? "",
     event.toolInput,
@@ -340,6 +342,7 @@ function QuestionToolBody({
                 key={`${question.id}-${index}`}
                 question={question}
                 index={index}
+                answer={answers.get(question.id)}
               />
             ))
           ) : event.toolInput ? (
@@ -348,7 +351,7 @@ function QuestionToolBody({
               source={JSON.stringify(event.toolInput, null, 2)}
             />
           ) : null}
-          {event.toolResponse !== undefined && (
+          {event.toolResponse !== undefined && (questions.length === 0 || answers.size < questions.length) && (
             <div className="space-y-1">
               <div className="text-[11px] font-medium uppercase text-muted-foreground">
                 Answer

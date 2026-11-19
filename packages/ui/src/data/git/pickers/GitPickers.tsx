@@ -29,8 +29,14 @@ export function GitBranchPicker(props: GitPickerProps<GitBranchOption>) {
   return <ReferencePicker {...props} label={props.label ?? "Branch"} plural="branches" option={(item) => branchOption(item, "refs/heads/")} />;
 }
 
+/** The newest branches and tags a ref picker lists before "Show more"; a search reaches every ref. */
+export const GIT_REF_GROUP_LIMITS = [
+  { group: "Branches", limit: 50, plural: "branches" },
+  { group: "Tags", limit: 10, plural: "tags" },
+] as const;
+
 export function GitRefPicker(props: GitPickerProps<GitRefOption> & { allowCustomRef?: boolean }) {
-  return <ReferencePicker {...props} label={props.label ?? "Git ref"} plural="refs" {...(props.allowCustomRef ? { custom: (value: string) => value.trim() ? { value: value.trim(), label: value.trim(), icon: <UiGitCommit /> } : null } : {})}
+  return <ReferencePicker {...props} label={props.label ?? "Git ref"} plural="refs" groupLimits={GIT_REF_GROUP_LIMITS} {...(props.allowCustomRef ? { custom: (value: string) => value.trim() ? { value: value.trim(), label: value.trim(), icon: <UiGitCommit /> } : null } : {})}
     option={(item) => ({ ...branchOption(item, item.kind === "tag" ? "refs/tags/" : "refs/heads/"), group: item.kind === "tag" ? "Tags" : "Branches", ...(item.kind === "tag" ? { icon: <UiTag /> } : {}) })} />;
 }
 

@@ -1,6 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
+import { useId, useState } from "react";
+import { Button } from "../components/button";
+import { InputField } from "../components/InputField";
 import { Modal } from "./Modal";
+import { ModalProvider } from "./ModalProvider";
+import {
+  useModal,
+  type HostedModalProps,
+  type ModalFormDefinition,
+  type ModalSubmissionResult,
+} from "./modal-context";
 
 const meta: Meta<typeof Modal> = {
   title: "Overlay/Modal",
@@ -262,6 +271,117 @@ export const Expandable: Story = {
           </p>
         </Modal>
       </>
+    );
+  },
+};
+
+function RenameReportForm({ modalProps, initialDraft, submit }: HostedModalProps) {
+  const [name, setName] = useState(String(initialDraft.name));
+  const formId = useId();
+  const nameId = useId();
+  const valid = name.trim() !== "";
+
+  return (
+    <Modal
+      {...modalProps}
+      footer={
+        <div className="flex justify-end gap-density-2">
+          <Button type="button" variant="outline" onClick={modalProps.onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" form={formId} disabled={!valid}>
+            Save
+          </Button>
+        </div>
+      }
+    >
+      <form
+        id={formId}
+        className="space-y-density-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!valid) return;
+          const draft = { name: name.trim() };
+          void submit({
+            draft,
+            request: () => new Promise<ModalSubmissionResult<string>>((resolve) => {
+              window.setTimeout(() => {
+                resolve(draft.name.toLowerCase() === "taken"
+                  ? { status: "rejected", error: "A report named “Taken” already exists." }
+                  : { status: "success", value: draft.name });
+              }, 5000);
+            }),
+          });
+        }}
+      >
+        <label className="block text-sm font-medium" htmlFor={nameId}>
+          Report name
+        </label>
+        <InputField id={nameId} required value={name} onChange={setName} />
+      </form>
+    </Modal>
+  );
+}
+
+const reportForms = {
+  renameReport: {
+    title: "Rename report",
+    Form: RenameReportForm,
+    recovery: {
+      serialize: (draft) => ({ name: String(draft.name) }),
+      restore: (saved) => {
+        if (saved && typeof saved === "object" && "name" in saved && typeof saved.name === "string") {
+          return { name: saved.name };
+        }
+        throw new Error("Invalid report draft");
+      },
+    },
+  },
+} satisfies Record<string, ModalFormDefinition>;
+
+function ReportPage({ onNavigate }: { onNavigate: () => void }) {
+  const { openModal } = useModal();
+  return (
+    <div className="flex flex-wrap gap-density-2">
+      <Button type="button" onClick={() => openModal("renameReport", { name: "Weekly report" })}>
+        Rename report
+      </Button>
+      <Button type="button" variant="outline" onClick={onNavigate}>
+        View activity
+      </Button>
+    </div>
+  );
+}
+
+export const OptimisticSubmission: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story: [
+          "Mount `ModalProvider` above the route outlet. Register the hosted form once and use `useModal().openModal(formKey, initialDraft)` to open it. Spread its `modalProps` into `Modal` and keep the draft in the hosted form so inputs survive minimization.",
+          "",
+          "Give forms that support reload recovery a `recovery` codec. The provider saves the fields selected by `serialize` before dispatch and validates them with `restore` after reload. Use a scope tied to the app, account, and workspace.",
+          "",
+          'Save to see the pending card. Use the name `Taken` for a server rejection, or refresh while submitting to restore the draft with an unknown outcome.',
+        ].join("\n"),
+      },
+    },
+  },
+  render: function OptimisticSubmissionStory() {
+    const [activity, setActivity] = useState(false);
+    return (
+      <ModalProvider scope="storybook:demo:reports" forms={reportForms}>
+        {activity ? (
+          <div className="space-y-density-2">
+            <h2 className="font-semibold">Report activity</h2>
+            <Button type="button" variant="outline" onClick={() => setActivity(false)}>
+              Back to reports
+            </Button>
+          </div>
+        ) : (
+          <ReportPage onNavigate={() => setActivity(true)} />
+        )}
+      </ModalProvider>
     );
   },
 };

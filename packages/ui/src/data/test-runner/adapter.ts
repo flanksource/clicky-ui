@@ -46,6 +46,17 @@ export type TestNodeAdapter = {
   renderFrameworkIcon?: (c: AdapterContext) => ReactNode;
   /** Extra decoration rendered between the framework icon and the node name. */
   renderRowLeading?: (c: AdapterContext) => ReactNode;
+  /**
+   * The tree row's text in place of the humanized node name, e.g. a step name
+   * without the kind prefix a `renderRowLeading` icon already shows. Return
+   * undefined to keep the default. The node's name is unchanged everywhere else.
+   */
+  rowLabel?: (c: AdapterContext) => string | undefined;
+  /**
+   * Extra content inside the detail header's framework badge, after the
+   * framework name (e.g. how the node ran). Return null to show the name alone.
+   */
+  frameworkBadge?: (c: AdapterContext) => ReactNode;
   /** Primary detail body for the node, replacing the default panel body. */
   renderDetail?: (c: AdapterContext) => ReactNode;
   /** Extra detail tabs, merged (in registration order) across all matching adapters. */
@@ -98,6 +109,16 @@ export class TestNodeAdapterRegistry {
 
   resolveRowLeading(node: Test, runner: TestRunnerContext): TestNodeAdapter | null {
     return this.firstWith(node, runner, (a) => !!a.renderRowLeading);
+  }
+
+  /** The first matching adapter's `rowLabel`, or undefined for the default name. */
+  resolveRowLabel(node: Test, runner: TestRunnerContext): string | undefined {
+    return this.firstWith(node, runner, (a) => !!a.rowLabel)?.rowLabel?.({ node, runner });
+  }
+
+  /** The first matching adapter's `frameworkBadge` content, or null for the name alone. */
+  resolveFrameworkBadge(node: Test, runner: TestRunnerContext): ReactNode {
+    return this.firstWith(node, runner, (a) => !!a.frameworkBadge)?.frameworkBadge?.({ node, runner }) ?? null;
   }
 
   resolveFrameworkIcon(node: Test, runner: TestRunnerContext): TestNodeAdapter | null {

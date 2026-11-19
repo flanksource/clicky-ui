@@ -3,7 +3,7 @@ import { cn } from "../../../lib/utils";
 import { GitRefPicker } from "./GitPickers";
 import { RepositoryCatalogPicker } from "./RepositoryCatalogPicker";
 import { usePickerItems } from "./use-picker-items";
-import type { GitPickerClient, GitPickerLoader, GitConnectionOption, GitRefOption, GitSourceValue } from "./types";
+import type { GitBranchOption, GitPickerClient, GitPickerLoader, GitConnectionOption, GitRefOption, GitSourceValue } from "./types";
 
 export interface GitSourcePickerProps {
   client: GitPickerClient;
@@ -16,6 +16,15 @@ export interface GitSourcePickerProps {
   branchesOnly?: boolean;
 }
 
+// newestFirst orders refs by commit date, newest first, keeping undated refs
+// after them in the order the client listed them.
+function newestFirst<T extends GitBranchOption>(refs: readonly T[]): T[] {
+  const time = (ref: T) => (ref.date ? Date.parse(ref.date) : Number.NEGATIVE_INFINITY);
+  return refs.map((ref, index) => ({ ref, index }))
+    .sort((a, b) => time(b.ref) - time(a.ref) || a.index - b.index)
+    .map(({ ref }) => ref);
+}
+
 export function GitSourcePicker({ client, value, onChange, layout = "stacked", leading, optionTrailing, disabled = false, branchesOnly = false }: GitSourcePickerProps) {
   const connectionLoader = useMemo<GitPickerLoader<GitConnectionOption>>(() => async ({ signal }) => ({ items: await client.connections(signal) }), [client]);
   const connections = usePickerItems({ load: connectionLoader });
@@ -25,7 +34,7 @@ export function GitSourcePicker({ client, value, onChange, layout = "stacked", l
   const scope = JSON.stringify([value.connection, repo]);
   const refLoader = useMemo<GitPickerLoader<GitRefOption>>(() => async ({ signal }) => {
     const refs = await client.refs({ connection: value.connection, ...(repo ? { repo } : {}) }, signal);
-    return { items: [...refs.branches.map((item) => ({ ...item, kind: "branch" as const })), ...(branchesOnly ? [] : refs.tags.map((item) => ({ ...item, kind: "tag" as const })))] };
+    return { items: [...newestFirst(refs.branches).map((item) => ({ ...item, kind: "branch" as const })), ...(branchesOnly ? [] : newestFirst(refs.tags).map((item) => ({ ...item, kind: "tag" as const })))] };
   }, [branchesOnly, client, repo, value.connection]);
   const row = layout === "row";
   return <div className={cn(row ? "flex flex-wrap items-start gap-2" : "space-y-2")} data-git-source-picker={layout}>

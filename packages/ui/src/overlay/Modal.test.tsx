@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, fireEvent } from "@testing-library/react";
-import { useState } from "react";
+import { Profiler, useState } from "react";
 import { Modal } from "./Modal";
 
 function getDialog() {
@@ -68,6 +68,27 @@ describe("Modal", () => {
         </Modal>,
       );
       expect(getDialog()).toHaveAttribute("aria-label", "New Redis connection");
+    });
+
+    it.each([
+      { case: "closed", open: false },
+      { case: "open", open: true },
+    ])("commits once per parent render while $case, so naming never feeds back into a render loop", ({ open }) => {
+      const parentRenders = 4;
+      const commits: number[] = [];
+      function Host({ tick }: { tick: number }) {
+        return (
+          <Profiler id="modal" onRender={() => commits.push(tick)}>
+            <Modal open={open} onClose={() => {}} title={<span>Palette</span>}>
+              <p>body</p>
+            </Modal>
+          </Profiler>
+        );
+      }
+      const { rerender } = render(<Host tick={0} />);
+      commits.length = 0;
+      for (let tick = 1; tick <= parentRenders; tick++) rerender(<Host tick={tick} />);
+      expect(commits).toEqual(Array.from({ length: parentRenders }, (_, index) => index + 1));
     });
   });
 

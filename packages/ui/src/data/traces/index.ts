@@ -78,6 +78,7 @@ export type {
 
 export { OtelTraceDetail } from "./otel/OtelTraceDetail";
 export { OtelTraceSearch } from "./otel/OtelTraceSearch";
+export { OtelTraceBrowser, type OtelTraceBrowserProps } from "./otel/OtelTraceBrowser";
 export { OtelTraceTable, type OtelTraceTableProps, type OtelOpenTrace } from "./otel/OtelTraceTable";
 export { profileSpans } from "./otel/profile-spans";
 export { profileListingSort, profileTraceListing } from "./otel/profile-listing";

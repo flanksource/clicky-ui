@@ -98,7 +98,7 @@ export function TestTreeNode({ node, selected }: { node: Test; selected: boolean
         )}
         title={message || undefined}
       >
-        {humanizeName(node.name, node.framework)}
+        {runner.adapters.resolveRowLabel(node, runner) ?? humanizeName(node.name, node.framework)}
       </span>
       {/* The verdict trails the name on the same line and gives way first. */}
       {message ? (

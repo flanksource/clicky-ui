@@ -8,11 +8,13 @@ import type { SearchValues, SearchResult, Source } from "./api";
 /** The search's page size when the request names none, as the trace search service defaults it. */
 const DEFAULT_LIMIT = 100;
 
-export function OtelTraceSearch({ value, result, sources, runs = [], loading = false, error, onChange, onOpen, href, onCancel, onRetry, allowRecords = true }: {
+export function OtelTraceSearch({ value, result, sources, runs = [], loading = false, error, onChange, onOpen, href, onCancel, onRetry, allowRecords = true, pinned }: {
   value: SearchValues; result?: SearchResult; sources: Source[]; runs?: string[];
   loading?: boolean; error?: string; onChange: (value: Partial<SearchValues>) => void;
   onOpen: (id: string) => void; href: (id: string) => string; onCancel: () => void; onRetry: () => void;
   allowRecords?: boolean;
+  /** Filter entries the page fixes: shown as selected, and kept by every change. */
+  pinned?: SearchValues;
 }) {
   const [jump, setJump] = useState("");
   const [notice, setNotice] = useState<string>();
@@ -36,7 +38,7 @@ export function OtelTraceSearch({ value, result, sources, runs = [], loading = f
       <h2 className="text-xl font-semibold">Traces</h2>
       <div className="flex min-w-0 gap-2"><SearchInput shortcut={null} aria-label="Trace ID" placeholder="Jump to trace ID" value={jump} onChange={setJump} /><Button type="submit" variant="outline">Open</Button></div>
     </form>
-    <QueryBar value={value} sources={sources} runs={runs} allowRecords={allowRecords} onChange={onChange} onError={setNotice} {...(result ? { result } : {})}
+    <QueryBar value={value} sources={sources} runs={runs} allowRecords={allowRecords} onChange={onChange} onError={setNotice} {...(result ? { result } : {})} {...(pinned ? { pinned } : {})}
       trailing={loading && <span className="inline-flex h-7 items-center rounded-md border border-input bg-background text-xs">
         <span role="status" className="flex items-center gap-1.5 whitespace-nowrap px-2 tabular-nums text-muted-foreground"><UiLoader className="size-3.5 animate-spin" aria-hidden />Searching… {(elapsed / 1000).toFixed(1)} s</span>
         <Button size="sm" variant="ghost" className="h-full rounded-l-none border-l border-input px-2 text-xs" onClick={() => { setCancelled(true); onCancel(); }}>Cancel</Button>

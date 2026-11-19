@@ -77,6 +77,23 @@ describe("Conversation", () => {
     expect(report).toContain("Page: http://localhost");
   });
 
+  it("packs one speaker's consecutive messages together and separates turns", () => {
+    const assistant = (id: string, text: string): UIMessage => ({ id, role: "assistant", parts: [{ type: "text", text }] });
+    const { container } = render(
+      <Conversation
+        messages={[
+          USER_MESSAGE,
+          assistant("a1", "first tool"),
+          assistant("a2", "second tool"),
+          { id: "u2", role: "user", parts: [{ type: "text", text: "thanks" }] },
+        ]}
+      />,
+    );
+    const log = container.querySelector('[role="log"] > div')!;
+    const spacing = [...log.children].map((child) => (child.className.match(/\bmt-\d+\b/) ?? [""])[0]);
+    expect({ gap: log.className.includes("gap-8"), spacing }).toEqual({ gap: false, spacing: ["", "mt-8", "mt-2", "mt-8"] });
+  });
+
   it("can dismiss the visible error", () => {
     const onClearError = vi.fn();
     render(
