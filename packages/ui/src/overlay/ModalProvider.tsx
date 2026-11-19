@@ -49,8 +49,12 @@ const unknownOutcome = "Submission outcome unknown";
 const unknownError = `${unknownOutcome}. Check whether the change was applied before retrying.`;
 const rejectedError =
   "The previous submission was rejected. Review your saved values and try again.";
-const cardClass =
-  "w-full rounded-lg border border-border bg-popover px-density-3 py-density-2 text-sm text-popover-foreground shadow-lg";
+const cardShapeClass =
+  "w-full rounded-lg border px-density-3 py-density-2 text-sm shadow-lg";
+const cardClass = `${cardShapeClass} border-border bg-popover text-popover-foreground`;
+// A pending submission is the one card the user is waiting on, so it is filled
+// with the primary colour rather than blending in with the page like a popover.
+const pendingCardClass = `${cardShapeClass} border-primary bg-primary text-primary-foreground`;
 
 export function ModalProvider(props: ModalProviderProps) {
   return <ModalScope key={props.scope} {...props} />;
@@ -279,12 +283,12 @@ function SubmissionCard({
       <div
         data-slot="modal-submission-card"
         role="status"
-        className={`${cardClass} flex items-center gap-density-2`}
+        className={`${pendingCardClass} flex items-center gap-density-2`}
       >
-        <LoadingDots className="size-4 text-muted-foreground motion-reduce:hidden" />
+        <LoadingDots className="size-4 motion-reduce:hidden" />
         <div className="min-w-0">
           <div className="wrap-break-word font-medium">{entry.form.title}</div>
-          <div className="text-muted-foreground">Submitting…</div>
+          <div className="opacity-80">Submitting…</div>
         </div>
       </div>
     );

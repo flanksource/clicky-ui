@@ -131,6 +131,7 @@ describe("ModalProvider", () => {
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Submitting…");
+    expect(screen.getByRole("status")).toHaveClass("bg-primary", "text-primary-foreground");
     expect(trigger).toHaveFocus();
     expect(fireEvent.keyDown(document, { key: "Escape" })).toBe(true);
     expect(request).toHaveBeenCalledTimes(1);
