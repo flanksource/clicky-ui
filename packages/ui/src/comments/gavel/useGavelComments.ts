@@ -1,3 +1,4 @@
+import { randomUUID } from "../../lib/random-uuid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CommentAuthor, CommentReplyInput } from "../comment-types";
 import type { GitDiffPayload } from "../../data/git/types";
@@ -222,7 +223,7 @@ export function useGavelComments(options: GavelCommentsOptions): GavelComments {
     refresh,
     create: async ({ preview, request, screenshot }) => {
       if (filterKey === undefined) throw new Error("Cannot create a comment before the host has said what it is commenting on");
-      const pendingId = `pending-${crypto.randomUUID()}`;
+      const pendingId = `pending-${randomUUID()}`;
       const comment: GavelComment = { ...preview, id: pendingId, createdAt: new Date().toISOString(), author: localUser, submission: { state: "sending" } };
       setOutbox((previous) => [...previous, { filterKey, comment }]);
       posting.current++;
@@ -280,11 +281,11 @@ export function useGavelComments(options: GavelCommentsOptions): GavelComments {
     loadProposalDiff: async (id) => client.proposalDiff(proposalReply(id).rootId, id),
     deliver: async (id, target) => {
       const comment = root(id);
-      return settled(client.deliver({ id, version: comment.version, requestId: crypto.randomUUID(), target }));
+      return settled(client.deliver({ id, version: comment.version, requestId: randomUUID(), target }));
     },
     deliverAll: async (ids, target) => {
       const threads = ids.map((id) => ({ id, expectedVersion: root(id).version }));
-      return settled(client.deliverBatch({ requestId: crypto.randomUUID(), target, threads }));
+      return settled(client.deliverBatch({ requestId: randomUUID(), target, threads }));
     },
     markRead: async () => {
       const uri = filter?.target;

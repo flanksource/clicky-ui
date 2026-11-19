@@ -1,3 +1,4 @@
+import { randomUUID } from "../../../lib/random-uuid";
 import { useEffect, useState } from "react";
 import type { AIPromptRunValue } from "../PromptRunEditor/model";
 import type {
@@ -52,7 +53,7 @@ export function useRuntimeProfilePicker({
   onSaveProfile,
   onCreateProfile,
   onResolveProfile,
-  newId = () => crypto.randomUUID(),
+  newId = () => randomUUID(),
 }: {
   value: AIPromptRunValue;
   onChange: (value: AIPromptRunValue) => void;

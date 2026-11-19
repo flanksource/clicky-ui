@@ -1,0 +1,11 @@
+const HEX = Array.from({ length: 256 }, (_, byte) => byte.toString(16).padStart(2, "0"));
+
+// RFC 4122 v4 UUID from crypto.getRandomValues. Unlike crypto.randomUUID, it
+// works outside secure contexts, e.g. a dashboard opened at http://<lan-ip>.
+export function randomUUID(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => HEX[byte]!);
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+}

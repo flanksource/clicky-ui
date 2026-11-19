@@ -106,3 +106,4 @@ export {
   type FormatBytesOptions,
 } from "./lib/format";
 export { shellCommandLine, shellQuote } from "./lib/shell-command";
+export { randomUUID } from "./lib/random-uuid";
