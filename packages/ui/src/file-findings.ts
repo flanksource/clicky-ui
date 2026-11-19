@@ -53,6 +53,7 @@ export {
   type OutlineEntry,
   type QuoteLocator,
 } from "./file-findings/file-review/quote-anchor";
+export { describeCell } from "./file-findings/file-review/table-cell";
 export {
   SOURCE_PREFIX,
   describeSource,

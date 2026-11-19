@@ -55,7 +55,7 @@ export function classSourceFixture(className: string, loader: string): JvmClassS
   const source =
     className === "com.example.orders.OrderService"
       ? ORDER_SERVICE_SOURCE
-      : `package ${className.slice(0, className.lastIndexOf("."))};\n\npublic class ${className.slice(className.lastIndexOf(".") + 1).replace("$", "_")} {\n    public String toString() {\n        return "${className}";\n    }\n}\n`;
+      : `package ${className.slice(0, className.lastIndexOf("."))};\n\npublic class ${className.slice(className.lastIndexOf(".") + 1).replaceAll("$", "_")} {\n    public String toString() {\n        return "${className}";\n    }\n}\n`;
   const lines = source.split("\n");
   const methods =
     className === "com.example.orders.OrderService"

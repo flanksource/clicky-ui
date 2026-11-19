@@ -8,6 +8,14 @@ export type CommentScreenshotCapture =
   | { status: "unavailable"; reason: CommentScreenshotUnavailableReason };
 /** The exact words of a selection with a few characters of the text on each side, as the W3C TextQuoteSelector. */
 export type TextQuote = { prefix: string; exact: string; suffix: string };
+/**
+ * A cell of a rendered markdown table. Its row is named by `key`, the row's text
+ * in `keyColumn`: the first column (from the left) whose body values are all
+ * unique, both blank when none is. `column` is its header text. `row` (0-based
+ * body row, -1 for the header) and `col` are where it was captured, used when
+ * those names repeat or are gone.
+ */
+export type TableCell = { keyColumn: string; key: string; column: string; row: number; col: number };
 /** A rectangle on an image as fractions of its width and height: every field in [0, 1] and `x + w`, `y + h` at most 1. */
 export type RegionAnchor = { x: number; y: number; w: number; h: number };
 export type PatchAnchor = {
@@ -39,5 +47,7 @@ export type AnnotationCapture = {
    * the patch's lines, which stay authoritative.
    */
   quote?: TextQuote;
+  /** The table cell a `code-range` selection lies in, a sibling of `patch` whose one line is the cell's row. */
+  cell?: TableCell;
   region?: RegionAnchor;
 };

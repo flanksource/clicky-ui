@@ -3,6 +3,7 @@
 // section it sits in) plus a few words on each side, so the same words
 // elsewhere — or edits to other sections — never move it.
 import type { TextQuote } from "../../comments/annotation-types";
+import { tableRows } from "./table-cell";
 
 /** A quote inside the section named by `path` (its heading trail), with the words around it. */
 export type QuoteLocator = { path: string[]; prefix: string; quote: string; suffix: string };
@@ -189,24 +190,39 @@ export function captureTextQuote(root: Element, range: Range): TextQuote | null 
 const QUOTE_TIERS = [...TIERS, { prefix: false, suffix: false }] as const;
 
 /**
- * Finds a patch's quote again, searching only the rendered blocks that cover
- * source lines `start`..`end` (where the patch matches now). The words with
+ * The rendered elements covering source lines `start`..`end`: each top-level
+ * block that overlaps them, or for a table only its rows on those lines.
+ */
+export function elementsInLines(root: Element, lines: { start: number; end: number }): Element[] {
+  return sections(root).flatMap(({ block }) => {
+    const { sourceStart, sourceEnd } = (block as HTMLElement).dataset;
+    if (Number(sourceStart) > lines.end || Number(sourceEnd) < lines.start) return [];
+    const rows = tableRows(block);
+    return rows.length > 0 ? rows.filter(({ line }) => line >= lines.start && line <= lines.end).map(({ row }) => row) : [block];
+  });
+}
+
+/**
+ * Finds a patch's quote again, searching only `within` (the rendered elements
+ * where the patch matches now, or the cell it was made in). The words with
  * their context first, then with the context edited away; null once they are
  * gone, or repeat so that nothing tells the occurrences apart, so the caller
  * falls back to highlighting the lines.
  */
-export function resolveQuoteInLines(root: Element, lines: { start: number; end: number }, quote: TextQuote): Range | null {
-  const covering = sections(root).filter(({ block }) => {
-    const { sourceStart, sourceEnd } = (block as HTMLElement).dataset;
-    return Number(sourceStart) <= lines.end && Number(sourceEnd) >= lines.start;
-  });
+export function resolveQuoteWithin(within: readonly Element[], quote: TextQuote): Range | null {
+  const candidates = within.map((block) => ({ block, path: [] }));
   const locator = { path: [], prefix: quote.prefix, quote: quote.exact, suffix: quote.suffix };
   for (const tier of QUOTE_TIERS) {
-    const found = matches(covering, locator, tier);
+    const found = matches(candidates, locator, tier);
     if (found.length === 1) return rangeIn(found[0]!.block, found[0]!.start, found[0]!.end);
     if (found.length > 1) return null;
   }
   return null;
+}
+
+/** `resolveQuoteWithin` the elements covering source lines `start`..`end`. */
+export function resolveQuoteInLines(root: Element, lines: { start: number; end: number }, quote: TextQuote): Range | null {
+  return resolveQuoteWithin(elementsInLines(root, lines), quote);
 }
 
 /**

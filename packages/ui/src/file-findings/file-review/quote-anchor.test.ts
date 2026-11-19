@@ -120,6 +120,19 @@ describe("quotes held by a patch", () => {
     }).toEqual({ inside: "error rate", elsewhere: null });
   });
 
+  it("searches only a table's rows on the patch lines, so words repeated in another row stay unambiguous", () => {
+    // Header on line 11, delimiter on 12, body rows on 13 and 14.
+    root.insertAdjacentHTML(
+      "beforeend",
+      `<div data-source-start="11" data-source-end="14"><table>
+        <thead><tr><th>Check</th><th>State</th></tr></thead>
+        <tbody><tr><td>disk</td><td>ok</td></tr><tr><td>cpu</td><td>ok</td></tr></tbody>
+      </table></div>`,
+    );
+    const range = resolveQuoteInLines(root, { start: 14, end: 14 }, { prefix: "", exact: "ok", suffix: "" });
+    expect(range?.startContainer.parentElement?.closest("tr")?.textContent).toBe("cpuok");
+  });
+
   it("returns null once the quoted words are gone from the patch lines, so the highlight falls back to the lines", () => {
     paragraph(9).textContent = "Check the latency again.";
     expect(resolveQuoteInLines(root, { start: 9, end: 9 }, quote)).toBeNull();

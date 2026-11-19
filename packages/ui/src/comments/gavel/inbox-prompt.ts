@@ -54,7 +54,9 @@ function readUrl(baseUrl: string, scope: string, filters: InboxFilters): string 
  */
 export function inboxPrompt({ items, scopes, filters, target, baseUrl, url }: { items: readonly InboxItem[]; scopes: readonly string[]; filters: InboxFilters; target: InboxPromptTarget; baseUrl: string; url: string }): string {
   if (!baseUrl.trim()) throw new Error("inboxPrompt needs the baseUrl gavel is served at, so the agent can reach the comments API");
-  const base = baseUrl.replace(/\/+$/, "");
+  let end = baseUrl.length;
+  while (end > 0 && baseUrl[end - 1] === "/") end -= 1;
+  const base = baseUrl.slice(0, end);
   const api = `${base}/api/v1/comments/{id}`;
   return [
     `# Comment inbox for ${AUDIENCE[target]}`,

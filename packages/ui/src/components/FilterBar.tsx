@@ -737,7 +737,9 @@ export function FilterBar({
             data-filter-bar-list
             className={cn(
               "flex min-w-0 items-center gap-2",
-              overflowMode === "wrap" ? "flex-wrap" : "flex-1",
+              overflowMode === "wrap"
+                ? "flex-wrap"
+                : inlineFilters.length > 0 && "flex-1",
             )}
           >
             {inlineFilters.map((filter, index) => (

@@ -2,8 +2,9 @@ import { ELEMENT_PREFIX, resolveElementAnchor } from "../../comments/anchoring/d
 import { isPatchAnchor } from "../../comments/anchoring/patch-anchor";
 import { blockAnchor, lineRangeAnchorResolver } from "../findings-comments";
 
-import type { TextQuote } from "../../comments/annotation-types";
-import { QUOTE_PREFIX, parseQuoteAnchor, resolveQuote, resolveQuoteInLines } from "./quote-anchor";
+import type { TableCell, TextQuote } from "../../comments/annotation-types";
+import { QUOTE_PREFIX, elementsInLines, parseQuoteAnchor, resolveQuote, resolveQuoteWithin } from "./quote-anchor";
+import { resolveTableCell } from "./table-cell";
 
 /** A rectangle relative to the annotated document's top-left corner. */
 export type Box = { top: number; left: number; width: number; height: number };
@@ -19,12 +20,23 @@ export function sourceBlockOf(node: Node | null): Element | null {
   return element?.closest(SOURCE_BLOCK) ?? null;
 }
 
+/** The table cell `cell` names in a table covering `lines`, while it still sits on them. */
+function cellInLines(markdown: Element, lines: { start: number; end: number }, cell: TableCell): Element | null {
+  for (const block of markdown.querySelectorAll<HTMLElement>(SOURCE_BLOCK)) {
+    if (Number(block.dataset.sourceStart) > lines.end || Number(block.dataset.sourceEnd) < lines.start) continue;
+    const found = resolveTableCell(block, cell);
+    if (found && found.line >= lines.start && found.line <= lines.end) return found.cell;
+  }
+  return null;
+}
+
 /**
  * Boxes for each anchor, relative to `origin`. A `q:` anchor finds its quote in
  * `markdown` through its section and context words; a `line:N` anchor resolves to its block like a line finding's
  * does. An anchor in `patchRanges` (an `r:` thread already placed in the
- * source) covers every block that overlaps its lines, or in text mode just its
- * quoted words while the quote still lies in them; an `e:` anchor finds its
+ * source) covers every block that overlaps its lines (in a table, just the rows
+ * on them); in text mode, just its table cell and quoted words while they still
+ * lie in those lines. An `e:` anchor finds its
  * element by its locators and takes that element's box. An anchor that no
  * longer finds its target is left out. Entries come in document order.
  */
@@ -39,7 +51,7 @@ export function measureAnchors({
   markdown: Element;
   anchors: readonly string[];
   mode: AnchorMode;
-  patchRanges?: ReadonlyMap<string, { start: number; end: number; quote?: TextQuote }>;
+  patchRanges?: ReadonlyMap<string, { start: number; end: number; quote?: TextQuote; cell?: TableCell }>;
 }): Map<string, Box[]> {
   const base = origin.getBoundingClientRect();
   const rel = (rect: DOMRect): Box => ({
@@ -83,17 +95,13 @@ export function measureAnchors({
     if (isPatchAnchor(anchor)) {
       const lines = patchRanges?.get(anchor);
       if (!lines) continue;
-      // The patch is authoritative; its quote only sharpens the highlight while it still lies in the matched lines.
-      const range = mode === "text" && lines.quote ? resolveQuoteInLines(markdown, lines, lines.quote) : null;
+      // The patch is authoritative; its cell and quote only sharpen the highlight while they still lie in the matched lines.
+      const within = mode === "text" && lines.cell ? cellInLines(markdown, lines, lines.cell) : null;
+      const covering = within ? [within] : elementsInLines(markdown, lines);
+      const range = mode === "text" && lines.quote ? resolveQuoteWithin(covering, lines.quote) : null;
       const words = range ? [...range.getClientRects()].filter((rect) => rect.width > 0).map(rel) : [];
-      if (words.length > 0) {
-        found.push({ anchor, boxes: words, at: words[0]!.top });
-        continue;
-      }
-      const covered = [...markdown.querySelectorAll<HTMLElement>(SOURCE_BLOCK)]
-        .filter((el) => Number(el.dataset.sourceStart) <= lines.end && Number(el.dataset.sourceEnd) >= lines.start)
-        .flatMap(blockBoxes);
-      if (covered.length > 0) found.push({ anchor, boxes: covered, at: covered[0]!.top });
+      const boxes = words.length > 0 ? words : covering.flatMap(blockBoxes);
+      if (boxes.length > 0) found.push({ anchor, boxes, at: boxes[0]!.top });
       continue;
     }
     const key = lineRangeAnchorResolver(anchor, [...blocks.keys()]);

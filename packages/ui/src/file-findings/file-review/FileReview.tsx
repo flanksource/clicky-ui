@@ -66,9 +66,10 @@ import { CommentDraft, type CommentDraftPosition } from "./CommentDraft";
 import { isBuiltinFileReviewView, type FileReviewView } from "./views";
 import { EditThreads, type EditThreadEntry } from "./EditThreads";
 import { FileDraftCard, FileThreadCard, FileThreads, type FileThreadEntry } from "./FileThreads";
-import { patchDraft, patchLabel, patchLineRanges, patchSourceMarks, placePatches, type PatchPlacement } from "./patch-comments";
+import { patchDraft, patchExtras, patchLabel, patchLineRanges, patchSourceMarks, placePatches, type PatchExtras, type PatchPlacement } from "./patch-comments";
 import { composerActions, createComment } from "./post-actions";
 import { previewSelectionLines, sourceSelectionLines } from "./selection-lines";
+import { describeCell, tableCellOf } from "./table-cell";
 
 const DEFAULT_CONFIG: CommentConfig = { statuses: DEFAULT_COMMENT_STATUSES };
 const ESTIMATED_CARD_HEIGHT = 96;
@@ -92,8 +93,8 @@ const isFindingAnchor = (anchor: string) => anchor.startsWith(FINDING_ANCHOR_PRE
 
 type AuthorFilter = "all" | "user" | "agent";
 /** A selection offered for commenting: a Comment pill that morphs into a composer card once `expanded`. */
-/** `quote` is the selected words of a patch (`r:`) draft; it is posted beside the anchor, never inside it. */
-type Draft = { anchor: string; label: string; quote?: TextQuote; position: CommentDraftPosition; expanded: boolean; surface: "preview" | "source" | "edit" };
+/** `quote` and `cell` are the selected words and table cell of a patch (`r:`) draft; they are posted beside the anchor, never inside it. */
+type Draft = { anchor: string; label: string; position: CommentDraftPosition; expanded: boolean; surface: "preview" | "source" | "edit" } & PatchExtras;
 /** An edit-mode draft is composed in the thread rail beside the editor, so it has no floating position. */
 const NO_POSITION: CommentDraftPosition = { top: 0, bottom: 0, left: 0 };
 
@@ -119,10 +120,27 @@ function boxClass({ mode, active }: { mode: AnchorMode; active: boolean }) {
  * A thread's label. An r: anchor carries its own hunk, so one not among the placed threads
  * (a just-posted comment the host has not yet fed back) is placed against `raw` here.
  */
-function anchorLabel({ anchor, found, placements, raw }: { anchor: string; found: boolean; placements: ReadonlyMap<string, PatchPlacement>; raw: string }): string {
+/** A patch thread on a table cell reads as that cell while its lines still match; any other by its lines (or why they don't). */
+function anchorLabel({
+  anchor,
+  found,
+  placements,
+  extras,
+  raw,
+}: {
+  anchor: string;
+  found: boolean;
+  placements: ReadonlyMap<string, PatchPlacement>;
+  extras: ReadonlyMap<string, PatchExtras>;
+  raw: string;
+}): string {
   if (anchor === DOCUMENT_ANCHOR) return "File";
   if (anchor.startsWith(ELEMENT_PREFIX)) return found ? "Element" : "Element not found";
-  if (anchor.startsWith(PATCH_PREFIX)) return patchLabel(placements.get(anchor) ?? placePatches(raw, [anchor]).get(anchor)!);
+  if (anchor.startsWith(PATCH_PREFIX)) {
+    const placement = placements.get(anchor) ?? placePatches(raw, [anchor]).get(anchor)!;
+    const cell = extras.get(anchor)?.cell;
+    return cell && placement.match.state === "matched" ? describeCell(cell) : patchLabel(placement);
+  }
   const label = anchor.startsWith(QUOTE_PREFIX)
     ? describeQuote(parseQuoteAnchor(anchor))
     : anchor.startsWith(SOURCE_PREFIX)
@@ -538,13 +556,17 @@ export function FileReview({
   const unposted = draftAnchor && !threadAnchors.includes(draftAnchor) ? draftAnchor : null;
   const allAnchors = useMemo(() => (unposted ? [...threadAnchors, unposted] : threadAnchors), [threadAnchors, unposted]);
   const patchPlacements = useMemo(() => placePatches(raw, allAnchors), [raw, allAnchors]);
-  const draftQuote = draft?.expanded ? draft.quote : savedDraft?.quote;
-  // The selected words each patch thread was written on, kept by the host beside the patch; they only sharpen the highlight.
-  const patchQuotes = useMemo(
-    () => new Map<string, TextQuote>([...getRoots(open).flatMap((c) => (c.anchor && c.quote ? [[c.anchor, c.quote] as const] : [])), ...(unposted && draftQuote ? [[unposted, draftQuote] as const] : [])]),
-    [open, unposted, draftQuote],
-  );
-  const patchRanges = useMemo(() => patchLineRanges(patchPlacements, patchQuotes), [patchPlacements, patchQuotes]);
+  const draftSource = draft?.expanded ? draft : savedDraft;
+  const draftQuote = draftSource?.quote;
+  const draftCell = draftSource?.cell;
+  // The selected words and table cell each patch thread was written on, kept by the host beside the patch; they only sharpen the highlight.
+  const extrasByAnchor = useMemo(() => {
+    const extras = new Map<string, PatchExtras>();
+    for (const c of getRoots(open)) if (c.anchor && (c.quote || c.cell)) extras.set(c.anchor, patchExtras(c));
+    if (unposted && (draftQuote || draftCell)) extras.set(unposted, patchExtras({ quote: draftQuote, cell: draftCell }));
+    return extras;
+  }, [open, unposted, draftQuote, draftCell]);
+  const patchRanges = useMemo(() => patchLineRanges(patchPlacements, extrasByAnchor), [patchPlacements, extrasByAnchor]);
   const elementStates = useElementDrift({ markdown, anchors: allAnchors });
   // One drift state per thread anchor: patch lines outdated or ambiguous, an element moved or gone.
   const driftStates = useMemo(
@@ -566,13 +588,13 @@ export function FileReview({
           const state = driftStates.get(anchor);
           return {
             anchor,
-            label: anchorLabel({ anchor, found: state !== "orphaned", placements: patchPlacements, raw }),
+            label: anchorLabel({ anchor, found: state !== "orphaned", placements: patchPlacements, extras: extrasByAnchor, raw }),
             ...(state ? { drift: state } : {}),
             note: state ? driftNote(state, isPatchAnchor(anchor) ? "lines" : "element") : null,
             thread: selectAnchorThreads(open, anchor),
           };
         }),
-    [threadAnchors, fileLevel, driftStates, patchPlacements, raw, open],
+    [threadAnchors, fileLevel, driftStates, patchPlacements, extrasByAnchor, raw, open],
   );
   // A line with several findings shows its most severe one.
   const severity = useMemo(() => {
@@ -778,12 +800,18 @@ export function FileReview({
    * the rendered text so the thread shows in Preview too; in any other file it
    * anchors on the source characters.
    */
-  function locate(surface: Draft["surface"], range: Range): Pick<Draft, "anchor" | "label" | "quote"> | null {
+  function locate(surface: Draft["surface"], range: Range): Pick<Draft, "anchor" | "label" | "quote" | "cell"> | null {
     if (patchMode) {
       const rendered = surface === "preview" ? markdown.current : null;
-      const lines = surface === "preview" ? rendered && previewSelectionLines(range, rendered) : sourceSelectionLines(range);
+      // A selection inside one table cell anchors on that cell's row line, and keeps the cell to highlight it.
+      const inCell = rendered && tableCellOf(range, rendered);
+      const lines = inCell
+        ? { startLine: inCell.line, endLine: inCell.line }
+        : surface === "preview"
+          ? rendered && previewSelectionLines(range, rendered)
+          : sourceSelectionLines(range);
       // A selection in rendered prose also keeps its words, to highlight them precisely; the lines stay authoritative.
-      return lines ? patchDraft({ raw, lines, quote: rendered && captureTextQuote(rendered, range) }) : null;
+      return lines ? patchDraft({ raw, lines, quote: rendered && captureTextQuote(rendered, range), cell: inCell?.cell }) : null;
     }
     if (!prose) {
       const covered = sourceRangeOf(range);
@@ -1069,7 +1097,7 @@ export function FileReview({
         onClose={closeDraft}
         {...(draftActions ? { createActions: draftActions } : {})}
         onCreate={async (input, action) => {
-          await postDraft(anchor, current.quote ? { ...input, quote: current.quote } : input, action);
+          await postDraft(anchor, { ...input, ...patchExtras(current) }, action);
           setDraft(null);
           saveDraft(null);
           setFocused(anchor);
@@ -1319,7 +1347,7 @@ export function FileReview({
                 key={sourceThread.anchor}
                 seamless
                 anchor={sourceThread.anchor}
-                label={anchorLabel({ anchor: sourceThread.anchor, found: true, placements: patchPlacements, raw })}
+                label={anchorLabel({ anchor: sourceThread.anchor, found: true, placements: patchPlacements, extras: extrasByAnchor, raw })}
                 boxes={sourceThread.boxes}
                 containerWidth={sourceWidth}
                 thread={selectAnchorThreads(open, sourceThread.anchor)}
@@ -1434,7 +1462,7 @@ export function FileReview({
               <InlineThread
                 key={inlineAnchor}
                 anchor={inlineAnchor}
-                label={anchorLabel({ anchor: inlineAnchor, found: true, placements: patchPlacements, raw })}
+                label={anchorLabel({ anchor: inlineAnchor, found: true, placements: patchPlacements, extras: extrasByAnchor, raw })}
                 boxes={boxes.get(inlineAnchor) ?? []}
                 containerWidth={width}
                 thread={selectAnchorThreads(open, inlineAnchor)}
@@ -1504,7 +1532,7 @@ export function FileReview({
                     style={sidebarScrolls && align === "line" ? { top: tops.get(anchor) ?? 0 } : undefined}
                   >
                     <div className="truncate px-2 pt-2 text-[11px] text-muted-foreground">
-                      {anchorLabel({ anchor, found: boxes.has(anchor), placements: patchPlacements, raw })}
+                      {anchorLabel({ anchor, found: boxes.has(anchor), placements: patchPlacements, extras: extrasByAnchor, raw })}
                     </div>
                     <CommentThread
                       {...(isFindingAnchor(anchor) ? findingThreads : peopleThreads)}

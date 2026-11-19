@@ -186,7 +186,9 @@ export type GavelCommentsClientOptions = {
 
 export function createGavelCommentsClient(options: GavelCommentsClientOptions) {
   const { scope } = options;
-  const baseUrl = options.baseUrl.replace(/\/+$/, "");
+  let end = options.baseUrl.length;
+  while (end > 0 && options.baseUrl[end - 1] === "/") end -= 1;
+  const baseUrl = options.baseUrl.slice(0, end);
   const fetcher: typeof fetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const path = (suffix: string, query?: Record<string, string>) => {
     const search = query ? new URLSearchParams(query).toString() : "";

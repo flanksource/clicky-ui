@@ -4,6 +4,7 @@ export type {
   AnnotationCapture,
   PatchAnchor,
   RegionAnchor,
+  TableCell,
   TextQuote,
   CommentScreenshotCapture,
   CommentScreenshotUnavailableReason,

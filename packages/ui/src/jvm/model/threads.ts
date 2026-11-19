@@ -157,6 +157,6 @@ export function withViewParam(state: ThreadsViewState, key: keyof ThreadsViewSta
 
 /** A file name for one thread's stack download. */
 export function threadStackFileName(thread: { id: number; name: string }): string {
-  const slug = thread.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const slug = thread.name.toLowerCase().match(/[a-z0-9]+/g)?.join("-");
   return `${slug || "thread"}-${thread.id}.txt`;
 }

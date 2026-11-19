@@ -1,4 +1,4 @@
-import type { CommentScreenshotCapture, TextQuote } from "./annotation-types";
+import type { CommentScreenshotCapture, TableCell, TextQuote } from "./annotation-types";
 import type { CommentVocabulary, CommentVocabularyItem } from "./comment-vocabulary";
 import type { ReactNode } from "react";
 import type { StaticIconComponent } from "../data/Icon";
@@ -199,6 +199,8 @@ export type Comment = {
   anchor?: CommentAnchor | null;
   /** The exact words a patch-anchored (`r:`) root was written on, which the host stores beside the patch; roots only. */
   quote?: TextQuote;
+  /** The table cell a patch-anchored (`r:`) root was written on, stored beside the patch like `quote`; roots only. */
+  cell?: TableCell;
   /** Optional positive/negative review signal; roots only. */
   rating?: CommentRating;
   /** Human decision on an opted-in playground review element; roots only. */
@@ -233,6 +235,8 @@ export type CommentCreateInput = {
    * inside the anchor): it must lie in those lines, and only sharpens the highlight.
    */
   quote?: TextQuote;
+  /** The table cell the selection lies in, stored beside a patch (`r:`) anchor whose one line is its row. */
+  cell?: TableCell;
   rating?: CommentRating;
   reviewDecision?: CommentReviewDecision;
   facets?: Record<string, string>;
@@ -362,6 +366,8 @@ export type CommentConfig = {
    * unset says the host does not know (or does not deliver comments).
    */
   defaultDelivery?: CommentDefaultDelivery | null;
+  /** Optional host-rendered delivery preview for the current root draft. */
+  renderDeliveryPreview?: (draft: { body: string; target?: CommentMention }) => ReactNode;
   /** Status values a checklist item cycles through on click. */
   checklistStatusCycle?: string[];
 };

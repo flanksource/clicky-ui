@@ -100,6 +100,58 @@ describe("measureAnchors for line-range and element anchors", () => {
     });
   });
 
+  describe("a placed r: range on a table row", () => {
+    // Header on line 12, delimiter on 13, body rows on 14 and 15.
+    const ROW_TOP: Record<string, number> = { Name: 120, Alice: 140, Bob: 150 };
+    const CELL_WIDTH = 50;
+    const CHAR_WIDTH = 10;
+    const CELL = { keyColumn: "Name", key: "Bob", column: "Age", row: 1, col: 1 };
+    const BOB_ROW = { top: 150, left: 0, width: CELL_WIDTH + CHAR_WIDTH * "25 years".length, height: 8 };
+
+    beforeEach(() => {
+      markdown.insertAdjacentHTML(
+        "beforeend",
+        `<div data-source-start="12" data-source-end="15"><table>
+          <thead><tr><th>Name</th><th>Age</th></tr></thead>
+          <tbody><tr><td>Alice</td><td>30</td></tr><tr><td>Bob</td><td>25 years</td></tr></tbody>
+        </table></div>`,
+      );
+      // jsdom has no layout: text sits on its row's line, each cell CELL_WIDTH apart, CHAR_WIDTH per character.
+      const textRect = (cell: HTMLTableCellElement, from: number, text: string) => ({
+        top: ROW_TOP[(cell.parentElement as HTMLTableRowElement).cells[0]!.textContent!]!,
+        left: cell.cellIndex * CELL_WIDTH + from * CHAR_WIDTH,
+        width: text.length * CHAR_WIDTH,
+        height: 8,
+      });
+      Range.prototype.getClientRects = function (this: Range) {
+        const start = this.startContainer;
+        if (start instanceof HTMLTableRowElement) return [...start.cells].map((c) => textRect(c, 0, c.textContent!)) as unknown as DOMRectList;
+        const cell = (start instanceof Element ? start : start.parentElement)?.closest("td, th");
+        return (cell ? [textRect(cell as HTMLTableCellElement, start instanceof Text ? this.startOffset : 0, this.toString())] : []) as unknown as DOMRectList;
+      };
+    });
+    const measure = (range: { start: number; end: number; cell?: typeof CELL; quote?: { prefix: string; exact: string; suffix: string } }) =>
+      [...measureAnchors({ origin, markdown, anchors: ["r:row"], mode: "text", patchRanges: new Map([["r:row", range]]) })];
+
+    it("boxes only the row's text when it carries neither a cell nor a quote, not the whole table", () => {
+      expect(measure({ start: 15, end: 15 })).toEqual([["r:row", [BOB_ROW]]]);
+    });
+
+    it("boxes only the cell's text when it carries the cell", () => {
+      expect(measure({ start: 15, end: 15, cell: CELL })).toEqual([["r:row", [{ top: 150, left: CELL_WIDTH, width: 8 * CHAR_WIDTH, height: 8 }]]]);
+    });
+
+    it("boxes the quoted words inside the cell when it carries both", () => {
+      expect(measure({ start: 15, end: 15, cell: CELL, quote: { prefix: "", exact: "years", suffix: "" } })).toEqual([
+        ["r:row", [{ top: 150, left: CELL_WIDTH + 3 * CHAR_WIDTH, width: 5 * CHAR_WIDTH, height: 8 }]],
+      ]);
+    });
+
+    it("boxes the row once the cell is gone from the matched lines", () => {
+      expect(measure({ start: 15, end: 15, cell: { ...CELL, key: "Dave", row: 4 } })).toEqual([["r:row", [BOB_ROW]]]);
+    });
+  });
+
   it("boxes the element an e: anchor's locators find, and leaves out one they cannot find", () => {
     const found = elementAnchor([{ kind: "css", selector: "p:nth-of-type(2)" }]);
     const gone = elementAnchor([{ kind: "css", selector: "#missing" }]);
