@@ -12,15 +12,15 @@ export function createFrameBridge(options: { receive: (value: BridgeEnvelope) =>
   return createBridge({ target: parent, origin, session, direction: "frame", onMessage: options.receive, onError: options.error });
 }
 
-export async function workerRequest(message: unknown, timeoutMs: number): Promise<void> {
+export async function workerRequest<T = void>(message: unknown, timeoutMs: number): Promise<T> {
   const controller = navigator.serviceWorker.controller;
   if (!controller) throw new Error("service worker does not control frame");
-  await new Promise<void>((resolve, reject) => {
+  return new Promise<T>((resolve, reject) => {
     const channel = new MessageChannel();
     const timer = setTimeout(() => { channel.port1.close(); reject(new Error("worker request timed out")); }, timeoutMs);
-    channel.port1.onmessage = (event: MessageEvent<{ ok: boolean; error?: unknown }>) => {
+    channel.port1.onmessage = (event: MessageEvent<{ ok: boolean; error?: unknown; result: T }>) => {
       clearTimeout(timer); channel.port1.close();
-      if (event.data.ok) resolve(); else reject(Object.assign(new Error("worker rejected request"), { pageRuntime: event.data.error }));
+      if (event.data.ok) resolve(event.data.result); else reject(Object.assign(new Error("worker rejected request"), { pageRuntime: event.data.error }));
     };
     controller.postMessage(message, [channel.port2]);
   });

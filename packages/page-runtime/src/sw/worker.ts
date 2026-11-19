@@ -69,7 +69,11 @@ scope.addEventListener("message", (event) => {
       const loaded = await load();
       const exportMessage = value?.message as { type?: unknown } | undefined;
       if (typeof value?.page === "string" && exportMessage?.type === "export-module") await loaded.exportModule(value.page, value.message);
-      else if (typeof value?.page === "string") await loaded.update(value.page, value.message); else await loaded.message(value?.message);
+      else if (typeof value?.page === "string") await loaded.update(value.page, value.message);
+      else {
+        port.postMessage({ ok: true, result: await loaded.message(value?.message) });
+        return;
+      }
       port.postMessage({ ok: true });
     } catch (error) { port.postMessage({ ok: false, error: runtimeError({ error, phase: "resolve", file: new URL(event.source!.url).pathname }) }); }
   })());

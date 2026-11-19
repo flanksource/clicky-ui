@@ -20,6 +20,7 @@ function importConditions(css: string, suffix: string): string {
 }
 
 async function assetUrl(url: string): Promise<string> {
+  if (url.startsWith("data:")) return url;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`HTML export asset ${url}: HTTP ${response.status}`);
   const bytes = new Uint8Array(await response.arrayBuffer());

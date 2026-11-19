@@ -11,6 +11,7 @@ import type { PageAgent } from "./agent/index.ts";
 import { PAGE_AGENT_URL } from "../sw/runtime-module.ts";
 import { createFrameActivity } from "./activity.ts";
 import { mountPage, type PageModule, type PageLayout, type ReactRuntime } from "./mount-page.ts";
+import { frameRenderJobs } from "./render-job.ts";
 
 export type PageStyles = Awaited<ReturnType<typeof preparePageStyles>>;
 
@@ -56,6 +57,7 @@ export async function bootFrame(): Promise<void> {
   const report = (error: unknown, re?: string) => { bridge.send({ type: "error", error: detail(error, phase, config?.page ?? location.pathname) }, re ? { re } : undefined); };
   const activity = createFrameActivity({ send: (message) => bridge.send(message), error: report });
   let controlled = false; let activitySubscribed = false;
+  let renderJobs: ReturnType<typeof frameRenderJobs> | undefined;
   const subscribeActivity = () => {
     if (activitySubscribed) return;
     activitySubscribed = true;
@@ -66,6 +68,12 @@ export async function bootFrame(): Promise<void> {
   window.addEventListener("pagehide", () => { activity.stop(); dispose(); bridge.dispose(); }, { once: true });
   async function receive(envelope: BridgeEnvelope) {
     const m = envelope.message;
+    if (m.type === "prepare-render" || m.type === "render") {
+      if (!renderJobs) throw new Error("render jobs are unavailable in this frame");
+      bridge.send(await renderJobs(envelope), envelope.id ? { re: envelope.id } : undefined);
+      return;
+    }
+    if (renderJobs) throw new Error("interactive messages are unavailable in a render frame");
     if (m.type === "open") {
       phase = "resolve"; await workerRequest({ message: m }, 15000);
       const url = new URL(location.href);
@@ -135,6 +143,12 @@ export async function bootFrame(): Promise<void> {
     }
     if (!await ensureController({ timeoutMs: profile.readinessTimeoutMs })) { bridge.dispose(); return; }
     controlled = true;
+    if (new URL(location.href).searchParams.has("render-job")) {
+      if (!profile.renderJobs) throw new Error("render jobs are disabled in this runtime");
+      renderJobs = frameRenderJobs(config);
+      bridge.send({ type: "status", state: "connecting" });
+      return;
+    }
     if (!config || !new URL(location.href).searchParams.has("runtime-opened")) { bridge.send({ type: "status", state: "connecting" }); return; }
     bridge.send({ type: "status", state: "booting" });
     performance.mark("page-runtime:controlled");
@@ -225,6 +239,7 @@ export async function bootFrame(): Promise<void> {
       phase = "readiness";
       await waitForReadiness({ root: pageRoot, mounted: pageStyles.ready(), ...(pageModule.ready ? { hook: pageModule.ready } : {}), timeoutMs: config!.profile.readinessTimeoutMs, status: () => undefined });
       await pageStyles.ready();
+      activity.schedule();
     };
     unmount = mountedPage.unmount;
     latestData = pageData;

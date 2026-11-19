@@ -5,7 +5,7 @@ import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
 import { remarkAlert } from "remark-github-blockquote-alert";
 import type { PageLock } from "../schema.ts";
-import { compileSource, DEV_SHIM_URL, type MdxPlugins } from "./compile.ts";
+import { compileMdx, compileSource, DEV_SHIM_URL, type MdxPlugins } from "./compile.ts";
 import { CANONICAL_CANDIDATES, defineNodeEnv, specifierKind, stylesheetModule, transformModule } from "./module-transform.ts";
 import { resolveSpecifier } from "./composition.ts";
 import { RuntimeFailure } from "./errors.ts";
@@ -13,7 +13,7 @@ import { sourceCandidates } from "./candidates.ts";
 import type { WorkerActivity } from "../activity-schema.ts";
 import { RUNTIME_MODULES } from "./runtime-module.ts";
 
-export type CompilerOptions = { path: string; code: string; lock: PageLock; sources: string[]; plugins: MdxPlugins; activity?: WorkerActivity };
+export type CompilerOptions = { path: string; code: string; lock: PageLock; sources: string[]; plugins: MdxPlugins; remark?: unknown[]; activity?: WorkerActivity; transpile?: (compile: () => Promise<string>) => Promise<string> };
 export const BASE_PLUGINS: MdxPlugins = { remarkFrontmatter, remarkGfm, remarkAlert, rehypeRaw };
 export const moduleUrl = (url: string): string => {
   const parsed = new URL(url, "https://runtime.invalid");
@@ -63,7 +63,7 @@ export async function rewriteImports(options: { code: string; path: string; lock
       const quoted = /^['"`]/.test(code.slice(item.start, item.end));
       const revision = new URL(options.path, "https://runtime.invalid").searchParams.get("revision");
       const revised = new URL(target, "https://runtime.invalid");
-      if (revision && revised.pathname.startsWith("/src/")) revised.searchParams.set("revision", revision);
+      if (revision && (revised.pathname.startsWith("/src/") || (revised.pathname.endsWith(".css") && revised.searchParams.has("module")))) revised.searchParams.set("revision", revision);
       const text = moduleUrl(revised.href);
       code = `${code.slice(0, item.start)}${quoted ? JSON.stringify(text) : text}${code.slice(item.end)}`;
     }
@@ -81,7 +81,11 @@ export async function compilePage(options: CompilerOptions): Promise<{ code: str
   else if (extension === ".css") { const stylesheet = new URL(url); stylesheet.searchParams.delete("module"); code = stylesheetModule(options.code, moduleUrl(stylesheet.href)); }
   else if ([".ts", ".tsx", ".jsx", ".mdx", ".md"].includes(extension)) {
     const started = performance.now();
-    try { code = await compileSource({ path: url.pathname.slice("/src/".length), extension, code: options.code }, { compile, plugins: options.plugins }); }
+    const input = { path: url.pathname.slice("/src/".length), extension, code: options.code };
+    const transpile = () => options.remark && /^\.mdx?$/.test(extension)
+      ? compileMdx(input, compile, options.plugins, options.remark)
+      : compileSource(input, { compile, plugins: options.plugins });
+    try { code = await (options.transpile ? options.transpile(transpile) : transpile()); }
     finally { if (options.activity) options.activity.compileMs += performance.now() - started; }
   } else if ([".js", ".mjs"].includes(extension)) code = options.code;
   else throw new Error(`${options.path}: unsupported source extension ${extension}`);

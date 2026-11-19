@@ -4,10 +4,12 @@ import { readFileSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { rolldown, type Plugin } from "rolldown";
-import { ClosureTracer, createResolver, IMPORT_CONDITIONS, moduleFormat, resolveBrowser } from "./trace.ts";
+import { ClosureTracer, createResolver, IMPORT_CONDITIONS, moduleFormat, packageName, packageOf, resolveBrowser } from "./trace.ts";
 import { dependencyBarrels } from "./dependency-barrels.ts";
 import { commonJsExportNames, type CommonJsExports } from "./commonjs-exports.ts";
 import { optionalDependency } from "./dependency-optional.ts";
+import { bundleWorkerURLs } from "./dependency-workers.ts";
+import { satisfiesVersion } from "../sw/versions.ts";
 
 export interface DependencyRuntimeOptions {
   root: string;
@@ -15,6 +17,8 @@ export interface DependencyRuntimeOptions {
   entries: string[];
   target: "node" | "browser";
   external?: Record<string, string>;
+  externalVersions?: Record<string, string>;
+  resolvedEntries?: Record<string, string>;
   exports?: Record<string, string[]>;
 }
 
@@ -27,20 +31,31 @@ export interface DependencyRuntime {
   styles: string[];
 }
 
-export async function buildDependencyRuntime(options: DependencyRuntimeOptions): Promise<DependencyRuntime> {
+export function buildInstalledDependencyRuntime(options: DependencyRuntimeOptions): Promise<DependencyRuntime> {
+  return buildDependencyRuntime(options, "installed");
+}
+
+export async function buildDependencyRuntime(options: DependencyRuntimeOptions, barrelSource: "published" | "installed" = "published"): Promise<DependencyRuntime> {
   if (!options.entries.length) throw new Error("A dependency runtime requires at least one entry");
   const root = resolve(options.root);
   const entries = [...new Set(options.entries)].sort();
   const inputs: Record<string, string> = {};
+  const trackInput = (path: string, code: string) => { inputs[path] = createHash("sha256").update(code).digest("hex"); };
   const styles = new Set<string>();
   const assets = new Set<string>();
+  const workers = new Map<string, Promise<string>>();
   const resolved = new Map<string, string>();
+  const peersByPackage = new Map<string, Record<string, string>>();
   let commonJs: CommonJsExports = {};
   const browserResolver = createResolver(IMPORT_CONDITIONS);
   const plugin: Plugin = {
     name: "dependency-runtime",
     async buildStart() {
       for (const entry of entries) {
+        if (options.resolvedEntries?.[entry]) {
+          resolved.set(entry, options.resolvedEntries[entry]);
+          continue;
+        }
         const result = await this.resolve(entry, join(root, "package.json"), { skipSelf: true });
         if (!result || result.external) throw new Error(`Cannot resolve runtime entry ${entry} from ${root}`);
         resolved.set(entry, result.id);
@@ -51,10 +66,24 @@ export async function buildDependencyRuntime(options: DependencyRuntimeOptions):
     async resolveId(source, importer, extra) {
       if (source.startsWith("\0external-require:")) return source;
       if (options.external?.[source]) {
-        if (extra.kind !== "require-call") return { id: source, external: true };
-        const original = await this.resolve(source, join(root, "package.json"), { ...extra, skipSelf: true });
-        if (!original) throw new Error(`Cannot resolve shared runtime dependency ${source}`);
-        return `\0external-require:${JSON.stringify({ source, commonJs: moduleFormat(original.id).format === "commonjs" })}`;
+        const version = options.externalVersions?.[packageName(source)];
+        const from = version && importer && !importer.startsWith("\0") ? importer : undefined;
+        const original = version || extra.kind === "require-call" ? await this.resolve(source, from ?? join(root, "package.json"), { ...extra, skipSelf: true }) : undefined;
+        let sharedPeer = false;
+        if (version && from) {
+          const pkg = packageOf(from);
+          if (!peersByPackage.has(pkg.dir)) peersByPackage.set(pkg.dir, JSON.parse(readFileSync(join(pkg.dir, "package.json"), "utf8")).peerDependencies ?? {});
+          const range = peersByPackage.get(pkg.dir)?.[packageName(source)];
+          if (range) {
+            if (!satisfiesVersion(version, range)) throw new Error(`${pkg.name} requires ${packageName(source)}@${range}; the runtime provides ${version}`);
+            sharedPeer = true;
+          }
+        }
+        if (!version || sharedPeer || !original || original.external || packageOf(original.id).version === version) {
+          if (extra.kind !== "require-call") return { id: source, external: true };
+          const commonJs = !original || original.external ? moduleFormat(options.external[source]).module.staticExports.some(item => item.entries.some(entry => entry.exportName.kind === "Default")) : moduleFormat(original.id).format === "commonjs";
+          return `\0external-require:${JSON.stringify({ source, commonJs })}`;
+        }
       }
       if (isBuiltin(source)) {
         if (options.target === "browser") {
@@ -94,21 +123,23 @@ export async function buildDependencyRuntime(options: DependencyRuntimeOptions):
         return { code: "export {};", moduleType: "js" };
       }
       if (!id.startsWith("\0entry:")) return null;
-      const path = resolved.get(id.slice(7));
+      const specifier = id.slice(7, -4);
+      const path = resolved.get(specifier);
       if (!path) throw new Error(`Missing resolved runtime entry ${id}`);
       const names = commonJs[path]?.names;
-      const requested = options.exports?.[id.slice(7)];
+      const requested = options.exports?.[specifier];
       if (!names) {
-        const source = JSON.stringify(id.slice(7));
+        const source = JSON.stringify(options.resolvedEntries?.[specifier] ?? specifier);
         if (requested) return `import { ${requested.map((name, index) => `${JSON.stringify(name)} as e${index}`).join(", ")} } from ${source}; export { ${requested.map((name, index) => `e${index} as ${JSON.stringify(name)}`).join(", ")} };`;
         return `export * from ${source}; ${moduleFormat(path).module.staticExports.some(item => item.entries.some(entry => entry.exportName.kind === "Default" || entry.exportName.name === "default")) ? `export { default } from ${source};` : ""}`;
       }
       const exported = names.filter(name => name !== "default" && name !== "__esModule");
       return [`import value from ${JSON.stringify(path)};`, "export default value;", ...exported.map((name, index) => `const e${index} = value[${JSON.stringify(name)}]; export { e${index} as ${JSON.stringify(name)} };`)].join("\n");
     },
-    transform(code, id) {
-      if (!id.startsWith("\0") && !id.endsWith(".css")) inputs[id] = createHash("sha256").update(code).digest("hex");
+    async transform(code, id) {
+      if (!id.startsWith("\0") && !id.endsWith(".css")) trackInput(id, code);
       if (id.startsWith("\0")) return null;
+      if (options.target === "browser" && code.includes("import.meta.url")) code = await bundleWorkerURLs({ code, id, context: this, workers, trackInput });
       return code.replace(/new URL\(\s*(['"])(\.{1,2}\/[^'"]+)\1\s*,\s*import\.meta\.url\s*\)/g, (_match, _quote: string, reference: string) => {
         const path = resolve(dirname(id), reference);
         const source = readFileSync(path);
@@ -121,8 +152,8 @@ export async function buildDependencyRuntime(options: DependencyRuntimeOptions):
   await rm(options.outDir, { recursive: true, force: true });
   await mkdir(options.outDir, { recursive: true });
   const bundle = await rolldown({
-    input: Object.fromEntries(entries.map((specifier, index) => [`entry-${index}`, `\0entry:${specifier}`])),
-    plugins: [plugin, dependencyBarrels({ target: options.target, root })],
+    input: Object.fromEntries(entries.map((specifier, index) => [`entry-${index}`, `\0entry:${specifier}.mjs`])),
+    plugins: [plugin, dependencyBarrels({ target: options.target, root, barrelSource, external: new Set(Object.keys(options.external ?? {})) })],
     platform: options.target,
     resolve: { conditionNames: [options.target, "import", "default"], mainFields: options.target === "browser" ? ["browser", "module", "main"] : ["module", "main"], aliasFields: options.target === "browser" ? [["browser"]] : [] },
     transform: { define: { "process.env.NODE_ENV": JSON.stringify("development") } },

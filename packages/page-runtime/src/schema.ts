@@ -43,6 +43,16 @@ export type CompilerPlugins = { remark: CompilerPlugin[] };
 
 export type ImportMap ={ imports: Record<string, string>; scopes: Record<string, Record<string, string>> };
 
+export type DocumentSource = {
+  page: string;
+  layout: string;
+  files: Record<string, { text: string } | { base64: string }>;
+  dependencies: Record<string, string>;
+  managed: Record<string, string>;
+  profileUrl?: string;
+  dynamicStyles?: boolean;
+};
+
 /**
  * A library's barrel export index, published as `runtime/barrels.json`: for each entry barrel, the defining module of
  * every named export (`modules[pos]`, or `[pos, importName]` when the name is re-exported under another one).
@@ -55,13 +65,17 @@ export type BarrelIndex = {
 export type DependencyPolicy = "any" | "ask" | "strict";
 export type RuntimePolicy = { dependencies: DependencyPolicy; allow?: string[] };
 
+export type RuntimeExports = Pick<Fragment, "imports" | "scopes" | "remaps" | "integrity"> & { versions: Record<string, string> };
+
 export type RuntimeProfile = {
+  renderJobs?: true;
   runtimeDomain: string;
   embedders: string[];
   packageOrigin: string;
   registry: string;
   managed: Record<string, string>;
   dependencies?: Record<string, string>;
+  runtimeExports?: true;
   /** `any` allows every declared package; `ask` and `strict` allow only the names (or `*` globs) in `allow`. */
   policy: RuntimePolicy;
   /** CommonJS-to-ESM converter for packages without ESM entries; also added to `connect-src`. */
@@ -103,6 +117,8 @@ export type SourceProvider = { url: string; paths: string[] };
 export type HostMessage =
   | AgentHostMessage
   | { type: "open"; page: string; layout?: string; manifest: FolderManifest; lock?: PageLock; files: Record<string, string>; sourceProvider?: SourceProvider; policy?: RuntimePolicy }
+  | { type: "prepare-render"; open: OpenMessage }
+  | { type: "render"; data: JsonValue }
   | { type: "sources"; files: Record<string, string | null>; data?: JsonValue }
   | { type: "reload" }
   | ({ type: "theme" } & Theme)
@@ -117,6 +133,8 @@ export type FrameMessage =
   | { type: "status"; state: "connecting" | "booting" | "mounted" | "fonts" | "images" | "stylesheets" | "diagrams" | "hook" | "quiescence" | "ready" }
   | { type: "error"; error: RuntimeError }
   | { type: "snapshot"; html: string }
+  | { type: "prepared-render"; lock: PageLock; navigate: boolean; runtimeVersion: string }
+  | { type: "rendered"; html: string; modulesMs: number; readinessMs: number; snapshotMs: number }
   /** A page-defined event with a JSON payload, sent through `host.emit` (see `PageHost`). */
   | { type: "emit"; event: string; payload: JsonValue }
   /** The rendered height of the page root in CSS pixels, sent whenever it changes. */

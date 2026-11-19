@@ -5,7 +5,7 @@ import { parseSync } from "rolldown/utils";
 import { ensureDependencyRuntime, type CachedDependencyRuntime } from "./dependency-cache.ts";
 import { moduleFormat } from "./trace.ts";
 
-export function dependencyRuntimePlugin(options: { root: string; cacheDir: string; base: CachedDependencyRuntime }): Plugin {
+export function dependencyRuntimePlugin(options: { root: string; cacheDir: string; base: CachedDependencyRuntime; versions?: Record<string, string> }): Plugin {
   const modules = new Map<string, { path: string; styles: string[] }>();
   const external = Object.fromEntries(Object.entries(options.base.imports).map(([source, path]) => [source, join(options.base.root, path)]));
   const pinned = new Set(Object.values(external));
@@ -40,7 +40,7 @@ export function dependencyRuntimePlugin(options: { root: string; cacheDir: strin
       const names = bindings.get(importer)?.get(source);
       const key = JSON.stringify([source, names ? [...names].sort() : null]);
       if (!modules.has(key)) {
-        const runtime = external[source] ? options.base : await ensureDependencyRuntime({ root: options.root, cacheDir: options.cacheDir, entries: [source], target: options.base.target, external, ...(names?.size ? { exports: { [source]: [...names].sort() } } : {}) });
+        const runtime = external[source] ? options.base : await ensureDependencyRuntime({ root: options.root, cacheDir: options.cacheDir, entries: [source], target: options.base.target, external, ...(options.versions ? { externalVersions: options.versions } : {}), ...(names?.size ? { exports: { [source]: [...names].sort() } } : {}) });
         const path = join(runtime.root, runtime.imports[source]!);
         pinned.add(path);
         modules.set(key, { path, styles: runtime.styles.map(style => join(runtime.root, style)) });

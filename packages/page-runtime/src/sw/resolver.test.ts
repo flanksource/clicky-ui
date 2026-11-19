@@ -71,6 +71,15 @@ describe("resolvePage", () => {
     };
     return { calls, fetcher };
   }
+  it("uses a pinned export catalog for undeclared imports and ignores conflicting project ranges", async () => {
+    const { fetcher, calls } = registryFixture();
+    const target = "@acme/icons@1.0.0/mi.js";
+    const fetchCatalog: typeof fetch = async input => String(input).endsWith("/runtime-exports.json")
+      ? Response.json({ imports: { "@acme/icons/mi": target }, versions: { "@acme/icons": "1.0.0" }, scopes: {}, remaps: {}, integrity: { [target]: `sha384-${"A".repeat(64)}` } })
+      : fetcher(input);
+    const lock = await resolvePage({ page: "report.tsx", profile: { ...PROFILE, runtimeExports: true }, manifest: { dependencies: { "@acme/icons": "^2" } }, fetch: fetchCatalog });
+    expect({ version: lock.versions["@acme/icons"], path: lock.map.imports["@acme/icons/mi"], registryRequests: calls.filter(url => url.includes("%40acme%2Ficons")) }).toEqual({ version: "1.0.0", path: `/npm/${target}`, registryRequests: [] });
+  });
   it('loads additional managed theme runtime fragments into the page lock', async () => {
     const { fetcher } = registryFixture();
     const name = 'example-theme';
