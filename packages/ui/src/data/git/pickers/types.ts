@@ -12,6 +12,8 @@ export interface GitPickerProps<T> {
   load?: GitPickerLoader<T>;
   scope?: string;
   label?: string;
+  /** False keeps `label` for assistive technology only, for a host (a form row) that draws its own label. */
+  showLabel?: boolean;
   help?: string;
   placeholder?: string;
   disabled?: boolean;
