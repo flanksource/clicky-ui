@@ -8,7 +8,8 @@ export function nextReleaseVersion({ current, published }: { current: string; pu
   if (!/^\d+\.\d+\.\d+$/.test(current)) throw new Error(`Invalid stable release version ${current}`);
   for (const version of [current, ...published]) compareVersions(version, version);
   const latest = published.filter(version => /^\d+\.\d+\.\d+$/.test(version)).sort(compareVersions).at(-1);
-  if (!latest) return current;
+  // A manifest ahead of the registry (a deliberate minor/major bump) wins over a patch increment.
+  if (!latest || compareVersions(current, latest) > 0) return current;
   const [major, minor, patch] = latest.split(".").map(Number);
   return `${major}.${minor}.${patch! + 1}`;
 }

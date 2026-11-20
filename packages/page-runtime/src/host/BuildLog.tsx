@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Badge, formatDuration } from "@flanksource/clicky-ui";
+import { Badge } from "@flanksource/clicky-ui/data";
+import { formatDuration } from "@flanksource/clicky-ui/utils";
 import type { BuildLogEntry } from "./build-log.ts";
 
 const elapsed = (ms: number) => `+${(ms / 1000).toFixed(2)}s`;

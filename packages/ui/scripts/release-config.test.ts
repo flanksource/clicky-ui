@@ -17,6 +17,9 @@ test("publishes the compiled builder through the parent repository main release"
   expect(release.jobs.release.strategy.matrix.include).toContainEqual(expect.objectContaining({
     name: "@flanksource/page-runtime-build", directory: "packages/page-runtime", manifest: "builder-package.json", build_package: "@flanksource/page-runtime", build_script: "build:builder", publish_directory: "packages/page-runtime/dist/build",
   }));
+  expect(release.jobs.release.strategy.matrix.include).toContainEqual(expect.objectContaining({
+    name: "@flanksource/page-runtime", directory: "packages/page-runtime", manifest: "package.json", build_package: "@flanksource/page-runtime", build_script: "build", publish_directory: "packages/page-runtime",
+  }));
   const steps = release.jobs.release.steps;
   expect(steps.find(step => step.name === "Publish to npm")?.["working-directory"]).toBe("${{ matrix.publish_directory }}");
   expect(steps.find(step => step.name === "Publish to npm")?.run).toContain("--provenance");

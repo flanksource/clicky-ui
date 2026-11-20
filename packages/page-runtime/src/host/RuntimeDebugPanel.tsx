@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from "react";
-import { Tabs } from "@flanksource/clicky-ui";
+import { Tabs } from "@flanksource/clicky-ui/components";
 import { RuntimeActivity } from "./RuntimeActivity.tsx";
 import { BuildLog } from "./BuildLog.tsx";
 import { buildLog } from "./build-log.ts";
