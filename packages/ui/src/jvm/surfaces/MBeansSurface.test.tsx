@@ -59,7 +59,8 @@ describe("MBeansSurface", () => {
   it("selecting another MBean resets the tab", async () => {
     renderSurface({ allowMutation: true }, { mbean: CACHE_MBEAN.objectName, view: "operations", q: "java.lang:type=Memory" });
     expect(await screen.findByRole("tab", { name: /Operations/ })).toHaveAttribute("aria-selected", "true");
-    fireEvent.click(within(screen.getByRole("treeitem", { name: "java.lang:type=Memory" })).getByText("Memory"));
+    const memory = await screen.findByRole("treeitem", { name: "java.lang:type=Memory" });
+    fireEvent.click(within(memory).getByText("Memory"));
     expect(await screen.findByRole("heading", { name: "java.lang:type=Memory" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Attributes/ })).toHaveAttribute("aria-selected", "true");
   });
