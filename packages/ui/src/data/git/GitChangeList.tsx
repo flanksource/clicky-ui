@@ -1,6 +1,8 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import {
+  UiArrowDown,
+  UiArrowUp,
   UiChevronDown,
   UiChevronRight,
   UiClock,
@@ -14,6 +16,7 @@ import {
   UiRemove,
 } from "../../icons";
 import type { IconComponent } from "../../icons/types";
+import { Button } from "../../components/button";
 import { Checkbox } from "../../components/Checkbox";
 import {
   CodeDiff,
@@ -64,10 +67,14 @@ export type GitDiffPanelProps = {
   lineSelection?: DiffLineSelection;
 };
 
+export type GitCommitSort = "newest" | "oldest";
+
 type GitCommitListBaseProps<T extends GitCommitItem> = {
   commits: T[];
   renderTime?: (iso: string) => ReactNode;
   groupByDate?: boolean;
+  /** Initial order by `committedAt`; the list's sort button flips it. Defaults to newest first. */
+  defaultSort?: GitCommitSort;
   emptyLabel?: string;
   className?: string;
   diffMaxHeightClassName?: string;
@@ -130,6 +137,16 @@ function messageFromError(error: unknown): string {
 
 function isActivationKey(event: KeyboardEvent<HTMLDivElement>): boolean {
   return event.key === "Enter" || event.key === " ";
+}
+
+// Orders by committedAt; commits without a parseable timestamp keep their given
+// order after the dated ones in either direction.
+function sortCommits<T extends GitCommitItem>(commits: T[], sort: GitCommitSort): T[] {
+  const time = (commit: T) => Date.parse(commit.committedAt ?? "");
+  const dated = commits.filter((commit) => !Number.isNaN(time(commit)));
+  const undated = commits.filter((commit) => Number.isNaN(time(commit)));
+  const direction = sort === "newest" ? -1 : 1;
+  return [...dated.sort((a, b) => direction * (time(a) - time(b))), ...undated];
 }
 
 function groupCommits<T extends GitCommitItem>(
@@ -413,6 +430,7 @@ function CommitRow<T extends GitCommitItem>({
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
               <span
+                data-commit-title=""
                 className="min-w-0 truncate font-medium text-foreground"
                 title={commit.title}
               >
@@ -503,13 +521,29 @@ export function GitCommitList<T extends GitCommitItem = GitCommitItem>(
   const {
     commits,
     groupByDate = true,
+    defaultSort = "newest",
     emptyLabel = "No commits found",
     className,
     selectedShas,
   } = props;
+  const [sort, setSort] = useState<GitCommitSort>(defaultSort);
   const groups = useMemo(
-    () => groupCommits(commits, groupByDate),
-    [commits, groupByDate],
+    () => groupCommits(sortCommits(commits, sort), groupByDate),
+    [commits, groupByDate, sort],
+  );
+  const sortLabel = `Sort commits: ${sort} first`;
+  const sortButton = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      aria-label={sortLabel}
+      title={`${sortLabel} (click to reverse)`}
+      onClick={() => setSort((current) => (current === "newest" ? "oldest" : "newest"))}
+      className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+    >
+      {sort === "newest" ? <UiArrowDown className="size-3.5" /> : <UiArrowUp className="size-3.5" />}
+    </Button>
   );
   const slots: CommitRowSlots<T> = {
     loadDiff: props.loadDiff,
@@ -535,14 +569,21 @@ export function GitCommitList<T extends GitCommitItem = GitCommitItem>(
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-md border border-border",
+        "relative overflow-hidden rounded-md border border-border",
         className,
       )}
     >
+      {/* The button stays outside the date sections: reversing the order changes
+          which section is first, and a button inside it would remount and lose focus. */}
+      {groupByDate ? (
+        <div className="absolute right-2 top-1 z-[1]">{sortButton}</div>
+      ) : (
+        <div className="flex justify-end border-b border-border bg-muted/60 px-2 py-0.5">{sortButton}</div>
+      )}
       {groups.map((group) => (
         <section key={group.key} aria-label={group.label || "Commits"}>
           {group.label && (
-            <div className="border-b border-border bg-muted/60 px-3 py-2 text-xs font-semibold text-foreground">
+            <div className="border-b border-border bg-muted/60 px-3 py-2 pr-10 text-xs font-semibold text-foreground">
               {group.label}
             </div>
           )}

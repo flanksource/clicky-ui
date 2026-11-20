@@ -196,6 +196,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "tsx ../page-runtime/scripts/run-package-build.ts",
+    "prepack": "pnpm run build",
     "build:artifacts": "pnpm run build:icons && pnpm run check:public-exports && vite build && node scripts/rewrite-declaration-imports.mjs && vite build --mode cjs && node scripts/build-styles.mjs && pnpm run build:react-grab && pnpm run check:declarations && tsx scripts/build-runtime.ts",
     "build:react-grab": "tsx react-grab/scripts/build.ts",
     "check:react-grab": "tsc -p react-grab/tsconfig.json --noEmit",

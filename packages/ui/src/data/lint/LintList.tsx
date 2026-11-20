@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Icon } from "../Icon";
 import { cn } from "../../lib/utils";
-import { UiChevronRight, UiFileText } from "../../icons";
+import { UiChevronRight } from "../../icons";
 import { useProblemExpansion } from "../diagnostics/use-problem-expansion";
 import { ProblemActions } from "../diagnostics/ProblemActions";
 import { LintSeverityIcon, ToolIcon } from "../test-runner/MarkIcons";
@@ -19,6 +19,17 @@ function position(flat: FlatViolation): string {
   return column ? `:${line}:${column}` : `:${line}`;
 }
 
+/** A file path with its folders muted, so the filename stands out. */
+function FilePath({ file }: { file: string }) {
+  const slash = file.lastIndexOf("/") + 1;
+  return (
+    <>
+      {slash > 0 && <span className="text-muted-foreground">{file.slice(0, slash)}</span>}
+      <span className="text-blue-600 dark:text-blue-400">{file.slice(slash)}</span>
+    </>
+  );
+}
+
 export type LintListProps = HostActionProps & {
   results: readonly LinterResult[];
   filters: LintFilters;
@@ -27,8 +38,9 @@ export type LintListProps = HostActionProps & {
 
 /**
  * The violations the filters keep, rendered like `gavel lint` on a terminal:
- * each linter with its count, its files beneath, and one `:line:col message (rule)`
- * line per violation. Clicking a violation opens its detail beneath it.
+ * each linter with its count, then one `dir/file:line:col (rule)` line per
+ * violation (folders muted) with its message beneath. Clicking a violation opens
+ * its detail beneath it.
  */
 export function LintList({ results, filters, className, ...host }: LintListProps) {
   const allKeys = useMemo(
@@ -54,16 +66,10 @@ export function LintList({ results, filters, className, ...host }: LintListProps
               ({group.count} violation{group.count === 1 ? "" : "s"})
             </span>
           </div>
-          <ul className="ml-2 border-l border-border pl-3">
+          <ul>
             {group.files.map(({ file, violations }) => (
               <li key={file} className="mt-0.5" data-lint-list-file={file}>
-                {file !== NO_FILE && (
-                  <div className="flex min-w-0 items-center gap-1 text-blue-600 dark:text-blue-400">
-                    <Icon icon={UiFileText} className="shrink-0" />
-                    <span className="truncate" title={file}>{file}</span>
-                  </div>
-                )}
-                <ul className={cn(file !== NO_FILE && "ml-4")}>
+                <ul>
                   {violations.map(({ id, flat }) => {
                     const open = expanded.includes(id);
                     return (
@@ -74,18 +80,21 @@ export function LintList({ results, filters, className, ...host }: LintListProps
                             aria-expanded={open}
                             data-lint-line=""
                             onClick={() => toggle(id)}
-                            className="flex min-w-0 flex-1 items-start gap-1.5 py-0.5 text-left"
+                            className="min-w-0 flex-1 py-0.5 text-left"
                           >
-                            <Icon
-                              icon={UiChevronRight}
-                              className={cn("mt-0.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
-                            />
-                            <LintSeverityIcon severity={severityOf(flat.v)} className="mt-0.5 shrink-0" />
-                            <span className="min-w-0 break-words">
-                              <span className="text-muted-foreground">{position(flat)}</span>{" "}
-                              <span className="text-foreground">{flat.v.message ?? ""}</span>
-                              {flat.v.rule?.method && <span className="text-muted-foreground"> ({flat.v.rule.method})</span>}
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <Icon
+                                icon={UiChevronRight}
+                                className={cn("shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
+                              />
+                              <LintSeverityIcon severity={severityOf(flat.v)} className="shrink-0" />
+                              <span className="min-w-0 truncate" title={file === NO_FILE ? undefined : `${file}${position(flat)}`} data-lint-location="">
+                                {file !== NO_FILE && <FilePath file={file} />}
+                                <span className="text-muted-foreground">{position(flat)}</span>
+                                {flat.v.rule?.method && <span className="text-muted-foreground"> ({flat.v.rule.method})</span>}
+                              </span>
                             </span>
+                            <span className="block break-words pl-[18px] text-foreground" data-lint-message="">{flat.v.message ?? ""}</span>
                           </button>
                           <div className="-my-1 opacity-0 focus-within:opacity-100 group-hover:opacity-100">
                             <ProblemActions
@@ -94,7 +103,7 @@ export function LintList({ results, filters, className, ...host }: LintListProps
                           </div>
                         </div>
                         {open && (
-                          <div className="mb-1 ml-5 font-sans">
+                          <div className="mb-1 ml-[18px] font-sans">
                             <ViolationDetail
                               violation={flat.v}
                               linter={flat.linter}
