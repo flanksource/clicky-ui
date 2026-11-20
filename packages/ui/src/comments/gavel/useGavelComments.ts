@@ -1,5 +1,5 @@
 import { randomUUID } from "../../lib/random-uuid";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CommentAuthor, CommentReplyInput } from "../comment-types";
 import type { GitDiffPayload } from "../../data/git/types";
 import type { CreateCommentRequest, GavelCommentsClient, ListFilter } from "./client";
@@ -99,11 +99,13 @@ export function useGavelComments(options: GavelCommentsOptions): GavelComments {
   const [error, setError] = useState<string | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
   const latest = useRef(stored);
-  latest.current = stored;
   const filterRef = useRef({ filter, filterKey });
-  filterRef.current = { filter, filterKey };
   const configured = useRef(options);
-  configured.current = options;
+  useLayoutEffect(() => {
+    latest.current = stored;
+    filterRef.current = { filter, filterKey };
+    configured.current = options;
+  }, [stored, filter, filterKey, options]);
   const posting = useRef(0);
   const mutationVersion = useRef(0);
   const generation = useRef(0);

@@ -63,7 +63,6 @@ export function PromptBanner({
     ...(showSummary ? {} : { state: "pending" }),
   });
   const [active, setActive] = useState<PromptSnapshot | null>(null);
-  const [comment, setComment] = useState("");
   const [resolving, setResolving] = useState<PromptInlineDecision | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,6 +72,10 @@ export function PromptBanner({
     () => (inlineActions === "auto" && activePrompt ? analyzePromptInlineActions(activePrompt) : null),
     [activePrompt, inlineActions],
   );
+  const promptKey = JSON.stringify([basePath, activePrompt?.id, inlineSpec?.commentField]);
+  const [draft, setDraft] = useState<{ promptKey: string; comment?: string }>({ promptKey });
+  if (draft.promptKey !== promptKey) setDraft({ promptKey });
+  const comment = draft.comment ?? (activePrompt ? initialPromptComment(activePrompt, inlineSpec) : "");
   const summary = useMemo(() => summarizePrompts(prompts), [prompts]);
   const recent = useMemo(() => orderPrompts(prompts).slice(0, Math.max(0, historyLimit)), [prompts, historyLimit]);
 
@@ -84,10 +87,9 @@ export function PromptBanner({
   }, [autoOpen, next?.id, active]);
 
   useEffect(() => {
-    setComment(activePrompt ? initialPromptComment(activePrompt, inlineSpec) : "");
     setError(null);
     setResolving(null);
-  }, [activePrompt?.id, inlineSpec]);
+  }, [promptKey]);
 
   if (showSummary ? prompts.length === 0 : !next) return null;
   const headline =
@@ -147,7 +149,7 @@ export function PromptBanner({
                       className="min-h-16 w-full resize-y rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-placeholder focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       placeholder="Add a short note"
                       value={comment}
-                      onChange={(event) => setComment(event.target.value)}
+                      onChange={(event) => setDraft({ promptKey, comment: event.target.value })}
                     />
                   </label>
                 ) : null}

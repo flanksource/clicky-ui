@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "./button";
 import { InputField } from "./InputField";
 import { Modal } from "../overlay/Modal";
@@ -44,7 +44,7 @@ export function WorkspaceAccessDialog({ client, initialPath = "", highlightedPat
   const refreshRevision = useRef(0);
   const keepAccess = useRef<HTMLButtonElement>(null);
   const changed = useRef(onChanged);
-  changed.current = onChanged;
+  useLayoutEffect(() => { changed.current = onChanged; }, [onChanged]);
 
   const refresh = useCallback(async () => {
     const revision = ++refreshRevision.current;

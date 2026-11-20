@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PromptSnapshot } from "../hooks/use-prompts";
 import {
@@ -135,11 +135,12 @@ describe("PromptBanner", () => {
   it("posts inline approval values with a comment", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => "" });
     vi.stubGlobal("fetch", fetchMock);
-    stubPromptStream([approvalPrompt]);
+    const publish = stubPromptStream([approvalPrompt]);
 
     render(<PromptBanner basePath="/api/todos" />);
 
     fireEvent.change(await screen.findByLabelText("Reason"), { target: { value: "Approved after smoke tests" } });
+    act(() => publish([approvalPrompt]));
     fireEvent.click(screen.getByRole("button", { name: /Approve/ }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
@@ -162,6 +163,16 @@ describe("PromptBanner", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const [, init] = fetchMock.mock.calls[0];
     expect(JSON.parse(init.body)).toEqual({ values: { choice: "1" } });
+  });
+
+  it("uses the next prompt's reason when the pending prompt changes", async () => {
+    const publish = stubPromptStream([approvalPrompt]);
+    render(<PromptBanner basePath="/api/todos" />);
+
+    fireEvent.change(await screen.findByLabelText("Reason"), { target: { value: "Draft for the first prompt" } });
+    act(() => publish([{ ...approvalPrompt, id: "p-next", value: { reason: "Next change window" } }]));
+
+    expect(screen.getByLabelText("Reason")).toHaveValue("Next change window");
   });
 
   it("falls back to the full dialog for unsupported prompt schemas", async () => {
@@ -211,11 +222,13 @@ describe("PromptBanner", () => {
 });
 
 function stubPromptStream(prompts: PromptSnapshot[]) {
+  let publish: ((snapshots: PromptSnapshot[]) => void) | undefined;
   class FakeEventSource {
     private listeners: Record<string, ((event: MessageEvent) => void)[]> = {};
 
     constructor() {
-      setTimeout(() => this.emit("prompts", prompts), 0);
+      publish = (snapshots) => this.publish(snapshots);
+      setTimeout(() => this.publish(prompts), 0);
     }
 
     addEventListener(type: string, callback: (event: MessageEvent) => void) {
@@ -224,12 +237,16 @@ function stubPromptStream(prompts: PromptSnapshot[]) {
 
     close() {}
 
-    private emit(type: string, data: unknown) {
-      for (const callback of this.listeners[type] ?? []) {
-        callback(new MessageEvent(type, { data: JSON.stringify(data) }));
+    publish(data: PromptSnapshot[]) {
+      for (const callback of this.listeners.prompts ?? []) {
+        callback(new MessageEvent("prompts", { data: JSON.stringify(data) }));
       }
     }
   }
 
   vi.stubGlobal("EventSource", FakeEventSource);
+  return (snapshots: PromptSnapshot[]) => {
+    if (!publish) throw new Error("Prompt stream has not opened");
+    publish(snapshots);
+  };
 }
