@@ -117,6 +117,28 @@ test.each([
   expect((await import(pathToFileURL(join(process.cwd(), root, "compiled", runtime.imports["example-lib"]!)).href)).value).toBe("selected export");
 });
 
+test("indexes a library's dependencies from the install, not from the versions its published index recorded", async () => {
+  const root = await fixture();
+  const library = join(root, "node_modules/example-lib");
+  const dependency = join(root, "node_modules/shared-dep");
+  await mkdir(dependency, { recursive: true });
+  await writeFile(join(library, "package.json"), JSON.stringify({ name: "example-lib", version: "1.0.0", type: "module", sideEffects: false, main: "./browser.js" }));
+  await mkdir(join(library, "dist/runtime"), { recursive: true });
+  // Published from a checkout where shared-dep re-exported from leaf@1.0.0; this install has neither that leaf nor that layout.
+  await writeFile(join(library, "dist/runtime/barrels.json"), JSON.stringify({
+    modules: ["leaf@1.0.0/index.js", "example-lib@1.0.0/leaf.js"],
+    barrels: { "shared-dep@2.0.0/index.js": { value: 0 }, "example-lib@1.0.0/browser.js": { value: 0, local: 1 } },
+  }));
+  await writeFile(join(library, "leaf.js"), 'export const local = "own module";');
+  await writeFile(join(library, "browser.js"), 'export { value } from "shared-dep"; export { local } from "./leaf.js";');
+  await writeFile(join(dependency, "package.json"), JSON.stringify({ name: "shared-dep", version: "2.0.0", type: "module", sideEffects: false, main: "./index.js" }));
+  await writeFile(join(dependency, "index.js"), 'export { value } from "./value.js";');
+  await writeFile(join(dependency, "value.js"), 'export const value = "installed dependency";');
+  const outDir = join(root, "compiled");
+  const runtime = await buildDependencyRuntime({ root, outDir, entries: ["example-lib"], target: "node", exports: { "example-lib": ["value", "local"] } });
+  expect({ ...(await import(pathToFileURL(resolve(outDir, runtime.imports["example-lib"]!)).href)) }).toEqual({ value: "installed dependency", local: "own module" });
+});
+
 test("keeps side effects when deriving an unpublished barrel index", async () => {
   const root = await fixture();
   const library = join(root, "node_modules/example-lib");
