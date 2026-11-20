@@ -88,16 +88,8 @@ export function SessionTranscript({
           const badge = event.turnId
             ? turnBadgeById.get(event.turnId)
             : undefined;
-          return badge ? (
-            <TranscriptTurnBadge badge={badge} placement="message" />
-          ) : null;
+          return badge ? <TranscriptTurnBadge badge={badge} /> : null;
         }}
-        headerActions={
-          <>
-            {viewerProps?.headerActions}
-            <TurnBadgeLegend badges={turnBadges} />
-          </>
-        }
       />
     </div>
   );
@@ -118,33 +110,14 @@ function buildTurnBadges(
   });
 }
 
-function TurnBadgeLegend({ badges }: { badges: TurnBadge[] }) {
-  return (
-    <div className="flex max-w-full flex-wrap gap-1" aria-label="Turn colors">
-      {badges.map((badge) => (
-        <TranscriptTurnBadge key={badge.id} badge={badge} placement="legend" />
-      ))}
-    </div>
-  );
-}
-
-function TranscriptTurnBadge({
-  badge,
-  placement,
-}: {
-  badge: TurnBadge;
-  placement: "legend" | "message";
-}) {
+function TranscriptTurnBadge({ badge }: { badge: TurnBadge }) {
   return (
     <span
-      data-testid={
-        placement === "legend" ? "transcript-turn-badge" : "message-turn-badge"
-      }
+      data-testid="message-turn-badge"
       data-turn-color={badge.color}
       title={`Turn ${badge.id}`}
       className={cn(
-        "inline-flex shrink-0 rounded border px-1 py-px font-mono text-[9px] font-semibold leading-none",
-        placement === "message" && "mt-1",
+        "mt-1 inline-flex shrink-0 rounded border px-1 py-px font-mono text-[9px] font-semibold leading-none",
         badge.className
       )}
     >

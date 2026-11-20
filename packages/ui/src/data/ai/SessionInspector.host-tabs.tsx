@@ -3,13 +3,26 @@ import type { StaticIconComponent } from "../Icon";
 import type { CompactSessionTab } from "./SessionInspector.compact";
 import { isSessionInspectorTab } from "./SessionInspector.tabs.model";
 
-/** A host-owned tab in the compact toolbar, beside the inspector's own tabs,
+/** A host-owned tab in the compact toolbar, right after the transcript tab,
  *  so a host shows its views (e.g. a branch's changes) without a second tab bar. */
 export interface SessionInspectorHostTab {
   id: string;
   label: ReactNode;
   icon: StaticIconComponent;
   content: ReactNode;
+}
+
+/** The compact toolbar's tabs with the host's views placed right after the
+ *  transcript, so a host view sits beside the conversation it accompanies. */
+export function withHostTabs(
+  inspectorTabs: readonly CompactSessionTab[],
+  hostItems: readonly CompactSessionTab[],
+): CompactSessionTab[] {
+  const at = inspectorTabs.findIndex((tab) => tab.id === "transcript") + 1;
+  if (at === 0) {
+    throw new Error("SessionInspector compact tabs have no transcript tab to place host tabs after");
+  }
+  return [...inspectorTabs.slice(0, at), ...hostItems, ...inspectorTabs.slice(at)];
 }
 
 export function useHostTabs(
