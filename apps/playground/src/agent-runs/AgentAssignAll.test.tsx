@@ -56,10 +56,10 @@ describe("the merged session list", () => {
     render(host({ comments: [thread("a")] }));
     openMenu();
 
-    const ended = await screen.findByRole("button", { name: `Inspect session ${ENDED.id}` });
+    const ended = await screen.findByRole("button", { name: `Use session ${ENDED.title}` });
 
     expect(ended.textContent).toContain("resumes");
-    expect(screen.getByRole("button", { name: `Inspect session ${LIVE.id}` }).textContent).not.toContain("resumes");
+    expect(screen.getByRole("button", { name: `Use session ${LIVE.title}` }).textContent).not.toContain("resumes");
     expect(screen.getByRole("button", { name: "Agent" }).textContent).toContain("1");
   });
 

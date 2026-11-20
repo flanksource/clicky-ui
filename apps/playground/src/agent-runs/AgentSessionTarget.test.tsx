@@ -1,7 +1,9 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentRunsProvider, useAgentRuns } from "./AgentRunsProvider";
 import { AgentSessionButton } from "./AgentSessionButton";
+import { AgentTargetPicker } from "./AgentTargetPicker";
+import { RunningSessionBars } from "./RunningSessionBars";
 import { fetchAgentSessions, fetchCaptainSessions, setPageAutoRun, updateAgentSessionSettings, type AgentSessionsView, type AgentTarget } from "./agent-runs-api";
 import { readPageTarget, rememberPageTarget } from "./page-targets";
 
@@ -35,6 +37,12 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); vi.restoreAllMocks(); localStor
 
 function SessionControls({ page, runAgent }: { page?: string; runAgent: () => Promise<void> }) {
   return <AgentRunsProvider {...(page ? { page } : {})} runAgent={runAgent}><AgentSessionButton /></AgentRunsProvider>;
+}
+const openAgentMenu = () => fireEvent.click(screen.getByRole("button", { name: "Agent" }));
+async function enabledSessionRow(title: string) {
+  const row = await screen.findByRole("button", { name: `Use session ${title}` });
+  await waitFor(() => expect(row.hasAttribute("disabled")).toBe(false));
+  return row;
 }
 function FailedThread() {
   return <>{useAgentRuns().renderRunDetails({ id: "failed", page: "other", body: "Fix toolbar", author: null, createdAt: "2026-11-03", agentRun: { requestedAt: "2026-11-03", state: "error", error: "Delivery failed" } } as import("@flanksource/clicky-ui").Comment & { page: string })}</>;
@@ -121,29 +129,33 @@ describe("page agent target controls", () => {
     vi.mocked(fetchCaptainSessions).mockResolvedValue([{ ...FIRST, captainId: managed.sessionId }]);
     render(<SessionControls runAgent={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Agent" }));
-    await screen.findByRole("button", { name: `Inspect session ${FIRST.id}` });
-    expect(screen.getAllByRole("button", { name: /^Inspect session / })).toHaveLength(1);
-    expect(screen.queryByRole("button", { name: "Inspect session ended" })).toBeNull();
+    await screen.findByRole("button", { name: `Use session ${FIRST.title}` });
+    expect(screen.getAllByRole("button", { name: /^Use session / })).toHaveLength(1);
   });
-  it("lists active sessions in the Agent menu and opens the clicked session", async () => {
-    render(<SessionControls runAgent={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Agent" }));
-    await screen.findByRole("button", { name: `Inspect session ${FIRST.id}` });
-    expect(screen.getByRole("button", { name: `Inspect session ${SECOND.id}` })).toBeTruthy();
+  it("lists active sessions in the Agent menu and points the page at the clicked one without sending", async () => {
+    const runAgent = vi.fn();
+    render(<SessionControls page="welcome" runAgent={runAgent} />);
+    openAgentMenu();
+    const row = await enabledSessionRow(FIRST.title);
+    expect(screen.getByRole("button", { name: `Use session ${SECOND.title}` })).toBeTruthy();
     expect(screen.getByRole("radiogroup", { name: "Session grouping" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Choose playground model" })).toBeTruthy();
-    expect(screen.queryByRole("dialog", { name: "Agent sessions" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: `Inspect session ${FIRST.id}` }));
-    await screen.findByRole("dialog", { name: "Agent session" });
-    expect(screen.getByText(FIRST.id)).toBeTruthy();
-    expect(screen.queryByRole("radiogroup", { name: "Session grouping" })).toBeNull();
+    fireEvent.click(row);
+    await waitFor(() => expect(readPageTarget("welcome")).toEqual(FIRST_TARGET));
+    await waitFor(() => expect(screen.queryByRole("radiogroup", { name: "Session grouping" })).toBeNull());
+    expect(runAgent).not.toHaveBeenCalled();
+  });
+  it("inspects the page's session from its running-session bar", async () => {
+    rememberPageTarget("welcome", FIRST_TARGET);
+    render(<AgentRunsProvider page="welcome" runAgent={vi.fn()}><RunningSessionBars page="welcome" /></AgentRunsProvider>);
+    fireEvent.click(await screen.findByRole("button", { name: `Inspect session ${FIRST.id}` }));
+    const dialog = await screen.findByRole("dialog", { name: "Agent session" });
+    expect(within(dialog).getByText(FIRST.id)).toBeTruthy();
   });
   it("combines project and agent filters while retaining creation and the default target", async () => {
     const project = "/work/example";
     vi.mocked(fetchCaptainSessions).mockResolvedValue([{ ...FIRST, cwd: project }, { ...SECOND, cwd: "/work/other" }]);
-    render(<SessionControls page="welcome" runAgent={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Agent" }));
-    fireEvent.click(screen.getByRole("button", { name: "All sessions…" }));
+    render(<AgentRunsProvider page="welcome" runAgent={vi.fn()}><AgentTargetPicker /></AgentRunsProvider>);
     const picker = await screen.findByRole("combobox", { name: "Send comments to" });
     await waitFor(() => expect(picker.hasAttribute("disabled")).toBe(false));
     fireEvent.click(picker);
@@ -159,20 +171,14 @@ describe("page agent target controls", () => {
   it("changes a page's Captain session and returns it to the playground agent without sending", async () => {
     const runAgent = vi.fn();
     render(<SessionControls page="welcome" runAgent={runAgent} />);
-    fireEvent.click(screen.getByRole("button", { name: "Agent" }));
-    fireEvent.click(screen.getByRole("button", { name: "All sessions…" }));
-    const picker = await screen.findByRole("combobox", { name: "Send comments to" });
-    await waitFor(() => expect(picker.hasAttribute("disabled")).toBe(false));
-    fireEvent.click(picker);
-    fireEvent.mouseDown(await screen.findByRole("option", { name: /Review changes/ }));
+    openAgentMenu();
+    fireEvent.click(await enabledSessionRow(FIRST.title));
     await waitFor(() => expect(readPageTarget("welcome")).toEqual(FIRST_TARGET));
-    await waitFor(() => expect(picker.hasAttribute("disabled")).toBe(false));
-    fireEvent.click(picker);
-    fireEvent.mouseDown(await screen.findByRole("option", { name: /Fix layout/ }));
+    openAgentMenu();
+    fireEvent.click(await enabledSessionRow(SECOND.title));
     await waitFor(() => expect(readPageTarget("welcome")).toEqual(SECOND_TARGET));
-    await waitFor(() => expect(picker.hasAttribute("disabled")).toBe(false));
-    fireEvent.click(picker);
-    fireEvent.mouseDown(await screen.findByRole("option", { name: /Playground agent/ }));
+    openAgentMenu();
+    fireEvent.click(await screen.findByRole("button", { name: "Playground agent" }));
     await waitFor(() => expect(readPageTarget("welcome")).toBeUndefined());
     expect(runAgent).not.toHaveBeenCalled();
     expect(setPageAutoRun).not.toHaveBeenCalled();
@@ -183,32 +189,26 @@ describe("page agent target controls", () => {
   ])("$name", async ({ remembered, expected }) => {
     localStorage.setItem("playground.agent-target", JSON.stringify({ kind: "captain", sessionId: remembered.id, label: "Review changes · codex" }));
     render(<SessionControls page="other" runAgent={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Agent" }));
-    fireEvent.click(screen.getByRole("button", { name: "All sessions…" }));
-    const picker = await screen.findByRole("combobox", { name: "Send comments to" });
-    await waitFor(() => expect(picker.hasAttribute("disabled")).toBe(false));
+    openAgentMenu();
+    await enabledSessionRow(FIRST.title);
     await waitFor(() => expect(readPageTarget("other")).toEqual(expected));
   });
   it("remembers the session chosen for one page in localStorage", async () => {
     render(<SessionControls page="welcome" runAgent={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Agent" }));
-    fireEvent.click(screen.getByRole("button", { name: "All sessions…" }));
-    const picker = await screen.findByRole("combobox", { name: "Send comments to" });
-    await waitFor(() => expect(picker.hasAttribute("disabled")).toBe(false));
-    fireEvent.click(picker);
-    fireEvent.mouseDown(await screen.findByRole("option", { name: /Fix layout/ }));
+    openAgentMenu();
+    fireEvent.click(await enabledSessionRow(SECOND.title));
     await waitFor(() => expect(localStorage.getItem("playground.agent-target")).toBe(JSON.stringify({ kind: "captain", sessionId: SECOND.id, label: "Fix layout · claude" })));
   });
   it("shows the saved target for each page when navigating", async () => {
     rememberPageTarget("welcome", FIRST_TARGET);
     rememberPageTarget("other", SECOND_TARGET);
     const runAgent = vi.fn();
+    const pressed = (title: string) => screen.getByRole("button", { name: `Use session ${title}` }).getAttribute("aria-pressed");
     const view = render(<SessionControls page="welcome" runAgent={runAgent} />);
-    fireEvent.click(screen.getByRole("button", { name: "Agent" }));
-    fireEvent.click(screen.getByRole("button", { name: "All sessions…" }));
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Send comments to" }).textContent).toContain("Review changes · codex"));
+    openAgentMenu();
+    await waitFor(() => expect([pressed(FIRST.title), pressed(SECOND.title)]).toEqual(["true", "false"]));
     view.rerender(<SessionControls page="other" runAgent={runAgent} />);
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Send comments to" }).textContent).toContain("Fix layout · claude"));
+    await waitFor(() => expect([pressed(FIRST.title), pressed(SECOND.title)]).toEqual(["false", "true"]));
     expect(setPageAutoRun).not.toHaveBeenCalled();
   });
   it("does not offer page targeting on the global comments dashboard", async () => {
