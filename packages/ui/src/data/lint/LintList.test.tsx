@@ -20,21 +20,31 @@ function outline(container: HTMLElement) {
     linter.dataset.lintListLinter,
     [...linter.querySelectorAll<HTMLElement>("[data-lint-list-file]")].map((file) => [
       file.dataset.lintListFile,
-      [...file.querySelectorAll("[data-lint-line]")].map((line) => line.textContent),
+      [...file.querySelectorAll("[data-lint-line]")].map((line) => [
+        line.querySelector("[data-lint-location]")?.textContent,
+        line.querySelector("[data-lint-message]")?.textContent,
+      ]),
     ]),
   ]);
 }
 
 describe("LintList", () => {
-  it("prints linter, then sorted files, then violations by line as `:line:col message (rule)`", () => {
+  it("prints linter, then violations by sorted file and line as `file:line:col (rule)` over the message", () => {
     const { container } = render(<LintList results={results} filters={emptyLintFilters()} />);
     expect(outline(container)).toEqual([
       ["golangci-lint", [
-        ["pkg/a.go", [":4 unused variable (unused)", ":30 unchecked error (errcheck)"]],
-        ["pkg/b.go", [":9:2 exported func lacks comment (revive)"]],
+        ["pkg/a.go", [["pkg/a.go:4 (unused)", "unused variable"], ["pkg/a.go:30 (errcheck)", "unchecked error"]]],
+        ["pkg/b.go", [["pkg/b.go:9:2 (revive)", "exported func lacks comment"]]],
       ]],
-      ["eslint", [["ui/app.ts", [":1 no-console (no-console)"]]]],
+      ["eslint", [["ui/app.ts", [["ui/app.ts:1 (no-console)", "no-console"]]]]],
     ]);
+  });
+
+  it("mutes the folders of a violation's path so only the filename stands out", () => {
+    const { container } = render(<LintList results={results} filters={emptyLintFilters()} />);
+    const location = container.querySelector('[data-lint-list-file="pkg/b.go"] [data-lint-location]')!;
+    const [folders, filename] = [...location.querySelectorAll("span")];
+    expect([folders?.textContent, folders?.className, filename?.textContent]).toEqual(["pkg/", "text-muted-foreground", "b.go"]);
   });
 
   it("drops linters the filters exclude and opens a violation's detail beneath it", () => {

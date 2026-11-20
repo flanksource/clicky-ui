@@ -60,6 +60,52 @@ describe("GitCommitList", () => {
     expect(screen.getByText(/Commits on Jul 2, 2026/)).toBeInTheDocument();
   });
 
+  const titles = () => [...document.querySelectorAll("[data-commit-title]")].map((el) => el.textContent);
+  const headers = () => screen.getAllByText(/^Commits on /).map((el) => el.textContent);
+
+  it("lists commits newest first by default, then oldest first after the sort button", () => {
+    render(<GitCommitList commits={COMMITS} />);
+    const sort = screen.getByRole("button", { name: "Sort commits: newest first" });
+    const newest = { titles: titles(), headers: headers() };
+    fireEvent.click(sort);
+    expect({
+      newest,
+      oldest: { titles: titles(), headers: headers() },
+      label: sort.getAttribute("aria-label"),
+    }).toEqual({
+      newest: {
+        titles: ["chore: follow-up", "docs: note pgx version", "fix(deps): update pgx in test module"],
+        headers: ["Commits on Jul 2, 2026", "Commits on Jul 1, 2026"],
+      },
+      oldest: {
+        titles: ["fix(deps): update pgx in test module", "docs: note pgx version", "chore: follow-up"],
+        headers: ["Commits on Jul 1, 2026", "Commits on Jul 2, 2026"],
+      },
+      label: "Sort commits: oldest first",
+    });
+  });
+
+  it("honours defaultSort and keeps the sort button when not grouped by date", () => {
+    render(<GitCommitList commits={COMMITS} groupByDate={false} defaultSort="oldest" />);
+    expect({
+      titles: titles(),
+      button: screen.getByRole("button", { name: "Sort commits: oldest first" }) !== null,
+    }).toEqual({
+      titles: ["fix(deps): update pgx in test module", "docs: note pgx version", "chore: follow-up"],
+      button: true,
+    });
+  });
+
+  it("keeps commits without a timestamp after dated ones, in their given order", () => {
+    const undated = [
+      { sha: "aaaaaaa1", title: "undated one" },
+      { ...COMMITS[0]! },
+      { sha: "aaaaaaa2", title: "undated two" },
+    ];
+    render(<GitCommitList commits={undated} groupByDate={false} />);
+    expect(titles()).toEqual(["fix(deps): update pgx in test module", "undated one", "undated two"]);
+  });
+
   it("loads a commit diff once when a row is expanded", async () => {
     const loadDiff = vi.fn().mockResolvedValue({
       diff: "diff --git a/test/go.mod b/test/go.mod\n@@ -1 +1 @@\n-github.com/jackc/pgx/v5 v5.7.4\n+github.com/jackc/pgx/v5 v5.7.5",
@@ -112,6 +158,7 @@ describe("GitCommitList slots", () => {
       <GitCommitList
         commits={HISTORY}
         groupByDate={false}
+        defaultSort="oldest"
         loadDiff={loadDiff}
         selectedShas={[added.sha]}
         onToggleSelect={onToggleSelect}
@@ -137,6 +184,7 @@ describe("GitCommitList slots", () => {
       <GitCommitList
         commits={HISTORY}
         groupByDate={false}
+        defaultSort="oldest"
         onToggleSelect={() => {}}
         selectBlockReason={(commit) => (commit.change === "added" ? reason : null)}
       />,
@@ -166,6 +214,7 @@ describe("GitCommitList slots", () => {
       <GitCommitList
         commits={HISTORY}
         groupByDate={false}
+        defaultSort="oldest"
         renderBadges={(commit) => <span data-testid="badge">{commit.change}</span>}
         renderSubtitle={(commit) => (commit.change === "renamed" ? <span>moved across plans</span> : null)}
       />,
