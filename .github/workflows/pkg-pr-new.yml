@@ -42,9 +42,9 @@ jobs:
       - name: Build packages
         run: |
           pnpm --filter @flanksource/clicky-ui run build
-          pnpm --filter @flanksource/page-runtime run build:builder
+          pnpm --filter @flanksource/page-runtime run build
 
       # --pnpm resolves catalog: dependencies; --previewVersion keeps preview
       # tarballs from colliding with npm releases of the same version.
       - name: Publish previews
-        run: pnpm exec pkg-pr-new publish --pnpm --previewVersion './packages/ui' './packages/page-runtime/dist/build'
+        run: pnpm exec pkg-pr-new publish --pnpm --previewVersion './packages/ui' './packages/page-runtime' './packages/page-runtime/dist/build'
