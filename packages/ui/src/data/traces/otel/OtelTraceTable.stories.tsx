@@ -13,3 +13,26 @@ function Interactive() {
 }
 export const Default: Story = { render: () => <Interactive /> };
 export const Empty: Story = { args: { spans: [], externalSearch: { value: "", onChange: () => undefined, placeholder: "Search spans" } } };
+
+function OpenTrace() {
+  const [loaded, setLoaded] = useState(3);
+  const [minimum, setMinimum] = useState(">=10ms");
+  const spans = traceExample.spans.slice(0, loaded);
+  const matching = minimum ? new Set(spans.filter(span => span.durationMs >= 10).map(span => span.spanId)) : undefined;
+  return (
+    <OtelTraceTable
+      {...meta.args}
+      selectedTraceId={traceExample.summary.traceId}
+      externalFilters={[{ key: "filter.duration_ms", kind: "text", label: "Span duration", value: minimum, onChange: setMinimum }]}
+      openTrace={{
+        spans,
+        total: traceExample.spans.length,
+        loading: false,
+        ...(loaded < traceExample.spans.length ? { onLoadMore: () => setLoaded(traceExample.spans.length) } : {}),
+        ...(matching ? { matchingSpanIds: matching } : {}),
+      }}
+    />
+  );
+}
+/** The open trace is fetched apart from the listing, paged, and the listing filters pick spans inside it. */
+export const OpenTracePagedAndFiltered: Story = { render: () => <OpenTrace /> };

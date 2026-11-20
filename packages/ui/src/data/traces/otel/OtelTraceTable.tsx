@@ -7,7 +7,13 @@ import type { Span, Summary } from "./api";
 import { spanTraces, traceRoot } from "./span-traces";
 import { DataTable, type DataTableColumn } from "../../DataTable";
 import { ServerTimingBadge } from "../../ServerTimingBadge";
+import { Callout } from "../../Callout";
 import type { ServerTimingMetric } from "../../server-timing";
+import {
+  FilterBar,
+  type FilterBarFilter,
+  type FilterBarSearchProps,
+} from "../../../components/FilterBar";
 
 export type OtelTraceTableProps = Pick<
   DataTableProps<Summary>,
@@ -39,6 +45,28 @@ export type OtelTraceTableProps = Pick<
   renderTraceTitle?: (title: ReactNode) => ReactNode;
   /** The listing response's Server-Timing metrics, shown as a badge in the listing's filter bar. */
   serverTiming?: readonly ServerTimingMetric[];
+  /**
+   * The selected trace fetched on its own, so the listing's span filters and
+   * paging never decide which of its spans exist. Without it the trace is
+   * assembled from `spans`, which can leave it incomplete.
+   */
+  openTrace?: OtelOpenTrace;
+};
+
+export type OtelOpenTrace = {
+  /** The trace's spans loaded so far, across every page fetched. */
+  spans: readonly Span[];
+  /** Spans the source holds for the trace, when it reports a count. */
+  total?: number;
+  loading: boolean;
+  /** Nothing usable loaded; replaces the trace. */
+  error?: string;
+  /** The spans shown are incomplete (e.g. the source stopped paging); shown above the trace. */
+  warning?: string;
+  /** Fetches the next page; set only while the source has more spans. */
+  onLoadMore?: () => void;
+  /** Spans the active filters select, matched by the source; unset when no filter is active. */
+  matchingSpanIds?: ReadonlySet<string>;
 };
 
 export function OtelTraceTable({
@@ -51,6 +79,7 @@ export function OtelTraceTable({
   traceHref,
   renderTraceTitle,
   serverTiming,
+  openTrace,
   ...tableProps
 }: OtelTraceTableProps) {
   const listingRows = listing?.rows;
@@ -81,17 +110,28 @@ export function OtelTraceTable({
       return { error: error instanceof Error ? error.message : String(error) };
     }
   }, [spans, listingRows, selectedTraceId]);
-  const selected = result.traces?.find(
-    (trace) => trace.summary.traceId === selectedTraceId,
-  );
+  const opened = useMemo(() => {
+    if (!openTrace) return undefined;
+    try {
+      return { trace: spanTraces(openTrace.spans).find((trace) => trace.summary.traceId === selectedTraceId) };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  }, [openTrace, selectedTraceId]);
+  const selected = opened
+    ? opened.trace
+    : result.traces?.find((trace) => trace.summary.traceId === selectedTraceId);
+  const openError = openTrace?.error ?? opened?.error;
   return (
     // A flex column so the listing's DataTable fills a bounded parent: its body
     // scrolls and the pagination footer stays on screen.
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-      <p className="shrink-0 text-sm text-muted-foreground">
-        Traces from loaded rows. Filters and paging can leave traces incomplete.
-      </p>
-      {result.error ? (
+      {!(selectedTraceId && openTrace) && (
+        <p className="shrink-0 text-sm text-muted-foreground">
+          Traces from loaded rows. Filters and paging can leave traces incomplete.
+        </p>
+      )}
+      {result.error && !(selectedTraceId && openTrace) ? (
         <p role="alert">Cannot render traces: {result.error}</p>
       ) : selectedTraceId ? (
         <>
@@ -100,17 +140,34 @@ export function OtelTraceTable({
               Back to traces
             </Button>
           )}
-          {selected ? (
+          {openError ? (
+            <p role="alert">Cannot load trace: {openError}</p>
+          ) : selected ? (
             <OtelTraceDetail
               trace={selected}
               {...(selectedSpanId ? { selectedSpanId } : {})}
               {...(renderTraceTitle ? { renderTitle: renderTraceTitle } : {})}
+              {...(openTrace?.matchingSpanIds ? { visibleSpanIds: openTrace.matchingSpanIds } : {})}
+              {...(openTrace
+                ? {
+                    header: (
+                      <OpenTraceHeader
+                        trace={openTrace}
+                        filters={tableProps.externalFilters}
+                        search={tableProps.externalSearch}
+                      />
+                    ),
+                  }
+                : {})}
               onSelectSpan={onSelectSpan}
             />
+          ) : openTrace?.loading ? (
+            <p role="status">Loading trace…</p>
           ) : (
             <p role="status">
-              This trace is not in the loaded rows. Return to traces or adjust
-              the profile filters.
+              {openTrace
+                ? "The source holds no spans for this trace."
+                : "This trace is not in the loaded rows. Return to traces or adjust the profile filters."}
             </p>
           )}
         </>
@@ -140,6 +197,53 @@ export function OtelTraceTable({
           now={Date.now()}
           tableProps={tableProps}
         />
+      )}
+    </div>
+  );
+}
+
+// The listing's filter bar, carried into the open trace: the same controls
+// now pick spans inside it rather than which traces the listing shows.
+function OpenTraceHeader({
+  trace,
+  filters,
+  search,
+}: {
+  trace: OtelOpenTrace;
+  filters: FilterBarFilter[] | undefined;
+  search: FilterBarSearchProps | undefined;
+}) {
+  const total = trace.total ?? trace.spans.length;
+  const progress = [
+    trace.spans.length < total || trace.onLoadMore
+      ? `${trace.spans.length} of ${total} spans loaded`
+      : undefined,
+    trace.matchingSpanIds
+      ? `${trace.matchingSpanIds.size} of ${total} spans match`
+      : undefined,
+  ].filter(Boolean);
+  return (
+    <div className="space-y-2">
+      {trace.warning && (
+        <Callout variant="warning" title="Incomplete trace">
+          <p className="whitespace-pre-line text-sm">{trace.warning}</p>
+        </Callout>
+      )}
+      {(filters?.length || search) && (
+        <FilterBar filters={filters ?? []} {...(search ? { search } : {})} />
+      )}
+      {(progress.length > 0 || trace.loading) && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span role="status">
+            {progress.join(" · ")}
+            {trace.loading ? `${progress.length ? " · " : ""}loading…` : ""}
+          </span>
+          {trace.onLoadMore && !trace.loading && (
+            <Button size="sm" variant="outline" onClick={trace.onLoadMore}>
+              Load more spans
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );

@@ -162,6 +162,7 @@ function DetailHeader(props: DetailHeaderProps) {
   const runner = useTestRunner();
   const outcome = outcomeFor(node);
   const location = node.file ? `${node.file}${node.line ? `:${node.line}` : ""}` : undefined;
+  const frameworkBadge = runner.adapters.resolveFrameworkBadge(node, runner);
   return (
     <div
       className="flex min-w-0 items-center gap-2 border-b border-border px-density-4 py-density-2"
@@ -176,9 +177,18 @@ function DetailHeader(props: DetailHeaderProps) {
         {node.name}
       </h2>
       {node.framework && (
-        <span className="inline-flex shrink-0 items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+        <span
+          className="inline-flex shrink-0 items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+          data-framework-badge=""
+        >
           <ToolIcon tool={toolKeyFor(node)} className="text-sm" />
           {node.framework}
+          {frameworkBadge != null && (
+            <>
+              <span aria-hidden="true">·</span>
+              {frameworkBadge}
+            </>
+          )}
         </span>
       )}
       {node.duration ? (
