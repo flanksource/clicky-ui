@@ -29,7 +29,12 @@ export function dependencyBarrels({ target, root, barrelSource, external }: { ta
       const file = join(pkg.dir, "dist/runtime/barrels.json");
       if (barrelSource === "published" && existsSync(file)) {
         const manifest = JSON.parse(readFileSync(join(pkg.dir, "package.json"), "utf8")) as { sideEffects?: boolean | string[] };
-        index = mergeBarrels([index, guardedBarrels({ index: JSON.parse(readFileSync(file, "utf8")) as BarrelIndex, name: pkg.name, version: pkg.version, ...(manifest.sideEffects === undefined ? {} : { sideEffects: manifest.sideEffects }) })]);
+        const published = guardedBarrels({ index: JSON.parse(readFileSync(file, "utf8")) as BarrelIndex, name: pkg.name, version: pkg.version, ...(manifest.sideEffects === undefined ? {} : { sideEffects: manifest.sideEffects }) });
+        // A published index records its dependencies at the publisher's installed versions; trust only barrels that stay
+        // inside the library and index everything else from this install.
+        const own = `${pkg.name}@${pkg.version}/`;
+        const inside = (at: number | [number, string]) => published.modules[typeof at === "number" ? at : at[0]]?.startsWith(own) === true;
+        index = mergeBarrels([index, { modules: published.modules, barrels: Object.fromEntries(Object.entries(published.barrels).filter(([url, entries]) => url.startsWith(own) && Object.values(entries).every(inside))) }]);
       }
     }
     return `/npm/${key}/${relative(pkg.dir, path).split(sep).join("/")}`;
