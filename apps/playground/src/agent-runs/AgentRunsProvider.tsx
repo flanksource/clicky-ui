@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -159,7 +160,7 @@ export function AgentRunsProvider({
   const pageSelection = usePageAgentTarget({ page, projectScope, data, sessions: listedSessions });
   const threads = (useCommentContextOptional()?.comments ?? []) as readonly Comment[];
   const threadsRef = useRef(threads);
-  threadsRef.current = threads;
+  useLayoutEffect(() => { threadsRef.current = threads; }, [threads]);
   const openThreads = threads.filter(comment => isOpenRoot(comment, page)).length;
 
   const refresh = useCallback(async () => {

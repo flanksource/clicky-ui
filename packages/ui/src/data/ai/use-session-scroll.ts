@@ -121,9 +121,7 @@ export function useSessionScroll(
   const firstKey = options.firstKey;
   const previousTotalRef = useRef({ resetKey, total, firstKey });
   const lastScrollHeightRef = useRef<number | null>(null);
-  const prependedRef = useRef(false);
   const onReachStartRef = useRef(options.onReachStart);
-  onReachStartRef.current = options.onReachStart;
 
   const [visibleCount, setVisibleCount] = useState(windowSize);
   const [following, setFollowing] = useState(true);
@@ -141,7 +139,6 @@ export function useSessionScroll(
       tracked.firstKey !== firstKey &&
       total > tracked.total
     ) {
-      prependedRef.current = true;
       setVisibleCount((count) => count + total - tracked.total);
     }
     setTracked({ resetKey, total, firstKey });
@@ -150,7 +147,6 @@ export function useSessionScroll(
   const startIndex = Math.max(0, total - effectiveCount);
   const hasMore = enabled && startIndex > 0;
   const hasMoreRef = useRef(hasMore);
-  hasMoreRef.current = hasMore;
 
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
@@ -192,7 +188,11 @@ export function useSessionScroll(
   }, [batchSize, total]);
 
   const growOlderRef = useRef(growOlder);
-  growOlderRef.current = growOlder;
+  useLayoutEffect(() => {
+    onReachStartRef.current = options.onReachStart;
+    hasMoreRef.current = hasMore;
+    growOlderRef.current = growOlder;
+  }, [options.onReachStart, hasMore, growOlder]);
 
   // A new session (resetKey change) snaps back to the newest screenful and re-pins.
   useLayoutEffect(() => {
@@ -205,25 +205,19 @@ export function useSessionScroll(
     scrollBottomPendingRef.current = true;
   }, [enabled, resetKey, windowSize]);
 
-  useLayoutEffect(() => {
-    const previous = previousTotalRef.current;
-    previousTotalRef.current = { resetKey, total, firstKey };
-    if (
-      enabled &&
-      previous.resetKey === resetKey &&
-      previous.firstKey === firstKey &&
-      !followingRef.current &&
-      total > previous.total
-    ) {
-      setVisibleCount((count) => count + total - previous.total);
-    }
-  }, [enabled, resetKey, total, firstKey]);
-
   // After each commit, either snap to bottom (pending pin) or preserve the reader's
   // position when older rows were prepended (anchor), then release the load latch.
   useLayoutEffect(() => {
+    const previous = previousTotalRef.current;
+    previousTotalRef.current = { resetKey, total, firstKey };
+    if (!enabled) return;
+    const grew = previous.resetKey === resetKey && total > previous.total;
+    const prepended = grew && previous.firstKey !== firstKey;
+    if (grew && !prepended && !followingRef.current) {
+      setVisibleCount((count) => count + total - previous.total);
+    }
     const el = scrollRef.current;
-    if (!enabled || !el) return;
+    if (!el) return;
     if (scrollStartPendingRef.current) {
       scrollStartPendingRef.current = false;
       el.scrollTop = 0;
@@ -232,7 +226,7 @@ export function useSessionScroll(
       scrollBottomPendingRef.current = false;
       anchorHeightRef.current = null;
       scrollToBottom();
-    } else if (prependedRef.current && lastScrollHeightRef.current != null) {
+    } else if (prepended && lastScrollHeightRef.current != null) {
       el.scrollTop += el.scrollHeight - lastScrollHeightRef.current;
       lastScrollTopRef.current = el.scrollTop;
     } else if (anchorHeightRef.current != null) {
@@ -242,10 +236,9 @@ export function useSessionScroll(
     } else if (followingRef.current) {
       scrollToBottom();
     }
-    prependedRef.current = false;
     lastScrollHeightRef.current = el.scrollHeight;
     loadingOlderRef.current = false;
-  }, [enabled, visibleCount, total, scrollToBottom]);
+  }, [enabled, visibleCount, total, firstKey, resetKey, scrollToBottom]);
 
   // Only the reader pauses following. Scroll events also fire for our own
   // programmatic pins and for layout shifts (rows highlighting, the viewport
@@ -310,14 +303,11 @@ export function useSessionScroll(
       [window, "pointerup", onPointerUp],
       [window, "pointercancel", onPointerUp],
     ];
+    const controller = new AbortController();
     for (const [target, type, listener] of listeners) {
-      target.addEventListener(type, listener, { passive: true });
+      target.addEventListener(type, listener, { passive: true, signal: controller.signal });
     }
-    return () => {
-      for (const [target, type, listener] of listeners) {
-        target.removeEventListener(type, listener);
-      }
-    };
+    return () => controller.abort();
   }, [enabled, scrollEl, bottomThreshold, topThreshold, scrollToBottom]);
 
   // Keep the newest row in view as rows grow (shiki highlighting settles after

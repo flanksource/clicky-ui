@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   useEventSourceFactory,
   type EventSourceFactory,
@@ -436,11 +436,13 @@ export function useRemoteSession(
 ): RemoteSessionView {
   const eventSourceFactory = useEventSourceFactory();
   const factoryRef = useRef(eventSourceFactory);
-  factoryRef.current = eventSourceFactory;
   // A host usually builds the subscription inline, so only its presence — not
   // its identity — restarts the session.
   const feedRef = useRef(feed);
-  feedRef.current = feed;
+  useLayoutEffect(() => {
+    factoryRef.current = eventSourceFactory;
+    feedRef.current = feed;
+  }, [eventSourceFactory, feed]);
   const hasFeed = feed !== undefined;
   const handleRef = useRef<RemoteSessionHandle>(undefined);
   const [snapshot, setSnapshot] = useState<{
@@ -499,7 +501,7 @@ export function useReportLoadState({
   onChange: ((state: SessionInspectorLoadState) => void) | undefined;
 }) {
   const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+  useLayoutEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   const { loading, error } = state;
   useEffect(() => {
     if (!enabled) return;

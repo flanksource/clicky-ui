@@ -18,8 +18,10 @@ export type PageFrameProps = Omit<IframeHTMLAttributes<HTMLIFrameElement>, "src"
 export function PageFrame({ runtimeOrigin, origin = "cross-origin", open, theme, data, dataUpdates = true, onMessage, onError, onBridge, ...props }: PageFrameProps) {
   const frame = useRef<HTMLIFrameElement>(null);
   const latest = useRef({ open, theme, data, onMessage, onError, onBridge });
-  latest.current = { open, theme, data, onMessage, onError, onBridge };
   const bridge = useRef<PageBridge | null>(null);
+  useLayoutEffect(() => {
+    latest.current = { open, theme, data, onMessage, onError, onBridge };
+  }, [open, theme, data, onMessage, onError, onBridge]);
   useLayoutEffect(() => {
     const target = frame.current?.contentWindow;
     if (!target || !frame.current) throw new Error("PageFrame has no contentWindow");

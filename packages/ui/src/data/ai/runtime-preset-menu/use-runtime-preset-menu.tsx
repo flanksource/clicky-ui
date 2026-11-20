@@ -1,5 +1,5 @@
 import { randomUUID } from "../../../lib/random-uuid";
-import { useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { UiLayers, UiSave } from "../../../icons";
 import {
   newPresetRecord,
@@ -40,7 +40,7 @@ export function useRuntimePresetMenu(options: RuntimePresetMenuOptions): {
   const [error, setError] = useState<string>();
   const pending = useRef(false);
   const latest = useRef(options);
-  latest.current = options;
+  useLayoutEffect(() => { latest.current = options; }, [options]);
   const catalog = [
     ...options.presets,
     ...created.filter(
