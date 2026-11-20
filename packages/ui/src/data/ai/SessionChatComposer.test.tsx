@@ -63,8 +63,16 @@ describe("SessionChatComposer", () => {
   });
 });
 
+const pickerButton = () =>
+  screen.getByRole("button", { name: /^Permission mode:/ });
+
+const openPicker = () => {
+  fireEvent.click(pickerButton());
+  return screen.getAllByRole("menuitem");
+};
+
 describe("SessionChatComposer permission mode picker", () => {
-  it("renders the current mode and only the allowed options", () => {
+  it("sits on the input row, right of the textbox and before Send, as a menu trigger naming the current mode", () => {
     render(
       <SessionChatComposer
         status="idle"
@@ -76,15 +84,35 @@ describe("SessionChatComposer permission mode picker", () => {
       />,
     );
 
-    const select = screen.getByRole("combobox", { name: "Permission mode" });
-    expect(select).toHaveValue("plan");
-    const optionLabels = screen
-      .getAllByRole("option")
-      .map((option) => (option as HTMLOptionElement).value);
-    expect(optionLabels).toEqual(PERMISSION_MODES);
+    const row = screen.getByRole("textbox").parentElement;
+    const order = [screen.getByRole("textbox"), pickerButton(), screen.getByRole("button", { name: "Send" })]
+      .map((element) => [...(row?.querySelectorAll("*") ?? [])].indexOf(element));
+    expect({
+      name: pickerButton().getAttribute("aria-label"),
+      inRow: row?.contains(pickerButton()),
+      ordered: order.every((index, i) => index >= 0 && (i === 0 || index > order[i - 1]!)),
+      combobox: screen.queryByRole("combobox"),
+    }).toEqual({ name: "Permission mode: Plan", inRow: true, ordered: true, combobox: null });
   });
 
-  it("calls onPermissionModeChange when a new mode is selected", () => {
+  it("opens a menu of only the allowed modes, marking the current one", () => {
+    render(
+      <SessionChatComposer
+        status="idle"
+        capabilities={capabilities}
+        onSubmit={vi.fn()}
+        permissionMode="plan"
+        permissionModes={PERMISSION_MODES}
+        onPermissionModeChange={vi.fn()}
+      />,
+    );
+
+    expect(
+      openPicker().map((item) => [item.textContent, item.querySelector("[data-current-mode]") !== null]),
+    ).toEqual([["Manual", false], ["Plan", true], ["Auto", false]]);
+  });
+
+  it("calls onPermissionModeChange when a new mode is chosen", () => {
     const onPermissionModeChange = vi.fn();
     render(
       <SessionChatComposer
@@ -97,10 +125,7 @@ describe("SessionChatComposer permission mode picker", () => {
       />,
     );
 
-    fireEvent.change(
-      screen.getByRole("combobox", { name: "Permission mode" }),
-      { target: { value: "auto" } },
-    );
+    fireEvent.click(openPicker()[2]!);
     expect(onPermissionModeChange).toHaveBeenCalledWith("auto");
   });
 
@@ -115,9 +140,8 @@ describe("SessionChatComposer permission mode picker", () => {
       />,
     );
 
-    const select = screen.getByRole("combobox", { name: "Permission mode" });
-    expect(select).toBeDisabled();
-    expect(select).toHaveValue("default");
+    expect(pickerButton()).toBeDisabled();
+    expect(pickerButton()).toHaveAttribute("aria-label", "Permission mode: Manual");
   });
 
   it.each(["starting", "interrupting", "stopping"] as const)(
@@ -134,9 +158,7 @@ describe("SessionChatComposer permission mode picker", () => {
         />,
       );
 
-      expect(
-        screen.getByRole("combobox", { name: "Permission mode" }),
-      ).toBeDisabled();
+      expect(pickerButton()).toBeDisabled();
     },
   );
 
@@ -153,7 +175,7 @@ describe("SessionChatComposer permission mode picker", () => {
     );
 
     expect(
-      screen.queryByRole("combobox", { name: "Permission mode" }),
+      screen.queryByRole("button", { name: /^Permission mode:/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -173,9 +195,7 @@ describe("SessionChatComposer permission mode picker", () => {
       />,
     );
 
-    expect(
-      screen.getAllByRole("option").map((option) => option.textContent),
-    ).toEqual(labels);
+    expect(openPicker().map((item) => item.textContent)).toEqual(labels);
   });
 
   it("still renders the host toolbar alongside the picker", () => {
@@ -192,9 +212,7 @@ describe("SessionChatComposer permission mode picker", () => {
     );
 
     expect(screen.getByText("Target model")).toBeInTheDocument();
-    expect(
-      screen.getByRole("combobox", { name: "Permission mode" }),
-    ).toBeInTheDocument();
+    expect(pickerButton()).toBeInTheDocument();
   });
 
   it("disables the input and says why while the host reports a reason", () => {

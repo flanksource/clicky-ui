@@ -76,10 +76,16 @@ export const WithPermissionModePicker: Story = {
   render: () => <InteractivePickerStory />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const picker = canvas.getByRole("combobox", { name: "Permission mode" });
-    await expect(picker).toHaveValue("default");
-    await userEvent.selectOptions(picker, "auto");
-    await expect(picker).toHaveValue("auto");
+    await expect(
+      canvas.getByRole("button", { name: "Permission mode: Manual" }),
+    ).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "Permission mode: Manual" }));
+    await userEvent.click(
+      await within(document.body).findByRole("menuitem", { name: /^Auto/ }),
+    );
+    await expect(
+      canvas.getByRole("button", { name: "Permission mode: Auto" }),
+    ).toBeInTheDocument();
     await expect(canvas.getByTestId("current-mode")).toHaveTextContent("auto");
   },
 };
@@ -91,9 +97,9 @@ export const ReadOnlyPicker: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const picker = canvas.getByRole("combobox", { name: "Permission mode" });
-    await expect(picker).toBeDisabled();
-    await expect(picker).toHaveValue("acceptEdits");
+    await expect(
+      canvas.getByRole("button", { name: "Permission mode: Accept edits" }),
+    ).toBeDisabled();
   },
 };
 
@@ -109,7 +115,7 @@ export const PickerAlongsideHostToolbar: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(
-      canvas.getByRole("combobox", { name: "Permission mode" }),
+      canvas.getByRole("button", { name: "Permission mode: Plan" }),
     ).toBeInTheDocument();
     await expect(canvas.getByText("Claude Sonnet")).toBeInTheDocument();
   },

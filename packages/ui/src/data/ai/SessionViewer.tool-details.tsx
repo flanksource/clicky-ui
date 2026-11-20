@@ -5,8 +5,10 @@ import { CodeDiff } from "../CodeDiff";
 import { Icon } from "../Icon";
 import { cn } from "../../lib/utils";
 import { UiCheck, UiCircleOutline } from "../../icons";
+import { Markdown } from "../Markdown";
 import {
   optionAnswered,
+  type MarkdownToolField,
   type SessionQuestion,
   type ToolDiff,
   type ToolParam,
@@ -104,6 +106,41 @@ export function DiffBlock({ diff }: { diff: ToolDiff }) {
           {...(diff.language ? { language: diff.language } : {})}
         />
       ))}
+    </div>
+  );
+}
+
+/**
+ * A tool call's prose rendered as it will read once posted: its title as a
+ * heading, each Markdown field beneath (labelled when there is more than one),
+ * and the remaining arguments as the usual structured block.
+ */
+export function MarkdownToolInput({
+  fields,
+  input,
+}: {
+  fields: readonly MarkdownToolField[];
+  input: Record<string, unknown>;
+}) {
+  const shown = new Set(fields.map((field) => field.key));
+  const rest = Object.fromEntries(Object.entries(input).filter(([key]) => !shown.has(key)));
+  const bodies = fields.filter((field) => field.kind === "markdown");
+  return (
+    <div className="space-y-1.5" data-tool-markdown-input="">
+      {fields.filter((field) => field.kind === "title").map((field) => (
+        <div key={field.key} className="text-sm font-semibold text-foreground" data-tool-markdown-title="">
+          {field.text}
+        </div>
+      ))}
+      {bodies.map((field) => (
+        <div key={field.key} className="rounded border border-border px-2 py-1.5" data-tool-markdown-field={field.key}>
+          {bodies.length > 1 && (
+            <div className="mb-1 text-[11px] font-medium uppercase text-muted-foreground">{field.key}</div>
+          )}
+          <Markdown text={field.text} />
+        </div>
+      ))}
+      {Object.keys(rest).length > 0 && <DetailBlock language="json" source={JSON.stringify(rest, null, 2)} />}
     </div>
   );
 }

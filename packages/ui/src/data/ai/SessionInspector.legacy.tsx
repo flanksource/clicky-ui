@@ -11,6 +11,7 @@ import {
 import { useInspectorTab } from "./SessionInspector.tab-state";
 import {
   useHostTabs,
+  withHostTabs,
   type SessionInspectorHostTab,
 } from "./SessionInspector.host-tabs";
 import { SessionViewer, type SessionViewerProps } from "./SessionViewer";
@@ -78,7 +79,7 @@ export function LegacySessionInspector({
     >
       {compact ? (
         <CompactSessionInspectorToolbar
-          tabs={[...compactTabs, ...host.items]}
+          tabs={withHostTabs(compactTabs, host.items)}
           activeTab={host.active?.id ?? tab}
           onSelect={(next) => {
             if (!host.select(next)) setTab(next as SessionInspectorTab);

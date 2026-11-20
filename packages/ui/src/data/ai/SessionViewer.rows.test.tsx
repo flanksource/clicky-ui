@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { SessionRow } from "./SessionViewer.rows";
 import { normalizeSession, type SessionEvent } from "./SessionViewer.model";
@@ -85,6 +85,39 @@ describe("file session rows", () => {
       "src",
       "/api/attachments/sha256:image",
     );
+  });
+});
+
+describe("assistant session rows", () => {
+  const assistant = (text: string) => {
+    const event = normalizeSession({
+      messages: [{ id: "reply", role: "assistant", parts: [{ type: "text", text }] }],
+    })[0];
+    if (!event) throw new Error("expected an assistant event");
+    return event;
+  };
+
+  it("unwraps a JSON reply's comment into Markdown and keeps its other keys structured", async () => {
+    const { container } = renderRow(
+      assistant(JSON.stringify({ comment: "All **three** tests passed.\n\n- one\n- two", event: "completed", success: true }, null, 2)),
+    );
+
+    const strong = '[data-tool-markdown-field="comment"] [data-streamdown="strong"]';
+    await waitFor(() => expect(container.querySelector(strong)).not.toBeNull());
+    const rest = container.querySelector('[data-tool-markdown-input] [data-format="yaml"]')?.textContent ?? "";
+    expect({
+      bold: container.querySelector(strong)?.textContent,
+      items: [...container.querySelectorAll('[data-tool-markdown-field="comment"] li')].map((item) => item.textContent),
+      restHasEvent: rest.includes("event: completed"),
+      restHasComment: rest.includes("three"),
+      rawBrace: container.textContent?.includes('"comment"'),
+    }).toEqual({ bold: "three", items: ["one", "two"], restHasEvent: true, restHasComment: false, rawBrace: false });
+  });
+
+  it("previews a collapsed JSON reply by its prose, not its opening brace", () => {
+    renderRow(assistant('{"summary": "Fixed the parser", "success": true}'));
+    fireEvent.click(screen.getByRole("button", { name: "Toggle assistant message" }));
+    expect(screen.getByRole("button", { name: "Toggle assistant message" })).toHaveTextContent("Fixed the parser…");
   });
 });
 
