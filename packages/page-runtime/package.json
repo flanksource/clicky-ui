@@ -1,9 +1,12 @@
 {
   "name": "@flanksource/page-runtime",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Browser-mode page runtime for facet and clicky-ui pages: library runtime sets, the module service worker and the page frame.",
   "license": "Apache-2.0",
   "type": "module",
+  "repository": { "type": "git", "url": "https://github.com/flanksource/clicky-ui.git", "directory": "packages/page-runtime" },
+  "publishConfig": { "access": "public" },
+  "files": ["src", "scripts", "static", "dist", "!**/*.test.ts", "!**/*.test.tsx"],
   "exports": {
     "./styles": "./src/styles.ts",
     "./editing": "./src/editing.ts",
@@ -18,7 +21,7 @@
     "./dev": "./src/dev/index.ts",
     "./publication": "./src/publication/index.ts",
     "./catalog": "./src/publication/schema.ts",
-    "./publication/cli": "./scripts/run-package-build.ts",
+    "./publication/cli": "./dist/publication/cli.mjs",
     "./link": "./src/link/index.ts",
     "./link/build": "./src/link/build.ts",
     "./schema": "./src/schema.ts",
@@ -50,7 +53,7 @@
     "tailwindcss": "catalog:"
   },
   "peerDependencies": {
-    "@flanksource/clicky-ui": "^0.3.57",
+    "@flanksource/clicky-ui": "^0.3.66",
     "react": "^18.3.1 || ^19.0.0",
     "react-dom": "^18.3.1 || ^19.0.0"
   },

@@ -5,6 +5,7 @@ test.each([
   { current: "0.1.0", published: [], expected: "0.1.0" },
   { current: "0.1.0", published: ["0.1.9", "0.1.10", "0.1.2"], expected: "0.1.11" },
   { current: "0.1.3", published: ["0.1.2", "0.2.0-beta.1"], expected: "0.1.3" },
+  { current: "0.1.0", published: ["0.0.0", "0.0.0-stage"], expected: "0.1.0" },
 ])("selects $expected from registry history $published", ({ current, published, expected }) => {
   expect(nextReleaseVersion({ current, published })).toBe(expected);
 });

@@ -32,6 +32,13 @@ jobs:
             build_script: build:builder
             publish_directory: packages/page-runtime/dist/build
             tag: page-runtime-build
+          - name: "@flanksource/page-runtime"
+            directory: packages/page-runtime
+            manifest: package.json
+            build_package: "@flanksource/page-runtime"
+            build_script: build
+            publish_directory: packages/page-runtime
+            tag: page-runtime
           - name: "@flanksource/clicky-ui"
             directory: packages/ui
             manifest: package.json
@@ -84,6 +91,11 @@ jobs:
           TAG_PREFIX: ${{ matrix.tag }}
           MANIFEST: ${{ github.workspace }}/${{ matrix.directory }}/${{ matrix.manifest }}
         run: pnpm --filter @flanksource/page-runtime exec tsx scripts/release-version.ts "$MANIFEST" "$TAG_PREFIX"
+
+      # Page-runtime builds import @flanksource/clicky-ui types and modules from its dist.
+      - name: Build Clicky UI dependency
+        if: matrix.build_package != '@flanksource/clicky-ui'
+        run: pnpm --filter @flanksource/clicky-ui run build
 
       - name: Build library
         run: pnpm --filter ${{ matrix.build_package }} run ${{ matrix.build_script }}

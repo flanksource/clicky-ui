@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { Badge, DataTable, FilterBar, Properties, Tabs, formatBytes, formatDuration, type DataTableColumn } from "@flanksource/clicky-ui";
+import { FilterBar, Tabs } from "@flanksource/clicky-ui/components";
+import { Badge, DataTable, Properties, type DataTableColumn } from "@flanksource/clicky-ui/data";
+import { formatBytes, formatDuration } from "@flanksource/clicky-ui/utils";
 import type { WorkerActivity } from "../activity-schema.ts";
 import { activityLibraries, summarizeActivity, type ActivityLibrary, type ActivityLoad, type ActivitySummary, type RuntimeActivityState } from "./activity-state.ts";
 
