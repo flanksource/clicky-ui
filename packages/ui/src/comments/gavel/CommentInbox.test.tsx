@@ -60,6 +60,20 @@ function renderInbox(overrides: Partial<CommentInboxProps> = {}) {
 beforeEach(() => vi.restoreAllMocks());
 
 describe("CommentInbox", () => {
+  it("renders the selected thread through the host renderer and reports selection changes", () => {
+    const changed = vi.fn();
+    renderInbox({
+      expandedThreadId: "file-open",
+      onExpandedThreadChange: changed,
+      renderThread: (item) => <div>Details for {item.thread.id}</div>,
+      canOpen: (item) => item.kind !== "file",
+    });
+    expect(screen.getByText("Details for file-open")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open guide/intro.md:12" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("comment page-open"));
+    expect(changed).toHaveBeenCalledWith("page-open");
+  });
+
   it("groups mixed file, page and image targets, newest first, with their kind and project", () => {
     renderInbox();
     const headers = screen.getAllByRole("button", { expanded: true }).map((button) => button.closest("tr")?.textContent);

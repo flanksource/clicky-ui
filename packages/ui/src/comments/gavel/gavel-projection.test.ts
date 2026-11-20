@@ -135,6 +135,16 @@ describe("projectNative: comments with no playground metadata", () => {
     ]);
   });
 
+  it("projects a native PR diff-range thread and its replies", () => {
+    const [root, reply] = projectNative({
+      ...editor,
+      target: { ...editor.target, uri: "https://github.com/acme/demo/pull/7", kind: "pull-request",
+        selector: { kind: "diff-range", version: 1, path: "docs/README.md", baseCommit: "abc", headCommit: "def", side: "new", startLine: 2, endLine: 4 } },
+    });
+    expect(root).toMatchObject({ id: editor.id, body: editor.bodyMarkdown });
+    expect(reply?.parentId).toBe(editor.id);
+  });
+
   it("carries the assignee, the outcome, the hand-off and a reply's proposal that gavel records without playground metadata", () => {
     const proposal = { ref: "refs/gavel/proposals/e-1/m-2", base: "abc", commit: "def", files: [{ path: "a.md", additions: 1, deletions: 0 }], state: "proposed" as const };
     const [root, reply] = projectNative({

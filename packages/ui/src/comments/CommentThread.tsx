@@ -53,6 +53,7 @@ export function CommentThread({
   defaultExpanded = false,
   previewLines,
   detailTabs,
+  renderMaximizedActions,
   onMaximizedChange,
   composerPlaceholder,
   hideComposer = false,
@@ -110,6 +111,7 @@ export function CommentThread({
         defaultExpanded={defaultExpanded}
         {...(previewLines !== undefined ? { previewLines } : {})}
         {...(detailTabs ? { detailTabs } : {})}
+        {...(renderMaximizedActions ? { renderMaximizedActions } : {})}
         {...(onMaximizedChange ? { onMaximizedChange } : {})}
         {...(renderRootMeta ? { renderRootMeta } : {})}
         {...(renderRootDetails ? { renderRootDetails } : {})}
