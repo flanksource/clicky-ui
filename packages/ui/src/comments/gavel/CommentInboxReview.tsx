@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "../../components/button";
 import { InputField } from "../../components/InputField";
 import { ActionError } from "../../data/diagnostics/ActionError";
@@ -16,6 +16,8 @@ export type CommentInboxReviewProps = {
   onSelect: (id: string | undefined) => void;
   /** Opens the thread where it lives. */
   onOpen: (item: InboxItem) => void;
+  canOpen?: ((item: InboxItem) => boolean) | undefined;
+  renderThread?: (item: InboxItem) => ReactNode;
   onExit: () => void;
 };
 
@@ -23,7 +25,7 @@ export type CommentInboxReviewProps = {
  * The resolved-review queue: a human reads each resolved thread and either
  * closes it or reopens it with feedback, then moves to the next.
  */
-export function CommentInboxReview({ queue, selectedId, config, actions, onSelect, onOpen, onExit }: CommentInboxReviewProps) {
+export function CommentInboxReview({ queue, selectedId, config, actions, onSelect, onOpen, canOpen, renderThread, onExit }: CommentInboxReviewProps) {
   const [pending, setPending] = useState<"close" | "reopen" | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -81,11 +83,11 @@ export function CommentInboxReview({ queue, selectedId, config, actions, onSelec
           <div className="space-y-density-3">
             <div className="rounded-md bg-muted/50 px-3 py-2 text-xs">
               <p className="font-medium text-foreground">{selected.project}</p>
-              <button type="button" className="mt-0.5 max-w-full truncate font-mono text-primary hover:underline" aria-label={`Open ${selected.label}`} title={`Open ${selected.label}`} onClick={() => onOpen(selected)}>
+              {!canOpen || canOpen(selected) ? <button type="button" className="mt-0.5 max-w-full truncate font-mono text-primary hover:underline" aria-label={`Open ${selected.label}`} title={`Open ${selected.label}`} onClick={() => onOpen(selected)}>
                 {selected.line === undefined ? selected.label : `${selected.label}:${selected.line}`}
-              </button>
+              </button> : <p className="truncate font-mono">{selected.label}</p>}
             </div>
-            <CommentInboxThread item={selected} config={config} actions={actions} />
+            {renderThread ? renderThread(selected) : <CommentInboxThread item={selected} config={config} actions={actions} />}
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-border p-density-4 text-center">
