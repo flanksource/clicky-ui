@@ -27,6 +27,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "oxlint": "catalog:",
+    "pkg-pr-new": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:"
   },

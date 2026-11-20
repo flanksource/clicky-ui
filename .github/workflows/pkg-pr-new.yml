@@ -1,0 +1,50 @@
+name: Preview Packages
+
+# Publishes every pull request and main commit to https://pkg.pr.new, e.g.
+#   npm i https://pkg.pr.new/@flanksource/clicky-ui@<pr-number-or-sha>
+# Requires the pkg.pr.new GitHub App: https://github.com/apps/pkg-pr-new
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: pkg-pr-new-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Skip the release workflow's version-bump commits.
+    if: "!startsWith(github.event.head_commit.message, 'chore(release):')"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The runtime builder's declarations import @flanksource/clicky-ui types from its dist.
+      - name: Build packages
+        run: |
+          pnpm --filter @flanksource/clicky-ui run build
+          pnpm --filter @flanksource/page-runtime run build:builder
+
+      # --pnpm resolves catalog: dependencies; --previewVersion keeps preview
+      # tarballs from colliding with npm releases of the same version.
+      - name: Publish previews
+        run: pnpm exec pkg-pr-new publish --pnpm --previewVersion './packages/ui' './packages/page-runtime/dist/build'
