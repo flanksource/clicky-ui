@@ -29,6 +29,9 @@ export default defineConfig({
         test: {
           name: 'storybook',
           environment: 'jsdom',
+          // Editor stories (MDXEditor, CodeMirror) wait up to 10s for lazy-loaded
+          // editors in their play functions; vitest's 5s default cut them short.
+          testTimeout: 15_000,
           setupFiles: [
             path.join(import.meta.dirname, '../../packages/ui/src/test/setup.ts'),
             path.join(configDir, 'vitest.jsdom-setup.tsx'),

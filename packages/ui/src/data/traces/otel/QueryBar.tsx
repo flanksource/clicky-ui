@@ -16,7 +16,7 @@ function withSelected(options: { value: string; label: string; description?: str
 }
 
 /** One line of trace filters: source, services, root operations, attributes, status, duration, span count and the time window. Any filter change returns to the first page. */
-export function QueryBar({ value, onChange: change, onError, sources, runs, result, allowRecords = true, trailing }: {
+export function QueryBar({ value, onChange: change, onError, sources, runs, result, allowRecords = true, trailing, pinned = {} }: {
   value: SearchValues;
   onChange: (next: Partial<SearchValues>) => void;
   onError: (message: string) => void;
@@ -26,13 +26,19 @@ export function QueryBar({ value, onChange: change, onError, sources, runs, resu
   allowRecords?: boolean;
   /** Rendered beside the time window, such as the in-flight search's timer. */
   trailing?: ReactNode;
+  /** Filter entries the page fixes: shown among the selected values, but every change keeps them. */
+  pinned?: SearchValues;
 }) {
   const onChange = (next: Partial<SearchValues>) => change({ ...next, offset: undefined });
   const choice = sourceChoice(value);
   const connection = sources.find(source => source.id === value.source && source.id !== "records");
-  const multi = (key: ModeFilter, label: string, options: { value: string; label: string; description?: string }[], extra: Partial<FilterBarMultiFilter> = {}): FilterBarMultiFilter => ({
-    ...extra, key, kind: "multi", label, value: value[key] ?? {}, onChange: next => onChange({ [key]: next }), options: withSelected(options, value[key]),
-  });
+  const multi = (key: ModeFilter, label: string, options: { value: string; label: string; description?: string }[], extra: Partial<FilterBarMultiFilter> = {}): FilterBarMultiFilter => {
+    const locked = pinned[key] ?? {};
+    return {
+      ...extra, key, kind: "multi", label, value: { ...value[key], ...locked }, onChange: next => onChange({ [key]: { ...next, ...locked } }),
+      options: withSelected(options, value[key]).map(option => option.value in locked ? { ...option, disabled: true, description: "Pinned by this page" } : option),
+    };
+  };
   const filters: FilterBarFilter[] = [
     {
       key: "source", kind: "enum", label: "Source", required: true, value: choice, onChange: next => onChange(chooseSource(next)),
