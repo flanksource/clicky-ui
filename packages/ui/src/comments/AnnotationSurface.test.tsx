@@ -187,7 +187,9 @@ describe("a text selection on a page with no source", () => {
     fireEvent.mouseUp(document.getElementById("price")!);
     const input = await screen.findByTestId("comment-compose-input");
     setCommentDraft(input, "Is this VAT inclusive?");
-    fireEvent.click(screen.getByRole("button", { name: "Post comment" }));
+    const post = screen.getByRole("button", { name: "Post comment" });
+    await waitFor(() => expect(post).toBeEnabled());
+    fireEvent.click(post);
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1));
     const [created, capture] = onCreate.mock.calls[0] as unknown as [{ body: string }, AnnotationCapture];
     expect({ body: created.body, kind: capture.kind, exact: capture.quote?.exact }).toEqual({ body: "Is this VAT inclusive?", kind: "dom", exact: "billed yearly" });
