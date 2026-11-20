@@ -11,5 +11,6 @@ export type CommentDetailTab = {
 export type CommentDetailOptions = {
   previewLines?: number;
   detailTabs?: readonly CommentDetailTab[];
+  renderMaximizedActions?: (thread: readonly Comment[]) => ReactNode;
   onMaximizedChange?: (open: boolean) => void;
 };

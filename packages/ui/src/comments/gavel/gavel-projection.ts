@@ -2,6 +2,7 @@ import { patchAnchor } from "../anchoring/patch-anchor";
 import { regionAnchor } from "../anchoring/region-anchor";
 import type { PatchAnchor, RegionAnchor, TextQuote } from "../annotation-types";
 import type { StoredAgentRun, StoredAuthor, StoredComment, StoredProposal } from "./comments-store";
+import type { CommentElementContext } from "./comments-model";
 import type { CommentEdits } from "./gavel-delivery";
 
 /*
@@ -65,7 +66,7 @@ export type NativeComment = {
   updatedAt: string;
   content?: Content;
   messages?: NativeMessage[];
-  attachments?: { id: string; name: string }[];
+  attachments?: { id: string; name: string; messageId?: string }[];
   outcome?: { at: string; actor: Actor };
 };
 export type Action = {
@@ -161,8 +162,12 @@ export function anchorOfSelector(selector: unknown): { anchor?: string; quote?: 
     case "document":
       return {};
     case "code-range":
-      if (!isRecord(selector.patch)) throw new Error("a code-range selector needs a patch");
-      return { anchor: patchAnchor(selector.patch as PatchAnchor), ...quote };
+      if (isRecord(selector.patch)) return { anchor: patchAnchor(selector.patch as PatchAnchor), ...quote };
+      if (typeof selector.revision === "string" && hasCodeLines(selector)) return {};
+      throw new Error("a code-range selector needs a patch or a revision and lines");
+    case "diff-range":
+      if (hasCodeLines(selector) && typeof selector.baseCommit === "string" && typeof selector.headCommit === "string" && (selector.side === "old" || selector.side === "new")) return {};
+      throw new Error("a diff-range selector needs a path, commits, side and lines");
     case "region":
       return { anchor: regionAnchor(selector.region as RegionAnchor) };
     case "dom":
@@ -173,7 +178,30 @@ export function anchorOfSelector(selector: unknown): { anchor?: string; quote?: 
   }
 }
 
+function hasCodeLines(selector: Record<string, unknown>): boolean {
+  const { path, startLine, endLine } = selector;
+  return typeof path === "string" && path.length > 0
+    && typeof startLine === "number" && Number.isInteger(startLine) && startLine > 0
+    && typeof endLine === "number" && Number.isInteger(endLine) && endLine >= startLine;
+}
+
 const isoOf = (time: string) => new Date(time).toISOString();
+
+export function commentCaptureOf(c: NativeComment, attachmentUrl: (commentId: string, attachmentId: string) => string): CommentElementContext | undefined {
+  const element = c.content?.playground?.element;
+  const selector = isRecord(c.target.selector) ? c.target.selector : undefined;
+  const html = typeof selector?.html === "string" ? selector.html : "";
+  const image = c.attachments?.find(({ name, messageId }) => name === "screenshot.png" && !messageId);
+  if (!element && !html && !image) return undefined;
+  const pageUrl = element?.pageUrl ?? c.content?.page?.url;
+  return {
+    source: "",
+    html,
+    ...element,
+    ...(pageUrl ? { pageUrl } : {}),
+    ...(image ? { screenshot: { status: "captured", filename: "screenshot.png", url: attachmentUrl(c.id, image.id) } } : {}),
+  };
+}
 
 /**
  * Any native thread in the comment components' shape, whoever wrote it: the
@@ -228,7 +256,7 @@ export function project(
     throw new Error(`Comment ${c.id} is missing playground metadata`);
   // Gavel owns the assignee; a copy left in the playground fields is never the current one.
   const { page: _page, assignee: _assignee, ...fields } = playground;
-  const capture = c.attachments?.find((a) => a.name === "screenshot.png");
+  const element = fields.element && commentCaptureOf(c, options.attachmentUrl);
   const root: StoredComment = {
     ...fields,
     id: c.id,
@@ -247,18 +275,7 @@ export function project(
           closedBy: fields.closedBy ?? authorFor(c.outcome.actor),
         }
       : {}),
-    ...(capture && fields.element
-      ? {
-          element: {
-            ...fields.element,
-            screenshot: {
-              status: "captured",
-              filename: "screenshot.png",
-              url: options.attachmentUrl(c.id, capture.id),
-            },
-          },
-        }
-      : {}),
+    ...(element ? { element } : {}),
     ...(c.content?.agentRun ? { agentRun: agentRunFor(c.content.agentRun, c.messages ?? []) } : {}),
   };
   return [

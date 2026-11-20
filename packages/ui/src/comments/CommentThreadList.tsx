@@ -62,6 +62,7 @@ export function CommentThreadList({
   defaultExpanded = false,
   previewLines,
   detailTabs = [],
+  renderMaximizedActions,
   onMaximizedChange,
   renderRootMeta,
   renderRootDetails,
@@ -212,6 +213,7 @@ export function CommentThreadList({
       </div>
       {maximizedRoot && (
         <Modal open onClose={closeMaximized} title="Comment thread" size="xl" className="h-[min(800px,90dvh)]"
+          headerSlot={renderMaximizedActions?.(maximizedThread)}
           subtitle={<Tabs tabs={[{ id: "thread", label: "Thread" }, ...detailTabs.map(({ id, label }) => ({ id, label }))]} value={maximizedTab} onChange={setMaximizedTab} />}
           footer={onReply && <div ref={replyBar}><CommentReplyInput key={maximizedRoot.id} pinned parentId={maximizedRoot.id} config={config} onCancel={() => {}} onSubmit={body => onReply(maximizedRoot, body)} /></div>}
         >

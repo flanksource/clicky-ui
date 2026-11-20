@@ -26,10 +26,14 @@ export function CommentCapture({ capture, expanded = false }: { capture?: Commen
             View full capture
           </a>
         ) : capture.screenshot?.status === "unavailable" ? <p className="text-muted-foreground">Screenshot unavailable ({capture.screenshot.reason})</p> : null}
-        <p className="font-medium">Source</p>
-        <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all text-muted-foreground">{capture.source}</pre>
-        <p className="font-medium">HTML</p>
-        <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-muted-foreground">{capture.html}</pre>
+        {capture.source && <div>
+          <p className="font-medium">Source</p>
+          <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all text-muted-foreground">{capture.source}</pre>
+        </div>}
+        {capture.html && <div>
+          <p className="font-medium">HTML</p>
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-muted-foreground">{capture.html}</pre>
+        </div>}
       </div>
     </details>
   );
