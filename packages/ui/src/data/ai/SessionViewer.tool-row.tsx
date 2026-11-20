@@ -7,6 +7,7 @@ import {
   questionsFromApproval,
   questionsFromToolInput,
   answersFromToolResponse,
+  markdownToolFields,
   shellCommand,
   summarizeToolInput,
   toolDiff,
@@ -18,6 +19,7 @@ import {
   DetailBlock,
   DiffBlock,
   InlineParams,
+  MarkdownToolInput,
   QuestionCard,
   ResponseBlock,
 } from "./SessionViewer.tool-details";
@@ -189,6 +191,7 @@ export function ToolBody({
 
   const params = toolInputParams(event.tool ?? "", event.toolInput, event.cwd);
   const diff = toolDiff(event.tool ?? "", event.toolInput);
+  const markdownFields = markdownToolFields(event.toolInput);
   const header = (
     <>
       {visual.summaryOnly && summary ? (
@@ -250,6 +253,8 @@ export function ToolBody({
         <div className="mt-1.5 space-y-1.5">
           {diff ? (
             <DiffBlock diff={diff} />
+          ) : markdownFields.length > 0 && event.toolInput ? (
+            <MarkdownToolInput fields={markdownFields} input={event.toolInput} />
           ) : (
             event.toolInput !== undefined && (
               <DetailBlock

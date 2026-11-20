@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { Icon, type StaticIconComponent } from "../Icon";
 import {
@@ -18,6 +18,8 @@ import type { SessionEventGroup } from "./SessionViewer.grouping";
 import { EventMetadata, RawEventBlock } from "./SessionViewer.row-metadata";
 import { formatEventRange } from "./SessionViewer.row-time";
 import { ToolBody } from "./SessionViewer.tool-row";
+import { jsonMessageFields } from "./SessionViewer.input";
+import { MarkdownToolInput } from "./SessionViewer.tool-details";
 import type { SessionToolDecision } from "./SessionViewer";
 import { Markdown } from "../Markdown";
 import { MessageFilePart } from "../chat/MessageFilePart";
@@ -439,6 +441,8 @@ function MessageBody({
   badge?: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(true);
+  const structured = useMemo(() => jsonMessageFields(event.text), [event.text]);
+  const preview = structured?.fields[0]?.text ?? event.text;
   return (
     <div className="min-w-0">
       <button
@@ -450,9 +454,9 @@ function MessageBody({
       >
         {badge}
         <span className="shrink-0">Agent</span>
-        {!expanded && event.text && (
+        {!expanded && preview && (
           <span className="min-w-0 flex-1 truncate font-normal">
-            {event.text.split("\n", 1)[0]}…
+            {preview.trim().split("\n", 1)[0]}…
           </span>
         )}
         <Icon
@@ -466,7 +470,11 @@ function MessageBody({
       {expanded && (
         <div className="min-w-0 whitespace-pre-wrap break-words text-sm font-medium leading-relaxed text-foreground">
           {event.file && <MessageFilePart part={event.file} />}
-          {event.text && <Markdown text={event.text} />}
+          {structured ? (
+            <MarkdownToolInput fields={structured.fields} input={structured.input} />
+          ) : (
+            event.text && <Markdown text={event.text} />
+          )}
         </div>
       )}
     </div>

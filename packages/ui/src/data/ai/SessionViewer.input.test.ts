@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  jsonMessageFields,
+  markdownToolFields,
   questionsFromToolInput,
   relativizePath,
   shellCommand,
@@ -63,6 +65,55 @@ describe("summarizeToolInput", () => {
     expect(summarizeToolInput("Write", { file_path: "/elsewhere/a.ts" }, "/repo")).toBe(
       "/elsewhere/a.ts",
     );
+  });
+});
+
+describe("markdownToolFields", () => {
+  it("finds the title first, then every body-like string field by name, ignoring blanks and non-strings", () => {
+    expect(
+      markdownToolFields({
+        id: "thread-1",
+        body: "**Fixed** the parser",
+        summary: "Parser fixed",
+        title: "Fix parser",
+        bodyMarkdown: "- item",
+        comment: "  ",
+        description: 42,
+      }),
+    ).toEqual([
+      { key: "title", text: "Fix parser", kind: "title" },
+      { key: "body", text: "**Fixed** the parser", kind: "markdown" },
+      { key: "summary", text: "Parser fixed", kind: "markdown" },
+      { key: "bodyMarkdown", text: "- item", kind: "markdown" },
+    ]);
+  });
+
+  it("leaves calls without prose fields structured", () => {
+    expect([
+      markdownToolFields({ command: "ls -la", description: "" }),
+      markdownToolFields({ name: "lookup", message: "hi" }),
+      markdownToolFields(undefined),
+    ]).toEqual([[], [], []]);
+  });
+});
+
+describe("jsonMessageFields", () => {
+  it("unwraps a message that is one JSON object carrying prose fields", () => {
+    const text = `\n{\n  "comment": "All **three** tests passed.\\n\\n- one",\n  "event": "completed",\n  "success": true\n}\n`;
+    expect(jsonMessageFields(text)).toEqual({
+      input: { comment: "All **three** tests passed.\n\n- one", event: "completed", success: true },
+      fields: [{ key: "comment", text: "All **three** tests passed.\n\n- one", kind: "markdown" }],
+    });
+  });
+
+  it("leaves prose, JSON without prose fields, arrays, and malformed JSON as ordinary text", () => {
+    expect([
+      jsonMessageFields("Done. {\"comment\": \"inline\"}"),
+      jsonMessageFields('{"event": "completed", "success": true}'),
+      jsonMessageFields('[{"comment": "x"}]'),
+      jsonMessageFields('{"comment": "unterminated}'),
+      jsonMessageFields(undefined),
+    ]).toEqual([undefined, undefined, undefined, undefined, undefined]);
   });
 });
 
@@ -166,6 +217,14 @@ describe("toolInputParams", () => {
         to: "b.go",
       }),
     ).toEqual([]);
+  });
+
+  it("hides an Edit's default replace_all: false, which the diff already shows, but keeps replace_all: true", () => {
+    const edit = { file_path: "a.ts", old_string: "a", new_string: "b" };
+    expect([
+      toolInputParams("Edit", { ...edit, replace_all: false }),
+      toolInputParams("Edit", { ...edit, replace_all: true }),
+    ]).toEqual([[], [{ name: "replace_all", value: "true" }]]);
   });
 
   it("skips empty values and collapses multiline values to one truncated line", () => {

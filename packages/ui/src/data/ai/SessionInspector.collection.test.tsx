@@ -77,6 +77,20 @@ describe("SessionInspector session collections", () => {
     expect(screen.queryByText("host view body")).not.toBeInTheDocument();
   });
 
+  it("places host tabs right after the transcript tab", () => {
+    const hostTab = { id: "branch-changes", label: "Branch changes", icon: UiGitCommit, content: <p>host view body</p> };
+    render(
+      <div className="h-[720px]">
+        <SessionInspector session={COLLECTION} layout="compact" hostTabs={[hostTab]} />
+      </div>,
+    );
+    const toolbar = screen.getByRole("toolbar", { name: "Session detail controls" });
+    const names = within(toolbar).getAllByRole("tab").map((tab) => tab.textContent?.trim());
+
+    expect(names.slice(names.indexOf("Transcript"), names.indexOf("Transcript") + 2)).toEqual(["Transcript", "Branch changes"]);
+    expect(names.indexOf("Branch changes")).toBeLessThan(names.length - 1);
+  });
+
   it("refuses host tabs outside the compact layout and ids that shadow inspector tabs", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const tab = { id: "branch-changes", label: "Changes", icon: UiGitCommit, content: null };

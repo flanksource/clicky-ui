@@ -221,7 +221,8 @@ describe("SessionInspector", () => {
     );
 
     expect(screen.getByText("done")).toBeInTheDocument();
-    expect(screen.getAllByTitle("Turn turn-1")).toHaveLength(2);
+    // Only the message carries its turn badge; the header has no turn legend.
+    expect(screen.getAllByTitle("Turn turn-1")).toHaveLength(1);
 
     expect(
       screen.queryByRole("tab", { name: /Turns/ }),
@@ -354,23 +355,19 @@ describe("SessionInspector", () => {
     expect(
       within(viewerActions).getByRole("button", { name: "Session options" }),
     ).toBeInTheDocument();
-    const badges = screen.getAllByTestId("transcript-turn-badge");
-    expect(badges).toHaveLength(3);
-    expect(badges[0]).toHaveClass("px-1", "py-px", "text-[9px]");
-    expect(badges[0]).toHaveAttribute("data-turn-color");
-    expect(badges[0]?.getAttribute("data-turn-color")).not.toBe(
-      badges[1]?.getAttribute("data-turn-color"),
-    );
+    expect(
+      within(viewerActions).queryByLabelText("Turn colors"),
+    ).not.toBeInTheDocument();
     const messageBadges = screen.getAllByTestId("message-turn-badge");
     expect(messageBadges).toHaveLength(3);
+    expect(messageBadges[0]).toHaveClass("px-1", "py-px", "text-[9px]");
+    expect(messageBadges[0]?.getAttribute("data-turn-color")).not.toBe(
+      messageBadges[1]?.getAttribute("data-turn-color"),
+    );
     expect(messageBadges[2]).toHaveTextContent("turn-3");
     expect(
       messageBadges[2]?.closest('[data-event-kind="assistant"]'),
     ).toHaveTextContent("third turn");
-    expect(messageBadges[2]).toHaveAttribute(
-      "data-turn-color",
-      badges[2]?.getAttribute("data-turn-color"),
-    );
 
     fireEvent.click(hierarchyPicker);
     const tree = screen.getByRole("tree", { name: "Session content" });

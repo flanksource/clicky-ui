@@ -60,6 +60,11 @@ const CONSUMED_INPUT_KEYS: Record<string, readonly string[]> = {
   ApplyPatch: ["input", "patch", "arguments", "files", "file_path", "operation", "to"],
 };
 
+/** Inputs left at a default the rendered diff already conveys. */
+const DEFAULT_INPUT_VALUES: Record<string, Readonly<Record<string, unknown>>> = {
+  Edit: { replace_all: false },
+};
+
 /** One file of a Codex patch, as captain's ParseApplyPatch emits it. */
 interface ApplyPatchFile {
   op?: string;
@@ -103,10 +108,12 @@ export function toolInputParams(
   cwd?: string,
 ): ToolParam[] {
   const consumed = CONSUMED_INPUT_KEYS[tool] ?? [];
+  const defaults = DEFAULT_INPUT_VALUES[tool] ?? {};
   return Object.entries(input ?? {})
     .filter(
       ([name, value]) =>
         !consumed.includes(name) &&
+        !(name in defaults && defaults[name] === value) &&
         value !== undefined &&
         value !== null &&
         value !== "",
@@ -454,4 +461,47 @@ export function optionAnswered(option: SessionQuestionOption, answers: readonly 
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/** A prose field of a tool call: its title, or a Markdown body to render. */
+export type MarkdownToolField = { key: string; text: string; kind: "title" | "markdown" };
+
+const MARKDOWN_KEYS = new Set(["body", "summary", "description", "comment"]);
+
+/**
+ * The prose a tool call carries, whatever the tool: a string `title`, and any
+ * `body`/`summary`/`description`/`comment`/`*markdown` field, found by name so
+ * MCP and host tools (reply_to_thread, resolve_thread, create PR/issue…) read as
+ * the text they post rather than one escaped JSON string. Titles come first,
+ * then bodies in argument order; empty for a call with neither.
+ */
+export function markdownToolFields(input: Record<string, unknown> | undefined): MarkdownToolField[] {
+  const fields = Object.entries(input ?? {}).flatMap(([key, value]): MarkdownToolField[] => {
+    if (typeof value !== "string" || value.trim() === "") return [];
+    const lower = key.toLowerCase();
+    if (lower === "title") return [{ key, text: value, kind: "title" }];
+    return MARKDOWN_KEYS.has(lower) || lower.endsWith("markdown") ? [{ key, text: value, kind: "markdown" }] : [];
+  });
+  return [...fields.filter((field) => field.kind === "title"), ...fields.filter((field) => field.kind === "markdown")];
+}
+
+/** A message whose whole text is one JSON object carrying prose fields — a
+ *  structured reply such as `{comment, event, success}` — parsed so the prose
+ *  can render as Markdown. Anything else is ordinary message text. */
+export function jsonMessageFields(
+  text: string | undefined,
+): { input: Record<string, unknown>; fields: MarkdownToolField[] } | undefined {
+  const trimmed = text?.trim() ?? "";
+  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    // Brace-wrapped text that is not valid JSON is prose, not a structured reply.
+    return undefined;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return undefined;
+  const input = parsed as Record<string, unknown>;
+  const fields = markdownToolFields(input);
+  return fields.length > 0 ? { input, fields } : undefined;
 }

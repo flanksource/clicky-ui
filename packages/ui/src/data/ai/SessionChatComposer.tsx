@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
-import { Select } from "../../components";
+import { Button } from "../../components/button";
+import { UiCheck } from "../../icons";
+import { DropdownMenu } from "../../overlay/DropdownMenu";
 import { PromptInput } from "../chat/PromptInput";
 import { CLAUDE_PERMISSION_MODE_OPTIONS } from "../chat/types";
 import { Icon } from "../Icon";
@@ -83,11 +85,11 @@ export function SessionChatComposer({
         {...(onPermissionModeChange ? { onChange: onPermissionModeChange } : {})}
       />
     ) : null;
-  const composedToolbar =
-    picker || toolbar ? (
+  const composedAccessory =
+    picker || inputAccessory ? (
       <>
+        {inputAccessory}
         {picker}
-        {toolbar}
       </>
     ) : undefined;
 
@@ -121,8 +123,8 @@ export function SessionChatComposer({
           status === "idle" ? "Continue this session…" : "Add a follow-up…"
         }
         onSubmit={(text) => onSubmit(text)}
-        {...(inputAccessory ? { inputAccessory } : {})}
-        {...(composedToolbar ? { toolbar: composedToolbar } : {})}
+        {...(composedAccessory ? { inputAccessory: composedAccessory } : {})}
+        {...(toolbar ? { toolbar } : {})}
         {...(capabilities.interrupt && status === "running" && onInterrupt
           ? { onStop: onInterrupt }
           : {})}
@@ -145,34 +147,45 @@ function PermissionModePicker({
   onChange?: (mode: SpecPermissionMode) => void;
 }) {
   const visual = permissionModeVisual(family, mode);
-  const tone = sessionTone(visual.tone);
+  const name = `Permission mode: ${visual.label}`;
   return (
-    <div className="inline-flex items-center gap-1.5">
-      <Icon
-        icon={visual.icon}
-        title={visual.label}
-        className={`size-3.5 ${tone.text}`}
-      />
-      <Select
-        aria-label="Permission mode"
-        value={mode}
-        disabled={readOnly}
-        onChange={(event) =>
-          onChange?.(event.target.value as SpecPermissionMode)
-        }
-        className="h-7 w-auto min-w-24 py-0 text-xs"
-      >
-        {modes.map((candidate) => (
-          <option
-            key={candidate}
-            value={candidate}
-            title={descriptionFor(family, candidate)}
-          >
-            {permissionModeVisual(family, candidate).label}
-          </option>
-        ))}
-      </Select>
-    </div>
+    <DropdownMenu
+      align="right"
+      menuLabel="Permission mode"
+      trigger={
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          aria-label={name}
+          title={name}
+          disabled={readOnly}
+          className="[&_svg]:size-5"
+        >
+          <Icon icon={visual.icon} className={`size-5 ${sessionTone(visual.tone).text}`} />
+        </Button>
+      }
+      items={modes.map((candidate) => {
+        const option = permissionModeVisual(family, candidate);
+        const description = descriptionFor(family, candidate);
+        return {
+          label: (
+            <span className="inline-flex w-full items-center gap-2">
+              {option.label}
+              {candidate === mode && (
+                <span data-current-mode className="ml-auto inline-flex">
+                  <Icon icon={UiCheck} title="Current mode" className="size-3.5" />
+                </span>
+              )}
+            </span>
+          ),
+          icon: option.icon,
+          iconClassName: sessionTone(option.tone).text,
+          ...(description ? { title: description } : {}),
+          onSelect: () => onChange?.(candidate),
+        };
+      })}
+    />
   );
 }
 
