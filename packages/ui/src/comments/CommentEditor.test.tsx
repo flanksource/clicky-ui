@@ -7,6 +7,22 @@ import { vocabularyHref, type CommentVocabulary } from "./comment-vocabulary";
 const item = { catalog: "example", type: "box", id: "box/header", label: "Header", description: "Role-coloured header", references: ["src/boxes.ts"] };
 const vocabulary: CommentVocabulary = { items: [item], renderPreview: entry => <span>Preview: {entry.id}</span> };
 describe("CommentEditor", () => {
+  it("focuses the editor when an autofocused composer mounts", () => {
+    render(<CommentEditor value="Saved draft" onChange={vi.fn()} mentionables={[]} autoFocus />);
+
+    expect(screen.getByRole("textbox")).toHaveFocus();
+  });
+
+  it("applies a restored body to the DOM when the controlled value changes", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<CommentEditor value="" onChange={onChange} mentionables={[]} />);
+
+    rerender(<CommentEditor value="Saved draft" onChange={onChange} mentionables={[]} />);
+
+    expect(screen.getByRole("textbox")).toHaveTextContent("Saved draft");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("previews an item before keyboard insertion and reserves Enter for selection", async () => {
     const submit = vi.fn();
     const change = vi.fn();
