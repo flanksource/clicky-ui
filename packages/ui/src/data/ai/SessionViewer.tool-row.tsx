@@ -191,7 +191,7 @@ export function ToolBody({
 
   const params = toolInputParams(event.tool ?? "", event.toolInput, event.cwd);
   const diff = toolDiff(event.tool ?? "", event.toolInput);
-  const markdownFields = markdownToolFields(event.toolInput);
+  const markdownFields = markdownToolFields(event.toolInput, event.tool);
   const header = (
     <>
       {visual.summaryOnly && summary ? (

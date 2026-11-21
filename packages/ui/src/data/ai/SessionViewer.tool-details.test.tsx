@@ -56,6 +56,39 @@ describe("Tool calls carrying prose", () => {
     });
     expect(container.querySelector('[data-tool-markdown-input] [data-format="yaml"]')?.textContent).not.toContain("Where it comes from");
   });
+
+  it("renders a sub-agent handback's message as Markdown", async () => {
+    const session: UnifiedSessionInput = {
+      messages: [
+        {
+          id: "handback",
+          role: "assistant",
+          parts: [
+            {
+              type: "dynamic-tool",
+              toolName: "SubAgentHandback",
+              input: { message: "**Root cause:** stale cache\n\n- cleared\n- retried", status: "completed" },
+              output: "ok",
+            },
+          ],
+        },
+      ],
+    };
+    const { container } = render(<SessionViewer session={session} defaultExpanded />);
+
+    const strong = '[data-tool-markdown-field="message"] [data-streamdown="strong"]';
+    await waitFor(() => expect(container.querySelector(strong)).not.toBeNull());
+    const message = container.querySelector('[data-tool-markdown-field="message"]');
+    expect({
+      bold: container.querySelector(strong)?.textContent,
+      items: [...(message?.querySelectorAll("li") ?? [])].map((item) => item.textContent),
+      rest: container.querySelector('[data-tool-markdown-input] [data-format="yaml"]')?.textContent,
+    }).toEqual({
+      bold: "Root cause:",
+      items: ["cleared", "retried"],
+      rest: expect.stringContaining("status: completed"),
+    });
+  });
 });
 
 describe("Tool detail density", () => {

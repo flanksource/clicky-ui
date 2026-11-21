@@ -95,6 +95,13 @@ describe("markdownToolFields", () => {
       markdownToolFields(undefined),
     ]).toEqual([[], [], []]);
   });
+
+  it("reads a sub-agent handback's message as Markdown", () => {
+    const message = "## Findings\n\n- **root cause** in the parser";
+    expect(markdownToolFields({ message, status: "completed" }, "SubAgentHandback")).toEqual([
+      { key: "message", text: message, kind: "markdown" },
+    ]);
+  });
 });
 
 describe("jsonMessageFields", () => {
