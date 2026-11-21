@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { StrictMode, type PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SearchValues } from "./api";
 import { searchExample, traceExample } from "./fixtures";
 import { OtelTraceBrowser } from "./OtelTraceBrowser";
+import story from "./OtelTraceBrowser.stories";
 
 // The presentational parts are covered by their own tests; these stand-ins expose
 // exactly what the container hands them and the callbacks it expects back.
@@ -18,6 +20,7 @@ vi.mock("./OtelTraceSearch", () => ({
       {props.result?.traces.map(trace => <a key={trace.traceId} href={props.href(trace.traceId)} onClick={event => { event.preventDefault(); props.onOpen(trace.traceId); }}>open {trace.traceId}</a>)}
       <button onClick={() => props.onChange({ attributes: {} })}>clear attributes</button>
       <button onClick={() => props.onChange({ limit: 25 })}>limit 25</button>
+      <button onClick={() => props.onChange({ offset: 100 })}>next page</button>
       <button onClick={props.onRetry}>retry</button>
     </div>
   ),
@@ -55,7 +58,8 @@ const lastSearch = () => requested().filter(url => url.pathname === base).at(-1)
 
 function mount(props: Partial<React.ComponentProps<typeof OtelTraceBrowser>> = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { gcTime: 0 } } });
-  return render(<QueryClientProvider client={client}><OtelTraceBrowser baseUrl={base} sources={sources} defaults={defaults} {...props} /></QueryClientProvider>);
+  const wrapper = ({ children }: PropsWithChildren) => <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return render(<OtelTraceBrowser baseUrl={base} sources={sources} defaults={defaults} {...props} />, { wrapper });
 }
 
 const shownValue = () => JSON.parse(screen.getByTestId("value").textContent!) as SearchValues;
@@ -65,6 +69,21 @@ beforeEach(() => {
   serve();
 });
 afterEach(() => vi.unstubAllGlobals());
+
+it("keeps the story mock active until the last canvas unmounts, then restores fetch", async () => {
+  const realFetch = window.fetch;
+  const Story = story.render;
+  const first = render(<StrictMode><Story {...story.args} /></StrictMode>);
+  const second = render(<Story {...story.args} />);
+  await within(first.container).findByRole("link", { name: `open ${traceId}` });
+  await within(second.container).findByRole("link", { name: `open ${traceId}` });
+  expect(fetchMock).not.toHaveBeenCalled();
+
+  first.unmount();
+  expect(await (await window.fetch(story.args.baseUrl)).json()).toMatchObject({ total: 2 });
+  second.unmount();
+  expect(window.fetch).toBe(realFetch);
+});
 
 describe("searching", () => {
   it("requests the defaults on the single source and lists the traces", async () => {
@@ -84,6 +103,36 @@ describe("searching", () => {
   it("refuses to render with no source to search", () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     expect(() => mount({ sources: [] })).toThrow(/at least one source/);
+  });
+
+  it.each([
+    ["source", "other"],
+    ["run", "next-run"],
+    ["index", "next-index"],
+    ["format", "flat"],
+    ["baseUrl", "/api/other/traces"],
+  ])("keeps pending page rows in the same scope and removes them when %s changes", async (key, replacement) => {
+    const view = mount();
+    const link = await screen.findByRole("link", { name: `open ${traceId}` });
+    fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
+
+    fireEvent.click(screen.getByText("next page"));
+    await waitFor(() => expect(lastSearch().searchParams.get("offset")).toBe("100"));
+    expect(link).toBeInTheDocument();
+
+    if (key === "baseUrl") {
+      view.rerender(<OtelTraceBrowser baseUrl={replacement} sources={sources} defaults={defaults} />);
+      await waitFor(() => expect(requested().at(-1)?.pathname).toBe(replacement));
+    } else {
+      act(() => {
+        const query = new URLSearchParams(window.location.search);
+        query.set(key, replacement);
+        window.history.pushState(null, "", `?${query}`);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      });
+      await waitFor(() => expect(lastSearch().searchParams.get(key)).toBe(replacement));
+    }
+    expect(link).not.toBeInTheDocument();
   });
 });
 
@@ -113,6 +162,26 @@ describe("pinned values", () => {
 });
 
 describe("the URL", () => {
+  it.each([false, true])("keeps cleared default attributes cleared on reload (pinned: %s)", async withPin => {
+    const attributes = { "db.system=postgresql": "include" } as const;
+    const pins = withPin ? planPin : {};
+    const expected = withPin ? JSON.stringify(planPin.attributes) : null;
+    const props = { defaults: { ...defaults, attributes }, pinned: pins };
+    const first = mount(props);
+    await screen.findByText(`open ${traceId}`);
+    expect(JSON.parse(lastSearch().searchParams.get("attributes")!)).toMatchObject(attributes);
+
+    fireEvent.click(screen.getByText("clear attributes"));
+    await waitFor(() => expect(lastSearch().searchParams.get("attributes")).toBe(expected));
+    expect(new URLSearchParams(window.location.search).get("attributes")).toBe("{}");
+    first.unmount();
+
+    mount(props);
+    await screen.findByText(`open ${traceId}`);
+    expect(lastSearch().searchParams.get("attributes")).toBe(expected);
+    expect(shownValue().attributes).toEqual(withPin ? planPin.attributes : {});
+  });
+
   it("keeps the path and the host's own query keys when the search changes, replacing history", async () => {
     window.history.replaceState(null, "", "/plan/p1/telemetry?env=lab&lookback=6h");
     const entries = window.history.length;

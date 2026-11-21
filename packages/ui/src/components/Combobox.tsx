@@ -238,14 +238,17 @@ export function Combobox(props: ComboboxProps) {
   }
 
   function setMode(value: string, mode: string) {
+    if (mode === "include" || mode === "exclude") {
+      emitModes({ ...modes, [value]: mode });
+      return;
+    }
     const next = { ...modes };
-    if (mode === "include" || mode === "exclude") next[value] = mode;
-    else delete next[value];
+    delete next[value];
     emitModes(next);
   }
 
   function cycleOption(value: string) {
-    const current = modes[value];
+    const current = Object.hasOwn(modes, value) ? modes[value] : undefined;
     setMode(
       value,
       current === undefined

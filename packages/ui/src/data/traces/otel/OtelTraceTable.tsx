@@ -122,6 +122,9 @@ export function OtelTraceTable({
     ? opened.trace
     : result.traces?.find((trace) => trace.summary.traceId === selectedTraceId);
   const openError = openTrace?.error ?? opened?.error;
+  const openHeader = openTrace && (
+    <OpenTraceHeader trace={openTrace} filters={tableProps.externalFilters} search={tableProps.externalSearch} />
+  );
   return (
     // A flex column so the listing's DataTable fills a bounded parent: its body
     // scrolls and the pagination footer stays on screen.
@@ -148,20 +151,10 @@ export function OtelTraceTable({
               {...(selectedSpanId ? { selectedSpanId } : {})}
               {...(renderTraceTitle ? { renderTitle: renderTraceTitle } : {})}
               {...(openTrace?.matchingSpanIds ? { visibleSpanIds: openTrace.matchingSpanIds } : {})}
-              {...(openTrace
-                ? {
-                    header: (
-                      <OpenTraceHeader
-                        trace={openTrace}
-                        filters={tableProps.externalFilters}
-                        search={tableProps.externalSearch}
-                      />
-                    ),
-                  }
-                : {})}
+              {...(openHeader ? { header: openHeader } : {})}
               onSelectSpan={onSelectSpan}
             />
-          ) : openTrace?.loading ? (
+          ) : openTrace?.onLoadMore ? openHeader : openTrace?.loading ? (
             <p role="status">Loading trace…</p>
           ) : (
             <p role="status">
@@ -213,13 +206,14 @@ function OpenTraceHeader({
   filters: FilterBarFilter[] | undefined;
   search: FilterBarSearchProps | undefined;
 }) {
-  const total = trace.total ?? trace.spans.length;
+  const { total, onLoadMore, matchingSpanIds } = trace;
+  const loaded = trace.spans.length;
   const progress = [
-    trace.spans.length < total || trace.onLoadMore
-      ? `${trace.spans.length} of ${total} spans loaded`
+    onLoadMore || (total !== undefined && loaded < total)
+      ? `${loaded}${total === undefined ? "" : ` of ${total}`} spans loaded`
       : undefined,
-    trace.matchingSpanIds
-      ? `${trace.matchingSpanIds.size} of ${total} spans match`
+    matchingSpanIds
+      ? `${matchingSpanIds.size}${total === undefined ? " loaded" : ` of ${total}`} spans match`
       : undefined,
   ].filter(Boolean);
   return (

@@ -149,6 +149,16 @@ it("pages a large trace: reports how many spans are loaded and asks for the next
   expect(onLoadMore).toHaveBeenCalledOnce();
 });
 
+it.each([0, 3])("offers paging with %i spans loaded and an unknown total", loaded => {
+  const onLoadMore = vi.fn();
+  render(<OtelTraceTable {...props} selectedTraceId={traceId} openTrace={{
+    spans: traceExample.spans.slice(0, loaded), loading: false, onLoadMore,
+  }} />);
+  expect(screen.getByRole("status").textContent).toBe(`${loaded} spans loaded`);
+  fireEvent.click(screen.getByRole("button", { name: "Load more spans" }));
+  expect(onLoadMore).toHaveBeenCalledOnce();
+});
+
 it("narrows the open trace to the spans the filters match, keeping their ancestors", () => {
   const filters = [{ key: "filter.duration_ms", kind: "text" as const, label: "Span duration", value: ">=10ms", onChange: vi.fn() }];
   render(

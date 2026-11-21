@@ -8,6 +8,7 @@ const SEARCH_KEYS = [
   "source", "run", "index", "format", "services", "operations", "statuses", "attributes", "minSpans", "traceId",
   "lookback", "from", "until", "minDuration", "maxDuration", "limit", "offset",
 ] as const;
+const SEARCH_KEY_SET: ReadonlySet<string> = new Set(SEARCH_KEYS);
 const TRACE_KEY = "trace";
 const SPAN_KEY = "span";
 const OWNED_KEYS: ReadonlySet<string> = new Set([...SEARCH_KEYS, TRACE_KEY, SPAN_KEY]);
@@ -24,10 +25,19 @@ export interface BrowserLocation {
 export function readBrowserLocation(search: string): BrowserLocation {
   const params = new URLSearchParams(search);
   const owned = new URLSearchParams();
-  for (const [key, value] of params) if (SEARCH_KEYS.includes(key as (typeof SEARCH_KEYS)[number])) owned.append(key, value);
+  const cleared: SearchValues = {};
+  for (const [key, value] of params) {
+    if (!SEARCH_KEY_SET.has(key)) continue;
+    if (value === "" && !isModeFilter(key)) {
+      cleared[key] = undefined;
+      owned.delete(key);
+    } else {
+      owned.append(key, value);
+    }
+  }
   const trace = params.get(TRACE_KEY);
   const span = params.get(SPAN_KEY);
-  return { values: readSearchValues(owned), ...(trace ? { trace } : {}), ...(span ? { span } : {}) };
+  return { values: { ...cleared, ...readSearchValues(owned) }, ...(trace ? { trace } : {}), ...(span ? { span } : {}) };
 }
 
 /** The values with the pinned ones added: a pinned mode filter entry wins over the user's, a pinned scalar replaces theirs. */
@@ -49,7 +59,7 @@ export function withoutPinned(values: SearchValues, pinned: SearchValues): Searc
       if (rest[key] === pin) delete rest[key];
       continue;
     }
-    const left = Object.fromEntries(Object.entries((rest[key] ?? {}) as Modes).filter(([entry]) => !(entry in (pin as Modes))));
+    const left = Object.fromEntries(Object.entries((rest[key] ?? {}) as Modes).filter(([entry]) => !Object.hasOwn(pin as Modes, entry)));
     if (Object.keys(left).length > 0) rest[key] = left;
     else delete rest[key];
   }
@@ -57,12 +67,17 @@ export function withoutPinned(values: SearchValues, pinned: SearchValues): Searc
 }
 
 /** The path with the current query's host keys kept and the otel keys (search values, trace, span) replaced. */
-export function browserHref({ pathname, search, values, pinned, trace, span }: {
-  pathname: string; search: string; values: SearchValues; pinned: SearchValues; trace?: string | undefined; span?: string | undefined;
+export function browserHref({ pathname, search, values, pinned, defaults = {}, trace, span }: {
+  pathname: string; search: string; values: SearchValues; pinned: SearchValues; defaults?: SearchValues; trace?: string | undefined; span?: string | undefined;
 }): string {
   const query = new URLSearchParams();
   for (const [key, value] of new URLSearchParams(search)) if (!OWNED_KEYS.has(key)) query.append(key, value);
   for (const [key, value] of searchParams(withoutPinned(values, pinned))) query.set(key, value);
+  // Cleared defaults must survive navigation without becoming API parameters.
+  const defaultParams = searchParams(withoutPinned(mergePinned(defaults, pinned), pinned));
+  for (const key of SEARCH_KEYS) {
+    if (defaultParams.has(key) && !query.has(key)) query.set(key, isModeFilter(key) ? "{}" : "");
+  }
   if (trace) query.set(TRACE_KEY, trace);
   if (trace && span) query.set(SPAN_KEY, span);
   const text = query.toString();

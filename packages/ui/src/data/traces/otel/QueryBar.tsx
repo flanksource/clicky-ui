@@ -34,9 +34,10 @@ export function QueryBar({ value, onChange: change, onError, sources, runs, resu
   const connection = sources.find(source => source.id === value.source && source.id !== "records");
   const multi = (key: ModeFilter, label: string, options: { value: string; label: string; description?: string }[], extra: Partial<FilterBarMultiFilter> = {}): FilterBarMultiFilter => {
     const locked = pinned[key] ?? {};
+    const selected = { ...value[key], ...locked };
     return {
-      ...extra, key, kind: "multi", label, value: { ...value[key], ...locked }, onChange: next => onChange({ [key]: { ...next, ...locked } }),
-      options: withSelected(options, value[key]).map(option => option.value in locked ? { ...option, disabled: true, description: "Pinned by this page" } : option),
+      ...extra, key, kind: "multi", label, value: selected, onChange: next => onChange({ [key]: { ...next, ...locked } }),
+      options: withSelected(options, selected).map(option => Object.hasOwn(locked, option.value) ? { ...option, disabled: true, description: "Pinned by this page" } : option),
     };
   };
   const filters: FilterBarFilter[] = [

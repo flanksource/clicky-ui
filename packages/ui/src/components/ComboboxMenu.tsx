@@ -97,7 +97,7 @@ export function ComboboxMenu({
         )}
         {filtered.map((option, index) => {
           const selected = isSelected(option.value);
-          const mode = tristate ? modes[option.value] : undefined;
+          const mode = tristate && Object.hasOwn(modes, option.value) ? modes[option.value] : undefined;
           const showHeader =
             option.group != null && option.group !== filtered[index - 1]?.group;
           const selectionIndicator = (

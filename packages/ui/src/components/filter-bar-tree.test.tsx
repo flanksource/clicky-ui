@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { FilterBar, type FilterBarFilter } from "./FilterBar";
@@ -161,23 +161,28 @@ describe("TreeFilterField", () => {
   });
 
   it("cycles a leaf neutral, include, exclude, neutral when its row is clicked", async () => {
-    const onChange = vi.fn();
-    render(<Harness onChange={onChange} />);
-    open();
-    // The trigger summary repeats the label once the node is selected.
-    const row = () => within(screen.getByRole("tree")).getByText("Overview");
-    fireEvent.click(screen.getByText("Globex"));
+    vi.useFakeTimers();
+    try {
+      const onChange = vi.fn();
+      render(<Harness onChange={onChange} />);
+      open();
+      fireEvent.click(screen.getByText("Globex"));
+      const tree = within(screen.getByRole("tree"));
 
-    fireEvent.click(row());
-    expect(await committed(onChange)).toEqual({ "globex/overview": "include" });
-    fireEvent.click(row());
-    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith({ "globex/overview": "exclude" }), {
-      timeout: FILTER_INPUT_DEBOUNCE_MS * 4,
-    });
-    fireEvent.click(row());
-    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith({}), {
-      timeout: FILTER_INPUT_DEBOUNCE_MS * 4,
-    });
+      const selections: TreeValue[] = [
+        { "globex/overview": "include" },
+        { "globex/overview": "exclude" },
+        {},
+      ];
+      for (const [index, selection] of selections.entries()) {
+        fireEvent.click(tree.getByText("Overview"));
+        await act(() => vi.advanceTimersByTimeAsync(FILTER_INPUT_DEBOUNCE_MS));
+        expect(onChange).toHaveBeenNthCalledWith(index + 1, selection);
+      }
+      expect(onChange).toHaveBeenCalledTimes(selections.length);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not select a folder when its row is clicked, it only expands", () => {

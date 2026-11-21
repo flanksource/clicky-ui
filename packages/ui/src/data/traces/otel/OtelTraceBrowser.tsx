@@ -1,5 +1,5 @@
 import { useMemo, useRef, useEffect, useState } from "react";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "../../../rpc/router";
 import { searchParams, type SearchResult, type SearchValues, type Source, type Trace } from "./api";
 import { browserHref, mergePinned, readBrowserLocation, withoutPinned, type BrowserLocation } from "./browser-state";
@@ -65,25 +65,26 @@ export function OtelTraceBrowser({ baseUrl, sources, defaults = NONE, pinned = N
 
   const locationSearch = window.location.search;
   const location = useMemo(() => parseLocation(locationSearch), [locationSearch]);
-  const [state, setState] = useState(() => ({ search: locationSearch, values: { ...baseValues, ...("error" in location ? {} : location.values) } as SearchValues }));
+  const [state, setState] = useState(() => ({ search: locationSearch, values: { ...baseValues, ...("error" in location ? {} : location.values) } }));
   if (state.search !== locationSearch && !("error" in location)) {
-    // The URL moved on its own (back, forward, a link): a value the user turned off stays off when the URL agrees with it.
-    const agrees = urlKey(location.values) === urlKey(withoutPinned(state.values, pinned));
-    setState({ search: locationSearch, values: agrees ? state.values : { ...baseValues, ...location.values } });
+    setState({ search: locationSearch, values: { ...baseValues, ...location.values } });
   }
   const values = mergePinned(state.values, pinned);
   const trace = "error" in location ? undefined : location.trace;
   const span = "error" in location ? undefined : location.span;
 
   const hrefFor = (next: SearchValues, to?: { trace: string; span?: string }) =>
-    browserHref({ pathname, search: window.location.search, values: next, pinned, trace: to?.trace, span: to?.span });
+    browserHref({ pathname, search: window.location.search, values: next, pinned, defaults: baseValues, trace: to?.trace, span: to?.span });
 
-  const search = useQuery({
-    queryKey: [SEARCH_KEY, baseUrl, values], enabled: !trace && !("error" in location), placeholderData: keepPreviousData, retry: false,
+  const scope = [baseUrl, values.source, values.run, values.index, values.format] as const;
+  const search = useQuery<SearchResult>({
+    queryKey: [SEARCH_KEY, ...scope, values], enabled: !trace && !("error" in location), retry: false,
+    placeholderData: (previous, query) =>
+      scope.every((part, index) => query?.queryKey[index + 1] === part) ? previous : undefined,
     queryFn: ({ signal }) => read<SearchResult>(`${baseUrl}?${searchParams(values)}`, signal),
   });
   const detail = useQuery({
-    queryKey: [TRACE_KEY, baseUrl, values.source, values.run, values.index, values.format, trace], enabled: !!trace, retry: false,
+    queryKey: [TRACE_KEY, ...scope, trace], enabled: !!trace, retry: false,
     queryFn: ({ signal }) => read<Trace>(`${baseUrl}/${encodeURIComponent(trace!)}?${searchParams({ source: values.source, run: values.run, index: values.index, format: values.format })}`, signal),
   });
 
@@ -98,7 +99,7 @@ export function OtelTraceBrowser({ baseUrl, sources, defaults = NONE, pinned = N
 
   if ("error" in location) return <div className="space-y-3">
     <p role="alert">Invalid trace search URL: {location.error}</p>
-    {renderLink({ to: hrefFor({}), children: "Clear search", className: "underline" })}
+    {renderLink({ to: browserHref({ pathname, search: locationSearch, values: {}, pinned }), children: "Clear search", className: "underline" })}
   </div>;
 
   if (trace) return <div className="min-w-0 space-y-3">

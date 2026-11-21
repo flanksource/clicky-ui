@@ -37,6 +37,11 @@ describe("withoutPinned", () => {
   it("drops a mode filter whose every entry is pinned", () => {
     expect(withoutPinned({ attributes: pinned.attributes }, pinned)).toEqual({});
   });
+
+  it("keeps a service named after an inherited property when only another service is pinned", () => {
+    expect(withoutPinned({ services: { constructor: "include", api: "include" } }, { services: { api: "include" } }))
+      .toEqual({ services: { constructor: "include" } });
+  });
 });
 
 describe("browserHref", () => {
@@ -52,5 +57,13 @@ describe("browserHref", () => {
 
   it("is the bare path when there is nothing to carry", () => {
     expect(browserHref({ pathname: "/t", search: "", values: {}, pinned: {} })).toBe("/t");
+  });
+
+  it("round-trips a cleared scalar default without serializing the pinned source", () => {
+    const defaults = { minSpans: 2, source: "records" };
+    const href = browserHref({ pathname: "/t", search: "", values: { minSpans: undefined }, defaults, pinned });
+    const { values } = readBrowserLocation(new URL(href, "http://localhost").search);
+    expect(href).toBe("/t?minSpans=");
+    expect({ ...defaults, ...values }).toEqual({ minSpans: undefined, source: "records" });
   });
 });
