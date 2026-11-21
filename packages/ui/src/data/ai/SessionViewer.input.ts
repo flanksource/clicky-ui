@@ -468,19 +468,29 @@ export type MarkdownToolField = { key: string; text: string; kind: "title" | "ma
 
 const MARKDOWN_KEYS = new Set(["body", "summary", "description", "comment"]);
 
+// Keys that are prose only for a specific tool: a generic `message` is often a
+// short status string, but a sub-agent's handback message is its Markdown report.
+const TOOL_MARKDOWN_KEYS: Record<string, ReadonlySet<string>> = {
+  SubAgentHandback: new Set(["message"]),
+};
+
 /**
  * The prose a tool call carries, whatever the tool: a string `title`, and any
  * `body`/`summary`/`description`/`comment`/`*markdown` field, found by name so
  * MCP and host tools (reply_to_thread, resolve_thread, create PR/issue…) read as
- * the text they post rather than one escaped JSON string. Titles come first,
- * then bodies in argument order; empty for a call with neither.
+ * the text they post rather than one escaped JSON string, plus the tool-specific
+ * prose keys of `tool`. Titles come first, then bodies in argument order; empty
+ * for a call with neither.
  */
-export function markdownToolFields(input: Record<string, unknown> | undefined): MarkdownToolField[] {
+export function markdownToolFields(input: Record<string, unknown> | undefined, tool?: string): MarkdownToolField[] {
+  const toolKeys = tool ? TOOL_MARKDOWN_KEYS[tool] : undefined;
   const fields = Object.entries(input ?? {}).flatMap(([key, value]): MarkdownToolField[] => {
     if (typeof value !== "string" || value.trim() === "") return [];
     const lower = key.toLowerCase();
     if (lower === "title") return [{ key, text: value, kind: "title" }];
-    return MARKDOWN_KEYS.has(lower) || lower.endsWith("markdown") ? [{ key, text: value, kind: "markdown" }] : [];
+    return MARKDOWN_KEYS.has(lower) || toolKeys?.has(lower) || lower.endsWith("markdown")
+      ? [{ key, text: value, kind: "markdown" }]
+      : [];
   });
   return [...fields.filter((field) => field.kind === "title"), ...fields.filter((field) => field.kind === "markdown")];
 }
