@@ -64,7 +64,8 @@ describe("GoProfileView", () => {
     // Two distinct stacks reach hashChunk: via process (1.2 s) and via verify (300 ms).
     expect(stacks.getByText(/^1\.2 s/)).toBeInTheDocument();
     expect(stacks.getByText(/^300 ms/)).toBeInTheDocument();
-    expect(stacks.getByText("app/runner.(*Runner).verify")).toBeInTheDocument();
+    const verifyFrame = stacks.getByText("app/runner.(*Runner).verify");
+    expect(within(verifyFrame).getByText("work.go:112")).toBeInTheDocument();
     fireEvent.click(within(document.querySelector('[data-profile-function="app/runner.hashChunk"]') as HTMLElement).getByRole("button"));
     expect(document.querySelector('[data-profile-stacks="app/runner.hashChunk"]')).toBeNull();
   });

@@ -12,7 +12,7 @@ function branchOption(item: GitBranchOption, prefix: string): ReferenceChoice {
   const value = item.name.startsWith(prefix) ? item.name : `${prefix}${item.name}`;
   return { value, label: item.name.replace(/^refs\/(heads|tags)\//, ""),
     description: [item.author, dateLabel(item.date), item.sha.slice(0, 7), item.subject].filter(Boolean).join(" · "),
-    icon: item.author ? <Avatar alt={item.author} size="xs" variant="mono" /> : <UiGitBranch />,
+    icon: item.author ? <Avatar alt={item.author} size="xs" variant="solid" /> : <UiGitBranch />,
     title: [value, item.sha, item.subject].filter(Boolean).join("\n"),
     ...(item.author ? { author: item.author } : {}), ...(item.date ? { date: dateLabel(item.date) } : {}), ...(item.subject ? { detail: item.subject } : {}) };
 }
@@ -40,7 +40,7 @@ export function GitCommitPicker(props: GitPickerProps<GitCommitOption>) {
     custom={(value) => /^[a-f\d]{40}$/i.test(value.trim()) ? { value: value.trim(), label: value.trim(), selectedLabel: value.trim().slice(0, 7), icon: <UiGitCommit /> } : null}
     option={(item) => ({ value: item.sha, label: item.subject, selectedLabel: item.sha.slice(0, 7),
       description: [item.author, dateLabel(item.date), item.sha.slice(0, 7)].filter(Boolean).join(" · "),
-      icon: item.author ? <Avatar alt={item.author} size="xs" variant="mono" /> : <UiGitCommit />, title: `${item.sha}\n${item.subject}`,
+      icon: item.author ? <Avatar alt={item.author} size="xs" variant="solid" /> : <UiGitCommit />, title: `${item.sha}\n${item.subject}`,
       detail: item.subject, ...(item.author ? { author: item.author } : {}), ...(item.date ? { date: dateLabel(item.date) } : {}) })} />;
 }
 
@@ -53,7 +53,7 @@ export function GitPipelineExecutionPicker(props: GitPickerProps<GitPipelineExec
   return <ReferencePicker {...props} label={props.label ?? "Pipeline execution"} plural="pipeline executions" option={(item) => ({ value: item.id,
     label: `#${item.number} ${item.name}`, selectedLabel: `#${item.number}`, group: item.result || item.status,
     description: [item.author, dateLabel(item.createdAt), item.branch, item.sha.slice(0, 7), item.status, item.result].filter(Boolean).join(" · "),
-    icon: item.author ? <Avatar alt={item.author} size="xs" variant="mono" /> : <UiPlayCircle />,
+    icon: item.author ? <Avatar alt={item.author} size="xs" variant="solid" /> : <UiPlayCircle />,
     title: `${item.id}\n${item.branch}\n${item.sha}`, detail: `${item.name} · ${item.result || item.status}`,
     ...(item.author ? { author: item.author } : {}), date: dateLabel(item.createdAt) })} />;
 }

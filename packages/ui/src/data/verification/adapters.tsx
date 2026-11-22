@@ -250,6 +250,8 @@ export function verificationAdapters(options: VerificationAdapterOptions = {}): 
         };
         // The step waits in its last attempt; that one keeps the step's identity so the host finds its prompt.
         const waiting = node.waiting === true && index === live;
+        // A finished step's log is its last attempt's; a report's attempts carry none.
+        if (index === live && node.log !== undefined && !node.running) attemptNode.log = node.log;
         return {
           id: attempt.attempt, status: attempt.status,
           ...(attempt.durationMs !== undefined ? { durationMs: attempt.durationMs } : {}),

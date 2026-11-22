@@ -38,6 +38,7 @@ function attemptTest(test: Test, attempt: TestAttempt, isLast: boolean): Test {
     message: _message,
     stdout: _stdout,
     stderr: _stderr,
+    log: _log,
     duration: _duration,
     ...identity
   } = test;
@@ -53,6 +54,7 @@ function attemptTest(test: Test, attempt: TestAttempt, isLast: boolean): Test {
     ...(attempt.message !== undefined ? { message: attempt.message } : {}),
     ...(attempt.stdout !== undefined ? { stdout: attempt.stdout } : {}),
     ...(attempt.stderr !== undefined ? { stderr: attempt.stderr } : {}),
+    ...(attempt.log !== undefined ? { log: attempt.log } : {}),
     ...(attempt.duration !== undefined ? { duration: attempt.duration } : {}),
     ...(attempt.command !== undefined ? { command: attempt.command } : {}),
     ...(isLast && failureDetail ? { failure_detail: failureDetail } : {}),

@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { UiFolderGit } from "../../../icons";
 import { ReferencePicker } from "./ReferencePicker";
 import { usePickerItems } from "./use-picker-items";
-import type { GitConnectionOption, GitPickerClient, GitPickerLoader, GitRepositoryOption, GitSourceValue } from "./types";
+import type { GitConnectionOption, GitPickerClient, GitPickerProps, GitPickerLoader, GitRepositoryOption, GitSourceValue } from "./types";
 
 interface CatalogRepository extends GitRepositoryOption { connection: string; pinned: boolean }
 
@@ -17,9 +17,10 @@ interface Props {
   disabled: boolean;
   compact: boolean;
   optionTrailing?: (value: GitSourceValue) => ReactNode;
+  variant?: GitPickerProps<unknown>["variant"];
 }
 
-export function RepositoryCatalogPicker({ client, connections, loading, error, onRetry, value, onChange, disabled, compact, optionTrailing }: Props) {
+export function RepositoryCatalogPicker({ client, connections, loading, error, onRetry, value, onChange, disabled, compact, optionTrailing, variant }: Props) {
   const [failures, setFailures] = useState<string[]>([]);
   const load = useMemo<GitPickerLoader<CatalogRepository>>(() => async ({ signal }) => {
     const results = await Promise.allSettled(connections.map(async (connection) => {
@@ -40,7 +41,7 @@ export function RepositoryCatalogPicker({ client, connections, loading, error, o
   return <ReferencePicker label="Repository" plural="repositories" items={repositories.items}
     value={value.repo ? `${value.connection}/${value.repo}` : value.connection}
     loading={loading || repositories.loading} error={error ?? repositories.error ?? (failures.length ? new Error(failures.join("; ")) : null)}
-    onRetry={error ? onRetry : repositories.retry} disabled={disabled}
+    onRetry={error ? onRetry : repositories.retry} disabled={disabled} {...(variant ? { variant } : {})}
     {...(compact ? { size: "sm", className: "w-64 max-w-full" } : {})}
     {...(optionTrailing ? { optionTrailing: (item: CatalogRepository) => optionTrailing(selected(item)) } : {})}
     option={(item) => ({ value: item.pinned ? item.connection : `${item.connection}/${item.fullName}`, label: item.fullName,

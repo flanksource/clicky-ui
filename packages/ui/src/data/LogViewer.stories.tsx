@@ -13,7 +13,7 @@ const meta: Meta<typeof LogViewer> = {
     docs: {
       description: {
         component:
-          "Expandable plain-text log block for dense detail panels. It starts with a fixed number of lines and can expand up to a viewport-height cap.",
+          "Expandable log block for dense detail panels. It starts with a fixed number of lines and can expand up to a viewport-height cap. Workflow commands in the log are read: groups become collapsible sections, statuses become lines, and the latest description, status and progress sit below the log. Raw shows the text as it was printed.",
       },
     },
   },
@@ -48,6 +48,28 @@ export const Groups: Story = {
       "::endgroup::",
       "::group::Test",
       "running 12 suites…",
+    ].join("\n"),
+  },
+};
+
+/** A running procedure that reports only through workflow commands. */
+export const StatusAndProgress: Story = {
+  args: {
+    variant: "terminal",
+    maxHeight: "none",
+    logs: [
+      "::description::Purging 500 staged activities",
+      "Warning: The join order has been enforced because a local join hint is used.",
+      "::group::Cycle tables",
+      "::status::Truncating AsCycle",
+      "::status::Truncating AsCycle",
+      "::progress::1/2",
+      "::endgroup::",
+      "::group::Table reload",
+      "::status::AsFundValue: copying kept rows, truncating, reloading",
+      "::progress::1/6",
+      "::status::AsFundValue: reloaded 1204 rows",
+      "::progress::2/6",
     ].join("\n"),
   },
 };

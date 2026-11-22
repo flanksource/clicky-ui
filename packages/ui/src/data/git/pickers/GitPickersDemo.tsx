@@ -24,7 +24,24 @@ export function GitPickersDemo() {
   const [branch, setBranch] = useState("refs/heads/main");
   const [pipeline, setPipeline] = useState("42");
   const [execution, setExecution] = useState("");
+  const [base, setBase] = useState("refs/heads/main");
+  const [head, setHead] = useState(branches[1]!.name);
   return <div className="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
+    <section className="min-w-0 space-y-3 md:col-span-2">
+      <h2 className="text-sm font-semibold">Click to edit</h2>
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <span>Merge into</span>
+        <GitBranchPicker variant="inline" label="Base branch" value={base} onChange={setBase} items={branches} />
+        <span aria-hidden="true">←</span>
+        <GitBranchPicker variant="inline" label="Head branch" value={head} onChange={setHead} items={branches} />
+        <span>at</span>
+        <GitPipelineExecutionPicker variant="inline" label="Pipeline execution" value={execution} onChange={setExecution} items={executions} />
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <span>Workbook</span>
+        <GitFilePicker variant="inline" client={client} value={file} onChange={setFile} accept={[".xlsx"]} />
+      </div>
+    </section>
     <section className="min-w-0 space-y-3">
       <h2 className="text-sm font-semibold">Workbook from Git</h2>
       <GitFilePicker client={client} value={file} onChange={setFile} accept={[".xlsx"]} help="Select a workbook at an immutable commit." />
