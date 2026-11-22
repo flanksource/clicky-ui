@@ -4,7 +4,6 @@ import { Button, ActionError, DOCUMENT_ANCHOR } from "@flanksource/clicky-ui";
 import { usePromptRuns } from "../prompt-runs/PromptRunsProvider";
 import { DOCUMENTS_REFRESH_EVENT } from "../navigation/refresh";
 import type { RepositoryMenuActions } from "../navigation/menus";
-import { refreshDocumentProblems, useDocumentProblems } from "./problems";
 import { useRepositoryCatalog } from "./catalog";
 import {
   RepositoryFolderSettings,
@@ -22,15 +21,12 @@ const workspaceAccess = workspaceAccessClient("/__playground/gavel/api/workspace
  * `useNavigationTree`.
  */
 export function useRepositoryNavigation({
-  activeSlug,
   pageHref,
 }: {
-  activeSlug: string | undefined;
   pageHref: (id: string) => string;
 }) {
   const catalog = useRepositoryCatalog();
   const { openPrompt } = usePromptRuns();
-  const problems = useDocumentProblems();
   const [picker, setPicker] = useState(false);
   const [access, setAccess] = useState(false);
   const [accessError, setAccessError] = useState("");
@@ -38,16 +34,12 @@ export function useRepositoryNavigation({
     setAccessError("");
     requestDocumentsRefresh();
     void catalog.refresh();
-    void refreshDocumentProblems();
   }, cause => setAccessError(cause.message)), []);
   const [openDocument, setOpenDocument] = useState<DocumentRepository>();
   const [settings, setSettings] = useState<{
     repository: DocumentRepository;
     path: string;
   }>();
-  useEffect(() => {
-    if (activeSlug?.startsWith("document:")) void refreshDocumentProblems();
-  }, [activeSlug]);
 
   const actions = useMemo<RepositoryMenuActions>(() => {
     const repositoryById = (id: string) => {
@@ -57,7 +49,7 @@ export function useRepositoryNavigation({
     };
     return {
       refresh: requestDocumentsRefresh,
-      lint: ({ id, path }) => {
+      review: ({ id, path }) => {
         const repository = repositoryById(id);
         openPrompt({
           page: `folder:${id}/${path}`,
@@ -79,18 +71,18 @@ export function useRepositoryNavigation({
             Add repository
           </Button>
           <Button size="sm" variant="outline" onClick={() => setAccess(true)}>Workspace access…</Button>
-          <Button size="sm" variant="ghost" onClick={() => { requestDocumentsRefresh(); void catalog.refresh(); void refreshDocumentProblems(); }}>
+          <Button size="sm" variant="ghost" onClick={() => { requestDocumentsRefresh(); void catalog.refresh(); }}>
             Refresh
           </Button>
         </div>
-        {(catalog.error || problems.error || accessError) && (
-          <ActionError title="Repository review unavailable" error={catalog.error ?? problems.error ?? accessError} context={[["Operation", "Load repository review"]]} className="mx-2 rounded-md bg-background text-xs text-foreground" />
+        {(catalog.error || accessError) && (
+          <ActionError title="Repository review unavailable" error={catalog.error ?? accessError} context={[["Operation", "Load repository review"]]} className="mx-2 rounded-md bg-background text-xs text-foreground" />
         )}
       </div>
     ),
     dialogs: (
       <>
-        {access && <WorkspaceAccessDialog client={workspaceAccess} initialPath={catalog.repositories[0]?.root ?? ""} onClose={() => setAccess(false)} onChanged={() => { requestDocumentsRefresh(); void catalog.refresh(); void refreshDocumentProblems(); }} />}
+        {access && <WorkspaceAccessDialog client={workspaceAccess} initialPath={catalog.repositories[0]?.root ?? ""} onClose={() => setAccess(false)} onChanged={() => { requestDocumentsRefresh(); void catalog.refresh(); }} />}
         {picker && <RepositoryPicker onClose={() => setPicker(false)} />}
         {settings && (
           <RepositoryFolderSettings

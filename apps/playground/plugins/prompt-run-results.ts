@@ -1,11 +1,18 @@
+import { isAbsolute, relative, resolve } from "node:path";
 import type { LinterResult } from "../../../packages/ui/src/data/lint/types";
 import { createRootComment, type CommentCreatedEvent } from "./comments-server";
 import { readAll } from "./comments-store";
 import type { PromptAssociation } from "./prompt-associations";
 import { promptResultComment } from "./prompt-result";
-import { problemFile } from "./document-problems";
 import { RepositoryDocuments } from "./repository-documents";
 import { LaunchHttpError, type LaunchSnapshot } from "./launch-client";
+
+function reviewFile(root: string, file: string, workDir = root): string {
+  const path = relative(root, isAbsolute(file) ? file : resolve(workDir, file)).replaceAll("\\", "/");
+  if (!path || path === ".." || path.startsWith("../") || !/\.(md|mdx|markdown)$/i.test(path))
+    throw new LaunchHttpError(422, `Lint finding is outside the Markdown review: ${file}`);
+  return path;
+}
 
 export async function persistPromptResult({
   dir,
@@ -40,7 +47,7 @@ export async function persistPromptResult({
         throw new LaunchHttpError(422, "Folder lint finding requires a file");
       const file =
         folder && item.file
-          ? problemFile(folder.repository.root, item.file, lint.work_dir)
+          ? reviewFile(folder.repository.root, item.file, lint.work_dir)
           : undefined;
       if (file && !entry.files?.includes(file))
         throw new LaunchHttpError(
@@ -103,7 +110,6 @@ export async function persistPromptResult({
   }
   entry.state = failure ? "failed" : violations.length ? "done" : "empty";
   if (failure) entry.error = failure;
-  if (!failure || violations.length) entry.results = results;
   entry.callbackSent = true;
   return notifications;
 }

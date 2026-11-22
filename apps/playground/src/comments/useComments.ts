@@ -72,6 +72,7 @@ export const PLAYGROUND_ASSIGNEES: NonNullable<CommentConfig["assignees"]> = [
 export const PLAYGROUND_COMMENT_CONFIG: CommentConfig = {
   statuses: DEFAULT_COMMENT_STATUSES,
   assignees: PLAYGROUND_ASSIGNEES,
+  canEditThread: (root) => root.status !== "closed" && !root.submission,
 };
 
 /** A comment as the API returns it: tagged with the page it was left on. */
@@ -176,6 +177,7 @@ export type PlaygroundComments = {
     screenshot?: Promise<CommentScreenshotCapture>,
   ) => void;
   reply: (input: CommentReplyInput) => Promise<void>;
+  edit: (id: string, body: string) => Promise<void>;
   updateStatus: (id: string, status: string) => Promise<void>;
   /** Claim a thread for the current user. */
   acknowledge: (id: string) => Promise<void>;
@@ -594,17 +596,19 @@ export function useComments(
     [mutate, post],
   );
 
-  const updateRating = useCallback(
-    (id: string, rating: CommentRating) =>
+  const patch = useCallback(
+    (id: string, changes: { body: string } | { rating: CommentRating }) =>
       mutate(() =>
         request(`${COMMENTS_ROUTE}/${encodeURIComponent(id)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rating }),
+          body: JSON.stringify(changes),
         }),
       ),
     [mutate],
   );
+  const edit = useCallback((id: string, body: string) => patch(id, { body }), [patch]);
+  const updateRating = useCallback((id: string, rating: CommentRating) => patch(id, { rating }), [patch]);
 
   const remove = useCallback(
     (id: string) =>
@@ -625,6 +629,7 @@ export function useComments(
     captureSelection,
     prepareSelection,
     reply,
+    edit,
     updateStatus,
     acknowledge,
     assign,

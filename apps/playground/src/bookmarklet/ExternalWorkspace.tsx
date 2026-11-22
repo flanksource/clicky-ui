@@ -67,7 +67,7 @@ export function ExternalWorkspace({
   const activityMap = useMemo(() => mergeActivity(activity.feedback, activity.updates), [activity.feedback, activity.updates]);
   const onQueryChange = useCallback((query: string) => setSidebar({ query }, { replace: true }), [setSidebar]);
   const layoutDefaults = useExplorerLayoutDefaults();
-  const repositoryNavigation = useRepositoryNavigation({ activeSlug: id, pageHref });
+  const repositoryNavigation = useRepositoryNavigation({ pageHref });
   const navigationMenu = useMemo<NavigationMenuDeps>(
     () => ({
       actionsDisabled: true,
@@ -82,6 +82,7 @@ export function ExternalWorkspace({
   const { recent, metadataError } = useRecentSection({ activeSlug: id, activity: activityMap, query: sidebar.query, filters: sidebar.filters, pageHref, loading: activity.loading });
   const page = catalog.pages.find((entry) => entry.id === id);
   const ctx = useCommentContext();
+  const capturesById = new Map(comments.map(({ id, element }) => [id, element]));
   const agentRuns = useAgentRuns();
   const feedback = useFeedbackCopy({
     active: undefined,
@@ -98,7 +99,7 @@ export function ExternalWorkspace({
   }, [review, commentsLoading, error, selected, id, selectedId, navigate]);
   const headerActions = (
     <>
-      <VocabularyStatus problemsError={tree.problemsError} />
+      <VocabularyStatus />
       <AgentSessionButton />
       <Button
         size="sm"
@@ -191,7 +192,7 @@ export function ExternalWorkspace({
                     className="rounded-md border border-border p-3"
                   >
                     <p className="mb-2 text-sm font-medium">{comment.body}</p>
-                    <CommentCapture capture={comment.element} />
+                    <CommentCapture capture={capturesById.get(comment.id)} />
                   </div>
                 ))}
             </div>
@@ -235,7 +236,7 @@ export function ExternalWorkspace({
               extraAssignItems={agentRuns.extraAssignItems}
               renderRootDetails={(comment) => (
                 <>
-                  <CommentCapture capture={comment.element} />
+                  <CommentCapture capture={capturesById.get(comment.id)} />
                   {agentRuns.renderRunDetails(comment)}
                 </>
               )}

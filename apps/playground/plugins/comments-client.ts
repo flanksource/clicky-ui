@@ -192,8 +192,7 @@ export class CommentsClient {
     }
     return body as T;
   }
-  async all(page?: string): Promise<CommentsFile> {
-    const data: CommentsFile = {};
+  async *threads(page?: string): AsyncGenerator<NativeComment> {
     for (let offset = 0; ; offset += 200) {
       const result = await this.request<{
         data: NativeComment[];
@@ -208,20 +207,20 @@ export class CommentsClient {
         result.page.limit !== 200
       )
         throw new Error("Gavel comments returned an invalid paged response");
-      const rows = result.data;
-      for (const c of rows) {
-        const page = c.content?.playground?.page;
-        if (!page) throw new Error(`Comment ${c.id} is missing its page`);
-        (data[page] ??= []).push(...project(c));
-      }
-      if (rows.length < 200) {
-        for (const list of Object.values(data))
-          list.sort((left, right) =>
-            left.createdAt.localeCompare(right.createdAt),
-          );
-        return data;
-      }
+      yield* result.data;
+      if (result.data.length < 200) return;
     }
+  }
+  async all(page?: string): Promise<CommentsFile> {
+    const data: CommentsFile = {};
+    for await (const thread of this.threads(page)) {
+      const slug = thread.content?.playground?.page;
+      if (!slug) throw new Error(`Comment ${thread.id} is missing its page`);
+      (data[slug] ??= []).push(...project(thread));
+    }
+    for (const list of Object.values(data))
+      list.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+    return data;
   }
   async batch(actions: Action[], author = localUser): Promise<NativeComment[]> {
     return actions.length
@@ -423,9 +422,14 @@ export class CommentsClient {
   }
 }
 async function findComment(client: CommentsClient, id: string) {
-  for (const [page, list] of Object.entries(await client.all())) {
-    const comment = list.find((c) => c.id === id);
-    if (comment) return { page, comment };
+  for await (const thread of client.threads()) {
+    const message = thread.messages?.find((item) => item.id === id);
+    if (thread.id !== id && !message) continue;
+    const page = thread.content?.playground?.page;
+    if (!page) throw new Error(`Comment ${thread.id} is missing its page`);
+    const comment = project(thread).find((item) => item.id === id);
+    if (!comment) throw new Error(`Comment ${id} could not be projected`);
+    return { page, comment, content: message ? message.content : thread.content };
   }
   throw new LaunchHttpError(404, `comment "${id}" not found`);
 }
@@ -491,7 +495,7 @@ export async function patchComment(
   } = {},
 ): Promise<StoredComment> {
   const client = await commentsClient(dir);
-  const { page, comment } = await findComment(client, id);
+  const { page, comment, content } = await findComment(client, id);
   const updated = { ...comment, ...patch } as StoredComment;
   if (patch.body !== undefined) {
     const refs = vocabularyReferences(patch.body, commentVocabularyItems(dir));
@@ -500,6 +504,7 @@ export async function patchComment(
   }
   for (const [key, value] of Object.entries(patch))
     if (value === null) delete (updated as Record<string, unknown>)[key];
+  const updatedContent = { ...content, ...contentFor(page, updated) };
   const actions: Action[] = [];
   let version = comment.version!;
   const root = comment.rootId ?? id;
@@ -510,7 +515,7 @@ export async function patchComment(
       action: "edit-reply",
       messageId: id,
       bodyMarkdown: updated.body,
-      content: contentFor(page, updated),
+      content: updatedContent,
     });
   } else {
     if (patch.body !== undefined)
@@ -551,7 +556,7 @@ export async function patchComment(
       id,
       expectedVersion: version++,
       action: "metadata",
-      content: contentFor(page, updated),
+      content: updatedContent,
     });
   }
   if (options.reply)

@@ -11,6 +11,7 @@ import {
   RESOLVED_STATUS,
   UNRESOLVED_STATUSES,
   assertStyleEdit,
+  configureTestComments,
   patchComment,
   readAll,
   withGavelAssignee,
@@ -155,6 +156,29 @@ describe("assignment fields in the comment store", () => {
       body: "Edited",
       version: 3,
       updatedAt: expect.any(String),
+    });
+  });
+
+  it("preserves Gavel metadata when editing the root and a reply", async () => {
+    await writeAll(dir, { sample: [comment] });
+    const client = await configureTestComments(dir);
+    const agentRun = { state: "sent", sessionId: "session-1", requestedAt: comment.createdAt };
+    const [updated] = await client.batch([{
+      id: comment.id, expectedVersion: 1, action: "metadata",
+      content: { playground: { page: "sample" }, agentRun },
+    }]);
+    const initialReply = await client.request<{ messages: { id: string }[] }>(`/${comment.id}/reply`, {
+      method: "POST",
+      body: JSON.stringify({ expectedVersion: updated!.version, bodyMarkdown: "Initial reply", content: { custom: { label: "Source" } } }),
+    });
+    const replyId = initialReply.messages[0]!.id;
+
+    await patchComment(dir, comment.id, { body: "Edited root" });
+    await patchComment(dir, replyId, { body: "Edited reply" });
+
+    expect(await client.request(`/${comment.id}`)).toMatchObject({
+      bodyMarkdown: "Edited root", content: { agentRun },
+      messages: [{ id: replyId, bodyMarkdown: "Edited reply", content: { custom: { label: "Source" } } }],
     });
   });
 });

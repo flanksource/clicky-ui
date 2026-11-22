@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { AppShellNavDrag, AppShellNavSection } from "@flanksource/clicky-ui";
-import { useDocumentProblems } from "../documents/problems";
 import type { SidebarState } from "../sidebar-state";
 import { fetchNavigation } from "./api";
 import { pageOnlyDrag } from "./drag";
@@ -22,8 +21,6 @@ export type NavigationTree = {
   olderCount: number | undefined;
   /** The root fetch failed; the tree keeps what it last had. Folder failures show on the folder. */
   error: Error | null;
-  /** Repository lint counts could not be loaded; the tree is still served without them. */
-  problemsError: string | undefined;
   /** The first root response has not arrived. */
   loading: boolean;
 };
@@ -77,7 +74,6 @@ export function useNavigationTree({
   const q = useDebounced(sidebar.query, SEARCH_DEBOUNCE_MS);
   const hard = useEventCounter(HARD_REFRESH_EVENTS);
   const soft = useEventCounter(SOFT_REFRESH_EVENTS);
-  const { results: problems } = useDocumentProblems();
   const generation = JSON.stringify([sidebar.sort, sidebar.filters, sidebar.age, q, hard]);
 
   const store = useRef<NodeStore>({ generation, nodes: new Map() });
@@ -85,7 +81,6 @@ export function useNavigationTree({
   const [cacheVersion, cacheChanged] = useReducer((value: number) => value + 1, 0);
   const [root, setRoot] = useState<Root | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const [problemsError, setProblemsError] = useState<string | undefined>(undefined);
 
   const rootRequests = useRef(0);
   const nodeRequests = useRef(new Map<string, number>());
@@ -104,7 +99,6 @@ export function useNavigationTree({
         if (request !== rootRequests.current || store.current !== requested) return;
         fillInlineChildren(requested.nodes, response.children);
         setRoot({ children: response.children, olderCount: response.olderCount, openKeys: collectOpenKeys(response.children) });
-        setProblemsError(response.problemsError);
         setError(null);
       },
       (cause: unknown) => {
@@ -113,7 +107,7 @@ export function useNavigationTree({
       },
     );
     return () => controller.abort();
-  }, [generation, activeSlug, soft, problems]);
+  }, [generation, activeSlug, soft]);
 
   const loadChildren = useCallback(
     (entry: NavigationEntry) => async (): Promise<NavChildren> => {
@@ -125,7 +119,6 @@ export function useNavigationTree({
       if (nodeRequests.current.get(entry.key) === request && store.current === requested) {
         requested.nodes.set(entry.key, response.children);
         fillInlineChildren(requested.nodes, response.children);
-        if (entry.source === "repository") setProblemsError(response.problemsError);
         cacheChanged();
       }
       // A response that a newer request or a newer query overtook must not replace what that one stored.
@@ -143,7 +136,6 @@ export function useNavigationTree({
       pageHref,
       generation,
       openKeys: root?.openKeys ?? new Set<string>(),
-      problemsError,
       childrenOf: (key) => store.current.nodes.get(key),
       loadChildren,
       menus: (entry) => entryMenus(entry, menu),
@@ -158,7 +150,7 @@ export function useNavigationTree({
       ...mapEntries(root?.children ?? [], ctx),
     };
     // store.current is read at map time; cacheVersion is what announces a change to it.
-  }, [root, error, problemsError, cacheVersion, activeSlug, sidebar.query, pageHref, generation, loadChildren, menu, onQueryChange, drag]);
+  }, [root, error, cacheVersion, activeSlug, sidebar.query, pageHref, generation, loadChildren, menu, onQueryChange, drag]);
 
-  return { section, olderCount: root?.olderCount, error, problemsError, loading: root === null && error === null };
+  return { section, olderCount: root?.olderCount, error, loading: root === null && error === null };
 }

@@ -1,5 +1,6 @@
 import { ActionError } from "@flanksource/clicky-ui";
 import { useState } from "react";
+import { CommentBodyEditor, type Comment } from "@flanksource/clicky-ui/comments";
 import {
   Badge,
   Button,
@@ -18,6 +19,7 @@ import {
   UiArrowRight,
   UiCheck,
   UiLock,
+  UiPencilSimpleLine,
   UiRestart,
   UiTrash,
   UiUserCheck,
@@ -25,7 +27,6 @@ import {
 } from "@flanksource/clicky-ui/icons";
 import { useAgentRuns } from "../agent-runs/AgentRunsProvider";
 import { PLAYGROUND_COMMENT_CONFIG, type PageComment } from "./useComments";
-import type { Comment } from "@flanksource/clicky-ui/comments";
 import { CroppedScreenshot } from "./CroppedScreenshot";
 import { CommentMiniThread } from "./CommentMiniThread";
 
@@ -76,7 +77,9 @@ export function CommentDashboardEntry({
   replies: Comment[];
 }) {
   const agentRuns = useAgentRuns();
-  const { config } = useCommentContext();
+  const { config, callbacks: { onEdit } } = useCommentContext();
+  const [editing, setEditing] = useState(false);
+  const canEdit = onEdit && config.canEditThread?.(comment) !== false;
   const status = PLAYGROUND_COMMENT_CONFIG.statuses.find(
     (entry) => entry.value === (comment.status ?? "open"),
   );
@@ -140,7 +143,11 @@ export function CommentDashboardEntry({
           </span>
         )}
         <div className="ml-auto">
-          <CommentDashboardActions comment={comment} href={href} />
+          <CommentDashboardActions
+            comment={comment}
+            href={href}
+            {...(canEdit && !editing ? { onEdit: () => setEditing(true) } : {})}
+          />
         </div>
         </div>
       </header>
@@ -153,30 +160,41 @@ export function CommentDashboardEntry({
       >
         {captured && <CommentScreenshot comment={comment} />}
         <div className="min-w-0 space-y-2 whitespace-normal">
-          <CommentMarkdown
-            text={comment.body}
-            {...(comment.vocabularyRefs ? { vocabularyRefs: comment.vocabularyRefs } : {})}
-            {...(config.vocabulary ? { vocabulary: config.vocabulary } : {})}
-            className="text-sm leading-relaxed"
-          />
+          {editing && onEdit ? (
+            <CommentBodyEditor
+              comment={comment}
+              config={config}
+              onSave={(body) => onEdit(comment.id, body)}
+              onDone={() => setEditing(false)}
+            />
+          ) : (
+            <CommentMarkdown
+              text={comment.body}
+              {...(comment.vocabularyRefs ? { vocabularyRefs: comment.vocabularyRefs } : {})}
+              {...(config.vocabulary ? { vocabulary: config.vocabulary } : {})}
+              className="text-sm leading-relaxed"
+            />
+          )}
           {comment.element?.componentName && (
             <p className="text-xs text-muted-foreground">
               {comment.element.componentName}
             </p>
           )}
-          <CommentMiniThread replies={replies} />
+          <CommentMiniThread root={comment} replies={replies} />
         </div>
       </div>
     </article>
   );
 }
 
-export function CommentDashboardActions({
+function CommentDashboardActions({
   comment,
   href,
+  onEdit,
 }: {
   comment: PageComment;
   href: string;
+  onEdit?: () => void;
 }) {
   const { callbacks } = useCommentContext();
   const { confirm, dialog } = useConfirm();
@@ -260,6 +278,11 @@ export function CommentDashboardActions({
         >
           <UiArrowRight className="size-4" />
         </a>
+        {onEdit && (
+          <Button size="sm" variant="ghost" aria-label="Edit comment" title="Edit comment" disabled={pending} onClick={onEdit}>
+            <UiPencilSimpleLine className="size-4" />
+          </Button>
+        )}
         <Button
           size="sm"
           variant="ghost"

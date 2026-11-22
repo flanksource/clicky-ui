@@ -3,7 +3,7 @@ import { workspaceJson } from "../repository-folder";
 import { containingFolder, directoryCacheKey, revealPaths, type NavigationTarget } from "../../src/documents/repository-navigation";
 import type { DirectoryEntry, DocumentRepository, RepositoryFolder } from "../../src/documents/types";
 import type { NavigationEntry } from "../../src/navigation/types";
-import { directoryActivity, directoryProblems, type ActivityIndex, type RepositoryActivity } from "./activity";
+import { directoryActivity, type ActivityIndex, type RepositoryActivity } from "./activity";
 import { documentKey, NavigationRequestError, repositoryKey } from "./keys";
 import { emptyActivity, matchesActivity, sortRanked, type Ranked, type ViewOptions } from "./tree";
 
@@ -42,7 +42,6 @@ export type RepositoryContext = {
   options: ViewOptions;
   activity: ActivityIndex;
   records: readonly RepositoryActivity[];
-  problems: ReadonlyMap<string, number>;
   /** The active document or folder when `options.active` is one; its ancestors come back open. */
   target: NavigationTarget | undefined;
 };
@@ -68,7 +67,6 @@ type EntryInput = { repository: DocumentRepository; folder: RepositoryFolder; pa
 function directoryEntry(ctx: RepositoryContext, { repository, folder, path, hidden = false, forced = false }: EntryInput): Ranked | undefined {
   const { activity, matches } = directoryActivity({ records: ctx.records, repositoryId: repository.id, directory: path, filters: ctx.options.filters });
   if (ctx.options.filters.length && !matches && !forced) return undefined;
-  const problems = directoryProblems(ctx.problems, repository.id, path);
   const label = directoryLabel(repository, path);
   return {
     entry: {
@@ -79,7 +77,6 @@ function directoryEntry(ctx: RepositoryContext, { repository, folder, path, hidd
       source: "repository",
       hasChildren: true,
       activity,
-      ...(problems ? { problems } : {}),
       repository: { id: repository.id, folder: folder.path, path },
       ...(hidden ? { hidden: true } : {}),
     },
@@ -92,7 +89,6 @@ function documentEntry(ctx: RepositoryContext, repository: DocumentRepository, f
   const id = `document:${repository.id}/${entry.path}`;
   const activity = ctx.activity.get(id) ?? emptyActivity();
   if (!matchesActivity(activity, ctx.options.filters) && ctx.target?.path !== entry.path) return undefined;
-  const problems = ctx.problems.get(id) ?? 0;
   return {
     entry: {
       key: documentKey(id),
@@ -102,7 +98,6 @@ function documentEntry(ctx: RepositoryContext, repository: DocumentRepository, f
       source: "repository",
       hasChildren: false,
       activity,
-      ...(problems ? { problems } : {}),
       repository: { id: repository.id, folder: folder.path, path: entry.path },
       ...(entry.visible ? {} : { hidden: true }),
     },

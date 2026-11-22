@@ -237,6 +237,8 @@ function SessionRail({
       initialRailMode="all"
       onCreate={comments.create}
       onReply={comments.reply}
+      onEdit={comments.edit}
+      onEditReply={(_rootId, replyId, body) => comments.edit(replyId, body)}
       onUpdateStatus={comments.updateStatus}
       onClose={comments.close}
       onAcknowledge={comments.acknowledge}

@@ -1,8 +1,8 @@
 /**
  * `preview` renders the page. `markdown` is a TSX page's extracted guidance;
- * `source` is a markdown page's annotated editor and `problems` its lint findings.
+ * `source` is a markdown page's annotated editor.
  */
-export type PlaygroundView = "preview" | "markdown" | "source" | "problems";
+export type PlaygroundView = "preview" | "markdown" | "source";
 export type AnnotationVisibility = "visible" | "hidden";
 
 export type PlaygroundRoute = {
@@ -19,15 +19,16 @@ export function parsePlaygroundRoute(
   fallbackPage: string,
 ): PlaygroundRoute {
   const params = new URLSearchParams(search);
-  const view = params.get("view") ?? "preview";
+  const requestedView = params.get("view");
+  const view = requestedView === null || requestedView === "problems" ? "preview" : requestedView;
   const annotations = params.get("annotations") ?? "visible";
   const review = params.get("review");
   const comment = params.get("comment");
   const rejected = params.get("rejected");
   if (rejected !== null && rejected !== "show") throw new Error('invalid rejected visibility; expected rejected=show');
-  if (view !== "preview" && view !== "markdown" && view !== "source" && view !== "problems") {
+  if (view !== "preview" && view !== "markdown" && view !== "source") {
     throw new Error(
-      `invalid playground view "${view}"; expected preview, markdown, source or problems`,
+      `invalid playground view "${view}"; expected preview, markdown or source`,
     );
   }
   if (annotations !== "visible" && annotations !== "hidden") {

@@ -11,10 +11,9 @@ import { DOCUMENT_ANCHOR, ToastProvider, useToast } from "@flanksource/clicky-ui
 
 import { fetchPromptRuns, type PromptRun } from "./prompt-runs-api";
 import { RunPromptDialog, type PromptTarget } from "./RunPromptDialog";
-import { refreshDocumentProblems } from "../documents/problems";
 
 type PromptRunsContext = {
-  /** Opens the prompt dialog for an element from the right-click menu, or a whole page from its Lint button. */
+  /** Opens the prompt dialog for an element or a whole page. */
   openPrompt: (target: PromptTarget) => void;
 };
 
@@ -68,7 +67,6 @@ function PromptRunWatcher({
                 durationMs: 0,
               });
             } else if (run.state !== "running") {
-              void refreshDocumentProblems();
               onSettled(runId);
               const { message, tone } = settledMessage(run);
               toast({ message, tone, ...(tone === "danger" ? { durationMs: 0 } : {}) });

@@ -1,7 +1,7 @@
 export class GavelCompatibilityError extends Error {}
 
-/** The launch APIs repository review calls; an older gavel lacks them, so it is reported rather than failing request by request. */
-const REQUIRED = [["get", "/api/launch/linters"], ["post", "/api/launch/lint/filter"], ["post", "/api/launch/lint/ignore"]] as const;
+/** The launch APIs used by Captain prompt review. */
+const REQUIRED = [["post", "/api/launch/prepare"], ["get", "/api/launch/prompts"], ["post", "/api/launch/lint"], ["get", "/api/runs/{executionId}"]] as const;
 
 export async function checkGavelCompatibility(url: string): Promise<void> {
   const response = await fetch(new URL("/api/launch/openapi", url), { signal: AbortSignal.timeout(3000) });
