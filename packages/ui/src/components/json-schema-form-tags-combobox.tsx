@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Combobox } from "./Combobox";
+import type { ComboboxOption } from "./combobox-types";
 import { withSelectedComboboxOptions } from "../lib/combobox-values";
 import {
   comboboxAriaProps,
@@ -8,6 +10,7 @@ import type { FormSize } from "./json-schema-form-size";
 import type {
   FieldControl,
   FieldOption,
+  JsonSchemaProperty,
   ScalarItemType,
 } from "./json-schema-form-types";
 
@@ -45,7 +48,14 @@ export function TagsComboboxControl({
   onSearch?: (query: string) => void;
 }) {
   const values = toTagValues(field.value);
+  const [refusal, setRefusal] = useState<string>();
+  const refusalId = `${fieldId}-refusal`;
+  const aria = comboboxAriaProps(field, fieldId);
+  // A typed string list refuses a tag its item schema rejects, saying why, so a
+  // bad value never reaches the committed array.
+  const typed = itemType === "string" && field.itemSchema ? field.itemSchema : undefined;
   return (
+    <div className="w-full">
     <Combobox
       multiple
       variant="tags"
@@ -75,13 +85,39 @@ export function TagsComboboxControl({
       {...(separators ? { separators } : {})}
       {...(loading !== undefined ? { loading } : {})}
       {...(onSearch ? { onSearch } : {})}
-      {...comboboxAriaProps(field, fieldId)}
+      {...aria}
+      {...(refusal ? { invalid: true, describedBy: [aria.describedBy, refusalId].filter(Boolean).join(" ") } : {})}
+      {...(typed
+        ? {
+            onCreate: (option: ComboboxOption) => {
+              const reason = tagRefusal(typed, option.value, field.label);
+              setRefusal(reason);
+              return reason ? null : option.value;
+            },
+            onInputValueChange: () => setRefusal(undefined),
+          }
+        : {})}
       {...(field.inputClassName ? { className: field.inputClassName } : {})}
       {...(defaultPlaceholder(field.schema)
         ? { placeholder: defaultPlaceholder(field.schema) }
         : {})}
     />
+    {refusal && <p id={refusalId} role="alert" className="mt-1 text-xs text-destructive">{refusal}</p>}
+    </div>
   );
+}
+
+// tagRefusal says why `text` is not a valid item of a string list — its pattern
+// or length bounds — or undefined when it is one.
+function tagRefusal(item: JsonSchemaProperty, text: string, label: string): string | undefined {
+  const { pattern, minLength, maxLength } = item;
+  const fits =
+    (typeof pattern !== "string" || new RegExp(pattern, "u").test(text)) &&
+    (typeof minLength !== "number" || text.length >= minLength) &&
+    (typeof maxLength !== "number" || text.length <= maxLength);
+  if (fits) return undefined;
+  const what = item.title || label;
+  return `“${text}” is not a valid ${what}${item.description ? `: ${item.description}` : typeof pattern === "string" ? `; it must match ${pattern}` : ""}`;
 }
 
 // The pills a committed value renders as. A numeric list holds numbers, and a

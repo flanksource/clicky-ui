@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
+import { useSectionActionsSlot } from "./json-schema-form-section-actions";
 import { UiCheck, UiDotsVertical } from "../icons";
 import { DropdownMenu } from "../overlay/DropdownMenu";
 import { AccordionArray } from "./json-schema-form-accordion-array";
@@ -30,17 +32,23 @@ export function ObjectArrayView({
   readOnly: boolean;
 }) {
   const [view, setView] = useState<ArrayView>(() => defaultArrayView(field, arrayViewOptions(field, ctx)));
-  const toolbar = ctx.presentation ? undefined : (
+  // The menu sits in the header row of the section this array heads; without one it stays on the summary line.
+  const headerSlot = useSectionActionsSlot(ctx.instancePath ?? "");
+  const menu = ctx.presentation ? undefined : (
     <ArrayViewMenu label={field.label || field.key} view={view} onChange={setView} />
   );
+  // null keeps the summary line (and its item count) when the menu moved to the header row.
+  const toolbar = menu && headerSlot ? null : menu;
+  const portal = menu && headerSlot ? createPortal(menu, headerSlot) : null;
+  const toolbarProp = toolbar === undefined ? {} : { toolbar };
   if (view === "grid") {
-    return <TableArray field={field} ctx={ctx} readOnly={readOnly} {...(toolbar ? { toolbar } : {})} />;
+    return <>{portal}<TableArray field={field} ctx={ctx} readOnly={readOnly} {...toolbarProp} /></>;
   }
   const itemCtx: RenderContext = {
     ...ctx,
     layout: { ...ctx.layout, mode: view === "stack" ? "stacked" : "inline" },
   };
-  return <AccordionArray field={field} ctx={itemCtx} readOnly={readOnly} {...(toolbar ? { toolbar } : {})} />;
+  return <>{portal}<AccordionArray field={field} ctx={itemCtx} readOnly={readOnly} {...toolbarProp} /></>;
 }
 
 // ArrayViewMenu is the ⋮ view switch on an object array's summary line.
