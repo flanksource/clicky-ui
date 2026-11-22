@@ -32,7 +32,6 @@ import { svgPreview } from "./plugins/svg-preview";
 import { playgroundPageActivity } from "./plugins/page-activity";
 import { playgroundRuntimeProfiles } from "./plugins/runtime-profiles-server";
 import { playgroundWorkspaceFiles } from "./plugins/workspace-files-server";
-import { playgroundGavelLint } from "./plugins/gavel-lint-server";
 import { playgroundBlame } from "./plugins/blame-server";
 import { playgroundProduction } from "./plugins/production-server";
 import { playgroundReactDevtoolsHook } from "./plugins/react-devtools-hook";
@@ -141,7 +140,6 @@ export default defineConfig(({ mode }) => ({
       dir: playgroundDataDir,
       pagesDir: resolve(root, "src/pages"),
       endpoint: gavelEndpoint,
-      problems: promptRuns.problems,
     }),
     playgroundComments({
       dir: playgroundDataDir,
@@ -163,11 +161,6 @@ export default defineConfig(({ mode }) => ({
     }),
     playgroundWorkspaceFiles({ cwd: workspaceRoot }),
     playgroundBlame({ cwd: workspaceRoot }),
-    playgroundGavelLint({
-      pagesDir: resolve(root, "src/pages"),
-      workspaceRoot,
-      promptFile: resolve(root, "prompts/markdown-review.prompt"),
-    }),
     playgroundVisualEdits({ pagesDir: resolve(root, "src/pages"), workspaceRoot }),
     playgroundSources({
       pagesDir: resolve(root, "src/pages"),
@@ -178,7 +171,7 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     // External source (see PLAYGROUND_EXTERNAL_ALIASES) cannot see this app's
     // node_modules, so these resolve from the playground's own install.
-    dedupe: ["react", "react-dom", "@iconify/react", "@tanstack/react-query", "monaco-editor", "@monaco-editor/react"],
+    dedupe: ["react", "react-dom", "@iconify/react", "@iconify-icons/ph", "@tanstack/react-query", "monaco-editor", "@monaco-editor/react"],
     alias: [
       ...externalAliases,
       {
@@ -192,6 +185,10 @@ export default defineConfig(({ mode }) => ({
       {
         find: /^@flanksource\/clicky-ui\/comments\/anchoring$/,
         replacement: resolve(uiSrc, "comment-anchoring.ts"),
+      },
+      {
+        find: /^@flanksource\/clicky-ui\/comments\/gavel$/,
+        replacement: resolve(uiSrc, "comments-gavel.ts"),
       },
       {
         find: /^@flanksource\/clicky-ui\/comments$/,

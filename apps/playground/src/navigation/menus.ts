@@ -13,7 +13,7 @@ export type PageActionState = {
 /** What a repository folder's context menu does; the repository dialogs and prompt runner live with the caller. */
 export type RepositoryMenuActions = {
   refresh: () => void;
-  lint: (folder: NavigationRepositoryRef) => void;
+  review: (folder: Pick<NavigationRepositoryRef, "id" | "path">) => void;
   openMarkdown: (repositoryId: string) => void;
   editRules: (folder: NavigationRepositoryRef) => void;
 };
@@ -76,7 +76,7 @@ function repositoryFolderMenu(entry: NavigationEntry, deps: NavigationMenuDeps):
   const { repository } = deps;
   return [
     { label: "Refresh", onSelect: repository.refresh },
-    { label: "Run prompt linter…", onSelect: () => repository.lint(folder) },
+    { label: "AI review…", onSelect: () => repository.review(folder) },
     { label: "Open Markdown by path…", onSelect: () => repository.openMarkdown(folder.id) },
     { label: "Sidebar folder and ignore rules…", onSelect: () => repository.editRules(folder) },
   ];

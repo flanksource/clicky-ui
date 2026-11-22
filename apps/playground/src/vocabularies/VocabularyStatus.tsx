@@ -4,10 +4,8 @@ import { RuntimeConfigurationDialog, RuntimeStatusSection } from "../browser-mod
 import { useRuntimeRoute } from "../browser-mode/runtime-route";
 import { useVocabulary } from "./context";
 import { useBackendConnections } from "../useBackendConnections";
-import { NAVIGATION_ROUTE } from "../navigation/types";
 
-/** `problemsError`: the navigation response could not attach repository lint counts. */
-export function VocabularyStatus({ problemsError }: { problemsError?: string | undefined }) {
+export function VocabularyStatus() {
   const state = useVocabulary();
   const backends = useBackendConnections();
   const [runtimeOpen, setRuntimeOpen] = useState(false);
@@ -15,12 +13,11 @@ export function VocabularyStatus({ problemsError }: { problemsError?: string | u
   const unavailable = state.error !== null || backends.error !== null;
   const disconnected = backends.connections?.some(connection => connection.status === "disconnected");
   const incompatible = backends.connections?.some(connection => connection.status === "incompatible");
-  const lintUnavailable = problemsError !== undefined;
-  const loading = !unavailable && !disconnected && !incompatible && !lintUnavailable && (!state.snapshot || !backends.connections);
-  const label = unavailable ? "Playground status: unavailable" : disconnected ? "Playground status: disconnected" : incompatible ? "Playground status: incompatible" : state.failures.length ? "Playground status: preview issues" : lintUnavailable ? "Playground status: lint counts unavailable" : loading ? "Playground status: loading" : "Playground status: ready";
+  const loading = !unavailable && !disconnected && !incompatible && (!state.snapshot || !backends.connections);
+  const label = unavailable ? "Playground status: unavailable" : disconnected ? "Playground status: disconnected" : incompatible ? "Playground status: incompatible" : state.failures.length ? "Playground status: preview issues" : loading ? "Playground status: loading" : "Playground status: ready";
   return <><RuntimeConfigurationDialog open={runtimeOpen} onClose={() => setRuntimeOpen(false)} /><DropdownMenu align="right" menuLabel="Playground status" menuClassName="w-[360px] max-w-[calc(100vw-24px)] max-h-[70dvh] overflow-auto [&_summary>div:last-child]:max-w-full [&_summary>div:last-child]:flex-wrap" trigger={
     <Button variant="ghost" size="icon" aria-label={label} title={label} className="shrink-0 [@media(pointer:coarse)]:size-11">
-      <span aria-hidden="true">{loading && !unavailable ? <span className="inline-block size-2.5 rounded-full bg-muted-foreground/40" /> : <StatusDot size="md" status={unavailable || disconnected ? "error" : incompatible || state.failures.length || lintUnavailable ? "warning" : "success"} />}</span>
+      <span aria-hidden="true">{loading && !unavailable ? <span className="inline-block size-2.5 rounded-full bg-muted-foreground/40" /> : <StatusDot size="md" status={unavailable || disconnected ? "error" : incompatible || state.failures.length ? "warning" : "success"} />}</span>
     </Button>
   }>{closeMenu => <div className="space-y-3 p-3 text-xs">
     {/* The open menu would float above the dialog, so it closes first. */}
@@ -34,11 +31,6 @@ export function VocabularyStatus({ problemsError }: { problemsError?: string | u
       </div>)}
     {backends.error !== null && <ActionError title="Connection status unavailable" error={backends.error} context={[["Endpoint", "/__playground/connections"]]} />}
     <Button size="sm" variant="outline" disabled={backends.refreshing} onClick={backends.retry}>{backends.refreshing ? "Checking connections…" : "Refresh connections"}</Button>
-    {lintUnavailable && <>
-      <hr className="border-border" />
-      <h2 className="font-semibold">Repository lint</h2>
-      <ActionError title="Lint counts unavailable" error={problemsError} context={[["Endpoint", NAVIGATION_ROUTE]]} />
-    </>}
     <hr className="border-border" />
     <h2 className="font-semibold">Comment vocabularies</h2>
     <p className="text-muted-foreground">{state.refreshing ? "Refreshing vocabularies…" : state.error !== null ? "Vocabulary selection is unavailable until loading succeeds." : state.snapshot ? "Vocabularies are ready." : "Loading vocabularies…"}</p>

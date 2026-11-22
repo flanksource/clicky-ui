@@ -53,7 +53,7 @@ describe("repository folder prompt lint", () => {
       }),
     ).rejects.toThrow("no visible Markdown files");
   });
-  it("prepares visible Markdown descendants, scopes the launch, and retains per-file findings after restart", async () => {
+  it("prepares visible Markdown descendants, scopes the launch, and retains review comments after restart", async () => {
     mkdirSync(resolve(".tmp"), { recursive: true });
     const dir = mkdtempSync(resolve(".tmp/folder-lint-"));
     configureTestComments(dir);
@@ -208,12 +208,9 @@ describe("repository folder prompt lint", () => {
         gavelURL,
         workspace: "/playground",
       });
-      const problems = await restored.problems();
-      expect(
-        problems[
-          `document:${repository.id}/docs/nested/setup.mdx`
-        ]?.prompt.flatMap((result) => result.violations ?? []),
-      ).toMatchObject([{ message: "Use active voice" }]);
+      expect(await restored.runs(createLogger("silent"))).toMatchObject([
+        { page, state: "done", commentId: expect.any(String) },
+      ]);
       expect(
         (await readAll(dir))[`document:${repository.id}/docs/nested/setup.mdx`],
       ).toHaveLength(1);

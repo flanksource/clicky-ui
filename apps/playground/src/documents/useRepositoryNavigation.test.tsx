@@ -21,7 +21,6 @@ const repository: DocumentRepository = {
 };
 
 const mocks = vi.hoisted(() => ({
-  refreshDocumentProblems: vi.fn(),
   openPrompt: vi.fn(),
   catalog: { repositories: [] as unknown[], error: null as Error | null, refresh: vi.fn() },
 }));
@@ -29,10 +28,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./catalog", () => ({ useRepositoryCatalog: () => mocks.catalog }));
 vi.mock("../prompt-runs/PromptRunsProvider", () => ({
   usePromptRuns: () => ({ openPrompt: mocks.openPrompt }),
-}));
-vi.mock("./problems", () => ({
-  refreshDocumentProblems: mocks.refreshDocumentProblems,
-  useDocumentProblems: () => ({ results: {}, error: null }),
 }));
 vi.mock("./RepositoryDialogs", () => ({
   RepositoryFolderSettings: ({ path }: { path: string }) => <p>folder rules for {path}</p>,
@@ -53,7 +48,6 @@ beforeEach(() => {
   vi.stubGlobal("EventSource", WorkspaceAccessStream);
   mocks.catalog.repositories = [repository];
   mocks.catalog.error = null;
-  mocks.refreshDocumentProblems.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -105,21 +99,10 @@ describe("repository navigation helpers", () => {
 
 describe("useRepositoryNavigation", () => {
   const pageHref = (id: string) => `/#${id}`;
-  const docSlug = `document:${repositoryId}/docs/guides/a.md`;
   const folderRef = { id: repositoryId, folder: "docs", path: "docs/guides" };
 
-  it("refreshes problems when a document opens, and not for any other page", () => {
-    const { rerender } = renderHook(
-      ({ activeSlug }) => useRepositoryNavigation({ activeSlug, pageHref }),
-      { initialProps: { activeSlug: "page:button" as string | undefined } },
-    );
-    expect(mocks.refreshDocumentProblems).not.toHaveBeenCalled();
-    rerender({ activeSlug: docSlug });
-    expect(mocks.refreshDocumentProblems).toHaveBeenCalledTimes(1);
-  });
-
   it("exposes the controls, the dialogs and the folder-menu actions, and no tree of its own", () => {
-    const { result } = renderHook(() => useRepositoryNavigation({ activeSlug: undefined, pageHref }));
+    const { result } = renderHook(() => useRepositoryNavigation({ pageHref }));
     expect(Object.keys(result.current).sort()).toEqual(["actions", "controls", "dialogs"]);
     render(<>{result.current.controls}</>);
     expect(screen.getByRole("button", { name: "Add repository" })).toBeTruthy();
@@ -129,7 +112,7 @@ describe("useRepositoryNavigation", () => {
     mocks.catalog.error = Object.assign(new Error("catalog unavailable"), {
       diagnostics: { message: "catalog unavailable", context: [["Endpoint", "/__playground/documents/repositories"]], details: [{ label: "Response", value: "Workspace offline" }] },
     });
-    const { result } = renderHook(() => useRepositoryNavigation({ activeSlug: undefined, pageHref }));
+    const { result } = renderHook(() => useRepositoryNavigation({ pageHref }));
     render(<>{result.current.controls}</>);
     expect(screen.getByText("catalog unavailable")).toBeTruthy();
     const writeText = vi.fn().mockResolvedValue(undefined);
@@ -143,15 +126,15 @@ describe("useRepositoryNavigation", () => {
   it("Refresh in a folder menu asks the tree to re-read through the documents refresh event", () => {
     const refreshed = vi.fn();
     window.addEventListener("playground:documents-refresh", refreshed);
-    const { result } = renderHook(() => useRepositoryNavigation({ activeSlug: undefined, pageHref }));
+    const { result } = renderHook(() => useRepositoryNavigation({ pageHref }));
     result.current.actions.refresh();
     window.removeEventListener("playground:documents-refresh", refreshed);
     expect(refreshed).toHaveBeenCalledTimes(1);
   });
 
-  it("Run prompt linter opens a prompt on the folder's page for the folder's directory", async () => {
-    const { result } = renderHook(() => useRepositoryNavigation({ activeSlug: undefined, pageHref }));
-    result.current.actions.lint(folderRef);
+  it("opens a prompt scoped to the folder for AI review", async () => {
+    const { result } = renderHook(() => useRepositoryNavigation({ pageHref }));
+    result.current.actions.review(folderRef);
     const input = mocks.openPrompt.mock.calls[0]?.[0] as { page: string; element: Promise<{ source: string }> };
     expect({ page: input.page, source: (await input.element).source }).toEqual({
       page: `folder:${repositoryId}/docs/guides`,
@@ -160,7 +143,7 @@ describe("useRepositoryNavigation", () => {
   });
 
   it("opens the Markdown-by-path and folder-rules dialogs for the folder's repository", () => {
-    const { result } = renderHook(() => useRepositoryNavigation({ activeSlug: undefined, pageHref }));
+    const { result } = renderHook(() => useRepositoryNavigation({ pageHref }));
     const dialogs = render(<>{result.current.dialogs}</>);
     act(() => result.current.actions.openMarkdown(repositoryId));
     dialogs.rerender(<>{result.current.dialogs}</>);
@@ -171,7 +154,7 @@ describe("useRepositoryNavigation", () => {
   });
 
   it("fails loudly when a menu names a repository the catalog does not hold", () => {
-    const { result } = renderHook(() => useRepositoryNavigation({ activeSlug: undefined, pageHref }));
+    const { result } = renderHook(() => useRepositoryNavigation({ pageHref }));
     expect(() => result.current.actions.openMarkdown("22222222-2222-2222-2222-222222222222")).toThrow("is not in the loaded repository list");
   });
 });

@@ -1,6 +1,5 @@
 import { commentActivity } from "../comment-activity";
 import { listComments } from "../comments-query";
-import type { DocumentProblems } from "../document-problems";
 import { pageUpdates } from "../page-activity";
 import type { NavigationActivity, NavigationFilter } from "../../src/navigation/types";
 import { emptyActivity, matchesActivity, mergeActivities } from "./tree";
@@ -66,21 +65,4 @@ export function directoryActivity({
     (record) => record.repositoryId === repositoryId && contains(directory, record.path, record.folder) && matchesActivity(record.activity, filters),
   );
   return { activity: mergeActivities(below.map((record) => record.activity)), matches: below.length };
-}
-
-/** Lint violations per document id. */
-export function problemCounts(problems: DocumentProblems): Map<string, number> {
-  return new Map(
-    Object.entries(problems).map(([id, findings]) => [
-      id,
-      [...findings.plain, ...findings.prompt].reduce((sum, lint) => sum + (lint.violations?.length ?? 0), 0),
-    ]),
-  );
-}
-
-export function directoryProblems(counts: ReadonlyMap<string, number>, repositoryId: string, directory: string): number {
-  const prefix = directory === "." ? `document:${repositoryId}/` : `document:${repositoryId}/${directory}/`;
-  let total = 0;
-  for (const [id, count] of counts) if (id.startsWith(prefix)) total += count;
-  return total;
 }

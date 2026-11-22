@@ -5,9 +5,6 @@ import type { SidebarState } from "../sidebar-state";
 import type { NavigationMenuDeps } from "./menus";
 import type { NavigationActivity, NavigationEntry, NavigationResponse } from "./types";
 
-const problemsSnapshot = vi.hoisted(() => ({ results: {}, error: null }));
-vi.mock("../documents/problems", () => ({ useDocumentProblems: () => problemsSnapshot }));
-
 import { useNavigationTree } from "./useNavigationTree";
 
 const REPO = "11111111-1111-1111-1111-111111111111";
@@ -68,7 +65,7 @@ const menu: NavigationMenuDeps = {
   disabledReason: undefined,
   setPageAction: vi.fn(),
   pageFor: () => undefined,
-  repository: { refresh: vi.fn(), lint: vi.fn(), openMarkdown: vi.fn(), editRules: vi.fn() },
+  repository: { refresh: vi.fn(), review: vi.fn(), openMarkdown: vi.fn(), editRules: vi.fn() },
 };
 const onQueryChange = vi.fn();
 const pageHref = (slug: string) => `?page=${slug}`;
@@ -110,7 +107,7 @@ describe("useNavigationTree", () => {
       olderCount: 4,
       children: [
         pageFolder("docs", { slug: "docs", open: true, children: [intro], activity: { ...QUIET, openCount: 2 } }),
-        repoFolder(".", { problems: 3 }),
+        repoFolder(".", { activity: { ...QUIET, openCount: 3 } }),
         page("solo", { activity: { ...QUIET, openCount: 1 } }),
         entry({ key: "external", label: "External pages", kind: "folder", source: "external", hasChildren: true }),
       ],
@@ -164,26 +161,6 @@ describe("useNavigationTree", () => {
       returned: ["page-item:docs/a", "page-item:docs/b"],
       reloadOnOpen: false,
     });
-  });
-
-  it("keeps the tree when lint counts fail, reporting the failure and marking only repository rows", async () => {
-    const failure = "workspace path is outside enabled roots";
-    stubNavigation((params) =>
-      params.get("node") === `repo:${REPO}:.:.`
-        ? { children: [document("guide.md")], problemsError: failure }
-        : { children: [repoFolder("."), page("solo")], problemsError: failure },
-    );
-    const { result } = mount();
-    await waitFor(() => expect(result.current.section.groups).toHaveLength(1));
-    const loaded = await result.current.section.groups![0]!.loadChildren!();
-
-    expect({
-      problemsError: result.current.problemsError,
-      error: result.current.error,
-      repositoryFolderMarked: Boolean(result.current.section.groups![0]!.badge),
-      repositoryDocumentMarked: Boolean(loaded.items[0]?.badge),
-      pageMarked: Boolean(result.current.section.items![0]!.badge),
-    }).toEqual({ problemsError: failure, error: null, repositoryFolderMarked: true, repositoryDocumentMarked: true, pageMarked: false });
   });
 
   it("discards a root response that a newer request has overtaken", async () => {
@@ -325,7 +302,7 @@ describe("useNavigationTree", () => {
     }).toEqual({
       pageFolder: ["New page", "New folder", "Delete folder"],
       pageFolderLink: ["New page", "New folder", "Delete folder", "Rename", "Move", "Delete"],
-      repository: ["Refresh", "Run prompt linter…", "Open Markdown by path…", "Sidebar folder and ignore rules…"],
+      repository: ["Refresh", "AI review…", "Open Markdown by path…", "Sidebar folder and ignore rules…"],
       external: undefined,
       page: ["Rename", "Move", "Delete"],
       document: undefined,

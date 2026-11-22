@@ -15,6 +15,10 @@
 @source "./pages";
 /* BuildLog (the load and error-view timings) ships its utilities in the page runtime host source, outside this app's scan root. */
 @source "../../../packages/page-runtime/src/host";
+/* The gavel extension pages (pages/gavel/chrome-extension-*) render the sibling gavel checkout's extension source, which uses utilities nothing here does. */
+@source "../../../../gavel/extension/src";
+@source "../../../../gavel/extension/host";
+@source "../../../../gavel/extension/agents";
 @source inline("{rounded-xl,overflow-hidden,shadow-lg,border-2,border-solid,p-2,px-3,py-2,p-3,text-center,text-white,text-xs,font-bold}");
 
 /* The Workspace-based playground chrome is full-height; let it fill the viewport. */

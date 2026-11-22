@@ -7,6 +7,28 @@ import { PageReloadProvider } from "../page-reload";
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("feedback loading scope", () => {
+  it("patches a comment by ID and refreshes the stored text", async () => {
+    const id = "reply-id";
+    const original = { id, parentId: "root-id", body: "Check spacing" };
+    const amended = { ...original, body: "Check heading spacing" };
+    let stored = original;
+    const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method !== "PATCH") return Response.json({ comments: [stored] });
+      stored = amended;
+      return Response.json(amended);
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const { result } = renderHook(() => useComments("example", { current: null }));
+    await waitFor(() => expect(result.current.comments).toEqual([original]));
+
+    await act(() => result.current.edit(id, amended.body));
+
+    expect(fetcher).toHaveBeenCalledWith(`/__playground/comments/${id}`, expect.objectContaining({
+      method: "PATCH", body: JSON.stringify({ body: amended.body }),
+    }));
+    expect(result.current.comments).toEqual([amended]);
+  });
+
   it("shows a pending root immediately and replaces it with the server result", async () => {
     let complete!: (response: Response) => void;
     vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => init?.method === "POST" ? new Promise<Response>(resolve => { complete = resolve; }) : Promise.resolve(Response.json({ comments: [] }))));

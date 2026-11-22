@@ -207,7 +207,7 @@ export function PlaygroundShell({
   const markdownPage = active?.kind === "markdown";
   const folderPage = active?.kind === "folder";
   const repositoryDocument = active?.slug.startsWith("document:") === true;
-  const repositoryNavigation = useRepositoryNavigation({ activeSlug: active?.slug, pageHref });
+  const repositoryNavigation = useRepositoryNavigation({ pageHref });
   // A markdown page is always its own editor, so its source is always loaded.
   const editFile = editTarget?.kind === "file" && active?.kind === "component" ? editTarget : undefined;
   const source = useSource(editFile ? fileSourceTarget(editFile.file) : active?.slug, !folderPage && (editing || markdownPage));
@@ -383,9 +383,9 @@ export function PlaygroundShell({
     ctx.focusedAnchor !== null &&
     overlayLabel(ctx.focusedAnchor) !== null;
   const editorOpen = editing && active?.kind === "component";
-  // source and problems are markdown-page views; a .tsx page's source is its
+  // Source is a markdown-page view; a .tsx page's source is its
   // Edit editor, so such a link opens that instead.
-  const unsupportedView = active?.kind === "component" && (view === "source" || view === "problems");
+  const unsupportedView = active?.kind === "component" && view === "source";
   useEffect(() => {
     if (!unsupportedView) return;
     setEditTarget({ kind: "page" });
@@ -416,7 +416,15 @@ export function PlaygroundShell({
     onCopyFeedback: feedback.copyFeedback,
     feedbackCopyActions: feedback.copyActions,
     pageCommentCount: ctx.comments.length,
-    problemsError: tree.problemsError,
+  };
+  const reviewDocument = (file: string) => {
+    if (!active || !contentRef.current) throw new Error("AI review needs the document mounted");
+    openPrompt({
+      page: active.slug,
+      anchor: DOCUMENT_ANCHOR,
+      element: onCaptureSelection(DOCUMENT_ANCHOR, contentRef.current),
+      files: [file],
+    });
   };
   const editFabVisible = Boolean(active) && !markdownPage && !folderPage;
   const editFabProps: PlaygroundEditFabProps = {
@@ -524,15 +532,14 @@ export function PlaygroundShell({
               {browser && active.kind !== "folder" && !repositoryDocument && view === "preview" ? (
                 <BrowserPage key={active.slug} slug={active.slug} sourceDirty={source.dirty} designing={designing} annotations={annotations} showRejected={showRejected} comments={pageComments} onAnchors={setFrameAnchors} onPending={setFramePending} onOpenSource={({ file, line }) => { setDesigning(false); setEditTarget({ kind: "file", file, line }); }} />
               ) : active.kind === "folder" ? (
-                <Suspense fallback={<p role="status">Loading folder problems…</p>}>
-                  <RepositoryFolderPage key={active.slug} id={active.slug} onNavigate={onNavigate} />
+                <Suspense fallback={<p role="status">Loading folder…</p>}>
+                  <RepositoryFolderPage key={active.slug} id={active.slug} onReview={repositoryNavigation.actions.review} />
                 </Suspense>
               ) : active.kind === "markdown" ? (
                 view === "markdown" ? (
                   <Banner tone="danger">
                     view=markdown is the guidance export of a .tsx page; a
-                    markdown page has view=preview (rendered), view=source and
-                    view=problems.
+                    markdown page has view=preview (rendered) and view=source.
                   </Banner>
                 ) : (
                   <Suspense
@@ -540,26 +547,13 @@ export function PlaygroundShell({
                       <p className="text-sm text-muted-foreground">Loading…</p>
                     }
                   >
-                    {repositoryDocument ? <RepositoryDocumentPage slug={active.slug} view={view} onViewChange={onViewChange} source={source} annotations={annotations} onLint={(file, promptId) => {
-                      if (!contentRef.current) throw new Error("AI review needs the document mounted");
-                      openPrompt({ page: active.slug, anchor: DOCUMENT_ANCHOR, element: onCaptureSelection(DOCUMENT_ANCHOR, contentRef.current), files: [file], ...(promptId ? { promptId } : {}) });
-                    }} /> : <MarkdownDocumentPage
+                    {repositoryDocument ? <RepositoryDocumentPage slug={active.slug} view={view} onViewChange={onViewChange} source={source} annotations={annotations} onReview={reviewDocument} /> : <MarkdownDocumentPage
                       slug={active.slug}
                       view={view}
                       onViewChange={onViewChange}
                       source={source}
                       annotations={annotations}
-                      onLint={(file) => {
-                        if (!contentRef.current) {
-                          throw new Error("Lint needs the playground content mounted");
-                        }
-                        openPrompt({
-                          page: active.slug,
-                          anchor: DOCUMENT_ANCHOR,
-                          element: onCaptureSelection(DOCUMENT_ANCHOR, contentRef.current),
-                          files: [file],
-                        });
-                      }}
+                      onReview={reviewDocument}
                     />}
                   </Suspense>
                 )

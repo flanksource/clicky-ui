@@ -44,7 +44,6 @@ export type PlaygroundShellActionsProps = {
   feedbackCopyActions: DropdownMenuItem[];
   pageCommentCount: number;
   /** Repository lint counts could not be loaded; reported in the status dropdown. */
-  problemsError: string | undefined;
   /** The phone overflow row: leaves out what {@link PlaygroundMobileActions} already shows. */
   overflow?: boolean;
 };
@@ -117,7 +116,7 @@ export function PlaygroundMobileActions(
       >
         <UiSliders className="size-4" />
       </button>
-      <VocabularyStatus problemsError={props.problemsError} />
+      <VocabularyStatus />
       <AgentSessionButton compact />
       <PlaygroundNotifications recent={props.recent} review={{ active: props.reviewActive, count: props.reviewCount, onToggle: props.onToggleReview }} />
       <PlaygroundPreferences sourceDirty={props.sourceDirty} />
@@ -160,7 +159,7 @@ export function PlaygroundShellActions(props: PlaygroundShellActionsProps) {
         />
       </div>
       {!props.overflow && (
-        <VocabularyStatus problemsError={props.problemsError} />
+        <VocabularyStatus />
       )}
       {!props.overflow && <PlaygroundNotifications recent={props.recent} review={{ active: props.reviewActive, count: props.reviewCount, onToggle: props.onToggleReview }} />}
       {!props.overflow && (

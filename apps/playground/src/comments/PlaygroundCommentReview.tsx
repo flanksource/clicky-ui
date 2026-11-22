@@ -4,6 +4,7 @@ import {
   Button,
   CommentThreadList,
   InputField,
+  useCommentContext,
   type Comment,
   type CommentAnchor,
   type CommentConfig,
@@ -73,6 +74,7 @@ export function PlaygroundCommentReview({
   onExit,
   onMaximizedChange,
 }: PlaygroundCommentReviewProps) {
+  const { callbacks: { onEdit, onEditReply } } = useCommentContext();
   const detailTabs = useCommentDetails(threadToMarkdown ? { threadToMarkdown } : {});
   const [pending, setPending] = useState<"close" | "reopen" | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -192,6 +194,8 @@ export function PlaygroundCommentReview({
               detailTabs={detailTabs}
               {...(onMaximizedChange ? { onMaximizedChange } : {})}
               onReply={onReply}
+              {...(onEdit ? { onEdit } : {})}
+              {...(onEditReply ? { onEditReply } : {})}
               {...(threadToMarkdown ? { threadToMarkdown } : {})}
             />
           </div>

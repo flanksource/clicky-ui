@@ -100,21 +100,8 @@ export class LaunchClient {
       body: JSON.stringify(body),
     });
   }
-  filterLint(preparationId: string, results: LinterResult[]): Promise<LinterResult[]> {
-    return this.json("/api/launch/lint/filter", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ preparationId, results }),
-    });
-  }
   run(id: string): Promise<LaunchSnapshot> {
     return this.json(`/api/runs/${encodeURIComponent(id)}`);
-  }
-  async listRuns({ labels, limit, before }: { labels: Record<string, string>; limit: number; before: string }): Promise<{ runs: LaunchSnapshot[] }> {
-    const query = new URLSearchParams({ ...Object.fromEntries(Object.entries(labels).map(([key, value]) => [`label.${key}`, value])), limit: String(limit), ...(before ? { before } : {}) });
-    const result = await this.json<{ runs: LaunchSnapshot[] }>(`/api/runs?${query}`);
-    if (!Array.isArray(result.runs)) throw new LaunchHttpError(502, "Gavel run list is missing its runs array");
-    return result;
   }
   async find(association: string): Promise<LaunchSnapshot | undefined> {
     const result = await this.json<{ runs: LaunchSnapshot[] }>(

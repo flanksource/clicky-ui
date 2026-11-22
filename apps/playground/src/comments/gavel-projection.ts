@@ -181,7 +181,7 @@ export function project(
       author: {
         ...(run && m.author.kind === "agent" && m.author.id === c.assignee?.id &&
           Date.parse(m.createdAt) >= Date.parse(run.requestedAt) ? assignedSession : {}),
-        ...(m.content?.playground.author ?? authorFor(m.author)),
+        ...(m.content?.playground?.author ?? authorFor(m.author)),
       },
       createdAt: new Date(m.createdAt).toISOString(),
       parentId: c.id,

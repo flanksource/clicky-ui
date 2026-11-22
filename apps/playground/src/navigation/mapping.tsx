@@ -1,5 +1,5 @@
 import type { AppShellNavGroup, AppShellNavItem } from "@flanksource/clicky-ui";
-import { commentBadge, problemBadge, problemsUnavailableBadge } from "./badges";
+import { commentBadge } from "./badges";
 import { entryIcon } from "./icons";
 import type { EntryMenus } from "./menus";
 import type { NavigationEntry } from "./types";
@@ -15,8 +15,6 @@ export type MappingContext = {
   generation: string;
   /** Entries the latest root response opened: the active path and search hits. */
   openKeys: ReadonlySet<string>;
-  /** Repository lint counts failed to load; repository rows show this instead of a count. */
-  problemsError: string | undefined;
   /** Children already fetched or inlined for a folder key. */
   childrenOf: (key: string) => NavigationEntry[] | undefined;
   loadChildren: (entry: NavigationEntry) => () => Promise<NavChildren>;
@@ -25,22 +23,10 @@ export type MappingContext = {
 
 const PAGE_ITEM_PREFIX = "page-item:";
 
-function badge(entry: NavigationEntry, problemsError: string | undefined) {
-  const comments = commentBadge(entry.activity.openCount);
-  const problems =
-    entry.source === "repository" && problemsError !== undefined ? problemsUnavailableBadge(problemsError) : problemBadge(entry.problems);
-  return comments || problems ? (
-    <>
-      {comments}
-      {problems}
-    </>
-  ) : null;
-}
-
 /** An open folder re-fetches when any of its aggregates moved, so a comment or edit below refreshes just the folders above it. */
 function fingerprint(entry: NavigationEntry): string {
   const { updated, commented, resolved, openCount, resolvedCount } = entry.activity;
-  return [updated, commented, resolved, openCount, resolvedCount, entry.problems ?? 0].join(".");
+  return [updated, commented, resolved, openCount, resolvedCount].join(".");
 }
 
 function mapItem(entry: NavigationEntry, ctx: MappingContext, { key, menu, withBadge = true }: { key: string; menu: EntryMenus["item"]; withBadge?: boolean }): AppShellNavItem {
@@ -53,7 +39,7 @@ function mapItem(entry: NavigationEntry, ctx: MappingContext, { key, menu, withB
     to: ctx.pageHref(slug),
     active: slug === ctx.activeSlug,
     searchText: [entry.label, slug, entry.description ?? "", ctx.query].join(" "),
-    ...(withBadge ? { badge: badge(entry, ctx.problemsError) } : {}),
+    ...(withBadge ? { badge: commentBadge(entry.activity.openCount) } : {}),
     ...(menu ? { contextMenu: menu.items, contextMenuLabel: menu.label } : {}),
   };
 }
@@ -66,7 +52,7 @@ function mapGroup(entry: NavigationEntry, ctx: MappingContext): AppShellNavGroup
     key: entry.key,
     label: entry.label,
     icon: entryIcon(entry),
-    badge: badge(entry, ctx.problemsError),
+    badge: commentBadge(entry.activity.openCount),
     defaultCollapsed: true,
     ...(ctx.openKeys.has(entry.key) ? { forceExpanded: true } : {}),
     ...(loaded ? mapEntries(loaded, ctx) : { groups: [], items: [] }),

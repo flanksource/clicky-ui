@@ -6,7 +6,7 @@ import { fixedGavel } from "./gavel-launch-server";
 
 afterEach(() => vi.unstubAllGlobals());
 
-const compatible = { paths: { "/api/launch/linters": { get: {} }, "/api/launch/lint/filter": { post: {} }, "/api/launch/lint/ignore": { post: {} } } };
+const compatible = { paths: { "/api/launch/prepare": { post: {} }, "/api/launch/prompts": { get: {} }, "/api/launch/lint": { post: {} }, "/api/runs/{executionId}": { get: {} } } };
 
 /** Serves the plugin's middleware on loopback and fakes every backend probe with `gavelFailure()`. */
 async function serveConnections(gavelURL: string, gavelFailure: () => "http" | "network" | null) {
