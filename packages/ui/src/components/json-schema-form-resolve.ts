@@ -77,7 +77,7 @@ export function schemaRendersAsObject(prop: JsonSchemaProperty): boolean {
   );
 }
 
-function enumOptions(prop: JsonSchemaProperty): FieldOption[] {
+export function enumOptions(prop: JsonSchemaProperty): FieldOption[] {
   const labels = prop["x-enum-labels"];
   const icons = prop["x-enum-icons"];
   const descriptions = prop["x-enum-descriptions"];

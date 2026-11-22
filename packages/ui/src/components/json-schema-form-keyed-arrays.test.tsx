@@ -39,24 +39,30 @@ describe("inferred keyed-array objects", () => {
     expect(screen.getAllByRole("button", { name: "Add item" })).toHaveLength(3);
   });
 
-  it("hides four empty sections and offers their keys in one searchable picker", () => {
+  it("hides four empty sections and offers their keys from one Add menu", () => {
     render(<Harness count={4} />);
     expect(screen.queryByRole("button", { name: "Add item" })).not.toBeInTheDocument();
-    const picker = screen.getByRole("combobox", { name: "Add item" });
-    fireEvent.change(picker, { target: { value: "emp" } });
-    expect(screen.getByRole("option", { name: /Employer clients/ })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /Person clients/ })).not.toBeInTheDocument();
-    fireEvent.mouseDown(screen.getByRole("option", { name: /Employer clients/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Person clients", "Employer clients", "Trust clients", "Partner clients"]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Employer clients" }));
     expect(screen.getByText("Employer clients")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add item" })).toBeInTheDocument();
     expect(screen.queryByText("Person clients")).not.toBeInTheDocument();
   });
 
-  it("retains an existing array section and its own add button", () => {
+  it("retains an existing array section and its own add button, offering only the hidden empty arrays", () => {
     render(<Harness count={4} initial={{ Person: [{ Name: "Alice" }] }} />);
     expect(screen.getByText("Person clients")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add item" })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Add item" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Employer clients", "Trust clients", "Partner clients"]);
+  });
+
+  it("puts a section's Add menu in the section header row as a plus button", () => {
+    const sectioned: JsonSchemaObject = { type: "object", properties: { clients: { ...keyedSchema(4), title: "Clients" } } };
+    render(<JsonSchemaForm schema={sectioned} value={{}} onChange={() => undefined} layout={{ mode: "stacked" }} showPreferencesMenu={false} />);
+    const add = screen.getByRole("button", { name: "Add" });
+    expect({ heading: add.closest("[data-jsf-section-heading]")?.textContent, text: add.textContent }).toEqual({ heading: "ClientsAdd", text: "Add" });
   });
 
   describe("with layout.emptyArrays = add-menu", () => {
@@ -100,8 +106,8 @@ describe("inferred keyed-array objects", () => {
 
   it("adds a scalar item when an array schema omits items", () => {
     render(<Harness count={4} itemless />);
-    fireEvent.click(screen.getByRole("combobox", { name: "Add item" }));
-    fireEvent.mouseDown(screen.getByRole("option", { name: /Person clients/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Person clients" }));
     expect(screen.getByText("Person clients")).toBeInTheDocument();
   });
 });

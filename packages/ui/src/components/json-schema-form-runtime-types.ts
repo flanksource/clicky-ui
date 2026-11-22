@@ -90,12 +90,22 @@ export type ExpressionEvaluator = (args: {
 // to drop the field. Composed in array order; each sees the prior's output.
 // `ctx.rootValue` is the form's top-level value (the same object at every depth),
 // so a widget can read sibling fields (e.g. a selected namespace) to scope itself.
+// FieldParent is the object a field belongs to: what an extension reads and
+// writes when a field's control also edits a sibling of it.
+export interface FieldParent {
+  schema: JsonSchemaObject;
+  value: Record<string, unknown>;
+  onChange: (next: Record<string, unknown>) => void;
+}
+
 export interface PreExtensionContext {
   key: string;
   prop: JsonSchemaProperty;
   value: unknown;
   rootValue?: Record<string, unknown>;
   onRootChange?: (next: Record<string, unknown>) => void;
+  /** The object holding the field, when the field is one of an object's properties. */
+  parent?: FieldParent;
 }
 
 export type PreExtension = (
@@ -137,6 +147,7 @@ export interface FieldArgs extends FieldInstancePath {
   required: boolean;
   value: unknown;
   onChange: (next: unknown) => void;
+  parent?: FieldParent;
 }
 
 // RenderApi is the recursive render pipeline, injected into RenderContext so

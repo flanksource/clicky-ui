@@ -63,14 +63,15 @@ import { PropertiesFieldRow, PropertyValueEditor } from "./json-schema-form-prop
 import { PropertyValuePreview } from "./json-schema-form-property-preview";
 import { propertyControlSize } from "./json-schema-form-properties-size";
 import { matchesFieldFilter } from "./json-schema-form-filter";
-import { Combobox } from "./Combobox";
 import { UnionControl } from "./json-schema-form-union";
+import { ArrayAddMenu } from "./json-schema-form-array-add-menu";
+import { exclusiveKeys, switchExclusiveKey } from "./json-schema-form-exclusive-keys";
+import { ExclusiveKeySelect } from "./json-schema-form-exclusive-key-select";
 import { JsonControl } from "./json-schema-form-json";
 import { NullableControl } from "./json-schema-form-nullable";
 import { FormObjectSection } from "./json-schema-form-section";
 import { FieldClearButton } from "./field-clear-button";
-import { UiAdd, UiText, UiCalendar, UiToggleOff, UiListNumbers, UiArray, UiCode2, UiListDashes } from "../icons";
-import { DropdownMenu } from "../overlay/DropdownMenu";
+import { UiText, UiCalendar, UiToggleOff, UiListNumbers, UiArray, UiCode2, UiListDashes } from "../icons";
 import { FormHelp } from "./json-schema-form-help-links";
 import { hasFormHelp } from "./json-schema-form-help-model";
 
@@ -222,6 +223,7 @@ function buildField(
       value: args.value,
       ...(ctx.rootValue ? { rootValue: ctx.rootValue } : {}),
       ...(ctx.onRootChange ? { onRootChange: ctx.onRootChange } : {}),
+      ...(args.parent ? { parent: args.parent } : {}),
     });
   }
   // Debug mode keeps a dropped field for inspection, as its control alone: the
@@ -372,7 +374,7 @@ export function renderFieldNodes(
 export function renderFieldRow(
   args: FieldArgs,
   ctx: RenderContext,
-  opts?: { labelOverride?: string },
+  opts?: { labelOverride?: string; labelNode?: ReactNode },
 ): ReactNode | null {
   const buildResult = buildField(args, ctx, { labelOverride: opts?.labelOverride });
   if (!buildResult) return null;
@@ -412,6 +414,7 @@ export function renderFieldRow(
           )
         }
         actions={built.headerClear}
+        actionsOwner={args.instancePath ?? appendInstancePath(ctx.instancePath, args.key)}
         size={ctx.size}
         helpDisplay={built.help}
         {...(hasFormHelp(field) ? { helper: <FormHelp field={field} /> } : {})}
@@ -432,7 +435,7 @@ export function renderFieldRow(
   if (field.kind === "display") {
     return <div className="col-span-full">{built.value}</div>;
   }
-  const label = opts?.labelOverride ? (
+  const label = opts?.labelNode !== undefined ? opts.labelNode : opts?.labelOverride ? (
     <label htmlFor={built.fieldId} className={cn("flex items-center gap-2 whitespace-nowrap font-medium", labelSizeClass[ctx.size])}>
       <LabelIcon icon={field.labelIcon} className="text-[15px] text-muted-foreground" />
       <span>{opts.labelOverride}</span>
@@ -499,6 +502,7 @@ export function renderObjectFields(
   const own = Object.entries(properties).filter(
     ([key, prop]) => !hoisted.emptied.has(key) && !(ctx.depth > 0 && isHoisted(prop)),
   );
+  const parent = { schema: { ...schema, properties }, value, onChange };
   const fieldArgs = (key: string, prop: JsonSchemaProperty): FieldArgs =>
     hoisted.rows.get(key) ?? {
       key,
@@ -507,6 +511,7 @@ export function renderObjectFields(
       value: value[key],
       onChange: (next) => onChange(applyChangeEffects(schema, { ...listenerOptions, value, key, next })),
       instancePath: appendInstancePath(ctx.instancePath, key),
+      parent,
     };
   // Per-property `x-clicky-order` wins (composes across merged branches); the
   // object-level `x-order` array is the fallback; document order otherwise.
@@ -535,8 +540,28 @@ export function renderObjectFields(
   // layout engine owns its rows, so it is handed every array row instead.
   const compactArrays = isBuiltInFormLayout(ctx.layout.mode) && ctx.layout.mode !== "properties" && arrayEntries.length > (addMenu ? 0 : 3);
   const rowDisplay = schema["x-object-display"] === "row" && ctx.layout.mode !== "properties";
+  const exclusive = exclusiveKeys(schema)?.filter((key) => !hidden.has(key) && entries.some(([entry]) => entry === key));
+  const exclusiveAt = exclusive && exclusive.length > 1 ? entries.find(([key]) => exclusive.includes(key))?.[0] : undefined;
   const rows = entries.flatMap(([key, prop]): ReactNode[] => {
     if (hidden.has(key)) return [];
+    if (exclusive && exclusiveAt !== undefined && exclusive.includes(key)) {
+      if (key !== exclusiveAt) return [];
+      // The keys' one row sits where the first of them is ordered, as the chosen key's control.
+      const chosen = exclusive.find((candidate) => value[candidate] !== undefined) ?? exclusive[0]!;
+      const chosenProp = properties[chosen]!;
+      const row = renderFieldRow({ ...fieldArgs(chosen, chosenProp), required: true }, ctx, {
+        labelNode: (
+          <ExclusiveKeySelect
+            keys={exclusive.map((candidate) => ({ key: candidate, label: properties[candidate]?.title || candidate }))}
+            value={chosen}
+            fieldId={fieldInputId(appendInstancePath(ctx.instancePath, chosen), ctx.idPrefix)}
+            disabled={ctx.readOnly || ctx.presentation === true}
+            onChange={(next) => onChange(switchExclusiveKey({ value, keys: exclusive, next }))}
+          />
+        ),
+      });
+      return row ? [<div key={`exclusive:${exclusive.join("|")}`} className="contents" data-jsf-exclusive-keys="">{row}</div>] : [];
+    }
     if (rowDisplay) return renderRowCell(fieldArgs(key, prop), ctx);
     if (compactArrays && prop.type === "array" && prop["x-hidden"] !== false && (!Array.isArray(value[key]) || value[key].length === 0)) return [];
     const row = renderFieldRow(fieldArgs(key, prop), ctx);
@@ -574,35 +599,14 @@ export function renderObjectFields(
       if (items !== undefined && !Array.isArray(items)) throw new Error(`${key} is not an array`);
       onChange({ ...value, [key]: [...(items ?? []), seedFromSchema(prop.items ?? { type: "string" })] });
     };
-    // The add-menu offers only the arrays it hid; an array with items adds inline.
-    const empty = available.filter(([key]) => !Array.isArray(value[key]) || value[key].length === 0);
-    if (addMenu && empty.length > 0) {
-      rows.unshift(
-        <div key="keyed-array-add" data-jsf-add-menu="" className="col-span-full" style={{ gridColumn: "1 / -1" }}>
-          <DropdownMenu
-            label="Add"
-            icon={UiAdd}
-            variant="outline"
-            size="sm"
-            align="left"
-            menuLabel="Add"
-            items={empty.map(([key, prop]) => ({ label: prop.title || key, onSelect: () => addItem(key) }))}
-          />
-        </div>,
-      );
-    } else if (!addMenu && available.length > 0) {
-      rows.push(
-        <div key="keyed-array-add" className="col-span-full w-full max-w-72">
-          <Combobox
-            ariaLabel="Add item"
-            placeholder="Add item…"
-            options={available.map(([key, prop]) => ({ value: key, label: prop.title || key }))}
-            value=""
-            allowCustomValue={false}
-            onChange={addItem}
-          />
-        </div>,
-      );
+    // The Add menu offers only the arrays it hid; an array with items is shown and adds inline.
+    const offered = available.filter(([key]) => !Array.isArray(value[key]) || value[key].length === 0);
+    if (offered.length > 0) {
+      // One Add menu: a plus button in the object's section header, or an Add button at the top (add-menu) or foot of its grid.
+      const menu = <ArrayAddMenu key="keyed-array-add" owner={ctx.instancePath ?? ""}
+        items={offered.map(([key, prop]) => ({ key, label: prop.title || key, onSelect: () => addItem(key) }))} />;
+      if (addMenu) rows.unshift(menu);
+      else rows.push(menu);
     }
   }
   return rows;

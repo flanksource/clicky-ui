@@ -460,18 +460,18 @@ function TaskRow({
         )}
       />
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <span className="flex min-w-0 flex-1 basis-full items-center gap-1.5 text-sm font-medium sm:basis-auto">
-            <span className="break-words">{t.name}</span>
+        <div className="flex items-start justify-between gap-2">
+          <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium">
+            <span className="shrink-0 whitespace-nowrap">{t.name}</span>
             {t.error && (
-              <span className="truncate text-xs font-normal text-red-500">
+              <span className="min-w-0 flex-1 truncate text-xs font-normal text-red-500">
                 {t.error}
               </span>
             )}
             {latestWarn && (
               <span
                 className={cn(
-                  "truncate text-xs font-normal",
+                  "min-w-0 flex-1 truncate text-xs font-normal",
                   logLevelColor("warn"),
                 )}
               >

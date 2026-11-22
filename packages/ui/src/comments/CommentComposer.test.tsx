@@ -142,6 +142,19 @@ describe("CommentComposer", () => {
       ]).toEqual(["@codex", null]);
     });
 
+    it.each([
+      { name: "a host delivery preview", extra: { renderDeliveryPreview: () => <span data-testid="host-delivery">Send to…</span> }, testId: "host-delivery" },
+      { name: "the default delivery line", extra: { defaultDelivery: { label: "claude-opus-5-5" } }, testId: "default-delivery" },
+    ])("puts $name on the send button's row, before the button", ({ extra, testId }) => {
+      render(<CommentComposer config={{ statuses: DEFAULT_COMMENT_STATUSES, ...extra }} collapsible={false} />);
+      const row = screen.getByRole("button", { name: "Post comment" }).closest("[data-comment-actions]");
+      const delivery = screen.getByTestId(testId);
+      expect({
+        sameRow: row?.contains(delivery) ?? false,
+        before: Boolean(delivery.compareDocumentPosition(screen.getByRole("button", { name: "Post comment" })) & Node.DOCUMENT_POSITION_FOLLOWING),
+      }).toEqual({ sameRow: true, before: true });
+    });
+
     it("states the default delivery and the layer its rule came from under the input, even with no target menu", () => {
       render(
         <CommentComposer

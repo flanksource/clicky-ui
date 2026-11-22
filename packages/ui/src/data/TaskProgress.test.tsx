@@ -73,6 +73,15 @@ describe("TaskProgress", () => {
     expect(bar).toHaveAttribute("aria-valuemax", "4");
   });
 
+  it("truncates a task error instead of its name and keeps the header row unwrapped", () => {
+    render(<TaskProgress snapshots={RUN} />);
+
+    const name = screen.getByText("update stats");
+    expect(name).toHaveClass("shrink-0", "whitespace-nowrap");
+    expect(screen.getByText("timeout")).toHaveClass("min-w-0", "flex-1", "truncate");
+    expect(name.parentElement?.parentElement).not.toHaveClass("flex-wrap");
+  });
+
   it("counts canceled child tasks as completed in group progress", () => {
     const snapshots: TaskSnapshot[] = [
       { id: "group", name: "stopped run", type: "group", status: "canceled", groupId: "group", total: 2 },

@@ -285,12 +285,12 @@ export function AccordionList<T>({
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      {(summary !== undefined || toolbar !== undefined) && (
+      {(summary !== undefined || toolbar != null) && (
         <div data-accordion-summary className="flex items-center justify-between gap-2">
           {summary !== undefined && (
             <p className={cn("text-muted-foreground", labelSizeClass[size])}>{summary}</p>
           )}
-          {toolbar !== undefined && (
+          {toolbar != null && (
             <div className="ml-auto flex shrink-0 items-center">{toolbar}</div>
           )}
         </div>

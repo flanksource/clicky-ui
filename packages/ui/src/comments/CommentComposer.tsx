@@ -319,9 +319,6 @@ export function CommentComposer({
         className="min-h-[48px] pr-10 [@media(pointer:coarse)]:pr-12"
       />
       {error !== null && <ActionError error={error} context={[["Operation", "Post comment"], ["Anchor", anchor ?? "Whole page"]]} />}
-      {config.renderDeliveryPreview
-        ? config.renderDeliveryPreview({ body, ...(target ? { target } : {}) })
-        : <DefaultDeliveryLine delivery={config.defaultDelivery} className="mt-1 text-[11px] leading-4 text-muted-foreground" />}
       {collapsible && (
         <button
           type="button"
@@ -336,8 +333,9 @@ export function CommentComposer({
         </button>
       )}
       {/* Touch-sized controls cannot share one absolute row with the textarea,
-          so on a coarse pointer the row joins the flow and wraps. */}
-      <div className="absolute inset-x-3 bottom-2.5 flex items-center gap-1.5 [@media(pointer:coarse)]:static [@media(pointer:coarse)]:mt-2 [@media(pointer:coarse)]:flex-wrap [@media(pointer:coarse)]:gap-2">
+          so on a coarse pointer the row joins the flow and wraps. Where the
+          comment goes sits on this row, shrinking before the send button does. */}
+      <div data-comment-actions className="absolute inset-x-3 bottom-2.5 flex items-center gap-1.5 [@media(pointer:coarse)]:static [@media(pointer:coarse)]:mt-2 [@media(pointer:coarse)]:flex-wrap [@media(pointer:coarse)]:gap-2">
         {targets.length > 0 && (
           <TargetPicker
             targets={targets}
@@ -355,8 +353,13 @@ export function CommentComposer({
             onChange={(value) => setFacet(facet.key, value)}
           />
         ))}
+        <div className="flex min-w-0 flex-1 items-center overflow-hidden">
+          {config.renderDeliveryPreview
+            ? config.renderDeliveryPreview({ body, ...(target ? { target } : {}) })
+            : <DefaultDeliveryLine delivery={config.defaultDelivery} className="truncate text-[11px] leading-4 text-muted-foreground" />}
+        </div>
         <SplitButton
-          className="ml-auto [@media(pointer:coarse)]:min-h-11"
+          className="ml-auto shrink-0 [@media(pointer:coarse)]:min-h-11"
           size="sm"
           label={<span className="sr-only">{createActions?.[0]?.label ?? "Post comment"}</span>}
           icon={UiPaperPlaneRightFilled}

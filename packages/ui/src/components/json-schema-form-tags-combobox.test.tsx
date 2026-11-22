@@ -210,6 +210,51 @@ describe("scalar array as a tags combobox", () => {
   });
 });
 
+// A string list whose items carry a pattern is typed: a tag that does not fit the
+// item schema is refused, loudly, rather than committed for a later parse to reject.
+describe("typed string tags", () => {
+  const TICKET = "^[A-Z][A-Z0-9]+-[0-9]+$";
+  const refsSchema: JsonSchemaObject = {
+    type: "object",
+    properties: {
+      refs: { type: "array", title: "Refs", items: { type: "string", title: "Ticket", pattern: TICKET, description: "A Jira key such as ACME-12." } },
+    },
+  };
+  function typeAndCommit(text: string) {
+    const input = screen.getByRole("combobox", { name: "Refs" });
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: text } });
+    fireEvent.keyDown(input, { key: "Enter" });
+  }
+
+  it("commits a tag that matches the item pattern", () => {
+    const onChange = vi.fn();
+    render(<Harness schema={refsSchema} initial={{ refs: ["ACME-1"] }} onChange={onChange} />);
+    typeAndCommit("ACME-12");
+    expect(onChange).toHaveBeenLastCalledWith({ refs: ["ACME-1", "ACME-12"] });
+  });
+
+  it("refuses a tag that does not match, saying what the item must be and marking the field invalid", () => {
+    const onChange = vi.fn();
+    render(<Harness schema={refsSchema} initial={{ refs: ["ACME-1"] }} onChange={onChange} />);
+    typeAndCommit("not a ticket");
+    const input = screen.getByRole("combobox", { name: "Refs" });
+    expect({
+      committed: onChange.mock.calls.length,
+      message: screen.getByRole("alert").textContent,
+      invalid: input.getAttribute("aria-invalid"),
+      describedBy: input.getAttribute("aria-describedby")?.split(" ").includes(screen.getByRole("alert").id),
+    }).toEqual({ committed: 0, message: "“not a ticket” is not a valid Ticket: A Jira key such as ACME-12.", invalid: "true", describedBy: true });
+  });
+
+  it("clears the refusal once the text is edited", () => {
+    render(<Harness schema={refsSchema} initial={{ refs: [] }} onChange={vi.fn()} />);
+    typeAndCommit("nope");
+    fireEvent.change(screen.getByRole("combobox", { name: "Refs" }), { target: { value: "ACME" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});
+
 describe("multi lookup as a tags combobox", () => {
   it("keeps the committed values visible instead of dropping the array", async () => {
     render(

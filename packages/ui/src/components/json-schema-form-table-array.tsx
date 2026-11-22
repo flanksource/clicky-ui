@@ -229,15 +229,15 @@ export function TableArray({
   );
   if (toolbar === undefined) return table;
   // The same summary line the item list shows, so switching views keeps the
-  // count and the toolbar where they were.
-  const spec = field.itemSpec ?? resolveItemSpec(field.schema, itemSchema);
+  // count and the toolbar where they were. A null toolbar (the menu moved to
+  // the section header) with no count line (x-item count: false) has none.
+  const countLine = itemCountLine(field.itemSpec ?? resolveItemSpec(field.schema, itemSchema), items.length);
+  if (toolbar === null && countLine === undefined) return table;
   return (
     <div className="flex flex-col gap-2">
       <div data-jsf-array-summary className="flex items-center justify-between gap-2">
-        <p className={cn("text-muted-foreground", labelSizeClass[ctx.size])}>
-          {itemCountLine(spec, items.length)}
-        </p>
-        <div className="flex shrink-0 items-center">{toolbar}</div>
+        <p className={cn("text-muted-foreground", labelSizeClass[ctx.size])}>{countLine}</p>
+        {toolbar != null && <div className="flex shrink-0 items-center">{toolbar}</div>}
       </div>
       {table}
     </div>
