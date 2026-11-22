@@ -16,7 +16,10 @@ export function useLiveSnapshot<T, Change = T>(url: string | null, merge?: (prev
   const [attempt, setAttempt] = useState(0);
   const latest = useRef<Pick<LiveSnapshot<T>, "url" | "data">>({ url: "" });
   const mergeRef = useRef(merge);
-  mergeRef.current = merge;
+
+  useEffect(() => {
+    mergeRef.current = merge;
+  }, [merge]);
 
   useEffect(() => {
     if (!url) return;

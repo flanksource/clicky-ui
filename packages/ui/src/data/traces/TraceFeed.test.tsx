@@ -1,7 +1,8 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceFeed } from "./TraceFeed";
 import { httpExchangeRows } from "./fixtures";
+import type { TraceFeedPage, TraceFeedRecord } from "./trace-feed";
 
 beforeEach(() => window.history.replaceState(null, "", "/"));
 
@@ -88,6 +89,39 @@ describe("TraceFeed", () => {
     await vi.waitFor(() => expect(loadPage).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: "next-page" }), expect.any(AbortSignal)));
   });
 
+  it("replays records published while the initial page loads and deduplicates overlapping records", async () => {
+    const record = (seq: number, summary: string): TraceFeedRecord => ({ runId: "example", kind: "logs", stream: "app", seq, timestamp: null, summary, record: {} });
+    const snapshot = record(1, "In the snapshot");
+    const records = [snapshot];
+    const resumeToken = "snapshot-position";
+    const { promise, resolve } = Promise.withResolvers<TraceFeedPage>();
+    const loadPage = vi.fn(() => promise);
+    const follow = vi.fn(({ resume, onRecord }: { resume?: string; onRecord: (row: TraceFeedRecord) => void }) => {
+      if (resume === resumeToken) records.forEach(onRecord);
+      return () => {};
+    });
+    render(<TraceFeed kinds={["logs"]} loadPage={loadPage} follow={follow} />);
+    expect(loadPage).toHaveBeenCalledOnce();
+    expect(follow).not.toHaveBeenCalled();
+
+    const gapRecord = record(2, "Between snapshot and subscription");
+    records.push(gapRecord);
+    await act(async () => resolve({ rows: [snapshot], nextCursor: "older-page", resume: resumeToken }));
+
+    expect(follow).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ resume: resumeToken }));
+    expect(screen.getAllByRole("button", { name: /snapshot|subscription/ }).map(row => row.textContent)).toEqual([
+      `—${snapshot.summary}`,
+      `—${gapRecord.summary}`,
+    ]);
+  });
+
+  it("reports a missing snapshot token without starting a live-only subscription", async () => {
+    const follow = vi.fn(() => () => {});
+    render(<TraceFeed kinds={["logs"]} loadPage={async () => ({ rows: [], nextCursor: "" })} follow={follow} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Trace feed page is missing a resume token");
+    expect(follow).not.toHaveBeenCalled();
+  });
+
   it("shows UTC timestamps for mixed events and strips ANSI record prefixes while retaining message styles", async () => {
     const rows = [
       { runId: "example", kind: "logs", stream: "app", seq: 1, timestamp: "2026-11-08T14:00:02.123+02:00", summary: "worker ready", ansi: "\u001b[90mlogs #1\u001b[0m \u001b[90m14:00:02.123\u001b[0m \u001b[32mworker ready\u001b[0m", record: {} },
@@ -105,5 +139,17 @@ describe("TraceFeed", () => {
     expect(screen.getByLabelText("Timestamp unavailable")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Event stream" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("request completed")).toHaveStyle({ color: "#cd3131" });
+  });
+
+  it.each([
+    { name: "record prefix", ansi: "\u001b[90mlogs #1\u001b[32m ready\u001b[0m", color: "rgb(13, 188, 121)", fontWeight: "" },
+    { name: "record and clock prefixes", ansi: "\u001b[1;90mlogs #1 \u001b[90m12:00:00.000\u001b[32m ready\u001b[0m", color: "rgb(13, 188, 121)", fontWeight: "bold" },
+    { name: "clock reset", ansi: "\u001b[1;90mlogs #1 \u001b[32m12:00:00.000\u001b[0m ready", color: "", fontWeight: "" },
+    { name: "message override", ansi: "\u001b[1;90mlogs #1\u001b[32m \u001b[22;31mready\u001b[0m", color: "rgb(205, 49, 49)", fontWeight: "" },
+  ])("renders the expected ANSI style for $name", async ({ ansi, color, fontWeight }) => {
+    const rows = [{ runId: "example", kind: "logs", stream: "app", seq: 1, timestamp: "2026-11-22T12:00:00Z", summary: "ready", ansi, record: {} }];
+    render(<TraceFeed kinds={["logs"]} presentation="ansi" loadPage={async () => ({ rows, nextCursor: "" })} />);
+    const message = await screen.findByText("ready");
+    expect({ color: message.style.color, fontWeight: message.style.fontWeight }).toEqual({ color, fontWeight });
   });
 });

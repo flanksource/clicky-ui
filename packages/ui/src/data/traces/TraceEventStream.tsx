@@ -3,9 +3,15 @@ import { Button } from "../../components/button";
 import { AnsiHtml } from "../AnsiHtml";
 import { traceFeedKey, type TraceFeedRecord } from "./trace-feed";
 
-const sgr = String.raw`(?:\x1b\[[0-9;]*m)*`;
-const recordPrefix = new RegExp(String.raw`^${sgr}([a-z0-9_.\/-]+) #(\d+)${sgr}[^\S\r\n]+`, "i");
-const clockPrefix = new RegExp(String.raw`^${sgr}(\d{2}:\d{2}:\d{2}\.\d{3})${sgr}[^\S\r\n]+`);
+const sgr = String.raw`\x1b\[[0-9;]*m`;
+const sgrCodes = new RegExp(sgr, "g");
+const sgrSequence = `(?:${sgr})*`;
+const recordPrefix = new RegExp(String.raw`^${sgrSequence}([a-z0-9_.\/-]+) #(\d+)${sgrSequence}[^\S\r\n]+`, "i");
+const clockPrefix = new RegExp(String.raw`^${sgrSequence}(\d{2}:\d{2}:\d{2}\.\d{3})${sgrSequence}[^\S\r\n]+`);
+
+function stripVisiblePrefix(ansi: string, prefix: string): string {
+  return (prefix.match(sgrCodes) ?? []).join("") + ansi.slice(prefix.length);
+}
 
 function streamAnsi({ ansi, kind, seq, timestamp }: TraceFeedRecord, utcTime: string | undefined): string {
   if (typeof ansi !== "string") throw new Error("ANSI trace feed record is missing its presentation");
@@ -13,12 +19,12 @@ function streamAnsi({ ansi, kind, seq, timestamp }: TraceFeedRecord, utcTime: st
   const prefixKind = prefix?.[1];
   if (!prefix || !(prefixKind === kind || prefixKind?.startsWith(`${kind}/`)) || prefix[2] !== String(seq)) return ansi;
 
-  const message = ansi.slice(prefix[0].length);
+  const message = stripVisiblePrefix(ansi, prefix[0]);
   const clock = clockPrefix.exec(message);
   if (!clock || !timestamp) return message;
   const recordedClock = /T(\d{2}:\d{2}:\d{2})(?:\.(\d+))?/.exec(timestamp);
   const sourceTime = recordedClock && `${recordedClock[1]}.${(recordedClock[2] ?? "").padEnd(3, "0").slice(0, 3)}`;
-  return clock[1] === utcTime || clock[1] === sourceTime ? message.slice(clock[0].length) : message;
+  return clock[1] === utcTime || clock[1] === sourceTime ? stripVisiblePrefix(message, clock[0]) : message;
 }
 
 const timestampClass = "w-[16ch] shrink-0 whitespace-nowrap tabular-nums text-muted-foreground";
