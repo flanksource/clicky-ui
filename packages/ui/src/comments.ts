@@ -36,6 +36,7 @@ export * from "./comments/comment-vocabulary";
 export { VocabularyPreview } from "./comments/VocabularyPreview";
 export { captureVocabularyPreviews, type VocabularyPreviewImage } from "./comments/vocabulary-capture";
 export { CommentEditor } from "./comments/CommentEditor";
+export { CommentBodyEditor } from "./comments/CommentBodyEditor";
 export * from "./comments/comment-utils";
 export * from "./comments/agent-delivery";
 export {
