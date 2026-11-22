@@ -234,9 +234,9 @@ describe("repository documents", () => {
   const id = (path: string) => `document:${repository.id}/${path}`;
   const folder = repository.folders[0]!;
 
-  function context(index: [string, Partial<NavigationActivity>][], options: Partial<ViewOptions> = {}, problems: [string, number][] = []): RepositoryContext {
+  function context(index: [string, Partial<NavigationActivity>][], options: Partial<ViewOptions> = {}): RepositoryContext {
     const map: ActivityIndex = new Map(index.map(([key, value]) => [key, activity(value)]));
-    return { list, options: view(options), activity: map, records: repositoryActivity(map), problems: new Map(problems), target: navigationTarget(options.active) };
+    return { list, options: view(options), activity: map, records: repositoryActivity(map), target: navigationTarget(options.active) };
   }
   const labels = (entries: NavigationEntry[]) => entries.map((entry) => entry.label);
 
@@ -257,11 +257,6 @@ describe("repository documents", () => {
     expect(labels(await listDirectory(context(busy, { filters: ["open"] }), repository, folder, "docs"))).toEqual(["b.md"]);
     expect(labels(await listDirectory(context(busy, { filters: ["resolved"] }), repository, folder, "docs"))).toEqual(["deep"]);
     expect(labels(await listDirectory(context(busy, { filters: ["open", "resolved"] }), repository, folder, "docs"))).toEqual(["b.md", "deep"]);
-  });
-
-  it("sums lint problems on a document and on the folders above it", async () => {
-    const entries = await listDirectory(context([], {}, [[id("docs/deep/setup.md"), 3], [id("docs/a.md"), 1]]), repository, folder, "docs");
-    expect(entries.map((entry) => [entry.label, entry.problems])).toEqual([["deep", 3], ["a.md", 1], ["b.md", undefined]]);
   });
 
   it("reveals the active document: ancestors open with children, ignored entries on the path included", async () => {

@@ -25,7 +25,6 @@ export type DocumentLease = {
   file: DocumentFile;
 };
 
-export type FolderLintScope = { files: string[]; revision: string };
 
 export function folderPath(id: string): { repositoryId: string; path: string } {
   const match = /^folder:([\da-f-]{36})\/(.+)$/.exec(id);

@@ -1,13 +1,19 @@
 import { describeElement, resolveComment } from "@flanksource/clicky-ui/comments";
+import { getElementBounds } from "@flanksource/clicky-ui/react-grab/primitives";
 import type { AgentAnchorState, AgentFrameMessage, AgentPin, AgentRect } from "../../schema.ts";
 import { isPageElement } from "./owner.ts";
+import { observeCommentFrames } from "./frame-layout.ts";
 
-export function elementRect(element: Element): AgentRect {
+export function elementRect(element: Element, root?: Element): AgentRect {
+  if (root && element.ownerDocument !== root.ownerDocument) {
+    const { x, y, width, height } = getElementBounds(element);
+    return { left: x, top: y, width, height };
+  }
   const { left, top, width, height } = element.getBoundingClientRect();
   return { left, top, width, height };
 }
 
-export function mountAgentOverlay(options: { root: Element; send: (message: AgentFrameMessage) => void; registered: Map<string, Element> }) {
+export function mountAgentOverlay(options: { root: Element; send: (message: AgentFrameMessage) => void; registered: Map<string, Element>; frames?: boolean; onFrameLayout?: () => void }) {
   const host = document.createElement("div");
   host.setAttribute("data-page-agent", "");
   host.setAttribute("data-react-grab-ignore", "");
@@ -27,11 +33,12 @@ export function mountAgentOverlay(options: { root: Element; send: (message: Agen
   let highlighted: string | null = null;
   let pending = 0;
   let last = "";
+  const anchorOptions = { frames: options.frames === true };
 
   function resolve(pin: AgentPin) {
     const registered = options.registered.get(pin.anchor);
-    const match = registered?.isConnected ? { element: registered, matchedBy: "anchor" as const, conflict: false } : resolveComment(options.root, pin.anchor, pin.locators);
-    return match && isPageElement({ element: match.element, root: options.root }) ? match : null;
+    const match = registered?.isConnected ? { element: registered, matchedBy: "anchor" as const, conflict: false } : resolveComment(options.root, pin.anchor, pin.locators, anchorOptions);
+    return match && isPageElement({ element: match.element, root: options.root, ...anchorOptions }) ? match : null;
   }
   function target(anchor: string): Element | null {
     if (anchor === "__document__") return options.root;
@@ -40,7 +47,7 @@ export function mountAgentOverlay(options: { root: Element; send: (message: Agen
   function drawPin(pin: AgentPin, index: number): AgentAnchorState {
     const match = resolve(pin);
     if (!match) return { anchor: pin.anchor, state: "orphaned", label: pin.anchor, rect: null };
-    const box = elementRect(match.element);
+    const box = elementRect(match.element, options.root);
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = String(index + 1);
@@ -55,16 +62,21 @@ export function mountAgentOverlay(options: { root: Element; send: (message: Agen
   }
   function recompute() {
     pending = 0;
+    frames?.refresh();
     pins.replaceChildren();
     const states = saved.map(drawPin);
     const element = highlighted ? target(highlighted) : null;
     highlight.hidden = !element;
-    if (element) for (const [key, value] of Object.entries(elementRect(element))) highlight.style.setProperty(key, `${value}px`);
+    if (element) for (const [key, value] of Object.entries(elementRect(element, options.root))) highlight.style.setProperty(key, `${value}px`);
     const geometry = { type: "geometry" as const, scrollX: window.scrollX, scrollY: window.scrollY, width: window.innerWidth, height: window.innerHeight };
     const state = JSON.stringify([states, geometry]);
     if (state !== last) { last = state; options.send({ type: "anchors", anchors: states }); options.send(geometry); }
   }
   function schedule() { if (!pending) pending = requestAnimationFrame(recompute); }
+  const frames = options.frames ? observeCommentFrames(options.root, () => {
+    schedule();
+    options.onFrameLayout?.();
+  }) : undefined;
   const observer = new MutationObserver(schedule);
   observer.observe(options.root, { subtree: true, childList: true, characterData: true, attributes: true });
   observer.observe(options.root.ownerDocument.body, { subtree: true, childList: true, characterData: true, attributes: true });
@@ -84,6 +96,7 @@ export function mountAgentOverlay(options: { root: Element; send: (message: Agen
     update(anchors: AgentPin[], focus?: string | null) { saved = anchors; if (focus !== undefined) selected = focus; last = ""; schedule(); },
     highlight(anchor: string | null) { highlighted = anchor; schedule(); },
     dispose() {
+      frames?.dispose();
       observer.disconnect(); resize.disconnect(); cancelAnimationFrame(pending);
       window.removeEventListener("scroll", schedule, true); window.removeEventListener("resize", schedule); host.remove();
     },

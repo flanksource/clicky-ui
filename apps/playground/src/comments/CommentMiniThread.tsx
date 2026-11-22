@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Button, CommentCard, useCommentContext } from "@flanksource/clicky-ui";
 import { sortReplies, type Comment } from "@flanksource/clicky-ui/comments";
 
-export function CommentMiniThread({ replies }: { replies: Comment[] }) {
-  const { config } = useCommentContext();
+export function CommentMiniThread({ root, replies }: { root: Comment; replies: Comment[] }) {
+  const { config, callbacks: { onEditReply } } = useCommentContext();
+  const editReply = config.canEditThread?.(root) === false ? undefined : onEditReply;
   const [expanded, setExpanded] = useState(false);
   if (replies.length === 0) return null;
   const sorted = sortReplies(replies);
@@ -35,6 +36,7 @@ export function CommentMiniThread({ replies }: { replies: Comment[] }) {
           comment={reply}
           config={config}
           compact
+          {...(editReply ? { onEdit: (body) => editReply(root.id, reply.id, body) } : {})}
         />
       ))}
     </section>

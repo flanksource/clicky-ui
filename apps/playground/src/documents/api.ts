@@ -2,7 +2,6 @@ import type {
   DirectoryEntry,
   DocumentRepository,
   RepositoryFolder,
-  FolderLintScope,
 } from "./types";
 import { normalizeErrorDiagnostics, type ErrorDiagnostics } from "@flanksource/clicky-ui";
 
@@ -77,7 +76,3 @@ export const directoryEntries = (input: {
     `${GAVEL_ROUTE}/api/workspace/entries`,
     jsonBody("POST", input),
   );
-
-export const folderLintScope = (id: string) => documentJson<FolderLintScope>(
-  `/__playground/documents/scope?${new URLSearchParams({ id })}`,
-);

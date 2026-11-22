@@ -127,16 +127,6 @@ it("preserves the status and response body for a non-JSON failure", async () => 
   expect(screen.getByText("Service unavailable")).toBeTruthy();
 });
 
-it("keeps the lint-count failure behind a warning status dot", async () => {
-  const problemsError = "invalid launch input: local workspace access is disabled";
-  vi.stubGlobal("fetch", vi.fn(async (url: string) => Response.json(url === "/__playground/connections" ? { connections } : snapshot)));
-  render(<VocabularyProvider><VocabularyStatus problemsError={problemsError} /></VocabularyProvider>);
-  const trigger = await screen.findByRole("button", { name: "Playground status: lint counts unavailable" });
-  expect(screen.queryByText(problemsError)).toBeNull();
-  fireEvent.click(trigger);
-  expect({ title: screen.getByText("Lint counts unavailable").textContent, message: screen.getByText(problemsError).textContent }).toEqual({ title: "Lint counts unavailable", message: problemsError });
-});
-
 it("lists each backend with its address and offers no way to start or restart it", async () => {
   const calls: string[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {

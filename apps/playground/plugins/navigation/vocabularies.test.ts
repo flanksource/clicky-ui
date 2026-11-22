@@ -31,7 +31,7 @@ it("lists vocabulary root pages in Vocabularies with titles or aliases and keeps
   ]));
   configureComments({ dir: root, workspace: root, endpoint: fixedGavel("http://gavel.local"), project: "playground" });
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ data: [], page: { total: 0, limit: 200, offset: 0 } })));
-  const navigation = createNavigation({ dir: root, pagesDir, endpoint: fixedGavel("http://gavel.local"), problems: async () => ({}) });
+  const navigation = createNavigation({ dir: root, pagesDir, endpoint: fixedGavel("http://gavel.local") });
   const tree = await navigation.children(parseNavigationQuery(new URLSearchParams({ age: "all", active: "vocabularies/shapes" })));
   expect(tree.children).toEqual(expect.arrayContaining([
     expect.objectContaining({ key: "page-item:guide", slug: "guide" }),

@@ -5,7 +5,6 @@ import { dirname, join, resolve } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 import type { DirectoryEntry } from "../src/documents/types";
 import type { NavigationEntry, NavigationResponse } from "../src/navigation/types";
-import type { DocumentProblems } from "./document-problems";
 import { configureComments } from "./comments-client";
 import { fixedGavel } from "./gavel-launch-server";
 import { playgroundNavigation } from "./navigation-server";
@@ -39,7 +38,7 @@ function writeAt(path: string, text: string, ageMs: number) {
   utimesSync(path, time, time);
 }
 
-async function fixture({ problems = () => ({}), betaAge = 3 * HOUR }: { problems?: (repositoryId: string) => DocumentProblems; betaAge?: number } = {}) {
+async function fixture({ betaAge = 3 * HOUR }: { betaAge?: number } = {}) {
   mkdirSync(resolve(".tmp"), { recursive: true });
   const dir = mkdtempSync(resolve(".tmp/navigation-"));
   const pagesDir = join(dir, "pages");
@@ -100,7 +99,6 @@ async function fixture({ problems = () => ({}), betaAge = 3 * HOUR }: { problems
     dir,
     pagesDir,
     endpoint: fixedGavel("http://gavel.local"),
-    problems: async () => problems(repository.id),
     loadMeta: async (path) => (path.endsWith("solo.tsx") ? { title: "Setup guide", description: "Start here", icon: Object.assign(() => null, { displayName: "UiFileCode" }) } : undefined),
   });
   (plugin.configureServer as (server: unknown) => void)({
@@ -221,38 +219,6 @@ it("filters every source by open or resolved threads", async () => {
   expect(keys(resolved.body.children)).toEqual([repoKey(repository.id, ".", ".")]);
   const docs = await get({ filters: "resolved", node: repoKey(repository.id, ".", "docs") });
   expect(keys(docs.body.children)).toEqual([repoKey(repository.id, ".", "docs/deep")]);
-});
-
-it("sets lint problems on documents and sums them on the folders above", async () => {
-  const lint = { violations: [{ file: "docs/deep/setup.md" }, { file: "docs/deep/setup.md" }] };
-  const { get, documentId } = await fixture({
-    problems: (id) => ({ [`document:${id}/docs/deep/setup.md`]: { plain: [lint], prompt: [] } }) as unknown as DocumentProblems,
-  });
-  const { body } = await get({ active: documentId("docs/deep/setup.md") });
-  const repo = body.children[0];
-  const docs = repo?.children?.find((entry) => entry.label === "docs");
-  const deep = docs?.children?.find((entry) => entry.label === "deep");
-  const setup = deep?.children?.find((entry) => entry.label === "setup.md");
-  expect([repo?.problems, docs?.problems, deep?.problems, setup?.problems]).toEqual([2, 2, 2, 2]);
-  expect(docs?.children?.find((entry) => entry.label === "guide.md")?.problems).toBeUndefined();
-});
-
-it("still serves the tree when lint problems fail, reporting the failure instead of counts", async () => {
-  const failure = "workspace path is outside enabled roots";
-  const { get, documentId, repository } = await fixture({
-    problems: () => {
-      throw new Error(failure);
-    },
-  });
-  const root = await get({ active: documentId("docs/deep/setup.md") });
-  const repo = root.body.children[0];
-  const lazy = await get({ node: repoKey(repository.id, ".", "docs") });
-  expect({
-    status: [root.status, lazy.status],
-    problemsError: [root.body.problemsError, lazy.body.problemsError],
-    problems: [repo?.problems, repo?.children?.find((entry) => entry.label === "docs")?.problems],
-    hasRepository: repo?.key === repoKey(repository.id, ".", "."),
-  }).toEqual({ status: [200, 200], problemsError: [failure, failure], problems: [undefined, undefined], hasRepository: true });
 });
 
 it.each([

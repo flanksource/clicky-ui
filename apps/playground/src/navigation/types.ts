@@ -79,8 +79,6 @@ export type NavigationEntry = {
   open?: boolean;
   children?: NavigationEntry[];
   activity: NavigationActivity;
-  /** Lint violations on a document, summed on repository folders; omitted when zero. */
-  problems?: number;
   /** Page folders: path relative to src/pages (New page / Move / drag targets). */
   folderPath?: string;
   /** Repository folders and documents. */
@@ -97,12 +95,6 @@ export type NavigationResponse = {
    * because repository documents carry no source timestamp.
    */
   olderCount?: number;
-  /**
-   * Root and repository nodes: repository lint counts could not be loaded, so
-   * no entry carries `problems`. The tree is still served; the client shows
-   * this message and marks repository rows instead of counts.
-   */
-  problemsError?: string;
 };
 
 export const NAVIGATION_ROUTE = "/__playground/navigation";

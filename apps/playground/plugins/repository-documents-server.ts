@@ -4,7 +4,6 @@ import type { Plugin } from "vite";
 import { readJsonBody, sendJson } from "./comments-server";
 import type { GavelEndpoint } from "./gavel-launch-server";
 import { RepositoryDocuments } from "./repository-documents";
-import { prepareRepositoryFolder } from "./repository-folder";
 import type {
   DocumentRepository,
   RepositoryFolder,
@@ -44,17 +43,6 @@ export function registerRepositoryDocumentsMiddleware({ middlewares, dir, endpoi
   middlewares.use("/__playground/documents", (req, res) => {
     void (async () => {
       const url = new URL(req.url ?? "/", "http://playground.local");
-      if (url.pathname === "/scope" && req.method === "GET") {
-        const scope = await prepareRepositoryFolder({
-          dir,
-          endpoint,
-          page: url.searchParams.get("id") ?? "",
-        });
-        return sendJson(res, 200, {
-          files: scope.files,
-          revision: scope.revision,
-        });
-      }
       if (url.pathname === "/repositories" && req.method === "GET")
         return sendJson(res, 200, store.all());
       if (url.pathname === "/repositories" && req.method === "POST") {
@@ -86,7 +74,7 @@ export function registerRepositoryDocumentsMiddleware({ middlewares, dir, endpoi
           200,
           store.document(url.searchParams.get("id") ?? ""),
         );
-      sendJson(res, 405, { error: "Unknown document operation" });
+      sendJson(res, req.method === "GET" ? 404 : 405, { error: "Unknown document operation" });
     })().catch((cause: unknown) =>
       sendJson(res, 400, {
         error: cause instanceof Error ? cause.message : String(cause),
@@ -98,24 +86,28 @@ export function registerRepositoryDocumentsMiddleware({ middlewares, dir, endpoi
     res.once("close", () => abort.abort());
     void (async () => {
       const path = req.url ?? "/";
-      if (/^\/api\/workspace\/access(?:[/?]|$)/.test(path)) {
+      if (!path.startsWith("/api/workspace/"))
+        return sendJson(res, 404, { error: "Unknown Gavel operation" });
+      const url = new URL(path, await endpoint.url());
+      if (!url.pathname.startsWith("/api/workspace/"))
+        return sendJson(res, 404, { error: "Unknown Gavel operation" });
+      const workspaceAccess = /^\/api\/workspace\/access(?:\/|$)/.test(url.pathname);
+      if (workspaceAccess) {
         const peer = req.socket.remoteAddress;
         const localPeer = peer === "127.0.0.1" || peer === "::1" || peer === "::ffff:127.0.0.1";
         const host = new URL(`http://${req.headers.host}`).hostname;
         if (!localPeer || !(host === "localhost" || host === "[::1]" || isIP(host) && host === "127.0.0.1") || req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) return sendJson(res, 403, { error: "Workspace access management requires a local same-origin browser" });
       }
-      if (!/^\/api\/(workspace\/|runs(?:[/?]|$)|launch(?:[/?]|$))/.test(path))
-        return sendJson(res, 404, { error: "Unknown Gavel operation" });
       const method = req.method ?? "GET";
       const headers: Record<string, string> = {};
-      if (/^\/api\/workspace\/access(?:[/?]|$)/.test(path) && req.headers.origin) headers.Origin = new URL(await endpoint.url()).origin;
+      if (workspaceAccess && req.headers.origin) headers.Origin = url.origin;
       if (typeof req.headers["idempotency-key"] === "string")
         headers["Idempotency-Key"] = req.headers["idempotency-key"];
       const body = ["POST", "PUT"].includes(method)
         ? JSON.stringify(await readJsonBody(req))
         : undefined;
       if (body) headers["Content-Type"] = "application/json";
-      const response = await fetch(new URL(path, await endpoint.url()), {
+      const response = await fetch(url, {
         method,
         headers,
         signal: abort.signal,

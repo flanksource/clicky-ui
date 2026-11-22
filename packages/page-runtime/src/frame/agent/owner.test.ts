@@ -66,6 +66,20 @@ describe("agent page owner", () => {
     expect(() => resolvePageOwner({ ...options, sourceContext: { ...sourceContext, url: "javascript:alert(1)" } })).toThrow();
   });
 
+  it("accepts iframe selections only for external comments inside the page root", () => {
+    document.body.innerHTML = "<main><iframe></iframe></main><aside></aside>";
+    const root = document.querySelector("main")!;
+    const frame = root.querySelector("iframe")!;
+    frame.contentDocument!.body.innerHTML = "<button>Repository</button>";
+    const element = frame.contentDocument!.querySelector("button")!;
+    const options = { element, root, componentName: null, fiber: null };
+    const sourceContext = { mode: "external-document" as const, url: "https://example.com/docs" };
+    expect(() => resolvePageOwner(options)).toThrow(/outside/);
+    expect(resolvePageOwner({ ...options, sourceContext })).toEqual({ element, source: sourceContext.url, componentName: "button" });
+    frame.setAttribute("data-react-grab-ignore", "");
+    expect(() => resolvePageOwner({ ...options, sourceContext })).toThrow(/outside/);
+  });
+
   it("resolves React 19 owner creation stacks and ignores library frames", () => {
     document.body.innerHTML = "<h2>Revenue</h2>";
     const element = document.querySelector("h2")!;

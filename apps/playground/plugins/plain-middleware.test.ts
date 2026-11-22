@@ -10,7 +10,6 @@ import { registerNavigationMiddleware } from "./navigation-server";
 import { registerSourcesMiddleware } from "./sources-server";
 import { registerVisualEditsMiddleware } from "./visual-edits-server";
 import { registerExportsMiddleware } from "./exports-server";
-import { registerGavelLintMiddleware } from "./gavel-lint-server";
 import { registerBlameMiddleware } from "./blame-server";
 import { registerConnectionsMiddleware } from "./connections-server";
 import { registerRuntimeProfilesMiddleware } from "./runtime-profiles-server";
@@ -69,11 +68,10 @@ it("mounts every API without a Vite server and preserves routing and validation"
   registerAgentRunsMiddleware({ ...options, runs });
   registerPromptRunsMiddleware({ ...options, runs: prompts });
   registerCommentsMiddleware({ ...options });
-  registerNavigationMiddleware({ ...options, endpoint, problems: async () => ({}) });
+  registerNavigationMiddleware({ ...options, endpoint });
   registerSourcesMiddleware({ ...options, commentsDir: dir, workspaceRoot: dir, events });
   registerVisualEditsMiddleware({ ...options, workspaceRoot: dir, changed: events.changed });
   registerExportsMiddleware(options);
-  registerGavelLintMiddleware({ ...options, workspaceRoot: dir, promptFile: "unused" });
   registerBlameMiddleware({ ...options, cwd: dir });
   registerConnectionsMiddleware({ ...options, gavel: endpoint, captainURL: "http://127.0.0.1:1" });
   registerRuntimeProfilesMiddleware({ ...options, modelsURL: "unused", permissionsURL: "unused", resolveURL: "unused", presetsResolveURL: "unused", runtimesURL: "unused" });
@@ -84,7 +82,7 @@ it("mounts every API without a Vite server and preserves routing and validation"
   const routes = [
     ["agent-sessions", "POST"], ["prompts", "POST"], ["comments", "PUT"],
     ["navigation", "POST"], ["sources", "OPTIONS"], ["visual-edits", "GET"],
-    ["exports/test.svg", "POST"], ["lint", "GET"], ["blame", "POST"],
+    ["exports/test.svg", "POST"], ["blame", "POST"],
     ["connections", "POST"], ["runtime-profiles/models", "POST"],
     ["workspace-files", "POST"], ["documents", "DELETE"], ["page-activity", "POST"],
   ];
@@ -94,7 +92,9 @@ it("mounts every API without a Vite server and preserves routing and validation"
   }
   expect((await fetch(`${origin}/__playground/comments/schema`)).status).toBe(200);
   expect((await fetch(`${origin}/__playground/agent-sessions`)).status).toBe(200);
-  expect(await (await fetch(`${origin}/__playground/document-problems`)).json()).toEqual({ results: {} });
+  for (const route of ["lint", "document-problems", "documents/scope", "gavel/api/runs", "gavel/api/launch/linters"]) {
+    expect((await fetch(`${origin}/__playground/${route}`)).status, route).toBe(404);
+  }
   expect(await (await fetch(`${origin}/__playground/sources?slug=welcome`)).json()).toMatchObject({ slug: "welcome", source: "export default () => null;" });
   expect((await fetch(`${origin}/__playground/sources?slug=welcome`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: "export default () => <main />;" }) })).status).toBe(200);
   expect(events.changed).toHaveBeenCalledWith(join(dir, "pages/welcome.tsx"));

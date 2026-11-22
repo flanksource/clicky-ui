@@ -4,7 +4,6 @@ import type { MiddlewareApp } from "./middleware";
 import { readStaticExports } from "./static-metadata";
 import { NAVIGATION_ROUTE } from "../src/navigation/types";
 import { sendJson } from "./comments-server";
-import type { DocumentProblems } from "./document-problems";
 import type { GavelEndpoint } from "./gavel-launch-server";
 import { createNavigation, parseNavigationQuery } from "./navigation/service";
 import type { PageMetaLoader } from "./navigation/sources";
@@ -18,7 +17,7 @@ function failure(cause: unknown): { status: number; error: string } {
 
 /**
  * `GET /__playground/navigation`: every node of the sidebar tree (pages,
- * repository documents, external pages) with comment activity, lint problems,
+ * repository documents, external pages) with comment activity,
  * filter, sort, age and search applied on the server. See
  * `src/navigation/types.ts` for the contract.
  *
@@ -28,7 +27,6 @@ type NavigationOptions = {
   dir: string;
   pagesDir: string;
   endpoint: GavelEndpoint;
-  problems: () => Promise<DocumentProblems>;
   loadMeta?: PageMetaLoader;
   metadataRoots?: string[];
 };

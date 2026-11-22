@@ -17,7 +17,6 @@ import {
 } from "./comments-store";
 import { persistPromptResult } from "./prompt-run-results";
 import { prepareRepositoryFolder } from "./repository-folder";
-import { documentProblems, type DocumentLintSnapshot } from "./document-problems";
 import { LaunchClient, LaunchHttpError } from "./launch-client";
 import { fixedGavel, type GavelEndpoint } from "./gavel-launch-server";
 import { RepositoryDocuments } from "./repository-documents";
@@ -380,37 +379,6 @@ export function createPromptRuns(options: PromptRunsOptions) {
         ...(page?.startsWith("document:") ? { defaultFiles: scopedFiles({ page, files: [new RepositoryDocuments(dir).document(page).path], directory }) } : {}),
       };
     },
-    problems: async () => {
-      const repositories = new RepositoryDocuments(dir).all();
-      if (!repositories.length) return {};
-      const plain: DocumentLintSnapshot[] = [];
-      let before = "";
-      while (true) {
-        const value = await gavel.listRuns({ labels: { documentLint: "plain" }, limit: 200, before });
-        plain.push(...value.runs);
-        if (value.runs.length < 200) break;
-        const next = value.runs.at(-1)!.metadata.executionId;
-        if (next === before) throw new Error("Document lint pagination did not advance");
-        before = next;
-      }
-      const problems = documentProblems({ repositories, prompts: associations.all(), plain });
-      for (const repo of repositories) {
-        const entries = Object.entries(problems).filter(([id]) => id.startsWith(`document:${repo.id}/`));
-        const results = entries.flatMap(([, entry]) => [...entry.plain, ...entry.prompt]);
-        if (!results.length) continue;
-        const { preparationId } = await gavel.prepare(repo.root);
-        const filtered = await gavel.filterLint(preparationId, results);
-        let offset = 0;
-        for (const [, entry] of entries) {
-          const plainEnd = offset + entry.plain.length;
-          const promptEnd = plainEnd + entry.prompt.length;
-          entry.plain = filtered.slice(offset, plainEnd);
-          entry.prompt = filtered.slice(plainEnd, promptEnd);
-          offset = promptEnd;
-        }
-      }
-      return problems;
-    },
     start,
     runs: async (logger: ErrorLogger): Promise<PromptRun[]> => {
       const entries = associations.all();
@@ -436,8 +404,7 @@ export function registerPromptRunsMiddleware({ middlewares, logger, runs }: { mi
     const single = PROMPT_ROUTE.exec(url.pathname);
     const isList = url.pathname === "/prompts";
     const isRuns = url.pathname === "/prompt-runs";
-    const isProblems = url.pathname === "/document-problems";
-    if (!(single || isList || isRuns || isProblems)) {
+    if (!(single || isList || isRuns)) {
       next();
       return;
     }
@@ -456,8 +423,6 @@ export function registerPromptRunsMiddleware({ middlewares, logger, runs }: { mi
             `${method} is not allowed; GET reads prompts and runs, POST /prompt-runs starts one`,
             405,
           );
-        } else if (isProblems) {
-          sendJson(res, 200, { results: await runs.problems() });
         } else if (isRuns) {
           sendJson(res, 200, { runs: await runs.runs(logger) });
         } else if (isList) {

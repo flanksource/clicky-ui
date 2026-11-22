@@ -1,5 +1,6 @@
 import { parseStack } from "bippy/source";
 import { getFiberFromHostInstance } from "bippy";
+import { commentFramePath } from "@flanksource/clicky-ui/comments/anchoring";
 import { isPageSource, validateDocumentSource } from "../../host/agent-source.ts";
 import type { AgentSourceContext } from "../../schema.ts";
 
@@ -11,8 +12,10 @@ export type OwnerFiber = {
   stateNode?: Node | { containerInfo: Node } | null;
 };
 
-export function isPageElement(options: { element: Element; root: Element; fiber?: OwnerFiber | null }): boolean {
-  if (!options.element.isConnected || options.element.ownerDocument !== options.root.ownerDocument) return false;
+export function isPageElement(options: { element: Element; root: Element; fiber?: OwnerFiber | null; frames?: boolean }): boolean {
+  if (!options.element.isConnected) return false;
+  if (options.element.ownerDocument !== options.root.ownerDocument)
+    return options.frames === true && commentFramePath(options.element, options.root) !== null;
   for (let element: Element | null = options.element; element; ) {
     if (element.closest("[data-page-agent],[data-react-grab],[data-react-grab-ignore]")) return false;
     const tree = element.getRootNode();
@@ -30,7 +33,7 @@ export function isPageElement(options: { element: Element; root: Element; fiber?
 }
 
 export function resolvePageOwner(options: { element: Element; root: Element; componentName: string | null; fiber: OwnerFiber | null; sourceContext?: AgentSourceContext }) {
-  if (!isPageElement(options)) throw new Error("picker selected outside the page root");
+  if (!isPageElement({ ...options, frames: options.sourceContext?.mode === "external-document" })) throw new Error("picker selected outside the page root");
   if (options.sourceContext) {
     validateDocumentSource(options.sourceContext.url);
     return { element: options.element, source: options.sourceContext.url, componentName: options.componentName ?? options.element.tagName.toLowerCase() };

@@ -24,6 +24,7 @@ export type PageAgentOptions = {
   picker?: ReactGrabAPI;
   toolbar?: boolean;
   sourceContext?: AgentSourceContext;
+  onFrameLayout?: () => void;
 } & PageSourceContext;
 
 export function startPageAgent(options: PageAgentOptions) {
@@ -33,7 +34,8 @@ export function startPageAgent(options: PageAgentOptions) {
   const design = createDesignAgent(options);
   const api = options.picker ?? init({ enabled: true, telemetry: false, freezeReactUpdates: false });
   const registered = new Map<string, Element>();
-  const overlay = mountAgentOverlay({ root: options.root, send: options.send, registered });
+  const frames = options.sourceContext?.mode === "external-document";
+  const overlay = mountAgentOverlay({ root: options.root, send: options.send, registered, frames, ...(options.onFrameLayout ? { onFrameLayout: options.onFrameLayout } : {}) });
   const review = createReviewAgent({ ...options, componentName: (element) => api.getDisplayName(element), containedAnchors: overlay.containedAnchors });
   const plugin = `page-agent-${randomUUID()}`;
   const previousAction = api.getToolbarState()?.defaultAction;
@@ -49,19 +51,19 @@ export function startPageAgent(options: PageAgentOptions) {
     const revision = ++version;
     const componentName = api.getDisplayName(element);
     const owner = mode === "design" ? { ...resolveDesignTarget({ element, root: options.root }), componentName: componentName ?? element.tagName.toLowerCase() } : resolvePageOwner({ element, root: options.root, componentName, fiber: getFiberFromHostInstance(element), ...(options.sourceContext ? { sourceContext: options.sourceContext } : {}) });
-    const anchor = commentAnchor(owner.element, options.root);
+    const anchor = commentAnchor(owner.element, options.root, { frames });
     if (!anchor) throw new Error("selected page element cannot be anchored");
     const html = owner.element.outerHTML;
     const context = {
       source: owner.source, componentName: owner.componentName,
       ...(options.sourceContext ? { sourceContext: options.sourceContext } : {}),
       html: html.length <= COMMENT_ELEMENT_HTML_LIMIT ? html : `${html.slice(0, COMMENT_ELEMENT_HTML_LIMIT)}${COMMENT_ELEMENT_HTML_TRUNCATION}`,
-      locators: captureLocators(owner.element, options.root),
+      locators: captureLocators(owner.element, options.root, { frames }),
     };
     api.deactivate();
     if (disposed || version !== revision) return;
     overlay.highlight(mode === "design" ? anchor : null);
-    const selection = { anchor, label: describeElement(owner.element), element: context, rect: elementRect(owner.element) };
+    const selection = { anchor, label: describeElement(owner.element), element: context, rect: elementRect(owner.element, options.root) };
     if (mode === "design") design.select(owner, selection); else options.send({ type: "selection", selection });
   }
   api.registerPlugin({ name: plugin, ...(options.toolbar === false ? { theme: { toolbar: { enabled: false } } } : {}), actions: REVIEW_ACTIONS.map((action) => ({
@@ -96,7 +98,7 @@ export function startPageAgent(options: PageAgentOptions) {
       case "page": {
         version++; picking = false; api.deactivate();
         const html = options.root.outerHTML;
-        options.send({ type: "selection", selection: { anchor: "__document__", label: "Whole page", rect: elementRect(options.root), element: {
+        options.send({ type: "selection", selection: { anchor: "__document__", label: "Whole page", rect: elementRect(options.root, options.root), element: {
           source: options.sourceContext?.url ?? `${options.page}:1:1`, ...(options.sourceContext ? { sourceContext: options.sourceContext } : {}), componentName: "Page", locators: [],
           html: html.length <= COMMENT_ELEMENT_HTML_LIMIT ? html : `${html.slice(0, COMMENT_ELEMENT_HTML_LIMIT)}${COMMENT_ELEMENT_HTML_TRUNCATION}`,
         } } }); break;
