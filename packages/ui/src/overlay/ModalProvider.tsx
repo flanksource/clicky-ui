@@ -63,7 +63,7 @@ export function ModalProvider(props: ModalProviderProps) {
 function ModalScope({ scope, forms, children }: ModalProviderProps) {
   const prefix = modalDraftPrefix(scope);
   const formRegistry = useRef(forms);
-  formRegistry.current = forms;
+  useLayoutEffect(() => { formRegistry.current = forms; }, [forms]);
   const active = useRef(false);
   const modals = useRef(new Map<string, HostedModal>());
   const [entries, setEntries] = useState<HostedModal[]>([]);

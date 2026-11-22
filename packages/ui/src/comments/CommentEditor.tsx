@@ -86,15 +86,12 @@ function EditorBehavior(props: Props) {
   useEffect(() => {
     if (props.value === lastValue.current) return;
     lastValue.current = props.value;
-    editor.update(() => importBody(props.value, props.vocabulary));
+    editor.update(() => importBody(props.value, props.vocabulary), { discrete: true });
   }, [editor, props.value, props.vocabulary]);
   useEffect(() => {
     if (!props.autoFocus) return;
-    const frame = requestAnimationFrame(() => {
-      editor.update(() => $getRoot().selectEnd());
-      editor.getRootElement()?.focus();
-    });
-    return () => cancelAnimationFrame(frame);
+    editor.update(() => $getRoot().selectEnd(), { discrete: true });
+    editor.getRootElement()?.focus();
   }, [editor, props.autoFocus]);
   useEffect(() => editor.registerCommand(PASTE_COMMAND, event => {
     if (!(event instanceof ClipboardEvent)) return false;

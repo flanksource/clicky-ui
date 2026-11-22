@@ -581,10 +581,12 @@ export function FilterBar({
   const responsiveOverflowRef = useRef(responsiveOverflow);
   const mobileCollapseRef = useRef(mobileCollapse);
   const maximumInlineFiltersRef = useRef(maximumInlineFilters);
-  allFiltersRef.current = allFilters;
-  responsiveOverflowRef.current = responsiveOverflow;
-  mobileCollapseRef.current = mobileCollapse;
-  maximumInlineFiltersRef.current = maximumInlineFilters;
+  useLayoutEffect(() => {
+    allFiltersRef.current = allFilters;
+    responsiveOverflowRef.current = responsiveOverflow;
+    mobileCollapseRef.current = mobileCollapse;
+    maximumInlineFiltersRef.current = maximumInlineFilters;
+  }, [allFilters, responsiveOverflow, mobileCollapse, maximumInlineFilters]);
 
   useLayoutEffect(() => {
     setVisibleFilterCount(

@@ -1,4 +1,4 @@
-import type { ServerTimingMetric } from "@flanksource/clicky-ui";
+import type { ServerTimingMetric } from "@flanksource/clicky-ui/data";
 import type { ActivityMessage, RuntimeResolution, TailwindActivity, WorkerActivity } from "../activity-schema.ts";
 
 export type ActivitySummary = { requests: number; transferredBytes: number; unknownTransfers: number; unknownCompiles: number; decodedBytes: number; outputBytes: number; cacheHits: number; compileMs: number; readyMs: number | null; versions: Record<string, string> };

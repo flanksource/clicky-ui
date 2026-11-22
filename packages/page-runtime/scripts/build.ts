@@ -1,4 +1,5 @@
 import "./build-builder.ts";
+import "./build-node.ts";
 import { buildStatic } from "./build-static.ts";
 
 const unknown = process.argv.slice(2).filter(arg => arg !== "--dev");

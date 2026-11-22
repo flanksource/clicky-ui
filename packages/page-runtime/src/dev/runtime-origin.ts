@@ -1,10 +1,19 @@
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { RuntimeProfile } from "../schema.ts";
 import { createPackageHandler, type PackageOriginOptions } from "./index.ts";
+
+// This module runs from src/ in the workspace and from a bundle in dist/node/ when installed, so locate the package root.
+function packageAssets(): string {
+  for (let dir = dirname(fileURLToPath(import.meta.url)); dir !== dirname(dir); dir = dirname(dir)) {
+    if (existsSync(join(dir, "package.json")) && existsSync(join(dir, "dist/static"))) return join(dir, "dist/static");
+  }
+  throw new Error("Cannot find the built page-runtime assets; run the page-runtime build");
+}
 
 export type RuntimeOriginOptions = PackageOriginOptions & { hostOrigin: string; assetsDir?: string };
 
@@ -12,7 +21,7 @@ export type RuntimeOriginOptions = PackageOriginOptions & { hostOrigin: string; 
 export async function serveRuntime(options: RuntimeOriginOptions): Promise<{ origin: string; dependencies: Record<string, string>; close: () => Promise<void> }> {
   const host = new URL(options.hostOrigin);
   if (host.origin !== options.hostOrigin || !["http:", "https:"].includes(host.protocol) || !["localhost", "127.0.0.1", "[::1]"].includes(host.hostname)) throw new Error("Local page runtime requires an exact loopback origin");
-  const assetsDir = options.assetsDir ?? fileURLToPath(new URL("../../dist/static/", import.meta.url));
+  const assetsDir = options.assetsDir ?? packageAssets();
   const assets = new Map(await Promise.all(["bootstrap.html", "sw.js", "boot.js", "page-agent.js", "editing.js", "export-compiler.js", "devtools-hook.js"].map(async (file) => [file, await readFile(resolve(assetsDir, file))] as const)));
   const packages = await createPackageHandler(options);
   const dependencies = () => Object.fromEntries(Object.entries(packages.current().packages).map(([name, entry]) => [name, entry.version]));

@@ -63,3 +63,6 @@ packages/ui/src/generated/storybook/
 !/packages/page-runtime/src/build/**
 /packages/page-runtime/spikes/
 /apps/playground/docs/
+
+# Amp orb portals
+.amp/portals/*

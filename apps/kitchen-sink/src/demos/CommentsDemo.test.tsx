@@ -14,6 +14,7 @@ import {
   $createTextNode,
   $getRoot,
   getNearestEditorFromDOMNode,
+  SKIP_SCROLL_INTO_VIEW_TAG,
 } from "lexical";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as ClickyUI from "@flanksource/clicky-ui";
@@ -35,7 +36,7 @@ function setCommentDraft(element: HTMLElement, body: string) {
         $getRoot().clear().append($createParagraphNode().append(text));
         text.selectEnd();
       },
-      { discrete: true },
+      { discrete: true, tag: SKIP_SCROLL_INTO_VIEW_TAG },
     );
   });
 }
