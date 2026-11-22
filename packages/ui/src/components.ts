@@ -364,6 +364,7 @@ export {
 } from "./components/json-schema-form-conditionals";
 export { rehydrateRefs } from "./components/json-schema-form-refs";
 export { templateValuePre } from "./components/json-schema-form-template";
+export { siblingPrefixPre, type SiblingPrefixOptions } from "./components/json-schema-form-sibling-prefix";
 export {
   applyPostExtensions,
   type FieldNodes,
@@ -397,6 +398,7 @@ export type {
   HelpDisplay,
   PreExtension,
   PreExtensionContext,
+  FieldParent,
   PostExtension,
   PostExtensionContext,
   LookupDescriptor,

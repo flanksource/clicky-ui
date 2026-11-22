@@ -1,4 +1,5 @@
-import { useContext, type ReactNode } from "react";
+import { useContext, useState, type ReactNode } from "react";
+import { SectionActionsContext } from "./json-schema-form-section-actions";
 import { PropertiesContext } from "../data/properties-context";
 import { cn } from "../lib/utils";
 import { Icon, LabelIcon } from "../data/Icon";
@@ -310,6 +311,7 @@ export function SectionHeading({
 export function ObjectSection({
   heading,
   actions,
+  actionsOwner,
   size,
   helper,
   helpDisplay,
@@ -318,12 +320,20 @@ export function ObjectSection({
   heading: ReactNode;
   /** Right-aligned header-row actions, e.g. a nullable section's clear. */
   actions?: ReactNode;
+  /** The instance path of the field this section heads; its control may portal actions into the header row (see SectionActionsContext). */
+  actionsOwner?: string;
   size: FormSize;
   helper?: ReactNode;
   helpDisplay?: HelpDisplay;
   children: ReactNode;
 }) {
   const hoverHelp = helpDisplay === "hover" && !!helper;
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  // Always provided (null without a slot), so the body keeps its identity when the slot mounts and a nested
+  // section's body never sees an outer section's slot.
+  const body = (
+    <SectionActionsContext.Provider value={actionsOwner !== undefined && slot ? { owner: actionsOwner, element: slot } : null}>{children}</SectionActionsContext.Provider>
+  );
   return (
     <div
       className={cn(
@@ -342,7 +352,12 @@ export function ObjectSection({
           )}
         >
           {heading}
-          {actions != null && <span className="ml-auto shrink-0 font-normal">{actions}</span>}
+          {(actions != null || actionsOwner !== undefined) && (
+            <span className="ml-auto flex shrink-0 items-center gap-1 font-normal">
+              {actions}
+              {actionsOwner !== undefined && <span ref={setSlot} data-jsf-section-actions className="flex items-center empty:hidden" />}
+            </span>
+          )}
         </div>
       )}
       {helper && !hoverHelp && (
@@ -350,7 +365,7 @@ export function ObjectSection({
           {helper}
         </p>
       )}
-      {children}
+      {body}
     </div>
   );
 }

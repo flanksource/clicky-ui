@@ -158,10 +158,13 @@ describe("JsonSchemaForm accordion array", () => {
     expect(screen.queryByRole("textbox", { name: /^Name/ })).toBeNull();
   });
 
-  it("offers the view menu on its summary line, beside the item count", () => {
+  it("offers the view menu in its section header row, keeping the item count on the summary line", () => {
     renderAccordion();
     const menu = screen.getByRole("button", { name: "View options for Params" });
-    expect(menu.closest("[data-accordion-summary]")).toHaveTextContent("2 parameters");
+    expect({
+      heading: menu.closest("[data-jsf-section-heading]")?.textContent,
+      count: document.querySelector("[data-accordion-summary]")?.textContent,
+    }).toEqual({ heading: "Params", count: "2 parameters" });
   });
 
   it("identifies the row by the schema's chosen properties", () => {

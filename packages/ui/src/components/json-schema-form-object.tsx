@@ -5,6 +5,7 @@ import { Icon } from "../data/Icon";
 import { UiAdd, UiTrash } from "../icons";
 import { Button } from "./button";
 import { Combobox } from "./Combobox";
+import { exclusiveKeys } from "./json-schema-form-exclusive-keys";
 import type {
   FieldControl,
   JsonSchemaObject,
@@ -47,6 +48,9 @@ export function ObjectControl({
     properties: field.objectProperties ?? {},
     ...(field.objectRequired ? { required: field.objectRequired } : {}),
     ...(Array.isArray(field.schema.allOf) ? { allOf: field.schema.allOf } : {}),
+    // A oneOf of single-key required branches is the object's exclusive keys (one row with a key dropdown).
+    ...(field.schema.oneOf && exclusiveKeys({ type: "object", properties: field.objectProperties ?? {}, oneOf: field.schema.oneOf })
+      ? { oneOf: field.schema.oneOf } : {}),
     // Copied whatever its shape, so a malformed value fails loudly in the
     // listener collector rather than vanishing here.
     ...(field.schema["x-on-load"] !== undefined ? { "x-on-load": field.schema["x-on-load"] } : {}),

@@ -171,7 +171,7 @@ describe("layout engines", () => {
     };
     renderForm(arrays, { extensions: [layoutExtension], layout: { mode: "cards" } });
     expect(["a", "b", "c", "d"].map((key) => screen.queryByTestId(`card-${key}`) !== null)).toEqual([true, true, true, true]);
-    expect(screen.queryByRole("combobox", { name: "Add item" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add" })).not.toBeInTheDocument();
   });
 
   it("throws for an unregistered layout.mode", () => {
