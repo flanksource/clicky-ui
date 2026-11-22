@@ -1,9 +1,5 @@
 checks: {}
 commit:
-  compatibility: {}
-  compatibilityPrompt: {}
-  functionalityRemovedPrompt: {}
-  groupingPrompt: {}
   hooks:
   - name: vendor-icon-sources
     run: |
@@ -18,12 +14,8 @@ commit:
     - packages/ui/scripts/build-icons.ts
     - packages/ui/scripts/download-icons.ts
     - packages/ui/scripts/icon-sources.ts
-  linkedDeps: {}
   lint: {}
-  messagePrompt: {}
-  prContentPrompt: {}
   precommit: {}
-  summaryPrompt: {}
   tidy: {}
 fixtures: {}
 lint:
@@ -43,17 +35,3 @@ pre:
 procfile: {}
 secrets: {}
 ssh: {}
-status:
-  summaryPrompt: {}
-test:
-  outlineSummaryPrompt: {}
-todos:
-  planPrompt: {}
-  runPrompt: {}
-verify:
-  checks:
-    disabled: null
-    disabledCategories: null
-  model: ""
-  prompt: ""
-  promptTemplate: {}
