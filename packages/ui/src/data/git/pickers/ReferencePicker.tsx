@@ -43,7 +43,7 @@ export function ReferencePicker<T>({ label, plural, option, custom, groupLimits 
   const [pages, setPages] = useState<Record<string, number>>({});
   const all = data.items.map((item) => {
     const choice = option(item);
-    return { ...choice, descriptionLayout: "inline" as const, layout: "responsive" as const,
+    return { ...choice, descriptionLayout: "stacked" as const,
       title: [choice.title ?? choice.label, choice.description].filter(Boolean).join("\n"),
       ...(props.optionTrailing ? { trailing: props.optionTrailing(item) } : {}) };
   });
@@ -68,6 +68,20 @@ export function ReferencePicker<T>({ label, plural, option, custom, groupLimits 
   const selected = all.find((item) => item.value === props.value);
   const error = props.error ?? data.error;
   const loading = props.loading || data.loading;
+  if (props.variant === "inline") {
+    const caption = selected ? selected.selectedLabel ?? selected.label : props.value || (props.placeholder ?? `Search ${plural}…`);
+    return <Combobox searchPlacement="menu" ariaLabel={label} value={props.value} options={options} menuWidth={720}
+      className={cn("inline-block max-w-full align-middle", props.className)}
+      title={error ? error.message : selected?.title ?? props.value}
+      onChange={(value) => props.onChange(value, data.items.find((item) => option(item).value === value))}
+      allowCustomValue={Boolean(custom)} {...(custom ? { onNew: custom } : {})}
+      loading={loading} disabled={props.disabled ?? false} invalid={Boolean(error)}
+      {...(groupLimits.length > 0 ? { onInputValueChange: setQuery } : {})}
+      triggerClassName={cn("h-6 w-auto max-w-full rounded-md border-transparent bg-primary/10 px-2 pr-6 font-mono text-xs text-primary hover:bg-primary/20",
+        error && "border-destructive bg-destructive/10 text-destructive")}
+      triggerContent={<span className={cn("min-w-0 truncate", !props.value && "font-sans text-muted-foreground")}>{caption}</span>}
+      footer={footer} />;
+  }
   return <div className={cn("min-w-0 space-y-1.5", props.className)}>
     <label htmlFor={id} className={props.showLabel === false ? "sr-only" : "block text-sm font-medium text-foreground"}>{label}</label>
     {props.help && <p id={`${id}-help`} className="text-xs text-muted-foreground">{props.help}</p>}
@@ -84,7 +98,7 @@ export function ReferencePicker<T>({ label, plural, option, custom, groupLimits 
     </div> : <p id={`${id}-status`} role="status" className="text-xs text-muted-foreground">{loading ? `Loading ${plural}…` : all.length === 0 ? `No ${plural} found.` : null}</p>}
     {data.hasMore && <Button type="button" variant="ghost" size="sm" loading={loading} onClick={data.loadMore} aria-label={`Load more ${plural}`}>Load more</Button>}
     {selected && (selected.author || selected.detail) && <div aria-live="polite" className="space-y-1 text-sm">
-      {selected.author && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Avatar alt={selected.author} size="xs" variant="mono" /><span>{selected.author}{selected.date ? ` · ${selected.date}` : ""}</span></div>}
+      {selected.author && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Avatar alt={selected.author} size="xs" variant="solid" /><span>{selected.author}{selected.date ? ` · ${selected.date}` : ""}</span></div>}
       {selected.detail && <p className="break-words text-xs text-foreground">{selected.detail}</p>}
     </div>}
   </div>;

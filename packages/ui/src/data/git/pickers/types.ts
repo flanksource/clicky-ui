@@ -23,6 +23,13 @@ export interface GitPickerProps<T> {
   size?: FormSize;
   className?: string;
   optionTrailing?: (item: T) => ReactNode;
+  /**
+   * `field` (default) draws a labelled form control. `inline` draws only a compact
+   * chip showing the selection — click it to search and pick another, like the
+   * base/head branch chips in a pull request header. `label` names the chip for
+   * assistive technology; help, status and selection details are not drawn.
+   */
+  variant?: "field" | "inline";
 }
 
 export interface GitConnectionOption { name: string; type: string; url?: string }

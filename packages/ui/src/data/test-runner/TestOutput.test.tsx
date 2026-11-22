@@ -58,6 +58,28 @@ describe("test output", () => {
     expect(screen.queryByRole("button", { name: /Show more/ })).not.toBeInTheDocument();
   });
 
+  it("reads the log over the streams it was stripped into: status lines in the preview, the whole log in the tab", () => {
+    const lines = Array.from({ length: 12 }, (_, i) => `::status::table ${i + 1}\n::progress::${i + 1}/12`);
+    const { container } = render(<Panel test={{ name: "purge", running: true, stdout: "::group::Tables\n", log: `::group::Tables\n${lines.join("\n")}\n` }} />);
+    const shown = (from: number) => `Tables(12 lines)${lines.slice(from).map((_, i) => `table ${from + i + 1}`).join("\n")}`;
+
+    expect(container.querySelector("pre")?.textContent).toBe(shown(3));
+    expect(container.querySelector("[data-log-status]")?.textContent).toBe("table 1212/12");
+
+    fireEvent.click(screen.getByRole("button", { name: "Show more in Stdout" }));
+    expect(container.querySelector("pre")?.textContent).toBe(shown(0));
+  });
+
+  it("switches the log with the selected attempt", () => {
+    const { container } = render(<Panel test={{ ...node, log: "::status::second", attempts: [
+      { sequence: 1, failed: true, stdout: "", log: "::status::first" },
+      { sequence: 2, failed: true, stdout: "", log: "::status::second" },
+    ] }} />);
+    expect(container.querySelector("pre")?.textContent).toBe("second");
+    fireEvent.change(screen.getByRole("combobox", { name: "Attempt" }), { target: { value: "1" } });
+    expect(container.querySelector("pre")?.textContent).toBe("first");
+  });
+
   it("omits the output tab and preview when both streams are empty", () => {
     const { container } = render(<Panel test={{ name: "no output", stdout: "", stderr: "" }} />);
     expect(screen.queryByRole("tab", { name: "Stdout" })).not.toBeInTheDocument();

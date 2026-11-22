@@ -48,26 +48,30 @@ export function TestFailureDetail({ failure }: { failure: FailureDetail }) {
   );
 }
 
+const PREVIEW_LINES = 10;
+
 /**
- * Combined output, with a preview of its last ten lines — where a long run's
- * latest progress and its final error are — linking to the panel's Stdout tab.
+ * The node's log — both streams as they were written — or, without one, its
+ * stdout then its stderr. The preview is its last ten lines, where a long run's
+ * latest progress and its final error are, linking to the panel's Stdout tab.
  */
 export function TestOutput({ node, view = "preview" }: { node: Test; view?: "preview" | "full" }) {
   const selectTab = useSelectDetailTab();
-  if (!node.stdout && !node.stderr) return null;
-  const output = [node.stdout, node.stderr].flatMap((stream) => stream ? [stream.replace(/\r?\n$/, "")] : []).join("\n");
-  const lines = output.split(/\r?\n/);
+  const streams = node.log ? [node.log] : [node.stdout, node.stderr];
+  const output = streams.flatMap((stream) => stream ? [stream.replace(/\r?\n$/, "")] : []).join("\n");
+  if (!output) return null;
   const preview = view === "preview";
   return (
     <div className="space-y-1">
       {preview && <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Output</div>}
       <LogViewer
-        logs={preview ? lines.slice(-10).join("\n") : output}
+        logs={output}
         variant="terminal"
         maxHeight="none"
-        collapsedLines={lines.length}
+        collapsedLines={Infinity}
+        {...(preview ? { tailLines: PREVIEW_LINES } : {})}
       />
-      {preview && lines.length > 10 && selectTab && (
+      {preview && output.split("\n").length > PREVIEW_LINES && selectTab && (
         <Button type="button" variant="link" size="sm" className="px-0" onClick={() => selectTab("stdout")}>
           Show more in Stdout
         </Button>

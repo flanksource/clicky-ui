@@ -80,8 +80,7 @@ export function genericCopySections(node: Test): Required<CopySections> {
       ...section("Error", errorBody(node)),
       ...section("Expectation", expectationBody(node)),
       ...section("Stack", node.failure_detail?.stack),
-      ...section("stdout", node.stdout),
-      ...section("stderr", node.stderr),
+      ...(node.log ? section("output", node.log) : [...section("stdout", node.stdout), ...section("stderr", node.stderr)]),
     ],
     items: [],
   };
