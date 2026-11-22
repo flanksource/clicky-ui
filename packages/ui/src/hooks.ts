@@ -36,6 +36,9 @@ export {
   type EventSourceProviderProps,
 } from "./hooks/event-source-provider";
 export { createEventHub, type EventHubOptions } from "./hooks/event-hub";
+export { subscribeJSON } from "./hooks/event-stream";
+export { appendTailRows } from "./hooks/tail-buffer";
+export { useLiveSnapshot } from "./hooks/use-live-snapshot";
 export {
   useTaskRun,
   useTaskRuns,

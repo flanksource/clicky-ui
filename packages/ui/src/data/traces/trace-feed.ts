@@ -18,6 +18,7 @@ export interface TraceFeedRequest {
 export interface TraceFeedPage {
   rows: TraceFeedRecord[];
   nextCursor: string;
+  resume?: string;
 }
 
 export const traceFeedKey = (record: TraceFeedRecord) => `${record.runId}/${record.kind}/${record.stream}/${record.seq}`;

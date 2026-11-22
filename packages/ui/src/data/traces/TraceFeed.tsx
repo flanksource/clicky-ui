@@ -6,11 +6,12 @@ import { DataTable, type DataTableColumn } from "../DataTable";
 import { TraceView } from "./TraceView";
 import { TraceEventStream } from "./TraceEventStream";
 import { orderTraceFeed, traceFeedKey, type TraceFeedPage, type TraceFeedRecord, type TraceFeedRequest } from "./trace-feed";
+import { appendTailRows } from "../../hooks/tail-buffer";
 
 export interface TraceFeedProps {
   kinds: string[];
   loadPage: (request: TraceFeedRequest, signal: AbortSignal) => Promise<TraceFeedPage>;
-  follow?: (options: { kind: string; onRecord: (record: TraceFeedRecord) => void; onError: (error: Error) => void; onEnd: () => void }) => () => void;
+  follow?: (options: { kind: string; onRecord: (record: TraceFeedRecord) => void; onError: (error: Error) => void; onOpen: () => void; onEnd: () => void }) => () => void;
   /** Return a capture view, null to omit it, or undefined for the built-in renderer. Raw records remain available. */
   renderCapture?: (capture: { kind: string; stream: string; records: TraceFeedRecord["record"][] }) => ReactNode;
   presentation?: "text" | "ansi";
@@ -40,6 +41,7 @@ export function TraceFeed({ kinds, loadPage, follow, renderCapture, presentation
   const [selected, setSelected] = useState<TraceFeedRecord>();
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [seeded, setSeeded] = useState<{ request: TraceFeedRequest; revision: number; loadPage: TraceFeedProps["loadPage"] }>();
   const [view, setView] = useState(() => {
     const value = new URLSearchParams(window.location.search).get("feedView");
     return value === "raw" || (value?.startsWith(captureViewPrefix) && kinds.includes(value.slice(captureViewPrefix.length))) ? value : "stream";
@@ -58,19 +60,17 @@ export function TraceFeed({ kinds, loadPage, follow, renderCapture, presentation
     const controller = new AbortController();
     setLoading(true);
     setError(undefined);
-    loadPage(request, controller.signal).then(next => { if (!controller.signal.aborted) { setPage(next); setLoading(false); } }).catch((failure: unknown) => {
-      if (!controller.signal.aborted) setError(failure instanceof Error ? failure : new Error(String(failure)));
+    loadPage(request, controller.signal).then(next => { if (!controller.signal.aborted) { setPage(next); setLoading(false); setSeeded({ request, revision, loadPage }); } }).catch((failure: unknown) => {
+      if (!controller.signal.aborted) { setLoading(false); setError(failure instanceof Error ? failure : new Error(String(failure))); }
     });
     return () => controller.abort();
   }, [request, loadPage, revision]);
   useEffect(() => {
-    if (!follow || loading || paused || request.cursor || ended) return;
-    return follow({ kind: request.kind, onRecord: record => setPage(previous => {
-      const byKey = new Map(previous.rows.map(row => [traceFeedKey(row), row]));
-      byKey.set(traceFeedKey(record), record);
-      return { ...previous, rows: orderTraceFeed([...byKey.values()], request.sort).slice(-100) };
-    }), onError: setError, onEnd: () => setEnded(true) });
-  }, [follow, loading, paused, request.kind, request.cursor, request.sort, ended]);
+    if (!follow || loading || paused || request.cursor || ended || seeded?.request !== request || seeded.revision !== revision || seeded.loadPage !== loadPage) return;
+    return follow({ kind: request.kind, onRecord: record => setPage(previous => ({ ...previous, rows: appendTailRows(previous.rows, [record], {
+      limit: 100, key: traceFeedKey, order: rows => orderTraceFeed(rows, request.sort),
+    }).rows })), onError: setError, onOpen: () => setError(undefined), onEnd: () => setEnded(true) });
+  }, [follow, loading, paused, request, ended, seeded, revision, loadPage]);
   const rows = useMemo(() => orderTraceFeed(page.rows, request.sort), [page.rows, request.sort]);
   const captures = useMemo(() => {
     const grouped = new Map<string, { kind: string; stream: string; records: TraceFeedRecord["record"][] }>();
