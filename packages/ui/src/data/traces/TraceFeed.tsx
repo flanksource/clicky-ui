@@ -5,14 +5,11 @@ import { Tabs } from "../../layout/Tabs";
 import { DataTable, type DataTableColumn } from "../DataTable";
 import { TraceView } from "./TraceView";
 import { TraceEventStream } from "./TraceEventStream";
-import { orderTraceFeed, traceFeedKey, type TraceFeedPage, type TraceFeedRecord, type TraceFeedRequest } from "./trace-feed";
-import { appendTailRows } from "../../hooks/tail-buffer";
+import { orderTraceFeed, type TraceFeedRecord, type TraceFeedRequest, type TraceFeedSource } from "./trace-feed";
+import { useTraceFeed } from "./use-trace-feed";
 
-export interface TraceFeedProps {
+export interface TraceFeedProps extends TraceFeedSource {
   kinds: string[];
-  loadPage: (request: TraceFeedRequest, signal: AbortSignal) => Promise<TraceFeedPage>;
-  /** Replay records after the loaded page's resume token before delivering live records. */
-  follow?: (options: { kind: string; resume: string; onRecord: (record: TraceFeedRecord) => void; onError: (error: Error) => void; onOpen: () => void; onEnd: () => void }) => () => void;
   /** Return a capture view, null to omit it, or undefined for the built-in renderer. Raw records remain available. */
   renderCapture?: (capture: { kind: string; stream: string; records: TraceFeedRecord["record"][] }) => ReactNode;
   presentation?: "text" | "ansi";
@@ -27,22 +24,38 @@ const columns: DataTableColumn<TraceFeedRecord>[] = [
 
 const captureViewPrefix = "capture:";
 
+function TraceFeedFilters({ kinds, request, live, paused, ended, onChange, onTogglePause, onRefresh }: {
+  kinds: string[];
+  request: TraceFeedRequest;
+  live: boolean;
+  paused: boolean;
+  ended: boolean;
+  onChange: (request: Partial<TraceFeedRequest>) => void;
+  onTogglePause: () => void;
+  onRefresh: () => void;
+}) {
+  return <FilterBar className="shrink-0" filters={[
+    { key: "capture", kind: "enum", label: "Capture", required: true, value: request.kind || "*", onChange: kind => onChange({ kind: kind === "*" ? "" : kind }), options: [{ value: "*", label: "All events" }, ...kinds.map(kind => ({ value: kind, label: kind }))] },
+    { key: "order", kind: "enum", label: "Order", required: true, value: request.sort, onChange: sort => {
+      if (sort !== "seq" && sort !== "timestamp") throw new Error(`Unknown trace order: ${sort}`);
+      onChange({ sort });
+    }, options: [{ value: "seq", label: "Sequence" }, { value: "timestamp", label: "Timestamp" }] },
+  ]} trailing={<>
+    {live && <Button size="sm" variant="outline" onClick={onTogglePause}>{paused ? "Resume" : "Pause"}</Button>}
+    <Button size="sm" variant="outline" onClick={onRefresh}>Refresh</Button>
+    <span role="status" className="whitespace-nowrap text-xs text-muted-foreground">{!kinds.length ? "No captures armed" : ended || !live ? "Capture complete" : paused ? "Paused" : "Following"}</span>
+  </>} />;
+}
+
 /** A bounded, paged view over heterogeneous trace captures. The source owns
  * querying and resume tokens; paused viewers keep the capture running. */
-export function TraceFeed({ kinds, loadPage, follow, renderCapture, presentation = "text" }: TraceFeedProps) {
+export function TraceFeed({ kinds, renderCapture, presentation = "text", ...source }: TraceFeedProps) {
   const [request, setRequest] = useState<TraceFeedRequest>(() => {
     const values = new URLSearchParams(window.location.search);
     return { kind: values.get("feedKind") ?? "", sort: values.get("feedSort") === "seq" ? "seq" : "timestamp", cursor: "" };
   });
-  const [page, setPage] = useState<TraceFeedPage>({ rows: [], nextCursor: "" });
   const [history, setHistory] = useState<string[]>([]);
-  const [error, setError] = useState<Error>();
-  const [paused, setPaused] = useState(false);
-  const [ended, setEnded] = useState(false);
   const [selected, setSelected] = useState<TraceFeedRecord>();
-  const [revision, setRevision] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [seeded, setSeeded] = useState<{ request: TraceFeedRequest; revision: number; loadPage: TraceFeedProps["loadPage"]; resume: string | undefined }>();
   const [view, setView] = useState(() => {
     const value = new URLSearchParams(window.location.search).get("feedView");
     return value === "raw" || (value?.startsWith(captureViewPrefix) && kinds.includes(value.slice(captureViewPrefix.length))) ? value : "stream";
@@ -58,29 +71,8 @@ export function TraceFeed({ kinds, loadPage, follow, renderCapture, presentation
     if (request.kind) values.set("feedKind", request.kind); else values.delete("feedKind");
     values.set("feedSort", request.sort);
     window.history.replaceState(null, "", `${window.location.pathname}?${values}${window.location.hash}`);
-    const controller = new AbortController();
-    setLoading(true);
-    setError(undefined);
-    loadPage(request, controller.signal).then(next => {
-      if (controller.signal.aborted) return;
-      setPage(next);
-      setLoading(false);
-      setSeeded({ request, revision, loadPage, resume: next.resume });
-    }).catch((failure: unknown) => {
-      if (!controller.signal.aborted) { setLoading(false); setError(failure instanceof Error ? failure : new Error(String(failure))); }
-    });
-    return () => controller.abort();
-  }, [request, loadPage, revision]);
-  useEffect(() => {
-    if (!follow || loading || paused || request.cursor || ended || seeded?.request !== request || seeded.revision !== revision || seeded.loadPage !== loadPage) return;
-    if (typeof seeded.resume !== "string" || seeded.resume.length === 0) {
-      setError(new Error("Trace feed page is missing a resume token"));
-      return;
-    }
-    return follow({ kind: request.kind, resume: seeded.resume, onRecord: record => setPage(previous => ({ ...previous, rows: appendTailRows(previous.rows, [record], {
-      limit: 100, key: traceFeedKey, order: rows => orderTraceFeed(rows, request.sort),
-    }).rows })), onError: setError, onOpen: () => setError(undefined), onEnd: () => setEnded(true) });
-  }, [follow, loading, paused, request, ended, seeded, revision, loadPage]);
+  }, [request.kind, request.sort]);
+  const { page, error, paused, ended, resetEnded, togglePaused, refresh } = useTraceFeed(request, source);
   const rows = useMemo(() => orderTraceFeed(page.rows, request.sort), [page.rows, request.sort]);
   const captures = useMemo(() => {
     const grouped = new Map<string, { kind: string; stream: string; records: TraceFeedRecord["record"][] }>();
@@ -94,19 +86,9 @@ export function TraceFeed({ kinds, loadPage, follow, renderCapture, presentation
   }, [rows]);
   const kindCaptures = captures.filter(([, capture]) => capture.kind === viewKind);
   const viewLabel = view === "raw" ? "Raw stream" : viewKind ?? "Event stream";
-  const change = (next: Partial<TraceFeedRequest>) => { setHistory([]); setEnded(false); setSelected(undefined); setRequest(previous => ({ ...previous, ...next, cursor: "" })); };
+  const change = (next: Partial<TraceFeedRequest>) => { setHistory([]); resetEnded(); setSelected(undefined); setRequest(previous => ({ ...previous, ...next, cursor: "" })); };
   return <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
-    <FilterBar className="shrink-0" filters={[
-      { key: "capture", kind: "enum", label: "Capture", required: true, value: request.kind || "*", onChange: kind => change({ kind: kind === "*" ? "" : kind }), options: [{ value: "*", label: "All events" }, ...kinds.map(kind => ({ value: kind, label: kind }))] },
-      { key: "order", kind: "enum", label: "Order", required: true, value: request.sort, onChange: sort => {
-        if (sort !== "seq" && sort !== "timestamp") throw new Error(`Unknown trace order: ${sort}`);
-        change({ sort });
-      }, options: [{ value: "seq", label: "Sequence" }, { value: "timestamp", label: "Timestamp" }] },
-    ]} trailing={<>
-      {follow && <Button size="sm" variant="outline" onClick={() => setPaused(value => !value)}>{paused ? "Resume" : "Pause"}</Button>}
-      <Button size="sm" variant="outline" onClick={() => setRevision(value => value + 1)}>Refresh</Button>
-      <span role="status" className="whitespace-nowrap text-xs text-muted-foreground">{!kinds.length ? "No captures armed" : ended || !follow ? "Capture complete" : paused ? "Paused" : "Following"}</span>
-    </>} />
+    <TraceFeedFilters kinds={kinds} request={request} live={!!source.follow} paused={paused} ended={ended} onChange={change} onTogglePause={togglePaused} onRefresh={refresh} />
     {error && <p role="alert">{error.message}</p>}
     <Tabs className="shrink-0 flex-wrap" tabs={[
       { id: "stream", label: "Event stream" },
@@ -115,7 +97,7 @@ export function TraceFeed({ kinds, loadPage, follow, renderCapture, presentation
     ]} value={view} onChange={value => { setView(value); setSelected(undefined); }} />
     <div role="tabpanel" aria-label={viewLabel} className="flex min-h-0 flex-1 flex-col overflow-auto">
       {view === "stream" ? <>
-        <TraceEventStream rows={rows} presentation={presentation} following={!!follow && !paused && !request.cursor} onSelect={setSelected} />
+        <TraceEventStream rows={rows} presentation={presentation} following={!!source.follow && !paused && !request.cursor} onSelect={setSelected} />
         {selected && <div className="min-h-0 max-h-[40%] shrink-0 overflow-auto rounded border border-border p-3"><Button size="sm" variant="ghost" onClick={() => setSelected(undefined)}>Close event details</Button><TraceView kind={selected.kind} rows={[selected.record]} /></div>}
       </> : view === "raw" ? <>
         <DataTable data={rows} columns={columns} onRowClick={setSelected} emptyMessage="Waiting for records from the armed captures" />

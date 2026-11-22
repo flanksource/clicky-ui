@@ -1,4 +1,5 @@
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { useLayoutEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClickyRow } from "../data/Clicky";
 import {
@@ -303,6 +304,45 @@ describe("useLogTail (SSE)", () => {
     expect(result.current.sessionId).toBeNull();
     expect(MockEventSource.last).toBeNull();
     expect(deleteCalls(fetchMock)).toHaveLength(0);
+  });
+
+  it("ignores a failed start response whose body arrives after another session is streaming", async () => {
+    const { promise, resolve } = Promise.withResolvers<string>();
+    const readFailure = vi.fn(() => promise);
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ...response(409, ""), text: readFailure })
+      .mockResolvedValueOnce(response(201, sessionInfo()));
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, rerender } = renderHook(({ profile }: { profile: string }) => useLogTail({ profile, following: true }), {
+      initialProps: { profile: "previous-logs" },
+    });
+    await waitFor(() => expect(readFailure).toHaveBeenCalledOnce());
+    rerender({ profile: PROFILE });
+    await waitFor(() => expect(result.current.status).toBe("streaming"));
+
+    await act(async () => resolve("Previous profile session limit reached"));
+
+    expect(result.current).toMatchObject({ status: "streaming", error: null, sessionId: SESSION_ID });
+  });
+
+  it("commits an empty starting snapshot when switching profiles", async () => {
+    stubFetch();
+    const captureCommit = vi.fn();
+    const { result, rerender } = renderHook(({ profile }: { profile: string }) => {
+      const tail = useLogTail({ profile, following: true });
+      useLayoutEffect(() => captureCommit(profile, tail));
+      return tail;
+    }, { initialProps: { profile: PROFILE } });
+    await waitFor(() => expect(result.current.status).toBe("streaming"));
+    act(() => MockEventSource.last!.emit("event", frame(12, "From the old profile")));
+    expect(result.current.rows).toHaveLength(1);
+    captureCommit.mockClear();
+
+    await act(async () => rerender({ profile: "different-logs" }));
+
+    expect(captureCommit).toHaveBeenNthCalledWith(1, "different-logs", expect.objectContaining({
+      rows: [], sessionId: null, status: "starting",
+    }));
   });
 
   it("keeps following a session that reports stopping until its done frame", async () => {
