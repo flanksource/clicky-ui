@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { ClickyRow } from "../data/Clicky";
 import { isSessionState, isSessionTerminal, type SessionState } from "../rpc/sessionTypes";
-import { useEventSourceFactory, type EventSourceLike } from "./event-source";
+import { useEventSourceFactory } from "./event-source";
+import { subscribeJSON } from "./event-stream";
+import { appendTailRows } from "./tail-buffer";
 
 // use-log-tail is the clicky-ui client for a *follow* session: the server opens
 // a live source for a query profile and streams rows out of it until someone
@@ -174,14 +176,12 @@ export function appendTailEvent(
     ? event.rows.map(() => undefined)
     : [event.clickyRow];
 
-  const merged = buffer.rows.concat(incoming);
-  const mergedClickyRows = buffer.clickyRows.concat(incomingClickyRows);
-  const overflow = Math.max(0, merged.length - Math.max(1, maxRows));
+  const { rows, dropped } = appendTailRows(buffer.rows, incoming, { limit: maxRows });
   return {
-    rows: overflow > 0 ? merged.slice(overflow) : merged,
-    clickyRows: overflow > 0 ? mergedClickyRows.slice(overflow) : mergedClickyRows,
+    rows,
+    clickyRows: buffer.clickyRows.concat(incomingClickyRows).slice(dropped),
     lastSequence: event.sequence,
-    dropped: buffer.dropped + overflow,
+    dropped: buffer.dropped + dropped,
   };
 }
 
@@ -293,7 +293,7 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
 
     let cancelled = false;
     const aborter = new AbortController();
-    let source: EventSourceLike | undefined;
+    let closeSource: (() => void) | undefined;
     let ended = false;
     // onEvent's own watermark, tracked here rather than read from the buffer:
     // the buffer only dedupes inside a state updater, which React may run twice,
@@ -345,26 +345,24 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
     };
 
     const subscribe = (id: string) => {
-      const es = eventSourceFactoryRef.current(`${basePath}/sessions/${encodeURIComponent(id)}/events`);
-      source = es;
       setStatus("streaming");
-      es.addEventListener("event", (e) => {
-        const frame = readFrame("event", e as MessageEvent);
-        if (frame) apply(frame as LogTailEvent);
+      closeSource = subscribeJSON<LogTailEvent>(eventSourceFactoryRef.current, `${basePath}/sessions/${encodeURIComponent(id)}/events`, {
+        messageEvent: "event",
+        endEvent: "done",
+        onOpen: () => setStatus("streaming"),
+        onData: apply,
+        onInvalidMessage: error => setError({ scope: "stream", message: error.message }),
+        onEnd: event => {
+          const info = readFrame("done", event as MessageEvent);
+          if (info) settle(info as LogSessionInfo);
+          else setStatus("failed");
+        },
+        onError: (error, terminal) => {
+          if (ended) return;
+          setStatus(terminal ? "failed" : "connection lost — retrying");
+          if (terminal) setError({ scope: "stream", message: error.message });
+        },
       });
-      es.addEventListener("done", (e) => {
-        const info = readFrame("done", e as MessageEvent);
-        if (info) settle(info as LogSessionInfo);
-        es.close();
-      });
-      // A dropped connection is not a failure: EventSource reconnects with
-      // Last-Event-ID and the server replays. It is reported through `status`
-      // only, so a blip never leaves a sticky error the reader has to dismiss —
-      // and never after the session ended, where it would overwrite the reason
-      // it ended with a reconnect that is not going to happen.
-      es.onerror = () => {
-        if (!ended) setStatus("connection lost — retrying");
-      };
     };
 
     const start = async () => {
@@ -413,7 +411,7 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
     return () => {
       cancelled = true;
       aborter.abort();
-      source?.close();
+      closeSource?.();
     };
   }, [profile, paramsQuery, basePath, wantFollow]);
 

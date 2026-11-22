@@ -26,6 +26,8 @@ export interface EventHubOptions {
   buildId?: string | null;
   /** Called once on a build mismatch. Defaults to `window.location.reload()`. */
   onBuildMismatch?: () => void;
+  /** Resume each logical stream using its own last event ID. */
+  resume?: boolean;
 }
 
 const DEFAULT_URL = "/api/events";
@@ -67,6 +69,7 @@ class Sub implements EventSourceLike {
   readonly routedHandlers = new Map<string, (ev: Event) => void>();
   resubscribeTimer: ReturnType<typeof setTimeout> | null = null;
   disposed = false;
+  cursor = "";
 
   constructor(
     readonly id: string,
@@ -117,7 +120,7 @@ function dispatch(sub: Sub, name: string, event: Event): void {
  * reload guard) is per hub, so two hubs never share a connection.
  */
 export function createEventHub(options: EventHubOptions = {}): EventSourceFactory {
-  const { url: hubUrl = DEFAULT_URL, buildId = null, onBuildMismatch = () => window.location.reload() } = options;
+  const { url: hubUrl = DEFAULT_URL, buildId = null, onBuildMismatch = () => window.location.reload(), resume = false } = options;
 
   let real: EventSourceLike | null = null;
   let connId: string | null = null;
@@ -178,7 +181,7 @@ export function createEventHub(options: EventHubOptions = {}): EventSourceFactor
       const res = await fetch(`${hubUrl}/${conn}/subs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: sub.id, path: sub.url }),
+        body: JSON.stringify({ id: sub.id, path: sub.url, ...(resume ? { resume, cursor: sub.cursor || undefined } : {}) }),
       });
       if (stale()) return;
       if (res.status === 204) {
@@ -273,6 +276,22 @@ export function createEventHub(options: EventHubOptions = {}): EventSourceFactor
     if (!real || name === "open" || sub.disposed || sub.routedHandlers.has(eventName)) return;
     const handler = (event: Event) => {
       const message = event as MessageEvent;
+      if (resume) {
+        let frame: { data: string; cursor?: string };
+        try {
+          frame = JSON.parse(message.data) as typeof frame;
+          if (typeof frame.data !== "string" || (frame.cursor !== undefined && typeof frame.cursor !== "string")) {
+            throw new Error("expected data and an optional cursor");
+          }
+        } catch (error) {
+          failSub(sub, `malformed event: ${String(error)}`);
+          closeSub(sub);
+          return;
+        }
+        if (frame.cursor) sub.cursor = frame.cursor;
+        dispatch(sub, name, new MessageEvent(name, { data: frame.data, lastEventId: frame.cursor ?? "" }));
+        return;
+      }
       dispatch(sub, name, new MessageEvent(name, { data: message.data, lastEventId: message.lastEventId }));
     };
     real.addEventListener(eventName, handler);

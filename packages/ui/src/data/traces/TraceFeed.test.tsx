@@ -88,15 +88,22 @@ describe("TraceFeed", () => {
     await vi.waitFor(() => expect(loadPage).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: "next-page" }), expect.any(AbortSignal)));
   });
 
-  it("defaults to one mixed stream ordered by timestamp and retains ANSI styles", async () => {
+  it("shows UTC timestamps for mixed events and strips ANSI record prefixes while retaining message styles", async () => {
     const rows = [
-      { runId: "example", kind: "sql", stream: "db", seq: 1, timestamp: "2026-11-08T12:00:02Z", summary: "query completed", ansi: "\u001b[31mquery completed\u001b[0m", record: {} },
-      { runId: "example", kind: "http", stream: "proxy", seq: 9, timestamp: "2026-11-08T12:00:01Z", summary: "request completed", ansi: "\u001b[32mrequest completed\u001b[0m", record: {} },
+      { runId: "example", kind: "logs", stream: "app", seq: 1, timestamp: "2026-11-08T14:00:02.123+02:00", summary: "worker ready", ansi: "\u001b[90mlogs #1\u001b[0m \u001b[90m14:00:02.123\u001b[0m \u001b[32mworker ready\u001b[0m", record: {} },
+      { runId: "example", kind: "http", stream: "proxy", seq: 9, timestamp: "2026-11-08T12:00:01Z", summary: "request completed", ansi: "\u001b[90mhttp #9\u001b[0m \u001b[31mrequest completed\u001b[0m", record: {} },
+      { runId: "example", kind: "llm", stream: "api", seq: 2, timestamp: null, summary: "response", ansi: "\u001b[32mresponse\u001b[0m", record: {} },
     ];
-    render(<TraceFeed kinds={["sql", "http"]} presentation="ansi" loadPage={async () => ({ rows, nextCursor: "" })} />);
+    render(<TraceFeed kinds={["logs", "http", "llm"]} presentation="ansi" loadPage={async () => ({ rows, nextCursor: "" })} />);
     const log = await screen.findByRole("log", { name: "Trace events" });
-    await vi.waitFor(() => expect(log.textContent).toBe("request completedquery completed"));
+    await vi.waitFor(() => expect([...log.querySelectorAll("button")].map((row) => row.textContent)).toEqual([
+      "12:00:01.000 UTCrequest completed",
+      "12:00:02.123 UTCworker ready",
+      "—response",
+    ]));
+    expect(log.querySelector("time")).toHaveAttribute("datetime", rows[1]!.timestamp);
+    expect(screen.getByLabelText("Timestamp unavailable")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Event stream" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("query completed")).toHaveStyle({ color: "#cd3131" });
+    expect(screen.getByText("request completed")).toHaveStyle({ color: "#cd3131" });
   });
 });
