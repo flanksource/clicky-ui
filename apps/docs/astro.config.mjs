@@ -35,6 +35,7 @@ export default defineConfig({
             },
             { label: "Expressions", slug: "guides/expressions" },
             { label: "Timeseries widgets", slug: "guides/timeseries" },
+            { label: "Gavel comments", slug: "guides/gavel-comments" },
           ],
         },
         {

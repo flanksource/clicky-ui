@@ -1,5 +1,10 @@
 import type { StorybookConfig } from "@storybook/react-vite";
 import tailwindcss from "@tailwindcss/vite";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { pageRuntime } from "./page-runtime.ts";
+
+const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const config: StorybookConfig = {
   stories: [
@@ -35,7 +40,7 @@ const config: StorybookConfig = {
     // Keep Vite's source watcher active while requiring a browser refresh to see edits.
     viteConfig.server ??= {};
     viteConfig.server.hmr = false;
-    viteConfig.plugins = [...(viteConfig.plugins ?? []), tailwindcss()];
+    viteConfig.plugins = [...(viteConfig.plugins ?? []), tailwindcss(), pageRuntime({ workspaceRoot: resolve(appRoot, "../.."), facetRoot: resolve(appRoot, "../../../facet") })];
     // Force a single React instance across the storybook app and the linked
     // packages/ui source it renders (their react resolves via different
     // node_modules paths in the pnpm workspace) — otherwise stories hit
@@ -46,6 +51,25 @@ const config: StorybookConfig = {
       "react",
       "react-dom",
     ];
+    const aliases = viteConfig.resolve.alias ?? [];
+    const existingAliases = Array.isArray(aliases)
+      ? aliases
+      : Object.entries(aliases).map(([find, replacement]) => ({ find, replacement }));
+    // Fixtures authored the way a downstream module is (the form-extensions
+    // example imports `@flanksource/clicky-ui/components`) resolve to this
+    // checkout's source, so they never load a second, stale built copy.
+    const sourceAliases = [
+      {
+        find: /^@flanksource\/clicky-ui\/components$/,
+        replacement: resolve(appRoot, "../../packages/ui/src/components.ts"),
+      },
+      // PageFrame and the source-rendered console must share one diagnostics registry.
+      {
+        find: /^@flanksource\/clicky-ui\/data$/,
+        replacement: resolve(appRoot, "../../packages/ui/src/data.ts"),
+      },
+    ];
+    viteConfig.resolve.alias = [...sourceAliases, ...existingAliases];
     // Pre-bundle every dependency the stories pull in transitively through
     // packages/ui. On a cold cache (CI) Vite's browser-mode optimizer otherwise
     // discovers them only after the tests start, re-optimizes once and reloads
