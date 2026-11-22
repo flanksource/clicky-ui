@@ -101,6 +101,30 @@ afterEach(() => {
 });
 
 describe("createEventHub", () => {
+  it("resumes interleaved topics at their own cursor", async () => {
+    const open = createEventHub({ resume: true });
+    const first = open("/api/logs/first");
+    const second = open("/api/logs/second");
+    const real = FakeRealEventSource.instances[0];
+    const delivered = vi.fn();
+    first.onmessage = delivered;
+    first.addEventListener("update", vi.fn());
+    real.emit("__hello", helloPayload("conn-1"));
+    await flush();
+    real.emit("s1/message", JSON.stringify({ cursor: "first-7", data: "first record" }));
+    real.emit("s2/message", JSON.stringify({ cursor: "second-3", data: "second record" }));
+    real.emit("s1/update", JSON.stringify({ data: "status" }), "second-3");
+    real.fail();
+    real.emit("__hello", helloPayload("conn-2"));
+    await flush();
+    expect(delivered).toHaveBeenCalledWith(expect.objectContaining({ data: "first record", lastEventId: "first-7" }));
+    expect(posts().slice(-2).map(call => call.body)).toEqual([
+      { id: "s1", path: "/api/logs/first", resume: true, cursor: "first-7" },
+      { id: "s2", path: "/api/logs/second", resume: true, cursor: "second-3" },
+    ]);
+    first.close();
+    second.close();
+  });
   it("opens CONNECTING, subscribes once hello arrives, and dispatches open on 204", async () => {
     const open = createEventHub();
     const stream = open("/api/prs/stream");

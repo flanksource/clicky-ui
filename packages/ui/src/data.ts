@@ -209,7 +209,7 @@ export {
 } from "./data/Properties";
 export { formatPropertyLabel } from "./data/properties-utils";
 export { LogViewer, type LogViewerProps } from "./data/LogViewer";
-export { parseLogSections, type LogSection } from "./data/log-sections";
+export { parseLogSections, type LogSection, type ParsedLog } from "./data/log-sections";
 export {
   LogsTable,
   type LogsTableInput,
