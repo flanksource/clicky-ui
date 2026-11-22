@@ -48,12 +48,15 @@ function DrillDown({
             {formatProfileValue(stack.value, unit)} <Percent value={stack.value} total={total} />
           </div>
           <ol className="space-y-0.5 font-mono text-[11px] leading-4">
-            {stack.frames.map((frame, depth) => (
-              <li key={depth} className={cn("break-all", frame.func === func ? "font-semibold text-foreground" : "text-muted-foreground")}>
-                {frame.func}
-                {frameLocation(frame) && <span className="ml-2 text-[10px] font-normal opacity-80">{frameLocation(frame)}</span>}
-              </li>
-            ))}
+            {stack.frames.map((frame, depth) => {
+              const location = frameLocation(frame).split(/[\\/]/).at(-1);
+              return (
+                <li key={depth} className={cn("break-all", frame.func === func ? "font-semibold text-foreground" : "text-muted-foreground")}>
+                  {frame.func}
+                  {location && <span className="ml-2 text-[10px] font-normal opacity-80">{location}</span>}
+                </li>
+              );
+            })}
           </ol>
         </div>
       ))}

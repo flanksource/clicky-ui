@@ -42,6 +42,41 @@ describe("controlled Git pickers", () => {
     expect({ className: screen.getByText("Release Branch", { selector: "label" }).className, labelled: (input as HTMLInputElement).labels?.[0]?.textContent }).toEqual({ className, labelled: "Release Branch" });
   });
 
+  it("renders the inline variant as a click-to-edit chip that opens a searchable menu", () => {
+    const onChange = vi.fn();
+    render(<GitBranchPicker variant="inline" label="Base branch" items={[{ name: "main", sha }, branch]} value="refs/heads/main" onChange={onChange} />);
+    const chip = screen.getByRole("combobox", { name: "Base branch" });
+    expect({ tag: chip.tagName, text: chip.textContent, label: screen.queryByText("Base branch", { selector: "label" }) }).toEqual({ tag: "BUTTON", text: "main", label: null });
+    fireEvent.click(chip);
+    const search = screen.getByRole("textbox", { name: "Search Base branch" });
+    fireEvent.change(search, { target: { value: "dependent benefits" } });
+    fireEvent.keyDown(search, { key: "ArrowDown" });
+    fireEvent.keyDown(search, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledWith(`refs/heads/${branch.name}`, branch);
+  });
+
+  it("renders repository, ref and file of an inline file picker as click-to-edit chips", async () => {
+    const client: GitPickerClient = {
+      connections: vi.fn().mockResolvedValue([{ name: "host", type: "github" }]),
+      repositories: vi.fn().mockResolvedValue([{ name: "rules", fullName: "acme/rules", defaultBranch: "main" }]),
+      refs: vi.fn().mockResolvedValue({ branches: [{ name: "main", sha }], tags: [] }),
+      files: vi.fn().mockResolvedValue({ sha, paths: ["rules.xlsx"] }),
+    };
+    render(<GitFilePicker variant="inline" client={client} value={{ connection: "host", repo: "acme/rules", ref: "refs/heads/main", path: "rules.xlsx", sha }} onChange={vi.fn()} />);
+    const chip = (name: string) => screen.findByRole("combobox", { name });
+    const chips = await Promise.all(["Repository", "Git ref", "Git file"].map(async (name) => {
+      await waitFor(async () => expect((await chip(name)).textContent).not.toMatch(/^Search/));
+      const element = await chip(name);
+      return { tag: element.tagName, text: element.textContent };
+    }));
+    expect(chips).toEqual([{ tag: "BUTTON", text: "acme/rules" }, { tag: "BUTTON", text: "main" }, { tag: "BUTTON", text: "rules.xlsx" }]);
+  });
+
+  it("draws author avatars filled", () => {
+    render(<GitCommitPicker items={[branch]} value={sha} onChange={vi.fn()} />);
+    expect(document.querySelector("[data-avatar-variant]")).toHaveAttribute("data-avatar-variant", "solid");
+  });
+
   it("shows author metadata and a compact selected SHA while emitting the full SHA", () => {
     render(<GitCommitPicker items={[{ ...branch, subject: "Validate dependent benefits" }]} value={sha} onChange={vi.fn()} />);
     expect(screen.getByRole("combobox", { name: "Commit" })).toHaveValue(sha.slice(0, 7));

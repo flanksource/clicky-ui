@@ -9,14 +9,14 @@ describe("Git picker dropdown layout", () => {
     { name: "branch", label: "Branch", render: () => <GitBranchPicker items={[{ name: "feature/rules", sha, subject: "Validate benefits", author: "Alex Example" }]} value="" onChange={vi.fn()} /> },
     { name: "commit", label: "Commit", render: () => <GitCommitPicker items={[{ sha, subject: "Validate benefits", author: "Alex Example" }]} value="" onChange={vi.fn()} /> },
     { name: "repository", label: "Repository", render: () => <GitRepositoryPicker items={[{ name: "rules", fullName: "acme/rules", defaultBranch: "main" }]} value="" onChange={vi.fn()} /> },
-  ])("keeps $name metadata responsive in a wider menu and searchable", (picker) => {
+  ])("stacks $name metadata on a second line in a wider menu and keeps it searchable", (picker) => {
     render(picker.render());
     const input = screen.getByRole("combobox", { name: picker.label });
     fireEvent.focus(input);
     expect(screen.getByRole("listbox")).toHaveStyle({ minWidth: "720px" });
     const option = screen.getByRole("option");
-    expect(option.querySelector('[data-slot="combobox-option-text"]')).toHaveClass("flex");
-    expect(option.querySelector('[data-slot="combobox-option-text"]')).toHaveClass("flex-col");
+    const lines = [...option.querySelector('[data-slot="combobox-option-text"]')!.children].map((line) => line.className.includes("block"));
+    expect(lines).toEqual([true, true]);
     expect(option.title).toContain(picker.name === "repository" ? "main" : "Alex Example");
     fireEvent.change(input, { target: { value: picker.name === "repository" ? "main" : sha.slice(0, 7) } });
     expect(screen.getAllByRole("option")).toHaveLength(1);

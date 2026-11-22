@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { cn } from "../lib/utils";
 import { AnsiHtml } from "./AnsiHtml";
-import { parseLogSections, type LogSection } from "./log-sections";
+import { countLogRows, parseLogSections, takeLogRows, type LogSection, type ParsedLog } from "./log-sections";
+import { ProgressBar } from "./ProgressBar";
 
 function renderSections(sections: LogSection[]): ReactNode[] {
   return sections.map((section, i) =>
@@ -21,13 +22,17 @@ function renderSections(sections: LogSection[]): ReactNode[] {
 
 export type LogViewerProps = {
   /**
-   * Raw log text separated by newlines; ANSI SGR escapes are styled and
-   * GitHub Actions `::group::`/`::endgroup::` markers render as collapsible
-   * sections.
+   * Raw log text separated by newlines, both streams interleaved. ANSI SGR
+   * escapes are styled and workflow commands are read: `::group::` markers
+   * render as collapsible sections, a `::status::` as a line unless it repeats,
+   * and the latest description, status and progress below the log. A Raw toggle
+   * shows the text as it was printed.
    */
   logs: string;
-  /** Number of lines shown before the viewer is expanded. Ignored when `maxHeight` is set. */
+  /** Number of rows shown before the viewer is expanded. Ignored when `maxHeight` is set. */
   collapsedLines?: number;
+  /** Shows only the last rows, e.g. as a preview of a longer log. */
+  tailLines?: number;
   /**
    * Collapsed height as a CSS length (e.g. `25cqh` for a quarter of the
    * enclosing size container). Every line is rendered and the block scrolls,
@@ -59,9 +64,33 @@ const VARIANTS = {
   },
 };
 
+/** What the log last reported about the work it is of. */
+function LogStatus({ log, className }: { log: ParsedLog; className: string }) {
+  const { description, status, progress } = log;
+  return (
+    <div className={cn("flex items-center gap-2 rounded-b border border-t-0 px-1.5 py-1 text-[11px]", className)} data-log-status="">
+      {description && <span className="shrink-0 font-medium">{description}</span>}
+      {status && <span className="min-w-0 flex-1 truncate" title={status}>{status}</span>}
+      {progress && (
+        <span className="ml-auto flex shrink-0 items-center gap-1.5 tabular-nums">
+          <ProgressBar
+            label="Progress"
+            segments={[{ count: progress.done, color: "bg-blue-500", label: "done" }]}
+            total={progress.total}
+            height="h-1.5"
+            className="w-24"
+          />
+          {progress.done}/{progress.total}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function LogViewer({
   logs,
   collapsedLines = 5,
+  tailLines,
   maxHeight,
   maxExpandedVh = 70,
   variant = "muted",
@@ -70,29 +99,58 @@ export function LogViewer({
   className,
 }: LogViewerProps) {
   const [expanded, setExpanded] = useState(false);
-  const lines = useMemo(() => logs.split("\n"), [logs]);
-  const hasMore = lines.length > collapsedLines;
+  const [raw, setRaw] = useState(false);
+  const parsed = useMemo(() => parseLogSections(logs), [logs]);
+  const all = useMemo<LogSection[]>(
+    () => (raw ? [{ kind: "text", text: logs }] : parsed.sections),
+    [raw, logs, parsed],
+  );
+  const sections = useMemo(() => {
+    if (tailLines !== undefined) return takeLogRows(all, tailLines, "tail");
+    return expanded || maxHeight ? all : takeLogRows(all, collapsedLines, "head");
+  }, [all, tailLines, expanded, maxHeight, collapsedLines]);
+  const rows = useMemo(() => countLogRows(all), [all]);
+  const hasMore = tailLines === undefined && rows > collapsedLines;
   const tone = VARIANTS[variant];
+  const showStatus = !raw && !!(parsed.description || parsed.status || parsed.progress);
 
   const collapsedHeight = maxHeight ?? `${collapsedLines * 1.4}em`;
-  const shown = expanded || maxHeight ? logs : lines.slice(0, collapsedLines).join("\n");
-  const sections = useMemo(() => parseLogSections(shown), [shown]);
-  const grouped = sections.some((section) => section.kind === "group");
+  const bg = bgClass ?? tone.bg;
+  const border = borderClass ?? tone.border;
 
   return (
     <div className={cn("relative", className)}>
       <pre
         className={cn(
           "mt-0.5 text-[11px] rounded p-1.5 whitespace-pre-wrap overflow-y-auto border transition-all duration-200",
+          showStatus && "rounded-b-none",
           tone.text,
-          bgClass ?? tone.bg,
-          borderClass ?? tone.border,
+          bg,
+          border,
         )}
         style={{ maxHeight: expanded ? `${maxExpandedVh}vh` : collapsedHeight }}
         data-log-variant={variant}
       >
-        {grouped ? renderSections(sections) : <AnsiHtml as="span" text={shown} />}
+        {renderSections(sections)}
       </pre>
+      {parsed.hasCommands && (
+        <button
+          type="button"
+          aria-pressed={raw}
+          title="Show the log exactly as it was printed"
+          className={cn(
+            "absolute right-1 top-1.5 rounded border px-1 text-[10px] hover:opacity-100",
+            raw ? "opacity-100" : "opacity-60",
+            tone.text,
+            bg,
+            border,
+          )}
+          onClick={() => setRaw((value) => !value)}
+        >
+          Raw
+        </button>
+      )}
+      {showStatus && <LogStatus log={parsed} className={cn(tone.text, bg, border)} />}
       {hasMore && (
         <button
           type="button"
@@ -102,7 +160,7 @@ export function LogViewer({
           )}
           onClick={() => setExpanded((e) => !e)}
         >
-          {expanded ? `▲ Collapse (${lines.length} lines)` : `▼ Show more (${lines.length} lines)`}
+          {expanded ? `▲ Collapse (${rows} lines)` : `▼ Show more (${rows} lines)`}
         </button>
       )}
     </div>

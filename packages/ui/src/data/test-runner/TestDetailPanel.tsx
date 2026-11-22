@@ -278,7 +278,7 @@ export function TestDetailPanel({ header = "full", tabVariant = "pill" }: { head
   const detailAdapter = runner.adapters.resolveDetail(node, runner);
   const actionAdapter = runner.adapters.resolveActions(selected, runner);
   const tabs = runner.adapters.resolveTabs(node, runner);
-  if ((node.stdout || node.stderr) && !tabs.some((tab) => tab.id === "stdout")) {
+  if ((node.log || node.stdout || node.stderr) && !tabs.some((tab) => tab.id === "stdout")) {
     tabs.unshift({
       id: "stdout",
       label: "Stdout",

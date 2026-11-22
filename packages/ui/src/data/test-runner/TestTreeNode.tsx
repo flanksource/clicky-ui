@@ -113,12 +113,14 @@ export function TestTreeNode({ node, selected }: { node: Test; selected: boolean
         <span className="flex-1" />
       )}
 
-      {node.progress && node.progress.total > 0 && !node.passed && !node.failed && (
-        <span className="flex shrink-0 items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
-          {node.progress.phase && <span>{node.progress.phase}</span>}
-          <span className="tabular-nums">
-            {node.progress.done}/{node.progress.total}
-          </span>
+      {node.progress && (node.progress.total > 0 || node.progress.phase) && !node.passed && !node.failed && (
+        <span className="flex min-w-0 items-center gap-1 text-xs text-blue-600 dark:text-blue-400" data-row-progress="">
+          {node.progress.phase && <span className="truncate" title={node.progress.phase}>{node.progress.phase}</span>}
+          {node.progress.total > 0 && (
+            <span className="shrink-0 tabular-nums">
+              {node.progress.done}/{node.progress.total}
+            </span>
+          )}
         </span>
       )}
 
