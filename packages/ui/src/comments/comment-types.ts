@@ -352,6 +352,8 @@ export type CommentConfig = {
   mentionables?: CommentMentionable[];
   /** People/agents a root can be assigned to; the Assign menu lists exactly these. */
   assignees?: CommentMentionable[];
+  /** Restrict editing to eligible threads even when edit callbacks are available. */
+  canEditThread?: (root: Comment) => boolean;
   /**
    * Where a new comment can be sent (e.g. an agent session or runtime). The
    * composer offers them in its target picker and @-completion, and posts the

@@ -113,12 +113,15 @@ export function CommentThreadList({
   function cardHandlers(message: Comment, thread: readonly Comment[]) {
     const id = message.id;
     // A reply's edit and delete are addressed to its thread's root, never to the parent it answers (which may itself be a reply).
-    const rootId = thread[0]!.id;
+    const root = thread[0]!;
+    const rootId = root.id;
     const isReply = id !== rootId;
     const deleteReply = isReply ? onDeleteReply : undefined;
-    const edit = isReply ? onEditReply && ((body: string) => onEditReply(rootId, id, body)) : onEdit && ((body: string) => onEdit(id, body));
+    const edit = isReply
+      ? onEditReply && ((body: string) => onEditReply(rootId, id, body))
+      : onEdit && ((body: string) => onEdit(id, body));
     return {
-      ...(edit ? { onEdit: edit } : {}),
+      ...(edit && config.canEditThread?.(root) !== false ? { onEdit: edit } : {}),
       ...(!isReply && onCreateTodo ? { onCreateTodo: () => onCreateTodo(thread) } : {}),
       ...(onUpdateStatus
         ? { onUpdateStatus: (status: string) => onUpdateStatus(id, status) }

@@ -95,10 +95,66 @@ describe("resolveAnchor with dialog anchors", () => {
 describe("resolveAnchor with named anchors", () => {
   it("resolves a raw data-comment-anchor value that is not a valid selector", () => {
     const content = document.createElement("div");
-    content.innerHTML = '<div data-comment-anchor="vocabulary:oipa-symbol/badge">badge</div>';
+    content.innerHTML = '<div data-comment-anchor="vocabulary:oipa-symbol/badge">badge</div><div data-comment-anchor="iframe:preview">preview</div>';
     document.body.append(content);
-    expect([resolveAnchor(content, "vocabulary:oipa-symbol/badge")?.textContent, resolveAnchor(content, "vocabulary:missing")]).toEqual(["badge", null]);
+    expect([
+      resolveAnchor(content, "vocabulary:oipa-symbol/badge")?.textContent,
+      resolveAnchor(content, "vocabulary:missing"),
+      resolveAnchor(content, "iframe:preview", { frames: true })?.textContent,
+    ]).toEqual(["badge", null, "preview"]);
     content.remove();
+  });
+});
+
+describe("iframe comment anchors", () => {
+  const frames = { frames: true };
+  const buttonMarkup = '<button id="repository">Repository</button>';
+
+  function frameIn(root: HTMLElement, id: string, url?: string) {
+    const frame = root.ownerDocument.createElement("iframe");
+    frame.id = id;
+    root.append(frame);
+    const page = frame.contentDocument!;
+    if (url) Object.defineProperty(page, "URL", { value: url, configurable: true });
+    return { frame, page };
+  }
+
+  it("resolves a nested target and its locators only in the recorded frame", () => {
+    const root = mount();
+    root.innerHTML = buttonMarkup;
+    const sibling = frameIn(root, "another-story").page;
+    sibling.body.innerHTML = buttonMarkup;
+    const outer = frameIn(root, "preview").page;
+    const { page } = frameIn(outer.body, "story");
+    page.body.innerHTML = buttonMarkup;
+    const target = page.querySelector("button")!;
+    const anchor = commentAnchor(target, root, frames)!;
+    const locators = captureLocators(target, root, frames);
+
+    expect([resolveAnchor(root, anchor, frames), resolveAnchor(root, anchor), locators.length > 1]).toEqual([target, null, true]);
+    target.id = "new-id";
+    expect(resolveComment(root, anchor, locators, frames)?.element).toBe(target);
+    target.remove();
+    expect(resolveComment(root, anchor, locators, frames)).toBeNull();
+  });
+
+  it("orphans an anchor when the frame switches stories or becomes inaccessible", () => {
+    const root = mount();
+    const url = "https://example.com/iframe.html?id=git";
+    const { frame, page } = frameIn(root, "preview", url);
+    page.body.innerHTML = buttonMarkup;
+    const target = page.querySelector("button")!;
+    const anchor = commentAnchor(target, root, frames)!;
+    const locators = captureLocators(target, root, frames);
+
+    Object.defineProperty(page, "URL", { value: "https://example.com/iframe.html?id=another" });
+    expect(resolveComment(root, anchor, locators, frames)).toBeNull();
+    Object.defineProperty(page, "URL", { value: `${url}#stories` });
+    expect(resolveAnchor(root, anchor, frames)).toBe(target);
+    Object.defineProperty(frame, "contentDocument", { value: null });
+    expect(resolveComment(root, anchor, locators, frames)).toBeNull();
+    frame.remove();
+    expect(resolveAnchor(root, anchor, frames)).toBeNull();
   });
 });
 
