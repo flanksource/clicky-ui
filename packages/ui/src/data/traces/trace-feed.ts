@@ -22,6 +22,21 @@ export interface TraceFeedPage {
   resume?: string;
 }
 
+export interface TraceFeedFollowOptions {
+  kind: string;
+  resume: string;
+  onRecord: (record: TraceFeedRecord) => void;
+  onError: (error: Error) => void;
+  onOpen: () => void;
+  onEnd: () => void;
+}
+
+export interface TraceFeedSource {
+  loadPage: (request: TraceFeedRequest, signal: AbortSignal) => Promise<TraceFeedPage>;
+  /** Replay records after the loaded page's resume token before delivering live records. */
+  follow?: (options: TraceFeedFollowOptions) => () => void;
+}
+
 export const traceFeedKey = (record: TraceFeedRecord) => `${record.runId}/${record.kind}/${record.stream}/${record.seq}`;
 
 export function orderTraceFeed(rows: TraceFeedRecord[], sort: TraceFeedRequest["sort"]): TraceFeedRecord[] {

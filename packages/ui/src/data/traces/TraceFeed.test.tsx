@@ -1,6 +1,6 @@
 import { act, render, screen, fireEvent } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TraceFeed } from "./TraceFeed";
+import { TraceFeed, type TraceFeedProps } from "./TraceFeed";
 import { httpExchangeRows } from "./fixtures";
 import type { TraceFeedPage, TraceFeedRecord } from "./trace-feed";
 
@@ -120,6 +120,35 @@ describe("TraceFeed", () => {
     render(<TraceFeed kinds={["logs"]} loadPage={async () => ({ rows: [], nextCursor: "" })} follow={follow} />);
     expect(await screen.findByRole("alert")).toHaveTextContent("Trace feed page is missing a resume token");
     expect(follow).not.toHaveBeenCalled();
+  });
+
+  it("ignores events from a closed follow subscription while paused and after resuming", async () => {
+    const resume = "snapshot-position";
+    const loadPage = vi.fn(async () => ({ rows: [], nextCursor: "", resume }));
+    const close = vi.fn();
+    const follow = vi.fn<NonNullable<TraceFeedProps["follow"]>>(() => close);
+    render(<TraceFeed kinds={["logs"]} loadPage={loadPage} follow={follow} />);
+    await vi.waitFor(() => expect(follow).toHaveBeenCalledOnce());
+    const original = follow.mock.calls[0]![0];
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    expect(close).toHaveBeenCalledOnce();
+    act(() => original.onEnd());
+
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+    expect(follow).toHaveBeenCalledTimes(2);
+    expect(follow).toHaveBeenLastCalledWith(expect.objectContaining({ resume }));
+    expect(loadPage).toHaveBeenCalledOnce();
+
+    const current = follow.mock.calls[1]![0];
+    const record = { runId: "example", kind: "logs", stream: "app", seq: 1, timestamp: null, summary: "Current event", record: {} };
+    act(() => {
+      original.onRecord({ ...record, seq: 2, summary: "Closed stream event" });
+      original.onError(new Error("Closed stream failure"));
+      current.onRecord(record);
+    });
+    expect(screen.getByText(record.summary)).toBeInTheDocument();
+    expect(screen.queryByText("Closed stream event")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("shows UTC timestamps for mixed events and strips ANSI record prefixes while retaining message styles", async () => {

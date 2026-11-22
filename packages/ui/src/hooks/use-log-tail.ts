@@ -3,7 +3,10 @@ import type { ClickyRow } from "../data/Clicky";
 import { isSessionState, isSessionTerminal, type SessionState } from "../rpc/sessionTypes";
 import { useEventSourceFactory } from "./event-source";
 import { subscribeJSON } from "./event-stream";
+import { openLogTailSession, type LogSessionInfo, type LogTailError } from "./log-tail-session";
 import { appendTailRows } from "./tail-buffer";
+
+export type { LogSessionInfo, LogTailError } from "./log-tail-session";
 
 // use-log-tail is the clicky-ui client for a *follow* session: the server opens
 // a live source for a query profile and streams rows out of it until someone
@@ -29,19 +32,6 @@ import { appendTailRows } from "./tail-buffer";
 /** The sessions API's state, under the name this hook has always exported. */
 export type LogSessionState = SessionState;
 
-/** SessionInfo as returned by POST /profile/{name}/sessions and the `done` frame. */
-export interface LogSessionInfo {
-  id: string;
-  profile: string;
-  kind: string;
-  state: LogSessionState;
-  params?: Record<string, unknown>;
-  error?: string;
-  eventCount: number;
-  startedAt: string;
-  stoppedAt?: string;
-}
-
 /**
  * One `event:` frame. It carries either a single `row` or a batch under `rows`
  * — never both — plus an `error` when the source failed mid-stream without the
@@ -63,19 +53,6 @@ export interface LogTailEvent {
   /** The presented ClickyRow for `row`, when the profile sends one. */
   clickyRow?: ClickyRow;
   error?: string;
-}
-
-/**
- * Where a failure came from, because the three are not interchangeable to a
- * reader: `start` means the session never existed (409 is the cap), `stream`
- * means the session is alive but something in it went wrong, and `session`
- * means the server ended it.
- */
-export interface LogTailError {
-  scope: "start" | "stream" | "session";
-  message: string;
-  /** HTTP status when a request produced the failure. 409 is the session cap. */
-  httpStatus?: number;
 }
 
 /** Renderable transport/session state. The terminal values are the server's own. */
@@ -229,9 +206,21 @@ export interface UseLogTailResult {
 const DEFAULT_BASE = "/api/v1";
 const DEFAULT_MAX_ROWS = 5_000;
 
-function hasEventSource(): boolean {
-  return typeof globalThis !== "undefined" && typeof globalThis.EventSource !== "undefined";
+interface LogTailSnapshot {
+  request: { key: string; basePath: string; profile: string; paramsQuery: string } | null;
+  buffer: LogTailBuffer;
+  status: LogTailStatus;
+  error: LogTailError | null;
+  session: LogSessionInfo | null;
 }
+
+const emptyLogTailSnapshot: LogTailSnapshot = {
+  request: null,
+  buffer: emptyLogTailBuffer,
+  status: "idle",
+  error: null,
+  session: null,
+};
 
 export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
   const {
@@ -243,21 +232,13 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
     onEvent,
   } = options;
 
-  const [buffer, setBuffer] = useState<LogTailBuffer>(emptyLogTailBuffer);
-  const [status, setStatus] = useState<LogTailStatus>("idle");
-  const [error, setError] = useState<LogTailError | null>(null);
-  const [session, setSession] = useState<LogSessionInfo | null>(null);
-
-  // The cap is read when a frame lands rather than closed over, so changing how
-  // much history to keep never tears down a live session to do it.
-  const maxRowsRef = useRef(maxRows);
-  maxRowsRef.current = maxRows;
-  const onEventRef = useRef(onEvent);
-  onEventRef.current = onEvent;
+  const [snapshot, setSnapshot] = useState(emptyLogTailSnapshot);
 
   const eventSourceFactory = useEventSourceFactory();
-  const eventSourceFactoryRef = useRef(eventSourceFactory);
-  eventSourceFactoryRef.current = eventSourceFactory;
+  const streamOptions = useRef({ maxRows, onEvent, eventSourceFactory });
+  useEffect(() => {
+    streamOptions.current = { maxRows, onEvent, eventSourceFactory };
+  }, [maxRows, onEvent, eventSourceFactory]);
 
   // Profile parameters travel in the query string because that is where the
   // session endpoint reads them from: it builds its params by walking
@@ -268,32 +249,22 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
   // Serialized here rather than in the effect so it is also the effect's
   // dependency: two renders with equal parameters must not restart the session.
   const paramsQuery = encodeTailParams(params);
+  const key = wantFollow ? JSON.stringify([basePath, profile, paramsQuery]) : null;
+  const { request, buffer, error, session } = snapshot;
+  if (key !== (request?.key ?? null)) {
+    setSnapshot(key === null ? { ...snapshot, request: null } : {
+      ...emptyLogTailSnapshot,
+      request: { key, basePath, profile, paramsQuery },
+      status: "starting",
+    });
+  }
 
   useEffect(() => {
-    if (!wantFollow) return;
+    if (!request) return;
+    const update = (fields: Partial<Omit<LogTailSnapshot, "request">>) => {
+      setSnapshot(current => current.request === request ? { ...current, ...fields } : current);
+    };
 
-    // Each start is a distinct server session replaying from its own first
-    // sequence, so the previous run's rows cannot be continued — carrying them
-    // over would interleave two unrelated sequence spaces in one list.
-    setBuffer(emptyLogTailBuffer);
-    setError(null);
-    setSession(null);
-
-    // Checked before the session exists: a session nobody can subscribe to
-    // would hold a server slot until the reaper noticed.
-    if (!hasEventSource()) {
-      setStatus("failed");
-      setError({
-        scope: "start",
-        message: `cannot follow ${profile}: this browser has no EventSource, and session events are served only as SSE`,
-      });
-      return;
-    }
-    setStatus("starting");
-
-    let cancelled = false;
-    const aborter = new AbortController();
-    let closeSource: (() => void) | undefined;
     let ended = false;
     // onEvent's own watermark, tracked here rather than read from the buffer:
     // the buffer only dedupes inside a state updater, which React may run twice,
@@ -304,19 +275,24 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
       if (delivered !== null && event.sequence <= delivered) return;
       delivered = event.sequence;
       try {
-        onEventRef.current?.(event);
+        streamOptions.current.onEvent?.(event);
       } catch (cause) {
-        setError({ scope: "stream", message: `onEvent threw on sequence ${event.sequence}: ${String(cause)}` });
+        update({ error: { scope: "stream", message: `onEvent threw on sequence ${event.sequence}: ${String(cause)}` } });
       }
     };
 
     const apply = (event: LogTailEvent) => {
+      const { maxRows: limit } = streamOptions.current;
       // An event-level error does not end the session, so it is reported beside
       // the rows rather than in place of them. Set before delivery so a reducer
       // that throws on the same frame is the error left standing.
-      if (event.error) setError({ scope: "stream", message: event.error });
+      if (event.error) update({ error: { scope: "stream", message: event.error } });
       deliver(event);
-      setBuffer((prev) => appendTailEvent(prev, event, maxRowsRef.current));
+      setSnapshot(current => {
+        if (current.request !== request) return current;
+        const next = appendTailEvent(current.buffer, event, limit);
+        return next === current.buffer ? current : { ...current, buffer: next };
+      });
     };
 
     // Unlike the task stream this does not skip what it cannot parse: a tail
@@ -326,100 +302,56 @@ export function useLogTail(options: UseLogTailOptions): UseLogTailResult {
       try {
         return JSON.parse(e.data as string);
       } catch (cause) {
-        setError({ scope: "stream", message: `unparseable ${label} frame: ${String(cause)}` });
+        update({ error: { scope: "stream", message: `unparseable ${label} frame: ${String(cause)}` } });
         return undefined;
       }
     };
 
     const settle = (info: LogSessionInfo) => {
-      setSession(info);
-      if (!isTerminalSessionState(info.state)) return;
-      ended = true;
-      setStatus(info.state as LogTailStatus);
+      ended = isTerminalSessionState(info.state);
       if (info.state === "failed") {
-        setError({
-          scope: "session",
-          message: info.error || `session ${info.id} failed without reporting a reason`,
+        update({
+          session: info,
+          status: info.state,
+          error: { scope: "session", message: info.error || `session ${info.id} failed without reporting a reason` },
         });
+      } else {
+        update(ended ? { session: info, status: info.state as LogTailStatus } : { session: info });
       }
     };
 
-    const subscribe = (id: string) => {
-      setStatus("streaming");
-      closeSource = subscribeJSON<LogTailEvent>(eventSourceFactoryRef.current, `${basePath}/sessions/${encodeURIComponent(id)}/events`, {
+    const subscribe = (info: LogSessionInfo) => {
+      update({ session: info, status: "streaming" });
+      return subscribeJSON<LogTailEvent>(streamOptions.current.eventSourceFactory, `${request.basePath}/sessions/${encodeURIComponent(info.id)}/events`, {
         messageEvent: "event",
         endEvent: "done",
-        onOpen: () => setStatus("streaming"),
+        onOpen: () => update({ status: "streaming" }),
         onData: apply,
-        onInvalidMessage: error => setError({ scope: "stream", message: error.message }),
+        onInvalidMessage: error => update({ error: { scope: "stream", message: error.message } }),
         onEnd: event => {
           const info = readFrame("done", event as MessageEvent);
           if (info) settle(info as LogSessionInfo);
-          else setStatus("failed");
+          else update({ status: "failed" });
         },
         onError: (error, terminal) => {
           if (ended) return;
-          setStatus(terminal ? "failed" : "connection lost — retrying");
-          if (terminal) setError({ scope: "stream", message: error.message });
+          update(terminal ? { status: "failed", error: { scope: "stream", message: error.message } } : { status: "connection lost — retrying" });
         },
       });
     };
 
-    const start = async () => {
-      let info: LogSessionInfo;
-      try {
-        const res = await fetch(
-          `${basePath}/profile/${encodeURIComponent(profile)}/sessions?follow=true${paramsQuery}`,
-          { method: "POST", headers: { Accept: "application/json" }, signal: aborter.signal },
-        );
-        if (cancelled) return;
-        if (!res.ok) {
-          const detail = (await res.text()).trim() || "no detail";
-          setStatus("failed");
-          setError({
-            scope: "start",
-            httpStatus: res.status,
-            message:
-              res.status === 409
-                ? `the server is already running as many follow sessions as it allows (HTTP 409): ${detail}`
-                : `could not start a follow session for ${profile} (HTTP ${res.status}): ${detail}`,
-          });
-          return;
-        }
-        info = (await res.json()) as LogSessionInfo;
-      } catch (cause) {
-        // Our own abort on unmount or a parameter change: nothing is left to report to.
-        if (cancelled) return;
-        setStatus("failed");
-        setError({
-          scope: "start",
-          message: `could not reach ${basePath} to start a follow session for ${profile}: ${String(cause)}`,
-        });
-        return;
-      }
-
-      // The caller stopped following while the POST was in flight. If the
-      // session was created, nothing ever subscribes, so the server ends it.
-      if (cancelled) return;
-      setSession(info);
-      subscribe(info.id);
-    };
-
-    void start();
-    // Aborting the start and closing the stream is the whole release: a view
-    // session without a subscriber ends server-side.
-    return () => {
-      cancelled = true;
-      aborter.abort();
-      closeSource?.();
-    };
-  }, [profile, paramsQuery, basePath, wantFollow]);
+    return openLogTailSession({
+      basePath: request.basePath,
+      profile: request.profile,
+      paramsQuery: request.paramsQuery,
+      onStart: subscribe,
+      onError: error => update({ status: "failed", error }),
+    });
+  }, [request]);
 
   // Stopping returns the surface to idle, but a session that ended on its own
   // keeps its terminal status so the reason it ended stays on screen.
-  useEffect(() => {
-    if (!wantFollow) setStatus((prev) => (isTerminalTailStatus(prev) ? prev : "idle"));
-  }, [wantFollow]);
+  const status = request === null && !isTerminalTailStatus(snapshot.status) ? "idle" : snapshot.status;
 
   return {
     rows: buffer.rows,
