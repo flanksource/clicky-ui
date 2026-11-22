@@ -30,6 +30,11 @@ import {
   parseMarkdownAnchor,
   resolveMarkdown,
 } from "./markdown-anchor";
+import { commentFramePath, frameAnchor, isFrameAnchor, resolveFrameAnchor } from "./frame-anchor";
+
+export { commentFrameDocument, commentFramePath } from "./frame-anchor";
+
+type AnchorOptions = { frames?: boolean };
 
 export type Box = { left: number; top: number; width: number; height: number };
 
@@ -246,7 +251,13 @@ function markdownRootIn(root: Element): Element | null {
 export function captureLocators(
   target: Element,
   root: Element,
+  options?: AnchorOptions,
 ): CommentLocator[] {
+  if (options?.frames && target.ownerDocument !== root.ownerDocument) {
+    const frame = commentFramePath(target, root)?.at(-1);
+    if (!frame) return [];
+    root = frame.body;
+  }
   if (target === root || !root.contains(target)) return [];
   const markdown = markdownTarget(target);
   if (markdown) return [markdownLocator(markdown.block, markdown.root)];
@@ -313,7 +324,12 @@ export function resolveComment(
   root: Element,
   anchor: string,
   locators: readonly CommentLocator[],
+  options?: AnchorOptions,
 ): CommentMatch | null {
+  if (isFrameAnchor(anchor)) {
+    const framed = options?.frames && resolveFrameAnchor(root, anchor, uniqueFrame);
+    return framed ? resolveComment(framed.root, framed.anchor, locators) : null;
+  }
   const matches: ElementVote[] = [];
   const anchored = resolveAnchor(root, anchor);
   if (anchored) matches.push({ by: "anchor", element: anchored });
@@ -404,7 +420,14 @@ export function commentTarget(target: Element, content: Element): Element {
 export function commentAnchor(
   target: Element,
   content: Element,
+  options?: AnchorOptions,
 ): string | null {
+  if (target.ownerDocument !== content.ownerDocument) {
+    const path = options?.frames && commentFramePath(target, content);
+    if (!path) return null;
+    const anchor = commentAnchor(target, path[path.length - 1]!.body);
+    return anchor ? frameAnchor(path.map(({ frame, parent, url }) => ({ selector: cssPath(frame, parent), url })), anchor) : null;
+  }
   if (content.contains(target)) {
     const element = commentTarget(target, content);
     const markdown = markdownTarget(element);
@@ -426,7 +449,11 @@ export function overlayLabel(anchor: string): string | null {
 }
 
 /** Resolves a stored anchor, returning null when the node is gone (orphaned). */
-export function resolveAnchor(root: Element, anchor: string): Element | null {
+export function resolveAnchor(root: Element, anchor: string, options?: AnchorOptions): Element | null {
+  if (isFrameAnchor(anchor)) {
+    const framed = options?.frames && resolveFrameAnchor(root, anchor, uniqueFrame);
+    return framed ? resolveAnchor(framed.root, framed.anchor) : null;
+  }
   if (anchor === ROOT_ANCHOR) return root;
   const markdown = parseMarkdownAnchor(anchor);
   if (markdown) {
@@ -444,6 +471,10 @@ export function resolveAnchor(root: Element, anchor: string): Element | null {
   }
   const named = [...root.querySelectorAll("[data-comment-anchor]")].find(element => element.getAttribute("data-comment-anchor") === anchor);
   return named ?? query(root, anchor);
+}
+
+function uniqueFrame(root: Element, selector: string): Element | null {
+  return single(queryAll(root, selector));
 }
 
 function queryAll(root: ParentNode, selector: string): Element[] {
