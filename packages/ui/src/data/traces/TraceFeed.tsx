@@ -11,7 +11,8 @@ import { appendTailRows } from "../../hooks/tail-buffer";
 export interface TraceFeedProps {
   kinds: string[];
   loadPage: (request: TraceFeedRequest, signal: AbortSignal) => Promise<TraceFeedPage>;
-  follow?: (options: { kind: string; onRecord: (record: TraceFeedRecord) => void; onError: (error: Error) => void; onOpen: () => void; onEnd: () => void }) => () => void;
+  /** Replay records after the loaded page's resume token before delivering live records. */
+  follow?: (options: { kind: string; resume: string; onRecord: (record: TraceFeedRecord) => void; onError: (error: Error) => void; onOpen: () => void; onEnd: () => void }) => () => void;
   /** Return a capture view, null to omit it, or undefined for the built-in renderer. Raw records remain available. */
   renderCapture?: (capture: { kind: string; stream: string; records: TraceFeedRecord["record"][] }) => ReactNode;
   presentation?: "text" | "ansi";
@@ -41,7 +42,7 @@ export function TraceFeed({ kinds, loadPage, follow, renderCapture, presentation
   const [selected, setSelected] = useState<TraceFeedRecord>();
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [seeded, setSeeded] = useState<{ request: TraceFeedRequest; revision: number; loadPage: TraceFeedProps["loadPage"] }>();
+  const [seeded, setSeeded] = useState<{ request: TraceFeedRequest; revision: number; loadPage: TraceFeedProps["loadPage"]; resume: string | undefined }>();
   const [view, setView] = useState(() => {
     const value = new URLSearchParams(window.location.search).get("feedView");
     return value === "raw" || (value?.startsWith(captureViewPrefix) && kinds.includes(value.slice(captureViewPrefix.length))) ? value : "stream";
@@ -60,14 +61,23 @@ export function TraceFeed({ kinds, loadPage, follow, renderCapture, presentation
     const controller = new AbortController();
     setLoading(true);
     setError(undefined);
-    loadPage(request, controller.signal).then(next => { if (!controller.signal.aborted) { setPage(next); setLoading(false); setSeeded({ request, revision, loadPage }); } }).catch((failure: unknown) => {
+    loadPage(request, controller.signal).then(next => {
+      if (controller.signal.aborted) return;
+      setPage(next);
+      setLoading(false);
+      setSeeded({ request, revision, loadPage, resume: next.resume });
+    }).catch((failure: unknown) => {
       if (!controller.signal.aborted) { setLoading(false); setError(failure instanceof Error ? failure : new Error(String(failure))); }
     });
     return () => controller.abort();
   }, [request, loadPage, revision]);
   useEffect(() => {
     if (!follow || loading || paused || request.cursor || ended || seeded?.request !== request || seeded.revision !== revision || seeded.loadPage !== loadPage) return;
-    return follow({ kind: request.kind, onRecord: record => setPage(previous => ({ ...previous, rows: appendTailRows(previous.rows, [record], {
+    if (typeof seeded.resume !== "string" || seeded.resume.length === 0) {
+      setError(new Error("Trace feed page is missing a resume token"));
+      return;
+    }
+    return follow({ kind: request.kind, resume: seeded.resume, onRecord: record => setPage(previous => ({ ...previous, rows: appendTailRows(previous.rows, [record], {
       limit: 100, key: traceFeedKey, order: rows => orderTraceFeed(rows, request.sort),
     }).rows })), onError: setError, onOpen: () => setError(undefined), onEnd: () => setEnded(true) });
   }, [follow, loading, paused, request, ended, seeded, revision, loadPage]);

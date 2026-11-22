@@ -18,6 +18,7 @@ export interface TraceFeedRequest {
 export interface TraceFeedPage {
   rows: TraceFeedRecord[];
   nextCursor: string;
+  /** Opaque snapshot position. Required on pages loaded without a cursor when following. */
   resume?: string;
 }
 
