@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { AppShellNavDrag, AppShellNavSection } from "@flanksource/clicky-ui";
 import type { SidebarState } from "../sidebar-state";
 import { fetchNavigation } from "./api";
@@ -37,10 +37,9 @@ function useDebounced<T>(value: T, delay: number): T {
 function useEventCounter(events: readonly string[]): number {
   const [count, increment] = useReducer((value: number) => value + 1, 0);
   useEffect(() => {
-    for (const event of events) window.addEventListener(event, increment);
-    return () => {
-      for (const event of events) window.removeEventListener(event, increment);
-    };
+    const controller = new AbortController();
+    for (const event of events) window.addEventListener(event, increment, { signal: controller.signal });
+    return () => controller.abort();
   }, [events]);
   return count;
 }
@@ -76,8 +75,11 @@ export function useNavigationTree({
   const soft = useEventCounter(SOFT_REFRESH_EVENTS);
   const generation = JSON.stringify([sidebar.sort, sidebar.filters, sidebar.age, q, hard]);
 
-  const store = useRef<NodeStore>({ generation, nodes: new Map() });
-  if (store.current.generation !== generation) store.current = { generation, nodes: new Map() };
+  const current = useMemo<NodeStore>(() => ({ generation, nodes: new Map() }), [generation]);
+  const store = useRef(current);
+  useLayoutEffect(() => {
+    store.current = current;
+  }, [current]);
   const [cacheVersion, cacheChanged] = useReducer((value: number) => value + 1, 0);
   const [root, setRoot] = useState<Root | null>(null);
   const [error, setError] = useState<Error | null>(null);
@@ -86,7 +88,9 @@ export function useNavigationTree({
   const nodeRequests = useRef(new Map<string, number>());
   const params: QueryParams = { sort: sidebar.sort, filters: sidebar.filters, age: sidebar.age, q };
   const latest = useRef({ activeSlug, params });
-  latest.current = { activeSlug, params };
+  useLayoutEffect(() => {
+    latest.current = { activeSlug, params };
+  });
   const mapping = useRef<MappingContext | null>(null);
 
   useEffect(() => {
@@ -129,18 +133,24 @@ export function useNavigationTree({
     [],
   );
 
-  const section = useMemo<AppShellNavSection>(() => {
-    const ctx: MappingContext = {
+  const ctx = useMemo<MappingContext>(
+    () => ({
       activeSlug,
       query: sidebar.query,
       pageHref,
       generation,
       openKeys: root?.openKeys ?? new Set<string>(),
-      childrenOf: (key) => store.current.nodes.get(key),
+      childrenOf: (key) => current.nodes.get(key),
       loadChildren,
       menus: (entry) => entryMenus(entry, menu),
-    };
+    }),
+    [activeSlug, sidebar.query, pageHref, generation, root, current, loadChildren, menu],
+  );
+  useLayoutEffect(() => {
     mapping.current = ctx;
+  }, [ctx]);
+
+  const section = useMemo<AppShellNavSection>(() => {
     return {
       variant: "tree",
       reloadOnOpen: false,
@@ -149,8 +159,8 @@ export function useNavigationTree({
       drag: pageOnlyDrag(drag),
       ...mapEntries(root?.children ?? [], ctx),
     };
-    // store.current is read at map time; cacheVersion is what announces a change to it.
-  }, [root, error, cacheVersion, activeSlug, sidebar.query, pageHref, generation, loadChildren, menu, onQueryChange, drag]);
+    // The node store is read at map time; cacheVersion is what announces a change to it.
+  }, [root, error, cacheVersion, ctx, sidebar.query, onQueryChange, drag]);
 
   return { section, olderCount: root?.olderCount, error, loading: root === null && error === null };
 }
