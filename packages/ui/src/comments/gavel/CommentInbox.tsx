@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "../../components/button";
 import type { FilterBarFilter } from "../../components/FilterBar";
 import { Badge } from "../../data/Badge";
@@ -147,7 +147,9 @@ export function CommentInbox({ listings, error, filters, onFiltersChange, onOpen
   const unresolved = items.filter((item) => config.statuses.some((status) => status.value === item.thread.status && status.unresolved)).length;
   // FilterBar's "Clear all" clears each filter in turn within one event, so patches merge onto the latest filters.
   const latest = useRef(filters);
-  latest.current = filters;
+  useLayoutEffect(() => {
+    latest.current = filters;
+  });
   const set = (patch: Partial<InboxFilters>) => {
     latest.current = { ...latest.current, ...patch };
     onFiltersChange(latest.current);

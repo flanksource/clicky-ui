@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type RefObject,
@@ -211,11 +212,13 @@ export function useComments(
 ): PlaygroundComments {
   const reload = usePageReload();
   const captureRef = useRef(options.capture);
-  captureRef.current = options.capture;
   const enabled = options.enabled !== false;
   const scope = `${page}:${Boolean(options.all)}`;
   const scopeRef = useRef(scope);
-  scopeRef.current = scope;
+  useLayoutEffect(() => {
+    captureRef.current = options.capture;
+    scopeRef.current = scope;
+  });
   const [loadedScope, setLoadedScope] = useState<string>();
   const [comments, setComments] = useState<PlaygroundComment[]>([]);
   const [allComments, setAllComments] = useState<PageComment[]>([]);
