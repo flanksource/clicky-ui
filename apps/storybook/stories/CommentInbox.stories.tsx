@@ -109,7 +109,6 @@ function Controlled({ listings, initial = EMPTY_INBOX_FILTERS, withActions = fal
             ? {
                 actions: {
                   onClose: (item: InboxItem) => note(`close ${item.thread.id}`),
-                  onReopenWithFeedback: (item: InboxItem, feedback: string) => note(`reopen ${item.thread.id}: ${feedback}`),
                   onMarkRead: (target: { scope: string; uri: string }) => note(`mark read ${target.uri}`),
                   onReply: (item: InboxItem, body: string) => note(`reply ${item.thread.id}: ${body}`),
                 },
@@ -136,8 +135,8 @@ export const FilteredUnreadFiles: Story = { render: () => <Controlled listings={
 /** Nothing matches: the result says so and every filter control stays on screen. */
 export const NoMatches: Story = { render: () => <Controlled listings={MIXED} initial={{ ...EMPTY_INBOX_FILTERS, status: "closed", q: "nothing like this" }} /> };
 
-/** The review queue needs `onClose` and `onReopenWithFeedback`; "Review resolved" lists the two resolved threads. */
-export const ResolvedReview: Story = { render: () => <Controlled listings={MIXED} initial={{ ...EMPTY_INBOX_FILTERS, status: "resolved" }} withActions /> };
+/** The "Needs review" filter narrows the inbox to the two resolved threads; expand one to close it. */
+export const NeedsReview: Story = { render: () => <Controlled listings={MIXED} initial={{ ...EMPTY_INBOX_FILTERS, review: true }} withActions /> };
 
 export const Loading: Story = { render: () => <Controlled listings={undefined} /> };
 

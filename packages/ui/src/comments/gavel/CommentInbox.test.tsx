@@ -193,58 +193,31 @@ describe("CommentInbox", () => {
     expect(screen.getByText("comment file-open")).toBeInTheDocument();
   });
 
-  it("hides the review queue unless the host can close and reopen", () => {
-    renderInbox();
-    expect(screen.queryByRole("button", { name: /Review resolved/ })).not.toBeInTheDocument();
-  });
 });
 
-describe("CommentInbox resolved review", () => {
-  const actions = () => ({ onClose: vi.fn().mockResolvedValue(undefined), onReopenWithFeedback: vi.fn().mockResolvedValue(undefined) });
+describe("CommentInbox needs-review filter", () => {
+  const threadTexts = () => screen.queryAllByText(/^comment /).map((cell) => cell.textContent);
 
-  it("queues the resolved threads and closes the shown one, moving to the next", async () => {
-    const handlers = actions();
-    renderInbox({ actions: handlers });
-    fireEvent.click(screen.getByRole("button", { name: "Review resolved (2)" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Next resolved comment" }));
-    expect(screen.getByText("2 of 2")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Previous resolved comment" }));
-    expect(screen.getByText("1 of 2")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Close & next/ }));
-    await waitFor(() => expect(handlers.onClose).toHaveBeenCalledTimes(1));
-    expect(vi.mocked(handlers.onClose).mock.calls[0]?.[0]).toMatchObject({ thread: { id: "image-done" } });
-    // The host's refreshed listing drops the closed thread; until then the queue still holds it.
-    expect(await screen.findByText("2 of 2")).toBeInTheDocument();
+  it("is a filter control counting the resolved threads, not a separate review screen", () => {
+    renderInbox();
+    expect(screen.getByLabelText("Needs review (2)")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Review resolved/ })).not.toBeInTheDocument();
   });
 
-  it("reopens with feedback only once there is feedback", async () => {
-    const handlers = actions();
-    renderInbox({ actions: handlers });
-    fireEvent.click(screen.getByRole("button", { name: "Review resolved (2)" }));
-    const reopen = await screen.findByRole("button", { name: /Comment & reopen/ });
-    expect(reopen).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("Comment before reopening"), { target: { value: "  the logo is still blurry  " } });
-    expect(reopen).toBeEnabled();
-    fireEvent.click(reopen);
-    await waitFor(() => expect(handlers.onReopenWithFeedback).toHaveBeenCalledTimes(1));
-    expect(handlers.onReopenWithFeedback).toHaveBeenCalledWith(expect.objectContaining({ thread: expect.objectContaining({ id: "image-done" }) }), "the logo is still blurry");
+  it("reports turning it on through the controlled filters", () => {
+    const { props } = renderInbox();
+    fireEvent.click(screen.getByLabelText("Needs review (2)"));
+    expect(props.onFiltersChange).toHaveBeenCalledWith({ ...EMPTY_INBOX_FILTERS, review: true });
   });
 
-  it("keeps the thread and shows the failure when closing is refused", async () => {
-    renderInbox({ actions: { onClose: vi.fn().mockRejectedValue(new Error("version conflict")), onReopenWithFeedback: vi.fn() } });
-    fireEvent.click(screen.getByRole("button", { name: "Review resolved (2)" }));
-    fireEvent.click(await screen.findByRole("button", { name: /Close & next/ }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("version conflict");
-    expect(screen.getByText("1 of 2")).toBeInTheDocument();
+  it("keeps only the resolved threads the host can review, and counts them", () => {
+    renderInbox({ filters: { ...EMPTY_INBOX_FILTERS, review: true }, canReview: (item) => item.project === "docs" });
+    expect(threadTexts()).toEqual(["comment docs-done"]);
+    expect(screen.getByLabelText("Needs review (1)")).toBeInTheDocument();
   });
 
-  it("opens the reviewed thread where it lives and exits back to the inbox", async () => {
-    const handlers = actions();
-    const { props } = renderInbox({ actions: handlers });
-    fireEvent.click(screen.getByRole("button", { name: "Review resolved (2)" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Open assets/logo.png" }));
-    expect(vi.mocked(props.onOpen).mock.calls[0]?.[0]).toMatchObject({ thread: { id: "image-done" } });
-    fireEvent.click(screen.getByRole("button", { name: "Exit review" }));
-    expect(screen.getByRole("searchbox")).toBeInTheDocument();
+  it("counts within the other active filters", () => {
+    renderInbox({ filters: { ...EMPTY_INBOX_FILTERS, project: "demo" } });
+    expect(screen.getByLabelText("Needs review (1)")).toBeInTheDocument();
   });
 });

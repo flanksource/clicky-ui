@@ -10,7 +10,6 @@ import { toneToBadgeTone } from "../comment-utils";
 import { DriftBadge } from "../DriftList";
 import { DEFAULT_COMMENT_STATUSES, type CommentConfig } from "../comment-types";
 import { CommentInboxCopy } from "./CommentInboxCopy";
-import { CommentInboxReview } from "./CommentInboxReview";
 import { CommentInboxThread, type CommentInboxActions } from "./CommentInboxThread";
 import {
   inboxAuthorOptions,
@@ -20,7 +19,6 @@ import {
   INBOX_KIND_OPTIONS,
   INBOX_PHASE_OPTIONS,
   inboxProjectOptions,
-  resolvedReviewQueue,
   INBOX_STATUS_OPTIONS,
   type InboxFilters,
   type InboxItem,
@@ -43,6 +41,7 @@ export type CommentInboxProps = {
   expandedThreadId?: string | undefined;
   onExpandedThreadChange?: (id: string | undefined) => void;
   renderThread?: (item: InboxItem) => ReactNode;
+  /** Which resolved threads the "Needs review" filter keeps; every resolved thread when unset. */
   canReview?: (item: InboxItem) => boolean;
   /** Where gavel is served; copy-as-prompt points the agent's API calls here. */
   baseUrl: string;
@@ -59,7 +58,7 @@ const KIND_LABEL: Record<InboxTargetKind, string> = { file: "file", page: "page"
 
 const placeOf = (item: InboxItem) => (item.line === undefined ? item.label : `${item.label}:${item.line}`);
 
-function filterControls(filters: InboxFilters, set: (patch: Partial<InboxFilters>) => void, items: readonly InboxItem[], projects: { value: string; label: string }[]): FilterBarFilter[] {
+function filterControls(filters: InboxFilters, set: (patch: Partial<InboxFilters>) => void, items: readonly InboxItem[], projects: { value: string; label: string }[], reviewCount: number): FilterBarFilter[] {
   const choice = (key: "status" | "phase" | "author" | "project" | "kind", label: string, options: { value: string; label: string }[]): FilterBarFilter => ({
     key,
     kind: "enum",
@@ -75,6 +74,7 @@ function filterControls(filters: InboxFilters, set: (patch: Partial<InboxFilters
     choice("project", "Project", projects),
     choice("kind", "Target", INBOX_KIND_OPTIONS),
     { key: "unread", kind: "boolean", label: "Unread only", value: filters.unread, onChange: (unread) => set({ unread }) },
+    { key: "review", kind: "boolean", label: `Needs review (${reviewCount})`, value: filters.review, onChange: (review) => set({ review }) },
   ];
 }
 
@@ -128,21 +128,20 @@ function StatusCell({ status, config }: { status: string; config: CommentConfig 
  * Every comment thread across targets, whatever surface wrote it: files, pages
  * and images, grouped by target and newest first behind controlled filters that
  * stay visible when nothing matches. Copy-as-prompt hands the filtered selection
- * to an LLM, Claude or Codex, and the review queue lets a human close resolved
- * work or reopen it with feedback.
+ * to an LLM, Claude or Codex, and the "Needs review" filter narrows the list to
+ * resolved work awaiting a human's close or reopen.
  */
 const rowId = (item: InboxItem) => `${item.scope}\n${item.thread.id}`;
 
-export function CommentInbox({ listings, error, filters, onFiltersChange, onOpen, canOpen, projectOptions, expandedThreadId, onExpandedThreadChange, renderThread, canReview: canReviewItem, baseUrl, actions = {}, config = DEFAULT_CONFIG, className }: CommentInboxProps) {
-  const [reviewing, setReviewing] = useState(false);
-  const [reviewId, setReviewId] = useState<string | undefined>();
+export function CommentInbox({ listings, error, filters, onFiltersChange, onOpen, canOpen, projectOptions, expandedThreadId, onExpandedThreadChange, renderThread, canReview, baseUrl, actions = {}, config = DEFAULT_CONFIG, className }: CommentInboxProps) {
   const [expanded, setExpanded] = useState<string[]>([]);
   const items = useMemo(() => inboxItems(listings ?? []), [listings]);
-  const visible = useMemo(() => groupInbox(filterInbox(items, filters)).flatMap((group) => group.items), [items, filters]);
-  const queue = useMemo(() => {
-    const resolved = resolvedReviewQueue(filterInbox(items, { ...filters, status: "resolved" }));
-    return canReviewItem ? resolved.filter(canReviewItem) : resolved;
-  }, [items, filters, canReviewItem]);
+  const reviewable = (matched: InboxItem[]) => (canReview ? matched.filter(canReview) : matched);
+  const visible = useMemo(() => {
+    const matched = filterInbox(items, filters);
+    return groupInbox(filters.review ? reviewable(matched) : matched).flatMap((group) => group.items);
+  }, [items, filters, canReview]);
+  const reviewCount = reviewable(filterInbox(items, { ...filters, review: true })).length;
   const selection = onExpandedThreadChange && visible.find((item) => item.thread.id === expandedThreadId);
   const renderDetails = renderThread ?? ((item: InboxItem) => <CommentInboxThread item={item} config={config} actions={actions} />);
   const unresolved = items.filter((item) => config.statuses.some((status) => status.value === item.thread.status && status.unresolved)).length;
@@ -154,27 +153,8 @@ export function CommentInbox({ listings, error, filters, onFiltersChange, onOpen
     onFiltersChange(latest.current);
   };
 
-  const { onClose, onReopenWithFeedback, onMarkRead } = actions;
-  const canReview = onClose !== undefined && onReopenWithFeedback !== undefined;
+  const { onMarkRead } = actions;
   const unreadTargets = new Set(items.filter((item) => item.thread.unread).map((item) => `${item.scope}\n${item.uri}`));
-
-  if (reviewing && canReview) {
-    return (
-      <div className={className} data-testid="comment-inbox-review">
-        <CommentInboxReview
-          queue={queue}
-          selectedId={reviewId}
-          config={config}
-          actions={{ ...actions, onClose, onReopenWithFeedback }}
-          onSelect={setReviewId}
-          onOpen={onOpen}
-          canOpen={canOpen}
-          renderThread={renderDetails}
-          onExit={() => setReviewing(false)}
-        />
-      </div>
-    );
-  }
 
   const columns: DataTableColumn<InboxItem>[] = [
     { key: "thread", label: "Thread", sortable: false, grow: true, accessor: (item) => item.thread.bodyMarkdown, render: (_value, item) => <ThreadCell item={item} /> },
@@ -217,19 +197,6 @@ export function CommentInbox({ listings, error, filters, onFiltersChange, onOpen
           <p className="text-sm text-muted-foreground">{notReady ? "Loading…" : `${unresolved} unresolved across ${listings.length === 1 ? "1 project" : `${listings.length} projects`}`}</p>
         </div>
         <div className="flex flex-wrap items-start gap-2 sm:justify-end">
-          {canReview && (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={queue.length === 0}
-              onClick={() => {
-                setReviewId(queue[0]?.thread.id);
-                setReviewing(true);
-              }}
-            >
-              Review resolved ({queue.length})
-            </Button>
-          )}
           <CommentInboxCopy items={visible} scopes={(listings ?? []).map((listing) => listing.scope)} filters={filters} baseUrl={baseUrl} />
         </div>
       </header>
@@ -249,7 +216,7 @@ export function CommentInbox({ listings, error, filters, onFiltersChange, onOpen
         emptyMessage={items.length === 0 ? "No comment threads yet" : "No threads match these filters"}
         manualFilter
         externalSearch={{ value: filters.q, onChange: (q) => set({ q }), placeholder: "Comment text or path…", ariaLabel: "Search comments" }}
-        externalFilters={filterControls(filters, set, items, projectOptions ?? inboxProjectOptions(listings ?? []))}
+        externalFilters={filterControls(filters, set, items, projectOptions ?? inboxProjectOptions(listings ?? []), reviewCount)}
         expandedRowIds={onExpandedThreadChange ? (selection ? [rowId(selection)] : []) : expanded}
         onExpandedRowIdsChange={onExpandedThreadChange
           ? (ids) => onExpandedThreadChange(visible.find((item) => rowId(item) === ids.at(-1))?.thread.id)
