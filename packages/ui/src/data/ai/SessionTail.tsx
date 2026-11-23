@@ -1,6 +1,7 @@
 import { cn } from "../../lib/utils";
 import { Icon } from "../Icon";
 import { UiLoader } from "../../icons";
+import { AgentIdentity } from "../chat/AgentIdentity";
 import { isTerminalSessionLifecycle, useRemoteSession } from "./SessionInspector.remote";
 import { SessionTailLine } from "./SessionTail.line";
 import { TAIL_PAGE_SIZE, useSessionTail } from "./SessionTail.model";
@@ -28,6 +29,14 @@ export function SessionTail({ src, follow = true, className, emptyLabel }: Sessi
       data-session-tail
       className={cn("flex min-w-0 items-center gap-2 text-xs text-muted-foreground", className)}
     >
+      {(session?.provider || session?.model) && (
+        <AgentIdentity
+          iconOnly
+          className="shrink-0"
+          {...(session.provider ? { provider: session.provider } : {})}
+          {...(session.model ? { model: session.model } : {})}
+        />
+      )}
       <div className="min-w-0 flex-1">
         <SessionTailLine latest={latest} error={error} emptyLabel={emptyLabel} />
       </div>
