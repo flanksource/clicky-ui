@@ -52,23 +52,24 @@ export class LaunchClient {
         `Cannot reach Gavel at ${baseURL}: ${describe(cause)}`,
       );
     }
-    const body = await response.text();
     const context: Array<[string, string]> = [["Endpoint", new URL(path, baseURL).href], ["Method", init?.method ?? "GET"], ["Status", String(response.status)], ["Content type", response.headers.get("content-type") ?? "Missing"]];
-    const fail = (message: string, status: number, diagnostics?: ErrorDiagnostics): never => {
+    const fail = (body: string, message: string, status: number, diagnostics?: ErrorDiagnostics): never => {
       const error = new LaunchHttpError(status, message);
       error.diagnostics = { ...diagnostics, message, context: [...(diagnostics?.context ?? []), ...context], details: [...(diagnostics?.details ?? []), { label: "Response", value: body }], stacktrace: diagnostics?.stacktrace ?? error.stack ?? message };
       throw error;
     };
-    if (!response.headers.get("content-type")?.includes("application/json"))
-      fail(`Gavel returned a non-JSON response (HTTP ${response.status}) from ${path}`, 502);
-    let value: unknown;
-    try { value = JSON.parse(body); }
-    catch { fail(`Gavel returned invalid JSON (HTTP ${response.status}) from ${path}`, 502); }
+    const parse = (body: string): unknown => {
+      if (!response.headers.get("content-type")?.includes("application/json"))
+        fail(body, `Gavel returned a non-JSON response (HTTP ${response.status}) from ${path}`, 502);
+      try { return JSON.parse(body); }
+      catch { return fail(body, `Gavel returned invalid JSON (HTTP ${response.status}) from ${path}`, 502); }
+    };
     if (!response.ok) {
-      const diagnostics = normalizeErrorDiagnostics(value, `Gavel returned ${response.status}`);
-      fail(diagnostics?.message ?? `Gavel returned ${response.status}`, response.status, diagnostics ?? undefined);
+      const body = await response.text();
+      const diagnostics = normalizeErrorDiagnostics(parse(body), `Gavel returned ${response.status}`);
+      fail(body, diagnostics?.message ?? `Gavel returned ${response.status}`, response.status, diagnostics ?? undefined);
     }
-    return value as T;
+    return parse(await response.text()) as T;
   }
   prepare(workspace = this.workspace): Promise<{ preparationId: string; directory: string }> {
     return this.json("/api/launch/prepare", {

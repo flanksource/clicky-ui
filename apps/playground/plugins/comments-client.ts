@@ -163,17 +163,18 @@ export class CommentsClient {
         `Cannot reach Gavel comments at ${base}: ${String(cause)}`,
       );
     }
-    const text = await response.text();
-    let body: unknown;
-    try {
-      body = JSON.parse(text);
-    } catch {
-      throw new LaunchHttpError(
-        502,
-        `Gavel comments returned non-JSON (HTTP ${response.status}): ${text}`,
-      );
-    }
+    const parse = (text: string): unknown => {
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new LaunchHttpError(
+          502,
+          `Gavel comments returned non-JSON (HTTP ${response.status}): ${text}`,
+        );
+      }
+    };
     if (!response.ok) {
+      const body = parse(await response.text());
       const error = new LaunchHttpError(
         response.status,
         typeof body === "object" && body && "error" in body
@@ -190,7 +191,7 @@ export class CommentsClient {
       };
       throw error;
     }
-    return body as T;
+    return parse(await response.text()) as T;
   }
   async *threads(page?: string): AsyncGenerator<NativeComment> {
     for (let offset = 0; ; offset += 200) {
