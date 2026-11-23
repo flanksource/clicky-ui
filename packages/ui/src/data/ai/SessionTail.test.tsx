@@ -55,6 +55,36 @@ describe("SessionTail latest entry", () => {
     expect(screen.queryByText("Looking at the router")).not.toBeInTheDocument();
   });
 
+  it("shows the session's provider icon before the tool call", async () => {
+    stubMessages([toolMessage("m1", "Read", { file_path: "/work/repo/src/router.ts" })]);
+
+    const { container } = renderWithFakeStream(<SessionTail src={SRC} />);
+
+    const tool = await screen.findByTestId("session-tail-tool");
+    const provider = screen.getByTitle("claude-sonnet-5 · anthropic");
+    expect(provider.querySelector("svg")).not.toBeNull();
+    expect(provider.compareDocumentPosition(tool) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector("[data-session-tail]")?.firstElementChild).toBe(provider);
+  });
+
+  it("omits the provider icon when the session names no provider or model", async () => {
+    stubSessionFetch({
+      [TAIL]: [
+        () =>
+          jsonResponse({
+            ...remoteSession({ messages: [textMessage("m1", "Working")] }),
+            provider: undefined,
+            model: undefined,
+          }),
+      ],
+    });
+
+    const { container } = renderWithFakeStream(<SessionTail src={SRC} />);
+
+    await screen.findByText("Working");
+    expect(container.querySelector("[data-session-tail] > span[title]")).toBeNull();
+  });
+
   it("shows the assistant text when it comes after the last tool call", async () => {
     stubMessages([
       toolMessage("m1", "Bash", { command: "go test ./..." }),
