@@ -163,6 +163,24 @@ describe("projectNative: comments with no playground metadata", () => {
     expect(reply?.proposal).toEqual(proposal);
   });
 
+  it("names the hand-off's session as the author of agent replies written since it was requested, leaving earlier ones unattributed", () => {
+    const agent = { kind: "agent", id: "gavel:run-2", label: "Gavel agent" };
+    const [, before, during, human] = projectNative({
+      ...editor,
+      content: { agentRun: { sessionId: "s-2", requestedAt: "2026-11-01T10:06:30Z", state: "done" } },
+      messages: [
+        { id: "m-1", bodyMarkdown: "Earlier run", author: { ...agent, id: "gavel:run-1" }, createdAt: "2026-11-01T10:06:00Z" },
+        { id: "m-2", bodyMarkdown: "This run", author: agent, createdAt: "2026-11-01T10:07:00Z" },
+        { id: "m-3", bodyMarkdown: "Thanks", author: { kind: "user", id: "u-1", label: "Ada" }, createdAt: "2026-11-01T10:08:00Z" },
+      ],
+    });
+    expect([before?.author, during?.author, human?.author]).toEqual([
+      { id: "gavel:run-1", name: "Gavel agent", kind: "agent" },
+      { id: "gavel:run-2", name: "Gavel agent", kind: "agent", sessionId: "s-2" },
+      { id: "u-1", name: "Ada", kind: "user" },
+    ]);
+  });
+
   it("places a code-range thread on its patch, and keeps the selected words beside it as the thread's quote", () => {
     const patch = capturePatch(SOURCE, 3, 3);
     const quote = { prefix: "with the", exact: "next version", suffix: "and push" };

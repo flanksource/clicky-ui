@@ -69,9 +69,11 @@ export type InboxFilters = {
   project: string;
   kind: string;
   unread: boolean;
+  /** Only resolved threads, awaiting a human's close or reopen. */
+  review: boolean;
 };
 
-export const EMPTY_INBOX_FILTERS: InboxFilters = { q: "", status: "", phase: "", author: "", project: "", kind: "", unread: false };
+export const EMPTY_INBOX_FILTERS: InboxFilters = { q: "", status: "", phase: "", author: "", project: "", kind: "", unread: false, review: false };
 
 export type InboxOption = { value: string; label: string };
 
@@ -164,6 +166,7 @@ export function filterInbox(items: readonly InboxItem[], filters: InboxFilters):
       (!filters.project || item.project === filters.project) &&
       (!filters.kind || item.kind === filters.kind) &&
       (!filters.unread || item.thread.unread) &&
+      (!filters.review || item.thread.status === "resolved") &&
       matchesSearch(item, filters.q),
   );
 }
@@ -194,16 +197,4 @@ export function inboxAuthorOptions(items: readonly InboxItem[]): InboxOption[] {
 /** Every project, including ones with no threads, so a project filter is never missing the one a reader wants. */
 export function inboxProjectOptions(listings: readonly InboxListing[]): InboxOption[] {
   return listings.map(({ project }) => ({ value: project, label: project }));
-}
-
-/** The threads awaiting a human decision: resolved roots, one target's together, oldest first. */
-export function resolvedReviewQueue(items: readonly InboxItem[]): InboxItem[] {
-  return items
-    .filter((item) => item.thread.status === "resolved")
-    .sort((left, right) => {
-      const targets = `${left.scope}\n${left.uri}`.localeCompare(`${right.scope}\n${right.uri}`);
-      if (targets !== 0) return targets;
-      const created = Date.parse(left.thread.createdAt) - Date.parse(right.thread.createdAt);
-      return created !== 0 ? created : left.thread.id.localeCompare(right.thread.id);
-    });
 }
