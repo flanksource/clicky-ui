@@ -29,6 +29,16 @@ export {
   type ThreadSource,
 } from "./ThreadPicker";
 export {
+  SessionPicker,
+  type SessionPickerProps,
+} from "./SessionPicker";
+export {
+  sessionPickerDescription,
+  sessionPickerTitle,
+  type SessionPickerSession,
+  type SessionPickerLoader,
+} from "./SessionPicker.model";
+export {
   ContextBadges,
   ContextBadgesReadonly,
   type ContextBadgesProps,
