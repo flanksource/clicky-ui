@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVocabulary } from "../vocabularies/context";
 import { VocabularyStatus } from "../vocabularies/VocabularyStatus";
 import { VocabularyGenerationHost } from "../vocabularies/config";
@@ -57,7 +57,9 @@ export function BookmarkletPanel() {
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   const stateRef = useRef(bridge.state);
-  stateRef.current = bridge.state;
+  useLayoutEffect(() => {
+    stateRef.current = bridge.state;
+  });
 
   async function associate(state: HostState, mergeInto?: string) {
     setError("");
