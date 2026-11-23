@@ -15,6 +15,7 @@ export function describeInboxFilters(filters: InboxFilters): string {
     filters.project && `project ${filters.project}`,
     filters.kind && `${label(INBOX_KIND_OPTIONS, filters.kind)} only`,
     filters.unread && "unread only",
+    filters.review && "needs review only",
     filters.q.trim() && `search “${filters.q.trim()}”`,
   ].filter(Boolean);
   return parts.length === 0 ? "none" : parts.join(", ");

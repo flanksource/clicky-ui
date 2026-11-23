@@ -123,6 +123,13 @@ function authorFor(actor: Actor): StoredAuthor {
     kind: actor.kind === "agent" ? "agent" : "user",
   };
 }
+/** A reply's author, naming the hand-off's session when an agent wrote it since the hand-off was requested. */
+function replyAuthorFor(message: NativeMessage, run: NativeAgentRun | undefined): StoredAuthor {
+  const author = authorFor(message.author);
+  const sessionId = run?.sessionId;
+  const fromRun = sessionId && message.author.kind === "agent" && Date.parse(message.createdAt) >= Date.parse(run.requestedAt);
+  return fromRun ? { ...author, sessionId } : author;
+}
 /** A proposal as the thread shows it: who decided it becomes an author. */
 export function proposalFor(proposal: NativeProposal): StoredProposal {
   const { decidedBy, ...rest } = proposal;
@@ -233,7 +240,7 @@ export function projectNative(c: NativeComment): StoredComment[] {
         parentId: c.id,
         version: c.version,
         body: m.bodyMarkdown,
-        author: authorFor(m.author),
+        author: replyAuthorFor(m, c.content?.agentRun),
         createdAt: isoOf(m.createdAt),
         anchor: root.anchor ?? null,
         ...(m.content?.proposal ? { proposal: proposalFor(m.content.proposal) } : {}),
@@ -287,7 +294,7 @@ export function project(
       rootId: c.id,
       version: c.version,
       body: m.bodyMarkdown,
-      author: m.content?.playground?.author ?? authorFor(m.author),
+      author: m.content?.playground?.author ?? replyAuthorFor(m, c.content?.agentRun),
       createdAt: new Date(m.createdAt).toISOString(),
       parentId: c.id,
       anchor: root.anchor ?? null,

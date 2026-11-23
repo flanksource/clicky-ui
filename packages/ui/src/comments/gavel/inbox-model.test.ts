@@ -6,7 +6,6 @@ import {
   groupInbox,
   inboxItems,
   inboxProjectOptions,
-  resolvedReviewQueue,
   type InboxFilters,
   type InboxListing,
   type InboxThread,
@@ -121,6 +120,8 @@ describe("filterInbox", () => {
     ["author", { author: "agent:claude" }, ["file-2"]],
     ["project", { project: "docs" }, ["docs-1"]],
     ["unread", { unread: true }, ["file-1"]],
+    ["needs review", { review: true }, ["file-2"]],
+    ["needs review within a project with none", { review: true, project: "docs" }, []],
     ["target kind", { kind: "image" }, ["image-1"]],
     ["search of a thread body", { q: "BODY OF page" }, ["page-1"]],
     ["search of a target label", { q: "pricing" }, ["page-1"]],
@@ -170,24 +171,5 @@ describe("filter options", () => {
       { value: "docs", label: "docs" },
       { value: "empty", label: "empty" },
     ]);
-  });
-});
-
-describe("resolvedReviewQueue", () => {
-  it("queues only resolved roots, one target's threads together, oldest first", () => {
-    const resolved = inboxItems([
-      {
-        scope: SCOPE,
-        project: "demo",
-        threads: [
-          thread("b-late", { uri: PAGE_URI, status: "resolved", createdAt: "2026-11-05T00:00:00Z" }),
-          thread("open", { uri: FILE_URI, status: "open" }),
-          thread("a-late", { uri: FILE_URI, status: "resolved", createdAt: "2026-11-04T00:00:00Z" }),
-          thread("a-early", { uri: FILE_URI, status: "resolved", createdAt: "2026-11-02T00:00:00Z" }),
-          thread("closed", { uri: FILE_URI, status: "closed" }),
-        ],
-      },
-    ]);
-    expect(resolvedReviewQueue(resolved).map((entry) => entry.thread.id)).toEqual(["a-early", "a-late", "b-late"]);
   });
 });
