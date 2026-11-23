@@ -1378,7 +1378,7 @@
         "ANTHROPIC_API_KEY"
       ],
       "authenticated": true,
-      "binary": "/Users/moshe/.local/bin/claude",
+      "binary": "/Users/moshe/.cmuxterm/cmux-cli-shims/190D3880-0FCF-4F0D-A55E-34BF6552119D/claude",
       "kind": "cli",
       "mode": "cli",
       "modelDetails": [
@@ -1835,7 +1835,7 @@
         "OPENAI_API_KEY"
       ],
       "authenticated": true,
-      "binary": "/Users/moshe/Library/pnpm/bin/codex",
+      "binary": "/Users/moshe/.cmuxterm/cmux-cli-shims/190D3880-0FCF-4F0D-A55E-34BF6552119D/codex",
       "kind": "cli",
       "mode": "agent",
       "modelDetails": [
@@ -2140,7 +2140,7 @@
         "OPENAI_API_KEY"
       ],
       "authenticated": true,
-      "binary": "/Users/moshe/Library/pnpm/bin/codex",
+      "binary": "/Users/moshe/.cmuxterm/cmux-cli-shims/190D3880-0FCF-4F0D-A55E-34BF6552119D/codex",
       "kind": "cli",
       "mode": "cli",
       "modelDetails": [
