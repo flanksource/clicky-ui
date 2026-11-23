@@ -535,7 +535,8 @@ export const AllTabs: Story = {
 
     await step("shows the transcript", async () => {
       await expect(canvas.getByText("done")).toBeInTheDocument();
-      await expect(canvas.getAllByTitle("Turn turn-1")).toHaveLength(2);
+      // Only the message carries its turn badge; the header has no turn legend.
+      await expect(canvas.getAllByTitle("Turn turn-1")).toHaveLength(1);
     });
 
     await step("shows turn and agent hierarchy with file details", async () => {
