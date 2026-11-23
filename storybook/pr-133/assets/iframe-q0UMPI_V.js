@@ -1,0 +1,1 @@
+import{t as e}from"./iframe-Bknun_8N.js";e();
