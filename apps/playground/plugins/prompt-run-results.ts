@@ -40,6 +40,7 @@ export async function persistPromptResult({
   const folder = entry.page.startsWith("folder:")
     ? new RepositoryDocuments(dir).document(entry.page)
     : undefined;
+  const entryFiles = new Set(entry.files);
   const groups = new Map<string, typeof violations>();
   for (const lint of results) {
     for (const item of lint.violations ?? []) {
@@ -49,7 +50,7 @@ export async function persistPromptResult({
         folder && item.file
           ? reviewFile(folder.repository.root, item.file, lint.work_dir)
           : undefined;
-      if (file && !entry.files?.includes(file))
+      if (file && !entryFiles.has(file))
         throw new LaunchHttpError(
           422,
           `Lint finding names a file outside this folder run: ${file}`,

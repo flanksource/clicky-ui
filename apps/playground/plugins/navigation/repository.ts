@@ -50,12 +50,12 @@ const leafName = (path: string) => path.split("/").at(-1)!;
 const directoryLabel = (repository: DocumentRepository, path: string) => (path === "." ? repository.name : leafName(path));
 
 /** Directories above the active target that must come back open, outermost first. */
-function revealChain(ctx: RepositoryContext, repository: DocumentRepository, folder: RepositoryFolder): string[] | undefined {
+function revealChain(ctx: RepositoryContext, repository: DocumentRepository, folder: RepositoryFolder): Set<string> | undefined {
   const { target } = ctx;
   if (target?.repositoryId !== repository.id) return undefined;
   if (containingFolder(repository.folders, target.path)?.path !== folder.path) return undefined;
   const chain = revealPaths({ folder, target });
-  return target.kind === "folder" ? chain.slice(0, -1) : chain;
+  return new Set(target.kind === "folder" ? chain.slice(0, -1) : chain);
 }
 
 const onActivePath = (ctx: RepositoryContext, path: string) =>
@@ -112,8 +112,8 @@ function open(item: Ranked, children: NavigationEntry[]): Ranked {
 
 /** One directory's children, with the directories on the active path opened and inlined. */
 export async function listDirectory(ctx: RepositoryContext, repository: DocumentRepository, folder: RepositoryFolder, path: string): Promise<NavigationEntry[]> {
-  const chain = revealChain(ctx, repository, folder) ?? [];
-  const entries = (await ctx.list({ repository, folder, path, includeIgnored: chain.includes(path) })).filter(
+  const chain = revealChain(ctx, repository, folder) ?? new Set<string>();
+  const entries = (await ctx.list({ repository, folder, path, includeIgnored: chain.has(path) })).filter(
     (entry) => entry.visible || onActivePath(ctx, entry.path),
   );
   const ranked: Ranked[] = [];
@@ -125,7 +125,7 @@ export async function listDirectory(ctx: RepositoryContext, repository: Document
     }
     const item = directoryEntry(ctx, { repository, folder, path: entry.path, hidden: !entry.visible, forced: onActivePath(ctx, entry.path) });
     if (!item) continue;
-    ranked.push(chain.includes(entry.path) ? open(item, await listDirectory(ctx, repository, folder, entry.path)) : item);
+    ranked.push(chain.has(entry.path) ? open(item, await listDirectory(ctx, repository, folder, entry.path)) : item);
   }
   return sortRanked(ranked, ctx.options.sort);
 }
@@ -138,7 +138,7 @@ export async function repositoryRoots(ctx: RepositoryContext, repositories: read
       const chain = revealChain(ctx, repository, folder);
       const item = directoryEntry(ctx, { repository, folder, path: folder.path, forced: Boolean(chain) });
       if (!item) continue;
-      roots.push(chain?.includes(folder.path) ? open(item, await listDirectory(ctx, repository, folder, folder.path)) : item);
+      roots.push(chain?.has(folder.path) ? open(item, await listDirectory(ctx, repository, folder, folder.path)) : item);
     }
   }
   return roots;
