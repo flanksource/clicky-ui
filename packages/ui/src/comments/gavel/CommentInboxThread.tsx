@@ -7,11 +7,9 @@ import type { InboxItem } from "./inbox-model";
 export type CommentInboxActions = {
   onReply?: (item: InboxItem, body: string) => void | Promise<void>;
   onUpdateStatus?: (item: InboxItem, status: string) => void | Promise<void>;
-  /** A human closing resolved work; also the review queue's "Close & next". */
+  /** A human closing resolved work. */
   onClose?: (item: InboxItem) => void | Promise<void>;
   onAcknowledge?: (item: InboxItem) => void | Promise<void>;
-  /** The review queue's "Comment & reopen": reply with `feedback`, then reopen the thread. */
-  onReopenWithFeedback?: (item: InboxItem, feedback: string) => void | Promise<void>;
   /** Marks every thread on a target read for the caller (gavel `markRead`). */
   onMarkRead?: (target: { scope: string; uri: string }) => void | Promise<void>;
 };
