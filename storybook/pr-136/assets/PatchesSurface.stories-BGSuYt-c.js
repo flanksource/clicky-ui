@@ -1,0 +1,38 @@
+import{n as e}from"./rolldown-runtime-BCiCTKAo.js";import{t}from"./react-BcdEFcws.js";import{t as n}from"./jsx-runtime-DKU1u6-r.js";import{i as r,t as i}from"./loading-DGvF0cjn.js";import{i as a,n as o,r as s}from"./QueryClientProvider-b6YDq6fV.js";import{n as c,t as l}from"./queryClient-lXfmqi15.js";import{n as u,t as d}from"./useQuery-B6YeEONc.js";import{n as f,t as p}from"./InlineError-BjxwzgEU.js";import{a as m,i as h}from"./PatchRegisterTable-SaW1QMd5.js";import{n as g,t as _}from"./PatchRegister-URgLpQ6N.js";import{a as v,i as y,n as b,o as x,r as S,s as C,t as w}from"./JvmProvider-B9l2LAnu.js";import{i as T,n as E,r as D}from"./mutation-allowed-BK8QBYdq.js";function O(e){let[t,n]=(0,k.useState)(()=>Date.now());return(0,k.useEffect)(()=>{let t=setInterval(()=>n(Date.now()),e);return()=>clearInterval(t)},[e]),t}var k;function A(){return(A=e((()=>{k=t()})))()}function j(e,t){return{key:m(e),className:e.class,message:t instanceof Error?t.message:String(t)}}function M(){let{client:e,keys:t}=y(),n=a(),[r,i]=(0,N.useState)(),[o,s]=(0,N.useState)(),[c,l]=(0,N.useState)([]),u=(0,N.useCallback)(()=>Promise.all([n.invalidateQueries({queryKey:t.patches}),n.invalidateQueries({queryKey:t.classSources})]),[n,t]),d=(0,N.useCallback)(t=>e.restoreClass({class:t.class,loader:t.loader}),[e]);return{busyKey:r,restoringAll:o,failures:c,restore:(0,N.useCallback)(async e=>{i(m(e)),l([]);try{await d(e)}catch(t){l([j(e,t)])}finally{i(void 0),await u()}},[d,u]),restoreAll:(0,N.useCallback)(async e=>{let t=[];l([]);try{for(let n of e){s(n.class);try{await d(n)}catch(e){t.push(j(n,e))}}}finally{s(void 0),l(t),await u()}},[d,u]),renew:(0,N.useCallback)(async r=>{i(m(r)),l([]);try{await e.renewClassLease({class:r.class,loader:r.loader,seconds:120})}catch(e){l([j(r,e)])}finally{i(void 0),await n.invalidateQueries({queryKey:t.patches})}},[e,n,t])}}var N;function P(){return(P=e((()=>{N=t(),s(),h(),S()})))()}function F({canMutate:e=!0,requireConsent:t=!0,renderClassLink:n,emptyHint:r,className:a}){let{client:o,keys:s}=y(),c=v(),[l,d]=(0,I.useState)(!1),f=O(1e3),m=M(),h=u({queryKey:s.patches,queryFn:({signal:e})=>o.patches({signal:e}),refetchInterval:1e4});if(h.isPending)return(0,L.jsx)(i,{});if(h.error)return(0,L.jsx)(p,{title:`Patch register unavailable`,error:h.error});let g={runtime:c.data?.allowMutation,permitted:e,consent:l,requireConsent:t};return(0,L.jsx)(_,{patches:h.data,now:f,canMutate:E(g),busyKey:m.busyKey,restoringAll:m.restoringAll,failures:m.failures,onRestore:e=>void m.restore(e),onRestoreAll:e=>void m.restoreAll(e),onRenew:e=>void m.renew(e),onRefresh:()=>void h.refetch(),refreshing:h.isFetching,...n?{renderClassLink:n}:{},...r?{emptyHint:r}:{},toolbar:(0,L.jsx)(D,{...g,label:`Allow patch changes`,onConsentChange:d}),className:a??`flex h-full min-h-0 flex-col gap-3 p-3`})}var I,L;function R(){return(R=e((()=>{I=t(),d(),r(),f(),g(),A(),T(),S(),P(),L=n();try{F.displayName=`PatchesSurface`,F.__docgenInfo={description:`Every class the JVM runs modified bytecode for, with lease countdowns. A
+lease expires on its own, so the register refetches every 10s.`,displayName:`PatchesSurface`,filePath:`/home/runner/work/clicky-ui/clicky-ui/packages/ui/src/jvm/surfaces/PatchesSurface.tsx`,methods:[],props:{canMutate:{defaultValue:{value:`true`},declarations:[{fileName:`clicky-ui/packages/ui/src/jvm/surfaces/PatchesSurface.tsx`,name:`TypeLiteral`}],description:`The host lets this operator change the JVM. Default true.`,name:`canMutate`,required:!1,tags:{},type:{name:`boolean`}},requireConsent:{defaultValue:{value:`true`},declarations:[{fileName:`clicky-ui/packages/ui/src/jvm/surfaces/PatchesSurface.tsx`,name:`TypeLiteral`}],description:`Ask the operator to opt in before writes. Default true.`,name:`requireConsent`,required:!1,tags:{},type:{name:`boolean`}},renderClassLink:{defaultValue:null,declarations:[{fileName:`clicky-ui/packages/ui/src/jvm/surfaces/PatchesSurface.tsx`,name:`TypeLiteral`}],description:`Renders a class name, e.g. as a link to the host's class browser.`,name:`renderClassLink`,required:!1,tags:{},type:{name:`(patch: JvmPatch) => ReactNode`}},emptyHint:{defaultValue:null,declarations:[{fileName:`clicky-ui/packages/ui/src/jvm/surfaces/PatchesSurface.tsx`,name:`TypeLiteral`}],description:`Appended to the empty-register message.`,name:`emptyHint`,required:!1,tags:{},type:{name:`ReactNode`}},className:{defaultValue:null,declarations:[{fileName:`clicky-ui/packages/ui/src/jvm/surfaces/PatchesSurface.tsx`,name:`TypeLiteral`}],description:``,name:`className`,required:!1,tags:{},type:{name:`string`}}},tags:{}}}catch{}})))()}function z({status:e,patched:t}){let[n]=(0,B.useState)(()=>x({status:e,patched:t})),[r]=(0,B.useState)(()=>new l({defaultOptions:{queries:{retry:!1}}}));return(0,V.jsx)(o,{client:r,children:(0,V.jsx)(w,{client:n,scope:`story`,children:(0,V.jsx)(`div`,{className:`h-[420px]`,children:(0,V.jsx)(F,{emptyHint:`Patch a class from the class browser and it appears here.`})})})})}var B,V,H,U,W,G,K,q,J,Y,X;function Z(){return(Z=e((()=>{B=t(),c(),s(),C(),b(),R(),V=n(),{expect:H,userEvent:U,within:W}=__STORYBOOK_MODULE_TEST__,G={title:`JVM/PatchesSurface`,component:z,parameters:{layout:`fullscreen`},args:{status:{allowMutation:!0},patched:!0}},K={play:async({canvasElement:e})=>{await H(await W(e).findByText(`com.example.orders.OrderService`)).toBeInTheDocument()}},q={play:async({canvasElement:e})=>{let t=W(e),n=await t.findByRole(`button`,{name:`Restore com.example.orders.OrderService`});await H(n).toBeDisabled(),await U.click(t.getByRole(`checkbox`,{name:`Allow patch changes`})),await U.click(n),await H(await t.findByText(`This JVM is running its original bytecode.`)).toBeInTheDocument()}},J={args:{status:{allowMutation:!1}},play:async({canvasElement:e})=>{await H(await W(e).findByText(/Runtime changes are disabled/)).toBeInTheDocument()}},Y={args:{patched:!1}},X=[`Register`,`RestoreAfterConsent`,`MutationsDisabled`,`Empty`],K.parameters={...K.parameters,docs:{...K.parameters?.docs,source:{originalSource:`{
+  play: async ({
+    canvasElement
+  }) => {
+    await expect(await within(canvasElement).findByText("com.example.orders.OrderService")).toBeInTheDocument();
+  }
+}`,...K.parameters?.docs?.source}}},q.parameters={...q.parameters,docs:{...q.parameters?.docs,source:{originalSource:`{
+  play: async ({
+    canvasElement
+  }) => {
+    const canvas = within(canvasElement);
+    const restore = await canvas.findByRole("button", {
+      name: "Restore com.example.orders.OrderService"
+    });
+    await expect(restore).toBeDisabled();
+    await userEvent.click(canvas.getByRole("checkbox", {
+      name: "Allow patch changes"
+    }));
+    await userEvent.click(restore);
+    await expect(await canvas.findByText("This JVM is running its original bytecode.")).toBeInTheDocument();
+  }
+}`,...q.parameters?.docs?.source}}},J.parameters={...J.parameters,docs:{...J.parameters?.docs,source:{originalSource:`{
+  args: {
+    status: {
+      allowMutation: false
+    }
+  },
+  play: async ({
+    canvasElement
+  }) => {
+    await expect(await within(canvasElement).findByText(/Runtime changes are disabled/)).toBeInTheDocument();
+  }
+}`,...J.parameters?.docs?.source}}},Y.parameters={...Y.parameters,docs:{...Y.parameters?.docs,source:{originalSource:`{
+  args: {
+    patched: false
+  }
+}`,...Y.parameters?.docs?.source}}}})))()}Z();export{Y as Empty,J as MutationsDisabled,K as Register,q as RestoreAfterConsent,X as __namedExportsOrder,G as default};

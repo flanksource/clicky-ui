@@ -1,0 +1,28 @@
+import{n as e}from"./rolldown-runtime-BCiCTKAo.js";function t(e,t){let n=e===`com.example.orders.OrderService`?s:`package ${e.slice(0,e.lastIndexOf(`.`))};\n\npublic class ${e.slice(e.lastIndexOf(`.`)+1).replaceAll(`$`,`_`)} {\n    public String toString() {\n        return "${e}";\n    }\n}\n`,r=n.split(`
+`),i=e===`com.example.orders.OrderService`?[{name:`<init>`,descriptor:`(Lcom/example/orders/Inventory;Lcom/example/orders/PriceCalculator;)V`,line:9,endLine:12},{name:`checkout`,descriptor:`(Ljava/lang/String;)D`,line:14,endLine:19},{name:`cancel`,descriptor:`(Ljava/lang/String;)V`,line:21,endLine:23}]:[{name:`toString`,descriptor:`()Ljava/lang/String;`,line:4,endLine:6}];return{class:e,loader:t,source:n,methods:i,sourceLineNumbers:r.map((e,t)=>i.some(e=>t+1>e.line&&t+1<e.endLine)?t+3:0),decompiler:`CFR 0.152`,digest:`sha256:${e.length.toString(16).padStart(8,`0`)}`}}function n(e){if(e.split(`{`).length!==e.split(`}`).length)return{success:!1,diagnostics:[{kind:`ERROR`,line:e.split(`
+`).length,column:1,message:`reached end of file while parsing`}]};let t=e.split(`
+`).findIndex(e=>e.includes(`TODO compile error`));return t>=0?{success:!1,diagnostics:[{kind:`ERROR`,line:t+1,column:9,message:`incompatible types: java.lang.String cannot be converted to double`}]}:{success:!0,diagnostics:[{kind:`WARNING`,line:1,column:1,message:`[deprecation] Order.load(String) in Order has been deprecated`}]}}var r,i,a,o,s,c,l,u,d;function f(){return(f=e((()=>{r=`6d06d69c`,i=[{hash:r,label:`Order application`,className:`jdk.internal.loader.ClassLoaders$AppClassLoader`,classCount:2841,kind:`application`},{hash:`7852e922`,label:`Platform`,className:`jdk.internal.loader.ClassLoaders$PlatformClassLoader`,classCount:412,kind:`platform`},{hash:`bootstrap`,label:`Bootstrap`,className:`bootstrap`,classCount:1670,kind:`bootstrap`}],a=[`com.example.orders.OrderService`,`com.example.orders.OrderController`,`com.example.orders.Inventory`,`com.example.orders.Ledger`,`com.example.orders.PriceCalculator`,`com.example.orders.model.Order`,`com.example.orders.model.LineItem`,`com.example.payments.PaymentClient`,`com.example.payments.PaymentClient$Retry`].map(e=>({name:e,loader:r})),o=[`java.lang.Thread`,`java.util.HashMap`,`java.util.concurrent.ConcurrentHashMap`].map(e=>({name:e,loader:`bootstrap`})),s=`package com.example.orders;
+
+import com.example.orders.model.Order;
+
+public class OrderService {
+    private final Inventory inventory;
+    private final PriceCalculator prices;
+
+    public OrderService(Inventory inventory, PriceCalculator prices) {
+        this.inventory = inventory;
+        this.prices = prices;
+    }
+
+    public double checkout(String orderId) {
+        Order order = Order.load(orderId);
+        inventory.reserve(order);
+        double total = prices.total(order);
+        return total;
+    }
+
+    public void cancel(String orderId) {
+        inventory.release(Order.load(orderId));
+    }
+}
+`,c=[{name:``,level:`INFO`,parent:null},{name:`com.example`,level:null,parent:``},{name:`com.example.orders`,level:`FINE`,parent:`com.example`},{name:`com.example.orders.OrderService`,level:null,parent:`com.example.orders`},{name:`com.example.payments`,level:`WARNING`,parent:`com.example`},{name:`org.apache.catalina`,level:`INFO`,parent:``},{name:`org.apache.catalina.core.ContainerBase`,level:null,parent:`org.apache.catalina`}],l=1048576,u={capturedAt:`2026-11-15T08:00:00Z`,runtime:{javaVersion:`21.0.5`,javaHome:`/usr/lib/jvm/java-21`,osName:`Linux`,osVersion:`6.8.0`,processors:8,systemLoadAverage:2.4,uptime:9804e4},processCpuPercent:37.5,memory:{heap:[{name:`G1 Eden Space`,type:`HEAP`,used:182*l,committed:256*l,max:-1},{name:`G1 Old Gen`,type:`HEAP`,used:611*l,committed:768*l,max:1024*l},{name:`G1 Survivor Space`,type:`HEAP`,used:12*l,committed:16*l,max:-1}],nonHeap:[{name:`Metaspace`,type:`NON_HEAP`,used:148*l,committed:152*l,max:-1},{name:`CodeHeap 'non-profiled nmethods'`,type:`NON_HEAP`,used:38*l,committed:40*l,max:117*l},{name:`Compressed Class Space`,type:`NON_HEAP`,used:17*l,committed:19*l,max:1024*l}],buffer:[{name:`direct`,type:`BUFFER`,used:9*l,committed:9*l,max:-1},{name:`mapped`,type:`BUFFER`,used:0,committed:0,max:-1}]},garbageCollectors:[{name:`G1 Young Generation`,collectionCount:1842,collectionTime:21340},{name:`G1 Concurrent GC`,collectionCount:96,collectionTime:1210},{name:`G1 Old Generation`,collectionCount:2,collectionTime:3480}],connectors:[{name:`"http-nio-8080"`,objectName:`Catalina:name="http-nio-8080",type=ThreadPool`,currentThreadsBusy:37,maxThreads:200}],dataSources:[{name:`HikariPool-1`,objectName:`com.zaxxer.hikari:type=Pool (HikariPool-1)`,ActiveConnections:8,IdleConnections:2,TotalConnections:10}]},d={id:`result`,label:`result`,type:`com.example.orders.model.Order`,children:[{id:`result.id`,label:`id`,type:`java.lang.String`,value:`ORD-1042`},{id:`result.total`,label:`total`,type:`double`,value:129.5,path:`.total`},{id:`result.items`,label:`items`,type:`java.util.ArrayList`,path:`.items`,children:[{id:`result.items.0`,label:`[0]`,type:`com.example.orders.model.LineItem`,children:[{id:`result.items.0.sku`,label:`sku`,type:`java.lang.String`,value:`SKU-101`},{id:`result.items.0.quantity`,label:`quantity`,type:`int`,value:3}]}]},{id:`result.notes`,label:`notes`,type:`java.lang.String`,kind:`truncated`,value:`Leave at the side door…`,raw:`String character limit reached.`}]}})))()}export{c as a,t as c,d as i,n as l,a as n,u as o,i as r,o as s,r as t,f as u};
