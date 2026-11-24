@@ -7,6 +7,7 @@ import { readManifest } from "./manifest.ts";
 import { validateRuntime } from "./runtime.ts";
 import { BUILD_ID, type PackageBuild } from "./schema.ts";
 import { withPackageLock } from "./lock.ts";
+import { pnpmInvocation } from "./pnpm.ts";
 
 export type Publication = PackageBuild & { directory: string };
 export const publicationRoot = (libraryDir: string): string => resolve(libraryDir, ".tmp/package-publications");
@@ -28,7 +29,8 @@ export async function readPublication(libraryDir: string): Promise<Publication> 
 
 async function copyPublishable(libraryDir: string, directory: string): Promise<string[]> {
   const archive = resolve(directory, "..", "package.tgz");
-  const { stdout } = await promisify(execFile)("pnpm", ["--config.ignoreScripts=true", "pack", "--json", "--out", archive], { cwd: libraryDir, env: process.env, maxBuffer: 16 * 1024 * 1024 });
+  const pnpm = pnpmInvocation(["--config.ignoreScripts=true", "pack", "--json", "--out", archive]);
+  const { stdout } = await promisify(execFile)(pnpm.command, pnpm.args, { cwd: libraryDir, env: process.env, maxBuffer: 16 * 1024 * 1024 });
   const packed = JSON.parse(stdout) as { files: { path: string }[] };
   if (!Array.isArray(packed.files) || !packed.files.length) throw new Error(`${libraryDir}: native package file list is empty`);
   const files = packed.files.map(file => file.path).sort();
