@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import Ajv2020 from "ajv/dist/2020";
+import Ajv2020 from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import { collectionLayoutsSchema } from "./json-schema-form-collection-layouts.fixtures";
 import { allPropertiesSchema } from "./json-schema-form-properties.fixtures";
