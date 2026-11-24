@@ -12,7 +12,7 @@ import { Button } from "../components/button";
 import { SplitButton } from "../components/SplitButton";
 import { JsonSchemaForm } from "../components/JsonSchemaForm";
 import { Tabs } from "../layout/Tabs";
-import Ajv from "ajv/dist/2020";
+import Ajv from "ajv/dist/2020.js";
 import { applySchemaDefaults } from "../components/json-schema-form-defaults";
 import { rehydrateRefs } from "../components/json-schema-form-refs";
 import type {
