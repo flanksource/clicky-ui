@@ -1,1 +1,0 @@
-import{n as e}from"./rolldown-runtime-BCiCTKAo.js";function t(e,t,n){let{key:r,order:i,limit:a}=n,o=[...e,...t],s=r?[...new Map(o.map(e=>[r(e),e])).values()]:o,c=i?i(s):s,l=Math.max(0,c.length-Math.max(1,a));return{rows:c.slice(l),dropped:l}}function n(){return(n=e((()=>{})))()}export{n,t};
