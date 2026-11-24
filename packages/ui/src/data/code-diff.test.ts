@@ -171,6 +171,40 @@ describe("parseUnifiedDiff", () => {
     ]);
   });
 
+  it("parses a combined diff of a conflicted file, numbering the first parent and the result", () => {
+    // `git diff` of a file with unmerged entries: one prefix column per parent.
+    const diff = [
+      "diff --cc internal/rbac/route_permissions.go",
+      "index e183da27f6,9ccffedf3a..0000000000",
+      "--- a/internal/rbac/route_permissions.go",
+      "+++ b/internal/rbac/route_permissions.go",
+      "@@@ -17,4 -17,2 +17,6 @@@ type route struct",
+      "  \tsuffix  string",
+      "++<<<<<<< Updated upstream",
+      " +\texact   bool",
+      "++=======",
+      "++>>>>>>> Stashed changes",
+      "  \tperms []Permission",
+      "- \tdropped bool",
+      "",
+    ].join("\n");
+    expect(parseUnifiedDiff(diff)).toEqual([
+      {
+        header: "@@@ -17,4 -17,2 +17,6 @@@ type route struct",
+        path: "internal/rbac/route_permissions.go",
+        lines: [
+          { type: "context", content: "\tsuffix  string", oldNumber: 17, newNumber: 17 },
+          { type: "add", content: "<<<<<<< Updated upstream", newNumber: 18 },
+          { type: "add", content: "\texact   bool", newNumber: 19 },
+          { type: "add", content: "=======", newNumber: 20 },
+          { type: "add", content: ">>>>>>> Stashed changes", newNumber: 21 },
+          { type: "context", content: "\tperms []Permission", oldNumber: 19, newNumber: 22 },
+          { type: "remove", content: "\tdropped bool", oldNumber: 20 },
+        ],
+      },
+    ]);
+  });
+
   it("throws on a malformed hunk header instead of dropping it", () => {
     expect(() => parseUnifiedDiff("@@ not a header @@\n a\n")).toThrow(/Malformed unified diff/);
   });

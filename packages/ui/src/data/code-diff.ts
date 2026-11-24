@@ -79,7 +79,66 @@ function diffLines(a: string[], b: string[]): DiffLine[] {
   return out;
 }
 
-const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
+// `@@ -a,b +c,d @@` for a two-way diff; a combined diff (`diff --cc`, e.g. a
+// conflicted file) opens one more `@` and adds one `-a,b` range per parent.
+const HUNK_HEADER = /^(@@+) ((?:-\d+(?:,\d+)? )+)\+(\d+)(?:,(\d+))? \1(?: |$)/;
+const RANGE = /-(\d+)(?:,(\d+))?/g;
+
+type HunkState = {
+  hunk: DiffHunk;
+  /** Next line number per parent (index 0 is the old side) and of the result. */
+  parents: number[];
+  result: number;
+  /** Lines still owed per parent and by the result. */
+  parentRemaining: number[];
+  resultRemaining: number;
+};
+
+function openHunk(raw: string, path: string | undefined): HunkState {
+  const match = HUNK_HEADER.exec(raw);
+  const ranges = match ? Array.from(match[2]!.matchAll(RANGE)) : [];
+  if (!match || ranges.length !== match[1]!.length - 1) {
+    throw new Error(`Malformed unified diff hunk header: ${raw}`);
+  }
+  return {
+    hunk: { header: raw, lines: [], ...(path ? { path } : {}) },
+    parents: ranges.map((r) => Number(r[1])),
+    parentRemaining: ranges.map((r) => (r[2] ? Number(r[2]) : 1)),
+    result: Number(match[3]),
+    resultRemaining: match[4] ? Number(match[4]) : 1,
+  };
+}
+
+// One content line: a prefix column per parent, then the text. Following
+// git's colouring, a `-` in any column is a removal and otherwise a `+` in any
+// column is an addition. A line belongs to parent N when its column is `-`, or
+// is a space on a line with no `-` at all; it belongs to the result unless some
+// column is `-`. Numbers are reported for the first parent and the result.
+function appendLine(state: HunkState, raw: string) {
+  const width = state.parents.length;
+  const prefix = raw.slice(0, width).padEnd(width, " ");
+  const content = raw.slice(width);
+  const removed = prefix.includes("-");
+  const type: DiffLineType = removed ? "remove" : prefix.includes("+") ? "add" : "context";
+  const inParent = [...prefix].map((column) => column === "-" || (!removed && column === " "));
+  const line: DiffLine = { type, content };
+  if (inParent[0] && type !== "add") line.oldNumber = state.parents[0]!;
+  if (!removed) line.newNumber = state.result;
+  state.hunk.lines.push(line);
+  inParent.forEach((present, i) => {
+    if (!present) return;
+    state.parents[i]!++;
+    state.parentRemaining[i]!--;
+  });
+  if (!removed) {
+    state.result++;
+    state.resultRemaining--;
+  }
+}
+
+function hunkComplete(state: HunkState): boolean {
+  return state.resultRemaining <= 0 && state.parentRemaining.every((n) => n <= 0);
+}
 
 // Strip the `a/`|`b/` prefix (and any trailing tab-timestamp) from a `---`/`+++`
 // header path; `/dev/null` (add/delete) has no path.
@@ -89,18 +148,15 @@ function gitHeaderPath(token: string): string | undefined {
   return path.startsWith("a/") || path.startsWith("b/") ? path.slice(2) : path;
 }
 
-// Parse a unified-diff string. `@@ -a,b +c,d @@` headers drive line numbers and
-// hunk lengths; `+`/`-`/space lines become add/remove/context. Each hunk records
-// the file `path` from the enclosing `diff --git`/`---`/`+++` headers, so a
-// multi-file diff keeps its file boundaries. A line that starts with `@@` but is
-// not a valid hunk header throws rather than being dropped.
+// Parse a unified-diff string, including git's combined format (`diff --cc`,
+// `@@@` headers) for conflicted files and merges. Hunk headers drive line
+// numbers and hunk lengths; `+`/`-`/space prefixes become add/remove/context.
+// Each hunk records the file `path` from the enclosing `diff --git`/`---`/`+++`
+// headers, so a multi-file diff keeps its file boundaries. A line that starts
+// with `@@` but is not a valid hunk header throws rather than being dropped.
 export function parseUnifiedDiff(diff: string): DiffHunk[] {
   const hunks: DiffHunk[] = [];
-  let current: DiffHunk | null = null;
-  let oldNo = 0;
-  let newNo = 0;
-  let oldRemaining = 0;
-  let newRemaining = 0;
+  let current: HunkState | null = null;
   let path: string | undefined;
   let oldPath: string | undefined;
 
@@ -110,35 +166,18 @@ export function parseUnifiedDiff(diff: string): DiffHunk[] {
     // are exhausted — so a `+++ …` content line is never read as a file header.
     if (current) {
       if (raw.startsWith("\\")) continue; // "\ No newline at end of file"
-      if (raw.startsWith("+")) {
-        current.lines.push({ type: "add", content: raw.slice(1), newNumber: newNo++ });
-        newRemaining--;
-      } else if (raw.startsWith("-")) {
-        current.lines.push({ type: "remove", content: raw.slice(1), oldNumber: oldNo++ });
-        oldRemaining--;
-      } else {
-        const content = raw.startsWith(" ") ? raw.slice(1) : raw;
-        current.lines.push({ type: "context", content, oldNumber: oldNo++, newNumber: newNo++ });
-        oldRemaining--;
-        newRemaining--;
-      }
-      if (oldRemaining <= 0 && newRemaining <= 0) current = null;
+      appendLine(current, raw);
+      if (hunkComplete(current)) current = null;
       continue;
     }
 
     if (raw.startsWith("@@")) {
-      const match = HUNK_HEADER.exec(raw);
-      if (!match) throw new Error(`Malformed unified diff hunk header: ${raw}`);
-      oldNo = Number(match[1]);
-      newNo = Number(match[3]);
-      oldRemaining = match[2] ? Number(match[2]) : 1;
-      newRemaining = match[4] ? Number(match[4]) : 1;
-      current = { header: raw, lines: [], ...(path ? { path } : {}) };
-      hunks.push(current);
-      if (oldRemaining <= 0 && newRemaining <= 0) current = null;
+      current = openHunk(raw, path);
+      hunks.push(current.hunk);
+      if (hunkComplete(current)) current = null;
       continue;
     }
-    if (raw.startsWith("diff --git ")) {
+    if (raw.startsWith("diff --git ") || raw.startsWith("diff --cc ") || raw.startsWith("diff --combined ")) {
       path = undefined;
       oldPath = undefined;
     } else if (raw.startsWith("--- ")) {
