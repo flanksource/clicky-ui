@@ -1,1 +1,0 @@
-import{n as e}from"./rolldown-runtime-BCiCTKAo.js";import{t}from"./react-BcdEFcws.js";function n(e){let[t,n]=(0,r.useState)(Date.now);return(0,r.useEffect)(()=>{if(!e)return;let t=setInterval(()=>n(Date.now()),1e3);return()=>clearInterval(t)},[e]),t}var r;function i(){return(i=e((()=>{r=t()})))()}export{n,i as t};
