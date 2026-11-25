@@ -1,5 +1,6 @@
 import {
   UiBox,
+  UiCloud,
   UiGitBranch,
   UiRobotAi,
   UiShieldCheck,
@@ -55,6 +56,15 @@ const SANDBOX_KIND_META: Record<string, SandboxKindMeta> = {
     iconClassName: "text-sky-600 dark:text-sky-400",
     activeClassName:
       "border-sky-300 bg-sky-50 dark:border-sky-800 dark:bg-sky-950/40",
+  },
+  substrate: {
+    label: "Substrate",
+    description:
+      "Run the whole run in an agent-substrate environment of its own",
+    icon: UiCloud,
+    iconClassName: "text-violet-600 dark:text-violet-400",
+    activeClassName:
+      "border-violet-300 bg-violet-50 dark:border-violet-800 dark:bg-violet-950/40",
   },
 };
 
