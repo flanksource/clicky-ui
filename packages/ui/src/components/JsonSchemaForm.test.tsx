@@ -620,7 +620,7 @@ describe("JsonSchemaForm array of objects", () => {
         onChange={vi.fn()}
       />,
     );
-    expect(screen.getByText("2 items")).toBeInTheDocument();
+    expect(screen.queryByText("2 items")).toBeNull();
     const table = screen.getByRole("table");
     expect(within(table).getAllByRole("textbox").map((el) => (el as HTMLInputElement).value)).toEqual(["api", "8080", "worker", ""]);
   });

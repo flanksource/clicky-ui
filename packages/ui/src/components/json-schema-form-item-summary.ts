@@ -39,7 +39,6 @@ export function resolveItemSpec(
     ...(glyph ? { glyph } : {}),
     ...(typeof raw.badge === "string" && raw.badge ? { badge: raw.badge } : {}),
     ...(badges.length > 0 ? { badges } : {}),
-    ...(raw.count === false ? { count: false } : {}),
     ...(typeof raw.flag === "string" && raw.flag ? { flag: raw.flag } : {}),
     // Only carried when the schema actually said something: an absent key means
     // every action, while an explicit empty list means none, and those two
@@ -171,11 +170,10 @@ export function itemCountLabel(spec: ArrayItemSpec, count: number): string {
     : `${count} ${spec.nounPlural ?? "items"}`;
 }
 
-// The line above a list: "No items yet" when it is empty, else the count, which
-// `x-item.count: false` drops for a list whose rows say enough.
-export function itemCountLine(spec: ArrayItemSpec, count: number): string | undefined {
-  if (count === 0) return noItemsLabel(spec);
-  return spec.count === false ? undefined : itemCountLabel(spec, count);
+// The line above a list: "No items yet" when it is empty, else none — the rows
+// themselves show how many there are.
+export function emptyListLine(spec: ArrayItemSpec, count: number): string | undefined {
+  return count === 0 ? noItemsLabel(spec) : undefined;
 }
 
 // The zero-item explanation. Falls back to the array's own description, so a

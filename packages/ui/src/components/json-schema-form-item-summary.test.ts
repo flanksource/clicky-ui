@@ -4,7 +4,7 @@ import {
   emptyItemsCopy,
   itemActionsAllow,
   itemCountLabel,
-  itemCountLine,
+  emptyListLine,
   itemSummaryFor,
   noItemsLabel,
   resolveItemSpec,
@@ -253,10 +253,8 @@ describe("empty and count copy", () => {
     expect(noItemsLabel(spec)).toBe("No parameters yet");
   });
 
-  it("shows the count line unless x-item turns it off, and the zero-item line either way", () => {
-    expect([itemCountLine(spec, 0), itemCountLine(spec, 4)]).toEqual(["No parameters yet", "4 parameters"]);
-    const quiet = resolveItemSpec({ ...PARAMS_ARRAY, "x-item": { ...PARAMS_ARRAY["x-item"], count: false } }, PARAM_ITEM);
-    expect([itemCountLine(quiet, 0), itemCountLine(quiet, 4)]).toEqual(["No parameters yet", undefined]);
+  it("draws the zero-item line for an empty list and no count line otherwise", () => {
+    expect([emptyListLine(spec, 0), emptyListLine(spec, 1), emptyListLine(spec, 4)]).toEqual(["No parameters yet", undefined, undefined]);
   });
 
   it("takes the zero-item copy from the array's own description for free", () => {

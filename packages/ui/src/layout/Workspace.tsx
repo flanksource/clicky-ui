@@ -8,7 +8,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { UiSidebar } from "../icons";
+import { UiFullscreen, UiFullscreenFilled, UiSidebar } from "../icons";
 import { cn } from "../lib/utils";
 import {
   createWorkspaceLayoutState,
@@ -60,6 +60,11 @@ export type WorkspaceProps = {
    * workspace's `3xl` container width every side stacks.
    */
   sideArrangement?: WorkspaceSideArrangements;
+  /**
+   * Offers a top-right toggle that lays the workspace over the whole viewport, without the host's chrome
+   * or the side and bottom regions, until toggled again or Escape. Defaults to true.
+   */
+  maximizable?: boolean;
   className?: string;
 };
 
@@ -69,6 +74,9 @@ type WorkspaceTopRightProps = {
   slots?: WorkspaceSlots;
   state: WorkspaceLayoutState;
   update: WorkspaceUpdate;
+  maximizable: boolean;
+  maximized: boolean;
+  onMaximizedChange: (maximized: boolean) => void;
   /** Receives the controls' width plus their inset (0 when there are none), so headers underneath can keep clear of them. */
   onReserve: (width: number) => void;
 };
@@ -102,10 +110,14 @@ function WorkspaceTopRight({
   slots,
   state,
   update,
+  maximizable,
+  maximized,
+  onMaximizedChange,
   onReserve,
 }: WorkspaceTopRightProps) {
   const measureRef = useReportedWidth(onReserve);
-  if (!hasLeft && !hasRight && !slots?.topRightActions) return null;
+  if (!hasLeft && !hasRight && !maximizable && !slots?.topRightActions)
+    return null;
   const toggleSide = (location: "left" | "right") =>
     update((current) => ({
       ...current,
@@ -143,6 +155,22 @@ function WorkspaceTopRight({
           <UiSidebar className="size-4 -scale-x-100" />
         </button>
       )}
+      {maximizable && (
+        <button
+          type="button"
+          className="inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          aria-pressed={maximized}
+          aria-label={maximized ? "Restore workspace" : "Maximize workspace"}
+          title={maximized ? "Restore (Esc)" : "Maximize"}
+          onClick={() => onMaximizedChange(!maximized)}
+        >
+          {maximized ? (
+            <UiFullscreenFilled className="size-4" />
+          ) : (
+            <UiFullscreen className="size-4" />
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -156,6 +184,7 @@ export function Workspace({
   slots,
   collapsedSides,
   sideArrangement,
+  maximizable = true,
   className,
 }: WorkspaceProps) {
   validateWorkspacePanes(panes, sideArrangement);
@@ -168,6 +197,16 @@ export function Workspace({
       : createWorkspaceLayoutState(panes, defaultValue),
   );
   const [topRightReserve, setTopRightReserve] = useState(0);
+  const [maximized, setMaximized] = useState(false);
+  useEffect(() => {
+    if (!maximized) return;
+    const restoreOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented)
+        setMaximized(false);
+    };
+    window.addEventListener("keydown", restoreOnEscape);
+    return () => window.removeEventListener("keydown", restoreOnEscape);
+  }, [maximized]);
   const seenLocations = useRef(new Set(panes.map((pane) => pane.location)));
   const seenPaneIds = useRef(new Set(panes.map((pane) => pane.id)));
   const state = value ?? internal;
@@ -251,16 +290,17 @@ export function Workspace({
   }, [internal, storageKey, value]);
 
   const held = (location: WorkspaceSideLocation) =>
-    collapsedSides?.includes(location) ?? false;
-  const shown: WorkspaceLayoutState = collapsedSides?.length
-    ? {
-        ...state,
-        sideCollapsed: {
-          left: held("left") || state.sideCollapsed.left,
-          right: held("right") || state.sideCollapsed.right,
-        },
-      }
-    : state;
+    maximized || (collapsedSides?.includes(location) ?? false);
+  const shown: WorkspaceLayoutState =
+    maximized || collapsedSides?.length
+      ? {
+          ...state,
+          sideCollapsed: {
+            left: held("left") || state.sideCollapsed.left,
+            right: held("right") || state.sideCollapsed.right,
+          },
+        }
+      : state;
   const rightShown = groups.right.length > 0 && !shown.sideCollapsed.right;
 
   // The regions switch between stacked and side-by-side on the workspace's own
@@ -270,22 +310,30 @@ export function Workspace({
   return (
     <div
       data-slot="workspace"
-      className={cn("@container/workspace h-full min-h-0 w-full", className)}
+      data-maximized={maximized || undefined}
+      className={cn(
+        "@container/workspace h-full min-h-0 w-full",
+        className,
+        // Over the host's chrome (app shell header, sidebar, padding) until restored.
+        maximized &&
+          "fixed inset-0 z-50 h-dvh w-screen rounded-none border-0 bg-background",
+      )}
       style={
         {
           "--workspace-top-right-reserve": `${topRightReserve}px`,
         } as CSSProperties
       }
     >
-      <div
-        className="relative grid h-full min-h-0 w-full grid-cols-1 content-start overflow-auto bg-background @3xl/workspace:grid-cols-[auto_minmax(0,1fr)_auto] @3xl/workspace:grid-rows-[minmax(0,1fr)_auto] @3xl/workspace:content-stretch @3xl/workspace:overflow-hidden"
-      >
+      <div className="relative grid h-full min-h-0 w-full grid-cols-1 content-start overflow-auto bg-background @3xl/workspace:grid-cols-[auto_minmax(0,1fr)_auto] @3xl/workspace:grid-rows-[minmax(0,1fr)_auto] @3xl/workspace:content-stretch @3xl/workspace:overflow-hidden">
         <WorkspaceTopRight
           hasLeft={groups.left.length > 0 && !held("left")}
           hasRight={groups.right.length > 0 && !held("right")}
           {...(slots ? { slots } : {})}
           state={state}
           update={update}
+          maximizable={maximizable}
+          maximized={maximized}
+          onMaximizedChange={setMaximized}
           onReserve={setTopRightReserve}
         />
         <WorkspaceSideRegion
@@ -309,7 +357,7 @@ export function Workspace({
           update={update}
           reserveTopRight="wide"
         />
-        {groups.bottom && (
+        {groups.bottom && !maximized && (
           <WorkspaceSingleRegion
             pane={groups.bottom}
             state={state}

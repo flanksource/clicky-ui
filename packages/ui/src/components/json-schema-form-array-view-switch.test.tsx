@@ -81,28 +81,13 @@ describe("object array view switch", () => {
   it.each([
     ["grid", 3],
     ["item form", 7],
-  ])("puts the view menu of a sectioned %s in its section header row, keeping the item count on the summary line", (_view, columns) => {
+  ])("puts the view menu of a sectioned %s in its section header row and draws no item count", (_view, columns) => {
     render(<Harness columns={columns} initial={[{ c1: "a" }]} />);
     const heading = screen.getByRole("button", { name: MENU }).closest("[data-jsf-section-heading]");
     expect({
       heading: heading?.textContent,
-      count: document.querySelector("[data-jsf-array-summary], [data-accordion-summary]")?.textContent,
-    }).toEqual({ heading: "Reinsurers", count: "1 item" });
-  });
-
-  it.each([
-    ["grid", 3],
-    ["item form", 7],
-  ])("draws no summary line for a sectioned %s whose x-item turns the count off", (_view, columns) => {
-    const schema: JsonSchemaObject = {
-      type: "object",
-      properties: { Reinsurers: { type: "array", title: "Reinsurers", "x-item": { count: false }, items: itemsWith(columns) } },
-    };
-    render(<JsonSchemaForm schema={schema} value={{ Reinsurers: [{ c1: "a" }] }} onChange={() => undefined} layout={{ mode: "stacked" }} showPreferencesMenu={false} />);
-    expect({
-      menuInHeading: screen.getByRole("button", { name: MENU }).closest("[data-jsf-section-heading]") !== null,
       summaryLines: document.querySelectorAll("[data-jsf-array-summary], [data-accordion-summary]").length,
-    }).toEqual({ menuInHeading: true, summaryLines: 0 });
+    }).toEqual({ heading: "Reinsurers", summaryLines: 0 });
   });
 
   it("marks the active view in the menu", () => {

@@ -344,8 +344,6 @@ export interface ArrayItemSpec {
   badge?: string;
   /** Further chips, one per part, each the value through its pattern ("min {}"); an empty value drops its chip. */
   badges?: Array<string | ArrayItemSummaryPart>;
-  /** `false` drops the "4 items" count line once the list has items. Defaults to true. */
-  count?: boolean;
   /** Boolean property rendered as the required mark. */
   flag?: string;
   /**
