@@ -15,7 +15,7 @@ import {
   addItemLabel,
   emptyItemsCopy,
   itemActionsAllow,
-  itemCountLine,
+  emptyListLine,
   itemSummaryFor,
   resolveItemSpec,
 } from "./json-schema-form-item-summary";
@@ -50,7 +50,7 @@ export function AccordionArray({
   const itemSchema = field.itemSchema ?? { type: "object" };
   const spec = field.itemSpec ?? resolveItemSpec(field.schema, itemSchema);
   const emptyCopy = emptyItemsCopy(spec, field.schema);
-  const countLine = itemCountLine(spec, items.length);
+  const emptyLine = emptyListLine(spec, items.length);
   // The array's help mode governs its whole subtree. Without this the fields
   // inside an expanded row keep the form-level default, so an accordion that
   // resolved to "hover" would still stack a two-line paragraph under every
@@ -108,7 +108,7 @@ export function AccordionArray({
   if (ctx.presentation)
     return (
       <div className="min-w-0 space-y-1">
-        {countLine !== undefined && <div className="text-xs text-muted-foreground">{countLine}</div>}
+        {emptyLine !== undefined && <div className="text-xs text-muted-foreground">{emptyLine}</div>}
         {items.map((item, index) => (
           <div
             key={index}
@@ -130,7 +130,7 @@ export function AccordionArray({
     <AccordionList<unknown>
       items={items}
       onChange={(next) => field.onChange(next)}
-      {...(countLine !== undefined ? { summary: countLine } : {})}
+      {...(emptyLine !== undefined ? { summary: emptyLine } : {})}
       {...(toolbar !== undefined ? { toolbar } : {})}
       size={ctx.size}
       readOnly={readOnly}

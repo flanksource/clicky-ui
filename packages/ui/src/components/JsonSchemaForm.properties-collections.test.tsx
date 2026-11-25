@@ -41,7 +41,7 @@ describe("collection property presentation", () => {
       const accordion = screen.getByRole("button", {
         name: "Edit Object accordion",
       });
-      expect(accordion).toHaveTextContent("1 service");
+      expect(accordion).not.toHaveTextContent("1 service");
       expect(within(accordion).getByText("API")).toBeInTheDocument();
       expect(accordion).not.toHaveTextContent("Enabled");
       const list = within(

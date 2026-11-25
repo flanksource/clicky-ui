@@ -158,13 +158,14 @@ describe("JsonSchemaForm accordion array", () => {
     expect(screen.queryByRole("textbox", { name: /^Name/ })).toBeNull();
   });
 
-  it("offers the view menu in its section header row, keeping the item count on the summary line", () => {
+  it("offers the view menu in its section header row and draws no item count", () => {
     renderAccordion();
     const menu = screen.getByRole("button", { name: "View options for Params" });
     expect({
       heading: menu.closest("[data-jsf-section-heading]")?.textContent,
-      count: document.querySelector("[data-accordion-summary]")?.textContent,
-    }).toEqual({ heading: "Params", count: "2 parameters" });
+      summary: document.querySelector("[data-accordion-summary]"),
+      count: screen.queryByText("2 parameters"),
+    }).toEqual({ heading: "Params", summary: null, count: null });
   });
 
   it("identifies the row by the schema's chosen properties", () => {
@@ -175,11 +176,6 @@ describe("JsonSchemaForm accordion array", () => {
     expect(within(row).getByText("filters")).toBeInTheDocument();
     expect(within(row).getByTitle("Required")).toBeInTheDocument();
     expect(within(row).getByTitle("List (multi-select)")).toBeInTheDocument();
-  });
-
-  it("counts the items in the schema's own words", () => {
-    renderAccordion();
-    expect(screen.getByText("2 parameters")).toBeInTheDocument();
   });
 
   it("expands one item at a time", () => {

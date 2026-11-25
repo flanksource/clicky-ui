@@ -79,6 +79,44 @@ describe("Workspace", () => {
     ).toBe("220px");
   });
 
+  it("maximizes the body over the whole viewport without its sides, and restores on Escape", () => {
+    render(<Workspace panes={panes} />);
+    const workspace = screen
+      .getByTestId("workspace-region-center")
+      .closest("[data-slot=workspace]");
+
+    fireEvent.click(screen.getByRole("button", { name: "Maximize workspace" }));
+
+    expect(workspace).toHaveAttribute("data-maximized", "true");
+    expect(workspace).toHaveClass("fixed", "inset-0");
+    expect(screen.getByTestId("workspace-region-left")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(screen.getByTestId("workspace-region-right")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    expect(
+      screen.queryByTestId("workspace-region-bottom"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /left side/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-region-center")).toHaveTextContent(
+      "EditorSource",
+    );
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(workspace).not.toHaveAttribute("data-maximized");
+    expect(workspace).not.toHaveClass("fixed");
+    expect(screen.getByTestId("workspace-region-bottom")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Maximize workspace" }),
+    ).toBeInTheDocument();
+  });
+
   it("makes the center region fillable by its flexing editor pane", () => {
     render(<Workspace panes={panes} />);
 
@@ -211,7 +249,11 @@ describe("Workspace", () => {
     const stored = window.localStorage.getItem("held");
 
     rerender(
-      <Workspace panes={panes} storageKey="held" collapsedSides={["left", "right"]} />,
+      <Workspace
+        panes={panes}
+        storageKey="held"
+        collapsedSides={["left", "right"]}
+      />,
     );
     const held = {
       widths: [width("left"), width("right")],
@@ -223,9 +265,18 @@ describe("Workspace", () => {
 
     expect({
       held,
-      returned: [width("left"), width("right"), screen.getByRole("button", { name: "Expand Explorer" }).tagName],
+      returned: [
+        width("left"),
+        width("right"),
+        screen.getByRole("button", { name: "Expand Explorer" }).tagName,
+      ],
     }).toEqual({
-      held: { widths: ["0px", "0px"], panes: [null, null], toggles: [], stored: true },
+      held: {
+        widths: ["0px", "0px"],
+        panes: [null, null],
+        toggles: [],
+        stored: true,
+      },
       returned: ["280px", "340px", "BUTTON"],
     });
   });
@@ -475,7 +526,12 @@ describe("Workspace", () => {
         minWidth: 200,
         maxWidth: 600,
       },
-      { id: "page", label: "Page", location: "center", content: <div>Page</div> },
+      {
+        id: "page",
+        label: "Page",
+        location: "center",
+        content: <div>Page</div>,
+      },
       {
         id: "variables",
         label: "Variables",
@@ -509,11 +565,15 @@ describe("Workspace", () => {
         widths: [paneWidth("explorer"), paneWidth("source")],
         left: [
           regionWidth("left"),
-          screen.getByTestId("workspace-region-left").classList.contains("@3xl/workspace:flex-row"),
+          screen
+            .getByTestId("workspace-region-left")
+            .classList.contains("@3xl/workspace:flex-row"),
         ],
         right: [
           regionWidth("right"),
-          screen.getByTestId("workspace-region-right").classList.contains("@3xl/workspace:flex-row"),
+          screen
+            .getByTestId("workspace-region-right")
+            .classList.contains("@3xl/workspace:flex-row"),
         ],
       }).toEqual({
         order: ["workspace-stack-explorer", "workspace-stack-source"],
@@ -534,7 +594,9 @@ describe("Workspace", () => {
 
       expect({
         region: regionWidth("left"),
-        flexRow: screen.getByTestId("workspace-region-left").classList.contains("@3xl/workspace:flex-row"),
+        flexRow: screen
+          .getByTestId("workspace-region-left")
+          .classList.contains("@3xl/workspace:flex-row"),
         paneHandles: screen.queryAllByTestId(/^workspace-resize-pane-/),
         sideHandle: screen.queryByTestId("workspace-resize-left") !== null,
       }).toEqual({
@@ -546,9 +608,13 @@ describe("Workspace", () => {
     });
 
     it("allows panes of a columns side to differ in width, which a stacked side forbids", () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       try {
-        expect(() => render(<Workspace panes={columnPanes} />)).toThrow("share one width");
+        expect(() => render(<Workspace panes={columnPanes} />)).toThrow(
+          "share one width",
+        );
         expect(() =>
           render(<Workspace panes={columnPanes} sideArrangement={columns} />),
         ).not.toThrow();
@@ -559,7 +625,11 @@ describe("Workspace", () => {
 
     it("resizes one column by keyboard without moving the others, and remembers it by pane id", () => {
       const first = render(
-        <Workspace panes={columnPanes} sideArrangement={columns} storageKey="columns" />,
+        <Workspace
+          panes={columnPanes}
+          sideArrangement={columns}
+          storageKey="columns"
+        />,
       );
       const handle = screen.getByTestId("workspace-resize-pane-source");
       expect(handle).toHaveAttribute("aria-valuenow", `${SOURCE_WIDTH}`);
@@ -575,7 +645,13 @@ describe("Workspace", () => {
       });
       first.unmount();
 
-      render(<Workspace panes={columnPanes} sideArrangement={columns} storageKey="columns" />);
+      render(
+        <Workspace
+          panes={columnPanes}
+          sideArrangement={columns}
+          storageKey="columns"
+        />,
+      );
       expect([paneWidth("explorer"), paneWidth("source")]).toEqual([
         `${EXPLORER_WIDTH}px`,
         `${SOURCE_WIDTH + KEY_STEP}px`,
@@ -594,7 +670,9 @@ describe("Workspace", () => {
     });
 
     it("hands a pane that appears later its own default width and leaves resized siblings alone", () => {
-      const { rerender } = render(<Workspace panes={withoutSource} sideArrangement={columns} />);
+      const { rerender } = render(
+        <Workspace panes={withoutSource} sideArrangement={columns} />,
+      );
       fireEvent.keyDown(screen.getByTestId("workspace-resize-pane-explorer"), {
         key: "ArrowRight",
       });
@@ -615,9 +693,13 @@ describe("Workspace", () => {
     it("shrinks a collapsed column to a rail while the side toggle still collapses the whole side", () => {
       render(<Workspace panes={columnPanes} sideArrangement={columns} />);
 
-      fireEvent.click(screen.getByRole("button", { name: "Collapse Explorer" }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Collapse Explorer" }),
+      );
       const afterPane = [paneWidth("explorer"), regionWidth("left")];
-      fireEvent.click(screen.getByRole("button", { name: "Collapse left side" }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Collapse left side" }),
+      );
 
       expect({ afterPane, afterSide: regionWidth("left") }).toEqual({
         afterPane: ["40px", `${40 + SOURCE_WIDTH}px`],
@@ -642,7 +724,10 @@ describe("Workspace", () => {
 
   describe("stored layout versions", () => {
     const stored = (version: number, state: Record<string, unknown>) =>
-      window.localStorage.setItem("versioned", JSON.stringify({ version, state }));
+      window.localStorage.setItem(
+        "versioned",
+        JSON.stringify({ version, state }),
+      );
     const base = {
       leftWidth: 300,
       rightWidth: 350,
@@ -724,7 +809,8 @@ describe("Workspace", () => {
         .spyOn(HTMLElement.prototype, "getBoundingClientRect")
         .mockImplementation(function (this: HTMLElement) {
           return {
-            width: this.dataset["testid"] === "workspace-top-right" ? measured : 0,
+            width:
+              this.dataset["testid"] === "workspace-top-right" ? measured : 0,
           } as DOMRect;
         });
       try {
@@ -740,6 +826,7 @@ describe("Workspace", () => {
       const { container } = render(
         <Workspace
           panes={withoutRight.filter((pane) => pane.location !== "left")}
+          maximizable={false}
         />,
       );
 
