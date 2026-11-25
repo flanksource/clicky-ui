@@ -2,6 +2,11 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  cloudResourceRows,
+  kubernetesResourceRows,
+  type ResourceIconOptions,
+} from "./resource-icon-catalog";
 
 export type IconSourceIO = {
   exists: (path: string) => boolean;
@@ -21,6 +26,7 @@ export type SelectionRow = {
   concept?: string;
   variation?: string;
   tone?: string;
+  resource?: ResourceIconOptions;
   note: string;
 };
 
@@ -41,6 +47,30 @@ export const remoteSvgDir = join(svgSourceDir, "remote");
 export const downloadedSvgDir = join(svgSourceDir, "downloaded");
 export const DOWNLOAD_ICONS_COMMAND =
   "pnpm --filter @flanksource/clicky-ui download:icons";
+
+export async function readIconSelections(): Promise<Selections> {
+  const selections = JSON.parse(
+    await readFile(selectionsPath, "utf8"),
+  ) as Selections;
+  const resources = [...cloudResourceRows, ...kubernetesResourceRows];
+  const resourceNames = new Set(resources.map((row) => row.consumerName));
+  return {
+    rows: [
+      ...selections.rows.filter((row) => !resourceNames.has(row.consumerName)),
+      ...resources,
+    ],
+  };
+}
+
+export function kubernetesCommunitySvgPath(spec: string): string {
+  const path = spec.startsWith("k8s-community:")
+    ? spec.slice("k8s-community:".length)
+    : "";
+  if (!/^[a-z][a-z0-9_-]*(?:\/[a-z0-9_-]+)+$/.test(path)) {
+    throw new Error(`Invalid Kubernetes icon source "${spec}"`);
+  }
+  return join(svgSourceDir, "kubernetes", `${path}.svg`);
+}
 
 export function pascalCase(value: string): string {
   return value
@@ -80,7 +110,9 @@ export function resolveAliasTarget(consumerName: string): string | null {
   // the tail from every "(" in a row of them.
   const target = consumerName.slice(arrow + 4).trimEnd();
   const note = target.indexOf("(");
-  return (note >= 0 && target.endsWith(")") ? target.slice(0, note) : target).trim();
+  return (
+    note >= 0 && target.endsWith(")") ? target.slice(0, note) : target
+  ).trim();
 }
 
 /** The alias side of a `"<alias> -> <target>"` row. */
@@ -142,7 +174,10 @@ export function hasJetbrainsApacheHeader(svg: string): boolean {
 
 export function validateDownloadedSvg(spec: string, svg: string): string {
   const open = svgOpenTag(svg);
-  if (!open || !svg.slice(open.end).trimEnd().toLowerCase().endsWith("</svg>")) {
+  if (
+    !open ||
+    !svg.slice(open.end).trimEnd().toLowerCase().endsWith("</svg>")
+  ) {
     throw new Error(`JetBrains icon "${spec}" is not complete SVG artwork`);
   }
   if (
@@ -198,6 +233,7 @@ export function incumbentSvgPaths(
 }
 
 export function isIconifySpec(spec: string): boolean {
+  if (spec.startsWith("k8s-community:")) return false;
   if (spec === "incumbent" || spec.startsWith("incumbent:")) return false;
   if (spec.startsWith("jb-site:")) return false;
   if (spec.startsWith("jb-download:")) return false;
@@ -234,9 +270,10 @@ export async function readIconSource(options: {
   io?: IconSourceIO;
 }): Promise<string> {
   const { spec, consumerName, io = localSourceIO } = options;
-  const paths =
-    spec.startsWith("jb-download:") ||
-    spec.startsWith("jb-download-unverified:")
+  const paths = spec.startsWith("k8s-community:")
+    ? [kubernetesCommunitySvgPath(spec)]
+    : spec.startsWith("jb-download:") ||
+        spec.startsWith("jb-download-unverified:")
       ? [downloadedSvgPath(spec)]
       : spec === "incumbent" || spec.startsWith("incumbent:")
         ? incumbentSvgPaths(spec, consumerName)
