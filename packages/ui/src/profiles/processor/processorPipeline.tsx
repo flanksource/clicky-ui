@@ -260,7 +260,21 @@ export function ProcessorPipeline({
               />
             ) : (
               <p className="text-xs text-muted-foreground">
-                Add a processor to configure and preview it.
+                <DropdownMenu
+                  trigger={
+                    <button
+                      type="button"
+                      className="font-medium text-primary underline-offset-2 hover:underline"
+                    >
+                      Add a processor
+                    </button>
+                  }
+                  className="inline-flex align-baseline"
+                  menuClassName="min-w-64"
+                  menuLabel="Add processor"
+                  items={addItems}
+                />{" "}
+                to configure and preview it.
               </p>
             )}
           </section>

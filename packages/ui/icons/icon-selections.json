@@ -2841,6 +2841,70 @@
       "note": "File operations: edit file (replace a string in place)."
     },
     {
+      "consumerName": "logo-mssql",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:microsoftsqlserver",
+      "filled": "skip",
+      "note": "Database mark: Microsoft SQL Server. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-sqlite",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:sqlite",
+      "filled": "skip",
+      "note": "Database mark: SQLite. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-postgres",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:postgresql",
+      "filled": "skip",
+      "note": "Database mark: PostgreSQL. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-java",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "devicon-plain:java",
+      "filled": "skip",
+      "note": "Runtime mark: Java / JVM coffee cup. Devicon plain, currentColor."
+    },
+    {
+      "consumerName": "logo-openjdk",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:openjdk",
+      "filled": "skip",
+      "note": "Runtime mark: OpenJDK. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-opensearch",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:opensearch",
+      "filled": "skip",
+      "note": "Search engine mark: OpenSearch. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-opentelemetry",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:opentelemetry",
+      "filled": "skip",
+      "note": "Observability mark: OpenTelemetry. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "globe-share",
+      "group": "infrastructure",
+      "status": "NEW",
+      "outline": "tabler:world-share",
+      "filled": "skip",
+      "note": "Globe with an outbound arrow: traffic leaving through a proxy."
+    },
+    {
       "consumerName": "logo-openai",
       "group": "brands",
       "status": "NEW",
@@ -2879,6 +2943,54 @@
       "outline": "simple-icons:google",
       "filled": "skip",
       "note": "Model vendor mark: Google. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-aws",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:amazonwebservices",
+      "filled": "skip",
+      "note": "Cloud provider mark: Amazon Web Services. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-azure",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:microsoftazure",
+      "filled": "skip",
+      "note": "Cloud provider mark: Microsoft Azure. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-kubernetes",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:kubernetes",
+      "filled": "skip",
+      "note": "Platform mark: Kubernetes. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-git",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:git",
+      "filled": "skip",
+      "note": "Source control mark: Git. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-github",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:github",
+      "filled": "skip",
+      "note": "Source control host mark: GitHub. Simple Icons, currentColor."
+    },
+    {
+      "consumerName": "logo-azure-devops",
+      "group": "brands",
+      "status": "NEW",
+      "outline": "simple-icons:azuredevops",
+      "filled": "skip",
+      "note": "Source control host mark: Azure DevOps. Simple Icons, currentColor."
     },
     {
       "consumerName": "logo-deepseek",
@@ -3807,6 +3919,22 @@
       "outline": "jb-site:ProfilerCommonIcons/icons/expui/mergeCallees",
       "filled": "skip",
       "note": "Merge profiler callees."
+    },
+    {
+      "consumerName": "web-link",
+      "group": "tracing-observability",
+      "status": "NEW",
+      "outline": "incumbent",
+      "filled": "skip",
+      "note": "HTTP proxy trace, in the Database Link style: the JetBrains expui toolwindows/web globe with the DatabaseIcons databaseLink arrow badge clipped into its corner."
+    },
+    {
+      "consumerName": "kubernetes-link",
+      "group": "tracing-observability",
+      "status": "NEW",
+      "outline": "incumbent",
+      "filled": "skip",
+      "note": "Kubernetes API proxy trace: a monochrome JetBrains Kubernetes badge with a cutout wheel and the blue Database Link arrow."
     },
     {
       "consumerName": "programming-abstract-bean",

@@ -91,6 +91,19 @@ describe("ProcessorPipeline", () => {
     expect(onChange).not.toHaveBeenCalledWith([{}]);
   });
 
+  it("offers an inline Add a processor link in the empty editor that adds the chosen processor", () => {
+    const onChange = vi.fn();
+    renderPipeline({ steps: [], onChange, showSteps: false });
+
+    const link = screen.getByRole("button", { name: "Add a processor" });
+    expect(link.closest("p")?.textContent).toBe(
+      "Add a processor to configure and preview it.",
+    );
+    fireEvent.click(link);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Parse logfmt logs" }));
+    expect(onChange).toHaveBeenLastCalledWith([{ use: "logs.logfmt" }]);
+  });
+
   it("switches the selected processor preview between output, raw and split views", async () => {
     const previewer = vi.fn().mockResolvedValue({
       rows: [{ message: "deduplicated", count: 2 }],

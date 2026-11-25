@@ -254,6 +254,26 @@ describe("SessionHeader identity", () => {
     expect(screen.getByText("probe detached")).toBeInTheDocument();
   });
 
+  it.each([
+    { name: "the profile is the heading", session: STOPPED_JVM_TRACE_SESSION, profileShown: 1 },
+    { name: "the label label is the heading", session: STOPPED_SQL_XEVENT_SESSION, profileShown: 1 },
+  ])("prints the profile once when $name", ({ session, profileShown }) => {
+    renderHeader({ session });
+    expect(screen.getAllByText(session.profile)).toHaveLength(profileShown);
+  });
+
+  it("keeps the profile in the meta row when a title replaces the heading", () => {
+    renderHeader({ title: "Custom heading" });
+    expect(screen.getByRole("heading", { name: "Custom heading" })).toBeInTheDocument();
+    expect(screen.getByText(STOPPED_JVM_TRACE_SESSION.profile)).toBeInTheDocument();
+  });
+
+  it("places the host's actions beside the session controls", () => {
+    const { container } = renderHeader({ actions: <button type="button">Reconcile</button> });
+    const slot = container.querySelector<HTMLElement>('[data-slot="session-header-actions"]')!;
+    expect(within(slot).getAllByRole("button").map((b) => b.textContent)).toEqual(["Reconcile", "Restart"]);
+  });
+
   it("renders the labels as a named list so assistive tech announces them", () => {
     renderHeader();
     const list = screen.getByRole("list", { name: "Labels" });
