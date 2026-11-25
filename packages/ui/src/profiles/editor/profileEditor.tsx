@@ -29,6 +29,7 @@ import {
 } from "./profileEditorModel";
 import { ProfileEditorPreview } from "./profileEditorPreview";
 import { ProfileEditorRail } from "./profileEditorRail";
+import { ProfileSaveAsDialog } from "./profileSaveAsDialog";
 import {
   ProfileGeneralSection,
   ProfileSchemaSection,
@@ -80,6 +81,7 @@ const ProfileEditorRaw = lazy(() =>
 export function ProfileEditor({
   client,
   action,
+  createAction,
   surfaceKey,
   initialValue,
   onClose,
@@ -87,6 +89,10 @@ export function ProfileEditor({
 }: {
   client: OperationsApiClient;
   action: ResolvedOperation;
+  /** The profiles collection's create operation; when given, the header offers
+   * "Save as new…", which saves the draft under a new name and leaves the
+   * edited profile as it was. */
+  createAction?: ResolvedOperation | undefined;
   surfaceKey: string;
   initialValue: Record<string, unknown>;
   onClose: () => void;
@@ -121,6 +127,7 @@ export function ProfileEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [replaceTarget, setReplaceTarget] = useState("");
+  const [savingAs, setSavingAs] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmResetColumns, setConfirmResetColumns] = useState(false);
   const dirty = JSON.stringify(draft) !== initialSerialized;
@@ -128,6 +135,7 @@ export function ProfileEditor({
   const traces = draft.render === "traces";
   const obsolete = traces ? obsoleteSpanColumns(draft.columns ?? [], discovered) : [];
   const validationError = validateProfileEditorDraft(draft) ?? (obsolete.length ? `Columns require normalized sources: ${obsolete.join(", ")}. Reset to default or remove them.` : null);
+  const saveBlocked = saving || Boolean(validationError) || (section === "raw" && !rawValid);
   const sampleStale = profileSampleSignature(draft) !== lastSampleSignature;
   const resetState = traces ? {visible:true, disabled:false, title:"Reset to default"} : profileColumnResetState({
     providerType: draft.provider?.type ?? "",
@@ -507,14 +515,22 @@ export function ProfileEditor({
           <Button type="button" size="sm" variant="ghost" onClick={leave}>
             Discard
           </Button>
+          {createAction ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={saveBlocked}
+              title={validationError ?? undefined}
+              onClick={() => setSavingAs(true)}
+            >
+              Save as new…
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="sm"
-            disabled={
-              saving ||
-              Boolean(validationError) ||
-              (section === "raw" && !rawValid)
-            }
+            disabled={saveBlocked}
             title={validationError ?? undefined}
             onClick={() => void save()}
           >
@@ -587,6 +603,16 @@ export function ProfileEditor({
             unsaved until you save it.
           </p>
         </Modal>
+      ) : null}
+
+      {savingAs && createAction ? (
+        <ProfileSaveAsDialog
+          client={client}
+          action={createAction}
+          draft={draft}
+          onCancel={() => setSavingAs(false)}
+          onSaved={onSuccess}
+        />
       ) : null}
 
       {replaceTarget ? (

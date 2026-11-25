@@ -103,6 +103,17 @@ export const NotControllable: Story = {
   },
 };
 
+export const WithHostActions: Story = {
+  args: {
+    session: STOPPED_SQL_XEVENT_SESSION,
+    actions: (
+      <button type="button" className="h-8 rounded-md border border-border px-3 text-sm">
+        Reconcile
+      </button>
+    ),
+  },
+};
+
 export const SqlTraceStartedWith: Story = {
   args: { session: STOPPED_SQL_XEVENT_SESSION },
 };

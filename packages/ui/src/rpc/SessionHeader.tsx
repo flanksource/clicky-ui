@@ -44,6 +44,8 @@ export type SessionHeaderProps = {
   actionError?: unknown;
   /** Heading; defaults to `labels.label`, then the profile. */
   title?: ReactNode;
+  /** The host's own actions, placed beside the session controls on the title row. */
+  actions?: ReactNode;
   className?: string;
 };
 
@@ -72,26 +74,31 @@ export function SessionHeader({
   pendingAction = null,
   actionError,
   title,
+  actions,
   className,
 }: SessionHeaderProps) {
   const active = !isSessionTerminal(session.state);
   const countingDown = active && session.stopAt !== undefined;
   const now = useResourceClock(countingDown);
-  // The `label` label is already the heading when no title is given.
+  // With no title, the `label` label — else the profile — is already the heading.
   const labelIsHeading = title === undefined && session.labels?.label !== undefined;
+  const profileIsHeading = title === undefined && session.labels?.label === undefined;
   const labels = Object.entries(session.labels ?? {}).filter(
     ([key]) => !(labelIsHeading && key === "label"),
   );
   const sessionLink = (id: string) =>
     renderLink({ to: getSessionHref(id), children: shortId(id), className: LINK_CLASS, title: id, key: id });
 
+  // Identity, labels, lineage and metadata share one wrapped row and the
+  // controls stay on the title row, so a page fitted to the viewport keeps its
+  // height for the session's rows.
   return (
     <header
-      className={cn("space-y-3 rounded-md border border-border bg-card p-3", className)}
+      className={cn("space-y-2 rounded-md border border-border bg-card p-3", className)}
       data-slot="session-header"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-2">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="truncate text-base font-semibold">
               {title ?? session.labels?.label ?? session.profile}
@@ -112,7 +119,7 @@ export function SessionHeader({
             )}
           </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span className="font-mono">{session.profile}</span>
+            {!profileIsHeading && <span className="font-mono">{session.profile}</span>}
             {session.events && <span className="font-mono">Event kind: {session.events.kind}</span>}
             <span className="inline-flex items-center gap-1">
               <Icon icon={UiServer} className="size-3.5" />
@@ -122,62 +129,60 @@ export function SessionHeader({
             <span>{session.eventCount.toLocaleString()} events</span>
             {session.handle && <span className="font-mono">{session.handle}</span>}
             {!active && session.stopReason && <span>{session.stopReason}</span>}
+            {labels.length > 0 && (
+              <ul role="list" className="flex flex-wrap gap-1" aria-label="Labels">
+                {labels.map(([key, value]) => (
+                  <li key={key}>
+                    <Badge tone="neutral" variant="outline" size="xs">
+                      {`${key}=${value}`}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {session.restartOf && (
+              <span className="text-foreground">
+                Restart of {sessionLink(session.restartOf)}
+              </span>
+            )}
+            {session.restartedAs && session.restartedAs.length > 0 && (
+              <span className="inline-flex flex-wrap items-center gap-1 text-foreground">
+                Restarted as {session.restartedAs.map(sessionLink)}
+              </span>
+            )}
+            {session.metadata?.map((entry) => (
+              // An opened entry takes its own line so the value reads at full width.
+              <details key={entry.name} className="group open:basis-full" data-slot="session-metadata">
+                <summary className="inline-flex cursor-pointer list-none items-center gap-1 hover:text-foreground">
+                  <Icon icon={UiChevronRight} className="size-3.5 transition-transform group-open:rotate-90" />
+                  {entry.label}
+                  {entry.language && (
+                    <Badge tone="neutral" variant="outline" size="xs" className="uppercase">
+                      {entry.language}
+                    </Badge>
+                  )}
+                </summary>
+                {/* Bounded so a long statement scrolls in place instead of pushing the page's rows away. */}
+                <div className="mt-2 max-h-64 overflow-y-auto text-foreground" data-slot="session-metadata-value">
+                  <CodeBlock language={entry.language ?? "text"} source={entry.value} copyable />
+                </div>
+              </details>
+            ))}
           </div>
-          {labels.length > 0 && (
-            <ul role="list" className="flex flex-wrap gap-1" aria-label="Labels">
-              {labels.map(([key, value]) => (
-                <li key={key}>
-                  <Badge tone="neutral" variant="outline" size="xs">
-                    {`${key}=${value}`}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
-          {(session.restartOf || (session.restartedAs?.length ?? 0) > 0) && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-              {session.restartOf && (
-                <span>
-                  Restart of {sessionLink(session.restartOf)}
-                </span>
-              )}
-              {session.restartedAs && session.restartedAs.length > 0 && (
-                <span className="inline-flex flex-wrap items-center gap-1">
-                  Restarted as {session.restartedAs.map(sessionLink)}
-                </span>
-              )}
-            </div>
-          )}
-          {session.metadata?.map((entry) => (
-            <details key={entry.name} className="group text-xs" data-slot="session-metadata">
-              <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-muted-foreground hover:text-foreground">
-                <Icon icon={UiChevronRight} className="size-3.5 transition-transform group-open:rotate-90" />
-                {entry.label}
-                {entry.language && (
-                  <Badge tone="neutral" variant="outline" size="xs" className="uppercase">
-                    {entry.language}
-                  </Badge>
-                )}
-              </summary>
-              <CodeBlock
-                language={entry.language ?? "text"}
-                source={entry.value}
-                copyable
-                className="mt-2"
-              />
-            </details>
-          ))}
         </div>
-        <SessionHeaderControls
-          session={session}
-          onStop={onStop}
-          onExtend={onExtend}
-          onRestart={onRestart}
-          mutating={mutating}
-          renderConfirm={renderConfirm}
-          durationPresetsMs={durationPresetsMs}
-          pendingAction={pendingAction}
-        />
+        <div className="flex shrink-0 items-start gap-2" data-slot="session-header-actions">
+          {actions}
+          <SessionHeaderControls
+            session={session}
+            onStop={onStop}
+            onExtend={onExtend}
+            onRestart={onRestart}
+            mutating={mutating}
+            renderConfirm={renderConfirm}
+            durationPresetsMs={durationPresetsMs}
+            pendingAction={pendingAction}
+          />
+        </div>
       </div>
       <SessionHeaderNotices session={session} active={active} actionError={actionError} />
     </header>
