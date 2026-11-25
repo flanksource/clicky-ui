@@ -114,7 +114,7 @@ export function SandboxSection({
         />
       )}
 
-      {(mode === "docker" || mode === "git-agent") && (
+      {selectsBackend(mode) && (
         <ConfiguredBackendFields
           value={value}
           onChange={onChange}
@@ -126,13 +126,14 @@ export function SandboxSection({
         />
       )}
 
-      {mode === "git-agent" && workspaceIsolates(value) && (
-        <SandboxWarning>
-          Git Agent materializes its own working tree, so it cannot be combined
-          with the checkout or worktree set in Workspace. Register exactly one
-          isolator.
-        </SandboxWarning>
-      )}
+      {(mode === "git-agent" || mode === "substrate") &&
+        workspaceIsolates(value) && (
+          <SandboxWarning>
+            {sandboxKindMeta(mode).label} materializes its own working tree, so
+            it cannot be combined with the checkout or worktree set in
+            Workspace. Register exactly one isolator.
+          </SandboxWarning>
+        )}
 
       {createConfig && catalog && (
         <SandboxCreateWizard
@@ -142,7 +143,7 @@ export function SandboxSection({
           onClose={() => setCreating(false)}
           onCreated={(backend, input) => {
             const created = { ...backend, kind: backend.kind ?? input.kind };
-            if (created.kind !== "docker" && created.kind !== "git-agent") {
+            if (!selectsBackend(created.kind)) {
               throw new Error(
                 `created sandbox kind ${JSON.stringify(created.kind)} is not public`,
               );
@@ -207,7 +208,7 @@ function ConfiguredBackendFields({
 }: {
   value: AISpecRuntimeValue;
   onChange: (value: AISpecRuntimeValue) => void;
-  mode: "docker" | "git-agent";
+  mode: BackendSandboxMode;
   backends: SpecRuntimeSandboxBackend[];
   dispatchableAgents: string[];
   createConfig?: SpecRuntimeSandboxCreateConfig | undefined;
@@ -313,6 +314,16 @@ function sandboxModes(schema: RuntimeSpecSchema): SpecSandboxMode[] {
     }
     return value as SpecSandboxMode;
   });
+}
+
+type BackendSandboxMode = Extract<
+  SpecSandboxMode,
+  "docker" | "git-agent" | "substrate"
+>;
+
+/** Modes that run on a configured backend chosen from the sandbox catalog. */
+function selectsBackend(mode: string): mode is BackendSandboxMode {
+  return mode === "docker" || mode === "git-agent" || mode === "substrate";
 }
 
 function sandboxBackends(

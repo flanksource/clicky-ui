@@ -14,6 +14,7 @@ export const SPEC_SANDBOX_MODES = [
   "native",
   "docker",
   "git-agent",
+  "substrate",
 ] as const;
 
 export type SpecSandboxMode = (typeof SPEC_SANDBOX_MODES)[number];
@@ -125,7 +126,7 @@ export function compactRuntimeSandbox(
       ...(policy ? { policy } : {}),
     });
   }
-  if (mode === "docker") {
+  if (mode === "docker" || mode === "substrate") {
     rejectSandboxFields(mode, { agent, policy, dispatch });
     return compactSandboxObject({
       mode,

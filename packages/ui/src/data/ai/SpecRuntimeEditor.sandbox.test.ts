@@ -34,6 +34,27 @@ describe("compactAISpecRuntime sandbox", () => {
     });
   });
 
+  it("keeps a substrate backend and rejects git-agent-only settings", () => {
+    expect(
+      compactAISpecRuntime({ sandbox: { mode: "substrate" } }).sandbox,
+    ).toBe("substrate");
+    expect(
+      compactAISpecRuntime({
+        sandbox: { mode: "substrate", backend: "substrate-dev" },
+      }).sandbox,
+    ).toEqual({ mode: "substrate", backend: "substrate-dev" });
+    expect(() =>
+      compactAISpecRuntime({
+        sandbox: { mode: "substrate", agent: "worker-01" },
+      }),
+    ).toThrow("sandbox mode substrate does not accept agent");
+    expect(() =>
+      compactAISpecRuntime({
+        sandbox: { mode: "substrate", dispatch: { maxAttempts: 2 } },
+      }),
+    ).toThrow("sandbox mode substrate does not accept dispatch");
+  });
+
   it("rejects a legacy sandbox.approval instead of loading it silently", () => {
     // Captain's SandboxRef has no Approval field and decodes with
     // DisallowUnknownFields: a preset/profile saved before the move to

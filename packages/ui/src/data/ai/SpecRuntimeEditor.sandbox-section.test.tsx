@@ -31,7 +31,7 @@ const sandboxSchema = (claude: boolean) => ({
         mode: {
           type: "string" as const,
           title: "Sandbox mode",
-          enum: ["off", "native", "docker", "git-agent"],
+          enum: ["off", "native", "docker", "git-agent", "substrate"],
           "x-enum-display": "segmented" as const,
         },
         approval: {
@@ -160,6 +160,10 @@ const CATALOG: SpecRuntimeSandboxCatalog = {
         },
       ],
     },
+    {
+      kind: "substrate",
+      backends: [{ name: "substrate-dev", kind: "substrate" }],
+    },
   ],
 };
 
@@ -205,8 +209,8 @@ function chooseCombobox(name: string, option: string) {
 describe("SpecRuntimeEditor sandbox section", () => {
   it("renders only public modes published by the selected runtime schema", () => {
     render(<Harness />);
-    expect(within(sandboxModes()).getAllByRole("radio")).toHaveLength(4);
-    for (const label of ["Off", "Native", "Docker", "Git Agent"]) {
+    expect(within(sandboxModes()).getAllByRole("radio")).toHaveLength(5);
+    for (const label of ["Off", "Native", "Docker", "Git Agent", "Substrate"]) {
       expect(
         within(sandboxModes()).getByRole("radio", {
           name: new RegExp(`^${label}(?:\\s|$)`),
@@ -292,5 +296,34 @@ describe("SpecRuntimeEditor sandbox section", () => {
         },
       }),
     );
+  });
+
+  it("selects a substrate backend without git-agent dispatch fields", () => {
+    render(<Harness catalog={CATALOG} />);
+    chooseMode("Substrate");
+    chooseCombobox("Sandbox backend", "substrate-dev");
+    expect(screen.queryByRole("combobox", { name: "Pinned agent" })).toBeNull();
+    expect(screen.queryByText("Included paths")).toBeNull();
+    expect(screen.getByLabelText("Runtime value")).toHaveTextContent(
+      JSON.stringify({
+        mode: "cli",
+        sandbox: { mode: "substrate", backend: "substrate-dev" },
+      }),
+    );
+  });
+
+  it("warns when substrate is combined with a workspace checkout", () => {
+    render(
+      <Harness
+        initial={{
+          mode: "cli",
+          setup: { checkout: { mode: "remote" } },
+          sandbox: "substrate",
+        }}
+      />,
+    );
+    expect(
+      screen.getByText(/^Substrate materializes its own working tree/),
+    ).toBeInTheDocument();
   });
 });
