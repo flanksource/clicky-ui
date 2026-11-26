@@ -15,6 +15,7 @@ import { applyPostExtensions } from "./json-schema-form-extensions";
 import { appendInstancePath } from "./json-schema-form-errors";
 import { applyChangeEffects } from "./json-schema-form-listeners";
 import { tableColumnOptions, tableLayout } from "./json-schema-form-array-view";
+import { useArrayRows } from "./json-schema-form-array-rows";
 import { emptyListLine, resolveItemSpec } from "./json-schema-form-item-summary";
 import { labelSizeClass } from "./json-schema-form-size";
 import {
@@ -41,10 +42,11 @@ export function TableArray({
   field: FieldControl;
   ctx: RenderContext;
   readOnly: boolean;
-  /** List-level actions, right-aligned on a slim line above the table beside the row count. */
+  /** List-level actions, right-aligned on a slim line above the table. */
   toolbar?: ReactNode;
 }) {
   const items = Array.isArray(field.value) ? field.value : [];
+  const { rows: itemRows, rememberRows } = useArrayRows(field.value);
   const itemSchema = field.itemSchema ?? { type: "object" };
   // A table read-only as a whole — a view (the form's `readOnly` prop or a
   // readOnly ancestor; see RenderContext.viewOnly) or the array's own
@@ -78,10 +80,16 @@ export function TableArray({
   // gutter down the side.
   const removable = !readOnly && canRemoveItem(field, items.length);
 
+  function changeRows(next: typeof itemRows) {
+    rememberRows(next);
+    field.onChange(next.map((row) => row.item));
+  }
+
   // A cell renders its OWN row's property, so a listener's readOnly, enable or
   // patch reaches that row alone, and commits through the row's value
   // listeners exactly as an item of the list views does.
-  function cell(item: unknown, rowIndex: number, col: string): ReactNode {
+  function cell(row: (typeof itemRows)[number], rowIndex: number, col: string): ReactNode {
+    const { item } = row;
     const obj = isPlainObject(item) ? item : {};
     const prop = rows[rowIndex]?.[col];
     const nodes = prop
@@ -92,17 +100,20 @@ export function TableArray({
             required: false,
             value: obj[col],
             onChange: (next) =>
-              field.onChange(
+              changeRows(
                 setIndex(
-                  items,
+                  itemRows,
                   rowIndex,
-                  applyChangeEffects(itemSchema as JsonSchemaObject, {
-                    root: options.rootValue ?? obj,
-                    ...(options.evaluate ? { evaluate: options.evaluate } : {}),
-                    value: obj,
-                    key: col,
-                    next,
-                  }),
+                  {
+                    ...row,
+                    item: applyChangeEffects(itemSchema as JsonSchemaObject, {
+                      root: options.rootValue ?? obj,
+                      ...(options.evaluate ? { evaluate: options.evaluate } : {}),
+                      value: obj,
+                      key: col,
+                      next,
+                    }),
+                  },
                 ),
               ),
             instancePath: appendInstancePath(
@@ -178,9 +189,9 @@ export function TableArray({
           </tr>
         </thead>
         <tbody>
-          {items.map((item, i) => (
+          {itemRows.map((row, i) => (
             <tr
-              key={i}
+              key={row.key}
               className={cn(
                 "border-b last:border-b-0 align-top",
                 ctx.presentation ? "border-border" : "border-input",
@@ -188,7 +199,7 @@ export function TableArray({
             >
               {columns.map(([col]) => (
                 <td key={col} className={cn("px-2 py-1", !ctx.presentation && !readOnly && "min-w-40")}>
-                  {cell(item, i, col)}
+                  {cell(row, i, col)}
                 </td>
               ))}
               {removable && (
@@ -200,7 +211,7 @@ export function TableArray({
                       "inline-flex aspect-square items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground",
                       controlHeightClass[ctx.size],
                     )}
-                    onClick={() => field.onChange(removeIndex(items, i))}
+                    onClick={() => changeRows(removeIndex(itemRows, i))}
                   >
                     <Icon icon={UiTrash} className="text-sm" />
                   </button>
@@ -227,12 +238,8 @@ export function TableArray({
       )}
     </div>
   );
-  if (toolbar === undefined) return table;
-  // The same summary line the item list shows, so switching views keeps the
-  // empty-list copy and the toolbar where they were. A null toolbar (the menu
-  // moved to the section header) over a non-empty list has none.
   const emptyLine = emptyListLine(field.itemSpec ?? resolveItemSpec(field.schema, itemSchema), items.length);
-  if (toolbar === null && emptyLine === undefined) return table;
+  if (emptyLine === undefined && toolbar == null) return table;
   return (
     <div className="flex flex-col gap-2">
       <div data-jsf-array-summary className="flex items-center justify-between gap-2">

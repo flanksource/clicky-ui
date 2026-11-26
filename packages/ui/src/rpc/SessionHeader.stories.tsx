@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
+import { Button } from "../components/button";
 import { SessionHeader } from "./SessionHeader";
 import {
   KV_STORE_EVENTS,
@@ -107,9 +108,10 @@ export const WithHostActions: Story = {
   args: {
     session: STOPPED_SQL_XEVENT_SESSION,
     actions: (
-      <button type="button" className="h-8 rounded-md border border-border px-3 text-sm">
-        Reconcile
-      </button>
+      <>
+        <Button type="button" size="sm" variant="outline">Reconcile</Button>
+        <Button type="button" size="sm" variant="outline">Download results</Button>
+      </>
     ),
   },
 };

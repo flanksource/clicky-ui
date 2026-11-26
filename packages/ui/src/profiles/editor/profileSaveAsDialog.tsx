@@ -26,23 +26,29 @@ export function ProfileSaveAsDialog({
   onSaved: (name: string) => void | Promise<void>;
 }) {
   const [name, setName] = useState(`${draft.profile ?? "profile"}-copy`);
+  const [createdName, setCreatedName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const trimmed = name.trim();
 
   const save = async () => {
-    if (!client.submitForm) {
-      setError("Profile creation is unavailable");
-      return;
-    }
     setSaving(true);
     setError("");
+    let savedName = createdName;
     try {
-      const response = await client.submitForm(action.path, action.method, { ...draft, profile: trimmed });
-      if (!response.success) throw new Error(response.error || response.message || "Profile creation failed");
-      await onSaved(trimmed);
+      if (savedName === null) {
+        if (!client.submitForm) throw new Error("Profile creation is unavailable");
+        const response = await client.submitForm(action.path, action.method, { ...draft, profile: trimmed });
+        if (!response.success) throw new Error(response.error || response.message || "Profile creation failed");
+        savedName = trimmed;
+        setCreatedName(savedName);
+      }
+      await onSaved(savedName);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Profile creation failed");
+      const detail = saveError instanceof Error ? saveError.message : undefined;
+      setError(savedName === null
+        ? detail ?? "Profile creation failed"
+        : `Profile "${savedName}" was created. ${detail ?? "Could not complete the action."}`);
     } finally {
       setSaving(false);
     }
@@ -52,15 +58,17 @@ export function ProfileSaveAsDialog({
     <Modal
       open
       onClose={onCancel}
+      closeOnEsc={!saving}
+      hideClose={saving}
       title="Save as a new profile"
       size="sm"
       footer={
         <div className="flex w-full justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onCancel}>
-            Cancel
+          <Button type="button" variant="ghost" disabled={saving} onClick={onCancel}>
+            {createdName === null ? "Cancel" : "Close"}
           </Button>
           <Button type="button" disabled={saving || !trimmed} onClick={() => void save()}>
-            {saving ? "Saving…" : "Save as new profile"}
+            {saving ? "Saving…" : createdName === null ? "Save as new profile" : "Retry"}
           </Button>
         </div>
       }
@@ -69,7 +77,7 @@ export function ProfileSaveAsDialog({
         <p className="text-sm text-muted-foreground">
           Your changes are saved under the new name. {draft.profile ?? "This profile"} stays as it was.
         </p>
-        <InputField aria-label="New profile name" value={name} onChange={setName} autoFocus />
+        <InputField aria-label="New profile name" value={name} onChange={setName} disabled={saving || createdName !== null} autoFocus />
         {error ? (
           <p role="alert" className="text-sm text-destructive">
             {error}

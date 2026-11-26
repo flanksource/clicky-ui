@@ -28,6 +28,7 @@ import {
 import { cn } from "../lib/utils";
 import { controlMinHeightClass } from "./json-schema-form-size";
 import type { FieldControl, RenderContext } from "./json-schema-form-types";
+import { useArrayRows } from "./json-schema-form-array-rows";
 
 // AccordionArray is the JsonSchemaForm adapter over AccordionList: it turns
 // `x-item` into row content and the schema's item into a recursive sub-form, and
@@ -47,6 +48,7 @@ export function AccordionArray({
   toolbar?: ReactNode;
 }) {
   const items = Array.isArray(field.value) ? field.value : [];
+  const { rows: previewRows } = useArrayRows(ctx.presentation ? field.value : undefined);
   const itemSchema = field.itemSchema ?? { type: "object" };
   const spec = field.itemSpec ?? resolveItemSpec(field.schema, itemSchema);
   const emptyCopy = emptyItemsCopy(spec, field.schema);
@@ -109,9 +111,9 @@ export function AccordionArray({
     return (
       <div className="min-w-0 space-y-1">
         {emptyLine !== undefined && <div className="text-xs text-muted-foreground">{emptyLine}</div>}
-        {items.map((item, index) => (
+        {previewRows.map(({ item, key }, index) => (
           <div
-            key={index}
+            key={key}
             className={cn(
               "flex min-w-0 flex-wrap items-center gap-2 rounded px-2 py-1 even:bg-muted/40",
               controlMinHeightClass[ctx.size],

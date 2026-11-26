@@ -89,16 +89,13 @@ export function SessionHeader({
   const sessionLink = (id: string) =>
     renderLink({ to: getSessionHref(id), children: shortId(id), className: LINK_CLASS, title: id, key: id });
 
-  // Identity, labels, lineage and metadata share one wrapped row and the
-  // controls stay on the title row, so a page fitted to the viewport keeps its
-  // height for the session's rows.
   return (
     <header
       className={cn("space-y-2 rounded-md border border-border bg-card p-3", className)}
       data-slot="session-header"
     >
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1 space-y-1.5">
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="min-w-0 flex-[1_1_20rem] space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="truncate text-base font-semibold">
               {title ?? session.labels?.label ?? session.profile}
@@ -170,7 +167,7 @@ export function SessionHeader({
             ))}
           </div>
         </div>
-        <div className="flex shrink-0 items-start gap-2" data-slot="session-header-actions">
+        <div className="flex min-w-0 max-w-full flex-wrap items-start gap-2 empty:hidden" data-slot="session-header-actions">
           {actions}
           <SessionHeaderControls
             session={session}

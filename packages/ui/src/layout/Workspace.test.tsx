@@ -80,10 +80,16 @@ describe("Workspace", () => {
   });
 
   it("maximizes the body over the whole viewport without its sides, and restores on Escape", () => {
-    render(<Workspace panes={panes} />);
+    render(<Workspace panes={panes.map((pane) =>
+      pane.location === "bottom"
+        ? { ...pane, content: <input aria-label="Terminal command" defaultValue="" /> }
+        : pane,
+    )} />);
     const workspace = screen
       .getByTestId("workspace-region-center")
       .closest("[data-slot=workspace]");
+    const command = screen.getByRole("textbox", { name: "Terminal command" });
+    fireEvent.change(command, { target: { value: "git status" } });
 
     fireEvent.click(screen.getByRole("button", { name: "Maximize workspace" }));
 
@@ -97,9 +103,8 @@ describe("Workspace", () => {
       "aria-hidden",
       "true",
     );
-    expect(
-      screen.queryByTestId("workspace-region-bottom"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-region-bottom")).not.toBeVisible();
+    expect(screen.queryByRole("textbox", { name: "Terminal command" })).toBeNull();
     expect(
       screen.queryByRole("button", { name: /left side/ }),
     ).not.toBeInTheDocument();
@@ -111,7 +116,8 @@ describe("Workspace", () => {
 
     expect(workspace).not.toHaveAttribute("data-maximized");
     expect(workspace).not.toHaveClass("fixed");
-    expect(screen.getByTestId("workspace-region-bottom")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Terminal command" })).toBe(command);
+    expect(command).toHaveValue("git status");
     expect(
       screen.getByRole("button", { name: "Maximize workspace" }),
     ).toBeInTheDocument();

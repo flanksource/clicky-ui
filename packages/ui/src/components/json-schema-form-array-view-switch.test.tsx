@@ -125,9 +125,26 @@ describe("object array view switch", () => {
     expect(within(screen.getByRole("table")).getAllByRole("textbox")[0]).toHaveValue("again");
   });
 
+  it("keeps the same grid row through cell edits and the removal of a preceding row", () => {
+    render(<Harness columns={3} initial={[{ c1: "a" }, { c1: "b" }]} />);
+    const input = screen.getByDisplayValue("b");
+    fireEvent.change(input, { target: { value: "edited" } });
+    expect(screen.getByDisplayValue("edited")).toBe(input);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove item 1" }));
+    expect(screen.getByDisplayValue("edited")).toBe(input);
+  });
+
   it("hides the view menu in a presentation preview, keeping the default view", () => {
     render(<Harness columns={3} initial={[{ c1: "a" }]} layout={{ mode: "properties" }} />);
     expect(within(screen.getByRole("button", { name: "Edit Reinsurers" })).getByRole("table")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: MENU })).toBeNull();
+  });
+
+  it("shows the empty-list message in a grid presentation preview", () => {
+    render(<Harness columns={3} initial={[]} layout={{ mode: "properties" }} />);
+    const preview = within(screen.getByRole("button", { name: "Edit Reinsurers" }));
+    expect(preview.getByRole("table")).toBeInTheDocument();
+    expect(preview.getByText("No Reinsurers yet")).toBeInTheDocument();
   });
 });

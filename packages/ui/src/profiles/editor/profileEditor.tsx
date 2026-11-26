@@ -611,7 +611,10 @@ export function ProfileEditor({
           action={createAction}
           draft={draft}
           onCancel={() => setSavingAs(false)}
-          onSaved={onSuccess}
+          onSaved={async (name) => {
+            await onSuccess(name);
+            setSavingAs(false);
+          }}
         />
       ) : null}
 

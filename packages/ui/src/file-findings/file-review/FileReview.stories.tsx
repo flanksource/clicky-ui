@@ -96,11 +96,8 @@ export const AllFeatures: Story = {
   args: { withComments: true, withFindings: true, selectToComment: true, authorFilter: true, onCreate: fn() },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    const paragraph = await waitFor(() => {
-      const p = [...canvasElement.querySelectorAll("p")].find((el) => el.textContent?.includes("CI builds the artifacts"));
-      if (!p) throw new Error("the build paragraph has not rendered yet");
-      return p;
-    });
+    // The preview starts as plain text while the Markdown renderer loads.
+    const paragraph = await canvas.findByText(/CI builds the artifacts/, { selector: "p" }, { timeout: 3000 });
     const text = [...paragraph.childNodes].find((node): node is Text => node instanceof Text && node.data.includes("artifacts"))!;
     const start = text.data.indexOf("artifacts");
     const range = document.createRange();
@@ -112,7 +109,8 @@ export const AllFeatures: Story = {
     paragraph.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0 }));
 
     await userEvent.click(await canvas.findByRole("button", { name: "Comment" }));
-    await userEvent.type(canvas.getByTestId("comment-compose-input"), "Which registry?");
+    await userEvent.click(canvas.getByTestId("comment-compose-input"));
+    await userEvent.paste("Which registry?");
     await userEvent.click(canvas.getByRole("button", { name: "Post comment" }));
 
     const anchor = quoteAnchor({ path: ["Release checklist", "Cutting the build"], prefix: "builds the", quote: "artifacts", suffix: "and publishes" });
@@ -190,7 +188,8 @@ export const CodeFile: Story = {
     line.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0 }));
 
     await userEvent.click(await canvas.findByRole("button", { name: "Comment" }));
-    await userEvent.type(canvas.getByTestId("comment-compose-input"), "Off by one?");
+    await userEvent.click(canvas.getByTestId("comment-compose-input"));
+    await userEvent.paste("Off by one?");
     await userEvent.click(canvas.getByRole("button", { name: "Post comment" }));
 
     const column = CODE_SOURCE.split("\n")[11]!.indexOf("attempts");

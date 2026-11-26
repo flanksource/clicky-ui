@@ -255,11 +255,12 @@ describe("SessionHeader identity", () => {
   });
 
   it.each([
-    { name: "the profile is the heading", session: STOPPED_JVM_TRACE_SESSION, profileShown: 1 },
-    { name: "the label label is the heading", session: STOPPED_SQL_XEVENT_SESSION, profileShown: 1 },
-  ])("prints the profile once when $name", ({ session, profileShown }) => {
+    { heading: STOPPED_JVM_TRACE_SESSION.profile, session: { ...STOPPED_JVM_TRACE_SESSION, labels: {} } },
+    { heading: STOPPED_SQL_XEVENT_SESSION.labels!.label!, session: STOPPED_SQL_XEVENT_SESSION },
+  ])("prints the profile once with heading $heading", ({ session, heading }) => {
     renderHeader({ session });
-    expect(screen.getAllByText(session.profile)).toHaveLength(profileShown);
+    expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
+    expect(screen.getAllByText(session.profile)).toHaveLength(1);
   });
 
   it("keeps the profile in the meta row when a title replaces the heading", () => {

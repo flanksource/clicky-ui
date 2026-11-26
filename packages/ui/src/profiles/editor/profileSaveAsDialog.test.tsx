@@ -7,9 +7,8 @@ import { ProfileSaveAsDialog } from "./profileSaveAsDialog";
 const CREATE = { path: "/api/v1/profiles", method: "post" } as ResolvedOperation;
 const DRAFT = { profile: "spans.opensearch", provider: { type: "opentelemetry" }, columns: [{ name: "service" }] };
 
-function setup(response: { success: boolean; error?: string }) {
+function setup(response: { success: boolean; error?: string }, onSaved = vi.fn()) {
   const submitForm = vi.fn().mockResolvedValue(response);
-  const onSaved = vi.fn();
   render(
     <ProfileSaveAsDialog
       client={{ submitForm } as unknown as OperationsApiClient}
@@ -54,5 +53,19 @@ describe("ProfileSaveAsDialog", () => {
     setup({ success: true });
     fireEvent.change(screen.getByLabelText("New profile name"), { target: { value: "   " } });
     expect(screen.getByRole("button", { name: "Save as new profile" })).toBeDisabled();
+  });
+
+  it("retries the completion callback without issuing another create request", async () => {
+    const complete = vi.fn().mockRejectedValueOnce(new Error("Refresh failed"));
+    const { submitForm } = setup({ success: true }, complete);
+    fireEvent.click(screen.getByRole("button", { name: "Save as new profile" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent('Profile "spans.opensearch-copy" was created. Refresh failed');
+    expect(screen.getByLabelText("New profile name")).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(complete.mock.calls).toEqual([["spans.opensearch-copy"], ["spans.opensearch-copy"]]);
+    expect(submitForm).toHaveBeenCalledTimes(1);
   });
 });

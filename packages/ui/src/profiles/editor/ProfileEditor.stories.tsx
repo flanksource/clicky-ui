@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useMemo, type ComponentProps } from "react";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import type { ResolvedOperation } from "../../rpc/types";
 import type { OperationsApiClient } from "../../rpc/useOperations";
 import { ProfileEditor } from "./profileEditor";
@@ -129,6 +129,24 @@ export const General: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("Profile identity")).toBeVisible();
     await expect(canvas.getByDisplayValue("service-health")).toBeVisible();
+  },
+};
+
+export const SaveAsNew: Story = {
+  args: {
+    createAction: { ...action, method: "post", path: "/api/v1/profiles" },
+    onSuccess: fn(),
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.click(canvas.getByRole("button", { name: "Save as new…" }));
+    const dialog = await body.findByRole("dialog", { name: "Save as a new profile" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save as new profile" }));
+
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    await expect(args.onSuccess).toHaveBeenCalledWith(`${initialValue.profile}-copy`);
+    await expect(canvas.getByDisplayValue(initialValue.profile)).toBeVisible();
   },
 };
 

@@ -1195,7 +1195,7 @@ export const ObjectArrayCards: Story = {
 
 // The same routes, one line each. `x-item` is what makes a collapsed row worth
 // reading: which property titles it, which ones summarize it, which colours its
-// glyph — and the nouns the count, add row and empty state speak in.
+// glyph — and the nouns the add row and empty state speak in.
 const objectArrayAccordionSchema: JsonSchemaObject = {
   type: "object",
   properties: {
@@ -1221,13 +1221,13 @@ export const ObjectArrayAccordion: Story = {
     docs: {
       description: {
         story:
-          "The accordion an object array uses by default, told how to summarize its items. `x-item` names the property that titles the row (`path`), the ones that trail it, the enum whose `x-enum-tones`/`x-enum-icons` colour the glyph, the boolean that flags it, and the noun the count, **Add route** row and empty state speak in. Without `x-item` the same rows fall back to conventional keys and *Item N* — see **ArrayOfObjects**.",
+          "The accordion an object array uses by default, told how to summarize its items. `x-item` names the property that titles the row (`path`), the ones that trail it, the enum whose `x-enum-tones`/`x-enum-icons` colour the glyph, the boolean that flags it, and the noun the **Add route** row and empty state speak in. Without `x-item` the same rows fall back to conventional keys and *Item N* — see **ArrayOfObjects**.",
       },
     },
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText("2 routes")).toBeInTheDocument();
+    await expect(canvas.queryByText("2 routes")).not.toBeInTheDocument();
     // One line per route: the item's own fields wait behind the disclosure.
     await expect(canvas.queryByLabelText(/^Upstream/)).toBeNull();
     await userEvent.click(

@@ -17,6 +17,7 @@ import {
   writeWorkspaceLayoutState,
   type WorkspaceLayoutDefaults,
   type WorkspaceLayoutState,
+  type WorkspacePaneLocation,
   type WorkspacePaneSpec,
   type WorkspaceSideArrangements,
   type WorkspaceSideLocation,
@@ -175,19 +176,15 @@ function WorkspaceTopRight({
   );
 }
 
-export function Workspace({
+const DEFAULT_LAYOUT: WorkspaceLayoutDefaults = {};
+
+function useWorkspaceLayout({
   panes,
   value,
-  defaultValue = {},
+  defaultValue = DEFAULT_LAYOUT,
   onValueChange,
   storageKey,
-  slots,
-  collapsedSides,
-  sideArrangement,
-  maximizable = true,
-  className,
-}: WorkspaceProps) {
-  validateWorkspacePanes(panes, sideArrangement);
+}: Pick<WorkspaceProps, "panes" | "value" | "defaultValue" | "onValueChange" | "storageKey">) {
   if (value !== undefined && storageKey !== undefined) {
     throw new Error("Workspace cannot combine value with storageKey");
   }
@@ -196,44 +193,27 @@ export function Workspace({
       ? readWorkspaceLayoutState(storageKey, panes, defaultValue)
       : createWorkspaceLayoutState(panes, defaultValue),
   );
-  const [topRightReserve, setTopRightReserve] = useState(0);
-  const [maximized, setMaximized] = useState(false);
-  useEffect(() => {
-    if (!maximized) return;
-    const restoreOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !event.defaultPrevented)
-        setMaximized(false);
-    };
-    window.addEventListener("keydown", restoreOnEscape);
-    return () => window.removeEventListener("keydown", restoreOnEscape);
-  }, [maximized]);
-  const seenLocations = useRef(new Set(panes.map((pane) => pane.location)));
-  const seenPaneIds = useRef(new Set(panes.map((pane) => pane.id)));
+  const seenPanes = useRef<{ locations: Set<WorkspacePaneLocation>; ids: Set<string> } | null>(null);
   const state = value ?? internal;
-  const groups = useMemo(
-    () => ({
-      left: panes.filter((pane) => pane.location === "left"),
-      center: panes.find(
-        (pane) => pane.location === "center",
-      ) as WorkspacePaneSpec,
-      right: panes.filter((pane) => pane.location === "right"),
-      bottom: panes.find((pane) => pane.location === "bottom"),
-    }),
-    [panes],
-  );
 
   useLayoutEffect(() => {
+    if (seenPanes.current === null) {
+      seenPanes.current = {
+        locations: new Set(panes.map((pane) => pane.location)),
+        ids: new Set(panes.map((pane) => pane.id)),
+      };
+      return;
+    }
+    const { locations, ids } = seenPanes.current;
     const addedLocations = new Set(
       panes
         .map((pane) => pane.location)
-        .filter((location) => !seenLocations.current.has(location)),
+        .filter((location) => !locations.has(location)),
     );
-    const addedPanes = panes.filter(
-      (pane) => !seenPaneIds.current.has(pane.id),
-    );
+    const addedPanes = panes.filter((pane) => !ids.has(pane.id));
     panes.forEach((pane) => {
-      seenLocations.current.add(pane.location);
-      seenPaneIds.current.add(pane.id);
+      locations.add(pane.location);
+      ids.add(pane.id);
     });
     if (
       value !== undefined ||
@@ -288,6 +268,36 @@ export function Workspace({
     if (storageKey && value === undefined)
       writeWorkspaceLayoutState(storageKey, internal);
   }, [internal, storageKey, value]);
+
+  return { state, update };
+}
+
+export function Workspace(props: WorkspaceProps) {
+  const { panes, slots, collapsedSides, sideArrangement, maximizable = true, className } = props;
+  validateWorkspacePanes(panes, sideArrangement);
+  const { state, update } = useWorkspaceLayout(props);
+  const [topRightReserve, setTopRightReserve] = useState(0);
+  const [maximized, setMaximized] = useState(false);
+  useEffect(() => {
+    if (!maximized) return;
+    const restoreOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented)
+        setMaximized(false);
+    };
+    window.addEventListener("keydown", restoreOnEscape);
+    return () => window.removeEventListener("keydown", restoreOnEscape);
+  }, [maximized]);
+  const groups = useMemo(
+    () => ({
+      left: panes.filter((pane) => pane.location === "left"),
+      center: panes.find(
+        (pane) => pane.location === "center",
+      ) as WorkspacePaneSpec,
+      right: panes.filter((pane) => pane.location === "right"),
+      bottom: panes.find((pane) => pane.location === "bottom"),
+    }),
+    [panes],
+  );
 
   const held = (location: WorkspaceSideLocation) =>
     maximized || (collapsedSides?.includes(location) ?? false);
@@ -357,11 +367,12 @@ export function Workspace({
           update={update}
           reserveTopRight="wide"
         />
-        {groups.bottom && !maximized && (
+        {groups.bottom && (
           <WorkspaceSingleRegion
             pane={groups.bottom}
             state={state}
             update={update}
+            hidden={maximized}
           />
         )}
       </div>

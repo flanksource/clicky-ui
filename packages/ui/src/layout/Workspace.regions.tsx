@@ -396,6 +396,7 @@ type SingleRegionProps = {
   state: WorkspaceLayoutState;
   update: WorkspaceUpdate;
   reserveTopRight?: WorkspaceTopRightReserve;
+  hidden?: boolean;
 };
 
 export function WorkspaceSingleRegion({
@@ -403,6 +404,7 @@ export function WorkspaceSingleRegion({
   state,
   update,
   reserveTopRight,
+  hidden,
 }: SingleRegionProps) {
   const collapsed = state.collapsed[pane.id] ?? false;
   const isBottom = pane.location === "bottom";
@@ -415,9 +417,11 @@ export function WorkspaceSingleRegion({
   return (
     <div
       data-testid={`workspace-region-${pane.location}`}
+      hidden={hidden}
       style={style}
       className={cn(
-        "relative flex min-h-0 min-w-0 flex-col overflow-hidden",
+        "relative min-h-0 min-w-0 flex-col overflow-hidden",
+        hidden ? "hidden" : "flex",
         isBottom
           ? "order-4 w-full border-t border-border @3xl/workspace:order-none @3xl/workspace:col-start-2 @3xl/workspace:row-start-2 @3xl/workspace:h-[var(--workspace-bottom-height)]"
           : "order-1 min-h-80 @3xl/workspace:order-none @3xl/workspace:col-start-2 @3xl/workspace:row-start-1 @3xl/workspace:min-h-0",
